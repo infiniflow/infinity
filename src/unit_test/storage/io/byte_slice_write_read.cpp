@@ -14,9 +14,6 @@ using namespace infinity;
 
 class ByteSliceReaderWriterTest : public BaseTest {
 public:
-    void SetUp() override {}
-    void TearDown() override {}
-
     template <typename T>
     void CheckList(const ByteSliceList *list, u32 num_elem, T value = 0) {
         ASSERT_EQ(num_elem * sizeof(T), list->GetTotalSize());

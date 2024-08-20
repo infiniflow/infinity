@@ -23,9 +23,6 @@ public:
 
     ~PositionListDecoderTest() {}
 
-    void SetUp() override {}
-    void TearDown() override {}
-
 protected:
     static constexpr SizeT BUFFER_SIZE_ = 10240;
 };

@@ -21,6 +21,7 @@ import file_worker;
 import block_version;
 import infinity_exception;
 import logger;
+import third_party;
 
 namespace infinity {
 
@@ -60,16 +61,21 @@ void VersionFileWorker::FreeInMemory() {
 // FIXME
 SizeT VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTimeStamp); }
 
-void VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &base_ctx) {
     if (data_ == nullptr) {
         String error_message = "Data is not allocated.";
         UnrecoverableError(error_message);
     }
     auto *data = static_cast<BlockVersion *>(data_);
+    TxnTimeStamp latest_change_ts = data->latest_change_ts();
+    
     if (to_spill) {
         data->SpillToFile(*file_handler_);
+        return true;
     } else {
-        data->SaveToFile(checkpoint_ts_, *file_handler_);
+        const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
+        data->SaveToFile(ctx.checkpoint_ts_, *file_handler_);
+        return ctx.checkpoint_ts_ >= latest_change_ts;
     }
 }
 

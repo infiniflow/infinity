@@ -139,6 +139,10 @@ public:
     template <typename DataType, typename IdxType>
     SizeT AppendSparse(const SparseVecRef<DataType, IdxType> &sparse_vec);
 
+    const char *GetMultiVectorRaw(SizeT offset, SizeT size) const;
+
+    SizeT AppendMultiVectorRaw(const char *raw_data, SizeT size);
+
     const char *GetTensorRaw(SizeT offset, SizeT size) const;
 
     SizeT AppendTensorRaw(const char *raw_data, SizeT size);

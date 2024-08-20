@@ -192,7 +192,6 @@ inline bool FloatTryCastToFixlen::Run(FloatT, DecimalT &) {
 // Cast FloatT to varlen type
 template <>
 inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, ColumnVector* vector_ptr) {
-    target.is_value_ = false;
     String tmp_str = std::to_string(source);
     vector_ptr->AppendVarcharInner({tmp_str.data(), tmp_str.size()}, target);
     return true;
@@ -285,7 +284,6 @@ inline bool FloatTryCastToFixlen::Run(DoubleT, DecimalT &) {
 template <>
 inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, ColumnVector* vector_ptr) {
     // TODO: High-performance to_string implementation is needed.
-    target.is_value_ = false;
     String tmp_str = std::to_string(source);
     vector_ptr->AppendVarcharInner({tmp_str.data(), tmp_str.size()}, target);
 

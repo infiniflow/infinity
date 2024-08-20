@@ -48,14 +48,7 @@ public:
             infinity::InfinityContext::instance().Init(config_path);
         }
     }
-    void TearDown() override {
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            if (InfinityContext::instance().persistence_manager() != nullptr) {
-                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
-            }
-            infinity::InfinityContext::instance().UnInit();
-        }
-    }
+
 public:
     struct ExpectedPosting {
         String term;

@@ -92,6 +92,7 @@ VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, Si
         }
         case LogicalType::kSparse:
         case LogicalType::kVarchar:
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
             vector_buffer_type = VectorBufferType::kVarBuffer;
@@ -175,106 +176,110 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
 
         // Copy data from other column vector to here according to the select
         switch (data_type_->type()) {
-            case kBoolean: {
+            case LogicalType::kBoolean: {
                 CopyFrom<BooleanT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kTinyInt: {
+            case LogicalType::kTinyInt: {
                 CopyFrom<TinyIntT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kSmallInt: {
+            case LogicalType::kSmallInt: {
                 CopyFrom<SmallIntT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kInteger: {
+            case LogicalType::kInteger: {
                 CopyFrom<IntegerT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kBigInt: {
+            case LogicalType::kBigInt: {
                 CopyFrom<BigIntT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kHugeInt: {
+            case LogicalType::kHugeInt: {
                 CopyFrom<HugeIntT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kFloat: {
+            case LogicalType::kFloat: {
                 CopyFrom<FloatT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kDouble: {
+            case LogicalType::kDouble: {
                 CopyFrom<DoubleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kFloat16: {
+            case LogicalType::kFloat16: {
                 CopyFrom<Float16T>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kBFloat16: {
+            case LogicalType::kBFloat16: {
                 CopyFrom<BFloat16T>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kDecimal: {
+            case LogicalType::kDecimal: {
                 CopyFrom<DecimalT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kVarchar: {
+            case LogicalType::kVarchar: {
                 CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kTensor: {
+            case LogicalType::kMultiVector: {
+                CopyFrom<MultiVectorT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                break;
+            }
+            case LogicalType::kTensor: {
                 CopyFrom<TensorT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kTensorArray: {
+            case LogicalType::kTensorArray: {
                 CopyFrom<TensorArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
             }
-            case kSparse: {
+            case LogicalType::kSparse: {
                 CopyFrom<SparseT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kDate: {
+            case LogicalType::kDate: {
                 CopyFrom<DateT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kTime: {
+            case LogicalType::kTime: {
                 CopyFrom<TimeT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kDateTime: {
+            case LogicalType::kDateTime: {
                 CopyFrom<DateTimeT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kTimestamp: {
+            case LogicalType::kTimestamp: {
                 CopyFrom<TimestampT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kInterval: {
+            case LogicalType::kInterval: {
                 CopyFrom<IntervalT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kArray: {
+            case LogicalType::kArray: {
                 CopyFrom<ArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kTuple: {
+            case LogicalType::kTuple: {
                 CopyFrom<TupleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kPoint: {
+            case LogicalType::kPoint: {
                 CopyFrom<PointT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kLine: {
+            case LogicalType::kLine: {
                 CopyFrom<LineT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kLineSeg: {
+            case LogicalType::kLineSeg: {
                 CopyFrom<LineSegT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kBox: {
+            case LogicalType::kBox: {
                 CopyFrom<BoxT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
@@ -282,40 +287,40 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 //            }
                 //            case kPolygon: {
                 //            }
-            case kCircle: {
+            case LogicalType::kCircle: {
                 CopyFrom<CircleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
                 //            case kBitmap: {
                 //            }
-            case kUuid: {
+            case LogicalType::kUuid: {
                 CopyFrom<UuidT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
                 //            case kBlob: {
                 //            }
-            case kEmbedding: {
+            case LogicalType::kEmbedding: {
                 CopyFrom<EmbeddingT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kRowID: {
+            case LogicalType::kRowID: {
                 CopyFrom<RowID>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kMixed: {
+            case LogicalType::kMixed: {
                 CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case kEmptyArray:
-            case kNull: {
+            case LogicalType::kEmptyArray:
+            case LogicalType::kNull: {
                 Status status = Status::NotSupport("Not implemented");
                 RecoverableError(status);
             }
-            case kMissing: {
+            case LogicalType::kMissing: {
                 Status status = Status::NotSupport("Not implemented");
                 RecoverableError(status);
             }
-            case kInvalid: {
+            case LogicalType::kInvalid: {
                 String error_message = "Invalid data type";
                 UnrecoverableError(error_message);
             }
@@ -337,107 +342,111 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
         tail_index_ = capacity_;
         // Copy data from other column vector to here according to the range
         switch (data_type_->type()) {
-            case kBoolean: {
+            case LogicalType::kBoolean: {
                 CopyFrom<BooleanT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kTinyInt: {
+            case LogicalType::kTinyInt: {
                 CopyFrom<TinyIntT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kSmallInt: {
+            case LogicalType::kSmallInt: {
                 CopyFrom<SmallIntT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kInteger: {
+            case LogicalType::kInteger: {
                 CopyFrom<IntegerT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kBigInt: {
+            case LogicalType::kBigInt: {
                 CopyFrom<BigIntT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kHugeInt: {
+            case LogicalType::kHugeInt: {
                 CopyFrom<HugeIntT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kFloat: {
+            case LogicalType::kFloat: {
                 CopyFrom<FloatT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kDouble: {
+            case LogicalType::kDouble: {
                 CopyFrom<DoubleT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kFloat16: {
+            case LogicalType::kFloat16: {
                 CopyFrom<Float16T>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kBFloat16: {
+            case LogicalType::kBFloat16: {
                 CopyFrom<BFloat16T>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kDecimal: {
+            case LogicalType::kDecimal: {
                 CopyFrom<DecimalT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kVarchar: {
+            case LogicalType::kVarchar: {
                 CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kTensor: {
+            case LogicalType::kMultiVector: {
+                CopyFrom<MultiVectorT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case LogicalType::kTensor: {
                 CopyFrom<TensorT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kTensorArray: {
+            case LogicalType::kTensorArray: {
                 CopyFrom<TensorArrayT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kSparse: {
+            case LogicalType::kSparse: {
                 CopyFrom<SparseT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kDate: {
+            case LogicalType::kDate: {
                 CopyFrom<DateT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kTime: {
+            case LogicalType::kTime: {
                 CopyFrom<TimeT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kDateTime: {
+            case LogicalType::kDateTime: {
                 CopyFrom<DateTimeT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kTimestamp: {
+            case LogicalType::kTimestamp: {
                 CopyFrom<TimestampT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kInterval: {
+            case LogicalType::kInterval: {
                 CopyFrom<IntervalT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kArray: {
+            case LogicalType::kArray: {
                 CopyFrom<ArrayT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kTuple: {
+            case LogicalType::kTuple: {
                 CopyFrom<TupleT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kPoint: {
+            case LogicalType::kPoint: {
                 CopyFrom<PointT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kLine: {
+            case LogicalType::kLine: {
                 CopyFrom<LineT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kLineSeg: {
+            case LogicalType::kLineSeg: {
                 CopyFrom<LineSegT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kBox: {
+            case LogicalType::kBox: {
                 CopyFrom<BoxT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
@@ -445,27 +454,27 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 //            }
                 //            case kPolygon: {
                 //            }
-            case kCircle: {
+            case LogicalType::kCircle: {
                 CopyFrom<CircleT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
                 //            case kBitmap: {
                 //            }
-            case kUuid: {
+            case LogicalType::kUuid: {
                 CopyFrom<UuidT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
                 //            case kBlob: {
                 //            }
-            case kEmbedding: {
+            case LogicalType::kEmbedding: {
                 CopyFrom<EmbeddingT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kRowID: {
+            case LogicalType::kRowID: {
                 CopyFrom<RowID>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kMixed: {
+            case LogicalType::kMixed: {
                 // BUG1213_1: with no initialize of `this->buffer`, this will cause a segfault
                 // `VectorBuffer` should be `RAII`
 #if 0
@@ -475,16 +484,16 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 Status status = Status::NotSupport("Not implemented");
                 RecoverableError(status);
             }
-            case kEmptyArray:
-            case kNull: {
+            case LogicalType::kEmptyArray:
+            case LogicalType::kNull: {
                 Status status = Status::NotSupport("Not implemented");
                 RecoverableError(status);
             }
-            case kMissing: {
+            case LogicalType::kMissing: {
                 Status status = Status::NotSupport("Not implemented");
                 RecoverableError(status);
             }
-            case kInvalid: {
+            case LogicalType::kInvalid: {
                 String error_message = "Invalid data type";
                 UnrecoverableError(error_message);
             }
@@ -527,107 +536,111 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
         UnrecoverableError(error_message);
     }
     switch (data_type_->type()) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             CopyRowFrom<BooleanT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             CopyRowFrom<TinyIntT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             CopyRowFrom<SmallIntT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             CopyRowFrom<IntegerT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             CopyRowFrom<BigIntT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             CopyRowFrom<HugeIntT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             CopyRowFrom<FloatT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             CopyRowFrom<DoubleT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             CopyRowFrom<Float16T>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             CopyRowFrom<BFloat16T>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             CopyRowFrom<DecimalT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             CopyRowFrom<VarcharT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kTensor: {
+        case LogicalType::kMultiVector: {
+            CopyRowFrom<MultiVectorT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
+        case LogicalType::kTensor: {
             CopyRowFrom<TensorT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kTensorArray: {
+        case LogicalType::kTensorArray: {
             CopyRowFrom<TensorArrayT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kSparse: {
+        case LogicalType::kSparse: {
             CopyRowFrom<SparseT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kDate: {
+        case LogicalType::kDate: {
             CopyRowFrom<DateT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kTime: {
+        case LogicalType::kTime: {
             CopyRowFrom<TimeT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             CopyRowFrom<DateTimeT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             CopyRowFrom<TimestampT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kInterval: {
+        case LogicalType::kInterval: {
             CopyRowFrom<IntervalT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kArray: {
+        case LogicalType::kArray: {
             CopyRowFrom<ArrayT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kTuple: {
+        case LogicalType::kTuple: {
             CopyRowFrom<TupleT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kPoint: {
+        case LogicalType::kPoint: {
             CopyRowFrom<PointT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kLine: {
+        case LogicalType::kLine: {
             CopyRowFrom<LineT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kLineSeg: {
+        case LogicalType::kLineSeg: {
             CopyRowFrom<LineSegT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kBox: {
+        case LogicalType::kBox: {
             CopyRowFrom<BoxT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
@@ -635,40 +648,40 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             //        }
             //        case kPolygon: {
             //        }
-        case kCircle: {
+        case LogicalType::kCircle: {
             CopyRowFrom<CircleT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
             //        case kBitmap: {
             //        }
-        case kUuid: {
+        case LogicalType::kUuid: {
             CopyRowFrom<UuidT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
             //        case kBlob: {
             //        }
-        case kEmbedding: {
+        case LogicalType::kEmbedding: {
             CopyRowFrom<EmbeddingT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kRowID: {
+        case LogicalType::kRowID: {
             CopyRowFrom<RowID>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kMixed: {
+        case LogicalType::kMixed: {
             CopyRowFrom<MixedT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case kEmptyArray:
-        case kNull: {
+        case LogicalType::kEmptyArray:
+        case LogicalType::kNull: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        case kMissing: {
+        case LogicalType::kMissing: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        case kInvalid: {
+        case LogicalType::kInvalid: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
@@ -687,82 +700,82 @@ String ColumnVector::ToString(SizeT row_index) const {
     }
 
     switch (data_type_->type()) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             return buffer_->GetCompactBit(row_index) ? "true" : "false";
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             return std::to_string(((TinyIntT *)data_ptr_)[row_index]);
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             return std::to_string(((SmallIntT *)data_ptr_)[row_index]);
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             return std::to_string(((IntegerT *)data_ptr_)[row_index]);
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             return std::to_string(((BigIntT *)data_ptr_)[row_index]);
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             return std::to_string(((FloatT *)data_ptr_)[row_index]);
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             return std::to_string(((DoubleT *)data_ptr_)[row_index]);
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             return std::to_string(static_cast<float>(((Float16T *)data_ptr_)[row_index]));
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             return std::to_string(static_cast<float>(((BFloat16T *)data_ptr_)[row_index]));
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             Span<const char> data = this->GetVarchar(row_index);
             return {data.data(), data.size()};
         }
-        case kDate: {
+        case LogicalType::kDate: {
             return ((DateT *)data_ptr_)[row_index].ToString();
         }
-        case kTime: {
+        case LogicalType::kTime: {
             return ((TimeT *)data_ptr_)[row_index].ToString();
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             return ((DateTimeT *)data_ptr_)[row_index].ToString();
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             return ((TimestampT *)data_ptr_)[row_index].ToString();
         }
-        case kInterval: {
+        case LogicalType::kInterval: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        case kArray: {
+        case LogicalType::kArray: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        case kTuple: {
+        case LogicalType::kTuple: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        case kPoint: {
+        case LogicalType::kPoint: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        case kLine: {
+        case LogicalType::kLine: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        case kLineSeg: {
+        case LogicalType::kLineSeg: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        case kBox: {
+        case LogicalType::kBox: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
@@ -770,19 +783,19 @@ String ColumnVector::ToString(SizeT row_index) const {
             //        }
             //        case kPolygon: {
             //        }
-        case kCircle: {
+        case LogicalType::kCircle: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
             //        case kBitmap: {
             //        }
-        case kUuid: {
+        case LogicalType::kUuid: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
             //        case kBlob: {
             //        }
-        case kEmbedding: {
+        case LogicalType::kEmbedding: {
             //            RecoverableError(Status::NotSupport("Not implemented"));
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
                 Status status = Status::NotSupport("Not implemented");
@@ -795,42 +808,50 @@ String ColumnVector::ToString(SizeT row_index) const {
             embedding_element.SetNull();
             return embedding_str;
         }
-        case kTensor: {
+        case LogicalType::kMultiVector: {
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
-                String error_message = "Tensor type mismatch with unexpected type_info";
-                UnrecoverableError(error_message);
+                UnrecoverableError("MultiVector type mismatch with unexpected type_info");
+            }
+            const auto embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
+            const auto [raw_data, embedding_num] = GetMultiVectorRaw(row_index);
+            return MultiVectorT::MultiVector2String(raw_data.data(), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+        }
+        case LogicalType::kTensor: {
+            if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
+                UnrecoverableError("Tensor type mismatch with unexpected type_info");
             }
             const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             auto [raw_data, embedding_num] = GetTensorRaw(row_index);
             return TensorT::Tensor2String(raw_data.data(), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
         }
-        case kTensorArray: {
+        case LogicalType::kTensorArray: {
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
-                String error_message = "TensorArray type mismatch with unexpected type_info";
-                UnrecoverableError(error_message);
+                UnrecoverableError("TensorArray type mismatch with unexpected type_info");
             }
             const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             Vector<Pair<Span<const char>, SizeT>> raw_data = GetTensorArrayRaw(row_index);
             return TensorArrayT::TensorArray2String(raw_data, embedding_info->Type(), embedding_info->Dimension());
         }
-        case kSparse: {
+        case LogicalType::kSparse: {
             if (data_type_->type_info()->type() != TypeInfoType::kSparse) {
-                String error_message = "Sparse type mismatch with unexpected sparse_info";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Sparse type mismatch with unexpected sparse_info");
             }
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             const auto [data_span, index_span, nnz] = this->GetSparseRaw(row_index);
             auto res = SparseT::Sparse2String(data_span.data(), index_span.data(), sparse_info->DataType(), sparse_info->IndexType(), nnz);
             return res;
         }
-        case kRowID: {
+        case LogicalType::kRowID: {
             return (((RowID *)data_ptr_)[row_index]).ToString();
         }
-        case kMixed: {
+        case LogicalType::kMixed: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
-        default: {
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kEmptyArray:
+        case LogicalType::kInvalid: {
             String error_message = "Attempt to access an unaccepted type";
             UnrecoverableError(error_message);
             // Null/Missing/Invalid
@@ -856,97 +877,101 @@ Value ColumnVector::GetValue(SizeT index) const {
 
     switch (data_type_->type()) {
 
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             return Value::MakeBool(buffer_->GetCompactBit(index));
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             return Value::MakeTinyInt(((TinyIntT *)data_ptr_)[index]);
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             return Value::MakeSmallInt(((SmallIntT *)data_ptr_)[index]);
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             return Value::MakeInt(((IntegerT *)data_ptr_)[index]);
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             return Value::MakeBigInt(((BigIntT *)data_ptr_)[index]);
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             return Value::MakeHugeInt(((HugeIntT *)data_ptr_)[index]);
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             return Value::MakeFloat(((FloatT *)data_ptr_)[index]);
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             return Value::MakeDouble(((DoubleT *)data_ptr_)[index]);
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             return Value::MakeFloat16(((Float16T *)data_ptr_)[index]);
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             return Value::MakeBFloat16(((BFloat16T *)data_ptr_)[index]);
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             return Value::MakeDecimal(((DecimalT *)data_ptr_)[index], data_type_->type_info());
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             Span<const char> data = this->GetVarchar(index);
             return Value::MakeVarchar(data.data(), data.size());
         }
-        case kDate: {
+        case LogicalType::kDate: {
             return Value::MakeDate(((DateT *)data_ptr_)[index]);
         }
-        case kTime: {
+        case LogicalType::kTime: {
             return Value::MakeTime(((TimeT *)data_ptr_)[index]);
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             return Value::MakeDateTime(((DateTimeT *)data_ptr_)[index]);
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             return Value::MakeTimestamp(((TimestampT *)data_ptr_)[index]);
         }
-        case kInterval: {
+        case LogicalType::kInterval: {
             return Value::MakeInterval(((IntervalT *)data_ptr_)[index]);
         }
-        case kTuple: {
+        case LogicalType::kTuple: {
             String error_message = "Shouldn't access tuple directly, a tuple is flatten as many columns";
             UnrecoverableError(error_message);
         }
-        case kPoint: {
+        case LogicalType::kPoint: {
             return Value::MakePoint(((PointT *)data_ptr_)[index]);
         }
-        case kLine: {
+        case LogicalType::kLine: {
             return Value::MakeLine(((LineT *)data_ptr_)[index]);
         }
-        case kLineSeg: {
+        case LogicalType::kLineSeg: {
             return Value::MakeLineSegment(((LineSegT *)data_ptr_)[index]);
         }
-        case kBox: {
+        case LogicalType::kBox: {
             return Value::MakeBox(((BoxT *)data_ptr_)[index]);
         }
             //        case kPath: {
             //        }
             //        case kPolygon: {
             //        }
-        case kCircle: {
+        case LogicalType::kCircle: {
             return Value::MakeCircle(((CircleT *)data_ptr_)[index]);
         }
             //        case kBitmap: {
             //        }
-        case kUuid: {
+        case LogicalType::kUuid: {
             return Value::MakeUuid(((UuidT *)data_ptr_)[index]);
         }
             //        case kBlob: {
             //        }
-        case kEmbedding: {
+        case LogicalType::kEmbedding: {
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
             return Value::MakeEmbedding(ptr, data_type_->type_info());
         }
-        case kTensor: {
+        case LogicalType::kMultiVector: {
+            const auto [raw_data, embedding_num] = GetMultiVectorRaw(index);
+            return Value::MakeMultiVector(raw_data.data(), raw_data.size(), data_type_->type_info());
+        }
+        case LogicalType::kTensor: {
             auto [raw_data, embedding_num] = this->GetTensorRaw(index);
             return Value::MakeTensor(raw_data.data(), raw_data.size(), data_type_->type_info());
         }
-        case kTensorArray: {
+        case LogicalType::kTensorArray: {
             auto raw_datas = this->GetTensorArrayRaw(index);
             Value value = Value::MakeTensorArray(data_type_->type_info());
             for (const auto &[raw_data, embedding_num] : raw_datas) {
@@ -954,14 +979,19 @@ Value ColumnVector::GetValue(SizeT index) const {
             }
             return value;
         }
-        case kSparse: {
+        case LogicalType::kSparse: {
             auto [data_span, index_span, nnz] = this->GetSparseRaw(index);
             return Value::MakeSparse(data_span.data(), index_span.data(), nnz, data_type_->type_info());
         }
-        case kRowID: {
+        case LogicalType::kRowID: {
             return Value::MakeRow(((RowID *)data_ptr_)[index]);
         }
-        default: {
+        case LogicalType::kArray:
+        case LogicalType::kMixed:
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kEmptyArray:
+        case LogicalType::kInvalid: {
             String error_message = "Attempt to access an unaccepted type";
             UnrecoverableError(error_message);
             // Null/Missing/Invalid
@@ -996,91 +1026,91 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
     // TODO: Check if the value is null, then set the column vector validity.
     switch (data_type_->type()) {
 
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             buffer_->SetCompactBit(index, value.GetValue<BooleanT>());
             break;
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             ((TinyIntT *)data_ptr_)[index] = value.GetValue<TinyIntT>();
             break;
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             ((SmallIntT *)data_ptr_)[index] = value.GetValue<SmallIntT>();
             break;
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             ((IntegerT *)data_ptr_)[index] = value.GetValue<IntegerT>();
             break;
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             ((BigIntT *)data_ptr_)[index] = value.GetValue<BigIntT>();
             break;
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             ((HugeIntT *)data_ptr_)[index] = value.GetValue<HugeIntT>();
             break;
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             ((FloatT *)data_ptr_)[index] = value.GetValue<FloatT>();
             break;
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             ((DoubleT *)data_ptr_)[index] = value.GetValue<DoubleT>();
             break;
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             ((Float16T *)data_ptr_)[index] = value.GetValue<Float16T>();
             break;
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             ((BFloat16T *)data_ptr_)[index] = value.GetValue<BFloat16T>();
             break;
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             ((DecimalT *)data_ptr_)[index] = value.GetValue<DecimalT>();
             break;
         }
-        case kDate: {
+        case LogicalType::kDate: {
             ((DateT *)data_ptr_)[index] = value.GetValue<DateT>();
             break;
         }
-        case kTime: {
+        case LogicalType::kTime: {
             ((TimeT *)data_ptr_)[index] = value.GetValue<TimeT>();
             break;
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             ((DateTimeT *)data_ptr_)[index] = value.GetValue<DateTimeT>();
             break;
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             ((TimestampT *)data_ptr_)[index] = value.GetValue<TimestampT>();
             break;
         }
-        case kInterval: {
+        case LogicalType::kInterval: {
             ((IntervalT *)data_ptr_)[index] = value.GetValue<IntervalT>();
             break;
         }
-        case kArray: {
+        case LogicalType::kArray: {
             ((ArrayT *)data_ptr_)[index] = value.GetValue<ArrayT>();
             break;
         }
-        case kTuple: {
+        case LogicalType::kTuple: {
             String error_message = "Shouldn't store tuple directly, a tuple is flatten as many columns";
             UnrecoverableError(error_message);
         }
-        case kPoint: {
+        case LogicalType::kPoint: {
             ((PointT *)data_ptr_)[index] = value.GetValue<PointT>();
             break;
         }
-        case kLine: {
+        case LogicalType::kLine: {
             ((LineT *)data_ptr_)[index] = value.GetValue<LineT>();
             break;
         }
-        case kLineSeg: {
+        case LogicalType::kLineSeg: {
             ((LineSegT *)data_ptr_)[index] = value.GetValue<LineSegT>();
             break;
         }
-        case kBox: {
+        case LogicalType::kBox: {
             ((BoxT *)data_ptr_)[index] = value.GetValue<BoxT>();
             break;
         }
@@ -1088,35 +1118,42 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             //        }
             //        case kPolygon: {
             //        }
-        case kCircle: {
+        case LogicalType::kCircle: {
             ((CircleT *)data_ptr_)[index] = value.GetValue<CircleT>();
             break;
         }
             //        case kBitmap: {
             //        }
-        case kUuid: {
+        case LogicalType::kUuid: {
             ((UuidT *)data_ptr_)[index] = value.GetValue<UuidT>();
             break;
         }
             //        case kBlob: {
             //        }
-        case kRowID: {
+        case LogicalType::kRowID: {
             ((RowID *)data_ptr_)[index] = value.GetValue<RowID>();
             break;
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             const String &data = value.GetVarchar();
             this->AppendVarcharInner({data.data(), data.size()}, index);
             break;
         }
-        case kTensor: {
+        case LogicalType::kMultiVector: {
+            Span<char> data_span = value.GetEmbedding();
+            MultiVectorT &target_multivec = reinterpret_cast<MultiVectorT *>(data_ptr_)[index];
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
+            ColumnVector::SetMultiVector(target_multivec, buffer_.get(), data_span, embedding_info);
+            break;
+        }
+        case LogicalType::kTensor: {
             Span<char> data_span = value.GetEmbedding();
             TensorT &target_tensor = reinterpret_cast<TensorT *>(data_ptr_)[index];
-            const auto *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
             ColumnVector::SetTensor(target_tensor, buffer_.get(), data_span, embedding_info);
             break;
         }
-        case kTensorArray: {
+        case LogicalType::kTensorArray: {
             TensorArrayT &target_tensor_array = reinterpret_cast<TensorArrayT *>(data_ptr_)[index];
             const auto &value_tensor_array = value.GetTensorArray();
             Vector<Span<const char>> data;
@@ -1124,16 +1161,16 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
                 Span<const char> raw_data = tensor_data->GetData();
                 data.emplace_back(raw_data);
             }
-            const auto *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
             ColumnVector::SetTensorArray(target_tensor_array, buffer_.get(), data, embedding_info);
             break;
         }
-        case kSparse: {
+        case LogicalType::kSparse: {
             auto [source_nnz, source_indice, source_data] = value.GetSparse();
             AppendSparseRaw(source_data.data(), source_indice.data(), source_nnz, index);
             break;
         }
-        case kEmbedding: {
+        case LogicalType::kEmbedding: {
             Span<char> data_span = value.GetEmbedding();
             const_ptr_t src_ptr = data_span.data();
             SizeT src_size = data_span.size();
@@ -1147,10 +1184,13 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             std::memcpy(dst_ptr, src_ptr, src_size);
             break;
         }
-        case kEmptyArray: {
+        case LogicalType::kEmptyArray: {
             break;
         }
-        default: {
+        case LogicalType::kMixed:
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kInvalid: {
             String error_message = "Attempt to access an unaccepted type";
             UnrecoverableError(error_message);
             // Null/Missing/Invalid
@@ -1187,95 +1227,95 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
 
     switch (data_type_->type()) {
 
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             buffer_->SetCompactBit(index, *(BooleanT *)(raw_ptr));
             break;
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             ((TinyIntT *)data_ptr_)[index] = *(TinyIntT *)(raw_ptr);
             break;
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             ((SmallIntT *)data_ptr_)[index] = *(SmallIntT *)(raw_ptr);
             break;
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             ((IntegerT *)data_ptr_)[index] = *(IntegerT *)(raw_ptr);
             break;
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             ((BigIntT *)data_ptr_)[index] = *(BigIntT *)(raw_ptr);
             break;
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             ((HugeIntT *)data_ptr_)[index] = *(HugeIntT *)(raw_ptr);
             break;
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             ((FloatT *)data_ptr_)[index] = *(FloatT *)(raw_ptr);
             break;
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             ((Float16T *)data_ptr_)[index] = *(Float16T *)(raw_ptr);
             break;
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             ((BFloat16T *)data_ptr_)[index] = *(BFloat16T *)(raw_ptr);
             break;
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             ((DoubleT *)data_ptr_)[index] = *(DoubleT *)(raw_ptr);
             break;
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             ((DecimalT *)data_ptr_)[index] = *(DecimalT *)(raw_ptr);
             break;
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             String error_message = "Cannot SetByRawPtr to Varchar.";
             UnrecoverableError(error_message);
         }
-        case kDate: {
+        case LogicalType::kDate: {
             ((DateT *)data_ptr_)[index] = *(DateT *)(raw_ptr);
             break;
         }
-        case kTime: {
+        case LogicalType::kTime: {
             ((TimeT *)data_ptr_)[index] = *(TimeT *)(raw_ptr);
             break;
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             ((DateTimeT *)data_ptr_)[index] = *(DateTimeT *)(raw_ptr);
             break;
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             ((TimestampT *)data_ptr_)[index] = *(TimestampT *)(raw_ptr);
             break;
         }
-        case kInterval: {
+        case LogicalType::kInterval: {
             ((IntervalT *)data_ptr_)[index] = *(IntervalT *)(raw_ptr);
             break;
         }
-        case kArray: {
+        case LogicalType::kArray: {
             ((ArrayT *)data_ptr_)[index] = *(ArrayT *)(raw_ptr);
             break;
         }
-        case kTuple: {
+        case LogicalType::kTuple: {
             String error_message = "Shouldn't store tuple directly, a tuple is flatten as many columns";
             UnrecoverableError(error_message);
         }
-        case kPoint: {
+        case LogicalType::kPoint: {
             ((PointT *)data_ptr_)[index] = *(PointT *)(raw_ptr);
             break;
         }
-        case kLine: {
+        case LogicalType::kLine: {
             ((LineT *)data_ptr_)[index] = *(LineT *)(raw_ptr);
             break;
         }
-        case kLineSeg: {
+        case LogicalType::kLineSeg: {
             ((LineSegT *)data_ptr_)[index] = *(LineSegT *)(raw_ptr);
             break;
         }
-        case kBox: {
+        case LogicalType::kBox: {
             ((BoxT *)data_ptr_)[index] = *(BoxT *)(raw_ptr);
             break;
         }
@@ -1283,45 +1323,52 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             //        }
             //        case kPolygon: {
             //        }
-        case kCircle: {
+        case LogicalType::kCircle: {
             ((CircleT *)data_ptr_)[index] = *(CircleT *)(raw_ptr);
             break;
         }
             //        case kBitmap: {
             //        }
-        case kUuid: {
+        case LogicalType::kUuid: {
             ((UuidT *)data_ptr_)[index] = *(UuidT *)(raw_ptr);
             break;
         }
             //        case kBlob: {
             //        }
-        case kTensor: {
+        case LogicalType::kMultiVector: {
+            String error_message = "Cannot SetByRawPtr to MultiVector.";
+            UnrecoverableError(error_message);
+        }
+        case LogicalType::kTensor: {
             String error_message = "Cannot SetByRawPtr to Tensor.";
             UnrecoverableError(error_message);
         }
-        case kTensorArray: {
+        case LogicalType::kTensorArray: {
             String error_message = "Cannot SetByRawPtr to TensorArray.";
             UnrecoverableError(error_message);
         }
-        case kSparse: {
+        case LogicalType::kSparse: {
             String error_message = "Cannot SetByRawPtr to sparse";
             UnrecoverableError(error_message);
         }
-        case kEmbedding: {
+        case LogicalType::kEmbedding: {
             //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
             std::memcpy(ptr, raw_ptr, data_type_->Size());
             break;
         }
-        case kRowID: {
+        case LogicalType::kRowID: {
             ((RowID *)data_ptr_)[index] = *(RowID *)(raw_ptr);
             break;
         }
-        case kMixed: {
+        case LogicalType::kMixed: {
             ((MixedT *)data_ptr_)[index] = *(MixedT *)(raw_ptr);
             break;
         }
-        default: {
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kEmptyArray:
+        case LogicalType::kInvalid: {
             String error_message = "Attempt to access an unaccepted type";
             UnrecoverableError(error_message);
 
@@ -1376,6 +1423,47 @@ Vector<std::string_view> SplitArrayElement(std::string_view data, char delimiter
     return ret;
 }
 
+Vector<std::string_view> SplitTensorElement(std::string_view data, const u32 unit_embedding_dim) {
+    SizeT data_size = data.size();
+    if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
+        Status status = Status::ImportFileFormatError("Tensor data must be surrounded by [ and ]");
+        RecoverableError(status);
+    }
+    bool have_child_embedding = false;
+    for (SizeT i = 1; i < data_size - 1; ++i) {
+        if (data[i] == '[') {
+            have_child_embedding = true;
+            break;
+        }
+    }
+    if (!have_child_embedding) {
+        return SplitArrayElement(data, ',');
+    }
+    std::string_view child_data = data.substr(1, data_size - 2);
+    Vector<std::string_view> ret;
+    size_t bg_id = 0;
+    while (true) {
+        const auto next_bg_id = child_data.find('[', bg_id);
+        if (next_bg_id == std::string_view::npos) {
+            break;
+        }
+        const auto ed_id = child_data.find(']', next_bg_id);
+        if (ed_id == std::string_view::npos) {
+            RecoverableError(Status::ImportFileFormatError("Tensor data member embedding must be surrounded by [ and ]"));
+        }
+        if (const auto check_inner_valid = child_data.find('[', next_bg_id + 1); check_inner_valid < ed_id) {
+            RecoverableError(Status::ImportFileFormatError("Tensor data format invalid: mismatch of inner '[', ']'."));
+        }
+        Vector<std::string_view> sub_result = SplitArrayElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), ',');
+        if (sub_result.size() != unit_embedding_dim) {
+            RecoverableError(Status::ImportFileFormatError("Tensor data member embedding size must be equal to unit embedding dimension."));
+        }
+        ret.insert(ret.end(), sub_result.begin(), sub_result.end());
+        bg_id = ed_id + 1;
+    }
+    return ret;
+}
+
 Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, const u32 unit_embedding_dim) {
     SizeT data_size = data.size();
     if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
@@ -1406,7 +1494,7 @@ Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, 
             Status status = Status::ImportFileFormatError("TensorArray format error");
             RecoverableError(status);
         }
-        auto sub_result = SplitTensorElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), ',', unit_embedding_dim);
+        auto sub_result = SplitTensorElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), unit_embedding_dim);
         ret.emplace_back(std::move(sub_result));
         bg_id = ed_id + 1;
     }
@@ -1418,59 +1506,59 @@ Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, 
 void ColumnVector::AppendByStringView(std::string_view sv) {
     SizeT index = tail_index_++;
     switch (data_type_->type()) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             buffer_->SetCompactBit(index, DataType::StringToValue<BooleanT>(sv));
             break;
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             ((TinyIntT *)data_ptr_)[index] = DataType::StringToValue<TinyIntT>(sv);
             break;
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             ((SmallIntT *)data_ptr_)[index] = DataType::StringToValue<SmallIntT>(sv);
             break;
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             ((IntegerT *)data_ptr_)[index] = DataType::StringToValue<IntegerT>(sv);
             break;
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             ((BigIntT *)data_ptr_)[index] = DataType::StringToValue<BigIntT>(sv);
             break;
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             ((FloatT *)data_ptr_)[index] = DataType::StringToValue<FloatT>(sv);
             break;
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             ((DoubleT *)data_ptr_)[index] = DataType::StringToValue<DoubleT>(sv);
             break;
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             ((Float16T *)data_ptr_)[index] = DataType::StringToValue<Float16T>(sv);
             break;
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             ((BFloat16T *)data_ptr_)[index] = DataType::StringToValue<BFloat16T>(sv);
             break;
         }
-        case kDate: {
+        case LogicalType::kDate: {
             ((DateT *)data_ptr_)[index].FromString(sv);
             break;
         }
-        case kTime: {
+        case LogicalType::kTime: {
             ((TimeT *)data_ptr_)[index].FromString(sv);
             break;
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             ((DateTimeT *)data_ptr_)[index].FromString(sv);
             break;
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             ((TimestampT *)data_ptr_)[index].FromString(sv);
             break;
         }
-        case kEmbedding: {
+        case LogicalType::kEmbedding: {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
             if (embedding_info->Dimension() < ele_str_views.size()) {
@@ -1479,111 +1567,167 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             }
             SizeT dst_off = index * data_type_->Size();
             switch (embedding_info->Type()) {
-                case kElemBit: {
+                case EmbeddingDataType::kElemBit: {
                     AppendEmbedding<BooleanT>(ele_str_views, dst_off);
                     break;
                 }
-                case kElemUInt8: {
+                case EmbeddingDataType::kElemUInt8: {
                     AppendEmbedding<u8>(ele_str_views, dst_off);
                     break;
                 }
-                case kElemInt8: {
+                case EmbeddingDataType::kElemInt8: {
                     AppendEmbedding<TinyIntT>(ele_str_views, dst_off);
                     break;
                 }
-                case kElemInt16: {
+                case EmbeddingDataType::kElemInt16: {
                     AppendEmbedding<SmallIntT>(ele_str_views, dst_off);
                     break;
                 }
-                case kElemInt32: {
+                case EmbeddingDataType::kElemInt32: {
                     AppendEmbedding<IntegerT>(ele_str_views, dst_off);
                     break;
                 }
-                case kElemInt64: {
+                case EmbeddingDataType::kElemInt64: {
                     AppendEmbedding<BigIntT>(ele_str_views, dst_off);
                     break;
                 }
-                case kElemFloat: {
+                case EmbeddingDataType::kElemFloat: {
                     AppendEmbedding<FloatT>(ele_str_views, dst_off);
                     break;
                 }
-                case kElemDouble: {
+                case EmbeddingDataType::kElemDouble: {
                     AppendEmbedding<DoubleT>(ele_str_views, dst_off);
                     break;
                 }
-                case kElemFloat16: {
+                case EmbeddingDataType::kElemFloat16: {
                     AppendEmbedding<Float16T>(ele_str_views, dst_off);
                     break;
                 }
-                case kElemBFloat16: {
+                case EmbeddingDataType::kElemBFloat16: {
                     AppendEmbedding<BFloat16T>(ele_str_views, dst_off);
                     break;
                 }
-                case kElemInvalid: {
+                case EmbeddingDataType::kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
             }
             break;
         }
-        case kTensor: {
+        case LogicalType::kMultiVector: {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             const auto unit_embedding_dim = embedding_info->Dimension();
-            Vector<std::string_view> ele_str_views = SplitTensorElement(sv, ',', unit_embedding_dim);
+            Vector<std::string_view> ele_str_views = SplitTensorElement(sv, unit_embedding_dim);
             if (ele_str_views.size() == 0 or ele_str_views.size() % unit_embedding_dim != 0) {
                 Status status = Status::ImportFileFormatError("Embedding data size is not multiple of tensor unit dimension.");
                 RecoverableError(status);
             }
             SizeT dst_off = index;
             switch (embedding_info->Type()) {
-                case kElemBit: {
+                case EmbeddingDataType::kElemBit: {
+                    AppendMultiVector<BooleanT>(ele_str_views, dst_off, embedding_info);
+                    break;
+                }
+                case EmbeddingDataType::kElemUInt8: {
+                    AppendMultiVector<u8>(ele_str_views, dst_off, embedding_info);
+                    break;
+                }
+                case EmbeddingDataType::kElemInt8: {
+                    AppendMultiVector<TinyIntT>(ele_str_views, dst_off, embedding_info);
+                    break;
+                }
+                case EmbeddingDataType::kElemInt16: {
+                    AppendMultiVector<SmallIntT>(ele_str_views, dst_off, embedding_info);
+                    break;
+                }
+                case EmbeddingDataType::kElemInt32: {
+                    AppendMultiVector<IntegerT>(ele_str_views, dst_off, embedding_info);
+                    break;
+                }
+                case EmbeddingDataType::kElemInt64: {
+                    AppendMultiVector<BigIntT>(ele_str_views, dst_off, embedding_info);
+                    break;
+                }
+                case EmbeddingDataType::kElemFloat: {
+                    AppendMultiVector<FloatT>(ele_str_views, dst_off, embedding_info);
+                    break;
+                }
+                case EmbeddingDataType::kElemDouble: {
+                    AppendMultiVector<DoubleT>(ele_str_views, dst_off, embedding_info);
+                    break;
+                }
+                case EmbeddingDataType::kElemFloat16: {
+                    AppendMultiVector<Float16T>(ele_str_views, dst_off, embedding_info);
+                    break;
+                }
+                case EmbeddingDataType::kElemBFloat16: {
+                    AppendMultiVector<BFloat16T>(ele_str_views, dst_off, embedding_info);
+                    break;
+                }
+                case EmbeddingDataType::kElemInvalid: {
+                    UnrecoverableError("Invalid embedding type");
+                }
+            }
+            break;
+        }
+        case LogicalType::kTensor: {
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            const auto unit_embedding_dim = embedding_info->Dimension();
+            Vector<std::string_view> ele_str_views = SplitTensorElement(sv, unit_embedding_dim);
+            if (ele_str_views.size() == 0 or ele_str_views.size() % unit_embedding_dim != 0) {
+                Status status = Status::ImportFileFormatError("Embedding data size is not multiple of tensor unit dimension.");
+                RecoverableError(status);
+            }
+            SizeT dst_off = index;
+            switch (embedding_info->Type()) {
+                case EmbeddingDataType::kElemBit: {
                     AppendTensor<BooleanT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemUInt8: {
+                case EmbeddingDataType::kElemUInt8: {
                     AppendTensor<u8>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemInt8: {
+                case EmbeddingDataType::kElemInt8: {
                     AppendTensor<TinyIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemInt16: {
+                case EmbeddingDataType::kElemInt16: {
                     AppendTensor<SmallIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemInt32: {
+                case EmbeddingDataType::kElemInt32: {
                     AppendTensor<IntegerT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemInt64: {
+                case EmbeddingDataType::kElemInt64: {
                     AppendTensor<BigIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemFloat: {
+                case EmbeddingDataType::kElemFloat: {
                     AppendTensor<FloatT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemDouble: {
+                case EmbeddingDataType::kElemDouble: {
                     AppendTensor<DoubleT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemFloat16: {
+                case EmbeddingDataType::kElemFloat16: {
                     AppendTensor<Float16T>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemBFloat16: {
+                case EmbeddingDataType::kElemBFloat16: {
                     AppendTensor<BFloat16T>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemInvalid: {
+                case EmbeddingDataType::kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
             }
             break;
         }
-        case kTensorArray: {
+        case LogicalType::kTensorArray: {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             const auto unit_embedding_dim = embedding_info->Dimension();
             Vector<Vector<std::string_view>> ele_str_views = SplitTensorArrayElement(sv, unit_embedding_dim);
@@ -1599,109 +1743,125 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             }
             SizeT dst_off = index;
             switch (embedding_info->Type()) {
-                case kElemBit: {
+                case EmbeddingDataType::kElemBit: {
                     AppendTensorArray<BooleanT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemUInt8: {
+                case EmbeddingDataType::kElemUInt8: {
                     AppendTensorArray<u8>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemInt8: {
+                case EmbeddingDataType::kElemInt8: {
                     AppendTensorArray<TinyIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemInt16: {
+                case EmbeddingDataType::kElemInt16: {
                     AppendTensorArray<SmallIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemInt32: {
+                case EmbeddingDataType::kElemInt32: {
                     AppendTensorArray<IntegerT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemInt64: {
+                case EmbeddingDataType::kElemInt64: {
                     AppendTensorArray<BigIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemFloat: {
+                case EmbeddingDataType::kElemFloat: {
                     AppendTensorArray<FloatT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemDouble: {
+                case EmbeddingDataType::kElemDouble: {
                     AppendTensorArray<DoubleT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemFloat16: {
+                case EmbeddingDataType::kElemFloat16: {
                     AppendTensorArray<Float16T>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemBFloat16: {
+                case EmbeddingDataType::kElemBFloat16: {
                     AppendTensorArray<BFloat16T>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
-                case kElemInvalid: {
+                case EmbeddingDataType::kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
             }
             break;
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             this->AppendVarcharInner(sv, index);
             break;
         }
-        case kSparse: {
+        case LogicalType::kSparse: {
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
             switch (sparse_info->DataType()) {
-                case kElemBit: {
+                case EmbeddingDataType::kElemBit: {
                     AppendSparse<BooleanT>(ele_str_views, index);
                     break;
                 }
-                case kElemUInt8: {
+                case EmbeddingDataType::kElemUInt8: {
                     AppendSparse<u8>(ele_str_views, index);
                     break;
                 }
-                case kElemInt8: {
+                case EmbeddingDataType::kElemInt8: {
                     AppendSparse<TinyIntT>(ele_str_views, index);
                     break;
                 }
-                case kElemInt16: {
+                case EmbeddingDataType::kElemInt16: {
                     AppendSparse<SmallIntT>(ele_str_views, index);
                     break;
                 }
-                case kElemInt32: {
+                case EmbeddingDataType::kElemInt32: {
                     AppendSparse<IntegerT>(ele_str_views, index);
                     break;
                 }
-                case kElemInt64: {
+                case EmbeddingDataType::kElemInt64: {
                     AppendSparse<BigIntT>(ele_str_views, index);
                     break;
                 }
-                case kElemFloat: {
+                case EmbeddingDataType::kElemFloat: {
                     AppendSparse<FloatT>(ele_str_views, index);
                     break;
                 }
-                case kElemDouble: {
+                case EmbeddingDataType::kElemDouble: {
                     AppendSparse<DoubleT>(ele_str_views, index);
                     break;
                 }
-                case kElemFloat16: {
+                case EmbeddingDataType::kElemFloat16: {
                     AppendSparse<Float16T>(ele_str_views, index);
                     break;
                 }
-                case kElemBFloat16: {
+                case EmbeddingDataType::kElemBFloat16: {
                     AppendSparse<BFloat16T>(ele_str_views, index);
                     break;
                 }
-                case kElemInvalid: {
+                case EmbeddingDataType::kElemInvalid: {
                     String error_message = "Invalid sparse type";
                     UnrecoverableError(error_message);
                 }
             }
             break;
         }
-        default: {
+        case LogicalType::kHugeInt:
+        case LogicalType::kDecimal:
+        case LogicalType::kInterval:
+        case LogicalType::kArray:
+        case LogicalType::kTuple:
+        case LogicalType::kPoint:
+        case LogicalType::kLine:
+        case LogicalType::kLineSeg:
+        case LogicalType::kBox:
+        case LogicalType::kCircle:
+        case LogicalType::kUuid:
+        case LogicalType::kRowID:
+        case LogicalType::kMixed:
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kEmptyArray:
+        case LogicalType::kInvalid: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
         }
@@ -1747,51 +1907,51 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
     }
 
     switch (data_type_->type()) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             CopyValue<BooleanT>(*this, other, from, count);
             break;
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             CopyValue<TinyIntT>(*this, other, from, count);
             break;
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             CopyValue<SmallIntT>(*this, other, from, count);
             break;
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             CopyValue<IntegerT>(*this, other, from, count);
             break;
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             CopyValue<BigIntT>(*this, other, from, count);
             break;
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             CopyValue<HugeIntT>(*this, other, from, count);
             break;
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             CopyValue<FloatT>(*this, other, from, count);
             break;
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             CopyValue<DoubleT>(*this, other, from, count);
             break;
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             CopyValue<Float16T>(*this, other, from, count);
             break;
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             CopyValue<BFloat16T>(*this, other, from, count);
             break;
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             CopyValue<DecimalT>(*this, other, from, count);
             break;
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             // Copy string
             auto *base_src_ptr = (VarcharT *)(other.data_ptr_);
             VarcharT *base_dst_ptr = &((VarcharT *)(data_ptr_))[this->tail_index_];
@@ -1802,7 +1962,18 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             }
             break;
         }
-        case kTensor: {
+        case LogicalType::kMultiVector: {
+            auto *base_src_ptr = (MultiVectorT *)(other.data_ptr_);
+            MultiVectorT *base_dst_ptr = ((MultiVectorT *)(data_ptr_)) + this->tail_index_;
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
+            for (SizeT idx = 0; idx < count; ++idx) {
+                const MultiVectorT &src_ref = base_src_ptr[from + idx];
+                MultiVectorT &dst_ref = base_dst_ptr[idx];
+                CopyMultiVector(dst_ref, buffer_.get(), src_ref, other.buffer_.get(), embedding_info);
+            }
+            break;
+        }
+        case LogicalType::kTensor: {
             auto *base_src_ptr = (TensorT *)(other.data_ptr_);
             TensorT *base_dst_ptr = ((TensorT *)(data_ptr_)) + this->tail_index_;
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
@@ -1813,7 +1984,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             }
             break;
         }
-        case kTensorArray: {
+        case LogicalType::kTensorArray: {
             auto *base_src_ptr = (TensorArrayT *)(other.data_ptr_);
             TensorArrayT *base_dst_ptr = ((TensorArrayT *)(data_ptr_)) + this->tail_index_;
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
@@ -1824,7 +1995,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             }
             break;
         }
-        case kSparse: {
+        case LogicalType::kSparse: {
             const auto *base_src_ptr = reinterpret_cast<const SparseT *>(other.data_ptr_);
             auto *base_dst_ptr = reinterpret_cast<SparseT *>(data_ptr_) + this->tail_index_;
             const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
@@ -1835,67 +2006,67 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             }
             break;
         }
-        case kDate: {
+        case LogicalType::kDate: {
             CopyValue<DateT>(*this, other, from, count);
             break;
         }
-        case kTime: {
+        case LogicalType::kTime: {
             CopyValue<TimeT>(*this, other, from, count);
             break;
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             CopyValue<DateTimeT>(*this, other, from, count);
             break;
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             CopyValue<TimestampT>(*this, other, from, count);
             break;
         }
-        case kInterval: {
+        case LogicalType::kInterval: {
             CopyValue<IntervalT>(*this, other, from, count);
             break;
         }
-        case kArray: {
+        case LogicalType::kArray: {
             String error_message = "Array copy";
             UnrecoverableError(error_message);
             break;
         }
-        case kTuple: {
+        case LogicalType::kTuple: {
             String error_message = "Shouldn't store tuple directly, a tuple is flatten as many columns";
             UnrecoverableError(error_message);
             break;
         }
-        case kPoint: {
+        case LogicalType::kPoint: {
             CopyValue<PointT>(*this, other, from, count);
             break;
         }
-        case kLine: {
+        case LogicalType::kLine: {
             CopyValue<LineT>(*this, other, from, count);
             break;
         }
-        case kLineSeg: {
+        case LogicalType::kLineSeg: {
             CopyValue<LineSegT>(*this, other, from, count);
             break;
         }
-        case kBox: {
+        case LogicalType::kBox: {
             CopyValue<BoxT>(*this, other, from, count);
             break;
         }
             //        case kPath: {
             //        }
-        case kCircle: {
+        case LogicalType::kCircle: {
             CopyValue<CircleT>(*this, other, from, count);
             break;
         }
             //        case kBitmap: {
             //        }
-        case kUuid: {
+        case LogicalType::kUuid: {
             CopyValue<UuidT>(*this, other, from, count);
             break;
         }
             //        case kBlob: {
             //        }
-        case kEmbedding: {
+        case LogicalType::kEmbedding: {
             //            auto *base_src_ptr = (EmbeddingT *)(other.data_ptr_);
             auto *base_src_ptr = other.data_ptr_;
             ptr_t base_dst_ptr = data_ptr_ + this->tail_index_ * data_type_->Size();
@@ -1906,15 +2077,18 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             }
             break;
         }
-        case kRowID: {
+        case LogicalType::kRowID: {
             CopyValue<RowID>(*this, other, from, count);
             break;
         }
-        case kMixed: {
+        case LogicalType::kMixed: {
             CopyValue<MixedT>(*this, other, from, count);
             break;
         }
-        default: {
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kEmptyArray:
+        case LogicalType::kInvalid: {
             String error_message = "Attempt to access an unaccepted type";
             UnrecoverableError(error_message);
             // Null/Missing/Invalid
@@ -2122,20 +2296,36 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
 
 //////////////////////////////tensor////////////////////////////////////
 
+void ColumnVector::SetMultiVector(MultiVectorT &dest_multi_vec, VectorBuffer *dest_buffer, Span<const char> data, const EmbeddingInfo *embedding_info) {
+    SizeT unit_embedding_bytes = embedding_info->Size();
+    if (data.size() % unit_embedding_bytes != 0) {
+        UnrecoverableError(fmt::format("Data size {} is not a multiple of embedding size {}", data.size(), unit_embedding_bytes));
+    }
+    const auto embedding_num = data.size() / unit_embedding_bytes;
+    dest_multi_vec.embedding_num_ = embedding_num;
+    dest_multi_vec.file_offset_ = dest_buffer->AppendTensorRaw(data.data(), data.size());
+}
+
+Pair<Span<const char>, SizeT>
+ColumnVector::GetMultiVector(const MultiVectorT &multi_vec, const VectorBuffer *src_buffer, const EmbeddingInfo *embedding_info) {
+    const auto multi_vec_bytes = multi_vec.embedding_num_ * embedding_info->Size();
+    const char *raw_data = src_buffer->GetMultiVectorRaw(multi_vec.file_offset_, multi_vec_bytes);
+    return {Span<const char>(raw_data, multi_vec_bytes), multi_vec.embedding_num_};
+}
+
 void ColumnVector::SetTensor(TensorT &dest_tensor, VectorBuffer *dest_buffer, Span<const char> data, const EmbeddingInfo *embedding_info) {
     SizeT unit_embedding_bytes = embedding_info->Size();
     if (data.size() % unit_embedding_bytes != 0) {
-        String error_message = fmt::format("Data size {} is not a multiple of embedding size {}", data.size(), unit_embedding_bytes);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Data size {} is not a multiple of embedding size {}", data.size(), unit_embedding_bytes));
     }
-    SizeT embedding_num = data.size() / unit_embedding_bytes;
+    const auto embedding_num = data.size() / unit_embedding_bytes;
     dest_tensor.embedding_num_ = embedding_num;
     dest_tensor.file_offset_ = dest_buffer->AppendTensorRaw(data.data(), data.size());
 }
 
 Pair<Span<const char>, SizeT>
 ColumnVector::GetTensor(const TensorT &src_tensor, const VectorBuffer *src_buffer, const EmbeddingInfo *embedding_info) {
-    SizeT tensor_bytes = src_tensor.embedding_num_ * embedding_info->Size();
+    const auto tensor_bytes = src_tensor.embedding_num_ * embedding_info->Size();
     const char *raw_data = src_buffer->GetTensorRaw(src_tensor.file_offset_, tensor_bytes);
     return {Span<const char>(raw_data, tensor_bytes), src_tensor.embedding_num_};
 }
@@ -2178,6 +2368,12 @@ ColumnVector::GetTensorArray(const TensorArrayT &src_tensor_array, const VectorB
         res.emplace_back(raw_data, tensor.embedding_num_);
     }
     return res;
+}
+
+Pair<Span<const char>, SizeT> ColumnVector::GetMultiVectorRaw(SizeT idx) const {
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
+    const MultiVectorT &src_multi_vec = reinterpret_cast<const MultiVectorT *>(data_ptr_)[idx];
+    return ColumnVector::GetMultiVector(src_multi_vec, buffer_.get(), embedding_info);
 }
 
 Pair<Span<const char>, SizeT> ColumnVector::GetTensorRaw(SizeT idx) const {
@@ -2255,7 +2451,6 @@ Span<const char> ColumnVector::GetVarchar(SizeT index) const {
 
 void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT &src_ref, const VectorBuffer *src_vec_buffer) {
     const u32 varchar_len = src_ref.length_;
-    dst_ref.is_value_ = 0;
     dst_ref.length_ = varchar_len;
     if (src_ref.IsInlined()) {
         // Only prefix is enough to contain all string data.
@@ -2265,6 +2460,15 @@ void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT
         dst_ref.vector_.file_offset_ =
             dst_vec_buffer->AppendVarchar(src_vec_buffer->GetVarchar(src_ref.vector_.file_offset_, varchar_len), varchar_len);
     }
+}
+
+void CopyMultiVector(MultiVectorT &dst_ref,
+                     VectorBuffer *dst_vec_buffer,
+                     const MultiVectorT &src_ref,
+                     const VectorBuffer *src_vec_buffer,
+                     const EmbeddingInfo *embedding_info) {
+    auto [raw_data, embedding_num] = ColumnVector::GetMultiVector(src_ref, src_vec_buffer, embedding_info);
+    ColumnVector::SetMultiVector(dst_ref, dst_vec_buffer, raw_data, embedding_info);
 }
 
 void CopyTensor(TensorT &dst_ref,
@@ -2301,50 +2505,6 @@ void CopySparse(SparseT &dst_sparse,
     }
     const auto [raw_data_ptr, raw_idx_ptr] = src_vec_buffer->GetSparseRaw(src_sparse.file_offset_, src_sparse.nnz_, sparse_info);
     dst_sparse.file_offset_ = dst_vec_buffer->AppendSparseRaw(raw_data_ptr, raw_idx_ptr, src_sparse.nnz_, sparse_info);
-}
-
-Vector<std::string_view> SplitTensorElement(std::string_view data, char delimiter, const u32 unit_embedding_dim) {
-    SizeT data_size = data.size();
-    if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
-        Status status = Status::ImportFileFormatError("Tensor data must be surrounded by [ and ]");
-        RecoverableError(status);
-    }
-    bool have_child_embedding = false;
-    for (SizeT i = 1; i < data_size - 1; ++i) {
-        if (data[i] == '[') {
-            have_child_embedding = true;
-            break;
-        }
-    }
-    if (!have_child_embedding) {
-        return SplitArrayElement(data, ',');
-    }
-    std::string_view child_data = data.substr(1, data_size - 2);
-    Vector<std::string_view> ret;
-    size_t bg_id = 0;
-    while (true) {
-        const auto next_bg_id = child_data.find('[', bg_id);
-        if (next_bg_id == std::string_view::npos) {
-            break;
-        }
-        const auto ed_id = child_data.find(']', next_bg_id);
-        if (ed_id == std::string_view::npos) {
-            Status status = Status::ImportFileFormatError("Tensor data member embedding must be surrounded by [ and ]");
-            RecoverableError(status);
-        }
-        if (const auto check_inner_valid = child_data.find('[', next_bg_id + 1); check_inner_valid < ed_id) {
-            Status status = Status::ImportFileFormatError("Tensor data format invalid: mismatch of inner '[', ']'.");
-            RecoverableError(status);
-        }
-        Vector<std::string_view> sub_result = SplitArrayElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), ',');
-        if (sub_result.size() != unit_embedding_dim) {
-            Status status = Status::ImportFileFormatError("Tensor data member embedding size must be equal to unit embedding dimension.");
-            RecoverableError(status);
-        }
-        ret.insert(ret.end(), sub_result.begin(), sub_result.end());
-        bg_id = ed_id + 1;
-    }
-    return ret;
 }
 
 } // namespace infinity

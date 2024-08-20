@@ -54,8 +54,6 @@ class ExternalSortTest : public BaseTest {
 public:
     ExternalSortTest() {}
     ~ExternalSortTest() {}
-    void SetUp() override {}
-    void TearDown() override {}
 
 protected:
     template <class KeyType, class LenType>

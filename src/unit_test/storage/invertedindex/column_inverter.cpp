@@ -50,10 +50,6 @@ public:
     };
 
 public:
-    void SetUp() override {}
-
-    void TearDown() override {}
-
     SharedPtr<PostingWriter> GetOrAddPosting(const String &term) {
         auto it = postings_.find(term);
         if (it != postings_.end()) {

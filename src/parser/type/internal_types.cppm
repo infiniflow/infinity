@@ -74,6 +74,9 @@ export using infinity::Float16T;
 // BF16
 export using infinity::BFloat16T;
 
+// MultiVector
+export using infinity::MultiVectorT;
+
 export using infinity::RowID;
 export using infinity::TimeUnit;
 

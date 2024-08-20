@@ -89,7 +89,7 @@ void HnswFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (!data_) {
         String error_message = "WriteToFileImpl: Data is not allocated.";
         UnrecoverableError(error_message);
@@ -106,6 +106,7 @@ void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         },
         *hnsw_index);
     prepare_success = true;
+    return true;
 }
 
 void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {

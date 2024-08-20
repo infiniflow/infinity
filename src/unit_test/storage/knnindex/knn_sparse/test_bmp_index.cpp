@@ -31,10 +31,6 @@ using namespace infinity;
 
 class BMPIndexTest : public BaseTest {
 protected:
-    void SetUp() override {}
-
-    void TearDown() override {}
-
     template <typename DataType, typename IdxType, BMPCompressType CompressType>
     void TestFunc(u32 block_size) {
         using BMPAlg = BMPAlg<DataType, IdxType, CompressType>;

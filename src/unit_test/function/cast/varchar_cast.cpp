@@ -44,7 +44,6 @@ class VarcharTest : public BaseTest {};
 using namespace infinity;
 
 void InitVarcharAsInline(VarcharT& varchar, const std::string_view sv) {
-    varchar.is_value_ = false;
     varchar.length_ = sv.size();
     if (sv.size() <= VARCHAR_INLINE_LEN) {
         std::memcpy(varchar.short_.data_, sv.data(), sv.size());
