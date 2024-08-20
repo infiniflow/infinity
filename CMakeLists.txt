@@ -127,6 +127,15 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS "-O0 -g")
     set(CMAKE_C_FLAGS "-O0 -g")
 
+    if ("${CODE_COR}" STREQUAL "ON")
+        add_compile_options(--coverage)
+        add_link_options(--coverage)
+    else ()
+        set(CODE_COR "OFF")
+    endif()
+
+    message(STATUS "Code Coverage = ${CODE_COR}")
+
     if(NOT ENABLE_JEMALLOC)
 
         set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
