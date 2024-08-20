@@ -49,6 +49,7 @@ void VarFileWorker::FreeInMemory() {
         UnrecoverableError(error_message);
     }
     auto *buffer = static_cast<VarBuffer *>(data_);
+    buffer_size_ = buffer->TotalSize();
     delete buffer;
     data_ = nullptr;
 }

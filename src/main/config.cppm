@@ -67,7 +67,10 @@ public:
     String LogFileName();
     String LogDir();
     String LogFilePath();
+
+    void SetLogToStdout(bool log_to_stdout);
     bool LogToStdout();
+
     i64 LogFileMaxSize();
     i64 LogFileRotateCount();
 
