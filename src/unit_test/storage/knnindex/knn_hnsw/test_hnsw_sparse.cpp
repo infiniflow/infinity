@@ -73,10 +73,10 @@ protected:
                     continue;
                 }
                 Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
-                if (int(res[0].second) != gt_idx[i]) {
-                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
-                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
-                }
+//                if (int(res[0].second) != gt_idx[i]) {
+//                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
+//                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
+//                }
                 // EXPECT_EQ(res[0].second, gt_idx[i]);
                 // EXPECT_NEAR(-res[0].first, gt_score[i], 1e-5);
             }
@@ -103,10 +103,10 @@ protected:
                     continue;
                 }
                 Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
-                if (int(res[0].second) != gt_idx[i]) {
-                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
-                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
-                }
+//                if (int(res[0].second) != gt_idx[i]) {
+//                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
+//                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
+//                }
                 // EXPECT_EQ(res[0].second, gt_idx[i]);
                 // EXPECT_NEAR(-res[0].first, gt_score[i], 1e-5);
             }

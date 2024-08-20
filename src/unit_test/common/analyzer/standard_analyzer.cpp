@@ -131,10 +131,10 @@ TEST_F(StandardAnalyzerTest, test6) {
     for (auto &query : queries) {
         TermList term_list;
         analyzer.Analyze(query, term_list);
-        std::cout << "Text #" << query << "# parsed as:" << std::endl;
-        for (unsigned i = 0; i < term_list.size(); ++i) {
-            std::cout << "\t" << i << "#" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "#";
-        }
-        std::cout << std::endl;
+//        std::cout << "Text #" << query << "# parsed as:" << std::endl;
+//        for (unsigned i = 0; i < term_list.size(); ++i) {
+//            std::cout << "\t" << i << "#" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "#";
+//        }
+//        std::cout << std::endl;
     }
 }

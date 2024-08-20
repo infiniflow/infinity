@@ -81,7 +81,7 @@ protected:
 
     void TearDown() override {
         // system(tree_cmd.c_str());
-        RemoveDbDirs();
+//        RemoveDbDirs();
     }
 
     String tree_cmd;
@@ -619,7 +619,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
 #endif
     }
     // Restart the db instance
-    system(tree_cmd.c_str());
+//    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -758,7 +758,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 #endif
     }
     // Restart db instance
-    system(tree_cmd.c_str());
+//    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -869,7 +869,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-    system(tree_cmd.c_str());
+//    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -975,7 +975,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-    system(tree_cmd.c_str());
+//    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();

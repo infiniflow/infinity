@@ -34,7 +34,7 @@ TEST_F(IndexBaseTest, ivfflat_readwrite) {
     parameters.emplace_back(new InitParameter("metric", "l2"));
 
     auto index_base = IndexIVFFlat::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
-    std::cout << "index_base: " << index_base->ToString() << std::endl;
+//    std::cout << "index_base: " << index_base->ToString() << std::endl;
     for (auto parameter : parameters) {
         delete parameter;
     }
@@ -49,7 +49,7 @@ TEST_F(IndexBaseTest, ivfflat_readwrite) {
     ptr = buf_beg;
     int32_t maxbytes = exp_size;
     SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr, maxbytes);
-    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
+//    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
     EXPECT_EQ(ptr - buf_beg, exp_size);
     EXPECT_NE(index_base.get(), nullptr);
     EXPECT_EQ(*index_base, *index_base1);
@@ -66,7 +66,7 @@ TEST_F(IndexBaseTest, hnsw_readwrite) {
     parameters.emplace_back(new InitParameter("encode", "plain"));
 
     auto index_base = IndexHnsw::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
-    std::cout << "index_base: " << index_base->ToString() << std::endl;
+//    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
     for (auto parameter : parameters) {
         delete parameter;
@@ -82,7 +82,7 @@ TEST_F(IndexBaseTest, hnsw_readwrite) {
     ptr = buf_beg;
     int32_t maxbytes = exp_size;
     SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr, maxbytes);
-    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
+//    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
     EXPECT_EQ(ptr - buf_beg, exp_size);
     EXPECT_NE(index_base.get(), nullptr);
     EXPECT_EQ(*index_base, *index_base1);
@@ -94,7 +94,7 @@ TEST_F(IndexBaseTest, full_text_readwrite) {
     Vector<String> columns{"col1", "col2"};
     Vector<InitParameter *> parameters;
     auto index_base = IndexFullText::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
-    std::cout << "index_base: " << index_base->ToString() << std::endl;
+//    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
     for (auto parameter : parameters) {
         delete parameter;
@@ -110,7 +110,7 @@ TEST_F(IndexBaseTest, full_text_readwrite) {
     ptr = buf_beg;
     int32_t maxbytes = exp_size;
     SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr, maxbytes);
-    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
+//    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
     EXPECT_EQ(ptr - buf_beg, exp_size);
     EXPECT_NE(index_base.get(), nullptr);
     EXPECT_EQ(*index_base, *index_base1);

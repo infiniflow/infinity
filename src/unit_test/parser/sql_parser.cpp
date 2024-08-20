@@ -109,7 +109,7 @@ TEST_F(SQLParserTest, good_test1) {
 
     for (const String &input : inputs) {
         parser->Parse(input, result.get());
-        std::cout << result->ToString() << std::endl;
+//        std::cout << result->ToString() << std::endl;
         result->Reset();
     }
 }
