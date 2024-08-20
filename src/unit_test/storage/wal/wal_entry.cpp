@@ -37,6 +37,7 @@ import internal_types;
 import column_def;
 import statement_common;
 import data_type;
+import persistence_manager;
 
 class WalEntryTest : public BaseTest {};
 
@@ -241,6 +242,17 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
     }
+    {
+        WalChunkIndexInfo info;
+        info.chunk_id_ = 2;
+        info.base_name_ = "base_name";
+        info.base_rowid_ = RowID(0, 0);
+        info.row_count_ = 4;
+        info.deprecate_ts_ = 0;
+        Vector<WalChunkIndexInfo> chunk_infos{info};
+        Vector<ChunkID> deprecate_ids{0, 1};
+        entry->cmds_.push_back(MakeShared<WalCmdDumpIndex>("db1", "tbl1", "idx1", 0 /*segment_id*/, chunk_infos, deprecate_ids));
+    }
 
     i32 exp_size = entry->GetSizeInBytes();
     Vector<char> buf(exp_size, char(0));
@@ -254,6 +266,33 @@ TEST_F(WalEntryTest, ReadWrite) {
     EXPECT_NE(entry2, nullptr);
     EXPECT_EQ(*entry == *entry2, true);
     EXPECT_EQ(ptr - buf_beg, exp_size);
+}
+
+TEST_F(WalEntryTest, ReadWriteVFS) {
+    RemoveDbDirs();
+    SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
+
+    Vector<String> paths = {"path1", "path2"};
+    String workspace = "workspace";
+    String data_dir = "data_dir";
+    SizeT object_size_limit = 100;
+    PersistenceManager pm(workspace, data_dir, object_size_limit);
+    ObjAddr obj_addr1{.obj_key_ = "key1", .part_offset_ = 0, .part_size_ = 10};
+    pm.SaveLocalPath(paths[0], obj_addr1);
+
+    AddrSerializer addr_serializer;
+    SizeT size = addr_serializer.GetSizeInBytes(&pm, paths);
+    auto buffer = MakeUnique<char[]>(size);
+    char *ptr = buffer.get();
+    addr_serializer.WriteBufAdv(&pm, ptr, paths);
+    SizeT write_size = ptr - buffer.get();
+    ASSERT_EQ(write_size, size);
+
+    char *ptr1 = buffer.get();
+    Vector<String> paths1 = addr_serializer.ReadBufAdv(&pm, ptr1);
+    SizeT read_size = ptr1 - buffer.get();
+    ASSERT_EQ(read_size, size);
+    ASSERT_EQ(paths1, paths);
 }
 
 void Println(const String &message1, const String &message2) { std::cout << message1 << message2 << std::endl; }
