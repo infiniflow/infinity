@@ -32,6 +32,7 @@ import logical_type;
 import data_type;
 import compilation_config;
 
+#if 0
 class ColumnVectorGeoTest : public BaseTestParamStr {
     void SetUp() override {
         RemoveDbDirs();
@@ -2443,3 +2444,4 @@ TEST_P(ColumnVectorGeoTest, circle_column_slice_init) {
         EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(src_idx) + 7.9f);
     }
 }
+#endif

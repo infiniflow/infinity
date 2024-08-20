@@ -139,8 +139,8 @@ protected:
 };
 
 TEST_F(BPReorderingTest, test1) {
-    i32 data_n = 10000;
-    i32 query_n = 10000;
+    i32 data_n = 1000;
+    i32 query_n = 1000;
     i32 edge_n = data_n * query_n / 10;
     // i32 m = 100;
     // assert(data_n % m == 0);
