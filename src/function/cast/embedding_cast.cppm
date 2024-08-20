@@ -52,6 +52,9 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
     if (source.type() == LogicalType::kEmbedding && target.type() == LogicalType::kTensor) {
         return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<EmbeddingT, TensorT, EmbeddingTryCastToVarlen>);
     }
+    if (source.type() == LogicalType::kEmbedding && target.type() == LogicalType::kMultiVector) {
+        return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<EmbeddingT, MultiVectorT, EmbeddingTryCastToVarlen>);
+    }
     if (source.type() == LogicalType::kEmbedding && target.type() == LogicalType::kSparse) {
         auto *sparse_info = static_cast<const SparseInfo *>(target.type_info().get());
         if (sparse_info->DataType() == EmbeddingDataType::kElemBit) {
@@ -252,14 +255,23 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     return true;
 }
 
+export void ColumnVectorSetResult(TensorT &target, auto &&...args) { ColumnVector::SetTensor(target, std::forward<decltype(args)>(args)...); }
+
+export void ColumnVectorSetResult(MultiVectorT &target, auto &&...args) { ColumnVector::SetMultiVector(target, std::forward<decltype(args)>(args)...); }
+
 template <typename TargetValueType, typename SourceValueType>
-void EmbeddingTryCastToTensorImpl(const EmbeddingT &source, const SizeT source_embedding_dim, TensorT &target, ColumnVector *target_vector_ptr) {
+void EmbeddingTryCastToTensorMultiVectorImpl(const EmbeddingT &source,
+                                             const SizeT source_embedding_dim,
+                                             auto &target,
+                                             ColumnVector *target_vector_ptr) {
+    using TargetT = std::decay_t<decltype(target)>;
+    static_assert(std::is_same_v<TargetT, TensorT> || std::is_same_v<TargetT, MultiVectorT>);
     const auto *target_info = static_cast<const EmbeddingInfo *>(target_vector_ptr->data_type()->type_info().get());
     if constexpr (std::is_same_v<TargetValueType, SourceValueType>) {
         const auto source_size =
             std::is_same_v<SourceValueType, BooleanT> ? (source_embedding_dim + 7) / 8 : source_embedding_dim * sizeof(SourceValueType);
         Span<const char> tensor_data = {source.ptr, source_size};
-        ColumnVector::SetTensor(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
+        ColumnVectorSetResult(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
     } else if constexpr (std::is_same_v<TargetValueType, BooleanT>) {
         static_assert(sizeof(bool) == 1);
         const auto target_size = (source_embedding_dim + 7) / 8;
@@ -271,129 +283,109 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source, const SizeT source_e
             }
         }
         Span<const char> tensor_data = {target_tmp_ptr.get(), target_size};
-        ColumnVector::SetTensor(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
+        ColumnVectorSetResult(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
     } else {
         const auto target_size = source_embedding_dim * sizeof(TargetValueType);
         auto target_tmp_ptr = MakeUniqueForOverwrite<TargetValueType[]>(source_embedding_dim);
         if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceValueType *>(source.ptr),
                                            reinterpret_cast<TargetValueType *>(target_tmp_ptr.get()),
                                            source_embedding_dim)) {
-            String error_message = fmt::format("Failed to cast from embedding with type {} to tensor with type {}",
-                                               DataType::TypeToString<SourceValueType>(),
-                                               DataType::TypeToString<TargetValueType>());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to cast from embedding with type {} to tensor with type {}",
+                                           DataType::TypeToString<SourceValueType>(),
+                                           DataType::TypeToString<TargetValueType>()));
         }
         Span<const char> tensor_data = {reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size};
-        ColumnVector::SetTensor(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
+        ColumnVectorSetResult(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
     }
 }
 
-template <typename TargetValueType>
-void EmbeddingTryCastToTensorImpl(const EmbeddingT &source,
-                                  const EmbeddingDataType src_type,
-                                  const SizeT source_embedding_dim,
-                                  TensorT &target,
-                                  ColumnVector *target_vector_ptr) {
-    switch (src_type) {
+template <typename... T>
+void EmbeddingTryCastToTensorMultiVector(const EmbeddingT &source, const SizeT source_embedding_dim, auto &target, ColumnVector *target_vector_ptr) {
+    return EmbeddingTryCastToTensorMultiVectorImpl<T...>(source, source_embedding_dim, target, target_vector_ptr);
+}
+
+template <typename... T>
+void EmbeddingTryCastToTensorMultiVector(const EmbeddingT &source,
+                                         const SizeT source_embedding_dim,
+                                         auto &target,
+                                         ColumnVector *target_vector_ptr,
+                                         const EmbeddingDataType emb_data_type,
+                                         const auto... args) {
+    switch (emb_data_type) {
         case EmbeddingDataType::kElemBit: {
-            EmbeddingTryCastToTensorImpl<TargetValueType, BooleanT>(source, source_embedding_dim, target, target_vector_ptr);
+            EmbeddingTryCastToTensorMultiVector<BooleanT, T...>(source, source_embedding_dim, target, target_vector_ptr, args...);
             break;
         }
         case EmbeddingDataType::kElemUInt8: {
-            EmbeddingTryCastToTensorImpl<TargetValueType, u8>(source, source_embedding_dim, target, target_vector_ptr);
+            EmbeddingTryCastToTensorMultiVector<u8, T...>(source, source_embedding_dim, target, target_vector_ptr, args...);
             break;
         }
         case EmbeddingDataType::kElemInt8: {
-            EmbeddingTryCastToTensorImpl<TargetValueType, TinyIntT>(source, source_embedding_dim, target, target_vector_ptr);
+            EmbeddingTryCastToTensorMultiVector<TinyIntT, T...>(source, source_embedding_dim, target, target_vector_ptr, args...);
             break;
         }
         case EmbeddingDataType::kElemInt16: {
-            EmbeddingTryCastToTensorImpl<TargetValueType, SmallIntT>(source, source_embedding_dim, target, target_vector_ptr);
+            EmbeddingTryCastToTensorMultiVector<SmallIntT, T...>(source, source_embedding_dim, target, target_vector_ptr, args...);
             break;
         }
         case EmbeddingDataType::kElemInt32: {
-            EmbeddingTryCastToTensorImpl<TargetValueType, IntegerT>(source, source_embedding_dim, target, target_vector_ptr);
+            EmbeddingTryCastToTensorMultiVector<IntegerT, T...>(source, source_embedding_dim, target, target_vector_ptr, args...);
             break;
         }
         case EmbeddingDataType::kElemInt64: {
-            EmbeddingTryCastToTensorImpl<TargetValueType, BigIntT>(source, source_embedding_dim, target, target_vector_ptr);
+            EmbeddingTryCastToTensorMultiVector<BigIntT, T...>(source, source_embedding_dim, target, target_vector_ptr, args...);
             break;
         }
         case EmbeddingDataType::kElemFloat: {
-            EmbeddingTryCastToTensorImpl<TargetValueType, FloatT>(source, source_embedding_dim, target, target_vector_ptr);
+            EmbeddingTryCastToTensorMultiVector<FloatT, T...>(source, source_embedding_dim, target, target_vector_ptr, args...);
             break;
         }
         case EmbeddingDataType::kElemDouble: {
-            EmbeddingTryCastToTensorImpl<TargetValueType, DoubleT>(source, source_embedding_dim, target, target_vector_ptr);
+            EmbeddingTryCastToTensorMultiVector<DoubleT, T...>(source, source_embedding_dim, target, target_vector_ptr, args...);
             break;
         }
         case EmbeddingDataType::kElemFloat16: {
-            EmbeddingTryCastToTensorImpl<TargetValueType, Float16T>(source, source_embedding_dim, target, target_vector_ptr);
+            EmbeddingTryCastToTensorMultiVector<Float16T, T...>(source, source_embedding_dim, target, target_vector_ptr, args...);
             break;
         }
         case EmbeddingDataType::kElemBFloat16: {
-            EmbeddingTryCastToTensorImpl<TargetValueType, BFloat16T>(source, source_embedding_dim, target, target_vector_ptr);
+            EmbeddingTryCastToTensorMultiVector<BFloat16T, T...>(source, source_embedding_dim, target, target_vector_ptr, args...);
             break;
         }
         case EmbeddingDataType::kElemInvalid: {
-            String error_message = "Unreachable code";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Unreachable code");
         }
     }
 }
 
-void EmbeddingTryCastToTensor(const EmbeddingT &source,
-                              const EmbeddingDataType src_type,
-                              const SizeT source_embedding_dim,
-                              TensorT &target,
-                              const EmbeddingDataType dst_type,
-                              ColumnVector *target_vector_ptr) {
-    switch (dst_type) {
-        case EmbeddingDataType::kElemBit: {
-            EmbeddingTryCastToTensorImpl<BooleanT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
-            break;
-        }
-        case EmbeddingDataType::kElemUInt8: {
-            EmbeddingTryCastToTensorImpl<u8>(source, src_type, source_embedding_dim, target, target_vector_ptr);
-            break;
-        }
-        case EmbeddingDataType::kElemInt8: {
-            EmbeddingTryCastToTensorImpl<TinyIntT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
-            break;
-        }
-        case EmbeddingDataType::kElemInt16: {
-            EmbeddingTryCastToTensorImpl<SmallIntT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
-            break;
-        }
-        case EmbeddingDataType::kElemInt32: {
-            EmbeddingTryCastToTensorImpl<IntegerT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
-            break;
-        }
-        case EmbeddingDataType::kElemInt64: {
-            EmbeddingTryCastToTensorImpl<BigIntT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
-            break;
-        }
-        case EmbeddingDataType::kElemFloat: {
-            EmbeddingTryCastToTensorImpl<FloatT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
-            break;
-        }
-        case EmbeddingDataType::kElemDouble: {
-            EmbeddingTryCastToTensorImpl<DoubleT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
-            break;
-        }
-        case EmbeddingDataType::kElemFloat16: {
-            EmbeddingTryCastToTensorImpl<Float16T>(source, src_type, source_embedding_dim, target, target_vector_ptr);
-            break;
-        }
-        case EmbeddingDataType::kElemBFloat16: {
-            EmbeddingTryCastToTensorImpl<BFloat16T>(source, src_type, source_embedding_dim, target, target_vector_ptr);
-            break;
-        }
-        case EmbeddingDataType::kElemInvalid: {
-            String error_message = "Unreachable code";
-            UnrecoverableError(error_message);
-        }
+inline bool EmbeddingTryCastToVarlenTensorMultiVector(const EmbeddingT &source,
+                                                      const DataType &source_type,
+                                                      auto &target,
+                                                      const DataType &target_type,
+                                                      ColumnVector *target_vector_ptr) {
+    if (source_type.type() != LogicalType::kEmbedding) {
+        UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
     }
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(source_type.type_info().get());
+    const auto target_embedding_info = static_cast<const EmbeddingInfo *>(target_type.type_info().get());
+    LOG_TRACE(fmt::format("EmbeddingInfo Dimension: {}", embedding_info->Dimension()));
+    const auto source_embedding_dim = embedding_info->Dimension();
+    const auto target_embedding_dim = target_embedding_info->Dimension();
+    if (source_embedding_dim % target_embedding_dim != 0 || source_embedding_dim == 0) {
+        RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
+    }
+    const auto target_tensor_num = source_embedding_dim / target_embedding_dim;
+    target.embedding_num_ = target_tensor_num;
+    if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
+        UnrecoverableError(fmt::format("Tensor / MultiVector column should use kVarBuffer VectorBuffer."));
+    }
+    EmbeddingTryCastToTensorMultiVector<>(source,
+                                          source_embedding_dim,
+                                          target,
+                                          target_vector_ptr,
+                                          embedding_info->Type(),
+                                          target_embedding_info->Type());
+    return true;
 }
 
 template <>
@@ -402,27 +394,16 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           TensorT &target,
                                           const DataType &target_type,
                                           ColumnVector *target_vector_ptr) {
-    if (source_type.type() != LogicalType::kEmbedding) {
-        String error_message = fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString());
-        UnrecoverableError(error_message);
-    }
-    const EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
-    const EmbeddingInfo *target_embedding_info = (EmbeddingInfo *)(target_type.type_info().get());
-    LOG_TRACE(fmt::format("EmbeddingInfo Dimension: {}", embedding_info->Dimension()));
-    const auto source_embedding_dim = embedding_info->Dimension();
-    const auto target_embedding_dim = target_embedding_info->Dimension();
-    if (source_embedding_dim % target_embedding_dim != 0) {
-        Status status = Status::DataTypeMismatch(source_type.ToString(), target_type.ToString());
-        RecoverableError(status);
-    }
-    const auto target_tensor_num = source_embedding_dim / target_embedding_dim;
-    target.embedding_num_ = target_tensor_num;
-    if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
-        String error_message = fmt::format("Tensor column vector should use kVarBuffer VectorBuffer.");
-        UnrecoverableError(error_message);
-    }
-    EmbeddingTryCastToTensor(source, embedding_info->Type(), source_embedding_dim, target, target_embedding_info->Type(), target_vector_ptr);
-    return true;
+    return EmbeddingTryCastToVarlenTensorMultiVector(source, source_type, target, target_type, target_vector_ptr);
+}
+
+template <>
+inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
+                                          const DataType &source_type,
+                                          MultiVectorT &target,
+                                          const DataType &target_type,
+                                          ColumnVector *target_vector_ptr) {
+    return EmbeddingTryCastToVarlenTensorMultiVector(source, source_type, target, target_type, target_vector_ptr);
 }
 
 template <typename IdxT, typename SourceType>

@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -192,8 +193,7 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             return BuildCompact(static_cast<const CompactStatement *>(statement), bind_context_ptr);
         }
         default: {
-            String error_message = "Invalid statement type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Invalid statement type.");
         }
     }
     return Status::OK();
@@ -235,16 +235,14 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     }
 
     if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
-        Status status = Status::NotSupport("Currently, collection isn't supported.");
-        RecoverableError(status);
+        RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
     }
 
     // Create value list
     Vector<Vector<SharedPtr<BaseExpression>>> value_list_array;
     SizeT value_count = statement->values_->size();
     if(value_count > INSERT_BATCH_ROW_LIMIT) {
-        Status status = Status::NotSupport("Insert batch row limit shouldn't more than 8192.");
-        RecoverableError(status);
+        RecoverableError(Status::NotSupport("Insert batch row limit shouldn't more than 8192."));
     }
 
     for (SizeT idx = 0; idx < value_count; ++idx) {
@@ -270,11 +268,10 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         if (statement->columns_ != nullptr) {
             SizeT column_count = statement->columns_->size();
             if (column_count != value_list.size()) {
-                Status status = Status::SyntaxError(fmt::format("INSERT: Target column count ({}) and "
-                                                                "input value count mismatch ({})",
-                                                                column_count,
-                                                                value_list.size()));
-                RecoverableError(status);
+                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Target column count ({}) and "
+                                                                 "input value count mismatch ({})",
+                                                                 column_count,
+                                                                 value_list.size())));
             }
 
             SizeT table_column_count = table_entry->ColumnCount();
@@ -317,11 +314,10 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
                     value_list.emplace_back(value_expr);
                 } else {
-                    Status status = Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
-                                                                    "input value count mismatch ({})",
-                                                                    table_column_count,
-                                                                    column_count));
-                    RecoverableError(status);
+                    RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
+                                                                     "input value count mismatch ({})",
+                                                                     table_column_count,
+                                                                     column_count)));
                 }
 
                 const SharedPtr<DataType> &table_column_type = column_def->column_type_;
@@ -354,11 +350,10 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             }
 
             if (value_list.size() != table_column_count) {
-                Status status = Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
-                                                                "input value count mismatch ({})",
-                                                                table_column_count,
-                                                                value_list.size()));
-                RecoverableError(status);
+                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
+                                                                 "input value count mismatch ({})",
+                                                                 table_column_count,
+                                                                 value_list.size())));
             }
 
             // Create value list with table column size and null value
@@ -940,9 +935,9 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 
     Txn *txn = query_context_ptr_->GetTxn();
 
-    auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
+    auto [table_entry, stat] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    if (!stat.ok()) {
+        RecoverableError(stat);
     }
 
     Vector<u64> column_idx_array;
@@ -1092,8 +1087,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
 
     String to_write_path;
     if (!fs.Exists(statement->file_path_)) {
-        Status status = Status::FileNotFound(statement->file_path_);
-        RecoverableError(status);
+        RecoverableError(Status::FileNotFound(statement->file_path_));
     }
 
     SharedPtr<LogicalNode> logical_import = MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),

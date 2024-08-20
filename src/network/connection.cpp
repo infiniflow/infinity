@@ -263,6 +263,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
             }
             case LogicalType::kTensor:
             case LogicalType::kTensorArray:
+            case LogicalType::kMultiVector:
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
                     String error_message = "Not embedding type";
