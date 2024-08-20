@@ -80,6 +80,7 @@ export struct WalBlockInfo {
     Vector<Pair<u32, u64>> outline_infos_;
     Vector<String> paths_;
     AddrSerializer addr_serializer_;
+    mutable SizeT pm_size_ = 0; // tmp for test. should delete when stable
 
     WalBlockInfo() = default;
 
@@ -124,6 +125,7 @@ export struct WalChunkIndexInfo {
     String base_name_{};
     Vector<String> paths_{};
     AddrSerializer addr_serializer_;
+    mutable SizeT pm_size_; // tmp for test. should delete when stable
     RowID base_rowid_{};
     u32 row_count_{};
     TxnTimeStamp deprecate_ts_{};
