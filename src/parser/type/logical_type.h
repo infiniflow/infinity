@@ -111,10 +111,16 @@ enum LogicalType : int8_t {
 
     kEmptyArray,
 
-    // FP16
+    // extended floating-point types * 2
+    // FP16 (IEEE 754-2008)
+    // std::float16_t will be supported in C++23
     kFloat16,
     // BF16
+    // std::bfloat16_t will be supported in C++23
     kBFloat16,
+
+    // multi-vector type * 1
+    kMultiVector,
 
     kInvalid,
 };

@@ -67,6 +67,7 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
         case kSparse:
         case kTensor:
         case kTensorArray:
+        case kMultiVector:
         case kArray:
         case kTuple: {
 //        case kPath:
@@ -88,7 +89,7 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
 
 std::string DataType::ToString() const {
     if (type_ > kInvalid) {
-        ParserError(fmt::format("Invalid logical data type {}.", int(type_)));
+        ParserError(fmt::format("Invalid logical data type {}.", LogicalType2Str(type_)));
     }
     if (type_info_.get() != nullptr) {
         return fmt::format("{}({})", LogicalType2Str(type_), type_info_->ToString());
@@ -120,17 +121,18 @@ bool DataType::operator!=(const DataType &other) const { return !operator==(othe
 
 size_t DataType::Size() const {
     if (type_ > kInvalid) {
-        ParserError(fmt::format("Invalid logical data type {}.", int(type_)));
+        ParserError(fmt::format("Invalid logical data type {}.", LogicalType2Str(type_)));
     }
-
-    // embedding, varchar data can get data here.
-    if (type_info_ != nullptr and type_ != kTensor and type_ != kTensorArray) {
-        return type_info_->Size();
+    switch (type_) {
+        case LogicalType::kEmbedding:
+        case LogicalType::kSparse: {
+            // embedding type should get size from EmbeddingInfo
+            return type_info_->Size();
+        }
+        default: {
+            return LogicalTypeWidth(type_);
+        }
     }
-
-    // StorageAssert(type_ != kEmbedding && type_ != kVarchar, "This ype should have type info");
-
-    return LogicalTypeWidth(type_);
 }
 
 void DataType::MaxDataType(const DataType &right) {
@@ -191,6 +193,7 @@ int32_t DataType::GetSizeInBytes() const {
                 break;
             case LogicalType::kTensor:
             case LogicalType::kTensorArray:
+            case LogicalType::kMultiVector:
             case LogicalType::kEmbedding:
                 size += sizeof(EmbeddingDataType);
                 size += sizeof(int32_t);
@@ -202,7 +205,7 @@ int32_t DataType::GetSizeInBytes() const {
                 break;
             }
             default:
-                ParserError(fmt::format("Unexpected type {} here.", int(this->type_)));
+                ParserError(fmt::format("Unexpected type {} here.", LogicalType2Str(this->type_)));
         }
     }
     return size;
@@ -240,6 +243,7 @@ void DataType::WriteAdv(char *&ptr) const {
         }
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
+        case LogicalType::kMultiVector:
         case LogicalType::kEmbedding: {
             const EmbeddingInfo *embedding_info = dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
             ParserAssert(embedding_info != nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
@@ -283,6 +287,7 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
         }
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
+        case LogicalType::kMultiVector:
         case LogicalType::kEmbedding: {
             EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
             int32_t dimension = ReadBufAdv<int32_t>(ptr);
@@ -341,6 +346,7 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
             }
             case LogicalType::kTensor:
             case LogicalType::kTensorArray:
+            case LogicalType::kMultiVector:
             case LogicalType::kEmbedding: {
                 type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
                 break;
@@ -543,6 +549,11 @@ std::string DataType::TypeToString<TensorT>() {
 template <>
 std::string DataType::TypeToString<TensorArrayT>() {
     return "TensorArray";
+}
+
+template <>
+std::string DataType::TypeToString<MultiVectorT>() {
+    return "MultiVector";
 }
 
 template <>

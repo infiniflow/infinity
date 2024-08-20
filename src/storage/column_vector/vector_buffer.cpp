@@ -27,6 +27,8 @@ import default_values;
 import logger;
 import third_party;
 import serialize;
+import internal_types;
+import logical_type;
 
 namespace infinity {
 
@@ -289,30 +291,58 @@ void VectorBuffer::CopyCompactBits(u8 *dst_ptr_u8, const u8 *src_ptr_u8, SizeT d
 
 SizeT VectorBuffer::TotalSize(const DataType *data_type) const {
     SizeT size = 0;
-    if (const auto data_t = data_type->type(); data_t == kVarchar || data_t == kSparse || data_t == kTensor or data_t == kTensorArray) {
-        size += sizeof(i32) + var_buffer_mgr_->TotalSize();
+    switch (data_type->type()) {
+        case LogicalType::kVarchar:
+        case LogicalType::kSparse:
+        case LogicalType::kMultiVector:
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray: {
+            size += sizeof(i32) + var_buffer_mgr_->TotalSize();
+            break;
+        }
+        default: {
+            break;
+        }
     }
     return size;
 }
 
 void VectorBuffer::WriteAdv(char *&ptr, const DataType *data_type) const {
-    if (const auto data_t = data_type->type(); data_t == kVarchar || data_t == kSparse || data_t == kTensor or data_t == kTensorArray) {
-        SizeT heap_len = var_buffer_mgr_->TotalSize();
-        WriteBufAdv<i32>(ptr, heap_len);
-        SizeT write_n = var_buffer_mgr_->Write(ptr);
-        if (write_n != heap_len) {
-            String error_message = "Failed to write var buffer";
-            UnrecoverableError(error_message);
+    switch (data_type->type()) {
+        case LogicalType::kVarchar:
+        case LogicalType::kSparse:
+        case LogicalType::kMultiVector:
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray: {
+            const auto heap_len = var_buffer_mgr_->TotalSize();
+            WriteBufAdv<i32>(ptr, heap_len);
+            if (const auto write_n = var_buffer_mgr_->Write(ptr); write_n != heap_len) {
+                UnrecoverableError("Failed to write var buffer");
+            }
+            ptr += heap_len;
+            break;
         }
-        ptr += heap_len;
+        default: {
+            break;
+        }
     }
 }
 
 void VectorBuffer::ReadAdv(char *&ptr, const DataType *data_type) {
-    if (const auto data_t = data_type->type(); data_t == kVarchar || data_t == kSparse || data_t == kTensor or data_t == kTensorArray) {
-        SizeT heap_len = ReadBufAdv<i32>(ptr);
-        [[maybe_unused]] SizeT offset = this->AppendVarchar(ptr, heap_len);
-        ptr += heap_len;
+    switch (data_type->type()) {
+        case LogicalType::kVarchar:
+        case LogicalType::kSparse:
+        case LogicalType::kMultiVector:
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray: {
+            const auto heap_len = ReadBufAdv<i32>(ptr);
+            [[maybe_unused]] SizeT offset = this->AppendVarchar(ptr, heap_len);
+            ptr += heap_len;
+            break;
+        }
+        default: {
+            break;
+        }
     }
 }
 
@@ -343,6 +373,10 @@ SizeT VectorBuffer::AppendSparseRaw(const char *raw_data, const char *raw_idx, S
     }
     return file_offset;
 }
+
+const char *VectorBuffer::GetMultiVectorRaw(SizeT offset, SizeT size) const { return var_buffer_mgr_->Get(offset, size); }
+
+SizeT VectorBuffer::AppendMultiVectorRaw(const char *raw_data, SizeT size) { return var_buffer_mgr_->Append(raw_data, size); }
 
 const char *VectorBuffer::GetTensorRaw(SizeT offset, SizeT size) const { return var_buffer_mgr_->Get(offset, size); }
 

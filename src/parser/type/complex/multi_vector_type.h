@@ -12,46 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+#pragma once
 
-export module varchar_layout;
-
-
-import stl;
-import internal_types;
+#include "tensor_type.h"
 
 namespace infinity {
-// TODO shenyushi: Is this file in an appropriate location?
 
 #pragma pack(1)
 
-export struct VarcharLayout {
-    u64 is_value_:1{};
-    u64 length_:23{};
+struct MultiVectorType {
+    uint64_t embedding_num_ : 16 = 0;
+    uint64_t file_offset_ : 48 = 0;
 
-    struct ShortInfo {
-        Array<char_t, VARCHAR_INLINE_LEN> data{};
-    };
-
-    struct LongInfo {
-        Array<char_t, VARCHAR_PREFIX_LEN> prefix_{};
-
-        u16 file_idx_{};
-
-        u16 _gap_{};
-
-        u32 file_offset_{};
-    };
-
-    static_assert(sizeof(ShortInfo) == sizeof(LongInfo));
-
-    union {
-        ShortInfo short_info_;
-        LongInfo long_info_;
-    } u;
+    [[nodiscard]] static std::string MultiVector2String(const char *multivec_ptr, EmbeddingDataType type, size_t embedding_dim, size_t embedding_num) {
+        return TensorType::Tensor2String(multivec_ptr, type, embedding_dim, embedding_num);
+    }
 };
 
-static_assert(sizeof(VarcharLayout) == sizeof(VarcharT));
+static_assert(sizeof(MultiVectorType) == sizeof(uint64_t));
 
 #pragma pack()
 
