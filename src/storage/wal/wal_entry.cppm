@@ -25,6 +25,7 @@ import stl;
 import statement_common;
 import infinity_exception;
 import internal_types;
+import persistence_manager;
 
 namespace infinity {
 
@@ -78,8 +79,7 @@ export struct WalBlockInfo {
     u16 row_capacity_{};
     Vector<Pair<u32, u64>> outline_infos_;
     Vector<String> paths_;
-
-    mutable SizeT pm_size_{}; // tmp member for test
+    AddrSerializer addr_serializer_;
 
     WalBlockInfo() = default;
 
@@ -123,6 +123,7 @@ export struct WalChunkIndexInfo {
     ChunkID chunk_id_{};
     String base_name_{};
     Vector<String> paths_{};
+    AddrSerializer addr_serializer_;
     RowID base_rowid_{};
     u32 row_count_{};
     TxnTimeStamp deprecate_ts_{};

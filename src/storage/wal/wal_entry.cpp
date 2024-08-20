@@ -71,8 +71,7 @@ i32 WalBlockInfo::GetSizeInBytes() const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm_size_ = pm->GetSizeInBytes(paths_);
-        size += pm_size_;
+        size += addr_serializer_.GetSizeInBytes(pm, paths_);
     }
     return size;
 }
@@ -89,13 +88,7 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        char *start = buf;
-        pm->WriteBufAdv(buf, paths_);
-        SizeT pm_size = buf - start;
-        if (pm_size != pm_size_) {
-            String error_message = fmt::format("PersistenceManager size mismatch: expected {}, actual {}", pm_size_, pm_size);
-            UnrecoverableError(error_message);
-        }
+        addr_serializer_.WriteBufAdv(pm, buf, paths_);
     }
 }
 
@@ -115,7 +108,7 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ReadBufAdv(ptr);
+        block_info.paths_ = block_info.addr_serializer_.ReadBufAdv(pm, ptr);
     }
     return block_info;
 }
@@ -232,7 +225,7 @@ i32 WalChunkIndexInfo::GetSizeInBytes() const {
     bool use_object_cache = pm != nullptr;
     SizeT size = 0;
     if (use_object_cache) {
-        size = pm->GetSizeInBytes(paths_);
+        size += addr_serializer_.GetSizeInBytes(pm, paths_);
     }
     return size + sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);
 }
@@ -247,7 +240,7 @@ void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->WriteBufAdv(buf, paths_);
+        addr_serializer_.WriteBufAdv(pm, buf, paths_);
     }
 }
 
@@ -262,7 +255,7 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ReadBufAdv(ptr);
+        chunk_index_info.paths_ = chunk_index_info.addr_serializer_.ReadBufAdv(pm, ptr);
     }
     return chunk_index_info;
 }

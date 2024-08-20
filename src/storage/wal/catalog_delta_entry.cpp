@@ -87,7 +87,7 @@ SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        size += pm->GetSizeInBytes(GetFilePaths());
+        size += addr_serializer_.GetSizeInBytes(pm, GetFilePaths());
     }
     return size;
 }
@@ -102,7 +102,7 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->WriteBufAdv(buf, GetFilePaths());
+        addr_serializer_.WriteBufAdv(pm, buf, GetFilePaths());
     }
 }
 
@@ -116,7 +116,7 @@ void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ReadBufAdv(ptr);
+        addr_serializer_.ReadBufAdv(pm, ptr); // discard return value
     }
 }
 
