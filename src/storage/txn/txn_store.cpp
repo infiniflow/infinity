@@ -314,7 +314,7 @@ bool TxnTableStore::CheckConflict(Catalog *catalog, Txn *txn) const {
         if (auto *segment_entry = table_entry_->GetSegmentEntry(segment_id); segment_entry != nullptr) {
             for (const auto &[block_id, block_offsets] : block_map) {
                 if (auto block_entry = segment_entry->GetBlockEntryByID(block_id); block_entry.get() != nullptr) {
-                    if (block_entry->CheckDeleteConflict(block_offsets)) {
+                    if (block_entry->CheckDeleteConflict(block_offsets, txn->CommitTS())) {
                         return true;
                     }
                 }

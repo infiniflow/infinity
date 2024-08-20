@@ -1345,6 +1345,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                     }
                     break;
                 }
+                case LogicalType::kMultiVector:
                 case LogicalType::kTensor:
                 case LogicalType::kTensorArray: {
                     // build ConstantExpr
@@ -1856,7 +1857,7 @@ ParquetTensorHandler(SharedPtr<arrow::ListArray> list_array, const EmbeddingInfo
 } // namespace
 
 void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx) {
-    switch (column_vector.data_type()->type()) {
+    switch (const auto column_data_logical_type = column_vector.data_type()->type(); column_data_logical_type) {
         case LogicalType::kBoolean: {
             auto value = std::dynamic_pointer_cast<arrow::BooleanArray>(array)->Value(value_idx);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
@@ -2039,18 +2040,25 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             }
             break;
         }
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor: {
-            const auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(column_vector.data_type()->type_info());
+            auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(column_vector.data_type()->type_info());
             auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
             if (list_array.get() == nullptr) {
                 RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
             Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(list_array, embedding_info.get(), value_idx);
             Vector<Pair<ptr_t, SizeT>> embedding_data;
-            for (auto &data : embedding_vec) {
-                embedding_data.push_back({data.first.get(), data.second});
+            for (const auto &[data_ptr, data_bytes] : embedding_vec) {
+                embedding_data.emplace_back(data_ptr.get(), data_bytes);
             }
-            column_vector.AppendValue(Value::MakeTensor(embedding_data, embedding_info));
+            if (column_data_logical_type == LogicalType::kMultiVector) {
+                column_vector.AppendValue(Value::MakeMultiVector(embedding_data, std::move(embedding_info)));
+            } else if (column_data_logical_type == LogicalType::kTensor) {
+                column_vector.AppendValue(Value::MakeTensor(embedding_data, std::move(embedding_info)));
+            } else {
+                UnrecoverableError("Unhandled case.");
+            }
             break;
         }
         case LogicalType::kTensorArray: {

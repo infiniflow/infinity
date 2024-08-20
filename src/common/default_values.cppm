@@ -62,7 +62,6 @@ export {
 
     // Each row has one chunk.
     constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L; // 1MB
-    constexpr u64 DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE = 8192UL * 128UL * 8UL;
 
     // segment related constants
     constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 1024 * 8192; // 1024 * 8192 = 8M rows

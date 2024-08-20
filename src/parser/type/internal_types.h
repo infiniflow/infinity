@@ -29,9 +29,10 @@
 #include "type/geo/box_type.h"
 #include "type/geo/circle_type.h"
 #include "type/complex/embedding_type.h"
-#include "type/complex/tensor_type.h"
 #include "type/complex/sparse_type.h"
+#include "type/complex/tensor_type.h"
 #include "type/complex/tensor_array_type.h"
+#include "type/complex/multi_vector_type.h"
 #include "type/complex/row_id.h"
 #include "type/complex/varchar.h"
 #include "type/complex/uuid_type.h"
@@ -107,5 +108,8 @@ using EmptyArrayT = std::nullptr_t;
 using Float16T = float16_t;
 // BF16
 using BFloat16T = bfloat16_t;
+
+// MultiVector
+using MultiVectorT = MultiVectorType;
 
 }

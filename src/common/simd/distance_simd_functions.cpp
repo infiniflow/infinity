@@ -27,6 +27,17 @@ module;
 #define IMPRECISE_FUNCTION_END
 #define IMPRECISE_LOOP
 #endif
+IMPRECISE_FUNCTION_BEGIN
+float fvec_L2sqr(const float *x, const float *y, const size_t d) {
+    float res = 0.0f;
+    IMPRECISE_LOOP
+    for (size_t i = 0; i < d; ++i) {
+        const float tmp = x[i] - y[i];
+        res += tmp * tmp;
+    }
+    return res;
+}
+IMPRECISE_FUNCTION_END
 */
 
 module distance_simd_functions;

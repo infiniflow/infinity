@@ -85,6 +85,9 @@ static const char *type2name[] = {
     // BF16
     "BFloat16",
 
+    // multi-vector
+    "MultiVector",
+
     "Invalid",
 };
 
@@ -152,6 +155,9 @@ std::unordered_map<std::string, LogicalType> name2type = {
     {"float16", LogicalType::kFloat16},
     // BF16
     {"bfloat16", LogicalType::kBFloat16},
+
+    // multi-vector
+    {"multivector", LogicalType::kMultiVector},
 
     { "invalid" , LogicalType::kInvalid },
 };
@@ -222,6 +228,8 @@ static int64_t type_size[] = {
 
     2, // Float16
     2, // BFloat16
+
+    8, // MultiVector
 
     0, // Invalid
 };

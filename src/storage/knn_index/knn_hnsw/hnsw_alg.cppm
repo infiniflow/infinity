@@ -139,14 +139,16 @@ private:
 
         data_store_.PrefetchVec(enter_point);
         // enter_point will not be added to result_handler, the distance is not used
-        auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_.vec_store_meta());
-        candidate.emplace(-dist, enter_point);
-        if constexpr (!std::is_same_v<Filter, NoneType>) {
-            if (filter(GetLabel(enter_point))) {
+        {
+            auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_.vec_store_meta());
+            candidate.emplace(-dist, enter_point);
+            if constexpr (!std::is_same_v<Filter, NoneType>) {
+                if (filter(GetLabel(enter_point))) {
+                    result_handler.AddResult(0, dist, enter_point);
+                }
+            } else {
                 result_handler.AddResult(0, dist, enter_point);
             }
-        } else {
-            result_handler.AddResult(0, dist, enter_point);
         }
 
         SizeT cur_vec_num = data_store_.cur_vec_num();
@@ -175,8 +177,8 @@ private:
                 visited[n_idx] = true;
                 if (prefetch_start >= 0) {
                     int lower = std::max(0, prefetch_start - prefetch_step_);
-                    for (int i = prefetch_start; i >= lower; --i) {
-                        VertexType prefetch_idx = neighbors_p[i];
+                    for (int j = prefetch_start; j >= lower; --j) {
+                        VertexType prefetch_idx = neighbors_p[j];
                         data_store_.PrefetchVec(prefetch_idx);
                     }
                     prefetch_start -= prefetch_step_;

@@ -50,10 +50,7 @@ public:
 
     SizeT Write(char *ptr, SizeT offset, SizeT size) const;
 
-    SizeT TotalSize() const {
-        std::shared_lock lock(mtx_);
-        return buffer_size_prefix_sum_.back();
-    }
+    SizeT TotalSize() const;
 
 private:
     mutable std::shared_mutex mtx_;

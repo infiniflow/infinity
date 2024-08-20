@@ -134,6 +134,11 @@ public:
 
     static SharedPtr<EmbeddingValueInfo> MakeTensorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes);
 
+    // Also used for multivector info
+    static SharedPtr<EmbeddingValueInfo> MakeMultiVectorValueInfo(const_ptr_t ptr, SizeT bytes);
+
+    static SharedPtr<EmbeddingValueInfo> MakeMultiVectorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes);
+
     Span<char> GetData() const { return {data_.get(), len_}; }
 
 private:
@@ -267,6 +272,10 @@ public:
     }
 
     static Value MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr);
+
+    static Value MakeMultiVector(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
+
+    static Value MakeMultiVector(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr);
 
     static Value MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
 

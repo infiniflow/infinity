@@ -1792,6 +1792,17 @@ String Config::LogFilePath() {
     return fmt::format("{}/{}", global_options_.GetStringValue(GlobalOptionIndex::kLogDir), global_options_.GetStringValue(GlobalOptionIndex::kLogFileName));
 }
 
+void Config::SetLogToStdout(bool log_to_stdout) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogToStdout);
+    if (base_option->data_type_ != BaseOptionDataType::kBoolean) {
+        String error_message = "Attempt to set bool value to log to stdout data type option";
+        UnrecoverableError(error_message);
+    }
+    BooleanOption *log_to_stdout_option = static_cast<BooleanOption *>(base_option);
+    log_to_stdout_option->value_ = log_to_stdout;
+}
+
 bool Config::LogToStdout() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetBoolValue(GlobalOptionIndex::kLogToStdout);
