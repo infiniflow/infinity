@@ -20,7 +20,6 @@ import buffer_handle;
 import buffer_manager;
 import infinity_exception;
 import logger;
-import var_file_worker;
 import third_party;
 import logger;
 import file_worker_type;
@@ -111,7 +110,11 @@ bool BufferObj::Free() {
         }
         case BufferType::kEphemeral: {
             type_ = BufferType::kTemp;
-            file_worker_->WriteToFile(true);
+            bool all_save = file_worker_->WriteToFile(true);
+            if (!all_save) {
+                String error_message = fmt::format("Spill to file failed: {}", GetFilename());
+                UnrecoverableError(error_message);
+            }
             buffer_mgr_->AddTemp(this);
             break;
         }
@@ -121,7 +124,7 @@ bool BufferObj::Free() {
     return true;
 }
 
-bool BufferObj::Save() {
+bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     bool write = false;
     std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kEphemeral) {
@@ -129,7 +132,10 @@ bool BufferObj::Save() {
             case BufferStatus::kLoaded:
             case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
-                file_worker_->WriteToFile(false);
+                bool all_save = file_worker_->WriteToFile(false, ctx);
+                if (all_save) {
+                    type_ = BufferType::kPersistent;
+                }
                 write = true;
                 break;
             }
@@ -147,8 +153,8 @@ bool BufferObj::Save() {
         LOG_TRACE(fmt::format("BufferObj::Move file: {}", GetFilename()));
         buffer_mgr_->MoveTemp(this);
         file_worker_->MoveFile();
+        type_ = BufferType::kPersistent;
     }
-    type_ = BufferType::kPersistent;
     return write;
 }
 
@@ -240,14 +246,12 @@ bool BufferObj::AddBufferSize(SizeT add_size) {
     if (file_worker_->Type() != FileWorkerType::kVarFile) {
         UnrecoverableError("Invalid file worker type");
     }
-    auto *var_file_worker = static_cast<VarFileWorker *>(file_worker_.get());
 
     bool free_success = buffer_mgr_->RequestSpace(add_size);
     if (!free_success) {
         String warn_msg = fmt::format("Request memory {} failed, current memory usage: {}", add_size, buffer_mgr_->memory_usage());
         LOG_WARN(warn_msg);
     }
-    var_file_worker->AddBufferSize(add_size);
     return free_success;
 }
 

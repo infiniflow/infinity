@@ -153,7 +153,7 @@ public:
 
     void CheckRowsVisible(Bitmask &segment_offsets, TxnTimeStamp check_ts) const;
 
-    bool CheckDeleteConflict(const Vector<BlockOffset> &block_offsets) const;
+    bool CheckDeleteConflict(const Vector<BlockOffset> &block_offsets, TxnTimeStamp commit_ts) const;
 
     void SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const;
 

@@ -24,6 +24,8 @@ import persistence_manager;
 
 namespace infinity {
 
+export struct FileWorkerSaveCtx {};
+
 export class FileWorker {
 public:
     // spill_dir_ is not init here
@@ -33,7 +35,7 @@ public:
     virtual ~FileWorker();
 
 public:
-    void WriteToFile(bool to_spill);
+    [[nodiscard]] bool WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx = {});
 
     void ReadFromFile(bool from_spill);
 
@@ -62,7 +64,7 @@ public:
     void CleanupTempFile() const;
 
 protected:
-    virtual void WriteToFileImpl(bool to_spill, bool &prepare_success) = 0;
+    virtual bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
     virtual void ReadFromFileImpl(SizeT file_size) = 0;
 

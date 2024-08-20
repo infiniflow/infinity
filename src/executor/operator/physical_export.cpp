@@ -528,7 +528,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                         break;
                     }
                     default: {
-                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(buffer_manager));
+                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetConstColumnVector(buffer_manager));
                         if (column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
                             LOG_CRITICAL(error_message);

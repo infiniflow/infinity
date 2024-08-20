@@ -92,6 +92,11 @@ SizeT VarBuffer::Write(char *ptr, SizeT offset, SizeT size) const {
     return size;
 }
 
+SizeT VarBuffer::TotalSize() const {
+    std::shared_lock lock(mtx_);
+    return buffer_size_prefix_sum_.back();
+}
+
 SizeT VarBufferManager::Append(UniquePtr<char[]> data, SizeT size, bool *free_success) {
     auto *buffer = GetInnerMut();
     SizeT offset = buffer->Append(std::move(data), size, free_success);
