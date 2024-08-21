@@ -125,12 +125,12 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
-    if (column_type->type() != kEmbedding) {
+    if (column_type->type() != LogicalType::kEmbedding) {
         Status status = Status::ImportFileFormatError("FVECS file must have only one embedding column.");
         RecoverableError(status);
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-    if (embedding_info->Type() != kElemFloat) {
+    if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
         Status status = Status::ImportFileFormatError("FVECS file must have only one embedding column with float element.");
         RecoverableError(status);
     }
@@ -227,7 +227,7 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
-    if (column_type->type() != kEmbedding) {
+    if (column_type->type() != LogicalType::kEmbedding) {
         Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column.");
         RecoverableError(status);
     }
@@ -373,7 +373,7 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         RecoverableError(status);
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
-    if (column_type->type() != kSparse) {
+    if (column_type->type() != LogicalType::kSparse) {
         Status status = Status::ImportFileFormatError("CSR file must have only one sparse column.");
         RecoverableError(status);
     }

@@ -480,7 +480,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, 
     // two kinds of case statement, please check:
     // https://docs.oracle.com/en/database/oracle/oracle-database/21/lnpls/CASE-statement.html
 
-    DataType return_type{kInvalid};
+    DataType return_type{LogicalType::kInvalid};
     if (expr.expr_) {
         // Simple case
         SharedPtr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr_, bind_context_ptr, depth, false);

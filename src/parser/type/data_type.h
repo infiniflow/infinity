@@ -66,16 +66,16 @@ public:
 
     inline bool IsNumeric() const {
         switch (type_) {
-            case kTinyInt:
-            case kSmallInt:
-            case kInteger:
-            case kBigInt:
-            case kHugeInt:
-            case kFloat:
-            case kDouble:
-            case kFloat16:
-            case kBFloat16:
-            case kDecimal: {
+            case LogicalType::kTinyInt:
+            case LogicalType::kSmallInt:
+            case LogicalType::kInteger:
+            case LogicalType::kBigInt:
+            case LogicalType::kHugeInt:
+            case LogicalType::kFloat:
+            case LogicalType::kDouble:
+            case LogicalType::kFloat16:
+            case LogicalType::kBFloat16:
+            case LogicalType::kDecimal: {
                 return true;
             }
             default: {
@@ -86,19 +86,19 @@ public:
 
     [[nodiscard]] inline bool CanBuildSecondaryIndex() const {
         switch (type_) {
-            case kTinyInt:
-            case kSmallInt:
-            case kInteger:
-            case kBigInt:
-            case kFloat:
-            case kDouble:
-            case kFloat16: // need to be converted to float and keep order
-            case kBFloat16: // need to be converted to float and keep order
-            case kDate:
-            case kTime:
-            case kDateTime:  // need to be converted to int64 and keep order
-            case kTimestamp: // need to be converted to int64 and keep order
-            case kVarchar:  // need to be converted to int64 by hash
+            case LogicalType::kTinyInt:
+            case LogicalType::kSmallInt:
+            case LogicalType::kInteger:
+            case LogicalType::kBigInt:
+            case LogicalType::kFloat:
+            case LogicalType::kDouble:
+            case LogicalType::kFloat16: // need to be converted to float and keep order
+            case LogicalType::kBFloat16: // need to be converted to float and keep order
+            case LogicalType::kDate:
+            case LogicalType::kTime:
+            case LogicalType::kDateTime:  // need to be converted to int64 and keep order
+            case LogicalType::kTimestamp: // need to be converted to int64 and keep order
+            case LogicalType::kVarchar:  // need to be converted to int64 by hash
             {
                 return true;
             }
@@ -110,20 +110,20 @@ public:
 
     [[nodiscard]] inline bool SupportMinMaxFilter() const {
         switch (type_) {
-            case kTinyInt:
-            case kSmallInt:
-            case kInteger:
-            case kBigInt:
-            case kHugeInt:
-            case kFloat:
-            case kDouble:
-            case kFloat16:
-            case kBFloat16:
-            case kVarchar:
-            case kDate:
-            case kTime:
-            case kDateTime:
-            case kTimestamp: {
+            case LogicalType::kTinyInt:
+            case LogicalType::kSmallInt:
+            case LogicalType::kInteger:
+            case LogicalType::kBigInt:
+            case LogicalType::kHugeInt:
+            case LogicalType::kFloat:
+            case LogicalType::kDouble:
+            case LogicalType::kFloat16:
+            case LogicalType::kBFloat16:
+            case LogicalType::kVarchar:
+            case LogicalType::kDate:
+            case LogicalType::kTime:
+            case LogicalType::kDateTime:
+            case LogicalType::kTimestamp: {
                 return true;
             }
             default: {
@@ -137,18 +137,18 @@ public:
         // 2. remove duplicate
         // 3. build BinaryFuse filter
         switch (type_) {
-            case kBoolean:
-            case kTinyInt:
-            case kSmallInt:
-            case kInteger:
-            case kBigInt:
-            case kHugeInt:
-            case kDecimal:
-            case kVarchar:
-            case kDate:
-            case kTime:
-            case kDateTime:
-            case kTimestamp: {
+            case LogicalType::kBoolean:
+            case LogicalType::kTinyInt:
+            case LogicalType::kSmallInt:
+            case LogicalType::kInteger:
+            case LogicalType::kBigInt:
+            case LogicalType::kHugeInt:
+            case LogicalType::kDecimal:
+            case LogicalType::kVarchar:
+            case LogicalType::kDate:
+            case LogicalType::kTime:
+            case LogicalType::kDateTime:
+            case LogicalType::kTimestamp: {
                 return true;
             }
             default: {
