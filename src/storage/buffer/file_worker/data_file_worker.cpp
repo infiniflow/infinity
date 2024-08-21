@@ -57,7 +57,7 @@ void DataFileWorker::FreeInMemory() {
 }
 
 // FIXME: to_spill
-void DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     LocalFileSystem fs;
     // File structure:
     // - header: magic number
@@ -91,6 +91,7 @@ void DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         RecoverableError(status);
     }
     prepare_success = true; // Not run defer_fn
+    return true;
 }
 
 void DataFileWorker::ReadFromFileImpl(SizeT file_size) {

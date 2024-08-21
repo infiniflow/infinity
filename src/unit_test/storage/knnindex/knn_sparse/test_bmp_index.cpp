@@ -73,7 +73,7 @@ protected:
                 // SparseTestUtil<DataType, IdxType>::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
                 // std::cout << fmt::format("accuracy: {}\n", (f32)hit / total);
             }
-            std::cout << fmt::format("hit: {}, total: {}\n", hit_all, total_all);
+//            std::cout << fmt::format("hit: {}, total: {}\n", hit_all, total_all);
             if (hit_all < total_all * accuracy_all) {
                 EXPECT_TRUE(false);
             }

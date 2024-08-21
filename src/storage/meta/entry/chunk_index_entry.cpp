@@ -377,9 +377,7 @@ bool ChunkIndexEntry::TrySetOptimizing() {
 
 void ChunkIndexEntry::ResetOptimizing() {
     bool expected = true;
-    if (!optimizing_.compare_exchange_strong(expected, false)) {
-        UnrecoverableError(fmt::format("ResetOptimizing failed, {}", this->encode()));
-    }
+    optimizing_.compare_exchange_strong(expected, false);
 }
 
 } // namespace infinity

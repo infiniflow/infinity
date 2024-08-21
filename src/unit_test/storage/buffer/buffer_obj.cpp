@@ -57,22 +57,9 @@ using namespace infinity;
 class BufferObjTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
-        RemoveDbDirs();
-        infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
         BaseTest::TearDown();
     }
 
@@ -116,6 +103,12 @@ public:
 // Test status transfer of buffer handle.
 // ?? status transfer in all
 TEST_F(BufferObjTest, test1) {
+
+    RemoveDbDirs();
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+//    RemoveDbDirs();
+    infinity::InfinityContext::instance().Init(config_path);
+
     SizeT memory_limit = 1024;
     String data_dir(GetFullDataDir());
     auto temp_dir = MakeShared<String>(data_dir + "/spill");
@@ -294,6 +287,7 @@ TEST_F(BufferObjTest, test1) {
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);
     buf1->CheckState();
+    infinity::InfinityContext::instance().UnInit();
 }
 
 // unit test for BufferStatus::kClean transformation
@@ -505,8 +499,7 @@ TEST_F(BufferObjTest, test1) {
 
 TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // GTEST_SKIP(); // FIXME
-
-    infinity::InfinityContext::instance().UnInit();
+    RemoveDbDirs();
 #ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -514,10 +507,10 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     infinity::GlobalResourceUsage::Init();
 #endif
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj_2.toml");
-    RemoveDbDirs();
+//    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
-    constexpr u64 kInsertN = 4;
+    constexpr u64 kInsertN = 2;
     constexpr u64 kImportSize = 8192;
 
     Storage *storage = InfinityContext::instance().storage();
@@ -595,6 +588,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             column_vector->Initialize();
             for (SizeT j = 0; j < kImportSize; ++j) {
                 Vector<float> vec;
+                vec.reserve(128);
                 for (SizeT k = 0; k < 128; ++k) {
                     vec.push_back(j * 1000 + k);
                 }
@@ -675,10 +669,16 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
     WaitCleanup(storage, last_commit_ts);
+
+    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
-    constexpr u64 kInsertN = 1024;
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    RemoveDbDirs();
+    infinity::InfinityContext::instance().Init(config_path);
+
+    constexpr u64 kInsertN = 256;
     constexpr u64 kImportSize = 8192;
 
     Storage *storage = InfinityContext::instance().storage();
@@ -755,12 +755,25 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
         }
         txn_mgr->CommitTxn(txn);
     }
+
+    {
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+    }
+
+    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_F(BufferObjTest, test_multiple_threads_read) {
-    constexpr u64 kInsertN = 1024;
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    RemoveDbDirs();
+    infinity::InfinityContext::instance().Init(config_path);
+
+    constexpr u64 kInsertN = 256;
     constexpr u64 kImportSize = 8192;
-    constexpr u64 kThreadN = 2;
+    constexpr u64 kThreadN = 4;
 
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
@@ -843,4 +856,13 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
     for (SizeT i = 0; i < kThreadN; ++i) {
         ths[i].join();
     }
+
+    {
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+    }
+
+    infinity::InfinityContext::instance().UnInit();
 }

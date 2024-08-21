@@ -65,7 +65,7 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kIVFFlatIndexFile; }
 
 protected:
-    void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
+    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void ReadFromFileImpl(SizeT file_size) override;
 
@@ -129,10 +129,11 @@ void AnnIVFFlatIndexFileWorker<DataType>::FreeInMemory() {
 }
 
 template <typename DataType>
-void AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     auto *index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
     index->SaveIndexInner(*file_handler_);
     prepare_success = true;
+    return true;
 }
 
 template <typename DataType>

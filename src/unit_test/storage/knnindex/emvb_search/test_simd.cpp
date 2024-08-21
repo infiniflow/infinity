@@ -43,8 +43,8 @@ TEST_F(SIMDTest, testsum256) {
         const f32 expect_sum = std::reduce(random_f32.begin(), random_f32.end());
         const f32 abs_sum = std::accumulate(random_f32.begin(), random_f32.end(), 0.0f, [](f32 acc, f32 v) { return acc + std::abs(v); });
         const f32 diff_percent = std::abs(sum_f32 - expect_sum) / abs_sum;
-        std::cerr << "sum_f32: " << sum_f32 << " expect_sum: " << expect_sum << " abs_sum: " << abs_sum << " diff_percent: " << diff_percent
-                  << std::endl;
+//        std::cerr << "sum_f32: " << sum_f32 << " expect_sum: " << expect_sum << " abs_sum: " << abs_sum << " diff_percent: " << diff_percent
+//                  << std::endl;
         EXPECT_LE(diff_percent, 1e-6);
     }
 }

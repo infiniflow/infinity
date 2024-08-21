@@ -52,21 +52,20 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          BlockVersionTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
 
 TEST_P(BlockVersionTest, SaveAndLoad) {
     BlockVersion block_version(8192);
-    block_version.created_.emplace_back(10, 3);
-    block_version.created_.emplace_back(20, 6);
-    block_version.deleted_[2] = 30;
-    block_version.deleted_[5] = 40;
+    block_version.Append(10, 3);
+    block_version.Append(20, 6);
+    block_version.Delete(2, 30);
+    block_version.Delete(5, 40);
     String version_path = String(GetFullDataDir()) + "/block_version_test";
     LocalFileSystem fs;
 
     {
         auto [file_handler, status] = fs.OpenFile(version_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
-        if(!status.ok()) {
+        if (!status.ok()) {
             UnrecoverableError(status.message());
         }
         block_version.SpillToFile(*file_handler);
@@ -74,7 +73,7 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
 
     {
         auto [file_handler, status] = fs.OpenFile(version_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
-        if(!status.ok()) {
+        if (!status.ok()) {
             UnrecoverableError(status.message());
         }
         auto block_version2 = BlockVersion::LoadFromFile(*file_handler);
@@ -98,15 +97,13 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             auto block_version_handle = buffer_obj->Load();
             auto *block_version = static_cast<BlockVersion *>(block_version_handle.GetDataMut());
 
-            block_version->created_.emplace_back(10, 3);
-            block_version->created_.emplace_back(20, 6);
-            block_version->deleted_[2] = 30;
-            block_version->deleted_[5] = 40;
+            block_version->Append(10, 3);
+            block_version->Append(20, 6);
+            block_version->Delete(2, 30);
+            block_version->Delete(5, 40);
         }
         {
-            auto *file_worker = static_cast<VersionFileWorker *>(buffer_obj->file_worker());
-            file_worker->SetCheckpointTS(15);
-            buffer_obj->Save();
+            buffer_obj->Save(VersionFileWorkerSaveCtx(15));
         }
     }
     {
@@ -117,7 +114,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
 
         {
             BlockVersion block_version1(8192);
-            block_version1.created_.emplace_back(10, 3);
+            block_version1.Append(10, 3);
 
             auto block_version_handle = buffer_obj->Load();
             {
@@ -125,14 +122,12 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
                 ASSERT_EQ(block_version1, *block_version);
             }
             auto *block_version = static_cast<BlockVersion *>(block_version_handle.GetDataMut());
-            block_version->created_.emplace_back(20, 6);
-            block_version->deleted_[2] = 30;
-            block_version->deleted_[5] = 40;
+            block_version->Append(20, 6);
+            block_version->Delete(2, 30);
+            block_version->Delete(5, 40);
         }
         {
-            auto *file_worker = static_cast<VersionFileWorker *>(buffer_obj->file_worker());
-            file_worker->SetCheckpointTS(35);
-            buffer_obj->Save();
+            buffer_obj->Save(VersionFileWorkerSaveCtx(35));
         }
     }
     {
@@ -143,9 +138,9 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
 
         {
             BlockVersion block_version1(8192);
-            block_version1.created_.emplace_back(10, 3);
-            block_version1.created_.emplace_back(20, 6);
-            block_version1.deleted_[2] = 30;
+            block_version1.Append(10, 3);
+            block_version1.Append(20, 6);
+            block_version1.Delete(2, 30);
 
             auto block_version_handle = buffer_obj->Load();
             const auto *block_version = static_cast<const BlockVersion *>(block_version_handle.GetData());

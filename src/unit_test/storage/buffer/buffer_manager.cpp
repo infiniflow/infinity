@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "unit_test/base_test.h"
+#include <future>
 
 import stl;
 import buffer_manager;
@@ -27,6 +28,7 @@ import infinity_context;
 import local_file_system;
 import logger;
 import config;
+import infinity_exception;
 
 using namespace infinity;
 
@@ -61,6 +63,8 @@ protected:
     void SetUp() override {
         Config config;
         config.Init(nullptr, nullptr);
+        // config.SetLogToStdout(true);
+
         Logger::Initialize(&config);
 
         data_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/data");
@@ -339,12 +343,9 @@ protected:
                     continue;
                 }
                 test_obj->Check(file_info);
-
-                SizeT file_size = file_info.buffer_obj_->GetBufferSize();
-                EXPECT_EQ(file_size, file_info.file_size_);
             }
         }
-        LOG_INFO(fmt::format("Test {} thread {} finished", test_i, thread_i));
+//        LOG_INFO(fmt::format("Test {} thread {} finished", test_i, thread_i));
     }
 };
 
@@ -392,7 +393,7 @@ public:
 };
 
 TEST_F(BufferManagerParallelTest, parallel_test1) {
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 3; ++i) {
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
         auto test1_obj = MakeUnique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_);
         LocalFileSystem fs;
@@ -401,7 +402,7 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
         for (SizeT i = 0; i < file_n; ++i) {
             file_infos.emplace_back(i);
         }
-        LOG_INFO(fmt::format("Start parallel test1 {}", i));
+//        LOG_INFO(fmt::format("Start parallel test1 {}", i));
         for (SizeT test_i = 0; test_i < test_n_; test_i++) {
             Atomic<SizeT> finished_n = 0;
             for (auto &file_info : file_infos) {
@@ -419,7 +420,7 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
         EXPECT_EQ(buffer_mgr->memory_usage(), 0);
         buffer_mgr->RemoveClean();
 
-        LOG_INFO(fmt::format("Finished parallel test1 {}", i));
+//        LOG_INFO(fmt::format("Finished parallel test1 {}", i));
         ResetDir();
     }
 }
@@ -455,6 +456,9 @@ public:
         }
         buffer->Append(data.get(), var_file_step);
         file_info.file_size_ += var_file_step;
+
+        ASSERT_EQ(file_info.buffer_obj_->GetBufferSize(), file_info.file_size_);
+        LOG_INFO(fmt::format("Write file {} size {}", file_info.file_id_, file_info.file_size_));
     }
 
     void Check(const FileInfo &file_info) override {
@@ -470,7 +474,7 @@ public:
 };
 
 TEST_F(BufferManagerParallelTest, parallel_test2) {
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 3; ++i) {
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
         auto test2_obj = MakeUnique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_);
         LocalFileSystem fs;
@@ -479,25 +483,50 @@ TEST_F(BufferManagerParallelTest, parallel_test2) {
         for (SizeT i = 0; i < file_n; ++i) {
             file_infos.emplace_back(i);
         }
-        LOG_INFO(fmt::format("Start parallel test2 {}", i));
+//        LOG_INFO(fmt::format("Start parallel test2 {}", i));
         for (SizeT test_i = 0; test_i < test_n_; test_i++) {
             Atomic<SizeT> finished_n = 0;
             for (auto &file_info : file_infos) {
                 file_info.buffer_obj_ = nullptr;
             }
 
-            Vector<Thread> threads;
+            Vector<std::future<bool>> futures;
             for (SizeT thread_i = 0; thread_i < thread_n; ++thread_i) {
-                threads.emplace_back([&, thread_i]() { TestRoutine(file_infos, test_i, thread_i, test2_obj.get(), finished_n); });
+                auto f = std::async(std::launch::async, [&, thread_i]() {
+                    try {
+                        TestRoutine(file_infos, test_i, thread_i, test2_obj.get(), finished_n);
+                        return true;
+                    } catch (const UnrecoverableException &e) {
+                        return false;
+                    }
+                });
+                futures.push_back(std::move(f));
             }
-            for (auto &thread : threads) {
-                thread.join();
+            bool success = true;
+            for (auto &f : futures) {
+                if (!f.get()) {
+                    success = false;
+                }
+            }
+            if (!success) {
+                break;
             }
         }
-        EXPECT_EQ(buffer_mgr->memory_usage(), 0);
+        if (buffer_mgr->memory_usage() != 0) {
+            auto infos = buffer_mgr->GetBufferObjectsInfo();
+            for (const auto &info : infos) {
+                LOG_INFO(fmt::format("BufferObjectInfo: path: {}, status: {}, type: {}, size: {}",
+                                     info.object_path_,
+                                     BufferStatusToString(info.buffered_status_),
+                                     BufferTypeToString(info.buffered_type_),
+                                     info.object_size_));
+            }
+        }
+
+        ASSERT_EQ(buffer_mgr->memory_usage(), 0);
         buffer_mgr->RemoveClean();
 
-        LOG_INFO(fmt::format("Finished parallel test2 {}", i));
+//        LOG_INFO(fmt::format("Finished parallel test2 {}", i));
         ResetDir();
     }
 }

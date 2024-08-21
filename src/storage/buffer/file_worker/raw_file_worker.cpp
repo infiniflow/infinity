@@ -57,7 +57,7 @@ void RawFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     assert(data_ != nullptr && buffer_size_ > 0);
     LocalFileSystem fs;
     i64 nbytes = fs.Write(*file_handler_, data_, buffer_size_);
@@ -66,6 +66,7 @@ void RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         RecoverableError(status);
     }
     prepare_success = true; // Not run defer_fn
+    return true;
 }
 
 void RawFileWorker::ReadFromFileImpl(SizeT file_size) {

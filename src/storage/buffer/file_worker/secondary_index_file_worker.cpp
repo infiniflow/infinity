@@ -62,7 +62,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
     }
 }
 
-void SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
         auto index = static_cast<SecondaryIndexData *>(data_);
         index->SaveIndexInner(*file_handler_);
@@ -72,6 +72,7 @@ void SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
         String error_message = "WriteToFileImpl: data_ is nullptr";
         UnrecoverableError(error_message);
     }
+    return true;
 }
 
 void SecondaryIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
@@ -131,7 +132,7 @@ void SecondaryIndexFileWorkerParts::FreeInMemory() {
     }
 }
 
-void SecondaryIndexFileWorkerParts::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool SecondaryIndexFileWorkerParts::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
         file_handler_->Write(data_, part_row_count_ * data_pair_size_);
         prepare_success = true;
@@ -140,6 +141,7 @@ void SecondaryIndexFileWorkerParts::WriteToFileImpl(bool to_spill, bool &prepare
         String error_message = "WriteToFileImpl: data_ is nullptr";
         UnrecoverableError(error_message);
     }
+    return true;
 }
 
 void SecondaryIndexFileWorkerParts::ReadFromFileImpl(SizeT file_size) {

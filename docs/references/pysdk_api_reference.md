@@ -27,12 +27,12 @@ The `uri` here can be either a local directory in `str` format or a `NetworkAddr
 When connecting to Infinity in client-server mode, ensure that the client version *exactly* matches the server version. For example:
 
 | **Client version** | **Server version** |
-| ------------------ | ------------------ |
+|--------------------|--------------------|
 | v0.1.0             | v0.1.0             |
 | v0.1.1             | v0.1.1             |
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
-| v0.3.0.dev5        | v0.3.0.dev5        |
+| v0.3.0.dev6        | v0.3.0.dev6        |
 
 If the versions do not match, please update your client or server to ensure compatibility.
 
@@ -1041,7 +1041,8 @@ table_object = db_object.create_table("sparse_vector_table", {"c1": {"type": "in
 # Insert one row into the table:
 # `indices` specifies the correspoing indices to the values in `values`.
 # Note that the second row sets "c1" as 2024 by default. 
-table_object.insert([{"c1": 2022, "sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}, {"sparse_column":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}}}])
+from infinity.common import SparseVector
+table_object.insert([{"c1": 2022, "sparse_column": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])}, {"sparse_column": SparseVector([70, 80, 90], [7.7, 8.8, 9.9])}])
 ```
 
 #### Insert tensors

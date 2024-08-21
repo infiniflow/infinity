@@ -99,7 +99,7 @@ class TestInfinity:
         assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.EMPTY_SELECT_FIELDS
 
-        db_obj.drop_table("test_without_output_select_list", ConflictType.Error)
+        db_obj.drop_table("test_without_output_select_list"+suffix, ConflictType.Error)
 
     @pytest.mark.parametrize("condition_list", ["c1 > 0.1 and c2 < 3.0",
                                                 "c1 > 0.1 and c2 < 1.0",

@@ -838,3 +838,57 @@ class TestInfinity:
         res = db_obj.drop_table(
             "test_insert_no_match_column"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.slow
+    def test_insert_with_large_data(self, suffix):
+        total_row_count = 3,000,000
+
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("hr_data_mix"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("hr_data_mix" + suffix, {
+            "id": {"type": "varchar"},
+            "content": {"type": "varchar"},
+            "dense_vec": {"type": "vector, 1024, float"},
+            "sparse_vec": {"type": "sparse,250002,float,int"},
+        })
+
+        import json
+        import time
+        def read_jsonl(file_path):
+            data = []
+            with open(file_path, 'r') as file:
+                for line in file:
+                    data.append(json.loads(line))
+            return data
+        data_array = read_jsonl("./test/data/jsonl/test_table.jsonl")
+        loop_count: int = total_row_count // len(data_array)
+
+        start = time.time()
+        for global_idx in range(loop_count):
+            insert_data = []
+            for local_idx, data in enumerate(data_array):
+
+                # each 1000, a duplicated row is generated
+                if local_idx == 9 and global_idx % 1000 == 0:
+                    end = time.time()
+                    print(f"ID: {global_idx}@{local_idx}, cost: {end - start}s")
+                    data = data_array[0]
+                    local_idx = 0
+
+                indices = []
+                values = []
+                for key, value in data['sparse_vec'].items():
+                    indices.append(int(key))
+                    values.append(value)
+
+                insert_data.append(
+                    {
+                        "id": f'{global_idx}@{local_idx}',
+                        "content": data['content'],
+                        "dense_vec": data['dense_vec'],
+                        "sparse_vec": SparseVector(indices, values)
+                    }
+                )
+            table_obj.insert(insert_data)
+        res = table_obj.output(["count(*)"]).to_pl()
+        assert res.height == 1 and res.width == 1 and res.item(0, 0) == total_row_count

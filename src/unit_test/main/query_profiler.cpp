@@ -111,5 +111,5 @@ TEST_F(QueryProfilerTest, test3) {
     usleep(1000);
     profiler.StopPhase(infinity::QueryPhase::kExecution);
 
-    std::cout << profiler.ToString() << std::endl;
+//    std::cout << profiler.ToString() << std::endl;
 }

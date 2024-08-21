@@ -25,6 +25,7 @@ import knn_expr;
 import column_def;
 import internal_types;
 import file_worker_type;
+import file_worker;
 
 namespace infinity {
 
@@ -55,7 +56,7 @@ public:
     SizeT GetMemoryCost() const override { return index_size_; }
 
 protected:
-    void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
+    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void ReadFromFileImpl(SizeT file_size) override;
 

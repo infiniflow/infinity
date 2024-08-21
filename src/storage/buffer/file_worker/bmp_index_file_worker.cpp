@@ -83,7 +83,7 @@ void BMPIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (!data_) {
         UnrecoverableError("Data is not allocated.");
     }
@@ -99,6 +99,7 @@ void BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         },
         *bmp_index);
     prepare_success = true;
+    return true;
 }
 
 void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size) {

@@ -87,7 +87,8 @@ SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        size += pm->GetSizeInBytes(GetFilePaths());
+        pm_size_ = addr_serializer_.GetSizeInBytes(pm, GetFilePaths());
+        size += pm_size_;
     }
     return size;
 }
@@ -102,7 +103,13 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->WriteBufAdv(buf, GetFilePaths());
+        char *start = buf;
+        addr_serializer_.WriteBufAdv(pm, buf, GetFilePaths());
+        SizeT pm_size = buf - start;
+        if (pm_size != pm_size_) {
+            String error_message = fmt::format("Mismatched pm_size: {} != {}", pm_size, pm_size_);
+            UnrecoverableError(error_message);
+        }
     }
 }
 
@@ -116,7 +123,7 @@ void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ReadBufAdv(ptr);
+        addr_serializer_.ReadBufAdv(pm, ptr); // discard return value
     }
 }
 
