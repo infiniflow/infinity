@@ -190,17 +190,18 @@ class infinity_http:
                 for param_name in columns_definition[col]:
                     if param_name.lower() != "constraints" and param_name.lower() != "default": # not constraint and default, should be type
                         params = columns_definition[col][param_name].split(",")
-                        if params[0].strip().lower() == "vector" or params[0].strip().lower() == "tensor" or params[0].strip().lower() == "tensorarray":
-                            tmp["type"] = params[0].strip()
-                            tmp["dimension"] = int(params[1].strip())
-                            tmp["element_type"] = type_transfrom[params[2].strip()]
-                        elif params[0].strip().lower() == "sparse":
-                            tmp["type"] = params[0].strip()
-                            tmp["dimension"] = int(params[1].strip())
-                            tmp["data_type"] = type_transfrom[params[2].strip()]
-                            tmp["index_type"] = type_transfrom[params[3].strip()]
-                        else:
-                            tmp[param_name.lower()] = type_transfrom[columns_definition[col][param_name]]
+                        match params[0].strip().lower():
+                            case "vector" | "multivector" | "tensor" | "tensorarray":
+                                tmp["type"] = params[0].strip()
+                                tmp["dimension"] = int(params[1].strip())
+                                tmp["element_type"] = type_transfrom[params[2].strip()]
+                            case "sparse":
+                                tmp["type"] = params[0].strip()
+                                tmp["dimension"] = int(params[1].strip())
+                                tmp["data_type"] = type_transfrom[params[2].strip()]
+                                tmp["index_type"] = type_transfrom[params[3].strip()]
+                            case _:
+                                tmp[param_name.lower()] = type_transfrom[columns_definition[col][param_name]]
                     elif param_name.lower() == "default":
                         default_field = {}
                         if tmp["type"] == "vector":
