@@ -180,8 +180,10 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
 
 void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt) {
     // et_iter is nullptr if fulltext index is present but there's no data
-    if (et_iter == nullptr)
+    if (et_iter == nullptr) {
+        LOG_DEBUG(fmt::format("et_iter is nullptr"));
         return;
+    }
     while (true) {
         ++blockmax_loop_cnt;
         bool ok = et_iter->Next();
@@ -190,6 +192,13 @@ void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &r
         }
         RowID id = et_iter->DocID();
         float et_score = et_iter->BM25Score();
+        if (SHOULD_LOG_DEBUG()) {
+            OStringStream oss;
+            et_iter->PrintTree(oss, "", true);
+            String msg = fmt::format("Found candidate doc_id {} score {}\n", id.ToUint64(), et_score);
+            msg += oss.str();
+            LOG_DEBUG(msg);
+        }
         if (result_heap.AddResult(et_score, id)) {
             // update threshold
             et_iter->UpdateScoreThreshold(result_heap.GetScoreThreshold());
