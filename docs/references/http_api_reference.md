@@ -14,10 +14,10 @@ Creates a database by its name. If the database already exists, the behavior is 
 ### Request
 
 - Method: POST
-- URL: `database/{database_name}`
+- URL: `/database/{database_name}`
 - Headers:
-  - `Accept: application/json`
-  - `Content-Type: application/json`
+  - `accept: application/json`
+  - `content-Type: application/json`
 - Body:
 
   ```shell
@@ -99,10 +99,10 @@ Deletes a database by its name. If the database does not exist, the behavior is 
 ### Request
 
 - Method: DELETE
-- URL: `database/{database_name}`
+- URL: `/database/{database_name}`
 - Headers:
-  - `Accept: application/json`
-  - `Content-Type: application/json`
+  - `accept: application/json`
+  - `content-Type: application/json`
 - Body:
 
   ```shell
@@ -147,7 +147,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following: 
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
 
 ```shell
 {
@@ -155,6 +155,11 @@ A `500` HTTP status code indicates an error condition. The response includes a J
     "error_message": "{database_name} doesn't exist."
 }
 ```
+
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
 
@@ -167,14 +172,12 @@ Shows detailed information of a specified database.
 ### Request
 
 - Method: GET
-- URL: `database/{database_name}`
-- Headers:
-  - `Accept: application/json`
-  - `Content-Type: application/json`
+- URL: `/database/{database_name}`
+- Headers: `accept: application/json`
 
 #### Request example
 
-```
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json'
@@ -187,9 +190,11 @@ curl --request GET \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "database_name": "default_db"
@@ -198,14 +203,21 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3021,
     "error_message": "{database_name} doesn't exist."
 }
 ```
+
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
 
@@ -215,7 +227,13 @@ Retrieves all databases in the system.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases \
      --header 'accept: application/json'
@@ -223,9 +241,11 @@ curl --request GET \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "databases": [
@@ -243,7 +263,22 @@ Creates a table in a specified database.
 
 ### Request
 
-```
+- Method: POST
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+  {
+      "create_option": "<option>"
+  }
+  ```
+
+#### Request example
+
+```shell
 curl --request POST \
      --url localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
@@ -289,24 +324,37 @@ curl --request POST \
 } '
 ```
 
+
+
+#### Request parameter
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3017,
     "error_message": "Duplicate table: {table_name} in {database_name}."
 }
 ```
+
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
 
@@ -316,7 +364,20 @@ Deletes a table from a specified database.
 
 ### Request
 
-```
+- Method: DELETE
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+  {
+      "drop_option": "<option>"
+  }
+  ```
+
+```shell
 curl --request DELETE \
      --url localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
@@ -329,22 +390,31 @@ curl --request DELETE \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3022,
     "error_message": "Table {table_name} doesn't exist in {database_name}."
 }
 ```
+
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
 
@@ -354,7 +424,13 @@ Lists all tables in a specified database.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables \
      --header 'accept: application/json'
@@ -362,9 +438,11 @@ curl --request GET \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "tables": 
@@ -399,7 +477,13 @@ Shows detailed information of a specified table.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json'
@@ -407,9 +491,11 @@ curl --request GET \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "database_name": "default_db",
@@ -421,14 +507,21 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3022,
     "error_message": "Table {table_name} doesn't exist in {database_name}."
 }
 ```
+
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
 
@@ -438,7 +531,13 @@ Shows the column information of a specific table in a specified database.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/columns`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/columns \
      --header 'accept: application/json'
@@ -446,9 +545,11 @@ curl --request GET \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "columns": [
@@ -471,14 +572,21 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3022,
     "error_message": "Table {table_name} doesn't exist in {database_name}."
 }
 ```
+
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
 
@@ -488,7 +596,18 @@ Creates an index on a specified table.
 
 ### Request
 
-```
+- Method: POST
+- URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+
+  ```
+
+```shell
 curl --request POST \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json' \
@@ -516,22 +635,31 @@ curl --request POST \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3018,
     "error_message": "Duplicate index: {index} in {table_name}."
 }
 ```
+
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
 
@@ -541,7 +669,20 @@ Drop an index.
 
 ### Request
 
-```
+- Method: DELETE
+- URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+      "drop_option": "<option>"
+  ```
+
+#### Request example
+
+```shell
 curl --request DELETE \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json' \
@@ -552,24 +693,37 @@ curl --request DELETE \
 } '
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3018,
     "error_message": "Index {index_name} doesn't exist in {table_name}."
 }
 ```
+
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
 
@@ -579,7 +733,11 @@ Show detailed information of a specified index.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+- Headers: `accept: application/json`
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json'
@@ -587,9 +745,11 @@ curl --request GET \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "database_name": "default_db",
@@ -604,14 +764,21 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3018,
     "error_message": "Index {index_name} doesn't exist in {table_name}."
 }
 ```
+
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
 
@@ -621,17 +788,29 @@ Show detailed information of a specified index segment.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id} \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code":0,
     "chunk_count":"1",
@@ -641,9 +820,11 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3018,
     "error_message": "Index {index_name} doesn't exist in {table_name}."
@@ -658,17 +839,27 @@ Show detailed information of a index chunk of specified index chunk.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id} \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code":0,
     "deprecate_timestamp":"18446744073709551615",
@@ -678,9 +869,11 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3018,
     "error_message": "Index {index_name} doesn't exist in {table_name}."
@@ -695,17 +888,29 @@ Lists all indexes of a specified table.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/indexes`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "tables": 
@@ -732,7 +937,20 @@ Imports data into a specified table.
 
 ### Request
 
-```
+- Method: PUT
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+
+  ```
+
+#### Request example
+
+```shell
 curl --request PUT \
      --url localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
@@ -746,19 +964,27 @@ curl --request PUT \
 } '
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3032,
     "error_message": "Not supported file type: docx"
@@ -773,7 +999,18 @@ Exports data into a specified table.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+
+  ```
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/table/{table_name} \
      --header 'accept: application/json' \
@@ -789,17 +1026,21 @@ curl --request GET \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 7002,
     "error_message": "File already existed: /var/infinity/filename.csv"
@@ -814,7 +1055,20 @@ Inserts data into a specified table.
 
 ### Request
 
-```
+- Method: POST
+- URL: `/databases/{database_name}/tables/{table_name}/docs`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+
+  ```
+
+#### Request example
+
+```shell
 curl --request POST \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
@@ -834,19 +1088,27 @@ curl --request POST \
 ] '
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3005,
     "error_message": "Column {column_name} doesn't exist in {table_name}."
@@ -861,7 +1123,18 @@ Deletes data in a specified table.
 
 ### Request
 
-```
+- Method: DELETE
+- URL: `/databases/{database_name}/tables/{table_name}/docs`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+
+  ```
+
+```shell
 curl --request DELETE \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
@@ -874,18 +1147,22 @@ curl --request DELETE \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "delete_row_count": 10
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3005,
     "error_message": "Column {column_name} doesn't exist in {table_name}."
@@ -900,7 +1177,20 @@ Updates data in a specified table.
 
 ### Request
 
-```
+- Method: PUT
+- URL: `/databases/{database_name}/tables/{table_name}/docs`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+
+  ```
+
+#### Request example
+
+```shell
 curl --request PUT \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
@@ -915,20 +1205,28 @@ curl --request PUT \
 } '
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "update_row_count": 10
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3005,
     "error_message": "Column {column_name} doesn't exist in {table_name}."
@@ -943,7 +1241,18 @@ Searches data in a specified table.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/docs`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+
+  ```
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
@@ -979,9 +1288,11 @@ curl --request GET \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "output": [
@@ -993,9 +1304,11 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3005,
     "error_message": "Column {column_name} doesn't exist in {table_name}."
@@ -1010,17 +1323,28 @@ Shows all segments of a specified table.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/segments/`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/ \
      --header 'accept: application/json'
 ```
+#### Request parameters
+
+
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "table_name": "test1",
@@ -1034,9 +1358,11 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3022,
     "error_message": "Table {table_name} doesn't exist in {database_name}."
@@ -1047,21 +1373,33 @@ curl --request GET \
 
 ## Show segment details
 
-Shows details of a specified segment. 
+Shows details of a specified segment.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/segments/{segment_id}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id} \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "actual_row_count": "4",
@@ -1077,9 +1415,11 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3070,
     "error_message": "Segment: {segment_id} doesn't exist."
@@ -1094,17 +1434,27 @@ Shows all blocks of specified segment.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/ \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "segment_id": 0,
@@ -1118,9 +1468,11 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3022,
     "error_message": "Table {table_name} doesn't exist in {database_name}."
@@ -1135,17 +1487,29 @@ Shows details of a specified block.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id} \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "id": "0",
@@ -1159,9 +1523,11 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3072,
     "error_message": "Block: {block_id} doesn't exist."
@@ -1176,17 +1542,29 @@ Shows details of a specified column in a specific block.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}/{column_id}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}/{column_id} \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "column_name": "c2",
     "column_id": "1",
@@ -1197,9 +1575,11 @@ curl --request GET \
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3072,
     "error_message": "Block: {block_id} doesn't exist."
@@ -1214,7 +1594,13 @@ Gets all global variables.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/variables`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/variables \
      --header 'accept: application/json'
@@ -1222,9 +1608,11 @@ curl --request GET \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code":0,
     "active_txn_count":"1",
@@ -1252,26 +1640,40 @@ Gets a global variable.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/variables/{variable_name}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/variables/{variable_name} \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "buffer_object_count":"6"
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3027,
     "error_message": "No such system variable {variable_name}."
@@ -1286,7 +1688,20 @@ Sets a variable with value.
 
 ### Request
 
-```
+- Method: POST
+- URL: `/variables/{variable_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+      "profile_record_capacity": 
+  ```
+
+#### Request example
+
+```shell
 curl --request POST \
      --url localhost:23820/variables/{variable_name} \
      --header 'accept: application/json' \
@@ -1296,17 +1711,21 @@ curl --request POST \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3076,
     "error_message": "Invalid command: unknown global variable {variable_name}"
@@ -1321,7 +1740,13 @@ Gets all configs.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/configs`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/configs \
      --header 'accept: application/json'
@@ -1329,9 +1754,11 @@ curl --request GET \
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "buffer_manager_size":"4294967296",
     "cleanup_interval":"10",
@@ -1373,26 +1800,40 @@ Gets a config.
 
 ### Request
 
-```
+- Method: GET
+- URL: `/configs/{config_name}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
 curl --request GET \
      --url localhost:23820/configs/{config_name} \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
+
+
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0,
     "version":"0.3.0"
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 1008,
     "error_message": "Attempt to get option: {config_name} which doesn't exist."
@@ -1407,27 +1848,46 @@ Sets a config with value.
 
 ### Request
 
-```
+- Method: PUT
+- URL: `/config/{config_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+
+  ```shell
+  {
+      "log_level": 
+  }   
+  ```
+
+#### Request example
+
+```shell
 curl --request POST \
      --url localhost:23820/configs/{config_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' { "log_level" : "trace" } '
+     --data ' { "log_level": "trace" } '
 ```
 
 ### Response
 
-- 200 Success.
+#### Status code 200
 
-```
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 0
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
 {
     "error_code": 3028,
     "error_message": "log level value range is trace, debug, info, warning, error, critical"

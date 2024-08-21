@@ -95,7 +95,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -218,7 +218,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -260,7 +260,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -481,7 +481,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -551,7 +551,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `table_names`: `list[str]` - A list of strings indicating the names of all available tables in the current database.
 
@@ -920,7 +920,7 @@ A structure containing these attributes:
 - `error_code`: `int`  
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.  
 
 ### Examples
@@ -1107,7 +1107,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -1293,7 +1293,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
