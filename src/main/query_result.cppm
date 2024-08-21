@@ -18,18 +18,28 @@ import stl;
 import data_table;
 import status;
 import logical_node_type;
+import global_resource_usage;
 
 namespace infinity {
 
 export struct BaseResult {
 public:
-    BaseResult() = default;
+    BaseResult() {
+        GlobalResourceUsage::IncrObjectCount("BaseResult");
+    }
 
-    BaseResult(BaseResult& other): status_(other.status_), result_table_(other.result_table_) {}
+    BaseResult(BaseResult& other): status_(other.status_), result_table_(other.result_table_) {
+        GlobalResourceUsage::IncrObjectCount("BaseResult");
+    }
+
+    ~BaseResult() {
+        GlobalResourceUsage::DecrObjectCount("BaseResult");
+    }
 
     BaseResult& operator=(BaseResult&& other)  noexcept {
         status_ = std::move(other.status_);
         result_table_ = std::move(other.result_table_);
+        GlobalResourceUsage::DecrObjectCount("BaseResult");
         return *this;
     }
 

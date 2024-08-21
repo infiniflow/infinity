@@ -25,11 +25,16 @@ import singleton;
 import session_manager;
 import persistence_manager;
 import third_party;
+import global_resource_usage;
 
 namespace infinity {
 
 export class InfinityContext : public Singleton<InfinityContext> {
 public:
+    ~InfinityContext() {
+        GlobalResourceUsage::DecrObjectCount("InfinityContext");
+    }
+
     [[nodiscard]] inline TaskScheduler *task_scheduler() noexcept { return task_scheduler_.get(); }
 
     [[nodiscard]] inline Config *config() noexcept { return config_.get(); }
@@ -54,7 +59,9 @@ public:
 private:
     friend class Singleton;
 
-    InfinityContext() = default;
+    InfinityContext() {
+        GlobalResourceUsage::IncrObjectCount("InfinityContext");
+    }
 
     UniquePtr<Config> config_{};
     UniquePtr<ResourceManager> resource_manager_{};

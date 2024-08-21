@@ -19,6 +19,7 @@ import stl;
 import session;
 import profiler;
 import status;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -32,7 +33,13 @@ export struct QueryInfo {
 export class SessionManager {
 
 public:
-    SessionManager() = default;
+    SessionManager() {
+        GlobalResourceUsage::IncrObjectCount("SessionManager");
+    }
+
+    ~SessionManager() {
+        GlobalResourceUsage::DecrObjectCount("SessionManager");
+    }
 
     SharedPtr<RemoteSession> CreateRemoteSession(bool maintenance_mode) {
         u64 session_id = ++ session_id_generator_;

@@ -130,6 +130,7 @@ public:
             std::swap(data_ptr_, right.data_ptr_);
             capacity_ = right.capacity_;
             tail_index_ = right.tail_index_;
+            GlobalResourceUsage::DecrObjectCount("ColumnVector");
         }
         return *this;
     }

@@ -19,6 +19,7 @@ export module options;
 import stl;
 import third_party;
 import status;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -33,8 +34,12 @@ export enum class BaseOptionDataType {
 };
 
 export struct BaseOption {
-    explicit BaseOption(std::string_view name, BaseOptionDataType data_type) : name_(std::move(name)), data_type_(data_type) {}
-    virtual ~BaseOption() = default;
+    explicit BaseOption(std::string_view name, BaseOptionDataType data_type) : name_(std::move(name)), data_type_(data_type) {
+        GlobalResourceUsage::IncrObjectCount("BaseOption");
+    }
+    virtual ~BaseOption() {
+        GlobalResourceUsage::DecrObjectCount("BaseOption");
+    }
 
     String name_{};
     BaseOptionDataType data_type_{BaseOptionDataType::kInvalid};

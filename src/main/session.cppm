@@ -22,6 +22,7 @@ import config;
 import options;
 import profiler;
 import catalog;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -35,7 +36,12 @@ export class BaseSession {
 public:
     BaseSession(u64 session_id, bool maintenance_mode, SessionType session_type)
         : connected_time_(std::time(nullptr)), current_database_("default_db"), session_type_(session_type),
-        session_id_(session_id), maintenance_mode_(maintenance_mode) {}
+        session_id_(session_id), maintenance_mode_(maintenance_mode) {
+        GlobalResourceUsage::IncrObjectCount("BaseSession");
+    }
+    virtual ~BaseSession() {
+        GlobalResourceUsage::DecrObjectCount("BaseSession");
+    }
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
@@ -91,13 +97,23 @@ protected:
 export class LocalSession : public BaseSession {
 
 public:
-    explicit LocalSession(u64 session_id, bool maintenance_mode) : BaseSession(session_id, maintenance_mode, SessionType::kLocal) {}
+    explicit LocalSession(u64 session_id, bool maintenance_mode) : BaseSession(session_id, maintenance_mode, SessionType::kLocal) {
+        GlobalResourceUsage::IncrObjectCount("LocalSession");
+    }
+    ~LocalSession() override {
+        GlobalResourceUsage::DecrObjectCount("LocalSession");
+    }
 };
 
 export class RemoteSession : public BaseSession {
 
 public:
-    explicit RemoteSession(u64 session_id, bool maintenance_mode) : BaseSession(session_id, maintenance_mode, SessionType::kRemote) {}
+    explicit RemoteSession(u64 session_id, bool maintenance_mode) : BaseSession(session_id, maintenance_mode, SessionType::kRemote) {
+        GlobalResourceUsage::IncrObjectCount("RemoteSession");
+    }
+    ~RemoteSession() override {
+        GlobalResourceUsage::DecrObjectCount("RemoteSession");
+    }
 
     [[nodiscard]] inline const String &user_name() const { return user_name_; }
 
