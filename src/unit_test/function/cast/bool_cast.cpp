@@ -42,12 +42,11 @@ import data_type;
 
 class BoolCastTest : public BaseTest {
     void SetUp() override {
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
     }
 
     void TearDown() override {
+        infinity::GlobalResourceUsage::UnInit();
     }
 };
 

@@ -19,17 +19,13 @@ import global_resource_usage;
 
 class GlobalResourceUsageTest : public BaseTest {
     void SetUp() override {
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
     }
 
     void TearDown() override {
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
     }
 };
 
@@ -37,7 +33,6 @@ TEST_F(GlobalResourceUsageTest, usage_test) {
     using namespace infinity;
 
     // Object count
-#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("GlobalResourceUsageTest");
     EXPECT_EQ(GlobalResourceUsage::GetObjectCount(), 1);
 
@@ -74,6 +69,5 @@ TEST_F(GlobalResourceUsageTest, usage_test) {
 
     GlobalResourceUsage::IncrRawMemCount("GlobalResourceUsageTest");
     EXPECT_EQ(GlobalResourceUsage::GetRawMemoryCount(), 0);
-#endif
 
 }

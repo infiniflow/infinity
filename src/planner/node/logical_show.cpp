@@ -96,6 +96,12 @@ String ToString(ShowType type) {
             return "Show persistence objects";
         case ShowType::kShowPersistenceObject:
             return "Show persistence object";
+        case ShowType::kShowMemory:
+            return "Show memory";
+        case ShowType::kShowMemoryObjects:
+            return "Show memory objects";
+        case ShowType::kShowMemoryAllocation:
+            return "Show memory allocation";
         case ShowType::kInvalid: {
             String error_message = "Invalid chunk scan type";
             UnrecoverableError(error_message);

@@ -892,34 +892,24 @@ RowID Value::GetValue() const {
 }
 
 Value::~Value() {
-#ifdef INFINITY_DEBUG
     GlobalResourceUsage::DecrObjectCount("Value");
-#endif
 }
 
 Value::Value(const DataType &data_type) : type_(data_type) {
-#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Value");
-#endif
 }
 
 Value::Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr) : type_(type, std::move(typeinfo_ptr)) {
-#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Value");
-#endif
 }
 
 Value::Value(const Value &other) : type_(other.type_) {
-#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Value");
-#endif
     CopyUnionValue(other);
 }
 
 Value::Value(Value &&other) noexcept : type_(other.type_) {
-#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Value");
-#endif
     MoveUnionValue(std::forward<Value>(other));
 }
 

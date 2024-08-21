@@ -49,15 +49,11 @@ public:
 
 public:
     explicit VectorBuffer() {
-#ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("VectorBuffer");
-#endif
     }
 
     ~VectorBuffer() {
-#ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrObjectCount("VectorBuffer");
-#endif
     }
 
     void Initialize(SizeT type_size, SizeT capacity);

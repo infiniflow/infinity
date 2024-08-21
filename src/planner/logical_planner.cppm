@@ -183,6 +183,12 @@ public:
 
     Status BuildShowPersistenceObject(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowMemory(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowMemoryObjects(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowMemoryAllocation(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     // Flush
     Status BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 

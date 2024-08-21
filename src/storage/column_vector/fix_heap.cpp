@@ -32,9 +32,7 @@ import logger;
 namespace infinity {
 
 FixHeapManager::FixHeapManager(const u32 heap_id, const u64 chunk_size, bool allow_cross_chunk) : heap_id_(heap_id), current_chunk_size_(chunk_size) {
-#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("FixHeapManager");
-#endif
     current_chunk_idx_ = INVALID_CHUNK_ID;
     allow_storage_across_chunks_ = allow_cross_chunk;
 }
@@ -46,9 +44,7 @@ FixHeapManager::FixHeapManager(const u32 heap_id,
                                bool allow_cross_chunk)
     : heap_id_(heap_id), current_chunk_size_(chunk_size), current_chunk_offset_(block_column_entry->LastChunkOff(heap_id)), buffer_mgr_(buffer_mgr),
       block_column_entry_(block_column_entry) {
-#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("FixHeapManager");
-#endif
     const int cnt = block_column_entry->OutlineBufferCount(heap_id);
     if (cnt == 0) {
         current_chunk_idx_ = INVALID_CHUNK_ID;
@@ -59,9 +55,7 @@ FixHeapManager::FixHeapManager(const u32 heap_id,
 }
 
 FixHeapManager::~FixHeapManager() {
-#ifdef INFINITY_DEBUG
     GlobalResourceUsage::DecrObjectCount("FixHeapManager");
-#endif
     // std::variant in `VectorHeapChunk` will call destructor automatically
 }
 
