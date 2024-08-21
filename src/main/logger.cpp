@@ -62,6 +62,31 @@ void Logger::Initialize(Config *config_ptr) {
     LOG_TRACE("Logger is initialized.");
 }
 
+void Logger::Initialize(const LoggerConfig &config) {
+    bool log_stdout = config.log_to_stdout_;
+    if (rotating_file_sinker.get() == nullptr) {
+        rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(config.log_file_path_,
+                                                                                config.log_file_max_size_,
+                                                                                config.log_file_rotate_count_); // NOLINT
+    }
+    if (log_stdout) {
+        if (stdout_sinker.get() == nullptr) {
+            stdout_sinker = MakeShared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
+        }
+        Vector<spdlog::sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
+
+        infinity_logger = MakeShared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
+        infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
+        spdlog::details::registry::instance().register_logger(infinity_logger);
+    } else {
+        Vector<spdlog::sink_ptr> sinks{rotating_file_sinker};
+        infinity_logger = MakeShared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
+        infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
+        spdlog::details::registry::instance().register_logger(infinity_logger);
+    }
+    SetLogLevel(config.log_level_);
+}
+
 void Logger::Shutdown() {
     if (stdout_sinker.get() != nullptr or rotating_file_sinker.get() != nullptr) {
         spdlog::shutdown();

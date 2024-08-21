@@ -72,52 +72,18 @@ protected:
 
     void TearDown() override { RemoveDbDirs(); }
 
-    void WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
-        TxnManager *txn_mgr = storage->txn_manager();
-        LOG_INFO("Waiting flush delta op");
-        TxnTimeStamp visible_ts = 0;
-        time_t start = time(nullptr);
-        while (true) {
-            visible_ts = txn_mgr->GetCleanupScanTS();
-            time_t end = time(nullptr);
-            if (visible_ts >= last_commit_ts) {
-                LOG_INFO(fmt::format("Flush delta op finished after {}", end - start));
-                break;
-            }
-            // wait for at most 10s
-            if (end - start > 10) {
-                String error_message = "WaitFlushDeltaOp timeout";
-                UnrecoverableError(error_message);
-            }
-        }
-    }
-
-    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+    void WaitCleanup(Storage *storage) {
         Catalog *catalog = storage->catalog();
-        TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_mgr = storage->buffer_manager();
-
-        LOG_INFO("Waiting cleanup");
-        TxnTimeStamp visible_ts = 0;
-        time_t start = time(nullptr);
-        while (true) {
-            visible_ts = txn_mgr->GetCleanupScanTS();
-            time_t end = time(nullptr);
-            if (visible_ts >= last_commit_ts) {
-                LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
-                break;
-            }
-            // wait for at most 10s
-            if (end - start > 10) {
-                String error_message = "WaitCleanup timeout";
-                UnrecoverableError(error_message);
-            }
-            LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
-            usleep(1000 * 1000);
-        }
-
+        TxnManager *txn_mgr = storage->txn_manager();
+        TxnTimeStamp visible_ts = txn_mgr->GetCleanupScanTS();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
+    }
+
+    void WaitFlushDeltaOp(Storage *storage) {
+        WalManager *wal_mgr = storage->wal_manager();
+        wal_mgr->Checkpoint(false /*is_full_checkpoint*/);
     }
 
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
@@ -182,7 +148,6 @@ TEST_P(CheckpointTest, test_cleanup_and_checkpoint) {
     Storage *storage = infinity::InfinityContext::instance().storage();
     BufferManager *buffer_manager = storage->buffer_manager();
     TxnManager *txn_mgr = storage->txn_manager();
-    TxnTimeStamp last_commit_ts = 0;
     CompactionProcessor *compaction_processor = storage->compaction_processor();
 
     Vector<SharedPtr<ColumnDef>> columns;
@@ -233,7 +198,7 @@ TEST_P(CheckpointTest, test_cleanup_and_checkpoint) {
 
         txn_mgr->CommitTxn(txn5);
     }
-    WaitCleanup(storage, last_commit_ts);
+    WaitCleanup(storage);
     infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -312,9 +277,9 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         auto status3 = txn->DropIndexByName(*db_name, *table_name, *index_name, ConflictType::kInvalid);
         EXPECT_TRUE(status3.ok());
 
-        auto last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
 
-        WaitFlushDeltaOp(storage, last_commit_ts);
+        WaitFlushDeltaOp(storage);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -363,7 +328,6 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
     // String analyzer = "standard";
     Vector<SharedPtr<ColumnDef>> columns;
     Vector<InitParameter *> index_param_list;
-    TxnTimeStamp last_commit_ts = 0;
 
     // create table
     // create index, insert data and shutdown
@@ -432,11 +396,10 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
             auto append_status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(append_status.ok());
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
 
-        usleep(5000 * 1000);
-        WaitFlushDeltaOp(storage, last_commit_ts);
+        WaitFlushDeltaOp(storage);
 
         infinity::InfinityContext::instance().UnInit();
     }

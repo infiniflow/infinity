@@ -595,13 +595,23 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
     for (SizeT i = 0; i < column_defs.size(); ++i) {
         auto &wrap_column_def = column_defs[i];
         SharedPtr<TypeInfo> type_info_ptr = nullptr;
-        auto &logical_type = wrap_column_def.column_type.logical_type;
-        if (logical_type == LogicalType::kEmbedding || logical_type == LogicalType::kTensor || logical_type == LogicalType::kTensorArray) {
-            auto &embedding_type = wrap_column_def.column_type.embedding_type;
-            type_info_ptr = MakeShared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
-        } else if (logical_type == LogicalType::kSparse) {
-            auto &sparse_type = wrap_column_def.column_type.sparse_type;
-            type_info_ptr = SparseInfo::Make(sparse_type.element_type, sparse_type.index_type, sparse_type.dimension, SparseStoreType::kSort);
+        switch (wrap_column_def.column_type.logical_type) {
+            case LogicalType::kEmbedding:
+            case LogicalType::kMultiVector:
+            case LogicalType::kTensor:
+            case LogicalType::kTensorArray: {
+                auto &embedding_type = wrap_column_def.column_type.embedding_type;
+                type_info_ptr = MakeShared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
+                break;
+            }
+            case LogicalType::kSparse: {
+                auto &sparse_type = wrap_column_def.column_type.sparse_type;
+                type_info_ptr = SparseInfo::Make(sparse_type.element_type, sparse_type.index_type, sparse_type.dimension, SparseStoreType::kSort);
+                break;
+            }
+            default: {
+                break;
+            }
         }
         auto column_type = MakeShared<DataType>(wrap_column_def.column_type.logical_type, type_info_ptr);
         Status status;
@@ -899,6 +909,29 @@ void HandleEmbeddingType(ColumnField &output_column_field, SizeT row_count, cons
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
+void HandleMultiVectorType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+    SizeT all_size = 0;
+    Vector<Pair<const char *, SizeT>> multi_vector_data(row_count);
+    for (SizeT index = 0; index < row_count; ++index) {
+        Span<const char> raw_data = column_vector->GetMultiVectorRaw(index).first;
+        all_size += sizeof(i32) + raw_data.size();
+        multi_vector_data[index] = {raw_data.data(), raw_data.size()};
+    }
+    String dst;
+    dst.resize(all_size);
+
+    i32 current_offset = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        const auto &[data, length] = multi_vector_data[index];
+        std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+        std::memcpy(dst.data() + current_offset + sizeof(i32), data, length);
+        current_offset += sizeof(i32) + length;
+    }
+
+    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+    output_column_field.column_type = column_vector->data_type()->type();
+}
+
 void HandleTensorType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     SizeT all_size = 0;
     Vector<Pair<const char *, SizeT>> tensor_data(row_count);
@@ -1011,6 +1044,10 @@ void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, c
             HandleEmbeddingType(output_column_field, row_count, column_vector);
             break;
         }
+        case LogicalType::kMultiVector: {
+            HandleMultiVectorType(output_column_field, row_count, column_vector);
+            break;
+        }
         case LogicalType::kTensor: {
             HandleTensorType(output_column_field, row_count, column_vector);
             break;
@@ -1061,6 +1098,7 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
             proto_data_type.logical_type = data_type->type();
             break;
         }
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
         case LogicalType::kEmbedding: {

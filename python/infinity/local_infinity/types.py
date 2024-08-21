@@ -45,28 +45,9 @@ def logic_type_to_dtype(ttype: WrapDataType):
         case LogicalType.kVarchar:
             return dtype('str')
         case LogicalType.kEmbedding:
-            if ttype.embedding_type is not None:
-                match ttype.embedding_type.element_type:
-                    case EmbeddingDataType.kElemUInt8:
-                        return object
-                    case EmbeddingDataType.kElemInt8:
-                        return object
-                    case EmbeddingDataType.kElemInt16:
-                        return object
-                    case EmbeddingDataType.kElemInt32:
-                        return object
-                    case EmbeddingDataType.kElemFloat:
-                        return object
-                    case EmbeddingDataType.kElemDouble:
-                        return object
-                    case EmbeddingDataType.kElemFloat16:
-                        return object
-                    case EmbeddingDataType.kElemBFloat16:
-                        return object
-                    case EmbeddingDataType.kElemBit:
-                        return object
-                    case _:
-                        raise NotImplementedError(f"Unsupported type {ttype.embedding_type}")
+            return object
+        case LogicalType.kMultiVector:
+            return object
         case LogicalType.kTensor:
             return object
         case LogicalType.kTensorArray:
@@ -235,6 +216,8 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
                     f"Unsupported type {element_type}")
         case LogicalType.kSparse:
             return parse_sparse_bytes(column_data_type, column_vector)
+        case LogicalType.kMultiVector:
+            return parse_tensor_bytes(column_data_type, column_vector)
         case LogicalType.kTensor:
             return parse_tensor_bytes(column_data_type, column_vector)
         case LogicalType.kTensorArray:

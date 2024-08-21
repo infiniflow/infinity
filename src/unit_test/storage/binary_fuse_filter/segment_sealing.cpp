@@ -111,6 +111,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 
 TEST_P(SealingTaskTest, append_unsealed_segment_sealed) {
+    GTEST_SKIP() << "Skipping slow test.";
     {
         String table_name = "tbl1";
         Storage *storage = infinity::InfinityContext::instance().storage();

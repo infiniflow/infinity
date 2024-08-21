@@ -208,7 +208,15 @@ OpenFile(std::shared_ptr<::arrow::RandomAccessFile> file, ::arrow::MemoryPool *p
 namespace infinity {
 
 // spdlog
-export enum class LogLevel { kTrace, kDebug, kInfo, kWarning, kError, kCritical };
+export enum class LogLevel {
+    kTrace,
+    kDebug,
+    kInfo,
+    kWarning,
+    kError,
+    kCritical,
+    kOff,
+};
 
 export std::string LogLevel2Str(LogLevel log_level) {
     switch (log_level) {
@@ -231,6 +239,9 @@ export std::string LogLevel2Str(LogLevel log_level) {
         case LogLevel::kCritical: {
             return "Critical";
         }
+        case LogLevel::kOff: {
+            return "Off";
+        }
     }
 }
 
@@ -248,6 +259,8 @@ export void SetLogLevel(LogLevel log_level) {
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::err);
         case LogLevel::kCritical:
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::critical);
+        case LogLevel::kOff:
+            return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::off);
     }
 }
 

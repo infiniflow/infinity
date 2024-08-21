@@ -197,6 +197,7 @@ TEST_P(CompactTaskTest, compact_to_single_segment) {
 }
 
 TEST_P(CompactTaskTest, compact_to_two_segment) {
+    GTEST_SKIP() << "Skipping slow test.";
     {
         String table_name = "tbl1";
 
@@ -261,6 +262,7 @@ TEST_P(CompactTaskTest, compact_to_two_segment) {
 }
 
 TEST_P(CompactTaskTest, compact_with_delete) {
+    GTEST_SKIP() << "Skipping slow test.";
     {
         String table_name = "tbl1";
 

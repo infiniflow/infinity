@@ -33,7 +33,8 @@ class LogicType(object):
     Tensor = 13
     TensorArray = 14
     Sparse = 15
-    Invalid = 16
+    MultiVector = 16
+    Invalid = 17
 
     _VALUES_TO_NAMES = {
         0: "Boolean",
@@ -52,7 +53,8 @@ class LogicType(object):
         13: "Tensor",
         14: "TensorArray",
         15: "Sparse",
-        16: "Invalid",
+        16: "MultiVector",
+        17: "Invalid",
     }
 
     _NAMES_TO_VALUES = {
@@ -72,7 +74,8 @@ class LogicType(object):
         "Tensor": 13,
         "TensorArray": 14,
         "Sparse": 15,
-        "Invalid": 16,
+        "MultiVector": 16,
+        "Invalid": 17,
     }
 
 
@@ -280,8 +283,9 @@ class ColumnType(object):
     ColumnTensor = 11
     ColumnTensorArray = 12
     ColumnSparse = 13
-    ColumnRowID = 14
-    ColumnInvalid = 15
+    ColumnMultiVector = 14
+    ColumnRowID = 15
+    ColumnInvalid = 16
 
     _VALUES_TO_NAMES = {
         0: "ColumnBool",
@@ -298,8 +302,9 @@ class ColumnType(object):
         11: "ColumnTensor",
         12: "ColumnTensorArray",
         13: "ColumnSparse",
-        14: "ColumnRowID",
-        15: "ColumnInvalid",
+        14: "ColumnMultiVector",
+        15: "ColumnRowID",
+        16: "ColumnInvalid",
     }
 
     _NAMES_TO_VALUES = {
@@ -317,8 +322,9 @@ class ColumnType(object):
         "ColumnTensor": 11,
         "ColumnTensorArray": 12,
         "ColumnSparse": 13,
-        "ColumnRowID": 14,
-        "ColumnInvalid": 15,
+        "ColumnMultiVector": 14,
+        "ColumnRowID": 15,
+        "ColumnInvalid": 16,
     }
 
 

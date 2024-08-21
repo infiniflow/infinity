@@ -522,6 +522,53 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         pass
 
+    def _test_insert_multivector(self, suffix):
+        """
+        target: test insert multivector column
+        method: create table with multivector column
+        expected: ok
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_multivector"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_multivector"+suffix, {"c1": {"type": "multivector,3,int"}}, ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": [1, 2, 3]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [[4, 5, 6]]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": np.array([[7, 8, 9], [-7, -8, -9]])}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
+        res = table_obj.insert([{"c1": [1, 2, 3]}, {"c1": [4, 5, 6]}, {
+            "c1": [7, 8, 9, -7, -8, -9]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]],
+                                                                [[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
+
+        res = db_obj.drop_table("test_insert_multivector"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        db_obj.drop_table("test_insert_multivector_2"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_insert_multivector_2"+suffix, {"c1": {"type": "multivector,3,float"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_insert_multivector_2"+suffix)
+        assert table_obj
+        res = table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [[4.4, 5.5, 6.6]]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]]}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': ([[1.1, 2.2, 3.3]], [[4.4, 5.5, 6.6]], [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]])}))
+
+        res = db_obj.drop_table("test_insert_multivector_2"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def _test_insert_tensor(self, suffix):
         """
         target: test insert tensor column
@@ -611,6 +658,7 @@ class TestInfinity:
         self._test_batch_insert(suffix)
         self._test_insert_zero_column(suffix)
         self._test_insert_sparse(suffix)
+        self._test_insert_multivector(suffix)
         self._test_insert_tensor(suffix)
         self._test_insert_tensor_array(suffix)
 
