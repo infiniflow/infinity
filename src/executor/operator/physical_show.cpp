@@ -548,13 +548,11 @@ void PhysicalShow::Init() {
             break;
         }
         case ShowType::kShowMemoryAllocation: {
-            output_names_->reserve(3);
-            output_types_->reserve(3);
+            output_names_->reserve(2);
+            output_types_->reserve(2);
             output_names_->emplace_back("name");
-            output_names_->emplace_back("count");
             output_names_->emplace_back("total_size");
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             break;
         }
@@ -5465,35 +5463,36 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
-//    SizeT row_count = 0;
 
-//    for(auto& range: deleted_ranges) {
-//        if (output_block_ptr.get() == nullptr) {
-//            output_block_ptr = DataBlock::MakeUniquePtr();
-//            output_block_ptr->Init(column_types);
-//        }
-//        {
-//            // start
-//            Value value = Value::MakeBigInt(range.start_);
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-//        }
-//        {
-//            // end
-//            Value value = Value::MakeBigInt(range.end_);
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
-//        }
-//
-//        ++row_count;
-//        if (row_count == output_block_ptr->capacity()) {
-//            output_block_ptr->Finalize();
-//            operator_state->output_.emplace_back(std::move(output_block_ptr));
-//            output_block_ptr = nullptr;
-//            row_count = 0;
-//        }
-//
-//    }
+    HashMap<String, i64> object_map = GlobalResourceUsage::GetObjectClones();
+    SizeT row_count = 0;
+
+    for(auto& object_pair: object_map) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+        {
+            // object_name
+            Value value = Value::MakeVarchar(object_pair.first);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // object_count
+            Value value = Value::MakeBigInt(object_pair.second);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
@@ -5501,7 +5500,53 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
 }
 
 void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        bigint_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    HashMap<String, i64> raw_memory_map = GlobalResourceUsage::GetRawMemoryClone();
+    SizeT row_count = 0;
+
+    for(auto& raw_memory_pair: raw_memory_map) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // name
+            Value value = Value::MakeVarchar(raw_memory_pair.first);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // total_memory
+            Value value = Value::MakeBigInt(raw_memory_pair.second);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
 }
 
 } // namespace infinity

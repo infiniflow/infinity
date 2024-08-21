@@ -87,6 +87,15 @@ public:
 #endif
     }
 
+    static HashMap<String, i64> GetObjectClones() {
+#ifdef INFINITY_STATS
+        std::unique_lock<std::mutex> unique_locker(object_mutex_);
+        return object_map_;
+#else
+        return HashMap<String, i64>();
+#endif
+    }
+
     static void IncrRawMemCount(const String &key) {
 #ifdef INFINITY_STATS
         std::unique_lock<std::mutex> unique_locker(raw_memory_mutex_);
@@ -127,6 +136,15 @@ public:
         return fmt::format("allocate count: {}, total_size: {}", raw_memory_map_.size(), raw_memory_count_);
 #else
         return "Not activate";
+#endif
+    }
+
+    static HashMap<String, i64> GetRawMemoryClone() {
+#ifdef INFINITY_STATS
+        std::unique_lock<std::mutex> unique_locker(raw_memory_mutex_);
+        return raw_memory_map_;
+#else
+        return HashMap<String, i64>();
 #endif
     }
 
