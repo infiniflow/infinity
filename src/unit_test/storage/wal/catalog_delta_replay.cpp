@@ -69,23 +69,9 @@ public:
     SharedPtr<String> config_path{};
 
 protected:
-    void WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
-        TxnManager *txn_mgr = storage->txn_manager();
-
-        TxnTimeStamp visible_ts = 0;
-        time_t start = time(nullptr);
-        while (true) {
-            visible_ts = txn_mgr->GetCleanupScanTS();
-            if (visible_ts >= last_commit_ts) {
-                break;
-            }
-            // wait for at most 10s
-            time_t end = time(nullptr);
-            if (end - start > 10) {
-                String error_message = "WaitFlushDeltaOp timeout";
-                UnrecoverableError(error_message);
-            }
-        }
+    void WaitFlushDeltaOp(Storage *storage) {
+        WalManager *wal_mgr = storage->wal_manager();
+        wal_mgr->Checkpoint(false /*is_full_checkpoint*/);
     }
 
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
@@ -138,7 +124,6 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp last_commit_ts = 0;
 
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
@@ -151,14 +136,14 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
             EXPECT_TRUE(status.ok());
             db_entry_dir1 = db_entry->db_entry_dir();
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
             txn->CreateDatabase(*db_name3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
         }
-        WaitFlushDeltaOp(storage, last_commit_ts);
+        WaitFlushDeltaOp(storage);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -209,7 +194,6 @@ TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp last_commit_ts = 0;
 
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
@@ -222,7 +206,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
             EXPECT_TRUE(status.ok());
             table_entry_dir1 = table_entry->TableEntryDir();
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
@@ -230,7 +214,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
             txn->CreateTable(*db_name, table_def3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
         }
-        WaitFlushDeltaOp(storage, last_commit_ts);
+        WaitFlushDeltaOp(storage);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -276,7 +260,6 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp last_commit_ts = 0;
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
@@ -285,7 +268,7 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
@@ -322,9 +305,9 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
             segment_entry->FlushNewData();
             txn->Import(table_entry, segment_entry);
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
-        WaitFlushDeltaOp(storage, last_commit_ts);
+        WaitFlushDeltaOp(storage);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -377,7 +360,6 @@ TEST_P(CatalogDeltaReplayTest, replay_append) {
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp last_commit_ts = 0;
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
@@ -405,9 +387,9 @@ TEST_P(CatalogDeltaReplayTest, replay_append) {
 
             status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
-        WaitFlushDeltaOp(storage, last_commit_ts);
+        WaitFlushDeltaOp(storage);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -459,7 +441,6 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp last_commit_ts = 0;
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
@@ -467,7 +448,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
         {
 
@@ -492,7 +473,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
 
             status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("delete"));
@@ -508,7 +489,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
             txn_mgr->CommitTxn(txn);
         }
 
-        WaitFlushDeltaOp(storage, last_commit_ts);
+        WaitFlushDeltaOp(storage);
         infinity::InfinityContext::instance().UnInit();
     }
 }
@@ -530,7 +511,6 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp last_commit_ts = 0;
         // create table and insert two records
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
@@ -559,7 +539,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
 
             status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert"));
@@ -586,7 +566,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
 
             status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
 
         // 1. remain some uncommitted txn before force full checkpoint
@@ -638,8 +618,8 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             status = txn_record3->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
 
-            last_commit_ts = txn_mgr->CommitTxn(txn_record3);
-            WaitFlushDeltaOp(storage, last_commit_ts);
+            txn_mgr->CommitTxn(txn_record3);
+            WaitFlushDeltaOp(storage);
         }
         infinity::InfinityContext::instance().UnInit();
     }
@@ -764,7 +744,6 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp last_commit_ts = 0;
         {
             // create table
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
@@ -774,7 +753,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
         {
             // insert datas
@@ -812,7 +791,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
             segment_entry->FlushNewData();
             txn->Import(table_entry, segment_entry);
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
 
         String idx_name = "test_full_idx";
@@ -881,9 +860,9 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
                         auto status8 = txn_idx->CreateIndexFinish(table_entry, table_idx_entry);
                         EXPECT_TRUE(status8.ok());
                     }
-                    last_commit_ts = txn_mgr->CommitTxn(txn_idx);
+                    txn_mgr->CommitTxn(txn_idx);
                 }
-                WaitFlushDeltaOp(storage, last_commit_ts);
+                WaitFlushDeltaOp(storage);
             }
             {
                 // Drop index (by Name)
@@ -893,9 +872,9 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
                     EXPECT_TRUE(status9.ok());
                 }
-                last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
+                txn_mgr->CommitTxn(txn_idx_drop);
             }
-            WaitFlushDeltaOp(storage, last_commit_ts);
+            WaitFlushDeltaOp(storage);
         }
         infinity::InfinityContext::instance().UnInit();
     }
@@ -916,7 +895,6 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp last_commit_ts = 0;
         {
             // create database
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
@@ -927,7 +905,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
             EXPECT_TRUE(status.ok());
             db_entry_dir = db_entry->db_entry_dir();
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
         {
             // create table
@@ -938,7 +916,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
         {
             // insert datas
@@ -976,7 +954,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
             segment_entry->FlushNewData();
             txn->Import(table_entry, segment_entry);
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
 
         String idx_name = "test_full_idx";
@@ -1045,7 +1023,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                         auto status8 = txn_idx->CreateIndexFinish(table_entry, table_idx_entry);
                         EXPECT_TRUE(status8.ok());
                     }
-                    last_commit_ts = txn_mgr->CommitTxn(txn_idx);
+                    txn_mgr->CommitTxn(txn_idx);
                 }
             }
             {
@@ -1056,10 +1034,10 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
                     EXPECT_TRUE(status9.ok());
                 }
-                last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
+                txn_mgr->CommitTxn(txn_idx_drop);
             }
         }
-        WaitFlushDeltaOp(storage, last_commit_ts);
+        WaitFlushDeltaOp(storage);
         infinity::InfinityContext::instance().UnInit();
     }
 }
@@ -1082,7 +1060,6 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         CompactionProcessor *compaction_processor = storage->compaction_processor();
 
         TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp last_commit_ts = 0;
         {
             // create table
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
@@ -1092,7 +1069,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
         {
             // insert data
@@ -1126,7 +1103,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
             segment_entry->FlushNewData();
             txn->Import(table_entry, segment_entry);
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
 
         String idx_name = "test_full_idx";
@@ -1192,7 +1169,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                         auto status8 = txn_idx->CreateIndexFinish(table_entry, table_idx_entry);
                         EXPECT_TRUE(status8.ok());
                     }
-                    last_commit_ts = txn_mgr->CommitTxn(txn_idx);
+                    txn_mgr->CommitTxn(txn_idx);
                 }
             }
 
@@ -1201,8 +1178,8 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
 
             this->AddSegments(txn_mgr, *table_name, segment_sizes, buffer_manager);
             {
-                last_commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
-                EXPECT_NE(last_commit_ts, 0u);
+                auto commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
+                EXPECT_NE(commit_ts, 0u);
             }
 
             {
@@ -1213,10 +1190,10 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
                     EXPECT_TRUE(status9.ok());
                 }
-                last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
+                txn_mgr->CommitTxn(txn_idx_drop);
             }
         }
-        WaitFlushDeltaOp(storage, last_commit_ts);
+        WaitFlushDeltaOp(storage);
         infinity::InfinityContext::instance().UnInit();
     }
 }
