@@ -130,8 +130,8 @@ TEST_F(VectorHeapTest, fix_heap1) {
 
     EXPECT_EQ(total_size, vector_heap_mgr_.total_size());
 
-    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
-    std::cout << vector_heap_mgr_.Stats() << std::endl;
+//    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
+//    std::cout << vector_heap_mgr_.Stats() << std::endl;
 }
 
 TEST_F(VectorHeapTest, fix_heap2) {
@@ -161,8 +161,8 @@ TEST_F(VectorHeapTest, fix_heap2) {
 
     EXPECT_EQ(total_size, vector_heap_mgr_.total_size());
 
-    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
-    std::cout << vector_heap_mgr_.Stats() << std::endl;
+//    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
+//    std::cout << vector_heap_mgr_.Stats() << std::endl;
 }
 
 

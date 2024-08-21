@@ -40,6 +40,7 @@ import column_def;
 import base_entry;
 import default_values;
 import constant_expr;
+import persistence_manager;
 
 namespace infinity {
 
@@ -115,6 +116,8 @@ public:
     TxnTimeStamp commit_ts_{0};
     MergeFlag merge_flag_{MergeFlag::kInvalid};
     SharedPtr<String> encode_;
+    AddrSerializer addr_serializer_{};
+    mutable SizeT pm_size_ = 0; // tmp for test. should delete when stable
 
 public:
     CatalogDeltaOpType type_{CatalogDeltaOpType::INVALID};

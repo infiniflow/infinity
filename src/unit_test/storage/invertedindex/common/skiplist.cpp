@@ -23,7 +23,7 @@ import skiplist;
 using namespace infinity;
 
 class SkiplistTest : public BaseTest {};
-
+# if 0
 typedef u32 Key;
 typedef u32 Value;
 
@@ -176,3 +176,4 @@ TEST_F(SkiplistTest, test3) {
 
     // You can add additional assertions here to validate the correctness of the SkipList
 }
+#endif

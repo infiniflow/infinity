@@ -49,8 +49,6 @@ protected:
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
-
-        RemoveDbDirs();
     }
 
     Txn *DeleteRow(const String &db_name, const String &table_name, Vector<SegmentOffset> segment_offsets) {

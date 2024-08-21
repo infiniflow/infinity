@@ -47,6 +47,6 @@ TEST_F(EmbeddingInfoTest, embedding_info_A) {
 
     nlohmann::json json;
     json["type_info"] = embedding_info_ptr->Serialize();
-    std::cout << json.dump() << std::endl;
+//    std::cout << json.dump() << std::endl;
     //    EXPECT_EQ(json.dump(), "{\"type_info\":{\"precision\":38,\"scale\":38}}");
 }

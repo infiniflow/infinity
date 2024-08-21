@@ -44,3 +44,7 @@ class TestDrop:
         except Exception as e:
             assert e.error_code == ErrorCode.TABLE_NOT_EXIST
         print(table_obj)
+
+        infinity_obj.disconnect()
+        infinity_runner.uninit()
+        time.sleep(1)

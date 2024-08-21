@@ -38,7 +38,7 @@ export struct ObjAddr {
 
     void WriteBufAdv(char *&buf) const;
 
-    void ReadBufAdv(char *&buf);
+    static ObjAddr ReadBufAdv(char *&buf);
 };
 
 export struct Range {
@@ -72,7 +72,7 @@ export struct ObjStat {
 
     void WriteBufAdv(char *&buf) const;
 
-    void ReadBufAdv(char *&buf);
+    static ObjStat ReadBufAdv(char *&buf);
 };
 
 export class PersistenceManager {
@@ -118,12 +118,6 @@ public:
 
     void Deserialize(const nlohmann::json &obj);
 
-    void WriteBufAdv(char *&buf, const Vector<String> &local_paths);
-
-    void ReadBufAdv(char *&buf);
-
-    SizeT GetSizeInBytes(const Vector<String> &local_paths);
-
     HashMap<String, ObjStat> GetAllObjects() const;
     HashMap<String, ObjAddr> GetAllFiles() const;
 
@@ -147,8 +141,10 @@ private:
 
     ObjStat GetObjStatByObjAddr(const ObjAddr &obj_addr);
 
+public: // for unit test
     void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
 
+private:
     void SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat);
 
     String workspace_;
@@ -162,5 +158,19 @@ private:
     String current_object_key_;
     SizeT current_object_size_;
     SizeT current_object_parts_;
+
+    friend struct AddrSerializer;
 };
+
+export struct AddrSerializer {
+    SizeT GetSizeInBytes(PersistenceManager *pm, const Vector<String> &path) const;
+
+    void WriteBufAdv(PersistenceManager *pm, char *&buf, const Vector<String> &path) const;
+
+    Vector<String> ReadBufAdv(PersistenceManager *pm, char *&buf);
+
+    mutable Vector<ObjAddr> obj_addrs_; // set mutable to minimize refactor
+    mutable Vector<ObjStat> obj_stats_;
+};
+
 } // namespace infinity

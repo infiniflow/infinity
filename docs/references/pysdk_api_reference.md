@@ -27,12 +27,12 @@ The `uri` here can be either a local directory in `str` format or a `NetworkAddr
 When connecting to Infinity in client-server mode, ensure that the client version *exactly* matches the server version. For example:
 
 | **Client version** | **Server version** |
-| ------------------ | ------------------ |
+|--------------------|--------------------|
 | v0.1.0             | v0.1.0             |
 | v0.1.1             | v0.1.1             |
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
-| v0.3.0.dev5        | v0.3.0.dev5        |
+| v0.3.0.dev6        | v0.3.0.dev6        |
 
 If the versions do not match, please update your client or server to ensure compatibility.
 

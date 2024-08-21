@@ -90,12 +90,12 @@ TEST_F(LinScanAlgTest, approximate_scan) {
 
     u32 hit_all = 0;
     u32 total_all = 0;
-    u64 used_budget_all = 0;
+//    u64 used_budget_all = 0;
     for (auto iter = SparseMatrixIter(query); iter.HasNext(); iter.Next()) {
         SparseVecRef query = iter.val();
 
         auto [candidate_indices, candidate_scores, used_budget] = index.SearchKnn(query, candidate_n, budget);
-        used_budget_all += used_budget;
+//        used_budget_all += used_budget;
 
         // std::cout << fmt::format("budget: {}, used: {}\n", budget, used_budget);
 
@@ -110,12 +110,12 @@ TEST_F(LinScanAlgTest, approximate_scan) {
         total_all += total;
 
         // SparseTestUtil<f32, i32>::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
-        std::cout << fmt::format("accuracy: {}\n", (f32)hit / total);
+//        std::cout << fmt::format("accuracy: {}\n", (f32)hit / total);
     }
     if (hit_all < total_all * accuracy_all) {
-        std::cout << fmt::format("hit: {}, total: {}\n", hit_all, total_all);
+//        std::cout << fmt::format("hit: {}, total: {}\n", hit_all, total_all);
         EXPECT_TRUE(false);
     }
-    std::cout << fmt::format("All accuracy: {}\n", (f32)hit_all / total_all);
-    std::cout << fmt::format("avg budget: {}\n", (f32)used_budget_all / query_n);
+//    std::cout << fmt::format("All accuracy: {}\n", (f32)hit_all / total_all);
+//    std::cout << fmt::format("avg budget: {}\n", (f32)used_budget_all / query_n);
 }
