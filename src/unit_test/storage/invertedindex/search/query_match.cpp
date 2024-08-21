@@ -47,9 +47,7 @@ protected:
     void SetUp() override {
         BaseTestParamStr::SetUp();
         BaseTestParamStr::RemoveDbDirs();
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
         system(("mkdir -p " + String(GetFullPersistDir())).c_str());
         system(("mkdir -p " + String(GetFullDataDir())).c_str());
         system(("mkdir -p " + String(GetFullTmpDir())).c_str());
@@ -63,11 +61,9 @@ protected:
     }
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
         BaseTestParamStr::TearDown();
     }
 

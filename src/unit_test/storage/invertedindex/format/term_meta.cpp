@@ -20,18 +20,14 @@ class TermMetaTest : public BaseTest {
 public:
     void SetUp() override {
         BaseTest::SetUp();
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
 
         file_name_ = String(GetFullTmpDir()) + "/term_meta";
     }
     void TearDown() override {
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
         BaseTest::TearDown();
     }
 

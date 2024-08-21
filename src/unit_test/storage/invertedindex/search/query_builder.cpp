@@ -149,9 +149,7 @@ auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<RowID> 
 class QueryBuilderTest : public BaseTestParamStr {
     void SetUp() override {
         BaseTestParamStr::SetUp();
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
         RemoveDbDirs();
         system(("mkdir -p " + String(GetFullPersistDir())).c_str());
         system(("mkdir -p " + String(GetFullDataDir())).c_str());
@@ -166,11 +164,9 @@ class QueryBuilderTest : public BaseTestParamStr {
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
         BaseTestParamStr::TearDown();
     }
 };

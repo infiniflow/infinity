@@ -66,11 +66,9 @@ class SealingTaskTest : public BaseTestParamStr {
     void TearDown() override {
         // system(tree_cmd.c_str());
         infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
     }
 
     String tree_cmd;
