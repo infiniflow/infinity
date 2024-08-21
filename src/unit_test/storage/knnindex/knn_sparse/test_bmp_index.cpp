@@ -55,6 +55,13 @@ protected:
         LocalFileSystem fs;
 
         auto test_query = [&](const BMPAlg &index) {
+            {
+                SparseMatrixIter iter(query_set);
+                SparseVecRef vec = iter.val();
+                auto [indices, scores] = index.SearchKnn(vec, 0/*topk*/, options);
+                EXPECT_EQ(indices.size(), 0);
+                EXPECT_EQ(scores.size(), 0);
+            }
             u32 hit_all = 0;
             u32 total_all = 0;
             for (SparseMatrixIter iter(query_set); iter.HasNext(); iter.Next()) {
