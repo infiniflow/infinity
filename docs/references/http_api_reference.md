@@ -69,8 +69,6 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 - `error_code`: `int`  
   `0`: The operation succeeds.
-- `error_msg`: `str`  
-  When `error_code` is `0`, `error_msg` is an empty string.  
 
 #### Status code 500
 
@@ -167,7 +165,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}`
 
-Shows detailed information of a specified database.
+Shows detailed information about a specified database.
 
 ### Request
 
@@ -186,7 +184,7 @@ curl --request GET \
 #### Request parameter
 
 - `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string indicating the name of the database to retrieve.
+  A non-empty string that specifies the name of the database to retrieve.
 
 ### Response
 
@@ -202,6 +200,15 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
     "table_count": 0
 }
 ```
+
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+- `database_name`: `str`  
+  The name of the retrieved database.
+- `store_dir`: `str`  
+  The directory path where the database is stored.
+- `table_count`: `int`  
+  The number of tables present in the database.
 
 #### Status code 500
 
@@ -222,6 +229,8 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ---
 
 ## List databases
+
+**GET** `/databases`
 
 Retrieves all databases in the system.
 
@@ -255,9 +264,16 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+- `databases`: `list[string]`  
+  An array of strings representing the names of the databases in the system.
+
 ---
 
 ## Create table
+
+**POST** `/databases/{database_name}/tables/{table_name}`
 
 Creates a table in a specified database.
 
@@ -273,6 +289,8 @@ Creates a table in a specified database.
   ```shell
   {
       "create_option": "<option>"
+      "fields": "<json_object_list>"
+      "properties": "<json_object_list>"
   }
   ```
 
@@ -326,7 +344,28 @@ curl --request POST \
 
 
 
-#### Request parameter
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database to retrieve.
+- `table_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the table to create, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+- `create_option`: (*Body parameter*), `enum<string>`, *Optional*  
+  Conflict policy in `enum<string>` for handling situations where a table with the same name exists.
+  - `"error"`: (Default) Raise an error if a database with the same name exists.
+  - `"ignore_if_exist"`: Ignore the table creation requrest and keep the existing table with the same name.
+- `field`: (*Body parameter*), `object[]`, *Required*
+  - `"name"`: `str`, *Required*
+  - `"type"`: `str`, *Required*
+  - `"constraints`: `[]`, *Required*
+  - `"id"`: `int`, *Optional*
 
 ### Response
 
@@ -359,6 +398,8 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ---
 
 ## Drop table
+
+**DELETE** `/databases/{database_name}/tables/{table_name}`
 
 Deletes a table from a specified database.
 
@@ -420,6 +461,8 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ## List tables
 
+**GET** `/databases/{database_name}/tables`
+
 Lists all tables in a specified database.
 
 ### Request
@@ -472,6 +515,8 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 ---
 
 ## Show table
+
+**GET** `/databases/{database_name}/tables/{table_name}`
 
 Shows detailed information of a specified table.
 
@@ -526,6 +571,8 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ---
 
 ## Show table columns
+
+**GET** `/databases/{database_name}/tables/{table_name}/columns`
 
 Shows the column information of a specific table in a specified database.
 
@@ -591,6 +638,8 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 ---
 
 ## Create an index
+
+**POST** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 
 Creates an index on a specified table.
 
@@ -665,6 +714,8 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ## Drop an index
 
+**DELETE** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+
 Drop an index.
 
 ### Request
@@ -729,6 +780,8 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ## Show index
 
+**GET** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+
 Show detailed information of a specified index.
 
 ### Request
@@ -784,6 +837,8 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ## Show index segment
 
+**GET** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}`
+
 Show detailed information of a specified index segment.
 
 ### Request
@@ -831,9 +886,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Show index chunk
+
+**DELETE** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id}`
 
 Show detailed information of a index chunk of specified index chunk.
 
@@ -880,9 +942,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## List indexes
+
+**GET** `/databases/{database_name}/tables/{table_name}/indexes`
 
 Lists all indexes of a specified table.
 
@@ -932,6 +1001,8 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 ---
 
 ## Import data
+
+**PUT** `/databases/{database_name}/tables/{table_name}`
 
 Imports data into a specified table.
 
@@ -991,9 +1062,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Export data
+
+**GET** `/databases/{database_name}/tables/{table_name}`
 
 Exports data into a specified table.
 
@@ -1047,9 +1125,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Insert data
+
+**POST** `/databases/{database_name}/tables/{table_name}/docs`
 
 Inserts data into a specified table.
 
@@ -1115,9 +1200,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Delete data
+
+**DELETE** `/databases/{database_name}/tables/{table_name}/docs`
 
 Deletes data in a specified table.
 
@@ -1169,9 +1261,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Update
+
+**PUT** `/databases/{database_name}/tables/{table_name}/docs`
 
 Updates data in a specified table.
 
@@ -1233,9 +1332,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Search data
+
+**GET** `/databases/{database_name}/tables/{table_name}/docs`
 
 Searches data in a specified table.
 
@@ -1251,6 +1357,8 @@ Searches data in a specified table.
   ```shell
 
   ```
+
+#### Request example
 
 ```shell
 curl --request GET \
@@ -1315,9 +1423,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Show segments
+
+**GET** `/databases/{database_name}/tables/{table_name}/segments/`
 
 Shows all segments of a specified table.
 
@@ -1369,9 +1484,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Show segment details
+
+**GET** `/databases/{database_name}/tables/{table_name}/segments/{segment_id}`
 
 Shows details of a specified segment.
 
@@ -1426,9 +1548,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Show blocks
+
+**GET** `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/`
 
 Shows all blocks of specified segment.
 
@@ -1479,9 +1608,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Show block details
+
+**GET** `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}`
 
 Shows details of a specified block.
 
@@ -1534,9 +1670,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Show block column
+
+**GET** `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}/{column_id}`
 
 Shows details of a specified column in a specific block.
 
@@ -1586,11 +1729,18 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Show variables
 
-Gets all global variables.
+**GET** `/variables`
+
+Retrieves all global variables.
 
 ### Request
 
@@ -1636,6 +1786,8 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 ## Show variable
 
+**GET** `/variables/{variable_name}`
+
 Gets a global variable.
 
 ### Request
@@ -1680,9 +1832,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Set a variable
+
+**POST** `/variables/{variable_name}`
 
 Sets a variable with value.
 
@@ -1732,9 +1891,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Show configs
+
+**GET** `/configs`
 
 Gets all configs.
 
@@ -1796,6 +1962,8 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 ## Show config
 
+**GET** `/configs/{config_name}`
+
 Gets a config.
 
 ### Request
@@ -1840,9 +2008,16 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
 ---
 
 ## Set a config
+
+**PUT** `/configs/{config_name}`
 
 Sets a config with value.
 
@@ -1893,5 +2068,10 @@ A `500` HTTP status code indicates an error condition. The response includes a J
     "error_message": "log level value range is trace, debug, info, warning, error, critical"
 }
 ```
+
+- `error_code`: `int`  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---

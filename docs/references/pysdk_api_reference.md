@@ -12,6 +12,10 @@ infinity.connect(uri)
 
 Connects to the local directory or the Infinity server, and gets an Infinity object.
 
+:::tip NOTE
+You must have an Infinity object ready to perform database-specific operations.
+:::
+
 ### Parameters
 
 #### uri: *Required*
@@ -309,6 +313,10 @@ db_object.create_table(table_name, columns_definition, conflict_type = ConflictT
 
 Creates a table with a specified name and defined columns.
 
+:::tip NOTE
+You must have a database object ready to perform table-specific operations.
+:::
+
 ### Parameters
 
 #### table_name: `str`, *Required*
@@ -571,6 +579,10 @@ table_object.create_index(index_name, index_info, conflict_type = ConflictType.E
 ```
 
 Creates index on a specified column.
+
+:::tip NOTE
+You must have a table object ready to perform index-specific operations.
+:::
 
 ### Parameters
 
@@ -1035,13 +1047,13 @@ table_object.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4,
 #### Insert sparse vectors
 
 ```python
+from infinity.common import SparseVector
 # Create a table with a integer column and a 100-d sparse vector column:
 table_object = db_object.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
 
 # Insert one row into the table:
 # `indices` specifies the correspoing indices to the values in `values`.
 # Note that the second row sets "c1" as 2024 by default. 
-from infinity.common import SparseVector
 table_object.insert([{"c1": 2022, "sparse_column": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])}, {"sparse_column": SparseVector([70, 80, 90], [7.7, 8.8, 9.9])}])
 ```
 
