@@ -646,6 +646,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kMixed", LogicalType::kMixed)
         .value("kNull", LogicalType::kNull)
         .value("kMissing", LogicalType::kMissing)
+        .value("kMultiVector", LogicalType::kMultiVector)
         .value("kTensor", LogicalType::kTensor)
         .value("kTensorArray", LogicalType::kTensorArray)
         .value("kSparse", LogicalType::kSparse)
