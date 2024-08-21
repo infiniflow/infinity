@@ -210,7 +210,7 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
             auto create_annivfflat_param = static_cast<CreateAnnIVFFlatParam *>(param);
             auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
             switch (elem_type) {
-                case kElemFloat: {
+                case EmbeddingDataType::kElemFloat: {
                     file_worker =
                         MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(index_dir, file_name, index_base, column_def, create_annivfflat_param->row_count_);
                     break;
@@ -619,7 +619,7 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
             u32 full_row_count = segment_entry->row_count();
             BufferHandle buffer_handle = GetIndex();
             switch (embedding_info->Type()) {
-                case kElemFloat: {
+                case EmbeddingDataType::kElemFloat: {
                     auto annivfflat_index = reinterpret_cast<AnnIVFFlatIndexData<f32> *>(buffer_handle.GetDataMut());
                     // TODO: How to select training data?
                     if (check_ts) {

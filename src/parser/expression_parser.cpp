@@ -2751,145 +2751,145 @@ yyreduce:
 
   case 77: /* column_type: EMBEDDING '(' BIT ',' LONG_VALUE ')'  */
 #line 535 "expression_parser.y"
-                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemBit}; }
+                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemBit}; }
 #line 2756 "expression_parser.cpp"
     break;
 
   case 78: /* column_type: EMBEDDING '(' TINYINT ',' LONG_VALUE ')'  */
 #line 536 "expression_parser.y"
-                                           { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt8}; }
+                                           { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
 #line 2762 "expression_parser.cpp"
     break;
 
   case 79: /* column_type: EMBEDDING '(' SMALLINT ',' LONG_VALUE ')'  */
 #line 537 "expression_parser.y"
-                                            { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt16}; }
+                                            { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
 #line 2768 "expression_parser.cpp"
     break;
 
   case 80: /* column_type: EMBEDDING '(' INTEGER ',' LONG_VALUE ')'  */
 #line 538 "expression_parser.y"
-                                           { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt32}; }
+                                           { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
 #line 2774 "expression_parser.cpp"
     break;
 
   case 81: /* column_type: EMBEDDING '(' INT ',' LONG_VALUE ')'  */
 #line 539 "expression_parser.y"
-                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt32}; }
+                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
 #line 2780 "expression_parser.cpp"
     break;
 
   case 82: /* column_type: EMBEDDING '(' BIGINT ',' LONG_VALUE ')'  */
 #line 540 "expression_parser.y"
-                                          { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt64}; }
+                                          { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
 #line 2786 "expression_parser.cpp"
     break;
 
   case 83: /* column_type: EMBEDDING '(' FLOAT ',' LONG_VALUE ')'  */
 #line 541 "expression_parser.y"
-                                         { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemFloat}; }
+                                         { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
 #line 2792 "expression_parser.cpp"
     break;
 
   case 84: /* column_type: EMBEDDING '(' DOUBLE ',' LONG_VALUE ')'  */
 #line 542 "expression_parser.y"
-                                          { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemDouble}; }
+                                          { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
 #line 2798 "expression_parser.cpp"
     break;
 
   case 85: /* column_type: VECTOR '(' BIT ',' LONG_VALUE ')'  */
 #line 543 "expression_parser.y"
-                                    { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemBit}; }
+                                    { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemBit}; }
 #line 2804 "expression_parser.cpp"
     break;
 
   case 86: /* column_type: VECTOR '(' TINYINT ',' LONG_VALUE ')'  */
 #line 544 "expression_parser.y"
-                                        { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt8}; }
+                                        { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
 #line 2810 "expression_parser.cpp"
     break;
 
   case 87: /* column_type: VECTOR '(' SMALLINT ',' LONG_VALUE ')'  */
 #line 545 "expression_parser.y"
-                                         { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt16}; }
+                                         { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
 #line 2816 "expression_parser.cpp"
     break;
 
   case 88: /* column_type: VECTOR '(' INTEGER ',' LONG_VALUE ')'  */
 #line 546 "expression_parser.y"
-                                        { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt32}; }
+                                        { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
 #line 2822 "expression_parser.cpp"
     break;
 
   case 89: /* column_type: VECTOR '(' INT ',' LONG_VALUE ')'  */
 #line 547 "expression_parser.y"
-                                    { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt32}; }
+                                    { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
 #line 2828 "expression_parser.cpp"
     break;
 
   case 90: /* column_type: VECTOR '(' BIGINT ',' LONG_VALUE ')'  */
 #line 548 "expression_parser.y"
-                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt64}; }
+                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
 #line 2834 "expression_parser.cpp"
     break;
 
   case 91: /* column_type: VECTOR '(' FLOAT ',' LONG_VALUE ')'  */
 #line 549 "expression_parser.y"
-                                      { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemFloat}; }
+                                      { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
 #line 2840 "expression_parser.cpp"
     break;
 
   case 92: /* column_type: VECTOR '(' DOUBLE ',' LONG_VALUE ')'  */
 #line 550 "expression_parser.y"
-                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::kElemDouble}; }
+                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
 #line 2846 "expression_parser.cpp"
     break;
 
   case 93: /* column_type: SPARSE '(' BIT ',' LONG_VALUE ')'  */
 #line 551 "expression_parser.y"
-                                    { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::kElemBit}; }
+                                    { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemBit}; }
 #line 2852 "expression_parser.cpp"
     break;
 
   case 94: /* column_type: SPARSE '(' TINYINT ',' LONG_VALUE ')'  */
 #line 552 "expression_parser.y"
-                                        { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt8}; }
+                                        { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
 #line 2858 "expression_parser.cpp"
     break;
 
   case 95: /* column_type: SPARSE '(' SMALLINT ',' LONG_VALUE ')'  */
 #line 553 "expression_parser.y"
-                                         { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt16}; }
+                                         { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
 #line 2864 "expression_parser.cpp"
     break;
 
   case 96: /* column_type: SPARSE '(' INTEGER ',' LONG_VALUE ')'  */
 #line 554 "expression_parser.y"
-                                        { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt32}; }
+                                        { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
 #line 2870 "expression_parser.cpp"
     break;
 
   case 97: /* column_type: SPARSE '(' INT ',' LONG_VALUE ')'  */
 #line 555 "expression_parser.y"
-                                    { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt32}; }
+                                    { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
 #line 2876 "expression_parser.cpp"
     break;
 
   case 98: /* column_type: SPARSE '(' BIGINT ',' LONG_VALUE ')'  */
 #line 556 "expression_parser.y"
-                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::kElemInt64}; }
+                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
 #line 2882 "expression_parser.cpp"
     break;
 
   case 99: /* column_type: SPARSE '(' FLOAT ',' LONG_VALUE ')'  */
 #line 557 "expression_parser.y"
-                                      { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::kElemFloat}; }
+                                      { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
 #line 2888 "expression_parser.cpp"
     break;
 
   case 100: /* column_type: SPARSE '(' DOUBLE ',' LONG_VALUE ')'  */
 #line 558 "expression_parser.y"
-                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::kElemDouble}; }
+                                       { (yyval.column_type_t) = infinity::ColumnType{infinity::LogicalType::kSparse, (yyvsp[-1].long_value), 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
 #line 2894 "expression_parser.cpp"
     break;
 

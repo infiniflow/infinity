@@ -342,7 +342,7 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
             case LogicalType::kTensorArray:
             case LogicalType::kMultiVector:
             case LogicalType::kEmbedding: {
-                type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
+                type_info = EmbeddingInfo::Make(type_info_json["embedding_type"].get<EmbeddingDataType>(), type_info_json["dimension"]);
                 break;
             }
             case LogicalType::kSparse: {
