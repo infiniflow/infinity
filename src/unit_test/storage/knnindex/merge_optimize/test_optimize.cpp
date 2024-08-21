@@ -74,40 +74,18 @@ protected:
         RemoveDbDirs();
     }
 
-    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+    void WaitCleanup(Storage *storage) {
         Catalog *catalog = storage->catalog();
-        TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_mgr = storage->buffer_manager();
-        BGTaskProcessor *bg_processor = storage->bg_processor();
-        {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"));
-            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true /*full_check_point*/);
-            bg_processor->Submit(force_ckp_task);
-            force_ckp_task->Wait();
-            txn_mgr->CommitTxn(txn);
-        }
-
-        LOG_INFO("Waiting cleanup");
-        TxnTimeStamp visible_ts = 0;
-        time_t start = time(nullptr);
-        while (true) {
-            visible_ts = txn_mgr->GetCleanupScanTS();
-            time_t end = time(nullptr);
-            if (visible_ts >= last_commit_ts) {
-                LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
-                break;
-            }
-            // wait for at most 10s
-            if (end - start > 10) {
-                String error_message = "WaitCleanup timeout";
-                UnrecoverableError(error_message);
-            }
-            LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
-            usleep(1000 * 1000);
-        }
-
+        TxnManager *txn_mgr = storage->txn_manager();
+        TxnTimeStamp visible_ts = txn_mgr->GetCleanupScanTS();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
+    }
+
+    void WaitFlushFullCkp(Storage *storage) {
+        WalManager *wal_mgr = storage->wal_manager();
+        wal_mgr->Checkpoint(true /*is_full_checkpoint*/);
     }
 };
 
@@ -210,7 +188,6 @@ TEST_P(OptimizeKnnTest, test1) {
             txn_mgr->CommitTxn(txn);
         }
     }
-    TxnTimeStamp last_commit_ts = 0;
     {
         Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"));
 
@@ -218,10 +195,11 @@ TEST_P(OptimizeKnnTest, test1) {
         ASSERT_TRUE(status.ok());
         table_entry->OptimizeIndex(txn);
 
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
 
-    WaitCleanup(storage, last_commit_ts);
+    WaitFlushFullCkp(storage);
+    WaitCleanup(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"));
 
@@ -311,15 +289,15 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
             txn_mgr->CommitTxn(txn);
         }
     }
-    TxnTimeStamp last_commit_ts = 0;
     {
         Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"));
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
         table_entry->OptimizeIndex(txn);
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
-    WaitCleanup(storage, last_commit_ts);
+    WaitFlushFullCkp(storage);
+    WaitCleanup(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"));
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
