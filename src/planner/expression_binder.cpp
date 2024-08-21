@@ -737,6 +737,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSpar
 
     SharedPtr<BaseExpression> query_expr = BuildExpression(*expr.query_sparse_expr_, bind_context_ptr, depth, root);
 
+    if (expr.topn_ == 0) {
+        RecoverableError(Status::InvalidParameterValue("topk", std::to_string(expr.topn_), "100"));
+    }
     auto bound_match_sparse_expr = MakeShared<MatchSparseExpression>(std::move(arguments),
                                                                      query_expr,
                                                                      expr.metric_type_,
