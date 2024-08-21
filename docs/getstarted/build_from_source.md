@@ -231,7 +231,7 @@ pip install gcovr
 
 ###  Step 2 Build and run unit test with code coverage option on 
 ```shell
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COR=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
 cmake --build . -t test_main
 ./cmake-build-debug/src/test_main
 ```
@@ -239,5 +239,5 @@ cmake --build . -t test_main
 ### Step 3 Use Gcovr to generate summarized code coverage results
 ```shell
 cd ./cmake-build-debug/src/CMakeFiles/unit_test.dir
-gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html example_html.html
+gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html unit_test_html.html
 ```

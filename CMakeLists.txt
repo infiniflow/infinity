@@ -127,14 +127,14 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS "-O0 -g")
     set(CMAKE_C_FLAGS "-O0 -g")
 
-    if ("${CODE_COR}" STREQUAL "ON")
+    if ("${CODE_COVERAGE}" STREQUAL "ON")
         add_compile_options(--coverage)
         add_link_options(--coverage)
     else ()
-        set(CODE_COR "OFF")
+        set(CODE_COVERAGE "OFF")
     endif()
 
-    message(STATUS "Code Coverage = ${CODE_COR}")
+    message(STATUS "Code Coverage = ${CODE_COVERAGE}")
 
     if(NOT ENABLE_JEMALLOC)
 
