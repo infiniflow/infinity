@@ -257,7 +257,7 @@ public:
 
     static void SetTensorArrayMeta(TensorArrayT &dest_tensor_array, VectorBuffer *dest_buffer, Span<const TensorT> tensors);
 
-    static Span<const TensorT> GetTensorArrayMeta(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer);
+    static Vector<TensorT> GetTensorArrayMeta(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer);
 
     static void SetTensorArray(TensorArrayT &dest_tensor_array,
                                VectorBuffer *dest_buffer,

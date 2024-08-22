@@ -143,7 +143,7 @@ public:
 
     SizeT AppendTensorRaw(const char *raw_data, SizeT size);
 
-    const TensorT *GetTensorArrayMeta(SizeT offset, SizeT array_num) const;
+    const char *GetTensorArrayMeta(SizeT offset, SizeT array_num) const;
 
     SizeT AppendTensorArrayMeta(Span<const TensorT> tensor_metas) const;
 

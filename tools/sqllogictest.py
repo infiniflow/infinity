@@ -36,6 +36,7 @@ from generate_test_parquet import generate as generate24
 from generate_tensor_parquet import generate as generate25
 from generate_tensor_array_parquet import generate as generate26
 from generate_multivector_parquet import generate as generate27
+from generate_multivector_knn_scan import generate as generate28
 
 
 class SpinnerThread(threading.Thread):
@@ -190,6 +191,7 @@ if __name__ == "__main__":
     generate25(args.generate_if_exists, args.copy)
     generate26(args.generate_if_exists, args.copy)
     generate27(args.generate_if_exists, args.copy)
+    generate28(args.generate_if_exists, args.copy)
 
     print("Generate file finshed.")
 
