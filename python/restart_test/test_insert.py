@@ -1,11 +1,10 @@
-import infinity
 import pytest
 from common import common_values
 from infinity_runner import InfinityRunner
 import time
 import threading
 
-
+@pytest.mark.slow
 class TestInsert:
     @pytest.mark.parametrize(
         "config",
@@ -76,3 +75,10 @@ class TestInsert:
             t1.start()
             insert_func(table_obj)
             t1.join()
+        
+        infinity_runner.init(config)
+        infinity_obj = InfinityRunner.connect(uri)
+        db_obj = infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert")
+
+

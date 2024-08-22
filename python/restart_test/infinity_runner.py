@@ -19,7 +19,7 @@ class InfinityRunner:
         os.system(f"rm -rf {self.data_dir}/*")
         print(f"clear {self.data_dir}")
 
-    def init(self, config_path: str | None):
+    def init(self, config_path: str | None = None):
         if config_path is None:
             config_path = self.default_config_path
         cmd = f"{self.infinity_path} --config={config_path} > restart_test.log.{self.i} 2>&1"

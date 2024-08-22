@@ -89,5 +89,7 @@ class TestMemIdx:
         time.sleep(3)
         check()
 
+        db_obj.drop_table("test_memidx1")
+
         infinity_obj.disconnect()
         infinity_runner.uninit()

@@ -43,5 +43,7 @@ class TestDrop:
             assert e.error_code == ErrorCode.TABLE_NOT_EXIST
         print(table_obj)
 
+        db_obj.drop_table("test_drop")
+
         infinity_obj.disconnect()
         infinity_runner.uninit()
