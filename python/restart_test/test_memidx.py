@@ -18,6 +18,7 @@ class TestMemIdx:
         infinity_obj = infinity.connect(uri)
 
         db_obj = infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_memidx1", infinity.common.ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_memidx1", {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}}
         )
@@ -45,7 +46,7 @@ class TestMemIdx:
         # config1 can held 6 rows of hnsw mem index before dump
         # 1. recover by dumpindex wal & memindex recovery
         infinity_runner.init(config2)
-        time.sleep(1)
+        time.sleep(3)
         infinity_obj = infinity.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("test_memidx1")
@@ -92,6 +93,7 @@ class TestMemIdx:
         time.sleep(3)
         check()
 
+        db_obj.drop_table("test_memidx1", infinity.common.ConflictType.Error)
         infinity_obj.disconnect()
         infinity_runner.uninit()
         time.sleep(1)
