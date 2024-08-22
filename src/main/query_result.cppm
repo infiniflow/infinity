@@ -39,7 +39,6 @@ public:
     BaseResult& operator=(BaseResult&& other)  noexcept {
         status_ = std::move(other.status_);
         result_table_ = std::move(other.result_table_);
-        GlobalResourceUsage::DecrObjectCount("BaseResult");
         return *this;
     }
 

@@ -5464,7 +5464,7 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    HashMap<String, i64> object_map = GlobalResourceUsage::GetObjectClones();
+    std::unordered_map<String, i64> object_map = GlobalResourceUsage::GetObjectClones();
     SizeT row_count = 0;
 
     for(auto& object_pair: object_map) {
@@ -5512,7 +5512,7 @@ void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, Show
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    HashMap<String, i64> raw_memory_map = GlobalResourceUsage::GetRawMemoryClone();
+    std::unordered_map<String, i64> raw_memory_map = GlobalResourceUsage::GetRawMemoryClone();
     SizeT row_count = 0;
 
     for(auto& raw_memory_pair: raw_memory_map) {
