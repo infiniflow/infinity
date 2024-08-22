@@ -314,7 +314,7 @@ db_object.create_table(table_name, columns_definition, conflict_type = ConflictT
 Creates a table with a specified name and defined columns.
 
 :::tip NOTE
-You must have a database object ready to perform table-specific operations.
+Call `create_database()` or `get_database()` to get a database object for all table-specific operations.
 :::
 
 ### Parameters
@@ -578,10 +578,10 @@ res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 table_object.create_index(index_name, index_info, conflict_type = ConflictType.Error)
 ```
 
-Creates index on a specified column.
+Creates an index on a specified column.
 
 :::tip NOTE
-You must have a table object ready to perform index-specific operations.
+Call `create_table()` or `get_table()` to get a database object for all index-specific operations.
 :::
 
 ### Parameters
@@ -1145,7 +1145,7 @@ table_object.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
 table_object.export_data(filepath, export_options, columns = None)
 ```
 
-Exports the current table to a specified file.
+Exports data in the current table to a specified file.
 
 ### Parameters
 

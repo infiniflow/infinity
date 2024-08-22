@@ -9,7 +9,7 @@ slug: /http_api_reference
 
 **POST** `/databases/{database_name}`
 
-Creates a database by its name. If the database already exists, the behavior is determined by the `create_option` parameter.
+Creates a database by its name. If the database already exists, the action taken depends on the `create_option` parameter.
 
 ### Request
 
@@ -92,7 +92,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **DELETE** `/databases/{database_name}`
 
-Deletes a database by its name. If the database does not exist, the behavior is determined by the `drop_option` parameter.
+Deletes a database by its name. If the database does not exist, the action taken depends on the `drop_option` parameter.
 
 ### Request
 
@@ -142,6 +142,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
     "error_code": 0
 }
 ```
+
+- `error_code`: `int`  
+  `0`: The operation succeeds.
 
 #### Status code 500
 
@@ -232,7 +235,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases`
 
-Retrieves all databases in the system.
+Retrieves a list of all available databases within the Infinity system.
 
 ### Request
 
@@ -275,7 +278,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 **POST** `/databases/{database_name}/tables/{table_name}`
 
-Creates a table in a specified database.
+Creates a table with a specified name and defined fields (columns) within a given database. If the table already exists, the action taken depends on the `create_option` parameter.
 
 ### Request
 
@@ -289,8 +292,7 @@ Creates a table in a specified database.
   ```shell
   {
       "create_option": "<option>"
-      "fields": "<json_object_list>"
-      "properties": "<json_object_list>"
+      "fields": <json_object_list>
   }
   ```
 
@@ -309,39 +311,19 @@ curl --request POST \
         {
             "name": "name",
             "type": "varchar",
-            "constraints": ["not null"],
-            "id": 0
-        },
-        {
-            "name": "age",
-            "type": "integer",
-            "constraints": ["not null"],
-            "id": 1
         },
         {
             "name": "score",
-            "type": "integer",
-            "constraints": ["not null"],
-            "id": 2
+            "type": "float"
         },
         {
             "name": "my_vector",
             "type": "vector",
-            "dimension": 1024,
-            "element_type": "float",
-            "id": 3
+            "dimension": 1024
         }
-    ],
-    "properties": 
-    [
-        { 
-            "bloomfilter_columns": [ "age", "score" ]
-        }
-    ]
-        
+    ]       
 } '
 ```
-
 
 
 #### Request parameters
@@ -364,8 +346,6 @@ curl --request POST \
 - `field`: (*Body parameter*), `object[]`, *Required*
   - `"name"`: `str`, *Required*
   - `"type"`: `str`, *Required*
-  - `"constraints`: `[]`, *Required*
-  - `"id"`: `int`, *Optional*
 
 ### Response
 
@@ -378,6 +358,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
     "error_code": 0
 }
 ```
+
+- `error_code`: `int`  
+  `0`: The operation succeeds.
 
 #### Status code 500
 
@@ -401,7 +384,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **DELETE** `/databases/{database_name}/tables/{table_name}`
 
-Deletes a table from a specified database.
+Deletes a table from a specified database. If the table does not exist, the action taken depends on the `drop_option` parameter.
 
 ### Request
 
@@ -441,6 +424,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -463,7 +449,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables`
 
-Lists all tables in a specified database.
+Retrieves a list of all available tables in a specified database.
 
 ### Request
 
@@ -512,13 +498,16 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 ---
 
 ## Show table
 
 **GET** `/databases/{database_name}/tables/{table_name}`
 
-Shows detailed information of a specified table.
+Shows detailed information about a specified table within a given database.
 
 ### Request
 
@@ -552,6 +541,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -574,7 +566,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}/columns`
 
-Shows the column information of a specific table in a specified database.
+Shows the column information about a specified table within a given database.
 
 ### Request
 
@@ -619,6 +611,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -637,11 +632,11 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Create an index
+## Create index
 
 **POST** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 
-Creates an index on a specified table.
+Creates an index on a specified table. If an index with the same name exists, the action taken depends on the `create_option` parameter.
 
 ### Request
 
@@ -653,7 +648,9 @@ Creates an index on a specified table.
 - Body:
 
   ```shell
-
+      "fields": <column_list>,
+      "index": <index_building_params_in_json>,
+      "create_option": "<option>"  
   ```
 
 ```shell
@@ -675,9 +672,7 @@ curl --request POST \
         "ef_construction": "50",
         "metric": "l2"
     },
-     "create_option": {
-        "ignore_if_exists": true
-    }
+     "create_option": "ignore_if_exists"
 } '
 
 ```
@@ -693,6 +688,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
     "error_code": 0
 }
 ```
+
+- `error_code`: `int`  
+  `0`: The operation succeeds.
 
 #### Status code 500
 
@@ -716,7 +714,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **DELETE** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 
-Drop an index.
+Deletes an index by its name.
 
 ### Request
 
@@ -760,6 +758,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -782,7 +783,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 
-Show detailed information of a specified index.
+Shows detailed information about a specified index.
 
 ### Request
 
@@ -817,6 +818,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -839,7 +843,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}`
 
-Show detailed information of a specified index segment.
+Shows detailed information about a specified index segment.
 
 ### Request
 
@@ -875,6 +879,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -897,7 +904,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **DELETE** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id}`
 
-Show detailed information of a index chunk of specified index chunk.
+Shows detailed information about a specified index chunk.
 
 ### Request
 
@@ -931,6 +938,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -953,7 +963,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}/indexes`
 
-Lists all indexes of a specified table.
+Retrieves a list of all indexes created on a given table.
 
 ### Request
 
@@ -998,13 +1008,16 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 ---
 
 ## Import data
 
 **PUT** `/databases/{database_name}/tables/{table_name}`
 
-Imports data into a specified table.
+Imports data from a selected file into a specified table.
 
 ### Request
 
@@ -1016,7 +1029,10 @@ Imports data into a specified table.
 - Body:
 
   ```shell
-
+      "file_path": "<path_to_the_input_file>",
+      "file_type": "<input_file_type>",
+      "header": <whether_the_file_has_a_header_in_enum>,
+      "delimiter": "<character_to_separate_values_in_the_file>"
   ```
 
 #### Request example
@@ -1051,6 +1067,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1073,7 +1092,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}`
 
-Exports data into a specified table.
+Exports data from a specified table to a selected file.
 
 ### Request
 
@@ -1085,7 +1104,10 @@ Exports data into a specified table.
 - Body:
 
   ```shell
-
+      "file_path": "<path_to_the_file_to_export_to>",
+      "file_type": "<export_file_type>",
+      "header": <whether_the_file_has_a_header_in_enum>,
+      "delimiter": "<character_to_separate_values_in_the_file>"
   ```
 
 ```shell
@@ -1114,6 +1136,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1136,7 +1161,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **POST** `/databases/{database_name}/tables/{table_name}/docs`
 
-Inserts data into a specified table.
+Inserts rows of data into a specified table.
 
 ### Request
 
@@ -1148,7 +1173,7 @@ Inserts data into a specified table.
 - Body:
 
   ```shell
-
+      <data_rows_in_a_json_list>
   ```
 
 #### Request example
@@ -1189,6 +1214,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1211,7 +1239,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **DELETE** `/databases/{database_name}/tables/{table_name}/docs`
 
-Deletes data in a specified table.
+Deletes rows from a table based on the specified condition.
 
 ### Request
 
@@ -1223,7 +1251,7 @@ Deletes data in a specified table.
 - Body:
 
   ```shell
-
+      "filter": "<filter_condition>"
   ```
 
 ```shell
@@ -1250,6 +1278,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1272,7 +1303,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **PUT** `/databases/{database_name}/tables/{table_name}/docs`
 
-Updates data in a specified table.
+Searches for rows that match the specified condition and updates them accordingly.
 
 ### Request
 
@@ -1284,7 +1315,8 @@ Updates data in a specified table.
 - Body:
 
   ```shell
-
+      "update": <fields_to_update_in_json>
+      "filter": "<filter_condition>"
   ```
 
 #### Request example
@@ -1321,6 +1353,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1343,7 +1378,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}/docs`
 
-Searches data in a specified table.
+Searches for data in a specified table. The search can range from a simple vector search, sparse vector search, or full-text search to complex hybrid searches involving reranking methods.
 
 ### Request
 
@@ -1355,7 +1390,9 @@ Searches data in a specified table.
 - Body:
 
   ```shell
-
+      "output": <list_of_columns_to_output>,
+      "filter": "<filter_condition>",
+      "fusion": <reranking_strategy_in_json>
   ```
 
 #### Request example
@@ -1412,6 +1449,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1432,21 +1472,21 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ## Show segments
 
-**GET** `/databases/{database_name}/tables/{table_name}/segments/`
+**GET** `/databases/{database_name}/tables/{table_name}/segments`
 
-Shows all segments of a specified table.
+Shows all segments in a specified table.
 
 ### Request
 
 - Method: GET
-- URL: `/databases/{database_name}/tables/{table_name}/segments/`
+- URL: `/databases/{database_name}/tables/{table_name}/segments`
 - Headers: `accept: application/json`
 
 #### Request example
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/ \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments \
      --header 'accept: application/json'
 ```
 #### Request parameters
@@ -1473,6 +1513,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1495,7 +1538,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}/segments/{segment_id}`
 
-Shows details of a specified segment.
+Shows the detailed information about a specified segment.
 
 ### Request
 
@@ -1537,6 +1580,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1557,21 +1603,21 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ## Show blocks
 
-**GET** `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/`
+**GET** `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks`
 
-Shows all blocks of specified segment.
+Shows all blocks of a specified segment.
 
 ### Request
 
 - Method: GET
-- URL: `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/`
+- URL: `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks`
 - Headers: `accept: application/json`
 
 #### Request example
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/ \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks \
      --header 'accept: application/json'
 ```
 
@@ -1597,6 +1643,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1619,7 +1668,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}`
 
-Shows details of a specified block.
+Shows the detailed information about a specified block.
 
 ### Request
 
@@ -1659,6 +1708,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1681,7 +1733,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}/{column_id}`
 
-Shows details of a specified column in a specific block.
+Shows the detailed information about a specified column in a block.
 
 ### Request
 
@@ -1718,6 +1770,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1740,7 +1795,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/variables`
 
-Retrieves all global variables.
+Retrieves all global variables in the Infinity system.
 
 ### Request
 
@@ -1782,13 +1837,16 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 ---
 
 ## Show variable
 
 **GET** `/variables/{variable_name}`
 
-Gets a global variable.
+Retrieves the value of a global variable.
 
 ### Request
 
@@ -1821,6 +1879,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1843,7 +1904,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **POST** `/variables/{variable_name}`
 
-Sets a variable with value.
+Assigns a value to a global variable.
 
 ### Request
 
@@ -1880,6 +1941,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -1902,7 +1966,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/configs`
 
-Gets all configs.
+Retrieves all configs in the Infinity system.
 
 ### Request
 
@@ -1958,13 +2022,16 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 ---
 
 ## Show config
 
 **GET** `/configs/{config_name}`
 
-Gets a config.
+Retrieves the value of a config in the Infinity system.
 
 ### Request
 
@@ -1997,6 +2064,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
+- `error_code`: `int`  
+  `0`: The operation succeeds.
+
 #### Status code 500
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
@@ -2019,7 +2089,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **PUT** `/configs/{config_name}`
 
-Sets a config with value.
+Assigns a value to a config.
 
 ### Request
 
@@ -2057,6 +2127,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
     "error_code": 0
 }
 ```
+
+- `error_code`: `int`  
+  `0`: The operation succeeds.
 
 #### Status code 500
 
