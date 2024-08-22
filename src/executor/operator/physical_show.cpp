@@ -4365,7 +4365,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option description
-                    Value value = Value::MakeVarchar("Use JEMalloc to profile Infinity");
+                    Value value = Value::MakeVarchar("Use jemalloc to profile Infinity");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }
