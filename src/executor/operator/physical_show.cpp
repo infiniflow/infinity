@@ -3846,6 +3846,24 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
+        case GlobalVariable::kJeProf: {
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                varchar_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+#ifdef ENABLE_JEMALLOC
+            // option value
+            Value value = Value::MakeVarchar("off");
+#else
+            Value value = Value::MakeVarchar("on");
+#endif
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+            break;
+        }
         default: {
             operator_state->status_ = Status::NoSysVar(object_name_);
             RecoverableError(operator_state->status_);
@@ -4322,6 +4340,32 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 {
                     // option description
                     Value value = Value::MakeVarchar("Infinity system CPU usage.");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
+            case GlobalVariable::kJeProf: {
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+#ifdef ENABLE_JEMALLOC
+                    // option value
+                    Value value = Value::MakeVarchar("off");
+#else
+                    Value value = Value::MakeVarchar("on");
+#endif
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("Use JEMalloc to profile Infinity");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }
