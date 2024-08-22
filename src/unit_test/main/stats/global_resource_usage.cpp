@@ -70,7 +70,7 @@ TEST_F(GlobalResourceUsageTest, usage_test) {
 
     GlobalResourceUsage::IncrRawMemCount("GlobalResourceUsageTest");
     EXPECT_EQ(GlobalResourceUsage::GetRawMemoryCount(), 0);
-#elif
+#else
     // Object count
     GlobalResourceUsage::IncrObjectCount("GlobalResourceUsageTest");
     EXPECT_EQ(GlobalResourceUsage::GetObjectCount(), 0);
