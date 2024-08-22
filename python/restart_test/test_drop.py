@@ -13,7 +13,7 @@ class TestDrop:
         infinity_runner.clear()
 
         infinity_runner.init(config)
-        time.sleep(1)
+        time.sleep(3)
         infinity_obj = infinity.connect(uri)
 
         db_obj = infinity_obj.get_database("default_db")

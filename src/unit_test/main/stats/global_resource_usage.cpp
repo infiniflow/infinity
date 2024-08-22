@@ -32,6 +32,7 @@ class GlobalResourceUsageTest : public BaseTest {
 TEST_F(GlobalResourceUsageTest, usage_test) {
     using namespace infinity;
 
+#ifdef INFINITY_STATS
     // Object count
     GlobalResourceUsage::IncrObjectCount("GlobalResourceUsageTest");
     EXPECT_EQ(GlobalResourceUsage::GetObjectCount(), 1);
@@ -69,5 +70,43 @@ TEST_F(GlobalResourceUsageTest, usage_test) {
 
     GlobalResourceUsage::IncrRawMemCount("GlobalResourceUsageTest");
     EXPECT_EQ(GlobalResourceUsage::GetRawMemoryCount(), 0);
+#elif
+    // Object count
+    GlobalResourceUsage::IncrObjectCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetObjectCount(), 0);
 
+    GlobalResourceUsage::IncrObjectCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetObjectCount(), 0);
+
+    GlobalResourceUsage::DecrObjectCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetObjectCount(), 0);
+
+    GlobalResourceUsage::DecrObjectCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetObjectCount(), 0);
+
+    GlobalResourceUsage::DecrObjectCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetObjectCount(), 0);
+
+    GlobalResourceUsage::IncrObjectCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetObjectCount(), 0);
+
+    // Raw memory count
+    GlobalResourceUsage::IncrRawMemCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetRawMemoryCount(), 0);
+
+    GlobalResourceUsage::IncrRawMemCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetRawMemoryCount(), 0);
+
+    GlobalResourceUsage::DecrRawMemCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetRawMemoryCount(), 0);
+
+    GlobalResourceUsage::DecrRawMemCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetRawMemoryCount(), 0);
+
+    GlobalResourceUsage::DecrRawMemCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetRawMemoryCount(), 0);
+
+    GlobalResourceUsage::IncrRawMemCount("GlobalResourceUsageTest");
+    EXPECT_EQ(GlobalResourceUsage::GetRawMemoryCount(), 0);
+#endif
 }
