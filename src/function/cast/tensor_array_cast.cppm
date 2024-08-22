@@ -59,7 +59,7 @@ void TensorArrayTryCastToTensorArrayImpl(const u32 basic_embedding_dim,
                                          const ColumnVector *source_vector_ptr,
                                          TensorArrayT &target,
                                          ColumnVector *target_vector_ptr) {
-    Span<const TensorT> source_tensors = ColumnVector::GetTensorArrayMeta(source, source_vector_ptr->buffer_.get());
+    const Vector<TensorT> &source_tensors = ColumnVector::GetTensorArrayMeta(source, source_vector_ptr->buffer_.get());
     SizeT tensor_num = source_tensors.size();
     Vector<TensorT> target_tensors(tensor_num);
     for (SizeT i = 0; i < tensor_num; ++i) {

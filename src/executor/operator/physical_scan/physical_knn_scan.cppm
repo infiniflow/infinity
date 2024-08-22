@@ -27,6 +27,7 @@ import segment_index_entry;
 import load_meta;
 import knn_expression;
 import data_type;
+import logical_type;
 import internal_types;
 import common_query_filter;
 import physical_filter_scan_base;
@@ -86,6 +87,7 @@ public:
     void *real_knn_query_embedding_ptr_ = nullptr;
     EmbeddingDataType real_knn_query_elem_type_ = EmbeddingDataType::kElemInvalid;
     EmbeddingDataType column_elem_type_ = EmbeddingDataType::kElemInvalid;
+    LogicalType column_logical_type_ = LogicalType::kInvalid;
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
@@ -100,13 +102,16 @@ public:
 private:
     void InitBlockParallelOption();
 
-    template <typename ColumnDataT>
+    template <LogicalType t>
+    void ExecuteInternalByColumnLogicalType(QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state);
+
+    template <LogicalType t, typename ColumnDataT>
     void ExecuteInternalByColumnDataType(QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state);
 
-    template <typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+    template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
     void ExecuteInternalByColumnDataTypeAndQueryDataType(QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state);
 
-    template <typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+    template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
     friend struct ExecuteDispatchHelper;
 };
 
