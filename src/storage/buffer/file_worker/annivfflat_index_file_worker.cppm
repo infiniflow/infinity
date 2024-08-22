@@ -106,7 +106,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
         centroids_count = default_centroid_num_;
     }
     switch (GetType()) {
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             data_ = static_cast<void *>(new AnnIVFFlatIndexData<DataType>(index_ivfflat->metric_type_, dimension, centroids_count));
             break;
         }

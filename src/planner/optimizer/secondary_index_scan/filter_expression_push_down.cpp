@@ -709,12 +709,12 @@ public:
                         switch (compare_type) {
                             case FilterCompareType::kEqual: {
                                 switch (value.type().type()) {
-                                    case kBoolean:
-                                    case kDecimal: {
+                                    case LogicalType::kBoolean:
+                                    case LogicalType::kDecimal: {
                                         return MakeUnique<FastRoughFilterEvaluatorProbabilisticDataFilter>(column_id, std::move(value));
                                     }
-                                    case kFloat:
-                                    case kDouble: {
+                                    case LogicalType::kFloat:
+                                    case LogicalType::kDouble: {
                                         auto minmax_filter_le =
                                             MakeUnique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kLessEqual);
                                         auto minmax_filter_ge =
@@ -786,7 +786,7 @@ private:
 
     static inline UniquePtr<FastRoughFilterEvaluator> ReturnValue(SharedPtr<BaseExpression> &expression, u32 sub_expr_depth) {
         auto value = FilterExpressionPushDownHelper::CalcValueResult(expression);
-        if (value.type().type() != kBoolean) {
+        if (value.type().type() != LogicalType::kBoolean) {
             LOG_TRACE("ReturnValue(): Non-boolean value. Return always true.");
             return ReturnAlwaysTrue();
         } else {

@@ -90,11 +90,11 @@ std::string ConstantExpr::ToString() const {
         }
         case LiteralType::kIntegerArray: {
             EmbeddingType embedding((char *)(long_array_.data()), false);
-            return EmbeddingType::Embedding2String(embedding, kElemInt64, long_array_.size());
+            return EmbeddingType::Embedding2String(embedding, EmbeddingDataType::kElemInt64, long_array_.size());
         }
         case LiteralType::kDoubleArray: {
             EmbeddingType embedding((char *)(double_array_.data()), false);
-            return EmbeddingType::Embedding2String(embedding, kElemInt64, double_array_.size());
+            return EmbeddingType::Embedding2String(embedding, EmbeddingDataType::kElemInt64, double_array_.size());
         }
         case LiteralType::kSubArrayArray: {
             std::stringstream ss;

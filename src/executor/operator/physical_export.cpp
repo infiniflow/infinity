@@ -387,7 +387,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
     EmbeddingInfo *embedding_type_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
     switch(embedding_type_info->Type()) {
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             // Supported
             break;
         }

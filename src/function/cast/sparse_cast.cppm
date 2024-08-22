@@ -165,7 +165,7 @@ void SparseTryCastToSparseFunT3(const SparseInfo *source_info,
                                 SparseT &target,
                                 ColumnVector *target_vector_ptr) {
     switch (source_info->IndexType()) {
-        case kElemInt8: {
+        case EmbeddingDataType::kElemInt8: {
             SparseTryCastToSparseFunT4<TargetValueType, TargetIndiceType, SourceValueType, TinyIntT>(source_info,
                                                                                                      source,
                                                                                                      source_vector_ptr,
@@ -174,7 +174,7 @@ void SparseTryCastToSparseFunT3(const SparseInfo *source_info,
                                                                                                      target_vector_ptr);
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             SparseTryCastToSparseFunT4<TargetValueType, TargetIndiceType, SourceValueType, SmallIntT>(source_info,
                                                                                                       source,
                                                                                                       source_vector_ptr,
@@ -183,7 +183,7 @@ void SparseTryCastToSparseFunT3(const SparseInfo *source_info,
                                                                                                       target_vector_ptr);
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             SparseTryCastToSparseFunT4<TargetValueType, TargetIndiceType, SourceValueType, IntegerT>(source_info,
                                                                                                      source,
                                                                                                      source_vector_ptr,
@@ -192,7 +192,7 @@ void SparseTryCastToSparseFunT3(const SparseInfo *source_info,
                                                                                                      target_vector_ptr);
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             SparseTryCastToSparseFunT4<TargetValueType, TargetIndiceType, SourceValueType, BigIntT>(source_info,
                                                                                                     source,
                                                                                                     source_vector_ptr,
@@ -216,11 +216,11 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                 SparseT &target,
                                 ColumnVector *target_vector_ptr) {
     switch (source_info->DataType()) {
-        case kElemBit: {
+        case EmbeddingDataType::kElemBit: {
             String error_message = "Unimplemented";
             UnrecoverableError(error_message);
         }
-        case kElemUInt8: {
+        case EmbeddingDataType::kElemUInt8: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, u8>(source_info,
                                                                               source,
                                                                               source_vector_ptr,
@@ -229,7 +229,7 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                               target_vector_ptr);
             break;
         }
-        case kElemInt8: {
+        case EmbeddingDataType::kElemInt8: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, TinyIntT>(source_info,
                                                                                     source,
                                                                                     source_vector_ptr,
@@ -238,7 +238,7 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                                     target_vector_ptr);
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, SmallIntT>(source_info,
                                                                                      source,
                                                                                      source_vector_ptr,
@@ -247,7 +247,7 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                                      target_vector_ptr);
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, IntegerT>(source_info,
                                                                                     source,
                                                                                     source_vector_ptr,
@@ -256,7 +256,7 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                                     target_vector_ptr);
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, BigIntT>(source_info,
                                                                                    source,
                                                                                    source_vector_ptr,
@@ -265,7 +265,7 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                                    target_vector_ptr);
             break;
         }
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, FloatT>(source_info,
                                                                                   source,
                                                                                   source_vector_ptr,
@@ -274,7 +274,7 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                                   target_vector_ptr);
             break;
         }
-        case kElemDouble: {
+        case EmbeddingDataType::kElemDouble: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, DoubleT>(source_info,
                                                                                    source,
                                                                                    source_vector_ptr,
@@ -283,7 +283,7 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                                    target_vector_ptr);
             break;
         }
-        case kElemFloat16: {
+        case EmbeddingDataType::kElemFloat16: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, Float16T>(source_info,
                                                                                     source,
                                                                                     source_vector_ptr,
@@ -292,7 +292,7 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                                     target_vector_ptr);
             break;
         }
-        case kElemBFloat16: {
+        case EmbeddingDataType::kElemBFloat16: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, BFloat16T>(source_info,
                                                                                      source,
                                                                                      source_vector_ptr,
@@ -316,19 +316,19 @@ void SparseTryCastToSparseFunT1(const SparseInfo *source_info,
                                 SparseT &target,
                                 ColumnVector *target_vector_ptr) {
     switch (target_info->IndexType()) {
-        case kElemInt8: {
+        case EmbeddingDataType::kElemInt8: {
             SparseTryCastToSparseFunT2<TargetValueType, TinyIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             SparseTryCastToSparseFunT2<TargetValueType, SmallIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             SparseTryCastToSparseFunT2<TargetValueType, IntegerT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             SparseTryCastToSparseFunT2<TargetValueType, BigIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
@@ -346,43 +346,43 @@ void SparseTryCastToSparseFun(const SparseInfo *source_info,
                               SparseT &target,
                               ColumnVector *target_vector_ptr) {
     switch (target_info->DataType()) {
-        case kElemBit: {
+        case EmbeddingDataType::kElemBit: {
             SparseTryCastToSparseFunT1<BooleanT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemUInt8: {
+        case EmbeddingDataType::kElemUInt8: {
             SparseTryCastToSparseFunT1<u8>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemInt8: {
+        case EmbeddingDataType::kElemInt8: {
             SparseTryCastToSparseFunT1<TinyIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             SparseTryCastToSparseFunT1<SmallIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             SparseTryCastToSparseFunT1<IntegerT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             SparseTryCastToSparseFunT1<BigIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             SparseTryCastToSparseFunT1<FloatT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemDouble: {
+        case EmbeddingDataType::kElemDouble: {
             SparseTryCastToSparseFunT1<DoubleT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemFloat16: {
+        case EmbeddingDataType::kElemFloat16: {
             SparseTryCastToSparseFunT1<Float16T>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
-        case kElemBFloat16: {
+        case EmbeddingDataType::kElemBFloat16: {
             SparseTryCastToSparseFunT1<BFloat16T>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
