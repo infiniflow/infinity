@@ -359,6 +359,12 @@ void SegmentIndexEntry::MemIndexCommit() {
         return;
     memory_indexer_->Commit();
 }
+void SegmentIndexEntry::MemIndexWaitInflightTasks() {
+    const IndexBase *index_base = table_index_entry_->index_base();
+    if (index_base->index_type_ != IndexType::kFullText || memory_indexer_.get() == nullptr)
+        return;
+    memory_indexer_->WaitInflightTasks();
+}
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *dump_size) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;

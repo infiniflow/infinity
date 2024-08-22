@@ -832,6 +832,7 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
                                                         segment_index_entry->max_ts(),
                                                         buffer_manager);
                 }
+                segment_index_entry->MemIndexWaitInflightTasks();
                 message = fmt::format("Table {}.{} index {} segment {} MemIndex recovered.", *GetDBName(), *table_name_, index_name, segment_id);
                 LOG_INFO(message);
             }
