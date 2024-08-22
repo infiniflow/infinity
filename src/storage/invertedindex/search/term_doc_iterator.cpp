@@ -138,6 +138,8 @@ void TermDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_
     os << " (doc_freq: " << GetDF() << ")";
     os << " (bm25_score_upper_bound: " << BM25ScoreUpperBound() << ")";
     os << " (threshold: " << Threshold() << ")";
+    os << " (bm25_score_cache_docid_: " << bm25_score_cache_docid_.ToUint64() << ")";
+    os << " (bm25_score_cache_: " << bm25_score_cache_ << ")";
     os << '\n';
 }
 

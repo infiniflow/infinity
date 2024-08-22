@@ -81,6 +81,12 @@ public:
         return inflight_tasks_;
     }
 
+    void WaitInflightTasks() {
+        while (GetInflightTasks() > 0) {
+            CommitSync(100);
+        }
+    }
+
     String GetBaseName() const { return base_name_; }
 
     RowID GetBaseRowId() const { return base_row_id_; }
@@ -98,11 +104,6 @@ public:
     void Reset();
 
 private:
-    void WaitInflightTasks() {
-        std::unique_lock<std::mutex> lock(mutex_);
-        cv_.wait(lock, [this] { return inflight_tasks_ == 0; });
-    }
-
     // CommitOffline is for offline case. It spill a batch of ColumnInverter. Returns the size of the batch.
     SizeT CommitOffline(SizeT wait_if_empty_ms = 0);
 

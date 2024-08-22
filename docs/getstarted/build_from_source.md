@@ -233,6 +233,7 @@ pip install gcovr
 ```shell
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
 cmake --build . -t test_main
+find . -name "*.gcda"  | xargs rm -f
 ./cmake-build-debug/src/test_main
 ```
 
@@ -240,4 +241,46 @@ cmake --build . -t test_main
 ```shell
 cd ./cmake-build-debug/src/CMakeFiles/unit_test.dir
 gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html unit_test_html.html
+```
+
+# Build and run function test
+
+## Build and run function test on Linux using Docker
+```shell
+docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  infinity"
+./cmake-build-debug/src/infinity
+python3 tools/run_pytest_parallel.py
+```
+
+## Build and run function test on Ubuntu
+```shell
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake --build . -t infinity
+./cmake-build-debug/src/infinity
+python3 tools/run_pytest_parallel.py
+```
+
+## Build and run function test with code coverage
+### Step 1 Build and start up Infinity server with code coverage option on
+```shell
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
+cmake --build . -t infinity
+find . -name "*.gcda"  | xargs rm -f
+./cmake-build-debug/src/infinity
+```
+
+### Step 2 Run function test
+```shell
+python3 tools/run_pytest_parallel.py
+```
+
+### Step 4 Shut down Infinity server
+```shell
+kill -15 `pidof infinity`
+```
+
+### Step 5 Use Gcovr to generate summarized code coverage results
+```shell
+cd ./cmake-build-debug/src/CMakeFiles
+gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html function_test_html.html
 ```

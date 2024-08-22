@@ -125,12 +125,12 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
-    if (column_type->type() != kEmbedding) {
+    if (column_type->type() != LogicalType::kEmbedding) {
         Status status = Status::ImportFileFormatError("FVECS file must have only one embedding column.");
         RecoverableError(status);
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-    if (embedding_info->Type() != kElemFloat) {
+    if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
         Status status = Status::ImportFileFormatError("FVECS file must have only one embedding column with float element.");
         RecoverableError(status);
     }
@@ -227,12 +227,12 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
-    if (column_type->type() != kEmbedding) {
+    if (column_type->type() != LogicalType::kEmbedding) {
         Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column.");
         RecoverableError(status);
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-    if (embedding_info->Type() != kElemUInt8) {
+    if (embedding_info->Type() != EmbeddingDataType::kElemUInt8) {
         Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column with uint8 element.");
         RecoverableError(status);
     }
@@ -360,7 +360,7 @@ UniquePtr<char[]> ConvertCSRIndice(UniquePtr<char[]> tmp_indice_ptr, SparseInfo 
             return ConvertCSRIndice<BigIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
         }
         default: {
-            String error_message = fmt::format("Unsupported index type {}.", sparse_info->IndexType());
+            String error_message = fmt::format("Unsupported index type {}.", EmbeddingT::EmbeddingDataType2String(sparse_info->IndexType()));
             UnrecoverableError(error_message);
         }
     }
@@ -373,13 +373,13 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         RecoverableError(status);
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
-    if (column_type->type() != kSparse) {
+    if (column_type->type() != LogicalType::kSparse) {
         Status status = Status::ImportFileFormatError("CSR file must have only one sparse column.");
         RecoverableError(status);
     }
     // nocheck sort or not sort
     auto sparse_info = std::static_pointer_cast<SparseInfo>(column_type->type_info());
-    if (sparse_info->DataType() != kElemFloat) {
+    if (sparse_info->DataType() != EmbeddingDataType::kElemFloat) {
         Status status = Status::ImportFileFormatError("FVECS file must has only one sparse column with float element");
         RecoverableError(status);
     }
@@ -924,7 +924,7 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
             break;
         }
         case EmbeddingDataType::kElemInvalid: {
-            const auto error_info = fmt::format("Unsupported sparse data type: {}", sparse_info->DataType());
+            const auto error_info = fmt::format("Unsupported sparse data type: {}", EmbeddingT::EmbeddingDataType2String(sparse_info->DataType()));
             RecoverableError(Status::ImportFileFormatError(error_info));
             return nullptr;
         }
@@ -1982,7 +1982,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             }
 
             switch (sparse_info->IndexType()) {
-                case kElemInt8: {
+                case EmbeddingDataType::kElemInt8: {
                     auto int8_index_array = std::dynamic_pointer_cast<arrow::Int8Array>(index_array->values());
                     if (int8_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
@@ -1995,7 +1995,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                                                                     end_offset);
                     break;
                 }
-                case kElemInt16: {
+                case EmbeddingDataType::kElemInt16: {
                     auto int16_index_array = std::dynamic_pointer_cast<arrow::Int16Array>(index_array->values());
                     if (int16_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
@@ -2008,7 +2008,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                                                                       end_offset);
                     break;
                 }
-                case kElemInt32: {
+                case EmbeddingDataType::kElemInt32: {
                     auto int32_index_array = std::dynamic_pointer_cast<arrow::Int32Array>(index_array->values());
                     if (int32_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
@@ -2021,7 +2021,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                                                                       end_offset);
                     break;
                 }
-                case kElemInt64: {
+                case EmbeddingDataType::kElemInt64: {
                     auto int64_index_array = std::dynamic_pointer_cast<arrow::Int64Array>(index_array->values());
                     if (int64_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));

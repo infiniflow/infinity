@@ -34,6 +34,7 @@ import physical_scan_base;
 import sparse_info;
 import match_sparse_expr;
 import internal_types;
+import logical_type;
 import knn_result_handler;
 import merge_knn;
 import match_sparse_scan_function_data;
@@ -78,27 +79,27 @@ template <template <typename, typename> typename C>
 void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state) {
     DataType result_type = match_sparse_expr_->Type();
     switch (result_type.type()) {
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             ExecuteInner<i8, C>(query_context, operator_state);
             break;
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             ExecuteInner<i16, C>(query_context, operator_state);
             break;
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             ExecuteInner<i32, C>(query_context, operator_state);
             break;
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             ExecuteInner<i64, C>(query_context, operator_state);
             break;
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             ExecuteInner<float, C>(query_context, operator_state);
             break;
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             ExecuteInner<double, C>(query_context, operator_state);
             break;
         }

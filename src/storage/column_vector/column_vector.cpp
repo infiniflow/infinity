@@ -2189,7 +2189,7 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
         (*this->data_type_).operator!=(*other.data_type_) || this->data_type_size_ != other.data_type_size_ ||
         this->vector_type_ != other.vector_type_ || this->tail_index_ != other.tail_index_ || *this->nulls_ptr_ != *other.nulls_ptr_)
         return false;
-    if (data_type_->type() == kVarchar) {
+    if (data_type_->type() == LogicalType::kVarchar) {
         for (SizeT i = 0; i < this->tail_index_; i++) {
             Span<const char> data1 = this->GetVarchar(i);
             Span<const char> data2 = other.GetVarchar(i);

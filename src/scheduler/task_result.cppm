@@ -35,7 +35,7 @@ public:
 
 private:
     UniquePtr<DataBlock> data_{};
-    TaskResultType task_result_type_{kInvalid};
+    TaskResultType task_result_type_{TaskResultType::kInvalid};
 };
 
 } // namespace infinity

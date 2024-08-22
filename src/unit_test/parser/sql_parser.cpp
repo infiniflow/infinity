@@ -421,7 +421,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "ac");
-                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemBit, 256);
+                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemBit, 256);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -430,7 +430,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "ad");
-                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemFloat, 512);
+                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 512);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -465,7 +465,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "af");
-                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemInt32, 32);
+                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemInt32, 32);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);

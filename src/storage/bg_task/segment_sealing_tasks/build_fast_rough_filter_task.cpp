@@ -24,6 +24,7 @@ import segment_entry;
 import segment_iter;
 import infinity_exception;
 import internal_types;
+import logical_type;
 import logger;
 import buffer_manager;
 import block_column_entry;
@@ -441,60 +442,60 @@ void BuildFastRoughFilterTask::ExecuteInner(SegmentEntry *segment_entry, BufferM
         // step 2.2. collect distinct data from blocks and build probabilistic_data_filter for blocks and segment
         BuildFastRoughFilterArg arg(segment_entry, column_id, distinct_keys, distinct_keys_backup, buffer_manager, begin_ts, segment_row_count);
         switch (data_type_ptr->type()) {
-            case kBoolean: {
+            case LogicalType::kBoolean: {
                 BuildFilter<BooleanT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kDecimal: {
+            case LogicalType::kDecimal: {
                 // TODO: DecimalT only support "==", cannot support MinMaxDataFilter
                 BuildFilter<DecimalT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kFloat: {
+            case LogicalType::kFloat: {
                 BuildFilter<FloatT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kDouble: {
+            case LogicalType::kDouble: {
                 BuildFilter<DoubleT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kTinyInt: {
+            case LogicalType::kTinyInt: {
                 BuildFilter<TinyIntT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kSmallInt: {
+            case LogicalType::kSmallInt: {
                 BuildFilter<SmallIntT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kInteger: {
+            case LogicalType::kInteger: {
                 BuildFilter<IntegerT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kBigInt: {
+            case LogicalType::kBigInt: {
                 BuildFilter<BigIntT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kHugeInt: {
+            case LogicalType::kHugeInt: {
                 BuildFilter<HugeIntT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kVarchar: {
+            case LogicalType::kVarchar: {
                 BuildFilter<VarcharT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kDate: {
+            case LogicalType::kDate: {
                 BuildFilter<DateT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kTime: {
+            case LogicalType::kTime: {
                 BuildFilter<TimeT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kDateTime: {
+            case LogicalType::kDateTime: {
                 BuildFilter<DateTimeT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }
-            case kTimestamp: {
+            case LogicalType::kTimestamp: {
                 BuildFilter<TimestampT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
                 break;
             }

@@ -16,6 +16,8 @@ module;
 
 #include <string>
 #include <vector>
+
+module physical_merge_aggregate;
 import stl;
 import third_party;
 import query_context;
@@ -23,13 +25,10 @@ import operator_state;
 import logger;
 import value;
 import data_block;
-
+import logical_type;
 import physical_aggregate;
 import aggregate_expression;
-
 import infinity_exception;
-
-module physical_merge_aggregate;
 
 namespace infinity {
 
@@ -74,27 +73,27 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
 
             switch (func_return_type.type()) {
                 LOG_TRACE("Physical MergeAggregate execute remain block");
-                case kTinyInt: {
+                case LogicalType::kTinyInt: {
                     HandleAggregateFunction<TinyIntT>(function_name, op_state, col_idx);
                     break;
                 }
-                case kSmallInt: {
+                case LogicalType::kSmallInt: {
                     HandleAggregateFunction<SmallIntT>(function_name, op_state, col_idx);
                     break;
                 }
-                case kInteger: {
+                case LogicalType::kInteger: {
                     HandleAggregateFunction<IntegerT>(function_name, op_state, col_idx);
                     break;
                 }
-                case kBigInt: {
+                case LogicalType::kBigInt: {
                     HandleAggregateFunction<BigIntT>(function_name, op_state, col_idx);
                     break;
                 }
-                case kFloat: {
+                case LogicalType::kFloat: {
                     HandleAggregateFunction<FloatT>(function_name, op_state, col_idx);
                     break;
                 }
-                case kDouble: {
+                case LogicalType::kDouble: {
                     HandleAggregateFunction<DoubleT>(function_name, op_state, col_idx);
                     break;
                 }

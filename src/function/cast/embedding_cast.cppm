@@ -451,19 +451,19 @@ void EmbeddingTryCastToSparse(const EmbeddingT &source,
                               const SparseInfo *target_info,
                               ColumnVector *target_vector_ptr) {
     switch (source_info->Type()) {
-        case kElemInt8: {
+        case EmbeddingDataType::kElemInt8: {
             EmbeddingTryCastToSparseImpl<IdxT, TinyIntT>(source, source_info, target, target_info, target_vector_ptr);
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             EmbeddingTryCastToSparseImpl<IdxT, SmallIntT>(source, source_info, target, target_info, target_vector_ptr);
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             EmbeddingTryCastToSparseImpl<IdxT, IntegerT>(source, source_info, target, target_info, target_vector_ptr);
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             EmbeddingTryCastToSparseImpl<IdxT, BigIntT>(source, source_info, target, target_info, target_vector_ptr);
             break;
         }
