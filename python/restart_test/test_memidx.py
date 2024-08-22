@@ -14,8 +14,7 @@ class TestMemIdx:
         infinity_runner.clear()
 
         infinity_runner.init(config1)
-        time.sleep(5)
-        infinity_obj = infinity.connect(uri)
+        infinity_obj = InfinityRunner.connect(uri)
 
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.create_table(
@@ -45,8 +44,7 @@ class TestMemIdx:
         # config1 can held 6 rows of hnsw mem index before dump
         # 1. recover by dumpindex wal & memindex recovery
         infinity_runner.init(config2)
-        time.sleep(5)
-        infinity_obj = infinity.connect(uri)
+        infinity_obj = InfinityRunner.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("test_memidx1")
         data_dict, data_type_dict = (
@@ -71,8 +69,7 @@ class TestMemIdx:
 
         # 2. recover by delta ckp & dumpindex wal & memindex recovery
         infinity_runner.init(config3)
-        time.sleep(5)
-        infinity_obj = infinity.connect(uri)
+        infinity_obj = InfinityRunner.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("test_memidx1")
 
@@ -94,4 +91,3 @@ class TestMemIdx:
 
         infinity_obj.disconnect()
         infinity_runner.uninit()
-        time.sleep(5)

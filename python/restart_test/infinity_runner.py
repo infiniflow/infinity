@@ -3,6 +3,8 @@ import os
 import subprocess
 import os
 import psutil
+import time
+import infinity
 
 
 class InfinityRunner:
@@ -15,6 +17,7 @@ class InfinityRunner:
 
     def clear(self):
         os.system(f"rm -rf {self.data_dir}/*")
+        print(f"clear {self.data_dir}")
 
     def init(self, config_path: str | None):
         if config_path is None:
@@ -23,8 +26,8 @@ class InfinityRunner:
 
         # unset env LD_PRELOAD, ASAN_OPTIONS
         my_env = os.environ.copy()
-        my_env['LD_PRELOAD'] = ''
-        my_env['ASAN_OPTIONS'] = ''
+        my_env["LD_PRELOAD"] = ""
+        my_env["ASAN_OPTIONS"] = ""
         self.process = subprocess.Popen(cmd, shell=True, env=my_env)
         self.i += 1
 
@@ -36,3 +39,14 @@ class InfinityRunner:
         ret = os.system(f"bash {self.script_path} {timeout} {' '.join(map(str, pids))}")
         if ret != 0:
             raise Exception("An error occurred.")
+
+    @staticmethod
+    def connect(uri: str):
+        try_n = 100
+        for i in range(try_n):
+            try:
+                return infinity.connect(uri)
+            except Exception as e:
+                print(e)
+                time.sleep(0.5)
+                print(f"retry connect {i}")
