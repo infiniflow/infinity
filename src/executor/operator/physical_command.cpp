@@ -16,7 +16,12 @@ module;
 
 // #include <fstream>
 #include <string>
+
+import compilation_config;
+
+#ifdef ENABLE_JEMALLOC
 #include <jemalloc/jemalloc.h>
+#endif
 
 module physical_command;
 
@@ -96,6 +101,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             RecoverableError(status);
                         }
                         case GlobalVariable::kJeProf: {
+#ifdef ENABLE_JEMALLOC
                             // dump jeprof
                             int ret = mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
                             if (ret != 0) {
@@ -103,6 +109,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 RecoverableError(status);
                             }
                             return true;
+#else
+                            Status status = Status::InvalidCommand("jemalloc is not enabled");
+                            RecoverableError(status);
+#endif
                         }
                         default: {
                             Status status = Status::InvalidCommand(fmt::format("Global variable: {} is read-only", set_command->var_name()));
