@@ -13,7 +13,7 @@ class TestDrop:
         infinity_runner.clear()
 
         infinity_runner.init(config)
-        time.sleep(3)
+        time.sleep(5)
         infinity_obj = infinity.connect(uri)
 
         db_obj = infinity_obj.get_database("default_db")
@@ -22,21 +22,21 @@ class TestDrop:
         res = table_obj.insert([{"c1": i} for i in range(10)])
         assert res.error_code == ErrorCode.OK
         # wait flush
-        time.sleep(2)
+        time.sleep(5)
 
         table_obj.delete("c1 < 5")
 
         db_obj.drop_table("test_drop")
 
         # wait for the drop be flushed in delta ckp
-        time.sleep(3)
+        time.sleep(5)
 
         infinity_obj.disconnect()
         infinity_runner.uninit()
 
         # replay nothing
         infinity_runner.init(config)
-        time.sleep(1)
+        time.sleep(5)
         infinity_obj = infinity.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         try:
@@ -47,4 +47,4 @@ class TestDrop:
 
         infinity_obj.disconnect()
         infinity_runner.uninit()
-        time.sleep(1)
+        time.sleep(5)

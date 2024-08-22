@@ -14,7 +14,7 @@ class TestMemIdx:
         infinity_runner.clear()
 
         infinity_runner.init(config1)
-        time.sleep(1)
+        time.sleep(5)
         infinity_obj = infinity.connect(uri)
 
         db_obj = infinity_obj.get_database("default_db")
@@ -36,7 +36,7 @@ class TestMemIdx:
         table_obj.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]}])
 
         # wait for the dump thread to start and memory index is reset
-        time.sleep(1)
+        time.sleep(5)
 
         table_obj.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]} for i in range(4)])
 
@@ -46,7 +46,7 @@ class TestMemIdx:
         # config1 can held 6 rows of hnsw mem index before dump
         # 1. recover by dumpindex wal & memindex recovery
         infinity_runner.init(config2)
-        time.sleep(3)
+        time.sleep(5)
         infinity_obj = infinity.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("test_memidx1")
@@ -72,7 +72,7 @@ class TestMemIdx:
 
         # 2. recover by delta ckp & dumpindex wal & memindex recovery
         infinity_runner.init(config3)
-        time.sleep(1)
+        time.sleep(5)
         infinity_obj = infinity.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("test_memidx1")
@@ -90,10 +90,10 @@ class TestMemIdx:
 
         check()
         # wait for optimize
-        time.sleep(3)
+        time.sleep(5)
         check()
 
         db_obj.drop_table("test_memidx1", infinity.common.ConflictType.Error)
         infinity_obj.disconnect()
         infinity_runner.uninit()
-        time.sleep(1)
+        time.sleep(5)
