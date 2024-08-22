@@ -16,6 +16,7 @@ module;
 
 // #include <fstream>
 #include <string>
+#include <jemalloc/jemalloc.h>
 
 module physical_command;
 
@@ -93,6 +94,15 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         case GlobalVariable::kInvalid: {
                             Status status = Status::InvalidCommand(fmt::format("unknown global variable {}", set_command->var_name()));
                             RecoverableError(status);
+                        }
+                        case GlobalVariable::kJeProf: {
+                            // dump jeprof
+                            int ret = mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
+                            if (ret != 0) {
+                                Status status = Status::UnexpectedError(fmt::format("mallctl prof1.dump failed {}", ret));
+                                RecoverableError(status);
+                            }
+                            return true;
                         }
                         default: {
                             Status status = Status::InvalidCommand(fmt::format("Global variable: {} is read-only", set_command->var_name()));
