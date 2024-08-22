@@ -29,6 +29,8 @@ export module compilation_config;
 #define CSV_DATA_PATH "@CSV_DATA_PATH@"
 #define TMP_DATA_PATH "@TMP_DATA_PATH@"
 
+#define ENABLE_JEMALLOC "@ENABLE_JEMALLOC@"
+
 namespace infinity {
 
 export int version_major() {

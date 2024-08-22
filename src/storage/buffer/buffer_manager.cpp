@@ -180,6 +180,7 @@ void BufferManager::RemoveClean() {
                 UnrecoverableError(error_message);
             }
         }
+        buffer_map_.rehash(buffer_map_.size());
     }
 }
 
