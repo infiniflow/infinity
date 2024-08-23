@@ -5,20 +5,20 @@ from math import sin, cos, acos, pi
 import numpy as np
 
 
-def get_sphere_point(r: float):
-    phi = random.uniform(0, 2 * pi)
-    theta = acos(random.uniform(-1, 1))
+def get_sphere_point(r, rand1, rand2):
+    phi = rand1 * 2.0 * pi
+    theta = acos(rand2 * 2.0 - 1.0)
     x = r * sin(theta) * cos(phi)
     y = r * sin(theta) * sin(phi)
     z = r * cos(theta)
-    return [x, y, z]
+    return np.array([x, y, z], dtype=np.float32)
 
 
-row_n = 100
-top_n = 5
+row_n = 1000
+query_data = [3, 500, 990, random.randint(0, row_n - 1)]
+top_n = [5, 255, 256, row_n]
 num_in_row = 10
-radius = 1000.0
-query_data = [1, 50, 97]
+radius = 10000.0
 require_min_diff = 1e-6
 
 
@@ -31,20 +31,16 @@ def get_random_data():
     while True:
         # generate random vectors at several positions
         # prepare row_n multivectors on sphere, with radius
-        all_multivector_centers = [get_sphere_point(radius) for _ in range(row_n)]
-        all_multivectors = []
+        rand_1 = np.random.rand(row_n, 2)
+        all_multivector_centers = np.zeros((row_n, 3), dtype=np.float32)
         for i in range(row_n):
-            append_mv = []
-            c = all_multivector_centers[i]
-            # generate num_in_row vectors around the center
-            for j in range(num_in_row):
-                append_mv.append(
-                    [c[0] + random.uniform(-1, 1), c[1] + random.uniform(-1, 1), c[2] + random.uniform(-1, 1)])
-            all_multivectors.append(append_mv)
-        all_multivector_centers = np.array(all_multivector_centers, dtype=np.float32)
-        all_multivectors = np.array(all_multivectors, dtype=np.float32)
-        assert all_multivector_centers.shape == (row_n, 3)
+            all_multivector_centers[i, :] = get_sphere_point(radius, rand_1[i][0], rand_1[i][1])
+        all_multivectors = np.repeat(all_multivector_centers[:, np.newaxis, :], num_in_row, axis=1) + (
+                np.random.rand(row_n, num_in_row, 3).astype(np.float32) - 0.5)
         assert all_multivectors.shape == (row_n, num_in_row, 3)
+        assert all_multivectors.dtype == np.float32
+        assert all_multivector_centers.shape == (row_n, 3)
+        assert all_multivector_centers.dtype == np.float32
         # check query result for query_data, return if all query distances are different
         distance_results = []
         good_diff = True
@@ -57,13 +53,13 @@ def get_random_data():
                 distance_pair.append((j, np.min(l2_d)))
             # sort by distance
             distance_pair.sort(key=lambda x: x[1])
-            for j in range(top_n):
-                if distance_pair[j + 1][1] - distance_pair[j][1] < require_min_diff:
+            for j in range(row_n - 1):
+                if (distance_pair[j + 1][1] - distance_pair[j][1]) / distance_pair[j + 1][1] < require_min_diff:
                     good_diff = False
                     break
             if not good_diff:
                 break
-            distance_results.append(distance_pair[:top_n])
+            distance_results.append(distance_pair)
         if good_diff:
             return all_multivector_centers, all_multivectors, distance_results
 
@@ -79,58 +75,68 @@ def generate(generate_if_exists: bool, copy_dir: str):
     slt_dir = "./test/sql/dql/knn/multivector"
     csv_name = "/test_big_multivector_scan.csv"
     slt_name = "/big_multivector_scan.slt"
+    slt_name_hnsw = "/big_multivector_hnsw.slt"
     table_name = "test_big_multivector_scan"
+    table_name_hnsw = "test_big_multivector_hnsw"
 
     csv_path = csv_dir + csv_name
     slt_path = slt_dir + slt_name
+    slt_path_hnsw = slt_dir + slt_name_hnsw
     copy_path = copy_dir + csv_name
 
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(csv_path) and os.path.exists(slt_path) and not generate_if_exists:
-        print("File {} and {} already existed exists. Skip Generating.".format(slt_path, csv_path))
+    if os.path.exists(csv_path) and os.path.exists(slt_path) and os.path.exists(slt_path_hnsw) and not generate_if_exists:
+        print("File {}, {} and {} already existed. Skip Generating.".format(slt_path, slt_path_hnsw, csv_path))
         return
     # generate data
     all_multivector_centers, all_multivectors, distance_results = get_random_data()
     # test method:
-    # 1. insert row 0 - 4
-    insert_val_1 = ",".join([f"({i},{get_multivector_str_not_quoted(all_multivectors[i])})" for i in range(5)])
-    # 2. import row 5 - 94
+    # 1. insert row [0, 20)
+    insert_val_1 = ",".join([f"({i},{get_multivector_str_not_quoted(all_multivectors[i])})" for i in range(20)])
+    # 2. import row [20, 980)
     with open(csv_path, "w") as multivector_scan_csv_file:
-        # write row 5 - 94
-        for i in range(5, 95):
+        for i in range(20, 980):
             multivector_scan_csv_file.write(f'{i},"{get_multivector_str_not_quoted(all_multivectors[i])}"\n')
-    # 3. insert row 95 - 99
-    insert_val_3 = ",".join([f"({i},{get_multivector_str_not_quoted(all_multivectors[i])})" for i in range(95, 100)])
+    # 3. insert row [980, 1000)
+    insert_val_3 = ",".join([f"({i},{get_multivector_str_not_quoted(all_multivectors[i])})" for i in range(980, 1000)])
     # 4. dense scan for row in query_data
-    with open(slt_path, "w") as multivector_scan_slt_file:
-        multivector_scan_slt_file.write("statement ok\n")
-        multivector_scan_slt_file.write(f"DROP TABLE IF EXISTS {table_name};\n")
-        multivector_scan_slt_file.write("\nstatement ok\n")
-        multivector_scan_slt_file.write(f"CREATE TABLE {table_name} (c1 integer, c2 multivector(float,3));\n")
-        # 1. insert row 0 - 4
-        multivector_scan_slt_file.write("\nstatement ok\n")
-        multivector_scan_slt_file.write(f"INSERT INTO {table_name} VALUES {insert_val_1};\n")
-        # 2. import row 5 - 94
-        multivector_scan_slt_file.write("\nstatement ok\n")
-        multivector_scan_slt_file.write(f"COPY {table_name} FROM '{copy_path}' WITH ( DELIMITER ',', FORMAT CSV );\n")
-        # 3. insert row 95 - 99
-        multivector_scan_slt_file.write("\nstatement ok\n")
-        multivector_scan_slt_file.write(f"INSERT INTO {table_name} VALUES {insert_val_3};\n")
-        # 4. dense scan for row 1, 50, 97
-        multivector_scan_slt_file.write("\n# multivector scan\n")
+    with open(slt_path, "w") as multivector_scan_slt_file, open(slt_path_hnsw, "w") as multivector_hnsw_slt_file:
+        def write_twice(statement: str, output_table_name: bool = False):
+            multivector_scan_slt_file.write(statement.format(table_name) if output_table_name else statement)
+            multivector_hnsw_slt_file.write(statement.format(table_name_hnsw) if output_table_name else statement)
+
+        write_twice("statement ok\n")
+        write_twice("DROP TABLE IF EXISTS {};\n", True)
+        write_twice("\nstatement ok\n")
+        write_twice("CREATE TABLE {} (c1 integer, c2 multivector(float,3));\n", True)
+        # create hnsw index for table_name_hnsw
+        multivector_hnsw_slt_file.write("\nstatement ok\n")
+        multivector_hnsw_slt_file.write(
+            f'CREATE INDEX idx ON {table_name_hnsw} (c2) USING HNSW WITH (M = 16, ef_construction = 200, metric = l2);\n')
+        # 1. insert row [0, 20)
+        write_twice("\nstatement ok\n")
+        write_twice(f"INSERT INTO \u007b\u007d VALUES {insert_val_1};\n", True)
+        # 2. import row [20, 980)
+        write_twice("\nstatement ok\n")
+        write_twice(f"COPY \u007b\u007d FROM '{copy_path}' WITH ( DELIMITER ',', FORMAT CSV );\n", True)
+        # 3. insert row [980, 1000)
+        write_twice("\nstatement ok\n")
+        write_twice(f"INSERT INTO \u007b\u007d VALUES {insert_val_3};\n", True)
+        # 4. dense scan for row in query_data
+        write_twice("\n# multivector scan\n")
         for i, q_id in enumerate(query_data):
-            multivector_scan_slt_file.write("\nquery I\n")
+            write_twice("\nquery I\n")
             query_v = np.array2string(all_multivector_centers[q_id], separator=',')
-            query_str = f"SELECT c1 FROM {table_name} SEARCH MATCH VECTOR (c2, {query_v}, 'float', 'l2', {top_n});\n"
-            multivector_scan_slt_file.write(query_str)
-            multivector_scan_slt_file.write("----\n")
+            query_str = f"SELECT c1 FROM \u007b\u007d SEARCH MATCH VECTOR (c2, {query_v}, 'float', 'l2', {top_n[i]});\n"
+            write_twice(query_str, True)
+            write_twice("----\n")
             distance_result = distance_results[i]
-            for j in range(top_n):
-                multivector_scan_slt_file.write(f"{distance_result[j][0]}\n")
+            for j in range(top_n[i]):
+                write_twice(f"{distance_result[j][0]}\n")
         # drop table
-        multivector_scan_slt_file.write("\nstatement ok\n")
-        multivector_scan_slt_file.write(f"DROP TABLE {table_name};\n")
+        write_twice("\nstatement ok\n")
+        write_twice(f"DROP TABLE \u007b\u007d;\n", True)
 
 
 if __name__ == "__main__":

@@ -150,30 +150,33 @@ nlohmann::json IndexHnsw::Serialize() const {
 void IndexHnsw::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref,
                                        const String &column_name,
                                        const Vector<InitParameter *> &index_param_list) {
-    SharedPtr<DataType> data_type_ptr;
-    auto &column_names_vector = *(base_table_ref->column_names_);
-    auto &column_types_vector = *(base_table_ref->column_types_);
-    SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    const auto &column_names_vector = *(base_table_ref->column_names_);
+    const auto &column_types_vector = *(base_table_ref->column_types_);
+    const SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
-        Status status = Status::ColumnNotExist(column_name);
-        RecoverableError(status);
+        RecoverableError(Status::ColumnNotExist(column_name));
     }
-    if (data_type_ptr = column_types_vector[column_id]; data_type_ptr->type() != LogicalType::kEmbedding) {
-        Status status = Status::InvalidIndexDefinition(
-            fmt::format("Attempt to create HNSW index on column: {}, data type: {}.", column_name, data_type_ptr->ToString()));
-        RecoverableError(status);
+    const DataType *data_type_ptr = column_types_vector[column_id].get();
+    switch (data_type_ptr->type()) {
+        case LogicalType::kEmbedding:
+        case LogicalType::kMultiVector: {
+            break;
+        }
+        default: {
+            RecoverableError(Status::InvalidIndexDefinition(
+                fmt::format("Attempt to create HNSW index on column: {}, data type: {}.", column_name, data_type_ptr->ToString())));
+        }
     }
-    SharedPtr<EmbeddingInfo> embedding_info = std::dynamic_pointer_cast<EmbeddingInfo>(data_type_ptr->type_info());
-    EmbeddingDataType embedding_data_type = embedding_info->Type();
+    const auto embedding_info = dynamic_cast<const EmbeddingInfo *>(data_type_ptr->type_info().get());
+    const EmbeddingDataType embedding_data_type = embedding_info->Type();
     for (const auto *param : index_param_list) {
         if (param->param_name_ == "encode" && StringToHnswEncodeType(param->param_value_) == HnswEncodeType::kLVQ) {
             // TODO: now only support float?
             if (embedding_data_type != EmbeddingDataType::kElemFloat) {
-                Status status =
+                RecoverableError(
                     Status::InvalidIndexDefinition(fmt::format("Attempt to create HNSW index with LVQ encoding on column: {}, data type: {}.",
                                                                column_name,
-                                                               data_type_ptr->ToString()));
-                RecoverableError(status);
+                                                               data_type_ptr->ToString())));
             }
         }
     }
