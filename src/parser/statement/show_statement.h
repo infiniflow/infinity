@@ -55,6 +55,9 @@ enum class ShowStmtType {
     kPersistenceFiles,
     kPersistenceObjects,
     kPersistenceObject,
+    kMemory,
+    kMemoryObjects,
+    kMemoryAllocation,
 };
 
 class ShowStatement : public BaseStatement {

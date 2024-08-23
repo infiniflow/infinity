@@ -11,24 +11,30 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 module;
 
-import stl;
+export module multivector_util;
 
-module global_resource_usage;
+import stl;
+import third_party;
 
 namespace infinity {
 
-atomic_bool GlobalResourceUsage::initialized_ = false;
+export template <typename ElementT>
+class MultiVectorRef {
+    Span<const char> raw_data_ = {};
+    SizeT embedding_num_ = 0;
 
-i64 GlobalResourceUsage::object_count_ = 0;
-HashMap<String, i64> GlobalResourceUsage::object_map_;
-
-i64 GlobalResourceUsage::raw_memory_count_ = 0;
-HashMap<String, i64> GlobalResourceUsage::raw_memory_map_;
-
-std::mutex GlobalResourceUsage::object_mutex_{};
-
-std::mutex GlobalResourceUsage::raw_memory_mutex_{};
+public:
+    using ElementType = ElementT;
+    MultiVectorRef &operator=(const Pair<Span<const char>, SizeT> &data) {
+        raw_data_ = data.first;
+        embedding_num_ = data.second;
+        return *this;
+    }
+    [[nodiscard]] Span<const char> raw_data() const { return raw_data_; }
+    [[nodiscard]] SizeT embedding_num() const { return embedding_num_; }
+};
 
 } // namespace infinity

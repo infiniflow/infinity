@@ -26,6 +26,7 @@ import buffer_manager;
 import column_vector;
 import block_entry;
 import sparse_util;
+import multivector_util;
 import internal_types;
 import column_vector;
 import fix_heap;
@@ -124,6 +125,40 @@ private:
     SizeT ele_size_;
     SizeT cur_;
     SizeT end_;
+};
+
+export template <typename ElementT>
+class MemIndexInserterIter<MultiVectorRef<ElementT>> {
+public:
+    MemIndexInserterIter(SegmentOffset block_offset, BlockColumnEntry *entry, BufferManager *buffer_mgr, SizeT offset, SizeT size)
+        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr))),
+          ele_size_(entry->column_type()->type_info()->Size()), cur_(offset), end_(offset + size) {}
+
+    Optional<Pair<const ElementT *, SegmentOffset>> Next() {
+        // prepare multi-vector data
+        while (multi_vector_cur_ == multi_vector_ref_.embedding_num()) {
+            if (cur_ == end_) {
+                return None;
+            }
+            multi_vector_ref_ = column_vector_->GetMultiVectorRaw(cur_++);
+            multi_vector_cur_ = 0;
+        }
+        const auto *ret = multi_vector_ref_.raw_data().data() + multi_vector_cur_ * ele_size_;
+        ++multi_vector_cur_;
+        const auto *v_ptr = reinterpret_cast<const ElementT *>(ret);
+        return std::make_pair(v_ptr, block_offset_ + cur_ - 1);
+    }
+
+    SharedPtr<ColumnVector> column_vector() const { return column_vector_; }
+
+private:
+    SegmentOffset block_offset_;
+    SharedPtr<ColumnVector> column_vector_;
+    SizeT ele_size_;
+    SizeT cur_;
+    SizeT end_;
+    MultiVectorRef<ElementT> multi_vector_ref_ = {};
+    SizeT multi_vector_cur_ = 0;
 };
 
 export template <typename DataType, typename IdxType>

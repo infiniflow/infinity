@@ -28,6 +28,7 @@ import infinity_exception;
 import block_entry;
 import logger;
 import sparse_util;
+import multivector_util;
 import internal_types;
 import column_vector;
 import fix_heap;
@@ -137,6 +138,39 @@ public:
 
 private:
     SizeT cap_;
+};
+
+export template <typename ElementT, bool CheckTS>
+class OneColumnIterator<MultiVectorRef<ElementT>, CheckTS> {
+public:
+    OneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT ele_size)
+        : segment_iter_(entry, buffer_mgr, Vector<ColumnID>{column_id}, iterate_ts), ele_size_(ele_size) {}
+
+    Optional<Pair<const ElementT *, SegmentOffset>> Next() {
+        while (multi_vector_cur_ == multi_vector_ref_.embedding_num()) {
+            auto ret = segment_iter_.Next();
+            if (!ret) {
+                return None;
+            }
+            const auto &[vec, offset] = *ret;
+            multi_vector_segment_offset_ = offset;
+            const auto block_offset = offset % DEFAULT_BLOCK_CAPACITY;
+            const auto &column_vector = segment_iter_.column_vector(0);
+            multi_vector_ref_ = column_vector->GetMultiVectorRaw(block_offset);
+            multi_vector_cur_ = 0;
+        }
+        const auto *ret = multi_vector_ref_.raw_data().data() + multi_vector_cur_ * ele_size_;
+        ++multi_vector_cur_;
+        const auto *v_ptr = reinterpret_cast<const ElementT *>(ret);
+        return std::make_pair(v_ptr, multi_vector_segment_offset_);
+    }
+
+private:
+    SegmentIter<CheckTS> segment_iter_;
+    SizeT ele_size_;
+    SegmentOffset multi_vector_segment_offset_ = {};
+    MultiVectorRef<ElementT> multi_vector_ref_ = {};
+    SizeT multi_vector_cur_ = 0;
 };
 
 export template <typename DataType, typename IdxType, bool CheckTS>

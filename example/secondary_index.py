@@ -13,11 +13,13 @@
 # limitations under the License.
 
 '''
-This example is to connect local infinity instance, create table, insert data, search the data
+This example is about connecting to the local infinity instance, creating table, inserting data, and searching data
 '''
 
 import infinity
-from infinity.common import SparseVector
+import time
+
+from infinity import index
 
 try:
     # open a local directory to store the data
@@ -34,34 +36,28 @@ try:
 
     # Create a table named "my_table"
     table_instance = db_instance.create_table("my_table", {
-        "num": {"type": "integer"},
-        "body": {"type": "varchar"},
-        "vec": {"type": "sparse,100,float,int"}
+        "num": {"type": "integer", "constraints": ["PRIMARY KEY"]},
+        "id": {"type": "varchar"},
+        "vec": {"type": "vector, 4, float"},
     })
 
-    # Insert 3 rows of data into the 'my_table'
-    table_instance.insert(
-        [
-            {
-                "num": 1,
-                "body": r"unnecessary and harmful",
-                "vec":  SparseVector([10, 20, 30], [1.1, 2.2, 3.3])
-            },
-            {
-                "num": 2,
-                "body": r"Office for Harmful Blooms",
-                "vec": SparseVector([40, 50, 60], [4.4, 5.5, 6.6])
-            },
-            {
-                "num": 3,
-                "body": r"A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
-                "vec":  SparseVector([70, 80, 90], [7.7, 8.8, 9.9])
-            },
-        ]
-    )
+    # Attempt to insert 10 rows
+    rows = 10
 
-    result = table_instance.output(["num", "vec", "_similarity"]).match_sparse("vec", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3).to_pl()
-    print(result)
+    start = time.time()
+    for idx in range(rows):
+        table_instance.insert([
+                {
+                    "num": idx,
+                    "id": "ID_" + str(idx),
+                    "vec": [1.0, 1.2, 0.8, 0.9],
+                }]
+        )
+
+    table_instance.create_index("index1", index.IndexInfo("id", index.IndexType.Secondary))
+    res = table_instance.filter("id='ID_1'").output(["*"]).to_pl()
+    print(res)
+
     infinity_instance.disconnect()
 
 except Exception as e:
