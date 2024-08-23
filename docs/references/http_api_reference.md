@@ -46,7 +46,6 @@ curl --request POST \
   - Maximum 65,535 characters.
   - Case-insensitive.
 - `create_option`: (*Body parameter*), `enum<string>`, *Optional*  
-  Conflict policy in `enum<string>` for handling situations where a database with the same name exists.
   - `"error"`: (Default) Raise an error if a database with the same name exists.
   - `"ignore_if_exist"`: Ignore the database creation requrest and keep the existing database with the same name.
 
@@ -62,7 +61,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -76,9 +75,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -133,7 +132,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -147,9 +146,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -177,7 +176,7 @@ curl --request GET \
 #### Request parameter
 
 - `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string that specifies the name of the database to retrieve.
+  A non-empty string specifying the name of the database to retrieve.
 
 ### Response
 
@@ -194,13 +193,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
-- `database_name`: `str`  
+- `database_name`: `string`  
   The name of the retrieved database.
-- `store_dir`: `str`  
+- `store_dir`: `string`  
   The directory path where the database is stored.
-- `table_count`: `int`  
+- `table_count`: `integer`  
   The number of tables present in the database.
 
 #### Status code 500
@@ -214,9 +213,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -257,7 +256,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 - `databases`: `list[string]`  
   An array of strings representing the names of the databases in the system.
@@ -325,12 +324,11 @@ curl --request POST \
   - Maximum 65,535 characters.
   - Case-insensitive.
 - `create_option`: (*Body parameter*), `enum<string>`, *Optional*  
-  Conflict policy in `enum<string>` for handling situations where a table with the same name exists.
-  - `"error"`: (Default) Raise an error if a database with the same name exists.
-  - `"ignore_if_exist"`: Ignore the table creation requrest and keep the existing table with the same name.
+  - `"error"`: (Default) Raise an error if a table with the same name exists.
+  - `"ignore_if_exist"`: Ignore the table creation request and keep the existing table with the same name.
 - `field`: (*Body parameter*), `object[]`, *Required*
-  - `"name"`: `str`, *Required*
-  - `"type"`: `str`, *Required*
+  - `"name"`: `string`, *Required*
+  - `"type"`: `string`, *Required*
 
 ### Response
 
@@ -344,7 +342,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -358,9 +356,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -404,7 +402,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -418,9 +416,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -478,7 +476,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 ---
@@ -521,7 +519,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -535,9 +533,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -591,7 +589,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -605,9 +603,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -668,7 +666,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -682,9 +680,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -735,7 +733,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -749,9 +747,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -795,7 +793,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -809,9 +807,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -856,7 +854,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -870,9 +868,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -915,7 +913,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -929,9 +927,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -985,7 +983,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 ---
@@ -1006,7 +1004,7 @@ Imports data from a selected file into a specified table.
 - Body:
   - `"file_path"`: `string`
   - `"file_type"`: `string`
-  - `"header"`: `enum`
+  - `"header"`: `boolean`
   - `"delimiter"`: `string`
 
 #### Request example
@@ -1041,7 +1039,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1055,9 +1053,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1066,7 +1064,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}`
 
-Exports data from a specified table to a selected file.
+Exports data from a specified table to a specified file.
 
 ### Request
 
@@ -1078,7 +1076,7 @@ Exports data from a specified table to a selected file.
 - Body:
   - `"file_path"`: `string`
   - `"file_type"`: `string`
-  - `"header"`: `enum`
+  - `"header"`: `boolean`
   - `"delimiter"`: `string`
 
 #### Request example
@@ -1109,7 +1107,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1123,9 +1121,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1184,7 +1182,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1198,9 +1196,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1249,7 +1247,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1263,9 +1261,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1321,7 +1319,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1335,9 +1333,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1414,7 +1412,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1428,9 +1426,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1478,7 +1476,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1492,9 +1490,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1545,7 +1543,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1559,9 +1557,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1608,7 +1606,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1622,9 +1620,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1673,7 +1671,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1687,9 +1685,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1735,7 +1733,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1749,9 +1747,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1802,7 +1800,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 ---
@@ -1844,7 +1842,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1858,9 +1856,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -1879,7 +1877,7 @@ Assigns a value to a global variable.
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-  - `"profile_record_capacity"`: `int`
+  - `"profile_record_capacity"`: `integer`
 
 #### Request example
 
@@ -1903,7 +1901,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -1917,9 +1915,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -2023,7 +2021,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -2037,9 +2035,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
@@ -2082,7 +2080,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   `0`: The operation succeeds.
 
 #### Status code 500
@@ -2096,9 +2094,9 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `int`  
+- `error_code`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `str`  
+- `error_msg`: `string`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ---
