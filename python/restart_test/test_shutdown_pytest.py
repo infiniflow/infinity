@@ -50,6 +50,7 @@ class TestShutDownPytest:
         ],
     )
     def test_shutdown_pytest(self, infinity_runner: InfinityRunner, test_name: str):
+        config = "test/data/config/restart_test/shutdown_pytest.toml"
         stop_interval = 10
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
@@ -69,7 +70,7 @@ class TestShutDownPytest:
                 time.sleep(1)
 
         while True:
-            infinity_runner.init()
+            infinity_runner.init(config)
             InfinityRunner.connect(uri)  # ensure infinity is started
 
             t1 = threading.Thread(target=shutdown_func)
