@@ -17,6 +17,7 @@ This example is to connect local infinity instance, create table, insert data, s
 '''
 
 import infinity
+from infinity.common import SparseVector
 
 try:
     # open a local directory to store the data
@@ -44,22 +45,22 @@ try:
             {
                 "num": 1,
                 "body": r"unnecessary and harmful",
-                "vec": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}
+                "vec": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])
             },
             {
                 "num": 2,
                 "body": r"Office for Harmful Blooms",
-                "vec": {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]}
+                "vec": SparseVector([40, 50, 60], [4.4, 5.5, 6.6])
             },
             {
                 "num": 3,
                 "body": r"A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
-                "vec":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}
+                "vec":  SparseVector([70, 80, 90], [7.7, 8.8, 9.9])
             },
         ]
     )
 
-    result = table_instance.output(["num", "vec", "_similarity"]).match_sparse("vec", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3).to_pl()
+    result = table_instance.output(["num", "vec", "_similarity"]).match_sparse("vec", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3).to_pl()
     print(result)
     infinity_instance.disconnect()
 
