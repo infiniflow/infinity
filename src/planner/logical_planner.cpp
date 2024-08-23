@@ -1272,6 +1272,15 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kPersistenceObject: {
             return BuildShowPersistenceObject(statement, bind_context_ptr);
         }
+        case ShowStmtType::kMemory: {
+            return BuildShowMemory(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kMemoryObjects: {
+            return BuildShowMemoryObjects(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kMemoryAllocation: {
+            return BuildShowMemoryAllocation(statement, bind_context_ptr);
+        }
         default: {
             String error_message = "Unexpected show statement type.";
             UnrecoverableError(error_message);
@@ -1681,6 +1690,38 @@ Status LogicalPlanner::BuildShowPersistenceObject(const ShowStatement *statement
     return Status::OK();
 }
 
+Status LogicalPlanner::BuildShowMemory(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowMemory,
+                                                                  "",
+                                                                  "",
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowMemoryObjects(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowMemoryObjects,
+                                                                  "",
+                                                                  "",
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowMemoryAllocation(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowMemoryAllocation,
+                                                                  "",
+                                                                  "",
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
 
 Status LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     switch (statement->type()) {

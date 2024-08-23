@@ -149,6 +149,12 @@ private:
 
     void ExecuteShowPersistenceObject(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowMemory(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowMemoryObjects(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowMemoryAllocation(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
     ShowType show_type_{ShowType::kInvalid};
     String db_name_{};

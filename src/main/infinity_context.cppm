@@ -25,6 +25,7 @@ import singleton;
 import session_manager;
 import persistence_manager;
 import third_party;
+import global_resource_usage;
 
 namespace infinity {
 

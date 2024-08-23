@@ -13,7 +13,7 @@ class TestDrop:
         infinity_runner.clear()
 
         infinity_runner.init(config)
-        time.sleep(1)
+        time.sleep(5)
         infinity_obj = infinity.connect(uri)
 
         db_obj = infinity_obj.get_database("default_db")
@@ -36,7 +36,7 @@ class TestDrop:
 
         # replay nothing
         infinity_runner.init(config)
-        time.sleep(1)
+        time.sleep(5)
         infinity_obj = infinity.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         try:
@@ -47,4 +47,4 @@ class TestDrop:
 
         infinity_obj.disconnect()
         infinity_runner.uninit()
-        time.sleep(1)
+        time.sleep(5)
