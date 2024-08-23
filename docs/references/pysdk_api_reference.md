@@ -626,7 +626,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
   - Parameter settings for an EMVB index:
     - `"pq_subspace_num"`: *Required*
-      - `"8"` 
+      - `"8"`
       - `"16"` (recommended)
       - `"32"`
       - `"64"`

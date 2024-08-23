@@ -19,12 +19,7 @@ Creates a database by its name. If the database already exists, the action taken
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-  {
-      "create_option": "<option>"
-  }
-  ```
+  - `"create_option"`: `enum<string>`
 
 #### Request example
 
@@ -102,12 +97,7 @@ Deletes a database by its name. If the database does not exist, the action taken
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-  {
-      "drop_option": "<option>"
-  }
-  ```
+  - `"drop_option"`: `enum<string>`
 
 #### Request example
 
@@ -288,13 +278,8 @@ Creates a table with a specified name and defined fields (columns) within a give
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-  {
-      "create_option": "<option>"
-      "fields": <json_object_list>
-  }
-  ```
+  - `"create_option"`: `enum<string>`
+  - `"fields"`: `object[]`
 
 #### Request example
 
@@ -394,12 +379,7 @@ Deletes a table from a specified database. If the table does not exist, the acti
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-  {
-      "drop_option": "<option>"
-  }
-  ```
+  - `"drop_option"`: `enum<string>`
 
 ```shell
 curl --request DELETE \
@@ -646,12 +626,11 @@ Creates an index on a specified table. If an index with the same name exists, th
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
+  - `"fields"`: `list[string]`
+  - `"index"`: `object`
+  - `"create_option"`: `enum<string>`
 
-  ```shell
-      "fields": <column_list>,
-      "index": <index_building_params_in_json>,
-      "create_option": "<option>"  
-  ```
+#### Request example
 
 ```shell
 curl --request POST \
@@ -724,9 +703,7 @@ Deletes an index by its name.
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-      "drop_option": "<option>"
+  - `"drop_option"`: `enum<string>`
   ```
 
 #### Request example
@@ -1027,13 +1004,10 @@ Imports data from a selected file into a specified table.
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-      "file_path": "<path_to_the_input_file>",
-      "file_type": "<input_file_type>",
-      "header": <whether_the_file_has_a_header_in_enum>,
-      "delimiter": "<character_to_separate_values_in_the_file>"
-  ```
+  - `"file_path"`: `string`
+  - `"file_type"`: `string`
+  - `"header"`: `enum`
+  - `"delimiter"`: `string`
 
 #### Request example
 
@@ -1102,13 +1076,12 @@ Exports data from a specified table to a selected file.
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
+  - `"file_path"`: `string`
+  - `"file_type"`: `string`
+  - `"header"`: `enum`
+  - `"delimiter"`: `string`
 
-  ```shell
-      "file_path": "<path_to_the_file_to_export_to>",
-      "file_type": "<export_file_type>",
-      "header": <whether_the_file_has_a_header_in_enum>,
-      "delimiter": "<character_to_separate_values_in_the_file>"
-  ```
+#### Request example
 
 ```shell
 curl --request GET \
@@ -1171,10 +1144,7 @@ Inserts rows of data into a specified table.
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-      <data_rows_in_a_json_list>
-  ```
+  - `object[]`
 
 #### Request example
 
@@ -1249,10 +1219,9 @@ Deletes rows from a table based on the specified condition.
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
+  - `"filter"`: `string`
 
-  ```shell
-      "filter": "<filter_condition>"
-  ```
+#### Request example
 
 ```shell
 curl --request DELETE \
@@ -1264,6 +1233,8 @@ curl --request DELETE \
     filter: "a > 0"
 } '
 ```
+
+#### Request parameters
 
 ### Response
 
@@ -1313,11 +1284,8 @@ Searches for rows that match the specified condition and updates them accordingl
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-      "update": <fields_to_update_in_json>
-      "filter": "<filter_condition>"
-  ```
+  - `"update"`: `object`
+  - `"filter"`: `string`
 
 #### Request example
 
@@ -1388,12 +1356,9 @@ Searches for data in a specified table. The search can range from a simple vecto
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-      "output": <list_of_columns_to_output>,
-      "filter": "<filter_condition>",
-      "fusion": <reranking_strategy_in_json>
-  ```
+  - `"output"`: `list[string]`
+  - `"filter"`: `string`
+  - `"fusion"`: `object`
 
 #### Request example
 
@@ -1914,10 +1879,7 @@ Assigns a value to a global variable.
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-      "profile_record_capacity": 
-  ```
+  - `"profile_record_capacity"`: `int`
 
 #### Request example
 
@@ -2022,9 +1984,6 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `int`  
-  `0`: The operation succeeds.
-
 ---
 
 ## Show config
@@ -2099,12 +2058,7 @@ Assigns a value to a config.
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-
-  ```shell
-  {
-      "log_level": 
-  }   
-  ```
+  - `"log_level"`: `enum<string>`
 
 #### Request example
 
