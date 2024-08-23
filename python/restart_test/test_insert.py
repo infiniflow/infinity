@@ -12,7 +12,7 @@ class TestInsert:
         "config",
         [
             "test/data/config/restart_test/test_insert/1.toml",
-            # "test/data/config/restart_test/test_insert/2.toml",
+            "test/data/config/restart_test/test_insert/2.toml",
         ],
     )
     @pytest.mark.parametrize(
@@ -38,7 +38,7 @@ class TestInsert:
                     {"c1": 0, "c2": [0.1, 0.2, 0.3, 0.4]},
                     {"c1": 1, "c2": [[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]},
                 ],
-            )
+            ),
         ],
     )
     def test_insert(
@@ -91,7 +91,7 @@ class TestInsert:
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_insert")
 
-            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            data_dict, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
             assert count_star == cur_insert_n
             print(f"cur_insert_n: {cur_insert_n}")
@@ -110,6 +110,4 @@ class TestInsert:
 
 
 if __name__ == "__main__":
-    vec = [1, 2, 3, 4]
-    vec1 = [*vec] * 2
-    print(vec1)
+    pass

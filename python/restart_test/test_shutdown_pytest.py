@@ -30,7 +30,7 @@ class TestShutDownPytest:
             print(
                 f"Test file: {test_file}, test class: {test_class}, test name: {test_name}"
             )
-            cmd = f"pytest {test_dir} -k {test_name} -x" # exit after first failure
+            cmd = f"pytest {test_dir} -k {test_name} -x"  # exit after first failure
             print(f"Test cmd: {cmd}")
 
             while True:
@@ -50,7 +50,6 @@ class TestShutDownPytest:
         ],
     )
     def test_shutdown_pytest(self, infinity_runner: InfinityRunner, test_name: str):
-        config = "test/data/config/restart_test/shutdown_pytest.toml"
         stop_interval = 10
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
@@ -70,15 +69,17 @@ class TestShutDownPytest:
                 time.sleep(1)
 
         while True:
-            infinity_runner.init(config)
-            InfinityRunner.connect(uri)  # ensure infinity is started
+            infinity_runner.init()
+            infinity_obj = InfinityRunner.connect(uri)  # ensure infinity is started
+            infinity_obj.disconnect()
 
             t1 = threading.Thread(target=shutdown_func)
             t1.start()
 
-            stop_testfile, stop_test_name = gen.__next__()
-            if stop_test_name is None:
+            x = next(gen, None)
+            if x is None:
                 break
+            stop_testfile, stop_test_name = x
             print(f"Stop test: {stop_test_name}")
 
             t1.join()
