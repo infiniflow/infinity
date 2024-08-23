@@ -1,13 +1,44 @@
+from abc import abstractmethod
+import functools
 import pytest
 from common import common_values
 from infinity.common import ConflictType
 from infinity_runner import InfinityRunner
 import time
 import threading
+import csv
 
 
 @pytest.mark.slow
 class TestInsert:
+    def simple_embedding_generator(insert_n: int):
+        for i in range(insert_n):
+            yield i, [0.1, 0.2, 0.3, 0.4]
+
+    def simple_varchar_generator(insert_n: int):
+        for i in range(insert_n):
+            if i % 2 == 0:
+                yield i, "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
+            else:
+                yield i, "test"
+
+    def simple_tensor_generator(insert_n: int):
+        for i in range(insert_n):
+            if i % 2 == 0:
+                yield i, [0.1, 0.2, 0.3, 0.4]
+            else:
+                yield i, [[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]
+
+    def enwiki_generator(enwiki_path: str, insert_n: int):
+        for i in range(insert_n):
+            with open(enwiki_path, "r") as f:
+                reader = csv.reader(f, delimiter="\t")
+                for row in reader:
+                    title = row[0]
+                    date = row[1]
+                    body = row[2]
+                    yield title, date, body
+
     @pytest.mark.parametrize(
         "config",
         [
@@ -16,35 +47,40 @@ class TestInsert:
         ],
     )
     @pytest.mark.parametrize(
-        "columns, data",
+        "columns, data_gen_factory",
         [
             (
                 {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}},
-                [{"c1": 0, "c2": [0.1, 0.2, 0.3, 0.4]}],
+                simple_embedding_generator,
             ),
             (
                 {"c1": {"type": "int"}, "c2": {"type": "varchar"}},
-                [
-                    {"c1": 1, "c2": "test"},
-                    {
-                        "c1": 2,
-                        "c2": "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz",
-                    },
-                ],
+                simple_varchar_generator,
             ),
             (
                 {"c1": {"type": "int"}, "c2": {"type": "tensor,4,float"}},
-                [
-                    {"c1": 0, "c2": [0.1, 0.2, 0.3, 0.4]},
-                    {"c1": 1, "c2": [[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]},
-                ],
+                simple_tensor_generator,
+            ),
+            (
+                {
+                    "title": {"type": "varchar"},
+                    "date": {"type": "varchar"},
+                    "body": {"type": "varchar"},
+                },
+                functools.partial(enwiki_generator, "test/data/csv/enwiki-10w.csv"),
             ),
         ],
     )
     def test_insert(
-        self, infinity_runner: InfinityRunner, config: str, columns: dict, data: list
+        self,
+        infinity_runner: InfinityRunner,
+        config: str,
+        columns: dict,
+        data_gen_factory,
     ):
         insert_n = 100000
+        data_gen = data_gen_factory(insert_n)
+
         stop_n = 10
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
@@ -65,11 +101,24 @@ class TestInsert:
 
             while cur_insert_n < insert_n:
                 try:
-                    insert_data = data * int(batch_size / len(data))
+                    insert_data = []
+                    # get `batch_size` data in data_gen one time
+                    for i in range(batch_size):
+                        try:
+                            data = next(data_gen)
+                            data_line = {}
+                            for col_name, col_data in zip(columns.keys(), data):
+                                data_line[col_name] = col_data
+                            insert_data.append(data_line)
+                        except StopIteration:
+                            break
                     table_obj.insert(insert_data)
                 except Exception as e:
                     break
                 cur_insert_n += batch_size
+
+        shutdown_time = 0
+        ok = False
 
         def shutdown_func():
             nonlocal cur_insert_n
@@ -79,12 +128,17 @@ class TestInsert:
                     cur_insert_n >= insert_n
                     or cur_insert_n - last_shutdown_insert_n >= insert_n // stop_n
                 ):
+                    nonlocal ok, shutdown_time
+
                     infinity_runner.uninit()
                     print("shutdown infinity")
+                    shutdown_time += 1
+                    if shutdown_time == 2 and False:
+                        ok = True
                     return
                 time.sleep(0.1)
 
-        while cur_insert_n < insert_n:
+        while cur_insert_n < insert_n and not ok:
             infinity_runner.init(config)
             infinity_obj = InfinityRunner.connect(uri)
 
