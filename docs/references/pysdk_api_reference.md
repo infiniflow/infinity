@@ -413,7 +413,7 @@ db_object.create_table("my_table", {"c1": {"type": "vector,128,float"}}, None)
 #### Create a table with a multi-vector column only
 
 :::tip NOTE
-You can build a HNSW index on the multi-vector column to speed up the match_dense search.
+You can build an HNSW index on the multi-vector column to accelerate match_dense search.
 :::
 
 ```python
