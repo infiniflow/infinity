@@ -11,24 +11,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 module;
 
-import stl;
+#include "global_resource_usage.h"
 
-module global_resource_usage;
+export module global_resource_usage;
+
 
 namespace infinity {
 
-atomic_bool GlobalResourceUsage::initialized_ = false;
-
-i64 GlobalResourceUsage::object_count_ = 0;
-HashMap<String, i64> GlobalResourceUsage::object_map_;
-
-i64 GlobalResourceUsage::raw_memory_count_ = 0;
-HashMap<String, i64> GlobalResourceUsage::raw_memory_map_;
-
-std::mutex GlobalResourceUsage::object_mutex_{};
-
-std::mutex GlobalResourceUsage::raw_memory_mutex_{};
+export using infinity::GlobalResourceUsage;
 
 } // namespace infinity

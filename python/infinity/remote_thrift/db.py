@@ -53,13 +53,11 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                 datatype = value.lower()
                 column_big_info = [item.strip() for item in datatype.split(",")]
                 column_big_info_first_str = column_big_info[0].lower()
-                if column_big_info_first_str == "vector" or column_big_info_first_str == "tensor" or column_big_info_first_str == "tensorarray":
-                    return get_embedding_info(column_info, column_defs, column_name, index)
-                elif column_big_info_first_str == "sparse":
-                    return get_sparse_info(column_info, column_defs, column_name, index)
-                else:
-                    pass
-
+                match column_big_info_first_str:
+                    case "vector" | "multivector" | "tensor" | "tensorarray":
+                        return get_embedding_info(column_info, column_defs, column_name, index)
+                    case "sparse":
+                        return get_sparse_info(column_info, column_defs, column_name, index)
                 proto_column_type = ttypes.DataType()
                 match datatype:
                     case "int8":
@@ -88,7 +86,6 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                     case _:
                         raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
                 proto_column_def.data_type = proto_column_type
-
             case "constraints":
                 # process constraints
                 constraints = value
@@ -125,6 +122,32 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
     column_defs.append(proto_column_def)
 
 
+def get_embedding_element_type(element_type):
+    match element_type:
+        case "bit":
+            return ttypes.ElementType.ElementBit
+        case "float32" | "float" | "f32":
+            return ttypes.ElementType.ElementFloat32
+        case "float64" | "double" | "f64":
+            return ttypes.ElementType.ElementFloat64
+        case "float16" | "f16":
+            return ttypes.ElementType.ElementFloat16
+        case "bfloat16" | "bf16":
+            return ttypes.ElementType.ElementBFloat16
+        case "uint8" | "u8":
+            return ttypes.ElementType.ElementUInt8
+        case "int8" | "i8":
+            return ttypes.ElementType.ElementInt8
+        case "int16" | "i16":
+            return ttypes.ElementType.ElementInt16
+        case "int32" | "int" | "i32":
+            return ttypes.ElementType.ElementInt32
+        case "int64" | "i64":
+            return ttypes.ElementType.ElementInt64
+        case _:
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
+
+
 def get_embedding_info(column_info, column_defs, column_name, index):
     # "vector,1024,float32"
     column_big_info = [item.strip() for item in column_info["type"].split(",")]
@@ -135,37 +158,19 @@ def get_embedding_info(column_info, column_defs, column_name, index):
     proto_column_def.id = index
     proto_column_def.name = column_name
     column_type = ttypes.DataType()
-    if column_big_info[0] == "vector":
-        column_type.logic_type = ttypes.LogicType.Embedding
-    elif column_big_info[0] == "tensor":
-        column_type.logic_type = ttypes.LogicType.Tensor
-    elif column_big_info[0] == "tensorarray":
-        column_type.logic_type = ttypes.LogicType.TensorArray
-    else:
-        raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
+    match column_big_info[0]:
+        case "vector":
+            column_type.logic_type = ttypes.LogicType.Embedding
+        case "multivector":
+            column_type.logic_type = ttypes.LogicType.MultiVector
+        case "tensor":
+            column_type.logic_type = ttypes.LogicType.Tensor
+        case "tensorarray":
+            column_type.logic_type = ttypes.LogicType.TensorArray
+        case _:
+            raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
     embedding_type = ttypes.EmbeddingType()
-    if element_type == "bit":
-        embedding_type.element_type = ttypes.ElementType.ElementBit
-    elif element_type == "float32" or element_type == "float":
-        embedding_type.element_type = ttypes.ElementType.ElementFloat32
-    elif element_type == "float64" or element_type == "double":
-        embedding_type.element_type = ttypes.ElementType.ElementFloat64
-    elif element_type == "float16":
-        embedding_type.element_type = ttypes.ElementType.ElementFloat16
-    elif element_type == "bfloat16":
-        embedding_type.element_type = ttypes.ElementType.ElementBFloat16
-    elif element_type == "uint8":
-        embedding_type.element_type = ttypes.ElementType.ElementUInt8
-    elif element_type == "int8":
-        embedding_type.element_type = ttypes.ElementType.ElementInt8
-    elif element_type == "int16":
-        embedding_type.element_type = ttypes.ElementType.ElementInt16
-    elif element_type == "int32" or element_type == "int":
-        embedding_type.element_type = ttypes.ElementType.ElementInt32
-    elif element_type == "int64":
-        embedding_type.element_type = ttypes.ElementType.ElementInt64
-    else:
-        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
+    embedding_type.element_type = get_embedding_element_type(element_type)
     embedding_type.dimension = int(length)
     assert isinstance(embedding_type, ttypes.EmbeddingType)
     assert embedding_type.element_type is not None
@@ -196,29 +201,7 @@ def get_sparse_info(column_info, column_defs, column_name, index):
         raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
 
     sparse_type = ttypes.SparseType()
-    if value_type == "bit":
-        sparse_type.element_type = ttypes.ElementType.ElementBit
-    elif value_type == "float32" or value_type == "float":
-        sparse_type.element_type = ttypes.ElementType.ElementFloat32
-    elif value_type == "float64" or value_type == "double":
-        sparse_type.element_type = ttypes.ElementType.ElementFloat64
-    elif value_type == "float16":
-        sparse_type.element_type = ttypes.ElementType.ElementFloat16
-    elif value_type == "bfloat16":
-        sparse_type.element_type = ttypes.ElementType.ElementBFloat16
-    elif value_type == "uint8":
-        sparse_type.element_type = ttypes.ElementType.ElementUInt8
-    elif value_type == "int8":
-        sparse_type.element_type = ttypes.ElementType.ElementInt8
-    elif value_type == "int16":
-        sparse_type.element_type = ttypes.ElementType.ElementInt16
-    elif value_type == "int32" or value_type == "int":
-        sparse_type.element_type = ttypes.ElementType.ElementInt32
-    elif value_type == "int64":
-        sparse_type.element_type = ttypes.ElementType.ElementInt64
-    else:
-        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown value type: {value_type}")
-    
+    sparse_type.element_type = get_embedding_element_type(value_type)
     if index_type == "int8":
         sparse_type.index_type = ttypes.ElementType.ElementInt8
     elif index_type == "int16":

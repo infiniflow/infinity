@@ -175,17 +175,17 @@ void RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
         SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_year_from_date(func_name,
                                               {DataType(LogicalType::kDate)},
-                                              DataType(kBigInt),
+                                              DataType(LogicalType::kBigInt),
                                               &ScalarFunction::UnaryFunction<DateT, BigIntT, ExtractYearFunction>);
         function_set_ptr->AddFunction(extract_year_from_date);
         ScalarFunction extract_year_from_datetime(func_name,
                                                   {DataType(LogicalType::kDateTime)},
-                                                  DataType(kBigInt),
+                                                  DataType(LogicalType::kBigInt),
                                                   &ScalarFunction::UnaryFunction<DateTimeT, BigIntT, ExtractYearFunction>);
         function_set_ptr->AddFunction(extract_year_from_datetime);
         ScalarFunction extract_year_from_timestamp(func_name,
                                                    {DataType(LogicalType::kTimestamp)},
-                                                   DataType(kBigInt),
+                                                   DataType(LogicalType::kBigInt),
                                                    &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractYearFunction>);
         function_set_ptr->AddFunction(extract_year_from_timestamp);
         Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
@@ -196,17 +196,17 @@ void RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
         SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_month_from_date(func_name,
                                                {DataType(LogicalType::kDate)},
-                                               DataType(kBigInt),
+                                               DataType(LogicalType::kBigInt),
                                                &ScalarFunction::UnaryFunction<DateT, BigIntT, ExtractMonthFunction>);
         function_set_ptr->AddFunction(extract_month_from_date);
         ScalarFunction extract_month_from_datetime(func_name,
                                                    {DataType(LogicalType::kDateTime)},
-                                                   DataType(kBigInt),
+                                                   DataType(LogicalType::kBigInt),
                                                    &ScalarFunction::UnaryFunction<DateTimeT, BigIntT, ExtractMonthFunction>);
         function_set_ptr->AddFunction(extract_month_from_datetime);
         ScalarFunction extract_month_from_timestamp(func_name,
                                                     {DataType(LogicalType::kTimestamp)},
-                                                    DataType(kBigInt),
+                                                    DataType(LogicalType::kBigInt),
                                                     &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractMonthFunction>);
         function_set_ptr->AddFunction(extract_month_from_timestamp);
         Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
@@ -217,17 +217,17 @@ void RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
         SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_day_from_date(func_name,
                                              {DataType(LogicalType::kDate)},
-                                             DataType(kBigInt),
+                                             DataType(LogicalType::kBigInt),
                                              &ScalarFunction::UnaryFunction<DateT, BigIntT, ExtractDayFunction>);
         function_set_ptr->AddFunction(extract_day_from_date);
         ScalarFunction extract_day_from_datetime(func_name,
                                                  {DataType(LogicalType::kDateTime)},
-                                                 DataType(kBigInt),
+                                                 DataType(LogicalType::kBigInt),
                                                  &ScalarFunction::UnaryFunction<DateTimeT, BigIntT, ExtractDayFunction>);
         function_set_ptr->AddFunction(extract_day_from_datetime);
         ScalarFunction extract_day_from_timestamp(func_name,
                                                   {DataType(LogicalType::kTimestamp)},
-                                                  DataType(kBigInt),
+                                                  DataType(LogicalType::kBigInt),
                                                   &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractDayFunction>);
         function_set_ptr->AddFunction(extract_day_from_timestamp);
         Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
@@ -238,17 +238,17 @@ void RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
         SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_hour_from_datetime(func_name,
                                                   {DataType(LogicalType::kDateTime)},
-                                                  DataType(kBigInt),
+                                                  DataType(LogicalType::kBigInt),
                                                   &ScalarFunction::UnaryFunction<DateTimeT, BigIntT, ExtractHourFunction>);
         function_set_ptr->AddFunction(extract_hour_from_datetime);
         ScalarFunction extract_hour_from_timestamp(func_name,
                                                    {DataType(LogicalType::kTimestamp)},
-                                                   DataType(kBigInt),
+                                                   DataType(LogicalType::kBigInt),
                                                    &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractHourFunction>);
         function_set_ptr->AddFunction(extract_hour_from_timestamp);
         ScalarFunction extract_hour_from_time(func_name,
                                               {DataType(LogicalType::kTime)},
-                                              DataType(kBigInt),
+                                              DataType(LogicalType::kBigInt),
                                               &ScalarFunction::UnaryFunction<TimeT, BigIntT, ExtractHourFunction>);
         function_set_ptr->AddFunction(extract_hour_from_time);
         Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
@@ -259,17 +259,17 @@ void RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
         SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_minute_from_datetime(func_name,
                                                     {DataType(LogicalType::kDateTime)},
-                                                    DataType(kBigInt),
+                                                    DataType(LogicalType::kBigInt),
                                                     &ScalarFunction::UnaryFunction<DateTimeT, BigIntT, ExtractMinuteFunction>);
         function_set_ptr->AddFunction(extract_minute_from_datetime);
         ScalarFunction extract_minute_from_timestamp(func_name,
                                                      {DataType(LogicalType::kTimestamp)},
-                                                     DataType(kBigInt),
+                                                     DataType(LogicalType::kBigInt),
                                                      &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractMinuteFunction>);
         function_set_ptr->AddFunction(extract_minute_from_timestamp);
         ScalarFunction extract_minute_from_time(func_name,
                                                 {DataType(LogicalType::kTime)},
-                                                DataType(kBigInt),
+                                                DataType(LogicalType::kBigInt),
                                                 &ScalarFunction::UnaryFunction<TimeT, BigIntT, ExtractMinuteFunction>);
         function_set_ptr->AddFunction(extract_minute_from_time);
         Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
@@ -280,17 +280,17 @@ void RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
         SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
         ScalarFunction extract_second_from_datetime(func_name,
                                                     {DataType(LogicalType::kDateTime)},
-                                                    DataType(kBigInt),
+                                                    DataType(LogicalType::kBigInt),
                                                     &ScalarFunction::UnaryFunction<DateTimeT, BigIntT, ExtractSecondFunction>);
         function_set_ptr->AddFunction(extract_second_from_datetime);
         ScalarFunction extract_second_from_timestamp(func_name,
                                                      {DataType(LogicalType::kTimestamp)},
-                                                     DataType(kBigInt),
+                                                     DataType(LogicalType::kBigInt),
                                                      &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractSecondFunction>);
         function_set_ptr->AddFunction(extract_second_from_timestamp);
         ScalarFunction extract_second_from_time(func_name,
                                                 {DataType(LogicalType::kTime)},
-                                                DataType(kBigInt),
+                                                DataType(LogicalType::kBigInt),
                                                 &ScalarFunction::UnaryFunction<TimeT, BigIntT, ExtractSecondFunction>);
         function_set_ptr->AddFunction(extract_second_from_time);
         Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

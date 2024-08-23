@@ -700,6 +700,18 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW PERSISTENCE OBJECT"));
             break;
         }
+        case ShowStmtType::kMemory: {
+            result->emplace_back(MakeShared<String>("SHOW MEMORY"));
+            break;
+        }
+        case ShowStmtType::kMemoryObjects: {
+            result->emplace_back(MakeShared<String>("SHOW MEMORY OBJECTS"));
+            break;
+        }
+        case ShowStmtType::kMemoryAllocation: {
+            result->emplace_back(MakeShared<String>("SHOW MEMORY ALLOCATION"));
+            break;
+        }
     }
 }
 

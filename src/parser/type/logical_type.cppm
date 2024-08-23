@@ -24,4 +24,8 @@ export using infinity::LogicalType;
 
 export using infinity::GetCommonLogicalType;
 
+export using infinity::LogicalType2Str;
+
+export using infinity::to_underlying_val;
+
 }

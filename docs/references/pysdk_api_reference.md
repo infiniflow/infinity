@@ -603,7 +603,7 @@ A non-empty string indicating the name of the index, which must adhere to the fo
 An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and `index_param_list`.
 
 - **column_name**: `str`, *Required*  
-  The name of the column to build index on. Must not be empty. 
+  The name of the column to build index on. Must not be empty.  
 - **index_type**: `IndexType`, *Required*  
   Index type. You may want to import `infinity.index` to set `IndexType`: `from infinity.index import IndexType`  
   - `Hnsw`: An HNSW index.
@@ -612,8 +612,8 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
   - `IVFFlat`: An IVFFlat index.
   - `Secondary`: A secondary index. Works with structured data only.
   - `BMP`: A Block-Max Pruning index. Works with sparse vectors only.
-- **index_param_list**: `list[InitParameter(str, str)]`  
-  A list of `InitParameter` objects specifying parameter settings for the chosen index type. Each object handles one parameter setting. To set a specific index parameter, pass the parameter name and its corresponding value as two separate strings to the `InitParameter` object: 
+- **index_param_list**: `dict[str, str]`  
+  A dictionary specifying the parameter settings for the selected index type. Each key-value pair in the dictionary corresponds to a parameter and its value:
   - Parameter settings for an HNSW index:
     - `"M"`: *Optional* - Defaults to`"16"`.
     - `"ef_construction"`: *Optional* - Defaults to`"50"`.
@@ -656,10 +656,10 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"raw"`: Store the block-max index without compression.
 
 :::tip NOTE
-Import the `infinity.index` package to set `IndexInfo`, `IndexType`, and `InitParameter`.
+Import the `infinity.index` package to set `IndexInfo`, and `IndexType`.
 
 ```python
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 ```
 
 :::
@@ -699,7 +699,7 @@ A structure containing these attributes:
 #### Create an HNSW index
 
 ```python {1}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
 table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an HNSW index named "my_index" on column "c1" with default parameter settings:
@@ -707,11 +707,11 @@ table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector
 # - "ef_construction": "50",
 # - "encode": "plain"
 # Only the "metric" parameter (required) is explicitly set to L2 distance. 
-table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, [InitParameter("metric", "l2")]), None)
+table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}), None)
 ```
 
 ```python {1}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
 table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an HNSW index named "my_index" on column "c1"
@@ -722,12 +722,12 @@ table_object.create_index(
         IndexInfo(
             "c1",
             IndexType.Hnsw,
-            [
-                InitParameter("M", "16"),
-                InitParameter("ef_construction", "50"),
-                InitParameter("metric", "l2"),
-                InitParameter("encode", "lvq") # "lvq" applies to float vector element only
-            ]
+            {
+              "M": "16",
+              "ef_construction": "50",
+              "metric": "l2",
+              "encode": "lvq"
+            }
         ),
     None
 )
@@ -736,7 +736,7 @@ table_object.create_index(
 #### Create a full-text index
 
 ```python {12}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_fulltext" with a varchar column "body"
 table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
 # Create a full-text index named "my_index" on column "body" with default parameter settings:
@@ -746,14 +746,13 @@ table_object.create_index(
         IndexInfo(
             "body", 
             IndexType.FullText, 
-            []
         ),
     None
 )
 ```
 
 ```python {13}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_fulltext" with a varchar column "body"
 table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
 # Create a full-text index named "my_index" on column "body"
@@ -763,16 +762,16 @@ table_object.create_index(
         IndexInfo(
             "body", 
             IndexType.FullText, 
-            [
-                InitParameter("ANALYZER", "standard")
-            ]
+            {
+                "ANALYZER": "standard"
+            }
         ),
     None
 )
 ```
 
 ```python {11-13}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # In the following code snippet, you will see an index built on three columns
 # IMPORTANT: For now, multi-column index works with full-text index ONLY. 
 # Create a table named "test_index_fulltext" with three varchar columns "doctitle", "docdate", and "body"
@@ -782,9 +781,9 @@ table_object = db_object.create_table("test_index_fulltext", {"doctitle": {"type
 table_object.create_index(
     "my_index",
     [
-        IndexInfo("doctitle", IndexType.FullText, []),
-        IndexInfo("docdate", IndexType.FullText, []),
-        IndexInfo("body", IndexType.FullText, []),
+        IndexInfo("doctitle", IndexType.FullText),
+        IndexInfo("docdate", IndexType.FullText),
+        IndexInfo("body", IndexType.FullText),
     ],
     None
 )
@@ -793,7 +792,7 @@ table_object.create_index(
 #### Create an IVFFlat index
 
 ```python {14}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_ivfflat" with a vector column "c1"
 table_ojbect = db_object.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an IVFFlat index named "my_index" on column "c1" with default parameter settings:
@@ -804,16 +803,16 @@ table_object.create_index(
         IndexInfo(
             "c1",
             IndexType.IVFFlat,
-            [
-                InitParameter("metric", "l2")
-            ]
+            {
+              "metric": "l2"
+            }
         ),
     None
 )
 ```
 
 ```python {13,14}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_ivfflat" with a vector column "c1"
 table_ojbect = db_object.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an IVFFlat index named "my_index" on column "c1"
@@ -823,10 +822,10 @@ table_object.create_index(
         IndexInfo(
             "c1",
             IndexType.IVFFlat,
-            [
-                InitParameter("centroids_count", "128"),
-                InitParameter("metric", "l2")
-            ]
+            {
+              "centroids_count": "128",
+              "metric": "l2"
+            }
         ),
     None
 )
@@ -835,7 +834,7 @@ table_object.create_index(
 #### Create a secondary index
 
 ```python {11}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_secondary" with a varchar column "body"
 table_object = db_object.create_table("test_index_secondary", {"c1": {"type": "varchar"}}, None)
 # Create a secondary index named "my_index" on column "c1"
@@ -843,8 +842,7 @@ table_object.create_index(
     "my_index",
         IndexInfo(
             "c1", 
-            IndexType.Secondary, 
-            []
+            IndexType.Secondary 
         ),
     None
 )
@@ -853,7 +851,7 @@ table_object.create_index(
 #### Create a BMP index
 
 ```python {13}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
 # Create a BMP index named "my_index" on column "c1" with default parameter settings:
@@ -863,15 +861,14 @@ table_object.create_index(
     "my_index",
         IndexInfo(
             "c1",
-            IndexType.BMP,
-            []
+            IndexType.BMP
         ),
     None
 )
 ```
 
 ```python {13,14}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
 # Create a BMP index named "my_index" on column "c1"
@@ -881,10 +878,10 @@ table_object.create_index(
         IndexInfo(
             "c1",
             IndexType.BMP,
-            [
-                InitParameter("block_size", "16"),
-                InitParameter("compress_type", "compress")
-            ]
+            {
+              "block_size": "16",
+              "compress_type": "compress"
+            }
         ),
     None
 )
@@ -1544,8 +1541,8 @@ table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "l2", 100)
 2. Set the `ef` value as follows:
 
 ```python
-from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50")]))
+from infinity.index import IndexInfo, IndexType
+table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, {"ef_construction": "50"}))
 # Find the 2 nearest neighbors using cosine distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
@@ -1554,8 +1551,8 @@ table_object.output(["*"]).match_dense("vec", [1, 2, 3], "uint8", "cosine", 2).t
 ```
 
 ```python
-from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50")]))
+from infinity.index import IndexInfo, IndexType
+table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, {"ef_construction": "50"}))
 # Find the 2 nearest neighbors using inner product distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
@@ -1635,14 +1632,14 @@ A dictionary representing additional parameters for the sparse vector search. Fo
 ```python
 # As demonstrated in the following example:
 # The sparse vector search is performed on column "sparse_column" to find the 100 nearest neighbors using inner product
-# SparseVector(**{"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}) represents the sparse vector to compare against:
+# SparseVector([0, 10, 20], [0.1, 0.2, 0.3]) represents the sparse vector to compare against:
 # - 0: the index of 0.1
 # - 10: the index of 0.2
 # - 20: the index of 0.3
 # If no sparse vector index is created on the column being queried, then the search defaults to a brute-force search.
 # In such case, set `opt_params` to `None` or leave it blank.
 from infinity.common import SparseVector
-table_object.output(["*"]).match_sparse('sparse', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100).to_df()
+table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100).to_df()
 ```
 
 :::caution NOTE
@@ -1652,25 +1649,25 @@ table_object.output(["*"]).match_sparse('sparse', SparseVector([0, 10, 20], [0.1
 #### Perform a sparse vector search in BMP
 
 ```python
-from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", [IndexInfo("sparse", IndexType.BMP)])
+from infinity.index import IndexInfo, IndexType
+table_object.create_index("my_index", [IndexInfo("sparse_column", IndexType.BMP)])
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
 # If you leave `opt_params` blank, the search takes the default settings for `"alpha"` and `"beta"`.
 from infinity.common import SparseVector
-table_object.output(["*"]).match_sparse('sparse', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
+table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
 ```
 
 ```python
-from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", IndexInfo("sparse", IndexType.BMP))
+from infinity.index import IndexInfo, IndexType
+table_object.create_index("my_index", IndexInfo("sparse_column", IndexType.BMP))
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
 # You can set the values of `"alpha"` or `"beta"` in `opt_params`, which overrides the default settings.
 from infinity.common import SparseVector
-table_object.output(["*"]).match_sparse('sparse', SparseVector([0, 10, 20], [8, 10, 66]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
+table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20], [8, 10, 66]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
 ```
 
 ---
@@ -1851,9 +1848,9 @@ The following code snippets illustrate the use of fused reranking in a three-way
 
 ```python {6}
 from infinity.common import SparseVector
-table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
+table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_score"])
             .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_sparse("sparse_column", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
             .match_text("body", "blooms", 10)
             .filter("year < 2024")
             .fusion("rrf", 2)
@@ -1862,9 +1859,9 @@ table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"]
 
 ```python {6}
 from infinity.common import SparseVector
-table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
+table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_score"])
             .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_sparse("sparse_column", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
             .match_text("body", "blooms", 10)
             .filter("year < 2024")
             .fusion("rrf", 2, {"rank_constant": 30})
@@ -1875,9 +1872,9 @@ table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"]
 
 ```python {6}
 from infinity.common import SparseVector
-table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
+table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_score"])
             .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_sparse("sparse_column", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
             .match_text("body", "blooms", 10)
             .filter("year < 2024")
             .fusion("weighted_sum", 2, {"weights": "1,2,0.5"})
@@ -1888,9 +1885,9 @@ table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"]
 
 ```python {8}
 from infinity.common import SparseVector
-table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
+table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_score"])
             .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_sparse("sparse_column", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
             .match_text("body", "blooms", 10)
             .filter("year < 2024")
             .fusion("match_tensor", 2, {"field": "tensor", "data_type": "float", "data": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})

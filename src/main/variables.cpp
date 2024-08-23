@@ -42,6 +42,7 @@ void VarUtil::InitVariablesMap() {
     global_name_map_[SYSTEM_MEMORY_USAGE_VAR_NAME.data()] = GlobalVariable::kSystemMemoryUsage;
     global_name_map_[OPEN_FILE_COUNT_VAR_NAME.data()] = GlobalVariable::kOpenFileCount;
     global_name_map_[CPU_USAGE_VAR_NAME.data()] = GlobalVariable::kCPUUsage;
+    global_name_map_["jeprof"] = GlobalVariable::kJeProf;
 
     session_name_map_[QUERY_COUNT_VAR_NAME.data()] = SessionVariable::kQueryCount;
     session_name_map_[TOTAL_COMMIT_COUNT_VAR_NAME.data()] = SessionVariable::kTotalCommitCount;

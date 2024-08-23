@@ -32,6 +32,7 @@ import create_index_info;
 import update_statement;
 import explain_statement;
 import command_statement;
+import global_resource_usage;
 
 namespace infinity {
 

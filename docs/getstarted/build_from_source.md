@@ -49,7 +49,7 @@ git clone https://github.com/infiniflow/infinity.git
 cd infinity && mkdir cmake-build-debug
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
 docker run -d --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang18
-docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build ."
+docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  infinity"
 ```
 
 ### Step3 Start up the Infinity server
@@ -106,7 +106,7 @@ cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-18
 export CXX=/usr/bin/clang++-18
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
-cmake --build .
+cmake --build . -t infinity
 ```
 
 ### Step4 Start up the Infinity server
@@ -152,7 +152,7 @@ cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-18
 export CXX=/usr/bin/clang++-18
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
-cmake --build .
+cmake --build . -t infinity
 ```
 
 ### Step4 Start up Infinity server
@@ -197,7 +197,7 @@ cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-18
 export CXX=/usr/bin/clang++-18
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
-cmake --build .
+cmake --build . -t infinity
 ```
 
 ### Step4 Start up Infinity server
@@ -206,4 +206,81 @@ cmake --build .
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 ulimit -n 500000
 ./cmake-build-debug/src/infinity
+```
+
+# Build and run unit test
+
+## Build and run unit test on Linux using Docker
+```shell
+docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  test_main"
+./cmake-build-debug/src/test_main
+```
+
+## Build and run unit test on Ubuntu
+```shell
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake --build . -t test_main
+./cmake-build-debug/src/test_main
+```
+
+## Build and run unit test with code coverage
+### Step 1 Install dependency
+```shell
+pip install gcovr
+```
+
+###  Step 2 Build and run unit test with code coverage option on 
+```shell
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
+cmake --build . -t test_main
+find . -name "*.gcda"  | xargs rm -f
+./cmake-build-debug/src/test_main
+```
+
+### Step 3 Use Gcovr to generate summarized code coverage results
+```shell
+cd ./cmake-build-debug/src/CMakeFiles/unit_test.dir
+gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html unit_test_html.html
+```
+
+# Build and run function test
+
+## Build and run function test on Linux using Docker
+```shell
+docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  infinity"
+./cmake-build-debug/src/infinity
+python3 tools/run_pytest_parallel.py
+```
+
+## Build and run function test on Ubuntu
+```shell
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake --build . -t infinity
+./cmake-build-debug/src/infinity
+python3 tools/run_pytest_parallel.py
+```
+
+## Build and run function test with code coverage
+### Step 1 Build and start up Infinity server with code coverage option on
+```shell
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
+cmake --build . -t infinity
+find . -name "*.gcda"  | xargs rm -f
+./cmake-build-debug/src/infinity
+```
+
+### Step 2 Run function test
+```shell
+python3 tools/run_pytest_parallel.py
+```
+
+### Step 4 Shut down Infinity server
+```shell
+kill -15 `pidof infinity`
+```
+
+### Step 5 Use Gcovr to generate summarized code coverage results
+```shell
+cd ./cmake-build-debug/src/CMakeFiles
+gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html function_test_html.html
 ```

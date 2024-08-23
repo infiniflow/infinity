@@ -35,13 +35,13 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
                                            SharedPtr<BaseTableRef> table_ref)
     : query_count_(query_count), topk_(topk), elem_type_(elem_type), table_ref_(table_ref) {
     switch (elem_type) {
-        case kElemInvalid: {
+        case EmbeddingDataType::kElemInvalid: {
             String error_message = "Invalid element type";
             UnrecoverableError(error_message);
         }
-        case kElemUInt8:
-        case kElemInt8:
-        case kElemFloat: {
+        case EmbeddingDataType::kElemUInt8:
+        case EmbeddingDataType::kElemInt8:
+        case EmbeddingDataType::kElemFloat: {
             MergeKnnFunctionData::InitMergeKnn<f32, f32>(knn_distance_type);
             break;
         }

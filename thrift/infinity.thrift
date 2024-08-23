@@ -20,6 +20,7 @@ Embedding,
 Tensor,
 TensorArray,
 Sparse,
+MultiVector,
 Invalid
 }
 
@@ -282,6 +283,7 @@ ColumnEmbedding,
 ColumnTensor,
 ColumnTensorArray,
 ColumnSparse,
+ColumnMultiVector,
 ColumnRowID,
 ColumnInvalid,
 }

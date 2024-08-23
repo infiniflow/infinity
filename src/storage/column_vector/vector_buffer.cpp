@@ -382,9 +382,9 @@ const char *VectorBuffer::GetTensorRaw(SizeT offset, SizeT size) const { return 
 
 SizeT VectorBuffer::AppendTensorRaw(const char *raw_data, SizeT size) { return var_buffer_mgr_->Append(raw_data, size); }
 
-const TensorT *VectorBuffer::GetTensorArrayMeta(SizeT offset, SizeT array_num) const {
+const char *VectorBuffer::GetTensorArrayMeta(SizeT offset, SizeT array_num) const {
     SizeT bytes = array_num * sizeof(TensorT);
-    return reinterpret_cast<const TensorT *>(var_buffer_mgr_->Get(offset, bytes));
+    return var_buffer_mgr_->Get(offset, bytes);
 }
 
 SizeT VectorBuffer::AppendTensorArrayMeta(Span<const TensorT> tensor_metas) const {

@@ -488,7 +488,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     // search expr
     SearchExpr *search_expr = nullptr;
     if (request.__isset.search_expr) {
-        search_expr = new SearchExpr();
+
         auto search_expr_list = new Vector<ParsedExpr *>();
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
@@ -512,10 +512,10 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
                     delete search_expr_list;
                     search_expr_list = nullptr;
                 }
-                if (search_expr != nullptr) {
-                    delete search_expr;
-                    search_expr = nullptr;
+                if (match_expr != nullptr) {
+                    delete match_expr;
                 }
+
                 ProcessStatus(response, status);
                 return;
             }
@@ -527,6 +527,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             search_expr_list->emplace_back(fusion_expr);
         }
 
+        search_expr = new SearchExpr();
         search_expr->SetExprs(search_expr_list);
     }
 
@@ -656,7 +657,6 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     // search expr
     SearchExpr *search_expr = nullptr;
     if (request.__isset.search_expr) {
-        search_expr = new SearchExpr();
         auto search_expr_list = new Vector<ParsedExpr *>();
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
@@ -697,6 +697,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             search_expr_list->emplace_back(fusion_expr);
         }
 
+        search_expr = new SearchExpr();
         search_expr->SetExprs(search_expr_list);
     }
 
@@ -1487,8 +1488,9 @@ SharedPtr<DataType> InfinityThriftService::GetColumnTypeFromProto(const infinity
             return MakeShared<infinity::DataType>(infinity::LogicalType::kBFloat16);
         case infinity_thrift_rpc::LogicType::Tensor:
         case infinity_thrift_rpc::LogicType::TensorArray:
+        case infinity_thrift_rpc::LogicType::MultiVector:
         case infinity_thrift_rpc::LogicType::Embedding: {
-            auto embedding_type = GetEmbeddingDataTypeFromProto(type.physical_type.embedding_type.element_type);
+            const auto embedding_type = GetEmbeddingDataTypeFromProto(type.physical_type.embedding_type.element_type);
             if (embedding_type == EmbeddingDataType::kElemInvalid) {
                 return MakeShared<infinity::DataType>(infinity::LogicalType::kInvalid);
             }
@@ -1503,6 +1505,10 @@ SharedPtr<DataType> InfinityThriftService::GetColumnTypeFromProto(const infinity
                     dt = infinity::LogicalType::kTensorArray;
                     break;
                 }
+                case infinity_thrift_rpc::LogicType::MultiVector: {
+                    dt = infinity::LogicalType::kMultiVector;
+                    break;
+                }
                 case infinity_thrift_rpc::LogicType::Embedding: {
                     dt = infinity::LogicalType::kEmbedding;
                     break;
@@ -1511,7 +1517,7 @@ SharedPtr<DataType> InfinityThriftService::GetColumnTypeFromProto(const infinity
                     UnrecoverableError("Unreachable code!");
                 }
             }
-            return MakeShared<infinity::DataType>(dt, embedding_info);
+            return MakeShared<infinity::DataType>(dt, std::move(embedding_info));
         }
         case infinity_thrift_rpc::LogicType::Varchar:
             return MakeShared<infinity::DataType>(infinity::LogicalType::kVarchar);
@@ -1527,8 +1533,9 @@ SharedPtr<DataType> InfinityThriftService::GetColumnTypeFromProto(const infinity
             auto sparse_info = SparseInfo::Make(embedding_type, index_type, type.physical_type.sparse_type.dimension, SparseStoreType::kSort);
             return MakeShared<infinity::DataType>(infinity::LogicalType::kSparse, sparse_info);
         }
-        default:
+        case infinity_thrift_rpc::LogicType::Invalid: {
             return MakeShared<infinity::DataType>(infinity::LogicalType::kInvalid);
+        }
     }
     return MakeShared<infinity::DataType>(infinity::LogicalType::kInvalid);
 }
@@ -2058,6 +2065,8 @@ infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColu
             return infinity_thrift_rpc::ColumnType::ColumnVarchar;
         case LogicalType::kEmbedding:
             return infinity_thrift_rpc::ColumnType::ColumnEmbedding;
+        case LogicalType::kMultiVector:
+            return infinity_thrift_rpc::ColumnType::ColumnMultiVector;
         case LogicalType::kTensor:
             return infinity_thrift_rpc::ColumnType::ColumnTensor;
         case LogicalType::kTensorArray:
@@ -2132,6 +2141,7 @@ UniquePtr<infinity_thrift_rpc::DataType> InfinityThriftService::DataTypeToProtoD
         }
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
+        case LogicalType::kMultiVector:
         case LogicalType::kEmbedding: {
             auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
             infinity_thrift_rpc::EmbeddingType embedding_type;
@@ -2145,6 +2155,10 @@ UniquePtr<infinity_thrift_rpc::DataType> InfinityThriftService::DataTypeToProtoD
                 }
                 case LogicalType::kTensorArray: {
                     data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::TensorArray);
+                    break;
+                }
+                case LogicalType::kMultiVector: {
+                    data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::MultiVector);
                     break;
                 }
                 case LogicalType::kEmbedding: {
@@ -2293,6 +2307,10 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
             HandleEmbeddingType(output_column_field, row_count, column_vector);
             break;
         }
+        case LogicalType::kMultiVector: {
+            HandleMultiVectorType(output_column_field, row_count, column_vector);
+            break;
+        }
         case LogicalType::kTensor: {
             HandleTensorType(output_column_field, row_count, column_vector);
             break;
@@ -2369,6 +2387,31 @@ void InfinityThriftService::HandleEmbeddingType(infinity_thrift_rpc::ColumnField
     String dst;
     dst.resize(size);
     std::memcpy(dst.data(), column_vector->data(), size);
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+}
+
+void InfinityThriftService::HandleMultiVectorType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                                  SizeT row_count,
+                                                  const SharedPtr<ColumnVector> &column_vector) {
+    SizeT all_size = 0;
+    Vector<Pair<const char *, SizeT>> multi_vector_data(row_count);
+    for (SizeT index = 0; index < row_count; ++index) {
+        Span<const char> raw_data = column_vector->GetMultiVectorRaw(index).first;
+        all_size += sizeof(i32) + raw_data.size();
+        multi_vector_data[index] = {raw_data.data(), raw_data.size()};
+    }
+    String dst;
+    dst.resize(all_size);
+
+    i32 current_offset = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        const auto &[data, length] = multi_vector_data[index];
+        std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+        std::memcpy(dst.data() + current_offset + sizeof(i32), data, length);
+        current_offset += sizeof(i32) + length;
+    }
+
     output_column_field.column_vectors.emplace_back(std::move(dst));
     output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
 }

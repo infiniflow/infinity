@@ -25,11 +25,7 @@ export class PeriodicTriggerThread {
 public:
     PeriodicTriggerThread() : running_(false) {}
 
-    ~PeriodicTriggerThread() {
-        if (running_.load()) {
-            Stop();
-        }
-    }
+    ~PeriodicTriggerThread();
 
     void Start();
 
@@ -45,9 +41,10 @@ public:
     SharedPtr<OptimizeIndexPeriodicTrigger> optimize_index_trigger_;
 
 private:
-
     Thread thread_{};
-    atomic_bool running_{false};
+    std::mutex mtx_{};
+    std::condition_variable cv_{};
+    bool running_{false};
 };
 
 } // namespace infinity

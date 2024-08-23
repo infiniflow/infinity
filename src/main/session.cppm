@@ -22,6 +22,7 @@ import config;
 import options;
 import profiler;
 import catalog;
+import global_resource_usage;
 
 namespace infinity {
 

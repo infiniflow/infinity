@@ -50,14 +50,14 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
 
     auto &merge_knn_data = *merge_knn_op_state->merge_knn_function_data_;
     switch (merge_knn_data.elem_type_) {
-        case kElemInvalid: {
+        case EmbeddingDataType::kElemInvalid: {
             String error_message = "Invalid elem type";
             UnrecoverableError(error_message);
             break;
         }
-        case kElemUInt8:
-        case kElemInt8:
-        case kElemFloat: {
+        case EmbeddingDataType::kElemUInt8:
+        case EmbeddingDataType::kElemInt8:
+        case EmbeddingDataType::kElemFloat: {
             switch (merge_knn_data.heap_type_) {
                 case MergeKnnHeapType::kInvalid: {
                     String error_message = "Invalid heap type";

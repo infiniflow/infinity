@@ -66,37 +66,18 @@ class BufferObjTest : public BaseTest {
 public:
     void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
 
-    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+    void WaitCleanup(Storage *storage) {
         Catalog *catalog = storage->catalog();
         BufferManager *buffer_mgr = storage->buffer_manager();
-
-        auto visible_ts = WaitFlushDeltaOp(storage, last_commit_ts);
-
+        TxnManager *txn_mgr = storage->txn_manager();
+        TxnTimeStamp visible_ts = txn_mgr->GetCleanupScanTS();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
     }
 
-    TxnTimeStamp WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
-        TxnManager *txn_mgr = storage->txn_manager();
-
-        TxnTimeStamp visible_ts = 0;
-        time_t start = time(nullptr);
-        while (true) {
-            visible_ts = txn_mgr->GetCleanupScanTS();
-            // wait for at most 10s
-            time_t end = time(nullptr);
-            if (visible_ts >= last_commit_ts) {
-                LOG_INFO(fmt::format("FlushDeltaOp finished after {}", end - start));
-                break;
-            }
-            if (end - start > 5) {
-                String error_message = "WaitFlushDeltaOp timeout";
-                UnrecoverableError(error_message);
-            }
-            LOG_INFO(fmt::format("Before usleep. Wait flush delta op for {} seconds", end - start));
-            usleep(1000 * 1000);
-        }
-        return visible_ts;
+    void WaitFlushDeltaOp(Storage *storage) {
+        WalManager *wal_mgr = storage->wal_manager();
+        wal_mgr->Checkpoint(false /*is_full_checkpoint*/);
     }
 };
 
@@ -519,7 +500,6 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
-    TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("test_hnsw");
@@ -602,10 +582,10 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             auto append_status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(append_status.ok());
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
     }
-    WaitFlushDeltaOp(storage, last_commit_ts);
+    WaitFlushDeltaOp(storage);
     // Get Index
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get index"));
@@ -666,9 +646,9 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
         txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
-    WaitCleanup(storage, last_commit_ts);
+    WaitCleanup(storage);
 
     infinity::InfinityContext::instance().UnInit();
 }

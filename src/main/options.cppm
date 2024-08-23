@@ -19,6 +19,7 @@ export module options;
 import stl;
 import third_party;
 import status;
+import global_resource_usage;
 
 namespace infinity {
 

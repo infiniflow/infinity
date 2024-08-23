@@ -18,6 +18,7 @@ import stl;
 import data_table;
 import status;
 import logical_node_type;
+import global_resource_usage;
 
 namespace infinity {
 

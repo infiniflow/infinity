@@ -111,7 +111,7 @@ static void GenerateInEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_
     String func_name = "<>";
     ScalarFunction inequals_function(func_name,
                                      {data_type, data_type},
-                                     DataType(kBoolean),
+                                     DataType(LogicalType::kBoolean),
                                      &ScalarFunction::BinaryFunction<CompareType, CompareType, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(inequals_function);
 }
@@ -164,37 +164,37 @@ void RegisterInEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
     ScalarFunction mix_inequals_bigint(func_name,
                                        {DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt)},
-                                       DataType(kBoolean),
+                                       DataType(LogicalType::kBoolean),
                                        &ScalarFunction::BinaryFunction<MixedT, BigIntT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(mix_inequals_bigint);
 
     ScalarFunction bigint_inequals_mixed(func_name,
                                          {DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed)},
-                                         DataType(kBoolean),
+                                         DataType(LogicalType::kBoolean),
                                          &ScalarFunction::BinaryFunction<BigIntT, MixedT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(bigint_inequals_mixed);
 
     ScalarFunction mix_inequals_double(func_name,
                                        {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},
-                                       DataType(kBoolean),
+                                       DataType(LogicalType::kBoolean),
                                        &ScalarFunction::BinaryFunction<MixedT, DoubleT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(mix_inequals_double);
 
     ScalarFunction double_inequals_mixed(func_name,
                                          {DataType(LogicalType::kDouble), DataType(LogicalType::kMixed)},
-                                         DataType(kBoolean),
+                                         DataType(LogicalType::kBoolean),
                                          &ScalarFunction::BinaryFunction<DoubleT, MixedT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(double_inequals_mixed);
 
     ScalarFunction mix_inequals_varchar(func_name,
                                         {DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar)},
-                                        DataType(kBoolean),
+                                        DataType(LogicalType::kBoolean),
                                         &ScalarFunction::BinaryFunction<MixedT, VarcharT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(mix_inequals_varchar);
 
     ScalarFunction varchar_inequals_mixed(func_name,
                                           {DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed)},
-                                          DataType(kBoolean),
+                                          DataType(LogicalType::kBoolean),
                                           &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(varchar_inequals_mixed);
 

@@ -126,7 +126,7 @@ void RegisterLikeFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
     ScalarFunction varchar_like_function(func_name,
                                          {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
-                                         DataType(kBoolean),
+                                         DataType(LogicalType::kBoolean),
                                          &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, LikeFunction>);
     function_set_ptr->AddFunction(varchar_like_function);
 
@@ -140,7 +140,7 @@ void RegisterNotLikeFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
     ScalarFunction varchar_not_like_function(func_name,
                                              {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
-                                             DataType(kBoolean),
+                                             DataType(LogicalType::kBoolean),
                                              &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, NotLikeFunction>);
     function_set_ptr->AddFunction(varchar_not_like_function);
 
