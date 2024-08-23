@@ -102,7 +102,7 @@ TEST_P(OptimizeKnnTest, test1) {
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0,
+        std::make_shared<ColumnDef>(1,
                                     std::make_shared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 4)),
                                     "col2",
                                     std::set<ConstraintType>());
