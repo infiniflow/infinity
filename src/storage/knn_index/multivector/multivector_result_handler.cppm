@@ -33,11 +33,11 @@ struct SegmentTreeForTopnDistance {
     RawLabelT *raw_label_ = nullptr;
     RawDataT max_raw_data_ = std::numeric_limits<RawDataT>::max();
     RawLabelT max_raw_label_ = {};
-    const u32 size_ = 0;
-    UniquePtr<InnerIndexT[]> inner_index_ = MakeUniqueForOverwrite<InnerIndexT[]>(size_ << 1);
+    const u32 topn_ = 0;
+    UniquePtr<InnerIndexT[]> inner_index_ = MakeUniqueForOverwrite<InnerIndexT[]>(topn_ << 1);
 
-    explicit SegmentTreeForTopnDistance(RawDataT *raw_data, RawLabelT *raw_label, const u32 size)
-        : raw_data_(raw_data), raw_label_(raw_label), size_(size) {}
+    explicit SegmentTreeForTopnDistance(RawDataT *raw_data, RawLabelT *raw_label, const u32 topn)
+        : raw_data_(raw_data), raw_label_(raw_label), topn_(topn) {}
 
     [[nodiscard]] InnerIndexT index_max_v(const InnerIndexT lhs, const InnerIndexT rhs) const {
         return CompareDistanceIdPair(raw_data_[lhs], raw_data_[rhs], raw_label_[lhs], raw_label_[rhs]) ? lhs : rhs;
@@ -45,9 +45,9 @@ struct SegmentTreeForTopnDistance {
 
     void Build() {
         // init inner_index_ for leaf nodes
-        std::iota(inner_index_.get() + size_, inner_index_.get() + (size_ << 1), InnerIndexT{});
+        std::iota(inner_index_.get() + topn_, inner_index_.get() + (topn_ << 1), InnerIndexT{});
         // init inner_index_ for non-leaf nodes
-        for (u32 i = size_ - 1; i > 0; --i) {
+        for (u32 i = topn_ - 1; i > 0; --i) {
             inner_index_[i] = index_max_v(inner_index_[i << 1], inner_index_[(i << 1) + 1]);
         }
         max_raw_data_ = raw_data_[inner_index_[1]];
@@ -55,7 +55,7 @@ struct SegmentTreeForTopnDistance {
     }
 
     void Update(InnerIndexT index) {
-        for (u32 i = ((size_ + index) >> 1); i > 0; i >>= 1) {
+        for (u32 i = ((topn_ + index) >> 1); i > 0; i >>= 1) {
             inner_index_[i] = index_max_v(inner_index_[i << 1], inner_index_[(i << 1) + 1]);
         }
         max_raw_data_ = raw_data_[inner_index_[1]];
@@ -76,12 +76,22 @@ public:
     explicit MultiVectorResultHandler(const SizeT top_k, DistanceType *distance_ptr, LabelType *label_ptr)
         : top_k_(top_k), segment_tree_for_top_n_distance_(distance_ptr, label_ptr, top_k) {}
 
+    MultiVectorResultHandler(const int query_num, const SizeT top_k, DistanceType *distance_ptr, LabelType *label_ptr)
+        : MultiVectorResultHandler(top_k, distance_ptr, label_ptr) {
+        if (query_num != 1) [[unlikely]] {
+            UnrecoverableError("MultiVectorResultHandler only support one query at a time.");
+        }
+    }
+
     // do nothing
     void Begin() const {}
 
-    // return the biggest distance in map
-    // call AddResult if distance <= GetDistanceBar()
-    [[nodiscard]] auto GetDistanceBar() const { return segment_tree_for_top_n_distance_.GetDistanceBar(); }
+    // do nothing
+    void EndWithoutSort() const {}
+
+    auto GetSize(int) const { return label_index_map_.size(); }
+
+    auto GetDistance0(int) const { return segment_tree_for_top_n_distance_.GetDistanceBar(); }
 
     void AddResult(DistanceType d, LabelType l) {
         if (const auto it = label_index_map_.find(l); it != label_index_map_.end()) {
@@ -117,9 +127,9 @@ public:
             }
         }
     }
-
-    // do nothing
-    void EndWithoutSort() const {}
 };
+
+template <typename DistanceType, typename LabelType>
+class MultiVectorResultHandler<DistanceType, LabelType, void>;
 
 } // namespace infinity

@@ -449,6 +449,17 @@ SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_i
 template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
 struct BruteForceBlockScan;
 
+template <typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+void MultiVectorSearchOneLine(MergeKnn<QueryDataType, C, DistanceDataType> *merge_heap,
+                              KnnDistance1<QueryDataType, DistanceDataType> *dist_func,
+                              const QueryDataType *knn_query_ptr,
+                              u32 embedding_dim,
+                              UniquePtr<QueryDataType[]> &buffer_ptr_for_cast,
+                              const ColumnVector &column_vector,
+                              SegmentID segment_id,
+                              SegmentOffset segment_offset,
+                              BlockOffset block_offset);
+
 template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
 void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state) {
     // knn expr output data type is always f32
@@ -489,13 +500,13 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
     BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
     SizeT knn_column_id = GetColumnID();
 
+    UniquePtr<QueryDataType[]> buffer_ptr_for_cast;
     if (u64 block_column_idx =
             knn_scan_function_data->execute_block_scan_job_ ? knn_scan_shared_data->current_block_idx_++ : std::numeric_limits<u64>::max();
         block_column_idx < brute_task_n) {
         LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{}", knn_scan_function_data->task_id_, block_column_idx + 1, brute_task_n));
         // brute force
         // TODO: now will try to finish all block scan job in the task
-        UniquePtr<QueryDataType[]> buffer_ptr_for_cast;
         do {
             BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_->at(block_column_idx);
             const BlockEntry *block_entry = block_column_entry->block_entry();
@@ -627,13 +638,13 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     break;
                 }
                 case IndexType::kHnsw: {
-                    if constexpr (!(t == LogicalType::kEmbedding && IsAnyOf<ColumnDataType, u8, i8, f32> &&
-                                    std::is_same_v<ColumnDataType, QueryDataType>)) {
+                    if constexpr (!(IsAnyOf<ColumnDataType, u8, i8, f32> && std::is_same_v<ColumnDataType, QueryDataType>)) {
                         UnrecoverableError("Invalid data type");
                     } else {
                         auto hnsw_search = [&](auto *hnsw_index, bool with_lock) {
                             bool rerank = false;
                             KnnSearchOption search_option;
+                            search_option.column_logical_type_ = t;
                             for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
                                 if (opt_param.param_name_ == "ef") {
                                     u64 ef = std::stoull(opt_param.param_value_);
@@ -688,7 +699,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                     UnrecoverableError(error_message);
                                 }
 
-                                if (rerank && t == LogicalType::kEmbedding) { // TODO: rerank for multivector
+                                if (rerank) {
                                     Vector<SizeT> idxes(result_n);
                                     std::iota(idxes.begin(), idxes.end(), 0);
                                     std::sort(idxes.begin(), idxes.end(), [&](SizeT i, SizeT j) {
@@ -706,14 +717,28 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(knn_column_id);
                                             column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
                                         }
-                                        const auto *data = reinterpret_cast<const ColumnDataType *>(column_vector.data());
-                                        data += block_offset * knn_scan_shared_data->dimension_;
-                                        merge_heap->Search(query,
-                                                           data,
-                                                           knn_scan_shared_data->dimension_,
-                                                           dist_func->dist_func_,
-                                                           segment_id,
-                                                           segment_offset);
+                                        if constexpr (t == LogicalType::kEmbedding) {
+                                            const auto *data = reinterpret_cast<const ColumnDataType *>(column_vector.data());
+                                            data += block_offset * knn_scan_shared_data->dimension_;
+                                            merge_heap->Search(query,
+                                                               data,
+                                                               knn_scan_shared_data->dimension_,
+                                                               dist_func->dist_func_,
+                                                               segment_id,
+                                                               segment_offset);
+                                        } else if constexpr (t == LogicalType::kMultiVector) {
+                                            MultiVectorSearchOneLine<ColumnDataType, QueryDataType, C, DistanceDataType>(merge_heap,
+                                                                                                                         dist_func,
+                                                                                                                         query,
+                                                                                                                         embedding_dim,
+                                                                                                                         buffer_ptr_for_cast,
+                                                                                                                         column_vector,
+                                                                                                                         segment_id,
+                                                                                                                         segment_offset,
+                                                                                                                         block_offset);
+                                        } else {
+                                            static_assert(false, "Unexpected logical type");
+                                        }
                                     }
                                 } else {
                                     switch (knn_scan_shared_data->knn_distance_type_) {
@@ -842,37 +867,60 @@ struct BruteForceBlockScan<LogicalType::kMultiVector, ColumnDataType, QueryDataT
                         const BlockID block_id,
                         const BlockOffset row_count,
                         const Bitmask &bitmask) {
-        const QueryDataType *target_ptr = nullptr;
-        if constexpr (!std::is_same_v<ColumnDataType, QueryDataType>) {
-            if (!buffer_ptr_for_cast) {
-                buffer_ptr_for_cast = MakeUniqueForOverwrite<QueryDataType[]>(embedding_dim);
-            }
-            target_ptr = buffer_ptr_for_cast.get();
-        }
-        using Compare = C<DistanceDataType, RowID>;
         for (BlockOffset row_id = 0; row_id < row_count; ++row_id) {
             if (bitmask.IsTrue(row_id)) {
-                const auto [data_span, embedding_num] = column_vector.GetMultiVectorRaw(row_id);
-                auto result_dist = Compare::InitialValue();
-                auto raw_data_ptr = reinterpret_cast<const ColumnDataType *>(data_span.data());
-                for (u32 i = 0; i < embedding_num; ++i) {
-                    if constexpr (!std::is_same_v<ColumnDataType, QueryDataType>) {
-                        for (u32 j = 0; j < embedding_dim; ++j) {
-                            buffer_ptr_for_cast[j] = static_cast<QueryDataType>(raw_data_ptr[j]);
-                        }
-                    } else {
-                        target_ptr = raw_data_ptr;
-                    }
-                    const auto new_dist = dist_func->dist_func_(knn_query_ptr, target_ptr, embedding_dim);
-                    static_assert(std::is_same_v<decltype(result_dist), std::decay_t<decltype(new_dist)>>);
-                    result_dist = Compare::Compare(result_dist, new_dist) ? new_dist : result_dist;
-                    raw_data_ptr += embedding_dim;
-                }
-                const RowID db_row_id(segment_id, static_cast<SegmentOffset>(block_id) * DEFAULT_BLOCK_CAPACITY + row_id);
-                merge_heap->Search(0, &result_dist, &db_row_id, 1);
+                SegmentOffset segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + row_id;
+                MultiVectorSearchOneLine<ColumnDataType, QueryDataType, C, DistanceDataType>(merge_heap,
+                                                                                             dist_func,
+                                                                                             knn_query_ptr,
+                                                                                             embedding_dim,
+                                                                                             buffer_ptr_for_cast,
+                                                                                             column_vector,
+                                                                                             segment_id,
+                                                                                             segment_offset,
+                                                                                             row_id);
             }
         }
     }
 };
+
+template <typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+void MultiVectorSearchOneLine(MergeKnn<QueryDataType, C, DistanceDataType> *merge_heap,
+                              KnnDistance1<QueryDataType, DistanceDataType> *dist_func,
+                              const QueryDataType *knn_query_ptr,
+                              const u32 embedding_dim,
+                              UniquePtr<QueryDataType[]> &buffer_ptr_for_cast,
+                              const ColumnVector &column_vector,
+                              const SegmentID segment_id,
+                              const SegmentOffset segment_offset,
+                              const BlockOffset block_offset) {
+    using Compare = C<DistanceDataType, RowID>;
+    const QueryDataType *target_ptr = nullptr;
+    if constexpr (!std::is_same_v<ColumnDataType, QueryDataType>) {
+        if (!buffer_ptr_for_cast) {
+            buffer_ptr_for_cast = MakeUniqueForOverwrite<QueryDataType[]>(embedding_dim);
+        }
+        target_ptr = buffer_ptr_for_cast.get();
+    }
+    const auto [data_span, embedding_num] = column_vector.GetMultiVectorRaw(block_offset);
+    auto result_dist = Compare::InitialValue();
+    auto raw_data_ptr = reinterpret_cast<const ColumnDataType *>(data_span.data());
+    for (u32 i = 0; i < embedding_num; ++i) {
+        if constexpr (!std::is_same_v<ColumnDataType, QueryDataType>) {
+            for (u32 j = 0; j < embedding_dim; ++j) {
+                buffer_ptr_for_cast[j] = static_cast<QueryDataType>(raw_data_ptr[j]);
+            }
+        } else {
+            target_ptr = raw_data_ptr;
+        }
+        const auto new_dist = dist_func->dist_func_(knn_query_ptr, target_ptr, embedding_dim);
+        static_assert(std::is_same_v<decltype(result_dist), std::decay_t<decltype(new_dist)>>);
+        result_dist = Compare::Compare(result_dist, new_dist) ? new_dist : result_dist;
+        raw_data_ptr += embedding_dim;
+    }
+    const RowID db_row_id(segment_id, segment_offset);
+    merge_heap->Search(0, &result_dist, &db_row_id, 1);
+}
+
 
 } // namespace infinity
