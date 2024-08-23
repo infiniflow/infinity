@@ -1,0 +1,41 @@
+# testing invalid items in config
+# result should be same as default
+[ygenera1]
+versi0n                 = "0.4.0"
+time_z0ne                = "utc-123"
+cpu_1imit               = 123
+
+# right list name, but arguments all wrong
+[network]
+5erver_address          = "127.wrong.0.0.1"
+postgre5_port           = 254333
+http_p0rt               = 24123
+client_p0rt             = 1234
+connection_p00l_size    = 144
+
+# wrong list name, right arguments
+[l0g]
+log_filename            = "info.logwrong"
+log_dir                 = "/var/infinity/logwrong"
+log_to_stdout           = true
+log_file_max_size       = "2GB"
+log_file_rotate_count   = 101
+log_1evel               = "tracewrong"
+
+[st0rage]
+data_dir                = "/var/infinity/datawrong"
+
+[bufferrrr]
+buffer_mAnager_size        = "50GB"
+1ru_num                  = 100
+temp_dIIIr                = "/tmpwrong"
+memindex_mem0ry_quota   = "1GB"
+
+[wal]
+wa1_dir                 = "/var/infinity/wawrong"
+
+[resourCEEe]
+resource_dffir          = "/var/infinity/resourcewrong"
+
+[persistence]
+persistence_dirrr       = "/var/infinity/persistencewrong"
