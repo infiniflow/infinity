@@ -102,12 +102,12 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     const SizeT total_data_size = (column_data_logical_type == LogicalType::kBoolean) ? ((row_capacity + 7) / 8) : (row_capacity * column_type->Size());
     auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->file_name_, total_data_size);
 
-    column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker));
+    column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker), true /*restart*/);
 
     if (next_outline_idx > 0) {
         SizeT buffer_size = last_chunk_offset;
         auto outline_buffer_file_worker = MakeUnique<VarFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(0, 0), buffer_size);
-        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker));
+        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker), true /*restart*/);
         column_entry->outline_buffers_.push_back(buffer_obj);
     }
     column_entry->last_chunk_offset_ = last_chunk_offset;

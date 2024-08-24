@@ -62,7 +62,7 @@ public:
     BufferObj *AllocateBufferObject(UniquePtr<FileWorker> file_worker);
 
     // Get an existing BufferHandle from memory or disk.
-    BufferObj *GetBufferObject(UniquePtr<FileWorker> file_worker);
+    BufferObj *GetBufferObject(UniquePtr<FileWorker> file_worker, bool restart = false);
 
     SharedPtr<String> GetFullDataDir() const { return data_dir_; }
 
