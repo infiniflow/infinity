@@ -51,7 +51,7 @@ u64 cpu_total_cost() {
 
     fgets(buffer, sizeof(buffer), fd);
     char name[64] = {0};
-    sscanf(buffer, "%s %ld %ld %ld %ld", name, &user_time, &nice_time, &system_time, &idle_time);
+    sscanf(buffer, "%s %lld %lld %lld %lld", name, &user_time, &nice_time, &system_time, &idle_time);
     fclose(fd);
 
     return (user_time + nice_time + system_time + idle_time);
@@ -99,7 +99,7 @@ u64 cpu_cost_of_process(pid_t pid) {
 
     sscanf(line_buff, "%u", &tmp_pid);
     const char *q = get_items(line_buff, 14);
-    sscanf(q, "%ld %ld %ld %ld", &utime, &stime, &cutime, &cstime);
+    sscanf(q, "%lld %lld %lld %lld", &utime, &stime, &cutime, &cstime);
     fclose(fd);
 
     return (utime + stime + cutime + cstime);
@@ -127,7 +127,7 @@ i64 SystemInfo::MemoryUsage() {
                 String str(line_rss + 6);
 
                 char kb[line_length];
-                sscanf(str.c_str(), "%ld %s", &vm_rss_in_kb, kb);
+                sscanf(str.c_str(), "%lld %s", &vm_rss_in_kb, kb);
             }
         }
     } catch (std::exception& e) {

@@ -16,25 +16,48 @@ add_subdirectory(parser)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
-execute_process(COMMAND grep -q fma /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_FMA
-        OUTPUT_QUIET
-        ERROR_QUIET)
+if(APPLE)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA" 
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_SSE42
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q avx2 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_AVX2
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q avx512 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_AVX512
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+else()
+        #Linux
+        execute_process(COMMAND grep -q fma /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q avx2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q avx512 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+endif()
 
 
 file(GLOB_RECURSE

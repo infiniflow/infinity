@@ -160,7 +160,7 @@ private:
             chunk_tail_ = chunk_list_.before_begin();
             next_chunk_size = initial_chunk_size_;
         } else {
-            next_chunk_size = std::max(1ul, static_cast<SizeT>(chunk_tail_->Size() * growth_rate_));
+            next_chunk_size = std::max(static_cast<SizeT>(1ul), static_cast<SizeT>(chunk_tail_->Size() * growth_rate_));
             next_chunk_size = std::min(next_chunk_size, max_chunk_size_);
         }
 

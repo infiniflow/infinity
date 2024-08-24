@@ -15,4 +15,5 @@ target_link_libraries(jma
     z
     c++.a
     c++abi.a
+    iconv.a
 )
