@@ -1003,7 +1003,7 @@ Imports data from a selected file into a specified table.
   - `content-Type: application/json`
 - Body:
   - `"file_path"`: `string`
-  - `"file_type"`: `string`
+  - `"file_type"`: `string`  
   - `"header"`: `boolean`
   - `"delimiter"`: `string`
 
@@ -1025,7 +1025,11 @@ curl --request PUT \
 
 #### Request parameters
 
-
+- `"file_path"`: `string`  
+  Absolute path to the file for export. Supported file types include:  
+  - `csv`
+  - `json`
+  - `jsonl`
 
 ### Response
 
@@ -1076,7 +1080,7 @@ Exports data from a specified table to a specified file.
 - Body:
   - `"file_path"`: `string`
   - `"file_type"`: `string`
-  - `"header"`: `boolean`
+  - `"header"`: `boolean`  
   - `"delimiter"`: `string`
 
 #### Request example
@@ -1094,6 +1098,14 @@ curl --request GET \
     "delimiter":","
 } '
 ```
+
+#### Request parameters
+
+
+- `"header"`: `boolean`, *Optional*  
+  Whether to display table header or not. Works with **.csv** files only:  
+  - `True`: Display table header.
+  - `False`: (Default) Do not display table header.
 
 ### Response
 
