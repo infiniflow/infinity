@@ -53,7 +53,7 @@ curl --request POST \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -66,7 +66,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -124,7 +124,7 @@ curl --request DELETE \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -137,7 +137,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -182,7 +182,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -204,7 +204,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -244,7 +244,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -309,7 +309,6 @@ curl --request POST \
 } '
 ```
 
-
 #### Request parameters
 
 - `database_name`: (*Path parameter*), `string`, *Required*  
@@ -334,7 +333,7 @@ curl --request POST \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -347,7 +346,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -394,7 +393,7 @@ curl --request DELETE \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -407,7 +406,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -447,7 +446,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -505,7 +504,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -564,7 +563,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -658,7 +657,7 @@ curl --request POST \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -671,7 +670,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -725,7 +724,7 @@ curl --request DELETE \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -738,7 +737,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -776,7 +775,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -798,7 +797,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -842,7 +841,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -859,7 +858,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -901,7 +900,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -918,7 +917,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -962,7 +961,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1017,7 +1016,7 @@ curl --request PUT \
      --data ' \
 {
     "file_path":"./filename.json",
-    "file_type":"csv",
+    "file_type":"json",
     "header":false,
     "delimiter":","
 } '
@@ -1025,17 +1024,28 @@ curl --request PUT \
 
 #### Request parameters
 
-- `"file_path"`: `string`  
+- `"file_path"`: `string`, *Required*   
   Absolute path to the file for export. Supported file types include:  
   - `csv`
   - `json`
   - `jsonl`
+- `"file_type"`: `string`, *Required*  
+  The type of the file to import. Supported file types include:
+  - `csv`
+  - `json`
+  - `jsonl`
+- `"header"`: `boolean`, *Optional*  
+  Whether to display table header or not. Works with **.csv** files only:
+  - `True`: Display table header.
+  - `False`: (Default) Do not display table header.
+- `"delimiter"`: `string`, *Optional*, Defaults to ","  
+  Delimiter to separate columns. Works with **.csv** files only.
 
 ### Response
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1048,7 +1058,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1102,16 +1112,28 @@ curl --request GET \
 #### Request parameters
 
 
+- `"file_path"`: `string`, *Required*   
+  Absolute path to the file for export. Supported file types include:  
+  - `csv`
+  - `json`
+  - `jsonl`
+- `"file_type"`: `string`, *Required*  
+  The type of the file to import. Supported file types include:
+  - `csv`
+  - `json`
+  - `jsonl`
 - `"header"`: `boolean`, *Optional*  
-  Whether to display table header or not. Works with **.csv** files only:  
+  Whether to display table header or not. Works with **.csv** files only:
   - `True`: Display table header.
   - `False`: (Default) Do not display table header.
+- `"delimiter"`: `string`, *Optional*, Defaults to ","  
+  Delimiter to separate columns. Works with **.csv** files only.
 
 ### Response
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1124,7 +1146,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1186,7 +1208,7 @@ curl --request POST \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1250,7 +1272,7 @@ curl --request DELETE \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1264,7 +1286,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1322,7 +1344,7 @@ curl --request PUT \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1336,7 +1358,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1410,7 +1432,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1429,7 +1451,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1472,7 +1494,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1493,7 +1515,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1537,7 +1559,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1560,7 +1582,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1602,7 +1624,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1623,7 +1645,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1667,7 +1689,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1688,7 +1710,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1732,7 +1754,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1750,7 +1772,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1790,7 +1812,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1845,7 +1867,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1859,7 +1881,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1905,7 +1927,7 @@ curl --request POST \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1918,7 +1940,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1958,7 +1980,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -2024,7 +2046,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -2084,7 +2106,7 @@ curl --request POST \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -2097,7 +2119,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
