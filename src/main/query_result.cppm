@@ -24,9 +24,17 @@ namespace infinity {
 
 export struct BaseResult {
 public:
-    BaseResult() = default;
+    BaseResult() {
+        GlobalResourceUsage::IncrObjectCount("BaseResult");
+    }
 
-    BaseResult(BaseResult& other): status_(other.status_), result_table_(other.result_table_) {}
+    BaseResult(BaseResult& other): status_(other.status_), result_table_(other.result_table_) {
+        GlobalResourceUsage::IncrObjectCount("BaseResult");
+    }
+
+    ~BaseResult() {
+        GlobalResourceUsage::DecrObjectCount("BaseResult");
+    }
 
     BaseResult& operator=(BaseResult&& other)  noexcept {
         status_ = std::move(other.status_);

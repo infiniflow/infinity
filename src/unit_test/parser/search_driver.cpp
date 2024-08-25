@@ -30,17 +30,13 @@ using namespace infinity;
 class SearchDriverTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
     }
 
     void TearDown() override {
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
         BaseTest::TearDown();
     }
 };

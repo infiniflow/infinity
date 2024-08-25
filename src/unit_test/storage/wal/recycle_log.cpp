@@ -57,9 +57,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
     {
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
         std::shared_ptr<std::string> config_path = RecycleLogTest::test_ckp_recycle_config();
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -119,16 +117,12 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         }
         infinity::InfinityContext::instance().UnInit();
 
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
     }
     {
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init(); // test replay
-#endif
         std::shared_ptr<std::string> config_path = RecycleLogTest::test_ckp_recycle_config();
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -142,19 +136,15 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         }
         infinity::InfinityContext::instance().UnInit();
 
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
     }
 }
 
 TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
     {
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
         std::shared_ptr<std::string> config_path = RecycleLogTest::test_ckp_recycle_config();
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -222,16 +212,12 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
         }
         infinity::InfinityContext::instance().UnInit();
 
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
     }
     {
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init(); // test replay
-#endif
         std::shared_ptr<std::string> config_path = RecycleLogTest::test_ckp_recycle_config();
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -245,10 +231,8 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
         }
         infinity::InfinityContext::instance().UnInit();
 
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
     }
 }

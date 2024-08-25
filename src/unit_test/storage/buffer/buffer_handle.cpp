@@ -26,9 +26,7 @@ import infinity_context;
 class BufferHandleTest : public BaseTestParamStr {
     void SetUp() override {
         BaseTestParamStr::SetUp();
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
         std::shared_ptr<std::string> config_path = nullptr;
         RemoveDbDirs();
         system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
@@ -43,11 +41,9 @@ class BufferHandleTest : public BaseTestParamStr {
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
         BaseTestParamStr::TearDown();
     }
 };

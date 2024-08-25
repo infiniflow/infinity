@@ -49,9 +49,8 @@ class SealingTaskTest : public BaseTestParamStr {
     void SetUp() override {
         tree_cmd = "tree ";
         tree_cmd += GetFullDataDir();
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
+
         std::shared_ptr<std::string> config_path = nullptr;
         RemoveDbDirs();
         system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
@@ -67,11 +66,9 @@ class SealingTaskTest : public BaseTestParamStr {
     void TearDown() override {
         // system(tree_cmd.c_str());
         infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
     }
 
     String tree_cmd;

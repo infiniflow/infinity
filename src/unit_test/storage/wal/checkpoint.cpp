@@ -139,9 +139,7 @@ TEST_P(CheckpointTest, test_cleanup_and_checkpoint) {
     auto table_name = MakeShared<String>("test_cleanup_and_checkpoint");
     auto column_name = MakeShared<String>("col1");
 
-#ifdef INFINITY_DEBUG
     infinity::GlobalResourceUsage::Init();
-#endif
     std::shared_ptr<std::string> config_path = CheckpointTest::config_path();
     infinity::InfinityContext::instance().Init(config_path);
 
@@ -200,17 +198,13 @@ TEST_P(CheckpointTest, test_cleanup_and_checkpoint) {
     }
     WaitCleanup(storage);
     infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
     infinity::GlobalResourceUsage::UnInit();
-#endif
 }
 
 TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
-#ifdef INFINITY_DEBUG
     infinity::GlobalResourceUsage::Init();
-#endif
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
     auto db_name = std::make_shared<std::string>("default_db");
@@ -305,20 +299,16 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
 
         infinity::InfinityContext::instance().UnInit();
     }
-#ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
     infinity::GlobalResourceUsage::UnInit();
-#endif
 }
 
 TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
     constexpr u64 kInsertN = 10;
     constexpr u64 kInsertSize = 8192;
 
-#ifdef INFINITY_DEBUG
     infinity::GlobalResourceUsage::Init();
-#endif
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
     auto db_name = std::make_shared<std::string>("default_db");
@@ -418,17 +408,13 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
 
         infinity::InfinityContext::instance().UnInit();
     }
-#ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
     infinity::GlobalResourceUsage::UnInit();
-#endif
 }
 
 TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
-#ifdef INFINITY_DEBUG
     infinity::GlobalResourceUsage::Init();
-#endif
 
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("tbl1");
@@ -514,9 +500,7 @@ TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
         infinity::InfinityContext::instance().UnInit();
     }
 
-#ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
     infinity::GlobalResourceUsage::UnInit();
-#endif
 }

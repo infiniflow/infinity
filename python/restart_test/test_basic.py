@@ -12,8 +12,8 @@ def test_0(infinity_runner: InfinityRunner):
         print(f"i: {i}")
         infinity_runner.init(None)
 
-        # sleep for 3 second
-        time.sleep(3)
+        # sleep for 5 second
+        time.sleep(5)
 
         uri = common_values.TEST_LOCAL_HOST
         infinity_obj = infinity.connect(uri)

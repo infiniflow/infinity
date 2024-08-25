@@ -38,9 +38,13 @@ namespace infinity {
 
 export class Infinity {
 public:
-    Infinity() = default;
+    Infinity() {
+        GlobalResourceUsage::IncrObjectCount("Infinity");
+    }
 
-    ~Infinity() = default;
+    ~Infinity() {
+        GlobalResourceUsage::DecrObjectCount("Infinity");
+    }
 
     u64 GetSessionId();
 

@@ -30,15 +30,11 @@ struct SelectionData {
             UnrecoverableError(error_message);
         }
         data_ = MakeUnique<u16[]>(count);
-#ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("SelectionData");
-#endif
     }
 
     ~SelectionData() {
-#ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrObjectCount("SelectionData");
-#endif
     }
 
     UniquePtr<u16[]> data_{};
@@ -48,15 +44,11 @@ struct SelectionData {
 export class Selection {
 public:
     Selection() {
-#ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("Selection");
-#endif
     }
 
     ~Selection() {
-#ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrObjectCount("Selection");
-#endif
     }
 
     void Initialize(SizeT count = DEFAULT_VECTOR_SIZE) {

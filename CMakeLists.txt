@@ -99,6 +99,11 @@ if(ENABLE_JEMALLOC)
     endif ()
 endif ()
 
+option(ENABLE_INFINITY_STATS "Enable Infinity stats" OFF)
+if(ENABLE_INFINITY_STATS)
+    add_definitions(-DINFINITY_STATS)
+endif ()
+
 if (NOT CMAKE_BUILD_TYPE)
     if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
         set(default_build_type "RelWithDebInfo")

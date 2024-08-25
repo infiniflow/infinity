@@ -38,9 +38,7 @@ import data_type;
 class DataBlockTest : public BaseTestParamStr {
     void SetUp() override {
         RemoveDbDirs();
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
         system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
         system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
         system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
@@ -54,11 +52,9 @@ class DataBlockTest : public BaseTestParamStr {
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
         BaseTestParamStr::TearDown();
     }
 };

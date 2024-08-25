@@ -100,9 +100,7 @@ public:
 
     // Construct a column vector without initialization;
     explicit ColumnVector(SharedPtr<DataType> data_type) : vector_type_(ColumnVectorType::kInvalid), data_type_(std::move(data_type)) {
-#ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("ColumnVector");
-#endif
     }
 
     // used in BatchInvertTask::BatchInvertTask, keep ObjectCount correct
@@ -110,9 +108,7 @@ public:
         : data_type_size_(right.data_type_size_), buffer_(right.buffer_), nulls_ptr_(right.nulls_ptr_), initialized(right.initialized),
           vector_type_(right.vector_type_), data_type_(right.data_type_), data_ptr_(right.data_ptr_), capacity_(right.capacity_),
           tail_index_(right.tail_index_) {
-#ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("ColumnVector");
-#endif
     }
 
     // used in BlockColumnIter, keep ObjectCount correct
@@ -120,9 +116,7 @@ public:
         : data_type_size_(right.data_type_size_), buffer_(std::move(right.buffer_)), nulls_ptr_(std::move(right.nulls_ptr_)),
           initialized(right.initialized), vector_type_(right.vector_type_), data_type_(std::move(right.data_type_)), data_ptr_(right.data_ptr_),
           capacity_(right.capacity_), tail_index_(right.tail_index_) {
-#ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("ColumnVector");
-#endif
     }
 
     ColumnVector &operator=(ColumnVector &&right) {
@@ -136,15 +130,14 @@ public:
             std::swap(data_ptr_, right.data_ptr_);
             capacity_ = right.capacity_;
             tail_index_ = right.tail_index_;
+            GlobalResourceUsage::DecrObjectCount("ColumnVector");
         }
         return *this;
     }
 
     ~ColumnVector() {
         // Reset(); // TODO: overload copy constructor and move constructor TO PREVENT USING `Reset`
-#ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrObjectCount("ColumnVector");
-#endif
     }
 
     String ToString() const {

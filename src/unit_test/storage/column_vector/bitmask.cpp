@@ -26,9 +26,7 @@ import global_resource_usage;
 class BitmaskTest : public BaseTestParamStr {
     void SetUp() override {
         RemoveDbDirs();
-#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-#endif
         system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
         system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
         system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
@@ -42,11 +40,9 @@ class BitmaskTest : public BaseTestParamStr {
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#endif
         BaseTestParamStr::TearDown();
     }
 };

@@ -60,16 +60,19 @@ import global_resource_usage;
 
 namespace infinity {
 
-QueryContext::QueryContext(BaseSession *session) : session_ptr_(session){};
+QueryContext::QueryContext(BaseSession *session) : session_ptr_(session) { GlobalResourceUsage::IncrObjectCount("QueryContext"); }
 
-QueryContext::~QueryContext() { UnInit(); }
+QueryContext::~QueryContext() {
+    GlobalResourceUsage::DecrObjectCount("QueryContext");
+    UnInit();
+}
 
 void QueryContext::Init(Config *global_config_ptr,
                         TaskScheduler *scheduler_ptr,
                         Storage *storage_ptr,
                         ResourceManager *resource_manager_ptr,
-                        SessionManager* session_manager,
-                        PersistenceManager* persistence_manager) {
+                        SessionManager *session_manager,
+                        PersistenceManager *persistence_manager) {
     global_config_ = global_config_ptr;
     scheduler_ = scheduler_ptr;
     storage_ = storage_ptr;

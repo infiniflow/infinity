@@ -481,12 +481,10 @@ TEST_F(BufferObjTest, test1) {
 TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // GTEST_SKIP(); // FIXME
     RemoveDbDirs();
-#ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
     infinity::GlobalResourceUsage::UnInit();
     infinity::GlobalResourceUsage::Init();
-#endif
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj_2.toml");
 //    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);

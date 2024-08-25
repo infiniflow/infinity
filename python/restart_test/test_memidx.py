@@ -18,6 +18,7 @@ class TestMemIdx:
         infinity_obj = infinity.connect(uri)
 
         db_obj = infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_memidx1", infinity.common.ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_memidx1", {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}}
         )
@@ -89,9 +90,10 @@ class TestMemIdx:
 
         check()
         # wait for optimize
-        time.sleep(3)
+        time.sleep(5)
         check()
 
+        db_obj.drop_table("test_memidx1", infinity.common.ConflictType.Error)
         infinity_obj.disconnect()
         infinity_runner.uninit()
         time.sleep(5)
