@@ -149,6 +149,9 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             return {MakeUnique<NGramAnalyzer>(ngram), Status::OK()};
         }
         default: {
+            if(std::filesystem::is_regular_file(name)) {
+                // Suppose it is a customized Python script analyzer
+            }
             return {nullptr, Status::AnalyzerNotFound(name.data())};
         }
     }
