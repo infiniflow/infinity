@@ -109,8 +109,8 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CompactTaskTest,
-                         ::testing::Values((std::string(test_data_path()) + "/config/test_cleanup_task.toml").c_str(),
-                                           (std::string(test_data_path()) + "/config/test_cleanup_task_vfs.toml").c_str()));
+                         ::testing::Values((std::string(test_data_path()) + "/config/test_close_bgtask.toml").c_str(),
+                                           (std::string(test_data_path()) + "/config/test_close_bgtask_vfs.toml").c_str()));
 
 
 class SilentLogTestCompactTaskTest : public CompactTaskTest {
@@ -133,7 +133,7 @@ class SilentLogTestCompactTaskTest : public CompactTaskTest {
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          SilentLogTestCompactTaskTest,
-                         ::testing::Values((std::string(test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
+                         ::testing::Values((std::string(test_data_path()) + "/config/test_close_bgtask_silent.toml").c_str(),
                                            BaseTestParamStr::VFS_CONFIG_PATH));
 
 TEST_P(CompactTaskTest, compact_to_single_segment) {
