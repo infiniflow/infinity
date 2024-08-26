@@ -35,7 +35,12 @@ target_link_libraries(
         arrow.a
         snappy.a
         ${JEMALLOC_STATIC_LIB}
+        ${Python3_LIBRARIES}
+        z.a
+        expat.a
 )
+
+target_link_options(remote_query_benchmark PRIVATE -no-pie)
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)
