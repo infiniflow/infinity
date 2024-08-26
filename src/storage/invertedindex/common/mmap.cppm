@@ -16,7 +16,14 @@ namespace fs = std::filesystem;
 
 namespace infinity {
 
-export int MmapFile(const String &fp, u8 *&data_ptr, SizeT &data_len, int advice = (MADV_RANDOM | MADV_DONTDUMP)) {
+export int MmapFile(const String &fp,
+                    u8 *&data_ptr,
+                    SizeT &data_len,
+                    int advice = (MADV_RANDOM
+#if defined(linux)
+                                  | MADV_DONTDUMP
+#endif
+                                  )) {
     data_ptr = nullptr;
     data_len = 0;
     long len_f = fs::file_size(fp);
@@ -97,7 +104,15 @@ export struct MmapReader {
         return buf;
     }
 
-    int MmapPartFile(const String &fp, u8 *&data_ptr, SizeT &data_len, int advice = (MADV_RANDOM | MADV_DONTDUMP), SizeT offset = 0) {
+    int MmapPartFile(const String &fp,
+                     u8 *&data_ptr,
+                     SizeT &data_len,
+                     int advice = (MADV_RANDOM
+#if defined(linux)
+                                   | MADV_DONTDUMP
+#endif
+                                   ),
+                     SizeT offset = 0) {
         data_ptr = nullptr;
         long len_f = fs::file_size(fp);
         if (len_f == 0) {

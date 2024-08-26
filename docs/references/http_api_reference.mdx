@@ -4,12 +4,14 @@ slug: /http_api_reference
 ---
 
 # HTTP API Reference
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 ## Create database
 
 **POST** `/databases/{database_name}`
 
-Creates a database by its name. If the database already exists, the action taken depends on the `create_option` parameter.
+Creates a database by its name. If the database already exists, the action taken depends on the `"create_option"` parameter.
 
 ### Request
 
@@ -25,16 +27,15 @@ Creates a database by its name. If the database already exists, the action taken
 
 ```shell
 curl --request POST \
-     --url localhost:23820/databases/{database_name} \
+     --url http://localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "create_option": "ignore_if_exists"
-} ' 
+     --data ' {
+       "create_option": "ignore_if_exists"
+       } ' 
 ```
 
-#### Request parameter
+#### Request parameters
 
 - `database_name`: (*Path parameter*), `string`, *Required*  
   A non-empty string indicating the name of the database, which must adhere to the following requirements:  
@@ -45,15 +46,21 @@ curl --request POST \
   - Must begin with an English letter or underscore.
   - Maximum 65,535 characters.
   - Case-insensitive.
-- `create_option`: (*Body parameter*), `enum<string>`, *Optional*  
+- `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
   - `"error"`: (Default) Raise an error if a database with the same name exists.
   - `"ignore_if_exist"`: Ignore the database creation requrest and keep the existing database with the same name.
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -61,12 +68,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -75,10 +83,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -86,7 +97,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **DELETE** `/databases/{database_name}`
 
-Deletes a database by its name. If the database does not exist, the action taken depends on the `drop_option` parameter.
+Deletes a database by its name. If the database does not exist, the action taken depends on the `"drop_option"` parameter.
 
 ### Request
 
@@ -102,29 +113,32 @@ Deletes a database by its name. If the database does not exist, the action taken
 
 ```shell
 curl --request DELETE \
-     --url localhost:23820/databases/{database_name} \
+     --url http://localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "drop_option": "ignore_if_not_exists"
-} '
+     --data ' {"drop_option": "error"} '
 ```
 
 #### Request parameter
 
 - `database_name`: (*Path parameter*), `string`, *Required*  
   A non-empty string indicating the name of the database to delete.
-- `drop_option`: (*Body parameter*), `enum<string>`, *Optional*  
+- `"drop_option"`: (*Body parameter*), `enum<string>`, *Optional*  
   Conflict policy in `enum<string>` for handling situations where a database with the specified name does not exist.
   - `"error"`: (Default) Raise an error if the specified database does not exist.
   - `"ignore_if_not exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -132,12 +146,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -146,10 +161,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -169,7 +187,7 @@ Shows detailed information about a specified database.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name} \
+     --url http://localhost:23820/databases/{database_name} \
      --header 'accept: application/json'
 ```
 
@@ -180,9 +198,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -193,18 +217,19 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 - `database_name`: `string`  
-  The name of the retrieved database.
+  The name of the database.
 - `store_dir`: `string`  
   The directory path where the database is stored.
 - `table_count`: `integer`  
   The number of tables present in the database.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -213,10 +238,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -236,7 +264,7 @@ Retrieves a list of all available databases within the Infinity system.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases \
+     --url http://localhost:23820/databases \
      --header 'accept: application/json'
 ```
 
@@ -244,7 +272,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -256,9 +284,9 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
-- `databases`: `list[string]`  
+- `databases`: `string[]`  
   An array of strings representing the names of the databases in the system.
 
 ---
@@ -267,7 +295,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 **POST** `/databases/{database_name}/tables/{table_name}`
 
-Creates a table with a specified name and defined fields (columns) within a given database. If the table already exists, the action taken depends on the `create_option` parameter.
+Creates a table with a specified name and defined fields (columns) within a given database. If the table already exists, the action taken depends on the `"create_option"` parameter.
 
 ### Request
 
@@ -284,36 +312,28 @@ Creates a table with a specified name and defined fields (columns) within a give
 
 ```shell
 curl --request POST \
-     --url localhost:23820/databases/{database_name}/tables/{table_name} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "create_option": "ignore_if_exists",
-    "fields": 
-    [
-        {
-            "name": "name",
-            "type": "varchar",
-        },
-        {
-            "name": "score",
-            "type": "float"
-        },
-        {
-            "name": "my_vector",
-            "type": "vector",
-            "dimension": 1024
-        }
-    ]       
-} '
+     --data ' {
+         "create_option": "ignore_if_exists",
+         "fields": [
+             {
+                 "name": "name",
+                 "type": "varchar"
+             },
+             {
+                 "name": "score",
+                 "type": "float"
+             }
+        ]
+    } '
 ```
-
 
 #### Request parameters
 
 - `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string that specifies the name of the database to retrieve.
+  A non-empty string that specifies the name of the database.
 - `table_name`: (*Path parameter*), `string`, *Required*  
   A non-empty string indicating the name of the table to create, which must adhere to the following requirements:  
   - Permitted characters include:
@@ -323,18 +343,33 @@ curl --request POST \
   - Must begin with an English letter or underscore.
   - Maximum 65,535 characters.
   - Case-insensitive.
-- `create_option`: (*Body parameter*), `enum<string>`, *Optional*  
+- `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
   - `"error"`: (Default) Raise an error if a table with the same name exists.
   - `"ignore_if_exist"`: Ignore the table creation request and keep the existing table with the same name.
 - `field`: (*Body parameter*), `object[]`, *Required*
-  - `"name"`: `string`, *Required*
-  - `"type"`: `string`, *Required*
+  - `"name"`: `string`, *Required*  
+    A non-empty string indicating the name of the column to create, which must adhere to the following requirements:  
+    - Permitted characters include:
+      - English letters (a-z, A-Z)
+      - Digits (0-9)
+      - "_" (underscore)
+    - Must begin with an English letter or underscore.
+    - Maximum 65,535 characters.
+    - Case-insensitive.
+  - `"type"`: `string`, *Required*  
+    The data type of the column.  
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -342,12 +377,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -356,10 +392,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -367,7 +406,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **DELETE** `/databases/{database_name}/tables/{table_name}`
 
-Deletes a table from a specified database. If the table does not exist, the action taken depends on the `drop_option` parameter.
+Deletes a table from a specified database. If the table does not exist, the action taken depends on the `"drop_option"` parameter.
 
 ### Request
 
@@ -379,22 +418,37 @@ Deletes a table from a specified database. If the table does not exist, the acti
 - Body:
   - `"drop_option"`: `enum<string>`
 
+#### Request example
+
 ```shell
 curl --request DELETE \
-     --url localhost:23820/databases/{database_name}/tables/{table_name} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "drop_option": "ignore_if_not_exists"
-} '
+     --data ' {"drop_option": "ignore_if_not_exists"} '
 ```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database.
+- `table_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the table to delete.
+- `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if a table with the same name exists.
+  - `"ignore_if_exist"`: Ignore the table creation request and keep the existing table with the same name.
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -402,12 +456,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -416,10 +471,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -439,15 +497,20 @@ Retrieves a list of all available tables in a specified database.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables \
+     --url http://localhost:23820/databases/{database_name}/tables \
      --header 'accept: application/json'
 ```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database.
 
 ### Response
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -476,7 +539,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
 ---
@@ -497,15 +560,28 @@ Shows detailed information about a specified table within a given database.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database.
+- `table_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the table.
+
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -519,10 +595,11 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
 
@@ -533,10 +610,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -556,15 +636,28 @@ Shows the column information about a specified table within a given database.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/columns \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/columns \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database.
+- `table_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the table.
+
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -589,12 +682,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -603,10 +697,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -614,7 +711,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **POST** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 
-Creates an index on a specified table. If an index with the same name exists, the action taken depends on the `create_option` parameter.
+Creates an index on a specified table. If an index with the same name exists, the action taken depends on the `"create_option"` parameter.
 
 ### Request
 
@@ -632,7 +729,7 @@ Creates an index on a specified table. If an index with the same name exists, th
 
 ```shell
 curl --request POST \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' \
@@ -654,11 +751,73 @@ curl --request POST \
 
 ```
 
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database.
+- `table_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the table.  
+- `index_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the index to create, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+- `"fields"`: (*Body parameter*), `string[]`, *Required*  
+  A non-empty list of strings indicating the names of the columns to build index on. For now, you are only allowed to create an index on one column.
+- `"index"`: (*Body parameter*), `dict[string, string]`  
+  - Parameter settings for an HNSW index:
+    - `"M"`: *Optional* - Defaults to`"16"`.
+    - `"ef_construction"`: *Optional* - Defaults to`"50"`.
+    - `"metric"` *Required* - The distance metric to use in similarity search.
+      - `"ip"`: Inner product.
+      - `"l2"`: Euclidean distance.
+      - `"cosine"`: Cosine similarity.
+    - `"encode"`: *Optional*
+      - `"plain"`: (Default) Plain encoding.
+      - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
+  - Parameter settings for an EMVB index:
+    - `"pq_subspace_num"`: *Required*
+      - `"8"`
+      - `"16"` (recommended)
+      - `"32"`
+      - `"64"`
+      - `"128"`
+    - `"pq_subspace_bits"`: *Required*
+      - `"8"` (recommended)
+      - `"16"`
+  - Parameter settings for a full-text index:
+    - `"ANALYZER"`: *Optional*
+      - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs.
+      - `"chinese"`: Simplified Chinese
+      - `"tradition"`: Traditional Chinese
+      - `"japanese"`: Japanese
+      - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
+  - Parameter settings for a secondary index:  
+    No parameters are required. For now, keep it empty.
+  - Parameter settings for a BMP index:
+    - `block_size`: *Optional* - The size of the block in a BMP index. Range: `"1"` ~ `"256"`. Defaults to `"16"`.
+    - `"compress_type"`: *Optional*  
+      - `"compress"`: (Default) Store the block-max index in sparse format. Works best with small block size situations.
+      - `"raw"`: Store the block-max index without compression.
+- `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if a table with the same name exists.
+  - `"ignore_if_exists"`: Ignore the table creation request and keep the existing table with the same name.
+
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -666,12 +825,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -680,10 +840,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -708,13 +871,10 @@ Deletes an index by its name.
 
 ```shell
 curl --request DELETE \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "drop_option": "ignore_if_not_exists"
-} '
+     --data ' {"drop_option": "ignore_if_not_exists"} '
 ```
 
 #### Request parameters
@@ -723,9 +883,15 @@ curl --request DELETE \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -733,12 +899,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -747,10 +914,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -768,15 +938,21 @@ Shows detailed information about a specified index.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json'
 ```
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -786,19 +962,20 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
     "index_name": "idx1",
     "index_column_ids": "0",
     "index_column_names": "col1",
-    "index_type": "IVFFlat",
-    "other_parameters": "metric = l2, centroids_count = 128",
+    "index_type": "EMVB",
+    "other_parameters": "pq_subspace_num = 16, pq_subspace_bits = 8",
     "segment_index_count": "0",
     "storage_directory": "/var/infinity/data/yjamyYqzzt_db_default/CxmfWOUCdN_table_test_index_tbl/inlt9JpOyy_index_idx1"
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -807,10 +984,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -830,7 +1010,7 @@ Shows detailed information about a specified index segment.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id} \
      --header 'accept: application/json'
 ```
 
@@ -840,9 +1020,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -854,12 +1040,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -868,10 +1055,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -891,7 +1081,7 @@ Shows detailed information about a specified index chunk.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id} \
      --header 'accept: application/json'
 ```
 
@@ -899,9 +1089,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -913,12 +1109,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -927,10 +1124,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -950,7 +1150,7 @@ Retrieves a list of all indexes created on a given table.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes \
      --header 'accept: application/json'
 ```
 
@@ -962,7 +1162,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -983,7 +1183,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
 ---
@@ -1003,7 +1203,7 @@ Imports data from a selected file into a specified table.
   - `content-Type: application/json`
 - Body:
   - `"file_path"`: `string`
-  - `"file_type"`: `string`
+  - `"file_type"`: `string`  
   - `"header"`: `boolean`
   - `"delimiter"`: `string`
 
@@ -1011,27 +1211,45 @@ Imports data from a selected file into a specified table.
 
 ```shell
 curl --request PUT \
-     --url localhost:23820/databases/{database_name}/tables/{table_name} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "file_path":"./filename.json",
-    "file_type":"csv",
-    "header":false,
-    "delimiter":","
-} '
+     --data ' {
+         "file_path":"./filename.json",
+         "file_type":"json"
+    } '
 ```
 
 #### Request parameters
 
-
+- `"file_path"`: `string`, *Required*   
+  Absolute path to the file to import. Supported file types include:  
+  - `csv`
+  - `json`
+  - `jsonl`
+- `"file_type"`: `string`, *Required*  
+  The type of the file to import. Supported file types include:
+  - `csv`
+  - `json`
+  - `jsonl`
+- `"header"`: `boolean`, *Optional*  
+  Whether to display table header or not. Works with **.csv** files only:
+  - `True`: Display table header.
+  - `False`: (Default) Do not display table header.
+- `"delimiter"`: `string`, *Optional*, Defaults to ","  
+  Delimiter to separate columns. Works with **.csv** files only.
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1039,12 +1257,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1053,10 +1272,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1076,30 +1298,54 @@ Exports data from a specified table to a specified file.
 - Body:
   - `"file_path"`: `string`
   - `"file_type"`: `string`
-  - `"header"`: `boolean`
+  - `"header"`: `boolean`  
   - `"delimiter"`: `string`
 
 #### Request example
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/table/{table_name} \
+     --url http://localhost:23820/databases/{database_name}/table/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "file_path":"/var/infinity/filename.csv",
-    "file_type":"csv",
-    "header":false,
-    "delimiter":","
-} '
+     --data ' {
+         "file_path":"/var/infinity/filename.csv",
+         "file_type":"csv",
+         "header":false,
+         "delimiter":","
+    } '
 ```
+
+#### Request parameters
+
+- `"file_path"`: `string`, *Required*   
+  Absolute path to the file for export. Supported file types include:  
+  - `csv`
+  - `json`
+  - `jsonl`
+- `"file_type"`: `string`, *Required*  
+  The type of the file for export. Supported file types include:
+  - `csv`
+  - `json`
+  - `jsonl`
+- `"header"`: `boolean`, *Optional*  
+  Whether to display table header or not. Works with **.csv** files only:
+  - `True`: Display table header.
+  - `False`: (Default) Do not display table header.
+- `"delimiter"`: `string`, *Optional*, Defaults to ","  
+  Delimiter to separate columns. Works with **.csv** files only.
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1107,12 +1353,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1121,10 +1368,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1148,7 +1398,7 @@ Inserts rows of data into a specified table.
 
 ```shell
 curl --request POST \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' \
@@ -1172,9 +1422,15 @@ curl --request POST \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1182,10 +1438,11 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
 
@@ -1196,10 +1453,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1223,7 +1483,7 @@ Deletes rows from a table based on the specified condition.
 
 ```shell
 curl --request DELETE \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
     --data ' \
@@ -1236,9 +1496,15 @@ curl --request DELETE \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1247,12 +1513,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1261,10 +1528,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1289,7 +1559,7 @@ Searches for rows that match the specified condition and updates them accordingl
 
 ```shell
 curl --request PUT \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
     --data ' \
@@ -1308,9 +1578,15 @@ curl --request PUT \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1319,12 +1595,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1333,10 +1610,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1362,7 +1642,7 @@ Searches for data in a specified table. The search can range from a simple vecto
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
     --data ' \
@@ -1396,9 +1676,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1412,12 +1698,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1426,10 +1713,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1449,7 +1739,7 @@ Shows all segments in a specified table.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/segments \
      --header 'accept: application/json'
 ```
 #### Request parameters
@@ -1458,9 +1748,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1476,12 +1772,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1490,10 +1787,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1513,7 +1813,7 @@ Shows the detailed information about a specified segment.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id} \
      --header 'accept: application/json'
 ```
 
@@ -1523,9 +1823,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1543,12 +1849,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1557,10 +1864,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1580,7 +1890,7 @@ Shows all blocks of a specified segment.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks \
      --header 'accept: application/json'
 ```
 
@@ -1588,9 +1898,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1606,12 +1922,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1620,10 +1937,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1643,7 +1963,7 @@ Shows the detailed information about a specified block.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id} \
      --header 'accept: application/json'
 ```
 
@@ -1653,9 +1973,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1671,12 +1997,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1685,10 +2012,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1708,7 +2038,7 @@ Shows the detailed information about a specified column in a block.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}/{column_id} \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}/{column_id} \
      --header 'accept: application/json'
 ```
 
@@ -1718,9 +2048,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1733,12 +2069,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1747,10 +2084,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1770,7 +2110,7 @@ Retrieves all global variables in the Infinity system.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/variables \
+     --url http://localhost:23820/variables \
      --header 'accept: application/json'
 ```
 
@@ -1778,7 +2118,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1800,7 +2140,7 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
 ---
@@ -1821,7 +2161,7 @@ Retrieves the value of a global variable.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/variables/{variable_name} \
+     --url http://localhost:23820/variables/{variable_name} \
      --header 'accept: application/json'
 ```
 
@@ -1831,9 +2171,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1842,12 +2188,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1856,10 +2203,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1883,7 +2233,7 @@ Assigns a value to a global variable.
 
 ```shell
 curl --request POST \
-     --url localhost:23820/variables/{variable_name} \
+     --url http://localhost:23820/variables/{variable_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' { "profile_record_capacity" : 120 } '
@@ -1891,9 +2241,15 @@ curl --request POST \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1901,12 +2257,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1915,10 +2272,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -1938,7 +2298,7 @@ Retrieves all configs in the Infinity system.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/configs \
+     --url http://localhost:23820/configs \
      --header 'accept: application/json'
 ```
 
@@ -1946,7 +2306,7 @@ curl --request GET \
 
 #### Status code 200
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -2000,7 +2360,7 @@ Retrieves the value of a config in the Infinity system.
 
 ```shell
 curl --request GET \
-     --url localhost:23820/configs/{config_name} \
+     --url http://localhost:23820/configs/{config_name} \
      --header 'accept: application/json'
 ```
 
@@ -2010,9 +2370,15 @@ curl --request GET \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -2021,10 +2387,11 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
 A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
 
@@ -2035,10 +2402,13 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -2062,7 +2432,7 @@ Assigns a value to a config.
 
 ```shell
 curl --request POST \
-     --url localhost:23820/configs/{config_name} \
+     --url http://localhost:23820/configs/{config_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' { "log_level": "trace" } '
@@ -2070,9 +2440,15 @@ curl --request POST \
 
 ### Response
 
-#### Status code 200
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+   <TabItem value="s200">
 
-A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -2080,12 +2456,13 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-#### Status code 500
+  </TabItem>
+  <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -2094,9 +2471,12 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 }
 ```
 
-- `error_code`: `integer`  
+- `"error_code"`: `integer`  
   A non-zero value indicates a specific error condition.
-- `error_msg`: `string`  
-  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+  </TabItem>
+</Tabs>
 
 ---

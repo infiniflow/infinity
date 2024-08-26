@@ -120,7 +120,7 @@ struct UnfinishedNodes {
     SizeT FindCommonPrefixAndSetOutput(u8 *bs_ptr, SizeT bs_len, Output &out) {
         assert(stack_.size() >= 1);
         SizeT i = 0;
-        SizeT common_len = std::min(bs_len, stack_.size() - 1);
+        SizeT common_len = std::min(bs_len, static_cast<SizeT>(stack_.size() - 1));
         for (; i < common_len; i++) {
             auto &t = stack_[i].last_;
             assert(t.present_);

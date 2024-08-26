@@ -355,6 +355,7 @@ void SortMerger<KeyType, LenType>::Merge() {
 
 template <typename KeyType, typename LenType>
 void SortMerger<KeyType, LenType>::Unpin(Vector<UniquePtr<Thread>> &threads) {
+#if defined(linux)
     int num_cores = std::thread::hardware_concurrency();
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
@@ -364,6 +365,7 @@ void SortMerger<KeyType, LenType>::Unpin(Vector<UniquePtr<Thread>> &threads) {
     for (auto& thread : threads) {
         pthread_setaffinity_np(thread->native_handle(), sizeof(cpu_set_t), &cpuset);
     }
+#endif
 }
 
 template <typename KeyType, typename LenType>
