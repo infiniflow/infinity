@@ -24,7 +24,7 @@ static PyThreadState *saved_state = nullptr;
 
 void PythonInstance::Init() {
     if (!Py_IsInitialized()) {
-        Py_Initialize();
+        Py_InitializeEx(0);
     }
 
     PyEval_InitThreads();
@@ -32,13 +32,13 @@ void PythonInstance::Init() {
 }
 
 void PythonInstance::UnInit() {
-
-//    if (Py_IsInitialized()) {
-//        Py_Finalize();
-//    }
-
     PyEval_RestoreThread(saved_state);
     saved_state = nullptr;
+
+    if (Py_IsInitialized()) {
+        Py_FinalizeEx();
+    }
+
 }
 
 }

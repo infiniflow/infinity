@@ -28,8 +28,7 @@ TEST_F(UserDefinedTermWeightTest, test1) {
     PythonInstance::Init();
 
     UserDefinedTermWeight term_weight(std::string(test_data_path()) + "/scripts/uda5.py");
-    Status s1 = term_weight.Init();
-    EXPECT_TRUE(s1.ok());
+
     Vector<String> vec_str;
     vec_str.push_back("text1");
     vec_str.push_back("text2");
@@ -39,7 +38,6 @@ TEST_F(UserDefinedTermWeightTest, test1) {
     EXPECT_EQ(term_map["a"], 1.0);
     EXPECT_EQ(term_map["b"], 2.0);
     EXPECT_EQ(term_map["c"], 3.0);
-    term_weight.UnInit();
 
     PythonInstance::UnInit();
 }
@@ -53,8 +51,6 @@ TEST_F(UserDefinedTermWeightTest, test2) {
     for (SizeT i = 0; i < thread_count; ++i) {
         threads.push_back(std::thread([&] {
             UserDefinedTermWeight term_weight(std::string(test_data_path()) + "/scripts/uda5.py");
-            Status s1 = term_weight.Init();
-            EXPECT_TRUE(s1.ok());
             Vector<String> vec_str;
             vec_str.push_back("text1");
             vec_str.push_back("text2");
@@ -64,7 +60,6 @@ TEST_F(UserDefinedTermWeightTest, test2) {
             EXPECT_EQ(term_map["a"], 1.0);
             EXPECT_EQ(term_map["b"], 2.0);
             EXPECT_EQ(term_map["c"], 3.0);
-            term_weight.UnInit();
         }));
     }
 
@@ -75,36 +70,37 @@ TEST_F(UserDefinedTermWeightTest, test2) {
     PythonInstance::UnInit();
 }
 
-//TEST_F(UserDefinedTermWeightTest, test3) {
-//    UserDefinedTermWeight term_weight(std::string(test_data_path()) + "/scripts/uda2.py");
-//    Status s1 = term_weight.Init();
-//    EXPECT_FALSE(s1.ok());
-//    EXPECT_EQ(s1.code(), ErrorCode::kFailToRunPython);
-//    term_weight.UnInit();
-//}
-//
-//TEST_F(UserDefinedTermWeightTest, test4) {
-//    UserDefinedTermWeight term_weight(std::string(test_data_path()) + "/scripts/uda3.py");
-//    Status s1 = term_weight.Init();
-//    EXPECT_FALSE(s1.ok());
-//    EXPECT_EQ(s1.code(), ErrorCode::kFailToRunPython);
-//    term_weight.UnInit();
-//}
+TEST_F(UserDefinedTermWeightTest, test3) {
+
+    PythonInstance::Init();
+    UserDefinedTermWeight term_weight(std::string(test_data_path()) + "/scripts/uda2.py");
+    Vector<String> vec_str;
+    auto [term_map, status] = term_weight.Run(vec_str);
+    EXPECT_EQ(status.code(), ErrorCode::kFailToRunPython);
+    PythonInstance::UnInit();
+}
+
+TEST_F(UserDefinedTermWeightTest, test4) {
+
+    PythonInstance::Init();
+    UserDefinedTermWeight term_weight(std::string(test_data_path()) + "/scripts/uda3.py");
+    Vector<String> vec_str;
+    auto [term_map, status] = term_weight.Run(vec_str);
+    EXPECT_EQ(status.code(), ErrorCode::kFailToRunPython);
+    PythonInstance::UnInit();
+
+}
 
 TEST_F(UserDefinedTermWeightTest, test5) {
     PythonInstance::Init();
 
     UserDefinedTermWeight term_weight(std::string(test_data_path()) + "/scripts/uda6.py");
-    Status s1 = term_weight.Init();
-    EXPECT_TRUE(s1.ok());
-
     Vector<String> vec_str;
     vec_str.push_back("text1");
     vec_str.push_back("text2");
     vec_str.push_back("text3");
     auto [term_map, status] = term_weight.Run(vec_str);
     EXPECT_EQ(status.code(), ErrorCode::kFailToRunPython);
-    term_weight.UnInit();
 
     PythonInstance::UnInit();
 }

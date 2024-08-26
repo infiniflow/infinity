@@ -33,19 +33,12 @@ public:
 
     ~UserDefinedTermWeight() = default;
 
-    Status Init();
-    void UnInit();
-
     Tuple<HashMap<String, double>, Status> Run(const Vector<String> &text);
 
 protected:
 private:
     const String tw_path_;
 
-    PyGILState_STATE gil_state_;
-    std::mutex locker_;
 
-    PyObject *module_{};
-    PyObject *function_{};
 };
 } // namespace infinity

@@ -29,13 +29,6 @@ import defer_op;
 
 namespace infinity {
 
-Status UserDefinedAnalyzer::Init() {
-    return Status::OK();
-}
-
-void UserDefinedAnalyzer::UnInit() {
-}
-
 Tuple<Vector<String>, Status> UserDefinedAnalyzer::Analyze(const String &text) {
     Vector<String> return_list;
 
@@ -48,15 +41,8 @@ Tuple<Vector<String>, Status> UserDefinedAnalyzer::Analyze(const String &text) {
     String file_dir = path.parent_path();
     String file_name = path.filename();
 
-//    PyEval_InitThreads();
-//    Py_BEGIN_ALLOW_THREADS
-//    auto check = PyGILState_Check();
-//    PyGILState_STATE gil_state{};
-//    if(!check) {
     PyGILState_STATE gil_state = PyGILState_Ensure();
-    DeferFn defer_fn([&]() { PyGILState_Release(gil_state); });
-//    }
-
+    DeferFn defer_fn1([&]() { PyGILState_Release(gil_state); });
 
     // Set module directory
     PyRun_SimpleString("import sys");
@@ -66,19 +52,26 @@ Tuple<Vector<String>, Status> UserDefinedAnalyzer::Analyze(const String &text) {
     // Import the module
     std::filesystem::path filePath(file_name);
     String main_filename = filePath.stem().string();
-    module_ = PyImport_ImportModule(main_filename.c_str());
-    if (module_ == nullptr) {
+    PyObject *module = PyImport_ImportModule(main_filename.c_str());
+    DeferFn defer_fn2([&]() { Py_XDECREF(module); });
+
+    if (module == nullptr) {
         return {return_list, Status::FailToRunPython(fmt::format("Fail to load python module: {}", main_filename))};
     }
 
     // Load function: analyze
-    function_ = PyObject_GetAttrString(module_, "analyze");
-    if (function_ == nullptr || !PyCallable_Check(function_)) {
+    PyObject *function = PyObject_GetAttrString(module, "analyze");
+    DeferFn defer_fn3([&]() { Py_XDECREF(function); });
+
+    if (function == nullptr || !PyCallable_Check(function)) {
         return {return_list, Status::FailToRunPython(fmt::format("Can't to load function: analyze"))};
     }
 
     PyObject *args = Py_BuildValue("(s)", text.c_str());
-    PyObject *result = PyObject_CallObject(function_, args);
+    DeferFn defer_fn4([&]() { Py_XDECREF(args); });
+
+    PyObject *result = PyObject_CallObject(function, args);
+    DeferFn defer_fn5([&]() { Py_XDECREF(result); });
 
     if (result == nullptr || !PyList_Check(result)) {
         return {return_list, Status::FailToRunPython(fmt::format("Failed to use {} to parse: {}", analyzer_path_, text))};
@@ -97,14 +90,6 @@ Tuple<Vector<String>, Status> UserDefinedAnalyzer::Analyze(const String &text) {
 //        Py_DECREF(python_list);
 //        python_list = nullptr;
     }
-
-    Py_XDECREF(args);
-    Py_XDECREF(result);
-    Py_XDECREF(function_);
-    Py_XDECREF(module_);
-
-
-//    Py_END_ALLOW_THREADS
 
     return {return_list, Status::OK()};
 }

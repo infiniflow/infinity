@@ -28,14 +28,11 @@ TEST_F(UserDefinedAnalyzerTest, test1) {
     PythonInstance::Init();
 
     UserDefinedAnalyzer analyzer(std::string(test_data_path()) + "/scripts/uda1.py");
-    Status s1 = analyzer.Init();
-    EXPECT_TRUE(s1.ok());
     auto [term_vector, status] = analyzer.Analyze("text1 text2 text3");
     EXPECT_TRUE(status.ok());
     EXPECT_STREQ(term_vector[0].c_str(), "text1");
     EXPECT_STREQ(term_vector[1].c_str(), "text2");
     EXPECT_STREQ(term_vector[2].c_str(), "text3");
-    analyzer.UnInit();
 
     PythonInstance::UnInit();
 }
@@ -51,14 +48,11 @@ TEST_F(UserDefinedAnalyzerTest, test2) {
     for (SizeT i = 0; i < thread_count; ++i) {
         threads.push_back(std::thread([&] {
             UserDefinedAnalyzer analyzer(std::string(test_data_path()) + "/scripts/uda1.py");
-            Status s1 = analyzer.Init();
-            EXPECT_TRUE(s1.ok());
             auto [term_vector, status] = analyzer.Analyze("text1 text2 text3");
             EXPECT_TRUE(status.ok());
             EXPECT_STREQ(term_vector[0].c_str(), "text1");
             EXPECT_STREQ(term_vector[1].c_str(), "text2");
             EXPECT_STREQ(term_vector[2].c_str(), "text3");
-            analyzer.UnInit();
         }));
     }
 
@@ -69,32 +63,29 @@ TEST_F(UserDefinedAnalyzerTest, test2) {
     PythonInstance::UnInit();
 }
 
-//TEST_F(UserDefinedAnalyzerTest, test3) {
-//    UserDefinedAnalyzer analyzer(std::string(test_data_path()) + "/scripts/uda2.py");
-//    Status s1 = analyzer.Init();
-//    EXPECT_FALSE(s1.ok());
-//    EXPECT_EQ(s1.code(), ErrorCode::kFailToRunPython);
-//    analyzer.UnInit();
-//}
-//
-//TEST_F(UserDefinedAnalyzerTest, test4) {
-//    UserDefinedAnalyzer analyzer(std::string(test_data_path()) + "/scripts/uda3.py");
-//    Status s1 = analyzer.Init();
-//    EXPECT_FALSE(s1.ok());
-//    EXPECT_EQ(s1.code(), ErrorCode::kFailToRunPython);
-//    analyzer.UnInit();
-//}
+TEST_F(UserDefinedAnalyzerTest, test3) {
+    PythonInstance::Init();
+    UserDefinedAnalyzer analyzer(std::string(test_data_path()) + "/scripts/uda2.py");
+    auto [term_vector, status] = analyzer.Analyze("");
+    EXPECT_EQ(status.code(), ErrorCode::kFailToRunPython);
+    PythonInstance::UnInit();
+}
+
+TEST_F(UserDefinedAnalyzerTest, test4) {
+    PythonInstance::Init();
+    UserDefinedAnalyzer analyzer(std::string(test_data_path()) + "/scripts/uda3.py");
+    auto [term_vector, status] = analyzer.Analyze("");
+    EXPECT_EQ(status.code(), ErrorCode::kFailToRunPython);
+    PythonInstance::UnInit();
+}
 
 TEST_F(UserDefinedAnalyzerTest, test5) {
     PythonInstance::Init();
 
     UserDefinedAnalyzer analyzer(std::string(test_data_path()) + "/scripts/uda4.py");
-    Status s1 = analyzer.Init();
-    EXPECT_TRUE(s1.ok());
 
     auto [term_vector, status] = analyzer.Analyze("text1 text2 text3");
     EXPECT_EQ(status.code(), ErrorCode::kFailToRunPython);
-    analyzer.UnInit();
 
     PythonInstance::UnInit();
 }
