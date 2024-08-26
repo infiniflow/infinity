@@ -25,39 +25,39 @@ import analyzer;
 import tokenizer;
 import status;
 import third_party;
+import defer_op;
 
 namespace infinity {
 
 Status UserDefinedAnalyzer::Init() {
-    locker_.lock();
-    //    gil_state_ = PyGILState_Ensure();
+    return Status::OK();
+}
 
-    if (!Py_IsInitialized()) {
-        Py_Initialize();
-    }
+void UserDefinedAnalyzer::UnInit() {
+}
 
-//    if (!Py_IsInitialized()) {
-//        return Status::FailToRunPython("Fail to init Python");
-//    }
-//
-//    if (!PyEval_ThreadsInitialized()) {
-//        // Start multiple thread supports
-//        PyEval_InitThreads();
-//        PyEval_SaveThread();
-//    }
-
-//    if (!PyGILState_Check()) {
-//        gil_state_ = PyGILState_Ensure();
-//    }
+Tuple<Vector<String>, Status> UserDefinedAnalyzer::Analyze(const String &text) {
+    Vector<String> return_list;
 
     std::filesystem::path path = analyzer_path_;
 
     if (!std::filesystem::exists(path)) {
-        return Status::FailToRunPython(fmt::format("{} doesn't exist!", analyzer_path_));
+        return {return_list, Status::FailToRunPython(fmt::format("{} doesn't exist!", analyzer_path_))};
     }
 
     String file_dir = path.parent_path();
     String file_name = path.filename();
+
+//    PyEval_InitThreads();
+//    Py_BEGIN_ALLOW_THREADS
+//    auto check = PyGILState_Check();
+//    PyGILState_STATE gil_state{};
+//    if(!check) {
+    PyGILState_STATE gil_state = PyGILState_Ensure();
+    DeferFn defer_fn([&]() { PyGILState_Release(gil_state); });
+//    }
+
+
     // Set module directory
     PyRun_SimpleString("import sys");
     String import_str = fmt::format("sys.path.append('{}')", file_dir);
@@ -68,41 +68,14 @@ Status UserDefinedAnalyzer::Init() {
     String main_filename = filePath.stem().string();
     module_ = PyImport_ImportModule(main_filename.c_str());
     if (module_ == nullptr) {
-        return Status::FailToRunPython(fmt::format("Fail to load python module: {}", main_filename));
+        return {return_list, Status::FailToRunPython(fmt::format("Fail to load python module: {}", main_filename))};
     }
 
     // Load function: analyze
     function_ = PyObject_GetAttrString(module_, "analyze");
     if (function_ == nullptr || !PyCallable_Check(function_)) {
-        return Status::FailToRunPython(fmt::format("Can't to load function: analyze"));
+        return {return_list, Status::FailToRunPython(fmt::format("Can't to load function: analyze"))};
     }
-
-    return Status::OK();
-}
-
-void UserDefinedAnalyzer::UnInit() {
-    if (function_ != nullptr) {
-        Py_DECREF(function_);
-        function_ = nullptr;
-    }
-
-    if (module_ != nullptr) {
-        Py_DECREF(module_);
-        module_ = nullptr;
-    }
-
-    //    if (Py_IsInitialized()) {
-    //        Py_FinalizeEx();
-    //    }
-
-//    if (PyGILState_Check()) {
-//        PyGILState_Release(gil_state_);
-//    }
-    locker_.unlock();
-}
-
-Tuple<Vector<String>, Status> UserDefinedAnalyzer::Analyze(const String &text) {
-    Vector<String> return_list;
 
     PyObject *args = Py_BuildValue("(s)", text.c_str());
     PyObject *result = PyObject_CallObject(function_, args);
@@ -125,8 +98,13 @@ Tuple<Vector<String>, Status> UserDefinedAnalyzer::Analyze(const String &text) {
 //        python_list = nullptr;
     }
 
-    Py_DECREF(args);
-    Py_DECREF(result);
+    Py_XDECREF(args);
+    Py_XDECREF(result);
+    Py_XDECREF(function_);
+    Py_XDECREF(module_);
+
+
+//    Py_END_ALLOW_THREADS
 
     return {return_list, Status::OK()};
 }

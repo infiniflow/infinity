@@ -26,39 +26,38 @@ import analyzer;
 import tokenizer;
 import status;
 import third_party;
+import defer_op;
 
 namespace infinity {
 
 Status UserDefinedTermWeight::Init() {
-    locker_.lock();
-    //    gil_state_ = PyGILState_Ensure();
+    return Status::OK();
+}
 
-    if (!Py_IsInitialized()) {
-        Py_Initialize();
-    }
+void UserDefinedTermWeight::UnInit() {
+}
 
-//    if (!Py_IsInitialized()) {
-//        return Status::FailToRunPython("Fail to init Python");
-//    }
-//
-//    if (!PyEval_ThreadsInitialized()) {
-//        // Start multiple thread supports
-//        PyEval_InitThreads();
-//        PyEval_SaveThread();
-//    }
-
-//    if (!PyGILState_Check()) {
-//        gil_state_ = PyGILState_Ensure();
-//    }
+Tuple<HashMap<String, double>, Status> UserDefinedTermWeight::Run(const Vector<String> &text_array) {
+    HashMap<String, double> return_map;
 
     std::filesystem::path path = tw_path_;
 
     if (!std::filesystem::exists(path)) {
-        return Status::FailToRunPython(fmt::format("{} doesn't exist!", tw_path_));
+        return {return_map, Status::FailToRunPython(fmt::format("{} doesn't exist!", tw_path_))};
     }
 
     String file_dir = path.parent_path();
     String file_name = path.filename();
+
+//    Py_BEGIN_ALLOW_THREADS
+//    auto check = PyGILState_Check();
+//    PyGILState_STATE gil_state{};
+//    if(!check) {
+    PyGILState_STATE gil_state = PyGILState_Ensure();
+    DeferFn defer_fn([&]() { PyGILState_Release(gil_state); });
+//    }
+
+
     // Set module directory
     PyRun_SimpleString("import sys");
     String import_str = fmt::format("sys.path.append('{}')", file_dir);
@@ -69,41 +68,14 @@ Status UserDefinedTermWeight::Init() {
     String main_filename = filePath.stem().string();
     module_ = PyImport_ImportModule(main_filename.c_str());
     if (module_ == nullptr) {
-        return Status::FailToRunPython(fmt::format("Fail to load python module: {}", main_filename));
+        return {return_map, Status::FailToRunPython(fmt::format("Fail to load python module: {}", main_filename))};
     }
 
     // Load function: analyze
     function_ = PyObject_GetAttrString(module_, "term_weight");
     if (function_ == nullptr || !PyCallable_Check(function_)) {
-        return Status::FailToRunPython(fmt::format("Can't to load function: analyze"));
+        return {return_map, Status::FailToRunPython(fmt::format("Can't to load function: analyze"))};
     }
-
-    return Status::OK();
-}
-
-void UserDefinedTermWeight::UnInit() {
-    if (function_ != nullptr) {
-        Py_DECREF(function_);
-        function_ = nullptr;
-    }
-
-    if (module_ != nullptr) {
-        Py_DECREF(module_);
-        module_ = nullptr;
-    }
-
-    //    if (Py_IsInitialized()) {
-    //        Py_FinalizeEx();
-    //    }
-
-//    if (PyGILState_Check()) {
-//        PyGILState_Release(gil_state_);
-//    }
-    locker_.unlock();
-}
-
-Tuple<HashMap<String, double>, Status> UserDefinedTermWeight::Run(const Vector<String> &text_array) {
-    HashMap<String, double> return_map;
 
     PyObject* pyParams = PyList_New(0);
     for(const String& text: text_array) {
@@ -125,10 +97,14 @@ Tuple<HashMap<String, double>, Status> UserDefinedTermWeight::Run(const Vector<S
 
         return_map.emplace(PyUnicode_AsUTF8(pKey), PyFloat_AsDouble(pValue));
     }
-    Py_DECREF(pItems);
-    Py_DECREF(dict_result);
+    Py_XDECREF(pItems);
+    Py_XDECREF(dict_result);
     Py_XDECREF(args);
-    Py_DECREF(pyParams);
+    Py_XDECREF(pyParams);
+    Py_XDECREF(function_);
+    Py_XDECREF(module_);
+
+//    Py_END_ALLOW_THREADS
 
     return {return_map, Status::OK()};
 }
