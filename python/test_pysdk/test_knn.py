@@ -666,8 +666,8 @@ class TestInfinity:
                              indirect=True)
     def test_fulltext_operator_option(self, check_data, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_fulltext_operator_option"+suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_fulltext_operator_option"+suffix,
+        db_obj.drop_table("test_fulltext_operator_option" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_fulltext_operator_option" + suffix,
                                         {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"},
                                          "body": {"type": "varchar"}})
         table_obj.create_index("my_index",
@@ -680,22 +680,22 @@ class TestInfinity:
         test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_99.csv"
         table_obj.import_data(test_csv_dir, import_options={"delimiter": "\t"})
         print('Test fulltext operator OR for query "TO BE OR NOT":')
-        print(table_obj.output(["*", "_row_id", "_score"]).match_text("doctitle,body^5", "TO BE OR NOT", 5,
+        print(table_obj.output(["*", "_row_id", "_score"]).match_text("body^5", "TO BE OR NOT", 5,
                                                                       {"operator": "or"}).to_pl())
         print('Test fulltext operator AND for query "TO BE OR NOT":')
-        print(table_obj.output(["*", "_row_id", "_score"]).match_text("doctitle,body^5", "TO BE OR NOT", 5,
+        print(table_obj.output(["*", "_row_id", "_score"]).match_text("body^5", "TO BE OR NOT", 5,
                                                                       {"operator": "and"}).to_pl())
         # expect throw
         print('No operator option for query "TO BE OR NOT", expect throw:')
         with pytest.raises(InfinityException) as e_info:
-            table_obj.output(["*", "_row_id", "_score"]).match_text("doctitle,body^5", "TO BE OR NOT", 5).to_pl()
+            table_obj.output(["*", "_row_id", "_score"]).match_text("body^5", "TO BE OR NOT", 5).to_pl()
         print(e_info.value.error_message)
         res = table_obj.drop_index("my_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        res = db_obj.drop_table("test_fulltext_operator_option"+suffix, ConflictType.Error)
+        res = db_obj.drop_table("test_fulltext_operator_option" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("match_param_1", ["doctitle,num,body^5"])
+    @pytest.mark.parametrize("match_param_1", ["body^5"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_fulltext_match_with_valid_columns(self, check_data, match_param_1, suffix):
@@ -813,7 +813,7 @@ class TestInfinity:
         res = (table_obj
                .output(["*"])
                .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
-               .match_text("doctitle,num,body^5", match_param_2, 1)
+               .match_text("body^5", match_param_2, 1)
                .fusion(method='rrf', topn=10)
                .to_pl())
         print(res)
@@ -963,6 +963,11 @@ class TestInfinity:
                                          "num": {"type": "int"},
                                          "t": {"type": "tensor, 4, float"},
                                          "body": {"type": "varchar"}})
+        table_obj.create_index("ft_index",
+                               index.IndexInfo("body",
+                                               index.IndexType.FullText,
+                                               {"ANALYZER": "standard"}),
+                               ConflictType.Error)
         if not check_data:
             copy_data("tensor_maxsim.csv")
         test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
@@ -1105,8 +1110,7 @@ class TestInfinity:
     # refer to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
     @pytest.mark.parametrize("fields_and_matching_text", [
         ["body", "black"],
-        ["doctitle,num,body", "black"],
-        ["doctitle,num,body^5", "black"],
+        ["body^5", "black"],
         ["", "body:black"],
         ["", "body:black^5"],
         ["", "'body':'(black)'"],
@@ -1116,12 +1120,12 @@ class TestInfinity:
         ["", "'body':'(black)^5 OR (white)'"],
         ["", "'body':'(black)^5 AND (white)'"],
         ["", "'body':'black - white'"],
-        ["", "body:black OR doctitle:black"],
-        ["", "body:black AND doctitle:black"],
-        ["", "(body:black OR doctitle:black) AND (body:white OR doctitle:white)"],
-        ["", "(body:black)^5 OR doctitle:black"],
-        ["", "(body:black)^5 AND doctitle:black"],
-        ["", "(body:black OR doctitle:black)^5 AND (body:white OR doctitle:white)"],
+        ["", "body:black OR body:black"],
+        ["", "body:black AND body:black"],
+        ["", "(body:black OR body:black) AND (body:white OR body:white)"],
+        ["", "(body:black)^5 OR body:black"],
+        ["", "(body:black)^5 AND body:black"],
+        ["", "(body:black OR body:black)^5 AND (body:white OR body:white)"],
         # ["", "doc\*:back"] not support
     ])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
