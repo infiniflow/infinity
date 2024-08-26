@@ -12,6 +12,10 @@ infinity.connect(uri)
 
 Connects to the local directory or the Infinity server, and gets an Infinity object.
 
+:::tip NOTE
+You must have an Infinity object ready to perform database-specific operations.
+:::
+
 ### Parameters
 
 #### uri: *Required*
@@ -95,7 +99,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -218,7 +222,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -260,7 +264,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -308,6 +312,10 @@ db_object.create_table(table_name, columns_definition, conflict_type = ConflictT
 ```
 
 Creates a table with a specified name and defined columns.
+
+:::tip NOTE
+Call `create_database()` or `get_database()` to get a database object for all table-specific operations.
+:::
 
 ### Parameters
 
@@ -378,6 +386,8 @@ db_object.create_table("my_table", {"c1": {"type": "int", "default": 1}})
 # The `create_table`method supports creating float columns in the following data types:
 # - float/float32
 # - double/float64
+# - float16
+# - bfloat16
 db_object.create_table("my_table", {"c1": {"type": "float64"}})
 ```
 
@@ -395,16 +405,39 @@ db_object.create_table("my_table", {"c1": {"type": "bool"}})
 
 #### Create a table with a vector column only
 
+:::tip NOTE
+You can build a HNSW index on the vector column to speed up the match_dense search.
+:::
+
 ```python
 # Create a table with a vector column only:  
 # - `vector`: The column is a vector column
 # - `128`: The vector dimension
-# - `float`: The primitive data type of the vectors. Can be `float`/`float32` or `double`/`float64`
+# - `float`: The primitive data type of the vectors. Can be `float`/`float32`, `float16`, `bfloat16`, `uint8` or `int8`
 db_object.create_table("my_table", {"c1": {"type": "vector,128,float"}}, None)
 
 ```
 
+#### Create a table with a multi-vector column only
+
+:::tip NOTE
+You can build an HNSW index on the multi-vector column to accelerate match_dense search.
+:::
+
+```python
+# Create a table with a multi-vector column only:  
+# - `multivector`: The column is a multi-vector column
+# - `128`: The basic vector dimension
+# - `float`: The primitive data type of the basic vectors. Can be `float`/`float32`, `float16`, `bfloat16`, `uint8` or `int8`
+db_object.create_table("my_table", {"c1": {"type": "multivector,128,float"}}, None)
+
+```
+
 #### Create a table with a sparse vector column only
+
+:::tip NOTE
+You can build a BMP index on the sparse vector column to speed up the match_sparse search.
+:::
 
 ```python
 from infinity.common import ConflictType
@@ -423,8 +456,8 @@ from infinity.common import ConflictType
 # Create a table with a tensor column only:  
 # - `tensor`: The column is a tensor column
 # - `4`: Dimension of each vector unit in the tensor
-# - `float64`: The primitive data type of the tensors. Can be `float`/`float32` or `double`/`float64`
-db_object.create_table("my_table", {"c1": {"type": "tensor,4,float64"}}, ConflictType.Ignore)
+# - `float`: The primitive data type of the tensors. Can be `float`/`float32`, `float16`, `bfloat16` or `bit`
+db_object.create_table("my_table", {"c1": {"type": "tensor,4,float"}}, ConflictType.Ignore)
 ```
 
 #### Create a table with a tensor array column only
@@ -434,7 +467,7 @@ from infinity.common import ConflictType
 # Create a table with a tensor array column only:  
 # - `tensorarray`: The column is a tensor array column
 # - `6`: Dimension of each vector unit in the tensor arrays
-# - `float`: The primitive data type of the tensor arrays. Can be `float`/`float32` or `double`/`float64`
+# - `float`: The primitive data type of the tensor arrays. Can be `float`/`float32`, `float16`, `bfloat16` or `bit`
 db_object.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Ignore)
 ```
 
@@ -481,7 +514,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -551,7 +584,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `table_names`: `list[str]` - A list of strings indicating the names of all available tables in the current database.
 
@@ -570,7 +603,11 @@ res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 table_object.create_index(index_name, index_info, conflict_type = ConflictType.Error)
 ```
 
-Creates index on a specified column.
+Creates an index on a specified column.
+
+:::tip NOTE
+Call `create_table()` or `get_table()` to get a database object for all index-specific operations.
+:::
 
 ### Parameters
 
@@ -614,7 +651,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
   - Parameter settings for an EMVB index:
     - `"pq_subspace_num"`: *Required*
-      - `"8"` 
+      - `"8"`
       - `"16"` (recommended)
       - `"32"`
       - `"64"`
@@ -917,7 +954,7 @@ A structure containing these attributes:
 - `error_code`: `int`  
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.  
 
 ### Examples
@@ -1032,13 +1069,13 @@ table_object.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4,
 #### Insert sparse vectors
 
 ```python
+from infinity.common import SparseVector
 # Create a table with a integer column and a 100-d sparse vector column:
 table_object = db_object.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
 
 # Insert one row into the table:
 # `indices` specifies the correspoing indices to the values in `values`.
 # Note that the second row sets "c1" as 2024 by default. 
-from infinity.common import SparseVector
 table_object.insert([{"c1": 2022, "sparse_column": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])}, {"sparse_column": SparseVector([70, 80, 90], [7.7, 8.8, 9.9])}])
 ```
 
@@ -1105,7 +1142,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -1130,7 +1167,7 @@ table_object.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
 table_object.export_data(filepath, export_options, columns = None)
 ```
 
-Exports the current table to a specified file.
+Exports data in the current table to a specified file.
 
 ### Parameters
 
@@ -1291,7 +1328,7 @@ A structure containing the following attributes:
 - `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
@@ -1457,7 +1494,7 @@ table_object.output(["*"]).filter("c2 = 3").to_pl()
 table_object.match_dense(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
-Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings).
+Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).
 
 :::tip NOTE
 To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
@@ -1467,7 +1504,7 @@ To display your query results, you must chain this method with `output(columns)`
 
 #### vector_column_name: `str`, *Required*
 
-A non-empty string indicating the name of the vector column to search on.
+A non-empty string indicating the name of the vector column or multi-vector column to search on.
 
 #### embedding_data: `list/np.ndarray`, *Required*
 
