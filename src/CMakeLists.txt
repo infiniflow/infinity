@@ -2,6 +2,8 @@
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
+#find_package(Python)
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm)
 
 ### Parser
@@ -218,7 +220,7 @@ target_sources(infinity_core
 )
 
 add_dependencies(infinity_core thrift thriftnb parquet_static snappy)
-
+target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
@@ -492,9 +494,14 @@ target_link_libraries(unit_test
         thrift.a
         thriftnb.a
         snappy.a
+        ${Python3_LIBRARIES}
+        z.a
+        expat.a
         ${JEMALLOC_STATIC_LIB}
+        util
 )
 
+target_link_options(unit_test PRIVATE -no-pie)
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")

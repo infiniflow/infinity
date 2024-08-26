@@ -450,7 +450,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                 const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
                 if (std::holds_alternative<Vector<u32>>(filter_result)) {
                     const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                    bitmask.Initialize(std::ceil(segment_row_count));
+                    bitmask.Initialize(std::bit_ceil(segment_row_count));
                     bitmask.SetAllFalse();
                     for (u32 row_id : filter_result_vector) {
                         bitmask.SetTrue(row_id);
