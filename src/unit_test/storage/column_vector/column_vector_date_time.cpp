@@ -70,7 +70,7 @@ class ColumnVectorDateTimeTest : public BaseTestParamStr {
 
 // INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 //                          ColumnVectorDateTimeTest,
-//                          ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
+//                          ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_close_bgtask_silent.toml").c_str(),
 //                                            BaseTestParamStr::VFS_CONFIG_PATH));
 
 
