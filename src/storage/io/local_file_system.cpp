@@ -380,7 +380,13 @@ int LocalFileSystem::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &dat
     if (tmpd == MAP_FAILED)
         return -1;
     close(f);
-    int rc = madvise(tmpd, len_f, MADV_DONTDUMP);
+    int rc = madvise(tmpd,
+                     len_f,
+                     MADV_NORMAL
+#if defined(linux)
+                         | MADV_DONTDUMP
+#endif
+    );
     if (rc < 0)
         return -1;
     data_ptr = (u8 *)tmpd;

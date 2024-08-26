@@ -101,7 +101,7 @@ inline u32 IntEncoder<u32, FastPForWrapper<Codec>>::Decode(u32 *dest, u32 dest_l
     if (len != comp_len) {
         UnrecoverableError("Decode posting FAILEDF");
     }
-    size_t destlen = dest_len;
+    SizeT destlen = dest_len;
     u32 count = comp_len / sizeof(u32);
     compressor_.Decompress((const u32 *)buf_ptr, count, dest, destlen);
     return destlen;
