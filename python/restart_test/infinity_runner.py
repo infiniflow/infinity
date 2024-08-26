@@ -43,6 +43,7 @@ class InfinityRunner:
     @staticmethod
     def connect(uri: str):
         try_n = 100
+        time.sleep(0.5)
         for i in range(try_n):
             try:
                 return infinity.connect(uri)

@@ -94,12 +94,13 @@ class TestInsert:
         infinity_runner.uninit()
 
         cur_insert_n = 0
+        gen_finished = False
 
         def insert_func(table_obj):
-            nonlocal cur_insert_n
+            nonlocal cur_insert_n, gen_finished
             batch_size = 10
 
-            while cur_insert_n < insert_n:
+            while cur_insert_n < insert_n and not gen_finished:
                 try:
                     insert_data = []
                     # get `batch_size` data in data_gen one time
@@ -111,34 +112,33 @@ class TestInsert:
                                 data_line[col_name] = col_data
                             insert_data.append(data_line)
                         except StopIteration:
+                            gen_finished = True
                             break
                     table_obj.insert(insert_data)
                 except Exception as e:
                     break
                 cur_insert_n += batch_size
+                if cur_insert_n == insert_n:
+                    gen_finished = True
 
         shutdown_time = 0
-        ok = False
 
         def shutdown_func():
-            nonlocal cur_insert_n
+            nonlocal cur_insert_n, shutdown_time
             last_shutdown_insert_n = cur_insert_n
             while True:
                 if (
-                    cur_insert_n >= insert_n
+                    gen_finished
                     or cur_insert_n - last_shutdown_insert_n >= insert_n // stop_n
                 ):
-                    nonlocal ok, shutdown_time
-
                     infinity_runner.uninit()
                     print("shutdown infinity")
                     shutdown_time += 1
-                    if shutdown_time == 2 and False:
-                        ok = True
                     return
+                print(f"cur_insert_n: {cur_insert_n}")
                 time.sleep(0.1)
 
-        while cur_insert_n < insert_n and not ok:
+        while not gen_finished:
             infinity_runner.init(config)
             infinity_obj = InfinityRunner.connect(uri)
 
