@@ -3488,6 +3488,16 @@ index_param : IDENTIFIER {
     $$->param_value_ = $3;
     free($3);
 }
+| IDENTIFIER '=' STRING {
+    ParserHelper::ToLower($1);
+    ParserHelper::ToLower($3);
+    $$ = new infinity::InitParameter();
+    $$->param_name_ = $1;
+    free($1);
+
+    $$->param_value_ = $3;
+    free($3);
+}
 | IDENTIFIER '=' LONG_VALUE {
     ParserHelper::ToLower($1);
     $$ = new infinity::InitParameter();

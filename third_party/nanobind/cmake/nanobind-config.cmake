@@ -1,8 +1,8 @@
 include_guard(GLOBAL)
 
-if (NOT TARGET Python::Module)
-  message(FATAL_ERROR "You must invoke 'find_package(Python COMPONENTS Interpreter Development REQUIRED)' prior to including nanobind.")
-endif()
+#if (NOT TARGET Python::Module)
+#  message(FATAL_ERROR "You must invoke 'find_package(Python COMPONENTS Interpreter Development REQUIRED)' prior to including nanobind.")
+#endif()
 
 # Determine the right suffix for ordinary and stable ABI extensions.
 
