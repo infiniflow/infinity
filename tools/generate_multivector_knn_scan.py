@@ -3,6 +3,18 @@ import argparse
 import random
 from math import sin, cos, acos, pi
 import numpy as np
+import string
+
+
+class MyFormatter(string.Formatter):
+    def format_field(self, value, format_spec):
+        if format_spec == 'm':
+            return super().format_field(value, 'e').replace('e+', 'e')
+        else:
+            return super().format_field(value, format_spec)
+
+
+fmt = MyFormatter()
 
 
 def get_sphere_point(r, rand1, rand2):
@@ -127,7 +139,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
         write_twice("\n# multivector scan\n")
         for i, q_id in enumerate(query_data):
             write_twice("\nquery I\n")
-            query_v = np.array2string(all_multivector_centers[q_id], separator=',')
+            query_v = np.array2string(all_multivector_centers[q_id], separator=',',
+                                      formatter={'float': lambda x: fmt.format_field(x, 'm')})
             query_str = f"SELECT c1 FROM \u007b\u007d SEARCH MATCH VECTOR (c2, {query_v}, 'float', 'l2', {top_n[i]});\n"
             write_twice(query_str, True)
             write_twice("----\n")
