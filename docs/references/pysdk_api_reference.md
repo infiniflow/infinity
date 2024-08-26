@@ -626,7 +626,6 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
   - `Hnsw`: An HNSW index.
   - `EMVB`: An EMVB index. Works with tensors only.
   - `FullText`: A full-text index.  
-  - `IVFFlat`: An IVFFlat index.
   - `Secondary`: A secondary index. Works with structured data only.
   - `BMP`: A Block-Max Pruning index. Works with sparse vectors only.
 - **index_param_list**: `dict[str, str]`  
@@ -658,12 +657,6 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"tradition"`: Traditional Chinese
       - `"japanese"`: Japanese
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
-  - Parameter settings for an IVFFlat index:  
-    - `"centroids_count"`: *Optional* - Defaults to`"128"`.
-    - `"metric"`: *Required* - The distance metric to use in similarity search.
-      - `"ip"`: Inner product.
-      - `"l2"`: Euclidean distance.
-      - `"cosine"`: Cosine similarity.
   - Parameter settings for a secondary index:  
     No parameters are required. For now, use an empty list `[]`.
   - Parameter settings for a BMP index:
@@ -800,48 +793,6 @@ table_object.create_index(
         IndexInfo("docdate", IndexType.FullText),
         IndexInfo("body", IndexType.FullText),
     ],
-    None
-)
-```
-
-#### Create an IVFFlat index
-
-```python {14}
-from infinity.index import IndexInfo, IndexType
-# Create a table named "test_index_ivfflat" with a vector column "c1"
-table_ojbect = db_object.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
-# Create an IVFFlat index named "my_index" on column "c1" with default parameter settings:
-# - "centroids_count": "128"
-# Only the metric parameter (required) is explicitly set to L2 distance. 
-table_object.create_index(
-    "my_index",
-        IndexInfo(
-            "c1",
-            IndexType.IVFFlat,
-            {
-              "metric": "l2"
-            }
-        ),
-    None
-)
-```
-
-```python {13,14}
-from infinity.index import IndexInfo, IndexType
-# Create a table named "test_index_ivfflat" with a vector column "c1"
-table_ojbect = db_object.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
-# Create an IVFFlat index named "my_index" on column "c1"
-# Explicitly settings "centroids_count" to "128" and "metric" to "l2" (same as above)
-table_object.create_index(
-    "my_index",
-        IndexInfo(
-            "c1",
-            IndexType.IVFFlat,
-            {
-              "centroids_count": "128",
-              "metric": "l2"
-            }
-        ),
     None
 )
 ```
