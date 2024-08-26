@@ -116,8 +116,7 @@ curl --request DELETE \
      --url http://localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' {
-       "drop_option": "error"} '
+     --data ' {"drop_option": "error"} '
 ```
 
 #### Request parameter
@@ -317,18 +316,18 @@ curl --request POST \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' {
-       "create_option": "ignore_if_exists",
-       "fields": [
-           {
-               "name": "name",
-               "type": "varchar"
-           },
-           {
-               "name": "score",
-               "type": "float"
-           }
+         "create_option": "ignore_if_exists",
+         "fields": [
+             {
+                 "name": "name",
+                 "type": "varchar"
+             },
+             {
+                 "name": "score",
+                 "type": "float"
+             }
         ]
-     } '
+    } '
 ```
 
 #### Request parameters
@@ -426,9 +425,7 @@ curl --request DELETE \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' {
-       "drop_option": "ignore_if_not_exists"
-     } '
+     --data ' {"drop_option": "ignore_if_not_exists"} '
 ```
 
 #### Request parameters
@@ -877,9 +874,7 @@ curl --request DELETE \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' {
-       "drop_option": "ignore_if_not_exists"
-     } '
+     --data ' {"drop_option": "ignore_if_not_exists"} '
 ```
 
 #### Request parameters
@@ -1220,9 +1215,9 @@ curl --request PUT \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' {
-       "file_path":"./filename.json",
-       "file_type":"json",
-     } '
+         "file_path":"./filename.json",
+         "file_type":"json"
+    } '
 ```
 
 #### Request parameters
@@ -1314,15 +1309,14 @@ curl --request GET \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' {
-       "file_path":"/var/infinity/filename.csv",
-       "file_type":"csv",
-       "header":false,
-       "delimiter":","
-     } '
+         "file_path":"/var/infinity/filename.csv",
+         "file_type":"csv",
+         "header":false,
+         "delimiter":","
+    } '
 ```
 
 #### Request parameters
-
 
 - `"file_path"`: `string`, *Required*   
   Absolute path to the file for export. Supported file types include:  
