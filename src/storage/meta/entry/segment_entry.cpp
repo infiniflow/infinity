@@ -564,7 +564,7 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
         for (const auto &block_json : segment_entry_json["block_entries"]) {
             UniquePtr<BlockEntry> block_entry = BlockEntry::Deserialize(block_json, segment_entry.get(), buffer_mgr);
             auto block_entries_size = segment_entry->block_entries_.size();
-            segment_entry->block_entries_.resize(std::max(block_entries_size, static_cast<SizeT>(block_entry->block_id() + 1)));
+            segment_entry->block_entries_.resize(std::max(static_cast<SizeT>(block_entries_size), static_cast<SizeT>(block_entry->block_id() + 1)));
             segment_entry->block_entries_[block_entry->block_id()] = std::move(block_entry);
         }
     }

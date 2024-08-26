@@ -17,7 +17,7 @@
 #include <sstream>
 
 namespace infinity {
-std::string TensorArrayType::TensorArray2String(const std::vector<std::pair<std::span<const char>, size_t>> &raw_data,
+std::string TensorArrayType::TensorArray2String(const std::vector<std::pair<std::span<const char>, uint64_t>> &raw_data,
                                                 EmbeddingDataType type,
                                                 size_t embedding_dimension) {
     std::ostringstream oss;

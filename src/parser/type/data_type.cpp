@@ -647,7 +647,7 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
     FloatT value{};
 #if defined(__APPLE__)
     auto ret = std::sscanf(str.data(), "%a", &value);
-    ParserAssert(ret == str.size(), "Error: parse float error");
+    ParserAssert((size_t)ret == str.size(), "Error: parse float error");
 #else
     // Used in libc++
     try {
@@ -670,7 +670,7 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
     DoubleT value{};
 #if defined(__APPLE__)
     auto ret = std::sscanf(str.data(), "%la", &value);
-    ParserAssert(ret == str.size(), "Error: parse double error");
+    ParserAssert((size_t)ret == str.size(), "Error: parse double error");
 #else
     try {
         const std::string double_str(str);

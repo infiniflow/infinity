@@ -18,25 +18,48 @@ add_subdirectory(parser)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
-execute_process(COMMAND grep -q fma /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_FMA
-        OUTPUT_QUIET
-        ERROR_QUIET)
+if(APPLE)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA" 
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_SSE42
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q avx2 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_AVX2
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q avx512 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_AVX512
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+else()
+        #Linux
+        execute_process(COMMAND grep -q fma /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q avx2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q avx512 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+endif()
 
 
 file(GLOB_RECURSE
@@ -527,8 +550,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thr
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
-
-target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
