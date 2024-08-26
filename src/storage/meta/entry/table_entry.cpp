@@ -269,6 +269,21 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
     return index_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
+Vector<TableIndexEntry *> TableEntry::TableIndexes(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    Vector<TableIndexEntry *> results;
+    auto map_guard = index_meta_map_.GetMetaMap();
+    results.reserve((*map_guard).size());
+    for (auto &[index_name, index_meta] : *map_guard) {
+        auto [index_entry, status] = index_meta->GetEntryNolock(txn_id, begin_ts);
+        if (!status.ok()) {
+            LOG_TRACE(fmt::format("error when get table index entry: {} index name: {}", status.message(), *index_meta->index_name()));
+        } else {
+            results.emplace_back(static_cast<TableIndexEntry *>(index_entry));
+        }
+    }
+    return results;
+}
+
 void TableEntry::AddSegmentReplayWalImport(SharedPtr<SegmentEntry> segment_entry) {
     this->AddSegmentReplayWal(segment_entry);
     row_count_ += segment_entry->actual_row_count();
