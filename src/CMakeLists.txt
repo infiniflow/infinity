@@ -2,8 +2,7 @@
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
-set (Python3_USE_STATIC_LIBS "ON")
-find_package (Python3 COMPONENTS Development)
+#find_package(Python)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm)
 
@@ -221,7 +220,6 @@ target_sources(infinity_core
 )
 
 add_dependencies(infinity_core thrift thriftnb parquet_static snappy)
-
 target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
