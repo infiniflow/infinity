@@ -660,7 +660,7 @@ std::variant<Vector<u32>, Bitmask> SolveSecondaryIndexFilter(const Vector<Filter
         // return all true
         auto res = std::variant<Vector<u32>, Bitmask>(std::in_place_type<Bitmask>);
         auto &bitmask = std::get<Bitmask>(res);
-        bitmask.Initialize(DEFAULT_SEGMENT_CAPACITY);
+        bitmask.Initialize(std::bit_ceil(DEFAULT_SEGMENT_CAPACITY));
         return res;
     }
     auto result =
