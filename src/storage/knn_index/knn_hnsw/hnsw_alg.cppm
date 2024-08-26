@@ -24,10 +24,12 @@ import file_system;
 import file_system_type;
 import infinity_exception;
 import knn_result_handler;
+import multivector_result_handler;
 import bitmask;
-
+import logical_type;
 import hnsw_common;
 import data_store;
+import third_party;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.
@@ -40,6 +42,7 @@ namespace infinity {
 
 export struct KnnSearchOption {
     SizeT ef_ = 0;
+    LogicalType column_logical_type_ = LogicalType::kEmbedding;
 };
 
 export template <typename VecStoreType, typename LabelType>
@@ -127,14 +130,46 @@ private:
         return static_cast<i32>(r);
     }
 
+    template <LogicalType ColumnLogicalType>
+    using SearchLayerReturnParam3T = std::conditional_t<ColumnLogicalType == LogicalType::kEmbedding, VertexType, LabelType>;
+
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
-    template <bool WithLock, FilterConcept<LabelType> Filter = NoneType>
-    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<VertexType[]>>
+    template <bool WithLock,
+              FilterConcept<LabelType> Filter = NoneType,
+              LogicalType ColumnLogicalType = LogicalType::kEmbedding,
+              typename MultiVectorInnerTopnIndexType = void>
+    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>
     SearchLayer(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Filter &filter) const {
+        static_assert(ColumnLogicalType == LogicalType::kEmbedding || ColumnLogicalType == LogicalType::kMultiVector);
         auto d_ptr = MakeUniqueForOverwrite<DistanceType[]>(result_n);
-        auto i_ptr = MakeUniqueForOverwrite<VertexType[]>(result_n);
-        HeapResultHandler<CompareMax<DistanceType, VertexType>> result_handler(1, result_n, d_ptr.get(), i_ptr.get());
+        auto i_ptr = MakeUniqueForOverwrite<SearchLayerReturnParam3T<ColumnLogicalType>[]>(result_n);
+        using ResultHandler = std::conditional_t<ColumnLogicalType == LogicalType::kEmbedding,
+                                                 HeapResultHandler<CompareMax<DistanceType, VertexType>>,
+                                                 MultiVectorResultHandler<DistanceType, LabelType, MultiVectorInnerTopnIndexType>>;
+        ResultHandler result_handler(1, result_n, d_ptr.get(), i_ptr.get());
         result_handler.Begin();
+        auto add_result = [&](DistanceType add_dist, VertexType add_v) {
+            if constexpr (ColumnLogicalType == LogicalType::kEmbedding) {
+                if constexpr (!std::is_same_v<Filter, NoneType>) {
+                    if (filter(this->GetLabel(add_v))) {
+                        result_handler.AddResult(0, add_dist, add_v);
+                    }
+                } else {
+                    result_handler.AddResult(0, add_dist, add_v);
+                }
+            } else if constexpr (ColumnLogicalType == LogicalType::kMultiVector) {
+                const auto l = this->GetLabel(add_v);
+                if constexpr (!std::is_same_v<Filter, NoneType>) {
+                    if (filter(l)) {
+                        result_handler.AddResult(add_dist, l);
+                    }
+                } else {
+                    result_handler.AddResult(add_dist, l);
+                }
+            } else {
+                static_assert(false, "Unsupported column logical type");
+            }
+        };
         DistHeap candidate;
 
         data_store_.PrefetchVec(enter_point);
@@ -142,13 +177,7 @@ private:
         {
             auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_.vec_store_meta());
             candidate.emplace(-dist, enter_point);
-            if constexpr (!std::is_same_v<Filter, NoneType>) {
-                if (filter(GetLabel(enter_point))) {
-                    result_handler.AddResult(0, dist, enter_point);
-                }
-            } else {
-                result_handler.AddResult(0, dist, enter_point);
-            }
+            add_result(dist, enter_point);
         }
 
         SizeT cur_vec_num = data_store_.cur_vec_num();
@@ -184,15 +213,9 @@ private:
                     prefetch_start -= prefetch_step_;
                 }
                 auto dist = distance_(query, data_store_.GetVec(n_idx), data_store_.vec_store_meta());
-                if (result_handler.GetSize(0) < result_n || dist < result_handler.GetDistance0(0)) {
+                if (result_handler.GetSize(0) < result_n || dist <= result_handler.GetDistance0(0)) {
                     candidate.emplace(-dist, n_idx);
-                    if constexpr (!std::is_same_v<Filter, NoneType>) {
-                        if (filter(GetLabel(n_idx))) {
-                            result_handler.AddResult(0, dist, n_idx);
-                        }
-                    } else {
-                        result_handler.AddResult(0, dist, n_idx);
-                    }
+                    add_result(dist, n_idx);
                 }
             }
         }
@@ -280,8 +303,8 @@ private:
             Vector<PDV> candidates;
             candidates.reserve(n_neighbor_size + 1);
             candidates.emplace_back(n_dist, vertex_i);
-            for (int i = 0; i < n_neighbor_size; ++i) {
-                candidates.emplace_back(distance_(n_data, data_store_.GetVec(n_neighbors_p[i]), data_store_.vec_store_meta()), n_neighbors_p[i]);
+            for (int j = 0; j < n_neighbor_size; ++j) {
+                candidates.emplace_back(distance_(n_data, data_store_.GetVec(n_neighbors_p[j]), data_store_.vec_store_meta()), n_neighbors_p[j]);
             }
 
             SelectNeighborsHeuristic(std::move(candidates), Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
@@ -290,8 +313,29 @@ private:
 
     LabelType GetLabel(VertexType vertex_i) const { return data_store_.GetLabel(vertex_i); }
 
-    template <bool WithLock, FilterConcept<LabelType> Filter = NoneType>
-    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<VertexType[]>>
+    template <bool WithLock, FilterConcept<LabelType> Filter, LogicalType ColumnLogicalType>
+    auto SearchLayerHelper(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Filter &filter) const {
+        if constexpr (ColumnLogicalType == LogicalType::kEmbedding) {
+            return SearchLayer<WithLock, Filter, ColumnLogicalType>(enter_point, query, layer_idx, result_n, filter);
+        } else if constexpr (ColumnLogicalType == LogicalType::kMultiVector) {
+            if (result_n <= std::numeric_limits<u8>::max()) {
+                return SearchLayer<WithLock, Filter, ColumnLogicalType, u8>(enter_point, query, layer_idx, result_n, filter);
+            }
+            if (result_n <= std::numeric_limits<u16>::max()) {
+                return SearchLayer<WithLock, Filter, ColumnLogicalType, u16>(enter_point, query, layer_idx, result_n, filter);
+            }
+            if (result_n <= std::numeric_limits<u32>::max()) {
+                return SearchLayer<WithLock, Filter, ColumnLogicalType, u32>(enter_point, query, layer_idx, result_n, filter);
+            }
+            UnrecoverableError(fmt::format("Unsupported result_n : {}, which is larger than u32::max()", result_n));
+            return Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>{};
+        } else {
+            static_assert(false, "Unsupported column logical type");
+        }
+    }
+
+    template <bool WithLock, FilterConcept<LabelType> Filter = NoneType, LogicalType ColumnLogicalType = LogicalType::kEmbedding>
+    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>
     KnnSearchInner(const QueryVecType &q, SizeT k, const Filter &filter, const KnnSearchOption &option) const {
         SizeT ef = option.ef_;
         if (ef == 0) {
@@ -305,7 +349,7 @@ private:
         for (i32 cur_layer = max_layer; cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
         }
-        return SearchLayer<WithLock, Filter>(ep, query, 0, ef, filter);
+        return SearchLayerHelper<WithLock, Filter, ColumnLogicalType>(ep, query, 0, ef, filter);
     }
 
 public:
@@ -373,12 +417,23 @@ public:
     template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
     Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<LabelType[]>>
     KnnSearch(const QueryVecType &q, SizeT k, const Filter &filter, const KnnSearchOption &option = {}) const {
-        auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter, option);
-        auto labels = MakeUniqueForOverwrite<LabelType[]>(result_n);
-        for (SizeT i = 0; i < result_n; ++i) {
-            labels[i] = GetLabel(v_ptr[i]);
+        switch (option.column_logical_type_) {
+            case LogicalType::kEmbedding: {
+                auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter, option);
+                auto labels = MakeUniqueForOverwrite<LabelType[]>(result_n);
+                for (SizeT i = 0; i < result_n; ++i) {
+                    labels[i] = GetLabel(v_ptr[i]);
+                }
+                return {result_n, std::move(d_ptr), std::move(labels)};
+            }
+            case LogicalType::kMultiVector: {
+                return KnnSearchInner<WithLock, Filter, LogicalType::kMultiVector>(q, k, filter, option);
+            }
+            default: {
+                UnrecoverableError(fmt::format("Unsupported column logical type: {}", LogicalType2Str(option.column_logical_type_)));
+            }
         }
-        return {result_n, std::move(d_ptr), std::move(labels)};
+        return {};
     }
 
     template <bool WithLock = true>

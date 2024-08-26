@@ -125,12 +125,12 @@ private:
     }
 
     template <typename Iter, typename Index>
-    static void InsertVecs(Index &index, Iter iter, const HnswInsertConfig &config, SizeT &mem_usage) {
+    static void InsertVecs(Index &index, Iter &&iter, const HnswInsertConfig &config, SizeT &mem_usage) {
         auto &thread_pool = InfinityContext::instance().GetHnswBuildThreadPool();
         using T = std::decay_t<decltype(index)>;
         if constexpr (!std::is_same_v<T, std::nullptr_t>) {
             SizeT mem1 = index->mem_usage();
-            auto [start, end] = index->StoreData(std::move(iter), config);
+            auto [start, end] = index->StoreData(std::forward<Iter>(iter), config);
             SizeT bucket_size = std::max(kBuildBucketSize, SizeT(end - start - 1) / thread_pool.size() + 1);
             SizeT bucket_n = (end - start - 1) / bucket_size + 1;
 

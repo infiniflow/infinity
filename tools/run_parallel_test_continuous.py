@@ -17,12 +17,12 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
     begin_time = time.time()
     while time.time() - begin_time < 8 * 3600:
         process = subprocess.Popen(
-            # ["python", "-m", "pytest", "--tb=line", '-s', '-x', '-m', pytest_mark, f'{python_test_dir}/test'],
+            # ["python", "-m", "pytest", "--tb=short", '-s', '-x', '-m', pytest_mark, f'{python_test_dir}/test'],
             [
                 python_executable,
                 "-m",
                 "pytest",
-                "--tb=line",
+                "--tb=short",
                 "-x",
                 "-m",
                 pytest_mark,

@@ -44,6 +44,10 @@ BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<Fil
 
 BufferObj::~BufferObj() = default;
 
+void BufferObj::SetFileWorker(UniquePtr<FileWorker> file_worker) {
+    file_worker_ = std::move(file_worker);
+}
+
 BufferHandle BufferObj::Load() {
     std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
