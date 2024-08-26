@@ -16,8 +16,9 @@ module;
 
 #include <cstdio>
 #include <dirent.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <string>
+#include <unistd.h>
 
 module system_info;
 
@@ -36,24 +37,22 @@ namespace {
 
 u64 cpu_total_cost() {
     // different mode cpu cost
-    u64 user_time;
-    u64 nice_time;
-    u64 system_time;
-    u64 idle_time;
+    u64 user_time{0};
+    u64 nice_time{0};
+    u64 system_time{0};
+    u64 idle_time{0};
 
-    FILE *fd;
-    char buffer[1024] = {0};
-
-    fd = fopen("/proc/stat", "r");
-    if (nullptr == fd) {
+    std::ifstream file("/proc/stat");
+    if (!file) {
         return 0;
     }
 
-    fgets(buffer, sizeof(buffer), fd);
-    char name[64] = {0};
-    sscanf(buffer, "%s %lld %lld %lld %lld", name, &user_time, &nice_time, &system_time, &idle_time);
-    fclose(fd);
-
+    String line;
+    if (std::getline(file, line)) {
+        std::istringstream iss(line);
+        String name;
+        iss >> name >> user_time >> nice_time >> system_time >> idle_time;
+    }
     return (user_time + nice_time + system_time + idle_time);
 }
 
@@ -99,7 +98,9 @@ u64 cpu_cost_of_process(pid_t pid) {
 
     sscanf(line_buff, "%u", &tmp_pid);
     const char *q = get_items(line_buff, 14);
-    sscanf(q, "%lld %lld %lld %lld", &utime, &stime, &cutime, &cstime);
+    std::istringstream iss(q);
+    iss >> utime >> stime >> cutime >> cstime;
+
     fclose(fd);
 
     return (utime + stime + cutime + cstime);
@@ -125,9 +126,9 @@ i64 SystemInfo::MemoryUsage() {
             {
                 LOG_DEBUG(line_rss);
                 String str(line_rss + 6);
-
-                char kb[line_length];
-                sscanf(str.c_str(), "%lld %s", &vm_rss_in_kb, kb);
+                String kb;
+                std::istringstream iss(str);
+                iss >> vm_rss_in_kb >> kb;
             }
         }
     } catch (std::exception& e) {
