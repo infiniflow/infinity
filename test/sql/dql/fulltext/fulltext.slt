@@ -35,7 +35,7 @@ Anarchism 30-APR-2012 03:25:17.000 6 46.196758
 
 # phrase and term
 query TTI rowsort
-SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle,body^5', '"social customs" harmful', 'topn=3');
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', '"social customs" harmful', 'topn=3');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 22.299635
 Anarchism 30-APR-2012 03:25:17.000 6 46.196758
@@ -65,7 +65,7 @@ Anarchism 30-APR-2012 03:25:17.000 8589934592 26.370461
 
 
 query TTI rowsort
-SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle,body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 26.370461
 Anarchism 30-APR-2012 03:25:17.000 4294967296 26.370461
