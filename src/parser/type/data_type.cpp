@@ -31,67 +31,64 @@ namespace infinity {
 
 DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info_ptr) : type_(logical_type), type_info_(std::move(type_info_ptr)) {
     switch (logical_type) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             plain_type_ = false;
             break;
         }
-        case kTinyInt:
-        case kSmallInt:
-        case kInteger:
-        case kBigInt:
-        case kHugeInt:
-        case kDecimal:
-        case kFloat:
-        case kDouble:
-        case kFloat16:
-        case kBFloat16:
-        case kDate:
-        case kTime:
-        case kDateTime:
-        case kTimestamp:
-        case kInterval:
-        case kPoint:
-        case kLine:
-        case kLineSeg:
-        case kBox:
-        case kCircle:
+        case LogicalType::kTinyInt:
+        case LogicalType::kSmallInt:
+        case LogicalType::kInteger:
+        case LogicalType::kBigInt:
+        case LogicalType::kHugeInt:
+        case LogicalType::kDecimal:
+        case LogicalType::kFloat:
+        case LogicalType::kDouble:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kDateTime:
+        case LogicalType::kTimestamp:
+        case LogicalType::kInterval:
+        case LogicalType::kPoint:
+        case LogicalType::kLine:
+        case LogicalType::kLineSeg:
+        case LogicalType::kBox:
+        case LogicalType::kCircle:
 //        case kBitmap:
-        case kUuid:
-        case kEmbedding:
-        case kRowID: {
+        case LogicalType::kUuid:
+        case LogicalType::kEmbedding:
+        case LogicalType::kRowID: {
             plain_type_ = true;
             break;
         }
-        case kMixed:
-        case kVarchar:
-        case kSparse:
-        case kTensor:
-        case kTensorArray:
-        case kMultiVector:
-        case kArray:
-        case kTuple: {
+        case LogicalType::kMixed:
+        case LogicalType::kVarchar:
+        case LogicalType::kSparse:
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray:
+        case LogicalType::kMultiVector:
+        case LogicalType::kArray:
+        case LogicalType::kTuple: {
 //        case kPath:
 //        case kPolygon:
 //        case kBlob:
             plain_type_ = false;
             break;
         }
-        case kNull:
-        case kEmptyArray:
-        case kMissing: {
+        case LogicalType::kNull:
+        case LogicalType::kEmptyArray:
+        case LogicalType::kMissing: {
             plain_type_ = true;
             break;
         }
-        case kInvalid:
+        case LogicalType::kInvalid:
             break;
     }
 }
 
 std::string DataType::ToString() const {
-    if (type_ > kInvalid) {
-        ParserError(fmt::format("Invalid logical data type {}.", LogicalType2Str(type_)));
-    }
-    if (type_info_.get() != nullptr) {
+    if (type_info_) {
         return fmt::format("{}({})", LogicalType2Str(type_), type_info_->ToString());
     }
     return LogicalType2Str(type_);
@@ -120,9 +117,6 @@ bool DataType::operator==(const DataType &other) const {
 bool DataType::operator!=(const DataType &other) const { return !operator==(other); }
 
 size_t DataType::Size() const {
-    if (type_ > kInvalid) {
-        ParserError(fmt::format("Invalid logical data type {}.", LogicalType2Str(type_)));
-    }
     switch (type_) {
         case LogicalType::kEmbedding:
         case LogicalType::kSparse: {
@@ -180,7 +174,7 @@ void DataType::MaxDataType(const DataType &right) {
 
 int32_t DataType::GetSizeInBytes() const {
     int32_t size = sizeof(LogicalType);
-    if (this->type_info_ != nullptr) {
+    if (this->type_info_) {
         switch (this->type_) {
             case LogicalType::kArray:
                 ParserError("Array isn't implemented here.");
@@ -325,7 +319,7 @@ nlohmann::json DataType::Serialize() {
 }
 
 std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_json) {
-    LogicalType logical_type = data_type_json["data_type"];
+    const auto logical_type = data_type_json["data_type"].get<LogicalType>();
 
     std::shared_ptr<TypeInfo> type_info{nullptr};
     if (data_type_json.contains("type_info")) {
@@ -348,7 +342,7 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
             case LogicalType::kTensorArray:
             case LogicalType::kMultiVector:
             case LogicalType::kEmbedding: {
-                type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
+                type_info = EmbeddingInfo::Make(type_info_json["embedding_type"].get<EmbeddingDataType>(), type_info_json["dimension"]);
                 break;
             }
             case LogicalType::kSparse: {
@@ -373,13 +367,13 @@ std::shared_ptr<DataType> DataType::StringDeserialize(const std::string &data_ty
         case LogicalType::kEmbedding: {
             return nullptr;
         }
-            case LogicalType::kInvalid: {
-                ParserError("Invalid data type");
-            }
-            default: {
-                // There's no type_info for other types
-                break;
-            }
+        case LogicalType::kInvalid: {
+            ParserError("Invalid data type");
+        }
+        default: {
+            // There's no type_info for other types
+            break;
+        }
     }
     std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, nullptr);
     return data_type;

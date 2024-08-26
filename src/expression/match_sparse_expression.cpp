@@ -53,18 +53,18 @@ DataType MatchSparseExpression::Type() const {
     const DataType &column_type = column_expr_->Type();
     const auto *sparse_info = static_cast<const SparseInfo *>(column_type.type_info().get());
     switch (sparse_info->DataType()) {
-        case kElemBit: {
+        case EmbeddingDataType::kElemBit: {
             switch (sparse_info->IndexType()) {
-                case kElemInt8: {
+                case EmbeddingDataType::kElemInt8: {
                     return DataType(LogicalType::kTinyInt);
                 }
-                case kElemInt16: {
+                case EmbeddingDataType::kElemInt16: {
                     return DataType(LogicalType::kSmallInt);
                 }
-                case kElemInt32: {
+                case EmbeddingDataType::kElemInt32: {
                     return DataType(LogicalType::kInteger);
                 }
-                case kElemInt64: {
+                case EmbeddingDataType::kElemInt64: {
                     return DataType(LogicalType::kBigInt);
                 }
                 default: {
@@ -72,17 +72,17 @@ DataType MatchSparseExpression::Type() const {
                 }
             }
         }
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             return DataType(LogicalType::kFloat);
         }
-        case kElemDouble: {
+        case EmbeddingDataType::kElemDouble: {
             return DataType(LogicalType::kDouble);
         }
-        case kElemUInt8:
-        case kElemInt8:
-        case kElemInt16:
-        case kElemInt32:
-        case kElemInt64: {
+        case EmbeddingDataType::kElemUInt8:
+        case EmbeddingDataType::kElemInt8:
+        case EmbeddingDataType::kElemInt16:
+        case EmbeddingDataType::kElemInt32:
+        case EmbeddingDataType::kElemInt64: {
             return DataType(LogicalType::kFloat);
         }
         default: {

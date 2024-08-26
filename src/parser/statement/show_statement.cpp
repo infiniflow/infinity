@@ -160,6 +160,18 @@ std::string ShowStatement::ToString() const {
             ss << "Show persistence object";
             break;
         }
+        case ShowStmtType::kMemory: {
+            ss << "Show memory";
+            break;
+        }
+        case ShowStmtType::kMemoryObjects: {
+            ss << "Show memory objects";
+            break;
+        }
+        case ShowStmtType::kMemoryAllocation: {
+            ss << "Show memory allocation";
+            break;
+        }
     }
     return ss.str();
 }

@@ -201,6 +201,7 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
                 ++iter;
             }
         }
+        meta_map_.rehash(meta_map_.size());
     }
 }
 

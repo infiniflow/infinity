@@ -43,6 +43,7 @@ export enum class GlobalVariable {
     kSystemMemoryUsage,         // global
     kOpenFileCount,             // global
     kCPUUsage,                  // global
+    kJeProf,                    // global
     kInvalid,
 };
 

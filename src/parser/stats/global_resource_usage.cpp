@@ -12,30 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-export module task_result;
-
-import stl;
-import data_type;
-import data_block;
-import internal_types;
+#include "global_resource_usage.h"
 
 namespace infinity {
 
-export enum class TaskResultType { kInvalid };
+std::atomic_bool GlobalResourceUsage::initialized_ = false;
 
-export class TaskResult {
-public:
-    explicit TaskResult(TaskResultType task_result_type) : task_result_type_(task_result_type) {}
+int64_t GlobalResourceUsage::object_count_ = 0;
+std::unordered_map<std::string, int64_t> GlobalResourceUsage::object_map_;
 
-    void Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity);
+int64_t GlobalResourceUsage::raw_memory_count_ = 0;
+std::unordered_map<std::string, int64_t> GlobalResourceUsage::raw_memory_map_;
 
-    void Seal();
+std::mutex GlobalResourceUsage::object_mutex_{};
 
-private:
-    UniquePtr<DataBlock> data_{};
-    TaskResultType task_result_type_{TaskResultType::kInvalid};
-};
+std::mutex GlobalResourceUsage::raw_memory_mutex_{};
 
 } // namespace infinity

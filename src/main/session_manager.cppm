@@ -19,6 +19,7 @@ import stl;
 import session;
 import profiler;
 import status;
+import global_resource_usage;
 
 namespace infinity {
 

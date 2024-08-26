@@ -124,6 +124,9 @@ public:
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();
 
+    // Wait MemIndex inflight tasks done.
+    void MemIndexWaitInflightTasks();
+
     // Dump or spill the memory indexer
     SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false, SizeT *dump_size = nullptr);
 

@@ -81,6 +81,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[13] = String("0.3.0.dev4");
     client_version_map_[14] = String("0.3.0.dev5");
     client_version_map_[15] = String("0.3.0.dev6");
+    client_version_map_[16] = String("0.3.0.dev7");
 }
 
 Pair<const char*, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -488,7 +489,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     // search expr
     SearchExpr *search_expr = nullptr;
     if (request.__isset.search_expr) {
-        search_expr = new SearchExpr();
+
         auto search_expr_list = new Vector<ParsedExpr *>();
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
@@ -512,10 +513,10 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
                     delete search_expr_list;
                     search_expr_list = nullptr;
                 }
-                if (search_expr != nullptr) {
-                    delete search_expr;
-                    search_expr = nullptr;
+                if (match_expr != nullptr) {
+                    delete match_expr;
                 }
+
                 ProcessStatus(response, status);
                 return;
             }
@@ -527,6 +528,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             search_expr_list->emplace_back(fusion_expr);
         }
 
+        search_expr = new SearchExpr();
         search_expr->SetExprs(search_expr_list);
     }
 
@@ -656,7 +658,6 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     // search expr
     SearchExpr *search_expr = nullptr;
     if (request.__isset.search_expr) {
-        search_expr = new SearchExpr();
         auto search_expr_list = new Vector<ParsedExpr *>();
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
@@ -697,6 +698,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             search_expr_list->emplace_back(fusion_expr);
         }
 
+        search_expr = new SearchExpr();
         search_expr->SetExprs(search_expr_list);
     }
 

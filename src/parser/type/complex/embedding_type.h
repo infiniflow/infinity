@@ -27,7 +27,7 @@
 
 namespace infinity {
 
-enum EmbeddingDataType : int8_t {
+enum class EmbeddingDataType : int8_t {
     kElemBit,
     kElemInt8,
     kElemInt16,
@@ -40,6 +40,8 @@ enum EmbeddingDataType : int8_t {
     kElemBFloat16,
     kElemInvalid,
 };
+
+constexpr auto to_underlying_val(EmbeddingDataType type) { return static_cast<std::underlying_type_t<EmbeddingDataType>>(type); }
 
 template <typename T>
 inline EmbeddingDataType ToEmbeddingDataType() {
@@ -104,7 +106,7 @@ public:
     static size_t embedding_type_width[];
 
 public:
-    static inline size_t EmbeddingDataWidth(EmbeddingDataType type_index) { return embedding_type_width[type_index]; }
+    static inline size_t EmbeddingDataWidth(EmbeddingDataType type_index) { return embedding_type_width[to_underlying_val(type_index)]; }
 
     [[nodiscard]] static inline size_t EmbeddingSize(EmbeddingDataType type, size_t dimension) {
         ParserAssert(type != EmbeddingDataType::kElemInvalid, "Invalid embedding data type");
@@ -118,27 +120,27 @@ public:
 
     [[nodiscard]] static inline std::string EmbeddingDataType2String(EmbeddingDataType type) {
         switch (type) {
-            case kElemBit:
+            case EmbeddingDataType::kElemBit:
                 return "BIT";
-            case kElemInt8:
+            case EmbeddingDataType::kElemInt8:
                 return "INT8";
-            case kElemInt16:
+            case EmbeddingDataType::kElemInt16:
                 return "INT16";
-            case kElemInt32:
+            case EmbeddingDataType::kElemInt32:
                 return "INT32";
-            case kElemInt64:
+            case EmbeddingDataType::kElemInt64:
                 return "INT64";
-            case kElemFloat:
+            case EmbeddingDataType::kElemFloat:
                 return "FLOAT32";
-            case kElemDouble:
+            case EmbeddingDataType::kElemDouble:
                 return "FLOAT64";
-            case kElemUInt8:
+            case EmbeddingDataType::kElemUInt8:
                 return "UINT8";
-            case kElemFloat16:
+            case EmbeddingDataType::kElemFloat16:
                 return "FLOAT16";
-            case kElemBFloat16:
+            case EmbeddingDataType::kElemBFloat16:
                 return "BFLOAT16";
-            case kElemInvalid: {
+            case EmbeddingDataType::kElemInvalid: {
                 ParserError("Unexpected embedding type");
             }
         }
@@ -147,54 +149,54 @@ public:
 
     static EmbeddingDataType String2EmbeddingDataType(std::string_view sv) {
         if (sv == "BIT") {
-            return kElemBit;
+            return EmbeddingDataType::kElemBit;
         } else if (sv == "INT8") {
-            return kElemInt8;
+            return EmbeddingDataType::kElemInt8;
         } else if (sv == "INT16") {
-            return kElemInt16;
+            return EmbeddingDataType::kElemInt16;
         } else if (sv == "INT32" || sv == "INT") {
-            return kElemInt32;
+            return EmbeddingDataType::kElemInt32;
         } else if (sv == "INT64") {
-            return kElemInt64;
+            return EmbeddingDataType::kElemInt64;
         } else if (sv == "FLOAT32" || sv == "FLOAT" || sv == "F32") {
-            return kElemFloat;
+            return EmbeddingDataType::kElemFloat;
         } else if (sv == "FLOAT64" || sv == "DOUBLE" || sv == "F64") {
-            return kElemDouble;
+            return EmbeddingDataType::kElemDouble;
         } else if (sv == "UINT8") {
-            return kElemUInt8;
+            return EmbeddingDataType::kElemUInt8;
         } else if (sv == "FLOAT16" || sv == "F16") {
-            return kElemFloat16;
+            return EmbeddingDataType::kElemFloat16;
         } else if (sv == "BFLOAT16" || sv == "BF16") {
-            return kElemBFloat16;
+            return EmbeddingDataType::kElemBFloat16;
         } else {
             ParserError("Unexpected embedding type");
         }
-        return kElemInvalid;
+        return EmbeddingDataType::kElemInvalid;
     }
 
     [[nodiscard]] static inline std::string Embedding2String(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension) {
         switch (type) {
-            case kElemBit:
+            case EmbeddingDataType::kElemBit:
                 return BitmapEmbedding2StringInternal(embedding, dimension);
-            case kElemInt8:
+            case EmbeddingDataType::kElemInt8:
                 return Embedding2StringInternal<int8_t>(embedding, dimension);
-            case kElemInt16:
+            case EmbeddingDataType::kElemInt16:
                 return Embedding2StringInternal<int16_t>(embedding, dimension);
-            case kElemInt32:
+            case EmbeddingDataType::kElemInt32:
                 return Embedding2StringInternal<int32_t>(embedding, dimension);
-            case kElemInt64:
+            case EmbeddingDataType::kElemInt64:
                 return Embedding2StringInternal<int64_t>(embedding, dimension);
-            case kElemFloat:
+            case EmbeddingDataType::kElemFloat:
                 return Embedding2StringInternal<float>(embedding, dimension);
-            case kElemDouble:
+            case EmbeddingDataType::kElemDouble:
                 return Embedding2StringInternal<double>(embedding, dimension);
-            case kElemUInt8:
+            case EmbeddingDataType::kElemUInt8:
                 return Embedding2StringInternal<uint8_t>(embedding, dimension);
-            case kElemFloat16:
+            case EmbeddingDataType::kElemFloat16:
                 return Embedding2StringInternal<float16_t>(embedding, dimension);
-            case kElemBFloat16:
+            case EmbeddingDataType::kElemBFloat16:
                 return Embedding2StringInternal<bfloat16_t>(embedding, dimension);
-            case kElemInvalid: {
+            case EmbeddingDataType::kElemInvalid: {
                 ParserError("Unexpected embedding type");
             }
         }

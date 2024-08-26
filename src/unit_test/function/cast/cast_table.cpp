@@ -40,13 +40,13 @@ class CastTableTest : public BaseTest {};
 
 TEST_F(CastTableTest, casttable_boolean) {
     using namespace infinity;
-    for (i8 to = LogicalType::kBoolean; to < LogicalType::kInvalid; ++to) {
+    for (i8 to = to_underlying_val(LogicalType::kBoolean); to < to_underlying_val(LogicalType::kInvalid); ++to) {
         switch (to) {
-            case LogicalType::kBoolean: {
+            case to_underlying_val(LogicalType::kBoolean): {
                 EXPECT_EQ(CastTable::instance().GetCastCost(LogicalType::kBoolean, LogicalType::kBoolean), 0);
                 break;
             }
-            case LogicalType::kVarchar: {
+            case to_underlying_val(LogicalType::kVarchar): {
                 EXPECT_EQ(CastTable::instance().GetCastCost(LogicalType::kBoolean, LogicalType::kVarchar), 100);
                 break;
             }

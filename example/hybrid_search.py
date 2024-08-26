@@ -92,9 +92,9 @@ try:
         )
         .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
         .match_sparse(
-            "sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3
+            "sparse", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3
         )
-        .match_text("body", "blooms", "topn=10")
+        .match_text("body", "blooms", 10)
         .filter("year < 2024")
         .fusion(
             method="match_tensor", topn=2,
