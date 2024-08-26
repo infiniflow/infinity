@@ -30,10 +30,9 @@ curl --request POST \
      --url http://localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "create_option": "ignore_if_exists"
-} ' 
+     --data ' {
+       "create_option": "ignore_if_exists"
+       } ' 
 ```
 
 #### Request parameters
@@ -117,10 +116,8 @@ curl --request DELETE \
      --url http://localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "drop_option": "ignore_if_not_exists"
-} '
+     --data ' {
+       "drop_option": "error"} '
 ```
 
 #### Request parameter
@@ -319,26 +316,19 @@ curl --request POST \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "create_option": "ignore_if_exists",
-    "fields": 
-    [
-        {
-            "name": "name",
-            "type": "varchar",
-        },
-        {
-            "name": "score",
-            "type": "float"
-        },
-        {
-            "name": "my_vector",
-            "type": "vector",
-            "dimension": 1024
-        }
-    ]       
-} '
+     --data ' {
+       "create_option": "ignore_if_exists",
+       "fields": [
+           {
+               "name": "name",
+               "type": "varchar"
+           },
+           {
+               "name": "score",
+               "type": "float"
+           }
+        ]
+     } '
 ```
 
 #### Request parameters
@@ -429,16 +419,27 @@ Deletes a table from a specified database. If the table does not exist, the acti
 - Body:
   - `"drop_option"`: `enum<string>`
 
+#### Request example
+
 ```shell
 curl --request DELETE \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "drop_option": "ignore_if_not_exists"
-} '
+     --data ' {
+       "drop_option": "ignore_if_not_exists"
+     } '
 ```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database.
+- `table_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the table to delete.
+- `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if a table with the same name exists.
+  - `"ignore_if_exist"`: Ignore the table creation request and keep the existing table with the same name.
 
 ### Response
 
@@ -503,6 +504,11 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database.
+
 ### Response
 
 #### Status code 200
@@ -560,6 +566,13 @@ curl --request GET \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json'
 ```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database.
+- `table_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the table.
 
 ### Response
 
@@ -629,6 +642,13 @@ curl --request GET \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/columns \
      --header 'accept: application/json'
 ```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database.
+- `table_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the table.
 
 ### Response
 
@@ -734,6 +754,62 @@ curl --request POST \
 
 ```
 
+#### Request parameters
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string that specifies the name of the database.
+- `table_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the table.  
+- `index_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the index to create, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+- `"fields"`: (*Body parameter*), `string[]`, *Required*  
+  A non-empty list of strings indicating the names of the columns to build index on. For now, you are only allowed to create an index on one column.
+- `"index"`: (*Body parameter*), `dict[string, string]`  
+  - Parameter settings for an HNSW index:
+    - `"M"`: *Optional* - Defaults to`"16"`.
+    - `"ef_construction"`: *Optional* - Defaults to`"50"`.
+    - `"metric"` *Required* - The distance metric to use in similarity search.
+      - `"ip"`: Inner product.
+      - `"l2"`: Euclidean distance.
+      - `"cosine"`: Cosine similarity.
+    - `"encode"`: *Optional*
+      - `"plain"`: (Default) Plain encoding.
+      - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
+  - Parameter settings for an EMVB index:
+    - `"pq_subspace_num"`: *Required*
+      - `"8"`
+      - `"16"` (recommended)
+      - `"32"`
+      - `"64"`
+      - `"128"`
+    - `"pq_subspace_bits"`: *Required*
+      - `"8"` (recommended)
+      - `"16"`
+  - Parameter settings for a full-text index:
+    - `"ANALYZER"`: *Optional*
+      - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs.
+      - `"chinese"`: Simplified Chinese
+      - `"tradition"`: Traditional Chinese
+      - `"japanese"`: Japanese
+      - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
+  - Parameter settings for a secondary index:  
+    No parameters are required. For now, keep it empty.
+  - Parameter settings for a BMP index:
+    - `block_size`: *Optional* - The size of the block in a BMP index. Range: `"1"` ~ `"256"`. Defaults to `"16"`.
+    - `"compress_type"`: *Optional*  
+      - `"compress"`: (Default) Store the block-max index in sparse format. Works best with small block size situations.
+      - `"raw"`: Store the block-max index without compression.
+- `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if a table with the same name exists.
+  - `"ignore_if_exists"`: Ignore the table creation request and keep the existing table with the same name.
+
 ### Response
 
 <Tabs
@@ -801,10 +877,9 @@ curl --request DELETE \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "drop_option": "ignore_if_not_exists"
-} '
+     --data ' {
+       "drop_option": "ignore_if_not_exists"
+     } '
 ```
 
 #### Request parameters
@@ -1144,19 +1219,16 @@ curl --request PUT \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "file_path":"./filename.json",
-    "file_type":"json",
-    "header":false,
-    "delimiter":","
-} '
+     --data ' {
+       "file_path":"./filename.json",
+       "file_type":"json",
+     } '
 ```
 
 #### Request parameters
 
 - `"file_path"`: `string`, *Required*   
-  Absolute path to the file for export. Supported file types include:  
+  Absolute path to the file to import. Supported file types include:  
   - `csv`
   - `json`
   - `jsonl`
@@ -1241,13 +1313,12 @@ curl --request GET \
      --url http://localhost:23820/databases/{database_name}/table/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-{
-    "file_path":"/var/infinity/filename.csv",
-    "file_type":"csv",
-    "header":false,
-    "delimiter":","
-} '
+     --data ' {
+       "file_path":"/var/infinity/filename.csv",
+       "file_type":"csv",
+       "header":false,
+       "delimiter":","
+     } '
 ```
 
 #### Request parameters
@@ -1259,7 +1330,7 @@ curl --request GET \
   - `json`
   - `jsonl`
 - `"file_type"`: `string`, *Required*  
-  The type of the file to import. Supported file types include:
+  The type of the file for export. Supported file types include:
   - `csv`
   - `json`
   - `jsonl`
