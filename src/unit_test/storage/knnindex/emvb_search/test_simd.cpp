@@ -98,7 +98,7 @@ TEST_F(SIMDTest, testmax) {
 }
 
 TEST_F(SIMDTest, testleftpack) {
-#if 0
+#if defined(__AVX2__)
     auto ptr = std::aligned_alloc(32, 128 * sizeof(u32));
     EXPECT_NE(ptr, nullptr);
     std::unique_ptr<u32[], decltype([](u32 *p) { std::free(p); })> test_output(static_cast<u32 *>(ptr));
@@ -140,7 +140,7 @@ TEST_F(SIMDTest, testleftpack) {
 }
 
 TEST_F(SIMDTest, testleftpackf) {
-#if 0
+#if defined(__AVX2__)
     auto ptr = std::aligned_alloc(32, 1024 * sizeof(f32));
     EXPECT_NE(ptr, nullptr);
     std::unique_ptr<f32[], decltype([](f32 *p) { std::free(p); })> test_input(static_cast<f32 *>(ptr));
