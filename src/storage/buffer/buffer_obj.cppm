@@ -86,6 +86,8 @@ public:
     BufferObj(const BufferObj &) = delete;
     BufferObj &operator=(const BufferObj &) = delete;
 
+    void SetFileWorker(UniquePtr<FileWorker> file_worker);
+
 public:
     // called by ObjectHandle when load first time for that ObjectHandle
     BufferHandle Load();
@@ -147,7 +149,7 @@ protected:
     BufferStatus status_{BufferStatus::kNew};
     BufferType type_{BufferType::kTemp};
     u64 rc_{0};
-    const UniquePtr<FileWorker> file_worker_;
+    UniquePtr<FileWorker> file_worker_;
 
 private:
     u32 id_;

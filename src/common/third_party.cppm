@@ -66,6 +66,7 @@ module;
 #include <arrow/io/interfaces.h>
 #include <arrow/type.h>
 #include "arrow/array/builder_primitive.h"
+#include "Python.h"
 
 #pragma clang diagnostic pop
 
@@ -297,5 +298,8 @@ export using WebServer = oatpp::network::Server;
 export using WebEnvironment = oatpp::base::Environment;
 export using WebAddress = oatpp::network::Address;
 export using HTTPStatus = oatpp::web::protocol::http::Status;
+
+// Python
+export using PyObject = PyObject;
 
 } // namespace infinity

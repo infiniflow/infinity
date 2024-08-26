@@ -532,6 +532,10 @@ Status Status::InvalidFileFlag(u8 flag) {
     return Status(ErrorCode::kInvalidFileFlag, MakeUnique<String>(fmt::format("Invalid open file flag: {}", flag)));
 }
 
+Status Status::FailToRunPython(const String& reason) {
+    return Status(ErrorCode::kFailToRunPython, MakeUnique<String>(reason));
+}
+
 Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
 }

@@ -18,6 +18,7 @@ endif()
 
 set(CMAKE_CXX_STANDARD 20)
 
+message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
 string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
 if (CLANG_VERSION_STRING VERSION_GREATER 16)
@@ -48,7 +49,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
 
 else ()
 
-    message(FATAL_ERROR "Please use clang version 17.0 and above, current version: ${CLANG_VERSION_STRING}")
+    message(FATAL_ERROR "Please use clang version 17.0 and above, current version: ${CLANG_VERSION_STRING} ${CMAKE_CXX_COMPILER}")
 
 endif ()
 
@@ -192,10 +193,10 @@ find_package(Lz4 REQUIRED)
 
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-
-find_package(Python 3.8
-        REQUIRED COMPONENTS Interpreter Development.Module
-        OPTIONAL_COMPONENTS Development.SABIModule)
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+#find_package(Python 3.8
+#        REQUIRED COMPONENTS Interpreter Development.Module
+#        OPTIONAL_COMPONENTS Development.SABIModule)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)

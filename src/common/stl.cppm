@@ -221,6 +221,7 @@ export namespace std {
     using std::filesystem::path;
     using std::filesystem::remove;
     using std::filesystem::remove_all;
+    using std::filesystem::is_regular_file;
     }
 
     namespace this_thread {
