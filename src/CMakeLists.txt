@@ -498,6 +498,7 @@ target_link_libraries(unit_test
         z.a
         expat.a
         ${JEMALLOC_STATIC_LIB}
+        util
 )
 
 target_link_options(unit_test PRIVATE -no-pie)
