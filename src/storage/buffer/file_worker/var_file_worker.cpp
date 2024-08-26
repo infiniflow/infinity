@@ -89,7 +89,7 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size) {
         String error_message = "Data is not allocated.";
         UnrecoverableError(error_message);
     }
-    if (file_size != buffer_size_) {
+    if (file_size < buffer_size_) {
         String error_message = fmt::format("File size {} is smaller than buffer size {}.", file_size, buffer_size_);
         UnrecoverableError(error_message);
     }
