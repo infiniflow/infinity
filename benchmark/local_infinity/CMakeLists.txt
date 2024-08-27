@@ -28,8 +28,12 @@ target_link_libraries(
     c++abi.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    ${Python3_LIBRARIES}
+    z.a
+    expat.a
 )
 
+target_link_options(infinity_benchmark PRIVATE -no-pie)
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
@@ -66,7 +70,12 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    ${Python3_LIBRARIES}
+    z.a
+    expat.a
 )
+
+target_link_options(knn_import_benchmark PRIVATE -no-pie)
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
@@ -100,7 +109,12 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    ${Python3_LIBRARIES}
+    z.a
+    expat.a
 )
+
+target_link_options(knn_query_benchmark PRIVATE -no-pie)
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
@@ -136,7 +150,12 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    ${Python3_LIBRARIES}
+    z.a
+    expat.a
 )
+
+target_link_options(fulltext_benchmark PRIVATE -no-pie)
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
@@ -170,7 +189,12 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    ${Python3_LIBRARIES}
+    z.a
+    expat.a
 )
+
+target_link_options(sparse_benchmark PRIVATE -no-pie)
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
@@ -203,7 +227,12 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    ${Python3_LIBRARIES}
+    z.a
+    expat.a
 )
+
+target_link_options(bmp_benchmark PRIVATE -no-pie)
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
@@ -236,7 +265,12 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    ${Python3_LIBRARIES}
+    z.a
+    expat.a
 )
+
+target_link_options(hnsw_benchmark PRIVATE -no-pie)
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")

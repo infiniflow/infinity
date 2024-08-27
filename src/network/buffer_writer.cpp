@@ -40,13 +40,13 @@ void BufferWriter::send_string(const String &value, NullTerminator null_terminat
     auto position_in_string = 0u;
 
     if (!full()) {
-        position_in_string = static_cast<u32>(std::min(max_capacity() - size(), value.size()));
+        position_in_string = static_cast<u32>(std::min(max_capacity() - size(), static_cast<SizeT>(value.size())));
         RingBufferIterator::CopyN(value.c_str(), position_in_string, current_pos_);
         current_pos_.increment(position_in_string);
     }
 
     while (position_in_string < value.size()) {
-        const auto bytes_to_transfer = std::min(max_capacity(), value.size() - position_in_string);
+        const auto bytes_to_transfer = std::min(max_capacity(), static_cast<SizeT>(value.size() - position_in_string));
         try_flush(bytes_to_transfer);
         RingBufferIterator::CopyN(value.c_str() + position_in_string, bytes_to_transfer, current_pos_);
         current_pos_.increment(bytes_to_transfer);

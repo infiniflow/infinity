@@ -406,6 +406,7 @@ TermQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_re
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader) {
+        RecoverableError(Status::SyntaxError("Invalid query statement: Column has no fulltext index"));
         return nullptr;
     }
 
@@ -431,6 +432,7 @@ PhraseQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader) {
+        RecoverableError(Status::SyntaxError("Invalid query statement: Column has no fulltext index"));
         return nullptr;
     }
     bool fetch_position = false;

@@ -18,8 +18,6 @@ public:
 public:
     void *Allocate(SizeT num_bytes);
 
-    void *Allocate(SizeT num_bytes, SizeT align);
-
     bool IsInChunk(const void *ptr) const { return ptr >= (void *)this && ptr < (void *)((char *)this + pos_); }
 
     bool IsEmpty() const { return (pos_ >= size_); }

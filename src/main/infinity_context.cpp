@@ -27,10 +27,13 @@ import task_scheduler;
 import storage;
 import session_manager;
 import variables;
+import python_instance;
 
 namespace infinity {
 
 void InfinityContext::Init(const SharedPtr<String> &config_path, bool m_flag, DefaultConfig *default_config) {
+//    PythonInstance::Init();
+
     // Variables
     VarUtil::InitVariablesMap();
     maintenance_mode_ = m_flag;
@@ -90,6 +93,8 @@ void InfinityContext::UnInit() {
     Logger::Shutdown();
 
     config_.reset();
+
+//    PythonInstance::UnInit();
 }
 
 } // namespace infinity

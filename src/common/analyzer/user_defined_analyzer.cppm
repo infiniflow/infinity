@@ -14,10 +14,9 @@
 
 module;
 
-#include "Python.h"
-
 export module user_defined_analyzer;
-
+#if 0
+#include "Python.h"
 import stl;
 import term;
 import stemmer;
@@ -33,19 +32,11 @@ public:
 
     ~UserDefinedAnalyzer() = default;
 
-    Status Init();
-    void UnInit();
-
     Tuple<Vector<String>, Status> Analyze(const String &text);
 
 protected:
 private:
     const String analyzer_path_;
-
-    PyGILState_STATE gil_state_;
-    std::mutex locker_;
-
-    PyObject *module_{};
-    PyObject *function_{};
 };
 } // namespace infinity
+#endif

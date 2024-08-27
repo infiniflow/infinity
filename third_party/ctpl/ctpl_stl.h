@@ -243,6 +243,7 @@ namespace ctpl {
         void init() { this->nWaiting = 0; this->isStop = false; this->isDone = false; }
 
         void unpin() {
+#if defined(linux)
             int num_cores = std::thread::hardware_concurrency();
             cpu_set_t cpuset;
             CPU_ZERO(&cpuset);
@@ -252,6 +253,7 @@ namespace ctpl {
             for (int i = 0; i < static_cast<int>(this->threads.size()); ++i) {
                 pthread_setaffinity_np(this->threads[i]->native_handle(), sizeof(cpu_set_t), &cpuset);
             }
+#endif
         }
 
         std::vector<std::unique_ptr<std::thread>> threads;

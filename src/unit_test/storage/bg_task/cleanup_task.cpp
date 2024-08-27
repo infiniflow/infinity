@@ -79,7 +79,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CleanupTaskTest,
-                         ::testing::Values((std::string(test_data_path()) + "/config/test_cleanup_task.toml").c_str(),
+                         ::testing::Values((std::string(test_data_path()) + "/config/test_close_bgtask.toml").c_str(),
                                            BaseTestParamStr::VFS_CONFIG_PATH));
 
 TEST_P(CleanupTaskTest, test_delete_db_simple) {
