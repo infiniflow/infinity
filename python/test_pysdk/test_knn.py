@@ -894,6 +894,11 @@ class TestInfinity:
                .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], query_elem_t, 3)
                .to_pl())
         print(res)
+        with pytest.raises(InfinityException) as e:
+            table_obj.output(["*", "_row_id", "_score"]).match_tensor('t',
+                                                                      [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],
+                                                                      query_elem_t, 3, {"some_option": 222}).to_df()
+        print(e)
         pd.testing.assert_frame_equal(
             table_obj.output(["title"]).match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],
                                                      query_elem_t, 3).to_df(),
@@ -1205,7 +1210,6 @@ class TestInfinity:
                                               pytest.param(1),
                                               pytest.param(1.1),
                                               pytest.param([]),
-                                              pytest.param({}),
                                               pytest.param(()),
                                               ])
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
@@ -1223,11 +1227,9 @@ class TestInfinity:
         test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
         with pytest.raises(Exception):
-            res = (table_obj
-                   .output(["*", "_row_id", "_score"])
-                   .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim',
-                                 extra_option)
-                   .to_pl())
+            table_obj.output(["*", "_row_id", "_score"]).match_tensor('t',
+                                                                      [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],
+                                                                      'float', 3, extra_option).to_pl()
 
         res = db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
