@@ -303,27 +303,16 @@ class RemoteTable(Table, ABC):
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
-    def update(self, cond: Optional[str],
-               data: Optional[list[dict[str, Union[str, int, float, list[Union[int, float]]]]]]):
+    def update(self, cond: str, data: dict[str, Any]):
         # {"c1": 1, "c2": 1.1}
-        match cond:
-            case None:
-                where_expr = None
-            case _:
-                where_expr = traverse_conditions(condition(cond))
-        match data:
-            case None:
-                update_expr_array = None
-            case _:
-                update_expr_array: list[ttypes.UpdateExpr] = []
-                for row in data:
-                    for column_name, value in row.items():
-                        constant_expression = get_remote_constant_expr_from_python_value(value)
-                        expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
-                        paser_expr = ttypes.ParsedExpr(type=expr_type)
-                        update_expr = ttypes.UpdateExpr(column_name=column_name, value=paser_expr)
-                        update_expr_array.append(update_expr)
-
+        where_expr = traverse_conditions(condition(cond))
+        update_expr_array: list[ttypes.UpdateExpr] = []
+        for column_name, value in data.items():
+            constant_expression = get_remote_constant_expr_from_python_value(value)
+            expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
+            paser_expr = ttypes.ParsedExpr(type=expr_type)
+            update_expr = ttypes.UpdateExpr(column_name=column_name, value=paser_expr)
+            update_expr_array.append(update_expr)
         res = self._conn.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
                                 update_expr_array=update_expr_array)
         if res.error_code == ErrorCode.OK:

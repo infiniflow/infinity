@@ -14,7 +14,7 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional, Union
+from typing import Optional, Union, Any
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.index import IndexInfo
@@ -92,7 +92,7 @@ class Table(ABC):
         pass
 
     @abstractmethod
-    def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
+    def update(self, cond: str, data: dict[str, Any]):
         pass
 
     @abstractmethod
