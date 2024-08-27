@@ -96,15 +96,23 @@ static_assert(std::size(type2name) == to_underlying_val(LogicalType::kInvalid) +
 std::unordered_map<std::string, LogicalType> name2type = {
     // Bool
     {"boolean", LogicalType::kBoolean }, 
+    {"bool", LogicalType::kBoolean }, 
 
     {"tinyint", LogicalType::kTinyInt },
+    {"int8", LogicalType::kTinyInt },
     {"smallint" , LogicalType::kSmallInt },
+    {"int16" , LogicalType::kSmallInt },
     {"integer" , LogicalType::kInteger },
+    {"int" , LogicalType::kInteger },
+    {"int32" , LogicalType::kInteger },
     {"bigint" , LogicalType::kBigInt },
+    {"int64" , LogicalType::kBigInt },
     {"hugeint" , LogicalType::kHugeInt },
     {"decimal" , LogicalType::kDecimal },
     {"float" , LogicalType::kFloat },
+    {"float32" , LogicalType::kFloat },
     {"double" , LogicalType::kDouble },
+    {"float64" , LogicalType::kDouble },
 
     // std::string
     {"varchar" , LogicalType::kVarchar }, 
