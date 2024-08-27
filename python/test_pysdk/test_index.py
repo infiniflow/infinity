@@ -136,6 +136,33 @@ class TestInfinity:
         res = db_obj.drop_table("test_index_fulltext"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def test_drop_index_fulltext(self, suffix):
+        # CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT;
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_index_fulltext_drop" + suffix, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table("test_index_fulltext_drop" + suffix,
+                                        {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"},
+                                         "body": {"type": "varchar"}}, ConflictType.Error)
+        assert table_obj is not None
+        # fulltext search when index is not created: expect error
+        with pytest.raises(InfinityException) as e:
+            table_obj.output(["doctitle", "_score"]).match_text("body^5", "harmful chemical", 3).to_pl()
+        print(e)
+        res = table_obj.create_index("my_index", index.IndexInfo("body", index.IndexType.FullText), ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        # fulltext search when index is created: expect success
+        res = table_obj.output(["doctitle", "_score"]).match_text("body^5", "harmful chemical", 3).to_pl()
+        print(res)
+        res = table_obj.drop_index("my_index")
+        assert res.error_code == ErrorCode.OK
+        # fulltext search when index is dropped: expect error
+        with pytest.raises(InfinityException) as e:
+            table_obj.output(["doctitle", "_score"]).match_text("body^5", "harmful chemical", 3).to_pl()
+        print(e)
+        res = db_obj.drop_table("test_index_fulltext_drop" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def test_create_index_secondary(self ,suffix):
         # CREATE INDEX idx_secondary ON t(c1);
         db_obj = self.infinity_obj.get_database("default_db")
