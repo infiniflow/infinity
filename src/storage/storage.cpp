@@ -59,7 +59,6 @@ void Storage::Init() {
                                             MakeShared<String>(config_ptr_->TempDir()),
                                             config_ptr_->LRUNum());
     buffer_mgr_->Start();
-    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota());
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -91,6 +90,8 @@ void Storage::Init() {
     txn_mgr_->Start();
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
+
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
 
     new_catalog_->StartMemoryIndexCommit();
     new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);

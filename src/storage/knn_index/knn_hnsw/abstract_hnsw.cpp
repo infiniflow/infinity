@@ -42,8 +42,6 @@ UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id,
     auto memidx = MakeUnique<HnswIndexInMem>(begin_row_id, index_base, column_def, segment_index_entry, trace);
     if (trace) {
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-        auto *base_memidx = static_cast<BaseMemIndex *>(memidx.get());
-        memindex_tracer->RegisterMemIndex(base_memidx);
         std::visit(
             [&](auto &&index) {
                 using T = std::decay_t<decltype(index)>;
@@ -121,8 +119,7 @@ HnswIndexInMem::~HnswIndexInMem() {
     if (trace_) {
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
         if (memindex_tracer != nullptr) {
-            auto *base_memidx = static_cast<BaseMemIndex *>(this);
-            memindex_tracer->UnregisterMemIndex(base_memidx, mem_usage);
+            memindex_tracer->DecreaseMemUsed(mem_usage);
         }
     }
 }
@@ -251,6 +248,8 @@ SharedPtr<ChunkIndexEntry> HnswIndexInMem::Dump(SegmentIndexEntry *segment_index
     own_memory_ = false;
     return new_chunk_indey_entry;
 }
+
+TableIndexEntry *HnswIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
 MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
     auto *table_index_entry = segment_index_entry_->table_index_entry();

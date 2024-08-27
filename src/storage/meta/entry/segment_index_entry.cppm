@@ -49,6 +49,7 @@ class HnswIndexInMem;
 class SecondaryIndexInMem;
 class EMVBIndexInMem;
 class BMPIndexInMem;
+class BaseMemIndex;
 
 export struct PopulateEntireConfig {
     bool prepare_;
@@ -177,6 +178,8 @@ public:
                                   Vector<ChunkIndexEntry *> old_chunks);
 
     ChunkIndexEntry *RebuildChunkIndexEntries(TxnTableStore *txn_table_store, SegmentEntry *segment_entry);
+
+    BaseMemIndex *GetMemIndex() const;
 
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<MemoryIndexer>> GetFullTextIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
