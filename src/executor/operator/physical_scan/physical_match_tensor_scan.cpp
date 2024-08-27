@@ -74,6 +74,7 @@ import filter_value_type_classification;
 import logical_match_tensor_scan;
 import simd_functions;
 import knn_expression;
+import search_options;
 
 namespace infinity {
 
@@ -198,6 +199,12 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id);
                 block_column_entries_.emplace_back(block_column_entry);
             }
+        }
+    }
+    if (!block_column_entries_.empty()) {
+        // check unused option text
+        if (const SearchOptions options(src_match_tensor_expr_->options_text_); options.size() != options.options_.count("topn")) {
+            RecoverableError(Status::SyntaxError(fmt::format(R"(Input option text "{}" has unused part.)", src_match_tensor_expr_->options_text_)));
         }
     }
     LOG_TRACE(fmt::format("MatchTensorScan: brute force task: {}, index task: {}", block_column_entries_.size(), index_entries_.size()));
