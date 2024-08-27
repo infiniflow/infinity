@@ -339,7 +339,7 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
 #### conflict_type: `ConflictType`, *Optional*
 
 - `Error`: Raise an error if a table with the same name exists.
-- `Ignore`: Ignore the table creation requrest and keep the existing table with the same name.
+- `Ignore`: Ignore the table creation request and keep the existing table with the same name.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
@@ -677,7 +677,7 @@ from infinity.index import IndexInfo, IndexType
 #### conflict_type: `ConflictType`, *Optional*
 
 - `Error`: Raise an error if an index with the same name exists.
-- `Ignore`: Ignore the index creation requrest and keep the existing table with the same name.
+- `Ignore`: Ignore the index creation request and keep the existing table with the same name.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
@@ -872,7 +872,7 @@ A non-empty string indicating the name of the index to delete.
 #### conflict_type: `ConflictType`, *Optional*
 
 - `Error`: Raise an error if an index with the specified name does not exist.
-- `Ignore`: Ignore the index creation requrest if the index does not exist.
+- `Ignore`: Ignore the index creation request if the index does not exist.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
