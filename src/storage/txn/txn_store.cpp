@@ -38,6 +38,7 @@ import background_process;
 import bg_task;
 import compact_statement;
 import build_fast_rough_filter_task;
+import create_index_info;
 
 namespace infinity {
 
@@ -411,6 +412,15 @@ void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
     for (auto [table_index_entry, ptr_seq_n] : txn_indexes_) {
         table_index_entry->Commit(commit_ts);
+        switch (table_index_entry->index_base()->index_type_) {
+            case IndexType::kFullText: {
+                table_index_entry->UpdateFulltextSegmentTs(commit_ts);
+                break;
+            }
+            default: {
+                break;
+            }
+        }
     }
 }
 

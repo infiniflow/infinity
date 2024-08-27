@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,29 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
 module;
 
-export module base_memindex;
-
-import stl;
-import memindex_tracer;
-import infinity_context;
-
+module python_instance;
+#if 0
+#include "Python.h"
 namespace infinity {
 
-class TableIndexEntry;
+static PyThreadState *saved_state = nullptr;
 
-export class BaseMemIndex {
-public:
-    virtual MemIndexTracerInfo GetInfo() const = 0;
-
-    virtual TableIndexEntry *table_index_entry() const = 0;
-
-protected:
-    void AddMemUsed(SizeT mem) {
-        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-        memindex_tracer->AddMemUsed(mem);
+void PythonInstance::Init() {
+    if (!Py_IsInitialized()) {
+        Py_InitializeEx(0);
     }
-};
 
-} // namespace infinity
+    PyEval_InitThreads();
+    saved_state = PyEval_SaveThread();
+}
+
+void PythonInstance::UnInit() {
+    PyEval_RestoreThread(saved_state);
+    saved_state = nullptr;
+
+    if (Py_IsInitialized()) {
+        Py_FinalizeEx();
+    }
+
+}
+
+}
+#endif

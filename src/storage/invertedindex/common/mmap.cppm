@@ -20,7 +20,7 @@ export int MmapFile(const String &fp,
                     u8 *&data_ptr,
                     SizeT &data_len,
                     int advice = (MADV_RANDOM
-#if defined(linux)
+#if defined(linux) || defined(__linux) || defined(__linux__)
                                   | MADV_DONTDUMP
 #endif
                                   )) {
@@ -108,7 +108,7 @@ export struct MmapReader {
                      u8 *&data_ptr,
                      SizeT &data_len,
                      int advice = (MADV_RANDOM
-#if defined(linux)
+#if defined(linux) || defined(__linux) || defined(__linux__)
                                    | MADV_DONTDUMP
 #endif
                                    ),

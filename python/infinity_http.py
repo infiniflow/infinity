@@ -189,37 +189,40 @@ class infinity_http:
                 tmp["name"] = col
                 for param_name in columns_definition[col]:
                     if param_name.lower() != "constraints" and param_name.lower() != "default": # not constraint and default, should be type
-                        params = columns_definition[col][param_name].split(",")
+                        tmp[param_name.lower()] = columns_definition[col][param_name]
+                    elif param_name.lower() == "default":
+                        type_tmp = {}
+                        params = tmp["type"].split(",")
                         match params[0].strip().lower():
                             case "vector" | "multivector" | "tensor" | "tensorarray":
-                                tmp["type"] = params[0].strip()
-                                tmp["dimension"] = int(params[1].strip())
-                                tmp["element_type"] = type_transfrom[params[2].strip()]
+                                type_tmp["type"] = params[0].strip()
+                                type_tmp["dimension"] = int(params[1].strip())
+                                type_tmp["element_type"] = type_transfrom[params[2].strip()]
                             case "sparse":
-                                tmp["type"] = params[0].strip()
-                                tmp["dimension"] = int(params[1].strip())
-                                tmp["data_type"] = type_transfrom[params[2].strip()]
-                                tmp["index_type"] = type_transfrom[params[3].strip()]
+                                type_tmp["type"] = params[0].strip()
+                                type_tmp["dimension"] = int(params[1].strip())
+                                type_tmp["data_type"] = type_transfrom[params[2].strip()]
+                                type_tmp["index_type"] = type_transfrom[params[3].strip()]
                             case _:
-                                tmp[param_name.lower()] = type_transfrom[columns_definition[col][param_name]]
-                    elif param_name.lower() == "default":
+                                type_tmp["type"] = params[0].strip()
+
                         default_field = {}
-                        if tmp["type"] == "vector":
-                            default_field["type"] = type_to_vector_literaltype[tmp["element_type"]]
-                        elif tmp["type"] == "tensor":
+                        if type_tmp["type"] == "vector":
+                            default_field["type"] = type_to_vector_literaltype[type_tmp["element_type"]]
+                        elif type_tmp["type"] == "tensor":
                             pass
-                        elif tmp["type"] == "sparse":
+                        elif type_tmp["type"] == "sparse":
                             pass
                         else:
-                            default_field["type"] = type_to_literaltype[tmp["type"]]
+                            default_field["type"] = type_to_literaltype[type_tmp["type"]]
                         default_field["value"] = columns_definition[col][param_name]
                         tmp["default"] = default_field
                     else:
-                        tmp[param_name] = columns_definition[col][param_name]
+                        tmp[param_name.lower()] = columns_definition[col][param_name]
                 fields.append(tmp)
         except:
             raise InfinityException(ErrorCode.SYNTAX_ERROR, "http adapter create table parse error")
-        #print(fields)
+        print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
         h = self.set_up_header(["accept", "content-type"])

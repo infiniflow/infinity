@@ -258,6 +258,13 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     return table_index_entry;
 }
 
+BaseMemIndex *TableIndexEntry::GetMemIndex() const {
+    if (last_segment_.get() == nullptr) {
+        return nullptr;
+    }
+    return last_segment_->GetMemIndex();
+}
+
 void TableIndexEntry::MemIndexCommit() {
     if (last_segment_.get() != nullptr) {
         last_segment_->MemIndexCommit();

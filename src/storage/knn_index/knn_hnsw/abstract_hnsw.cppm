@@ -41,6 +41,7 @@ import infinity_context;
 import logger;
 import base_memindex;
 import memindex_tracer;
+import table_index_entry;
 
 namespace infinity {
 
@@ -182,6 +183,8 @@ public:
     const AbstractHnsw &get() const { return hnsw_; }
 
     AbstractHnsw *get_ptr() { return &hnsw_; }
+
+    TableIndexEntry *table_index_entry() const override;
 
 protected:
     MemIndexTracerInfo GetInfo() const override;

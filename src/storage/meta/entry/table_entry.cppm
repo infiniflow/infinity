@@ -136,6 +136,8 @@ public:
 
     TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    Vector<TableIndexEntry *> TableIndexes(TransactionID txn_id, TxnTimeStamp begin_ts);
+
     void AddSegmentReplayWalImport(SharedPtr<SegmentEntry> segment_entry);
 
     void AddSegmentReplayWalCompact(SharedPtr<SegmentEntry> segment_entry);

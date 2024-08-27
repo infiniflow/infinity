@@ -325,6 +325,9 @@ Tuple<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntry(std::shared_lock<std
         }
         case FindResult::kFound: {
             SharedPtr<Entry> drop_entry = init_func(txn_id, begin_ts);
+            if constexpr (std::is_same_v<Entry, TableIndexEntry>) {
+                drop_entry->table_index_def().get()->index_type_ = entry_list_.front()->index_base()->index_type_;
+            }
             entry_list_.push_front(drop_entry);
             return {drop_entry, Status::OK()};
         }

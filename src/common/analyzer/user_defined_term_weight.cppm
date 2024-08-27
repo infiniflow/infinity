@@ -14,10 +14,8 @@
 
 module;
 
-#include "Python.h"
-
 export module user_defined_term_weight;
-
+#if 0
 import stl;
 import term;
 import stemmer;
@@ -33,19 +31,13 @@ public:
 
     ~UserDefinedTermWeight() = default;
 
-    Status Init();
-    void UnInit();
-
     Tuple<HashMap<String, double>, Status> Run(const Vector<String> &text);
 
 protected:
 private:
     const String tw_path_;
 
-    PyGILState_STATE gil_state_;
-    std::mutex locker_;
 
-    PyObject *module_{};
-    PyObject *function_{};
 };
-} // namespace infinity
+} // namespace infinityz
+#endif

@@ -54,6 +54,7 @@ module;
 #include <utility>
 #include <variant>
 #include <vector>
+#include <ranges>
 
 export module stl;
 
@@ -373,6 +374,42 @@ namespace infinity {
         if (pos == String::npos)
             return path;
         return path.substr(pos + 1);
+    }
+
+    inline String TrimString(const String &s) {
+        int len=s.length();
+        int i=0;
+    
+        while(i<len && isspace(s[i]))
+        {
+            i++;
+        }
+    
+        while (len>i && isspace(s[len-1]))
+        {
+            len--;
+        }
+    
+        if(i==len)
+        {
+            return "";
+        }
+
+        String ss=s.substr(i,len-i);
+        return ss;
+    }
+
+    std::vector<std::string> SplitStrByComma(String str){
+        std::vector<std::string> tokens;
+        for(const auto& token : str | std::views::split(',')){
+            tokens.emplace_back(token.begin(), token.end());
+        }
+
+        for(auto &s : tokens){
+            s = TrimString(s);
+        }
+
+        return tokens;
     }
 
     void ToUpper(String &str) { std::transform(str.begin(), str.end(), str.begin(), ::toupper); }
