@@ -944,15 +944,15 @@ Inserts rows of data into the current table.
 
 #### data: `dict[str, Any]`, *Required*
 
-Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `dict[str, Any]` (one row) or `list[dict[str, Any]]` (multiple rows), with each key-value pair corresponding to a column name and table cell value.
-
-:::tip NOTE
-Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once.
-:::
+Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `dict[str, Any]` (one row) or `list[dict[str, Any]]` (multiple rows), with each key-value pair corresponding to a column name and a table cell value.
 
 :::tip NOTE
 When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table()`. Otherwise, an error will occur.  
 For information about setting default column values, see `create_table()`.
+:::
+
+:::tip NOTE
+Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once.
 :::
 
 ### Returns
