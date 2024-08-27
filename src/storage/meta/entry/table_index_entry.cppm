@@ -45,6 +45,7 @@ struct TableEntry;
 struct SegmentEntry;
 class BaseTableRef;
 class AddTableIndexEntryOp;
+class BaseMemIndex;
 
 export struct SegmentIndexesGuard {
     const Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment_;
@@ -93,6 +94,8 @@ public:
 public:
     // Getter
     const SharedPtr<String> &GetIndexName() const { return index_base_->index_name_; }
+
+    BaseMemIndex *GetMemIndex() const;
 
     inline TableIndexMeta *table_index_meta() { return table_index_meta_; }
     inline const IndexBase *index_base() const { return index_base_.get(); }

@@ -1011,6 +1011,11 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     return merged_chunk_index_entry.get();
 }
 
+BaseMemIndex *SegmentIndexEntry::GetMemIndex() const {
+    // only support hnsw index now.
+    return static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
+}
+
 void SegmentIndexEntry::SaveIndexFile() {
     String &index_name = *table_index_entry_->index_dir();
     u64 segment_id = this->segment_id_;

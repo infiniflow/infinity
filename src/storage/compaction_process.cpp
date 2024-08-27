@@ -38,6 +38,8 @@ import bg_query_state;
 import txn_store;
 import memindex_tracer;
 import segment_entry;
+import table_index_entry;
+import base_memindex;
 
 namespace infinity {
 
@@ -126,7 +128,7 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
                 }
 
                 LOG_TRACE("Construct compact task: ");
-                for(SegmentEntry* segment_ptr: compact_segments) {
+                for (SegmentEntry *segment_ptr : compact_segments) {
                     LOG_TRACE(fmt::format("To compact segment: {}", segment_ptr->ToString()));
                 }
 
@@ -158,30 +160,22 @@ void CompactionProcessor::ScanAndOptimize() {
 }
 
 void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
-    Txn *dump_txn = txn_mgr_->BeginTxn(MakeUnique<String>(dump_task->ToString()));
-    TransactionID txn_id = dump_txn->TxnID();
-    TxnTimeStamp begin_ts = dump_txn->BeginTS();
-
+    Txn *dump_txn = dump_task->txn_;
+    BaseMemIndex *mem_index = dump_task->mem_index_;
     auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
     try {
-        auto [table_entry, status1] = catalog_->GetTableByName(*dump_task->db_name_, *dump_task->table_name_, txn_id, begin_ts);
-        if (!status1.ok()) {
-            RecoverableError(status1);
-        }
-        auto [table_index_entry, status2] = table_entry->GetIndex(*dump_task->index_name_, txn_id, begin_ts);
-        if (!status2.ok()) {
-            RecoverableError(status2);
-        }
-
+        TableIndexEntry *table_index_entry = mem_index->table_index_entry();
+        auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
         TxnTableStore *txn_table_store = dump_txn->GetTxnTableStore(table_entry);
         SizeT dump_size = 0;
         table_index_entry->MemIndexDump(dump_txn, txn_table_store, false /*spill*/, &dump_size);
 
         txn_mgr_->CommitTxn(dump_txn);
-        memindex_tracer->DumpDone(dump_size, dump_task->task_id_);
+
+        memindex_tracer->DumpDone(dump_size, mem_index);
     } catch (const RecoverableException &e) {
         txn_mgr_->RollBackTxn(dump_txn);
-        memindex_tracer->DumpFail(dump_task->task_id_);
+        memindex_tracer->DumpFail(mem_index);
         LOG_WARN(fmt::format("Dump index task failed: {}, task: {}", e.what(), dump_task->ToString()));
     }
 }
