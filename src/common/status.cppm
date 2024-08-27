@@ -42,6 +42,7 @@ export enum class ErrorCode : long {
     kUnsupportedVersionIndex = 2003,
     kClientVersionMismatch = 2004,
     kAdminOnlySupportInMaintenanceMode = 2005,
+    kNotSupportInMaintenanceMode = 2006,
 
     // 3. syntax error or access rule violation
     kInvalidUsername = 3001,
@@ -199,8 +200,9 @@ public:
     static Status UnsupportedVersionIndex(i64 given_index);
     static Status ClientVersionMismatch(const char* expected_version, const char* given_version);
     static Status AdminOnlySupportInMaintenanceMode();
+    static Status NotSupportInMaintenanceMode();
 
-    // 3. Syntax error or access rule violation
+    // 3. Syntax error or access rule violation`
     static Status InvalidUserName(const String &user_name);
     static Status InvalidPasswd();
     static Status InvalidIdentifierName(const String &db_name);

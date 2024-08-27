@@ -331,13 +331,7 @@ target_link_libraries(infinity
         arrow.a
         snappy.a
         ${JEMALLOC_STATIC_LIB}
-        ${Python3_LIBRARIES}
-        z.a
-        expat.a
-        util
 )
-target_link_options(infinity PRIVATE -no-pie)
-
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
@@ -522,14 +516,9 @@ target_link_libraries(unit_test
         thrift.a
         thriftnb.a
         snappy.a
-        ${Python3_LIBRARIES}
-        z.a
-        expat.a
         ${JEMALLOC_STATIC_LIB}
-        util
 )
 
-target_link_options(unit_test PRIVATE -no-pie)
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
