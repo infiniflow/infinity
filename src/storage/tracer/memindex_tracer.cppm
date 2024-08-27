@@ -22,6 +22,9 @@ import bg_task;
 namespace infinity {
 
 class BaseMemIndex;
+class Txn;
+struct Catalog;
+class TxnManager;
 
 export struct MemIndexTracerInfo {
 public:
@@ -37,42 +40,44 @@ public:
 
 export class MemIndexTracer {
 public:
-    MemIndexTracer(SizeT index_memory_limit);
+    MemIndexTracer(SizeT index_memory_limit) : index_memory_limit_(index_memory_limit) {}
 
     virtual ~MemIndexTracer() = default;
 
-    void RegisterMemIndex(BaseMemIndex *memindex);
-
-    void UnregisterMemIndex(BaseMemIndex *memindex, SizeT mem_used);
+    void DecreaseMemUsed(SizeT mem_used);
 
     void AddMemUsed(SizeT usage);
 
-    void DumpDone(SizeT actual_dump_size, int dump_task_id);
+    void DumpDone(SizeT actual_dump_size, BaseMemIndex *mem_index);
 
-    void DumpFail(int dump_task_id);
+    void DumpFail(BaseMemIndex *mem_index);
 
-    Vector<MemIndexTracerInfo> GetMemIndexTracerInfo();
+    Vector<MemIndexTracerInfo> GetMemIndexTracerInfo(Txn *txn);
+
+    Vector<BaseMemIndex *> GetUndumpedMemIndexes(Txn *txn);
 
     virtual void TriggerDump(UniquePtr<DumpIndexTask> task) = 0;
 
     SizeT cur_index_memory() const { return cur_index_memory_.load(); }
 
-private:
-    UniquePtr<DumpIndexTask> MakeDumpTask();
+protected:
+    virtual Txn *GetTxn() = 0;
+
+    virtual Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) = 0;
 
     using MemIndexMapIter = HashSet<BaseMemIndex *>::iterator;
 
-    static SizeT ChooseDump(const Vector<Pair<MemIndexTracerInfo, MemIndexMapIter>> &info_vec);
+    UniquePtr<DumpIndexTask> MakeDumpTask();
 
-private:
+    static SizeT ChooseDump(const Vector<BaseMemIndex *> &mem_indexes);
+
+protected:
+    std::mutex mtx_;
+
     const SizeT index_memory_limit_;
     Atomic<SizeT> cur_index_memory_ = 0;
 
-    std::mutex mtx_;
-    HashSet<BaseMemIndex *> memindexes_{};
-
-    i64 dump_task_id_ = 0;
-    HashMap<int, Pair<SizeT, BaseMemIndex *>> proposed_dump_{};
+    HashMap<BaseMemIndex *, SizeT> proposed_dump_{};
     Atomic<SizeT> acc_proposed_dump_ = 0;
 };
 
@@ -93,9 +98,19 @@ inline void MemIndexTracer::AddMemUsed(SizeT add) {
 
 export class BGMemIndexTracer : public MemIndexTracer {
 public:
-    BGMemIndexTracer(SizeT index_memory_limit) : MemIndexTracer(index_memory_limit) {}
+    BGMemIndexTracer(SizeT index_memory_limit, Catalog *catalog, TxnManager *txn_mgr)
+        : MemIndexTracer(index_memory_limit), catalog_(catalog), txn_mgr_(txn_mgr) {}
 
     void TriggerDump(UniquePtr<DumpIndexTask> task) override;
+
+protected:
+    Txn *GetTxn() override;
+
+    Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override;
+
+private:
+    Catalog *catalog_;
+    TxnManager *txn_mgr_;
 };
 
 } // namespace infinity

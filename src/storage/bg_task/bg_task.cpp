@@ -14,27 +14,12 @@
 
 module;
 
-export module base_memindex;
+module bg_task;
 
-import stl;
-import memindex_tracer;
-import infinity_context;
+import base_memindex;
 
 namespace infinity {
 
-class TableIndexEntry;
-
-export class BaseMemIndex {
-public:
-    virtual MemIndexTracerInfo GetInfo() const = 0;
-
-    virtual TableIndexEntry *table_index_entry() const = 0;
-
-protected:
-    void AddMemUsed(SizeT mem) {
-        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-        memindex_tracer->AddMemUsed(mem);
-    }
-};
+DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, Txn *txn) : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), txn_(txn) {}
 
 } // namespace infinity
