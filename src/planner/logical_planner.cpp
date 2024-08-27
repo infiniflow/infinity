@@ -1446,11 +1446,11 @@ Status LogicalPlanner::BuildShowBlockColumn(const ShowStatement *statement, Shar
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildShowTables(const ShowStatement *, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildShowTables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     String object_name;
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowTables,
-                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->schema_name_,
                                                                   object_name,
                                                                   bind_context_ptr->GenerateTableIndex());
 
