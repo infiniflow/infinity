@@ -14,10 +14,10 @@
 
 module;
 
+module user_defined_term_weight;
+#if 0
 #include "Python.h"
 #include <vector>
-
-module user_defined_term_weight;
 
 import stl;
 import term;
@@ -100,3 +100,5 @@ Tuple<HashMap<String, double>, Status> UserDefinedTermWeight::Run(const Vector<S
 }
 
 } // namespace infinity
+
+#endif

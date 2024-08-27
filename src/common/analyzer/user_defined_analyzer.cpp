@@ -14,10 +14,9 @@
 
 module;
 
-#include "Python.h"
-
 module user_defined_analyzer;
-
+#if 0
+#include "Python.h"
 import stl;
 import term;
 import stemmer;
@@ -95,3 +94,4 @@ Tuple<Vector<String>, Status> UserDefinedAnalyzer::Analyze(const String &text) {
 }
 
 } // namespace infinity
+#endif

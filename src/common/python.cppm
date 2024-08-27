@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
 export module python_instance;
+#if 0
 
 namespace infinity {
 
@@ -24,4 +26,4 @@ public:
 
 }
 
-
+#endif

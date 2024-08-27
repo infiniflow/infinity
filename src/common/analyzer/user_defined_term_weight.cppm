@@ -14,10 +14,8 @@
 
 module;
 
-#include "Python.h"
-
 export module user_defined_term_weight;
-
+#if 0
 import stl;
 import term;
 import stemmer;
@@ -41,4 +39,5 @@ private:
 
 
 };
-} // namespace infinity
+} // namespace infinityz
+#endif

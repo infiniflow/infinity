@@ -14,10 +14,9 @@
 
 module;
 
-#include "Python.h"
-
 export module user_defined_analyzer;
-
+#if 0
+#include "Python.h"
 import stl;
 import term;
 import stemmer;
@@ -40,3 +39,4 @@ private:
     const String analyzer_path_;
 };
 } // namespace infinity
+#endif

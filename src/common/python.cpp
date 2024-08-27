@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
 module;
 
-#include "Python.h"
-
 module python_instance;
-
+#if 0
+#include "Python.h"
 namespace infinity {
 
 static PyThreadState *saved_state = nullptr;
@@ -42,3 +42,4 @@ void PythonInstance::UnInit() {
 }
 
 }
+#endif

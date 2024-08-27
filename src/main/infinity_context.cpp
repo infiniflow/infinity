@@ -32,7 +32,7 @@ import python_instance;
 namespace infinity {
 
 void InfinityContext::Init(const SharedPtr<String> &config_path, bool m_flag, DefaultConfig *default_config) {
-    PythonInstance::Init();
+//    PythonInstance::Init();
 
     // Variables
     VarUtil::InitVariablesMap();
@@ -94,7 +94,7 @@ void InfinityContext::UnInit() {
 
     config_.reset();
 
-    PythonInstance::UnInit();
+//    PythonInstance::UnInit();
 }
 
 } // namespace infinity
