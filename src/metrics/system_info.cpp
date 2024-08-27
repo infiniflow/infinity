@@ -229,7 +229,7 @@ int get_open_fd_count(pid_t pid) {
     return static_cast<int>(static_cast<unsigned long>(rv) / PROC_PIDLISTFD_SIZE);
 }
 
-#elif defined(linux)
+#elif defined(linux) || defined(__linux) || defined(__linux__)
 
 const char* get_items(const char* buffer, u32 item) {
     // read from buffer by offset
@@ -308,7 +308,7 @@ i64 SystemInfo::MemoryUsage() {
     try {
 #if defined(__APPLE__)
         vm_rss_in_kb = get_memory();
-#elif defined(linux)
+#elif defined(linux) || defined(__linux) || defined(__linux__)
         FILE* file = fopen("/proc/self/status", "r");
         DeferFn defer_fn([&] {
             fclose(file);
@@ -365,7 +365,7 @@ i64 SystemInfo::OpenFileCount() {
 #if defined(__APPLE__)
     pid_t current_pid = getpid();
     count = get_open_fd_count(current_pid);
-#elif defined(linux)
+#elif defined(linux) || defined(__linux) || defined(__linux__)
     String dir_path;
     DIR *dir;
     struct dirent *entry;
