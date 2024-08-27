@@ -166,6 +166,7 @@ export enum class ErrorCode : long {
     kMunmapFileError = 7014,
     kInvalidFileFlag = 7015,
     kInvalidServerAddress = 7016,
+    kFailToRunPython = 7017,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -317,6 +318,7 @@ public:
     static Status MmapFileError(const String &detailed_info);
     static Status MunmapFileError(const String &detailed_info);
     static Status InvalidFileFlag(u8 flag);
+    static Status FailToRunPython(const String& reason);
 
     // meta
     static Status InvalidEntry();

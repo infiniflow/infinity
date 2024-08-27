@@ -61,6 +61,9 @@ export enum class ShowType {
     kShowPersistenceFiles,
     kShowPersistenceObjects,
     kShowPersistenceObject,
+    kShowMemory,
+    kShowMemoryObjects,
+    kShowMemoryAllocation,
 };
 
 export String ToString(ShowType type);

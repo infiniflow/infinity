@@ -16,6 +16,7 @@
 
 #include "parser_assert.h"
 #include "type/type_info.h"
+#include "stats/global_resource_usage.h"
 #include <memory>
 
 namespace infinity {

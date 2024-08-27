@@ -66,6 +66,7 @@ module;
 #include <arrow/io/interfaces.h>
 #include <arrow/type.h>
 #include "arrow/array/builder_primitive.h"
+#include "Python.h"
 
 #pragma clang diagnostic pop
 
@@ -208,7 +209,15 @@ OpenFile(std::shared_ptr<::arrow::RandomAccessFile> file, ::arrow::MemoryPool *p
 namespace infinity {
 
 // spdlog
-export enum class LogLevel { kTrace, kDebug, kInfo, kWarning, kError, kCritical };
+export enum class LogLevel {
+    kTrace,
+    kDebug,
+    kInfo,
+    kWarning,
+    kError,
+    kCritical,
+    kOff,
+};
 
 export std::string LogLevel2Str(LogLevel log_level) {
     switch (log_level) {
@@ -231,6 +240,9 @@ export std::string LogLevel2Str(LogLevel log_level) {
         case LogLevel::kCritical: {
             return "Critical";
         }
+        case LogLevel::kOff: {
+            return "Off";
+        }
     }
 }
 
@@ -248,6 +260,8 @@ export void SetLogLevel(LogLevel log_level) {
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::err);
         case LogLevel::kCritical:
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::critical);
+        case LogLevel::kOff:
+            return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::off);
     }
 }
 
@@ -284,5 +298,8 @@ export using WebServer = oatpp::network::Server;
 export using WebEnvironment = oatpp::base::Environment;
 export using WebAddress = oatpp::network::Address;
 export using HTTPStatus = oatpp::web::protocol::http::Status;
+
+// Python
+export using PyObject = PyObject;
 
 } // namespace infinity

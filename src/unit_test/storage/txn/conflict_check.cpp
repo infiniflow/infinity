@@ -40,7 +40,7 @@ protected:
     void SetUp() override {
         RemoveDbDirs();
 
-        auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_all_bgtask.toml");
+        auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_bgtask.toml");
         infinity::InfinityContext::instance().Init(config_path);
 
         storage_ = InfinityContext::instance().storage();

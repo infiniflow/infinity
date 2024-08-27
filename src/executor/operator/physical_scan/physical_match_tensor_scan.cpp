@@ -271,7 +271,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                 const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
                 if (std::holds_alternative<Vector<u32>>(filter_result)) {
                     const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                    segment_bitmask.Initialize(std::ceil(segment_row_count));
+                    segment_bitmask.Initialize(std::bit_ceil(segment_row_count));
                     segment_bitmask.SetAllFalse();
                     for (u32 row_id : filter_result_vector) {
                         segment_bitmask.SetTrue(row_id);

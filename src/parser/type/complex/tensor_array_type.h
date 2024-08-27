@@ -26,7 +26,7 @@ struct TensorArrayType {
     uint64_t file_offset_ : 48 = 0;
 
     [[nodiscard]] static std::string
-    TensorArray2String(const std::vector<std::pair<std::span<const char>, size_t>> &raw_data, EmbeddingDataType type, size_t embedding_dimension);
+    TensorArray2String(const std::vector<std::pair<std::span<const char>, uint64_t>> &raw_data, EmbeddingDataType type, size_t embedding_dimension);
 };
 
 static_assert(sizeof(TensorArrayType) == sizeof(uint64_t));

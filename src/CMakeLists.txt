@@ -2,6 +2,8 @@
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
+#find_package(Python)
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm)
 
 ### Parser
@@ -16,25 +18,48 @@ add_subdirectory(parser)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
-execute_process(COMMAND grep -q fma /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_FMA
-        OUTPUT_QUIET
-        ERROR_QUIET)
+if(APPLE)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA" 
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_SSE42
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q avx2 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_AVX2
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q avx512 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_AVX512
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+else()
+        #Linux
+        execute_process(COMMAND grep -q fma /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q avx2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q avx512 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+endif()
 
 
 file(GLOB_RECURSE
@@ -218,7 +243,7 @@ target_sources(infinity_core
 )
 
 add_dependencies(infinity_core thrift thriftnb parquet_static snappy)
-
+target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
@@ -492,9 +517,14 @@ target_link_libraries(unit_test
         thrift.a
         thriftnb.a
         snappy.a
+        ${Python3_LIBRARIES}
+        z.a
+        expat.a
         ${JEMALLOC_STATIC_LIB}
+        util
 )
 
+target_link_options(unit_test PRIVATE -no-pie)
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
@@ -520,8 +550,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thr
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
-
-target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)

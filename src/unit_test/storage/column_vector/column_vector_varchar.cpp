@@ -34,6 +34,11 @@ import compilation_config;
 
 class ColumnVectorVarcharTest : public BaseTestParamStr {
     void SetUp() override {
+        using namespace infinity;
+
+        LoggerConfig logger_config;
+        logger_config.log_level_ = LogLevel::kOff;
+        Logger::Initialize(logger_config);
 //        RemoveDbDirs();
 //#ifdef INFINITY_DEBUG
 //        infinity::GlobalResourceUsage::Init();
@@ -50,6 +55,9 @@ class ColumnVectorVarcharTest : public BaseTestParamStr {
     }
 
     void TearDown() override {
+        using namespace infinity;
+
+        Logger::Shutdown();
 //        infinity::InfinityContext::instance().UnInit();
 //#ifdef INFINITY_DEBUG
 //        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -60,12 +68,12 @@ class ColumnVectorVarcharTest : public BaseTestParamStr {
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ColumnVectorVarcharTest,
-                         ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+// INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+//                          ColumnVectorVarcharTest,
+//                          ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_close_bgtask_silent.toml").c_str(),
+//                                            BaseTestParamStr::VFS_CONFIG_PATH));
 
-TEST_P(ColumnVectorVarcharTest, flat_inline_varchar) {
+TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -169,7 +177,7 @@ TEST_P(ColumnVectorVarcharTest, flat_inline_varchar) {
     }
 }
 
-TEST_P(ColumnVectorVarcharTest, constant_inline_varchar) {
+TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     using namespace infinity;
 
@@ -251,7 +259,7 @@ TEST_P(ColumnVectorVarcharTest, constant_inline_varchar) {
     }
 }
 
-TEST_P(ColumnVectorVarcharTest, varchar_column_vector_select) {
+TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -289,7 +297,7 @@ TEST_P(ColumnVectorVarcharTest, varchar_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorVarcharTest, varchar_column_slice_init) {
+TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -327,7 +335,7 @@ TEST_P(ColumnVectorVarcharTest, varchar_column_slice_init) {
     }
 }
 
-TEST_P(ColumnVectorVarcharTest, flat_not_inline_varchar) {
+TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -432,7 +440,7 @@ TEST_P(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     }
 }
 
-TEST_P(ColumnVectorVarcharTest, constant_not_inline_varchar) {
+TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     using namespace infinity;
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
@@ -509,7 +517,7 @@ TEST_P(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     }
 }
 
-TEST_P(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
+TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);

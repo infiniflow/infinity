@@ -39,7 +39,8 @@ struct LogicType {
     Tensor = 13,
     TensorArray = 14,
     Sparse = 15,
-    Invalid = 16
+    MultiVector = 16,
+    Invalid = 17
   };
 };
 
@@ -184,8 +185,9 @@ struct ColumnType {
     ColumnTensor = 11,
     ColumnTensorArray = 12,
     ColumnSparse = 13,
-    ColumnRowID = 14,
-    ColumnInvalid = 15
+    ColumnMultiVector = 14,
+    ColumnRowID = 15,
+    ColumnInvalid = 16
   };
 };
 

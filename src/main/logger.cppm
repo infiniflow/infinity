@@ -24,10 +24,20 @@ export extern SharedPtr<spdlog::logger> infinity_logger;
 
 class Config;
 
+export struct LoggerConfig {
+    bool log_to_stdout_ = true;
+    String log_file_path_ = "tmp.log";
+    SizeT log_file_max_size_ = 1024 * 1024 * 10;
+    SizeT log_file_rotate_count_ = 5;
+    LogLevel log_level_ = LogLevel::kInfo;
+};
+
 export class Logger {
 public:
     static void
     Initialize(Config* config_ptr);
+
+    static void Initialize(const LoggerConfig &config);
 
     static void
     Shutdown();

@@ -116,14 +116,16 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     SizeT &read_offset = table_scan_function_data_ptr->current_read_offset_;
 
-//    This part has performance issue
-//    {
-//        String out;
-//        for (auto &global_block_id : *block_ids) {
-//            out += fmt::format("({},{}) ", global_block_id.segment_id_, global_block_id.block_id_);
-//        }
-//        LOG_TRACE(fmt::format("TableScan: block_ids: {}", out));
-//    }
+#ifdef INFINITY_DEBUG
+    // This part has performance issue
+    {
+        String out;
+        for (auto &global_block_id : *block_ids) {
+            out += fmt::format("({},{}) ", global_block_id.segment_id_, global_block_id.block_id_);
+        }
+        LOG_TRACE(fmt::format("TableScan: block_ids: {}", out));
+    }
+#endif
 
     // Here we assume output is a fresh data block, we have never written anything into it.
     auto write_capacity = output_ptr->available_capacity();

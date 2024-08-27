@@ -91,7 +91,7 @@ static const char *type2name[] = {
     "Invalid",
 };
 
-static_assert(std::size(type2name) == static_cast<size_t>(LogicalType::kInvalid) + 1);
+static_assert(std::size(type2name) == to_underlying_val(LogicalType::kInvalid) + 1);
 
 std::unordered_map<std::string, LogicalType> name2type = {
     // Bool
@@ -234,9 +234,9 @@ static int64_t type_size[] = {
     0, // Invalid
 };
 
-static_assert(std::size(type_size) == static_cast<size_t>(LogicalType::kInvalid) + 1);
+static_assert(std::size(type_size) == to_underlying_val(LogicalType::kInvalid) + 1);
 
-const char *LogicalType2Str(LogicalType logical_type) { return type2name[logical_type]; }
+const char *LogicalType2Str(LogicalType logical_type) { return type2name[to_underlying_val(logical_type)]; }
 
 LogicalType Str2LogicalType(const std::string &str) {
     auto iter = name2type.find(str);
@@ -247,7 +247,7 @@ LogicalType Str2LogicalType(const std::string &str) {
     }
 }
 
-int64_t LogicalTypeWidth(LogicalType logical_type) { return type_size[logical_type]; }
+int64_t LogicalTypeWidth(LogicalType logical_type) { return type_size[to_underlying_val(logical_type)]; }
 
 template <typename T, typename U>
 LogicalType GetCommonLogicalType() {

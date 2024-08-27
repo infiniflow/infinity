@@ -30,6 +30,7 @@ static thread_local std::stringstream string_buffer;
 
 ADMIN           { return ADMIN; }
 ALL             { return ALL; }
+ALLOCATION      { return ALLOCATION; }
 ALTER           { return ALTER; }
 ANALYZE         { return ANALYZE; }
 AND             { return AND; }
@@ -130,11 +131,13 @@ LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
 MATCH           { return MATCH; }
 MAXSIM          { return MAXSIM; }
+MEMORY          { return MEMORY; }
 MEMINDEX        { return MEMINDEX; }
 MINUTE          { return MINUTE; }
 MINUTES         { return MINUTES; }
 MONTH           { return MONTH; }
 MONTHS          { return MONTHS; }
+MULTIVECTOR     { return MULTIVECTOR; }
 NATURAL         { return NATURAL; }
 NULL            { return NULLABLE; }
 NOT             { return NOT; }

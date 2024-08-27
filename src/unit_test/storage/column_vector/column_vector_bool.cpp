@@ -33,6 +33,11 @@ import compilation_config;
 
 class ColumnVectorBoolTest : public BaseTestParamStr {
     void SetUp() override {
+        using namespace infinity;
+
+        LoggerConfig logger_config;
+        logger_config.log_level_ = LogLevel::kOff;
+        Logger::Initialize(logger_config);
 //        RemoveDbDirs();
 //#ifdef INFINITY_DEBUG
 //        infinity::GlobalResourceUsage::Init();
@@ -49,6 +54,9 @@ class ColumnVectorBoolTest : public BaseTestParamStr {
     }
 
     void TearDown() override {
+        using namespace infinity;
+
+        Logger::Shutdown();
 //        infinity::InfinityContext::instance().UnInit();
 //#ifdef INFINITY_DEBUG
 //        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -59,12 +67,12 @@ class ColumnVectorBoolTest : public BaseTestParamStr {
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ColumnVectorBoolTest,
-                         ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+// INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+//                          ColumnVectorBoolTest,
+//                          ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_close_bgtask_silent.toml").c_str(),
+//                                            BaseTestParamStr::VFS_CONFIG_PATH));
 
-TEST_P(ColumnVectorBoolTest, flat_boolean) {
+TEST_F(ColumnVectorBoolTest, flat_boolean) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
@@ -172,7 +180,7 @@ TEST_P(ColumnVectorBoolTest, flat_boolean) {
     }
 }
 
-TEST_P(ColumnVectorBoolTest, contant_bool) {
+TEST_F(ColumnVectorBoolTest, contant_bool) {
 
     using namespace infinity;
 
@@ -250,7 +258,7 @@ TEST_P(ColumnVectorBoolTest, contant_bool) {
     }
 }
 
-TEST_P(ColumnVectorBoolTest, bool_column_vector_select) {
+TEST_F(ColumnVectorBoolTest, bool_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
@@ -284,7 +292,7 @@ TEST_P(ColumnVectorBoolTest, bool_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorBoolTest, bool_column_slice_init) {
+TEST_F(ColumnVectorBoolTest, bool_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);

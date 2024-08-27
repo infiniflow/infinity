@@ -19,7 +19,6 @@ module;
 module bm_posting;
 
 import stl;
-import bmp_simd_func;
 import infinity_exception;
 
 namespace infinity {

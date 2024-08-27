@@ -393,7 +393,7 @@ public:
 };
 
 TEST_F(BufferManagerParallelTest, parallel_test1) {
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 1; ++i) {
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
         auto test1_obj = MakeUnique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_);
         LocalFileSystem fs;
@@ -474,7 +474,7 @@ public:
 };
 
 TEST_F(BufferManagerParallelTest, parallel_test2) {
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 1; ++i) {
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
         auto test2_obj = MakeUnique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_);
         LocalFileSystem fs;

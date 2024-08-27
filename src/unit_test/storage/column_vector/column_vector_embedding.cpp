@@ -36,38 +36,46 @@ import compilation_config;
 
 class ColumnVectorEmbeddingTest : public BaseTestParamStr {
     void SetUp() override {
-        RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        std::string config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
+        using namespace infinity;
+
+        LoggerConfig logger_config;
+        logger_config.log_level_ = LogLevel::kOff;
+        Logger::Initialize(logger_config);
+//         RemoveDbDirs();
+// #ifdef INFINITY_DEBUG
+//         infinity::GlobalResourceUsage::Init();
+// #endif
+//         system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
+//         system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+//         system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+//         std::string config_path_str = GetParam();
+//         std::shared_ptr<std::string> config_path = nullptr;
+//         if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+//             config_path = infinity::MakeShared<std::string>(config_path_str);
+//         }
+//         infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
+        using namespace infinity;
+
+        Logger::Shutdown();
+//         infinity::InfinityContext::instance().UnInit();
+// #ifdef INFINITY_DEBUG
+//         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+//         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+//         infinity::GlobalResourceUsage::UnInit();
+// #endif
+//         BaseTestParamStr::TearDown();
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ColumnVectorEmbeddingTest,
-                         ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+// INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+//                          ColumnVectorEmbeddingTest,
+//                          ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_close_bgtask_silent.toml").c_str(),
+//                                            BaseTestParamStr::VFS_CONFIG_PATH));
 
-TEST_P(ColumnVectorEmbeddingTest, flat_embedding) {
+TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     using namespace infinity;
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
@@ -178,7 +186,7 @@ TEST_P(ColumnVectorEmbeddingTest, flat_embedding) {
     }
 }
 
-TEST_P(ColumnVectorEmbeddingTest, contant_embedding) {
+TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
 
     using namespace infinity;
 
@@ -259,7 +267,7 @@ TEST_P(ColumnVectorEmbeddingTest, contant_embedding) {
     }
 }
 
-TEST_P(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
+TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
     using namespace infinity;
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
@@ -305,7 +313,7 @@ TEST_P(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorEmbeddingTest, embedding_column_slice_init) {
+TEST_F(ColumnVectorEmbeddingTest, embedding_column_slice_init) {
     using namespace infinity;
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);

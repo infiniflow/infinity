@@ -186,6 +186,9 @@ Pair<Vector<BMPDocID>, Vector<DataType>> BMPAlg<DataType, IdxType, CompressType>
                                                                                             i32 topk,
                                                                                             const BmpSearchOptions &options,
                                                                                             const Filter &filter) const {
+    if (topk == 0) {
+        return {{}, {}};
+    }
     std::shared_lock lock(mtx_, std::defer_lock);
     if (options.use_lock_) {
         lock.lock();

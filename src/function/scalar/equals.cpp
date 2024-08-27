@@ -109,7 +109,7 @@ static void GenerateEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_pt
     String func_name = "=";
     ScalarFunction equals_function(func_name,
                                    {data_type, data_type},
-                                   DataType(kBoolean),
+                                   DataType(LogicalType::kBoolean),
                                    &ScalarFunction::BinaryFunction<CompareType, CompareType, BooleanT, EqualsFunction>);
     function_set_ptr->AddFunction(equals_function);
 }
@@ -162,37 +162,37 @@ void RegisterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
     ScalarFunction mix_equals_bigint(func_name,
                                      {DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt)},
-                                     DataType(kBoolean),
+                                     DataType(LogicalType::kBoolean),
                                      &ScalarFunction::BinaryFunction<MixedT, BigIntT, BooleanT, EqualsFunction>);
     function_set_ptr->AddFunction(mix_equals_bigint);
 
     ScalarFunction bigint_equals_mixed(func_name,
                                        {DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed)},
-                                       DataType(kBoolean),
+                                       DataType(LogicalType::kBoolean),
                                        &ScalarFunction::BinaryFunction<BigIntT, MixedT, BooleanT, EqualsFunction>);
     function_set_ptr->AddFunction(bigint_equals_mixed);
 
     ScalarFunction mix_equals_double(func_name,
                                      {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},
-                                     DataType(kBoolean),
+                                     DataType(LogicalType::kBoolean),
                                      &ScalarFunction::BinaryFunction<MixedT, DoubleT, BooleanT, EqualsFunction>);
     function_set_ptr->AddFunction(mix_equals_double);
 
     ScalarFunction double_equals_mixed(func_name,
                                        {DataType(LogicalType::kDouble), DataType(LogicalType::kMixed)},
-                                       DataType(kBoolean),
+                                       DataType(LogicalType::kBoolean),
                                        &ScalarFunction::BinaryFunction<DoubleT, MixedT, BooleanT, EqualsFunction>);
     function_set_ptr->AddFunction(double_equals_mixed);
 
     ScalarFunction mix_equals_varchar(func_name,
                                       {DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar)},
-                                      DataType(kBoolean),
+                                      DataType(LogicalType::kBoolean),
                                       &ScalarFunction::BinaryFunction<MixedT, VarcharT, BooleanT, EqualsFunction>);
     function_set_ptr->AddFunction(mix_equals_varchar);
 
     ScalarFunction varchar_equals_mixed(func_name,
                                         {DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed)},
-                                        DataType(kBoolean),
+                                        DataType(LogicalType::kBoolean),
                                         &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, EqualsFunction>);
     function_set_ptr->AddFunction(varchar_equals_mixed);
 
