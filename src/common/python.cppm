@@ -12,32 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
 
-export module user_defined_term_weight;
+export module python_instance;
 #if 0
-import stl;
-import term;
-import stemmer;
-import analyzer;
-import tokenizer;
-import third_party;
-import status;
 
 namespace infinity {
-export class UserDefinedTermWeight {
+
+export class PythonInstance {
 public:
-    UserDefinedTermWeight(const String &tw_path) : tw_path_(tw_path) {}
-
-    ~UserDefinedTermWeight() = default;
-
-    Tuple<HashMap<String, double>, Status> Run(const Vector<String> &text);
-
-protected:
-private:
-    const String tw_path_;
-
-
+    static void Init();
+    static void UnInit();
 };
-} // namespace infinityz
+
+}
+
 #endif
