@@ -21,7 +21,7 @@ log_file_rotate_count   = 3
 log_level               = "trace"
 
 [storage]
-data_dir                = "/var/infinity/data"
+persistence_dir         = "/var/infinity/persistence"
 
 [buffer]
 buffer_manager_size        = "3GB"
@@ -34,5 +34,3 @@ wal_dir                 = "/var/infinity/wal"
 
 [resource]
 resource_dir          = "/var/infinity/resource"
-
-[persistence]
