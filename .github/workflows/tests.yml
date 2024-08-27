@@ -217,7 +217,7 @@ jobs:
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity/* && cp test/data/config/infinity_conf.toml /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
