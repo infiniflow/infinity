@@ -9,9 +9,22 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print("python test path is {}".format(python_test_dir))
     # run test
     print(f"start pysdk test with {pytest_mark}")
+    args = [
+        "python",
+        "-m",
+        "pytest",
+        # "--capture=tee-sys",
+        "--tb=short",
+        "-x",
+        "-m",
+        pytest_mark,
+        f"{python_test_dir}/parallel_test",
+    ]
+    quoted_args = ['"' + arg + '"' if " " in arg else arg for arg in args]
+    print(" ".join(quoted_args))
+
     process = subprocess.Popen(
-        # ["python", "-m", "pytest", "--tb=short", '-s', '-x', '-m', pytest_mark, f'{python_test_dir}/test'],
-        ["python", "-m", "pytest", "--tb=short", '-x', '-m', pytest_mark, f'{python_test_dir}/parallel_test'],
+        args,
         stdout=sys.stdout,
         stderr=sys.stderr,
         universal_newlines=True,
@@ -23,7 +36,6 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print("pysdk test finished.")
 
 
-
 if __name__ == "__main__":
     print("Note: this script must be run under root directory of the project.")
     current_path = os.getcwd()
@@ -33,7 +45,7 @@ if __name__ == "__main__":
         "-m",
         "--pytest_mark",
         type=str,
-        default='not complex and not slow',
+        default="not complex and not slow",
         dest="pytest_mark",
     )
     args = parser.parse_args()
