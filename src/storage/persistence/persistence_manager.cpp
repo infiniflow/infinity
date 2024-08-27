@@ -64,7 +64,6 @@ nlohmann::json ObjStat::Serialize() const {
     nlohmann::json obj;
     obj["obj_size"] = obj_size_;
     obj["parts"] = parts_;
-    obj["deleted_size"] = deleted_size_;
     obj["deleted_ranges"] = nlohmann::json::array();
     for (auto &range : deleted_ranges_) {
         nlohmann::json range_obj;
@@ -79,7 +78,6 @@ void ObjStat::Deserialize(const nlohmann::json &obj) {
     ref_count_ = 0;
     obj_size_ = obj["obj_size"];
     parts_ = obj["parts"];
-    deleted_size_ = obj["deleted_size"];
     if (obj.contains("deleted_ranges")) {
         SizeT start = 0;
         SizeT end = 0;
@@ -96,7 +94,7 @@ void ObjStat::Deserialize(const nlohmann::json &obj) {
 }
 
 SizeT ObjStat::GetSizeInBytes() const {
-    SizeT size = sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT);
+    SizeT size = sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT);
     size += (sizeof(SizeT) + sizeof(SizeT)) * deleted_ranges_.size();
     return size;
 }
@@ -104,7 +102,6 @@ SizeT ObjStat::GetSizeInBytes() const {
 void ObjStat::WriteBufAdv(char *&buf) const {
     ::infinity::WriteBufAdv(buf, obj_size_);
     ::infinity::WriteBufAdv(buf, parts_);
-    ::infinity::WriteBufAdv(buf, deleted_size_);
     ::infinity::WriteBufAdv(buf, deleted_ranges_.size());
     for (auto &range : deleted_ranges_) {
         ::infinity::WriteBufAdv(buf, range.start_);
@@ -117,7 +114,6 @@ ObjStat ObjStat::ReadBufAdv(char *&buf) {
     ret.obj_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
     ret.parts_ = ::infinity::ReadBufAdv<SizeT>(buf);
     ret.ref_count_ = 0;
-    ret.deleted_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
 
     SizeT start, end;
     SizeT len = ::infinity::ReadBufAdv<SizeT>(buf);
@@ -290,7 +286,7 @@ String PersistenceManager::GetObjCache(const String &file_path) {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
-        String error_message = fmt::format("Failed to find object for local path {}", local_path);
+        String error_message = fmt::format("GetObjCache Failed to find object for local path {}", local_path);
         UnrecoverableError(error_message);
     }
     auto oit = objects_.find(it->second.obj_key_);
@@ -424,62 +420,73 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
             it = objects_.find(object_addr.obj_key_);
             assert(it != objects_.end());
         } else {
-            String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
+            String error_message = fmt::format("CleanupNoLock Failed to find object {}", object_addr.obj_key_);
             UnrecoverableError(error_message);
+            return;
         }
     }
-    Range range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
+    Range orig_range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
+    Range range(orig_range);
     auto inst_it = it->second.deleted_ranges_.lower_bound(range);
 
     if (inst_it != it->second.deleted_ranges_.begin()) {
-        // Check intersection with next range
         auto inst_it_prev = std::prev(inst_it);
-        if (inst_it_prev->HasIntersection(range)) {
+        if (inst_it_prev->Cover(orig_range)) {
+            // Check duplication. Cleanup could delete a local file multiple times.
+            String error_message = fmt::format("CleanupNoLock delete [{}, {}) more than once", range.start_, range.end_);
+            LOG_WARN(error_message);
+            return;
+        } else if (inst_it_prev->Intersect(orig_range)) {
+            // Check intersection with prev range
             String error_message = fmt::format("ObjAddr {} range to delete [{}, {}) intersects with prev one [{}, {})",
                                                object_addr.obj_key_,
-                                               range.start_,
-                                               range.end_,
+                                               orig_range.start_,
+                                               orig_range.end_,
                                                inst_it_prev->start_,
                                                inst_it_prev->end_);
             UnrecoverableError(error_message);
-        }
-        // Try merge with prev range
-        if (range.start_ == inst_it_prev->end_) {
+        } else if (orig_range.start_ == inst_it_prev->end_) {
+            // Try merge with prev range
             range.start_ = inst_it_prev->start_;
-            it->second.deleted_ranges_.erase(inst_it_prev);
+            inst_it = it->second.deleted_ranges_.erase(inst_it_prev);
         }
     }
 
     if (inst_it != it->second.deleted_ranges_.end()) {
-        // Check intersection with next range
-        if (inst_it->HasIntersection(range)) {
+        if (inst_it->Cover(orig_range)) {
+            // Check duplication. Cleanup could delete a local file multiple times.
+            String error_message = fmt::format("CleanupNoLock delete [{}, {}) more than once", orig_range.start_, orig_range.end_);
+            LOG_WARN(error_message);
+            return;
+        } else if (inst_it->Intersect(orig_range)) {
+            // Check intersection with next range
             String error_message = fmt::format("ObjAddr {} range to delete [{}, {}) intersects with next one [{}, {})",
                                                object_addr.obj_key_,
-                                               range.start_,
-                                               range.end_,
+                                               orig_range.start_,
+                                               orig_range.end_,
                                                inst_it->start_,
                                                inst_it->end_);
             UnrecoverableError(error_message);
-        }
-        // Try merge with next range
-        if (range.end_ == inst_it->start_) {
+        } else if (orig_range.end_ == inst_it->start_) {
+            // Try merge with next range
             range.end_ = inst_it->end_;
             it->second.deleted_ranges_.erase(inst_it);
         }
     }
+
     auto [_, ok] = it->second.deleted_ranges_.insert(range);
     if (!ok) {
         String error_message = fmt::format("Failed to delete ObjAddr {} range [{}, {})", object_addr.obj_key_, range.start_, range.end_);
         UnrecoverableError(error_message);
     }
 
-    it->second.deleted_size_ += object_addr.part_size_;
-    assert(it->second.deleted_size_ <= it->second.obj_size_);
-    if (it->second.deleted_size_ == it->second.obj_size_ && object_addr.obj_key_ != current_object_key_) {
+    LOG_TRACE(fmt::format("Deleted object {} range [{}, {})", object_addr.obj_key_, orig_range.start_, orig_range.end_));
+    if (range.start_ == 0 && range.end_ == it->second.obj_size_ && object_addr.obj_key_ != current_object_key_) {
         fs::path fp = workspace_;
         fp.append(object_addr.obj_key_);
         fs::remove(fp);
         objects_.erase(it);
+        LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
     }
 }
 
@@ -537,11 +544,16 @@ void PersistenceManager::Cleanup(const String &file_path) {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
-        String error_message = fmt::format("Failed to find object {}", local_path);
+        String error_message = fmt::format("Failed to find object for local path {}", local_path);
         LOG_WARN(error_message);
         return;
     }
     CleanupNoLock(it->second);
+    LOG_TRACE(fmt::format("Deleted mapping from local path {} to ObjAddr({}, {}, {})",
+                          local_path,
+                          it->second.obj_key_,
+                          it->second.part_offset_,
+                          it->second.part_size_));
     local_path_obj_.erase(it);
 }
 
