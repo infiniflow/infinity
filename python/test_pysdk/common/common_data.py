@@ -251,13 +251,20 @@ class literaltype(Enum):
 
 type_to_literaltype = {
     "boolean" : literaltype.kBoolean.value,
+    "bool" : literaltype.kBoolean.value,
     "tinyint" : literaltype.kInteger.value,
+    "int8" : literaltype.kInteger.value,
     "smallint" : literaltype.kInteger.value,
+    "int16" : literaltype.kInteger.value,
     "int" : literaltype.kInteger.value,
+    "int32" : literaltype.kInteger.value,
     "integer" : literaltype.kInteger.value,
     "bigint" : literaltype.kInteger.value,
+    "int64" : literaltype.kInteger.value,
     "float" : literaltype.kDouble.value,
-    "double": literaltype.kDouble.value
+    "float32" : literaltype.kDouble.value,
+    "double": literaltype.kDouble.value,
+    "float64": literaltype.kDouble.value
 }
 
 type_to_vector_literaltype = {
