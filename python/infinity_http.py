@@ -7,7 +7,7 @@ from test_pysdk.common.common_data import *
 from infinity.common import ConflictType, InfinityException, SparseVector
 from test_pysdk.common import common_values
 import infinity
-from typing import Optional
+from typing import Optional, Any
 from infinity.errors import ErrorCode
 from infinity.utils import deprecated_api
 import numpy as np
@@ -720,14 +720,10 @@ class infinity_http:
         self.raise_exception(r)
         return self
 
-    def update(self, filter="", update={},):
+    def update(self, filter_str: str, update: dict[str, Any]):
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])
-        if len(update) == 0:
-            update = {}
-        else:
-            update = update[0]
-        d = self.set_up_data([], {"update": update, "filter": filter})
+        d = self.set_up_data([], {"update": update, "filter": filter_str})
         r = self.request(url, "put", h, d)
         self.raise_exception(r)
         return self

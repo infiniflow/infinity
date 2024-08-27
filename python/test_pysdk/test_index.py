@@ -678,7 +678,7 @@ class TestInfinity:
 
         value = [{"c1": embedding_data} for _ in range(10)]
         for i in range(10):
-            table_obj.update("c2 = " + str(i), [{"c1": embedding_data}])
+            table_obj.update("c2 = " + str(i), {"c1": embedding_data})
         res = table_obj.output(["*"]).to_pl()
         print(res)
         res = db_obj.drop_table(
