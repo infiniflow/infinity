@@ -28,6 +28,7 @@ import value;
 import data_block;
 import default_values;
 import txn_manager;
+import buffer_manager;
 import txn;
 import catalog;
 import status;
@@ -38,6 +39,8 @@ import logical_type;
 import embedding_info;
 import index_hnsw;
 import statement_common;
+import data_access_state;
+import txn_store;
 
 import base_entry;
 
@@ -496,14 +499,121 @@ TEST_P(CatalogTest, remove_index_test) {
     txn_mgr->CommitTxn(txn1);
 }
 
-TEST_P(CatalogTest, roll_back_test) {
+TEST_P(CatalogTest, roll_back_append_test) {
     using namespace infinity;
 
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
+    BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-    txn_mgr->CommitTxn(txn1);
+    //create table
+    {
+        Vector<SharedPtr<ColumnDef>> columns;
+        {
+            std::set<ConstraintType> constraints;
+            constraints.insert(ConstraintType::kNotNull);
+            i64 column_id = 0;
+            auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            columns.emplace_back(column_def_ptr);
+        }
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto [table_entry, status] = catalog->GetTableByName("default_db", "tbl1", txn1->TxnID(), txn1->BeginTS());
+        EXPECT_TRUE(status.ok());
+
+
+        auto txn_store = txn1->GetTxnTableStore(table_entry);
+        txn_store->SetAppendState(MakeUnique<AppendState>(txn_store->GetBlocks()));
+        Catalog::Append(table_entry, txn1->TxnID(), (void *)txn_store, txn1->CommitTS(), buffer_mgr);
+        EXPECT_THROW(Catalog::RollbackAppend(table_entry, txn1->TxnID(), txn1->CommitTS(), (void *)txn_store), UnrecoverableException);
+    }
+}
+
+
+TEST_P(CatalogTest, roll_back_delete_test) {
+    using namespace infinity;
+
+    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
+    BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
+
+    // start txn1
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+
+    //create table
+    {
+        Vector<SharedPtr<ColumnDef>> columns;
+        {
+            std::set<ConstraintType> constraints;
+            constraints.insert(ConstraintType::kNotNull);
+            i64 column_id = 0;
+            auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            columns.emplace_back(column_def_ptr);
+        }
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto [table_entry, status] = catalog->GetTableByName("default_db", "tbl1", txn1->TxnID(), txn1->BeginTS());
+        EXPECT_TRUE(status.ok());
+
+        auto txn_store = txn1->GetTxnTableStore(table_entry);
+        Catalog::Delete(table_entry, txn1->TxnID(), (void *)txn_store, txn1->CommitTS(), txn_store->GetDeleteStateRef());
+        EXPECT_THROW(Catalog::RollbackDelete(table_entry, txn1->TxnID(), txn_store->GetDeleteStateRef(), buffer_mgr),UnrecoverableException);
+    }
+}
+
+TEST_P(CatalogTest, roll_back_write_test) {
+    using namespace infinity;
+
+    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
+    BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
+
+    // start txn1
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+
+    //create table
+    {
+        Vector<SharedPtr<ColumnDef>> columns;
+        {
+            std::set<ConstraintType> constraints;
+            constraints.insert(ConstraintType::kNotNull);
+            i64 column_id = 0;
+            auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            columns.emplace_back(column_def_ptr);
+        }
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto [table_entry, status] = catalog->GetTableByName("default_db", "tbl1", txn1->TxnID(), txn1->BeginTS());
+        EXPECT_TRUE(status.ok());
+
+
+        auto txn_store = txn1->GetTxnTableStore(table_entry);
+        txn_store->SetAppendState(MakeUnique<AppendState>(txn_store->GetBlocks()));
+        Catalog::Append(table_entry, txn1->TxnID(), (void *)txn_store, txn1->CommitTS(), buffer_mgr);
+        Catalog::CommitWrite(table_entry, txn1->TxnID(), txn1->CommitTS(), txn_store->txn_segments(), nullptr);
+        Vector<TxnSegmentStore> segment_stores;
+        auto status1 = Catalog::RollbackWrite(table_entry, txn1->CommitTS(), segment_stores);
+        EXPECT_TRUE(status1.ok());
+    }
 }
