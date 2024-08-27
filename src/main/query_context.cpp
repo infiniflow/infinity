@@ -110,6 +110,26 @@ QueryResult QueryContext::Query(const String &query) {
     StopProfile(QueryPhase::kParser);
 
     BaseStatement *base_statement = parsed_result->statements_ptr_->at(0);
+
+    if (session_ptr_->MaintenanceMode()) {
+        if (base_statement->Type() == StatementType::kAdmin) {
+            AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
+            QueryResult query_result = HandleAdminStatement(admin_statement);
+            return query_result;
+        } else {
+            QueryResult query_result;
+            query_result.result_table_ = nullptr;
+            query_result.status_ = Status::NotSupportInMaintenanceMode();
+            return query_result;
+        }
+    } else {
+        if (base_statement->Type() == StatementType::kAdmin) {
+            QueryResult query_result;
+            query_result.result_table_ = nullptr;
+            query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
+            return query_result;
+        }
+    }
     if (base_statement->Type() == StatementType::kAdmin) {
         if (session_ptr_->MaintenanceMode()) {
             AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);

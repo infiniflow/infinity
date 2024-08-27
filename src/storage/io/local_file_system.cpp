@@ -383,7 +383,7 @@ int LocalFileSystem::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &dat
     int rc = madvise(tmpd,
                      len_f,
                      MADV_NORMAL
-#if defined(linux)
+#if defined(linux) || defined(__linux) || defined(__linux__)
                          | MADV_DONTDUMP
 #endif
     );
