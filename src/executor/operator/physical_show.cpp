@@ -4605,7 +4605,8 @@ void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperator
     SizeT row_count = 0;
 
     BGMemIndexTracer *mem_index_tracer = query_context->storage()->memindex_tracer();
-    Vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo();
+    Txn *txn = query_context->GetTxn();
+    Vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo(txn);
     for (const auto &memindex_tracer_info : mem_index_tracer_info_array) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
