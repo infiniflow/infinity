@@ -12,32 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
 module;
 
-export module user_defined_term_weight;
+module python_instance;
 #if 0
-import stl;
-import term;
-import stemmer;
-import analyzer;
-import tokenizer;
-import third_party;
-import status;
-
+#include "Python.h"
 namespace infinity {
-export class UserDefinedTermWeight {
-public:
-    UserDefinedTermWeight(const String &tw_path) : tw_path_(tw_path) {}
 
-    ~UserDefinedTermWeight() = default;
+static PyThreadState *saved_state = nullptr;
 
-    Tuple<HashMap<String, double>, Status> Run(const Vector<String> &text);
+void PythonInstance::Init() {
+    if (!Py_IsInitialized()) {
+        Py_InitializeEx(0);
+    }
 
-protected:
-private:
-    const String tw_path_;
+    PyEval_InitThreads();
+    saved_state = PyEval_SaveThread();
+}
 
+void PythonInstance::UnInit() {
+    PyEval_RestoreThread(saved_state);
+    saved_state = nullptr;
 
-};
-} // namespace infinityz
+    if (Py_IsInitialized()) {
+        Py_FinalizeEx();
+    }
+
+}
+
+}
 #endif
