@@ -14,6 +14,8 @@
 
 module;
 
+#include <vector>
+
 module memindex_tracer;
 
 import stl;
@@ -23,36 +25,32 @@ import infinity_context;
 import infinity_exception;
 import logger;
 import third_party;
+import catalog;
+import db_entry;
+import table_entry;
+import table_index_entry;
+import txn_manager;
 
 namespace infinity {
 
-MemIndexTracer::MemIndexTracer(SizeT index_memory_limit) : index_memory_limit_(index_memory_limit) {}
-
-void MemIndexTracer::RegisterMemIndex(BaseMemIndex *memindex) {
-    std::lock_guard lck(mtx_);
-    memindexes_.insert(memindex);
-}
-
-void MemIndexTracer::UnregisterMemIndex(BaseMemIndex *memindex, SizeT mem_used) {
-    std::lock_guard lck(mtx_);
-    memindexes_.erase(memindex);
+void MemIndexTracer::DecreaseMemUsed(SizeT mem_used) {
     SizeT old_index_memory = cur_index_memory_.fetch_sub(mem_used);
     if (old_index_memory < mem_used) {
         UnrecoverableException(fmt::format("Memindex memory {} is larger than current index memory {}", mem_used, old_index_memory));
     }
 }
 
-void MemIndexTracer::DumpDone(SizeT actual_dump_size, int dump_task_id) {
+void MemIndexTracer::DumpDone(SizeT actual_dump_size, BaseMemIndex *mem_index) {
     std::lock_guard lck(mtx_);
-    auto iter = proposed_dump_.find(dump_task_id);
+    auto iter = proposed_dump_.find(mem_index);
     if (iter == proposed_dump_.end()) {
-        UnrecoverableException(fmt::format("Dump task {} is not found", dump_task_id));
+        UnrecoverableException(fmt::format("Dump task {} is not found", (u64)(mem_index)));
     }
     SizeT old_index_memory = cur_index_memory_.fetch_sub(actual_dump_size);
     if (old_index_memory < actual_dump_size) {
         UnrecoverableException(fmt::format("Dump size {} is larger than current index memory {}", actual_dump_size, old_index_memory));
     }
-    const auto &[proposed_dump_size, dumped_base_memindex] = iter->second;
+    SizeT proposed_dump_size = iter->second;
     if (proposed_dump_size > actual_dump_size) {
         UnrecoverableException(fmt::format("Dump size {} is larger than proposed dump size {}", actual_dump_size, proposed_dump_size));
     }
@@ -60,57 +58,66 @@ void MemIndexTracer::DumpDone(SizeT actual_dump_size, int dump_task_id) {
     proposed_dump_.erase(iter);
 }
 
-void MemIndexTracer::DumpFail(int dump_task_id) {
+void MemIndexTracer::DumpFail(BaseMemIndex *mem_index) {
     std::lock_guard lck(mtx_);
-    auto iter = proposed_dump_.find(dump_task_id);
+    auto iter = proposed_dump_.find(mem_index);
     if (iter == proposed_dump_.end()) {
-        UnrecoverableException(fmt::format("Dump task {} is not found", dump_task_id));
+        UnrecoverableException(fmt::format("Dump task {} is not found", (u64)(mem_index)));
     }
-    const auto &[proposed_dump_size, dumped_base_memindex] = iter->second;
+    SizeT proposed_dump_size = iter->second;
     acc_proposed_dump_.fetch_sub(proposed_dump_size);
-    memindexes_.insert(dumped_base_memindex);
 
     proposed_dump_.erase(iter);
 }
 
-Vector<MemIndexTracerInfo> MemIndexTracer::GetMemIndexTracerInfo() {
+Vector<MemIndexTracerInfo> MemIndexTracer::GetMemIndexTracerInfo(Txn *txn) {
+    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(txn);
     Vector<MemIndexTracerInfo> info_vec;
-    std::lock_guard lck(mtx_);
-    info_vec.reserve(memindexes_.size());
-    for (auto *memindex : memindexes_) {
-        info_vec.push_back(memindex->GetInfo());
+    for (auto *mem_index : mem_indexes) {
+        info_vec.push_back(mem_index->GetInfo());
     }
     return info_vec;
+}
+
+Vector<BaseMemIndex *> MemIndexTracer::GetUndumpedMemIndexes(Txn *txn) {
+    Vector<BaseMemIndex *> results;
+    Vector<BaseMemIndex *> mem_indexes = GetAllMemIndexes(txn);
+    for (auto *mem_index : mem_indexes) {
+        if (auto iter = proposed_dump_.find(mem_index); iter == proposed_dump_.end()) {
+            auto info = mem_index->GetInfo();
+            proposed_dump_.emplace(mem_index, info.mem_used_);
+            results.push_back(mem_index);
+        }
+    }
+    return results;
 }
 
 UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
     std::lock_guard lck(mtx_);
 
-    Vector<Pair<MemIndexTracerInfo, MemIndexMapIter>> info_vec;
-    info_vec.reserve(memindexes_.size());
-    for (auto iter = memindexes_.begin(); iter != memindexes_.end(); ++iter) {
-        info_vec.emplace_back((*iter)->GetInfo(), iter);
-    }
-    if (info_vec.empty()) {
+    Txn *txn = GetTxn();
+    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(txn);
+
+    if (mem_indexes.empty()) {
         return nullptr;
     }
-    SizeT dump_idx = ChooseDump(info_vec);
-    const auto &[info, max_iter] = info_vec[dump_idx];
-
-    i64 id = dump_task_id_++;
-    auto dump_task = MakeUnique<DumpIndexTask>(id, info.db_name_, info.table_name_, info.index_name_);
-
-    auto *dumped_base_memindex = *max_iter;
-    memindexes_.erase(max_iter);
+    SizeT dump_idx = ChooseDump(mem_indexes);
+    auto *mem_index = mem_indexes[dump_idx];
+    auto info = mem_index->GetInfo();
+    auto dump_task = MakeUnique<DumpIndexTask>(mem_index, txn);
 
     acc_proposed_dump_.fetch_add(info.mem_used_);
-    proposed_dump_[id] = {info.mem_used_, dumped_base_memindex};
+    proposed_dump_[mem_index] = info.mem_used_;
     return dump_task;
 }
 
-SizeT MemIndexTracer::ChooseDump(const Vector<Pair<MemIndexTracerInfo, MemIndexMapIter>> &info_vec) {
-    auto max_iter =
-        std::max_element(info_vec.begin(), info_vec.end(), [](const auto &a, const auto &b) { return a.first.mem_used_ < b.first.mem_used_; });
+SizeT MemIndexTracer::ChooseDump(const Vector<BaseMemIndex *> &mem_indexes) {
+    Vector<MemIndexTracerInfo> info_vec;
+    info_vec.reserve(mem_indexes.size());
+    for (auto *mem_index : mem_indexes) {
+        info_vec.push_back(mem_index->GetInfo());
+    }
+    auto max_iter = std::max_element(info_vec.begin(), info_vec.end(), [](const auto &a, const auto &b) { return a.mem_used_ < b.mem_used_; });
     return std::distance(info_vec.begin(), max_iter);
 }
 
@@ -119,6 +126,31 @@ void BGMemIndexTracer::TriggerDump(UniquePtr<DumpIndexTask> dump_task) {
 
     LOG_INFO(fmt::format("Submit dump task: {}", dump_task->ToString()));
     compaction_process->Submit(std::move(dump_task));
+}
+
+Txn *BGMemIndexTracer::GetTxn() {
+    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Dump index"));
+    return txn;
+}
+
+Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(Txn *scan_txn) {
+    Vector<BaseMemIndex *> mem_indexes;
+    TransactionID txn_id = scan_txn->TxnID();
+    TxnTimeStamp begin_ts = scan_txn->BeginTS();
+    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
+    for (auto *db_entry : db_entries) {
+        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
+        for (auto *table_entry : table_entries) {
+            Vector<TableIndexEntry *> table_index_entries = table_entry->TableIndexes(txn_id, begin_ts);
+            for (auto *table_index_entry : table_index_entries) {
+                auto *memindex = table_index_entry->GetMemIndex();
+                if (memindex != nullptr) {
+                    mem_indexes.push_back(memindex);
+                }
+            }
+        }
+    }
+    return mem_indexes;
 }
 
 } // namespace infinity
