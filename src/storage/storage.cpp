@@ -52,7 +52,7 @@ namespace infinity {
 
 Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {}
 
-void Storage::Init() {
+void Storage::Init(bool maintenance_mode) {
     // Construct buffer manager
     buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
                                             MakeShared<String>(config_ptr_->DataDir()),
@@ -68,6 +68,9 @@ void Storage::Init() {
                                       config_ptr_->DeltaCheckpointThreshold(),
                                       config_ptr_->FlushMethodAtCommit());
 
+    if(maintenance_mode) {
+        return ;
+    }
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
     TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile();
@@ -129,22 +132,29 @@ void Storage::Init() {
     }
 }
 
-void Storage::UnInit() {
+void Storage::UnInit(bool maintenance_mode) {
     LOG_INFO("Close storage ...");
-    periodic_trigger_thread_->Stop();
-    if (compact_processor_.get() != nullptr) {
-        compact_processor_->Stop();
-    }
-    bg_processor_->Stop();
-    wal_mgr_->Stop();
+    if(!maintenance_mode) {
+        periodic_trigger_thread_->Stop();
+        if (compact_processor_.get() != nullptr) {
+            compact_processor_->Stop();
+        }
+        bg_processor_->Stop();
 
-    txn_mgr_.reset();
-    if (compact_processor_.get() != nullptr) {
-        compact_processor_.reset();
+        new_catalog_.reset();
+
+        memory_index_tracer_.reset();
+
+        wal_mgr_->Stop();
+
+        txn_mgr_.reset();
+        if (compact_processor_.get() != nullptr) {
+            compact_processor_.reset();
+        }
+        bg_processor_.reset();
     }
-    bg_processor_.reset();
+
     wal_mgr_.reset();
-    new_catalog_.reset();
 
     buffer_mgr_->Stop();
     buffer_mgr_.reset();
