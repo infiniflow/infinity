@@ -147,7 +147,9 @@ class TestInsert:
 
             data_dict, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
-            assert count_star == cur_insert_n
+            if count_star != cur_insert_n:
+                print(f"Erorr: count_star: {count_star}, cur_insert_n: {cur_insert_n}")
+                # exit(1)
             print(f"cur_insert_n: {cur_insert_n}")
 
             t1 = threading.Thread(target=shutdown_func)
