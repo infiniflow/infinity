@@ -557,16 +557,11 @@ public:
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
                 DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
                 for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 1; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
-                    }
-                    json_response["tables"].push_back(json_table);
+                    // Column 1: table name
+                    Value value = data_block->GetValue(1, row);
+                    const String &column_value = value.ToString();
+                    json_response["tables"].push_back(column_value);
                 }
             }
 
