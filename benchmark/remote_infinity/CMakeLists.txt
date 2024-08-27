@@ -38,6 +38,7 @@ target_link_libraries(
         ${Python3_LIBRARIES}
         z.a
         expat.a
+        util
 )
 
 target_link_options(remote_query_benchmark PRIVATE -no-pie)

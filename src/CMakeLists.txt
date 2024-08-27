@@ -334,6 +334,7 @@ target_link_libraries(infinity
         ${Python3_LIBRARIES}
         z.a
         expat.a
+        util
 )
 target_link_options(infinity PRIVATE -no-pie)
 
