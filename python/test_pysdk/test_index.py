@@ -980,7 +980,7 @@ class TestInfinity:
             assert res.error_code == ErrorCode.OK
 
         res = table_obj.list_indexes()
-        print(res)
+        print(vars(res))
 
         for i in range(10):
             res = table_obj.drop_index(
