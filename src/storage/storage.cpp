@@ -91,6 +91,8 @@ void Storage::Init() {
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
+
     new_catalog_->StartMemoryIndexCommit();
     new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
@@ -125,7 +127,6 @@ void Storage::Init() {
 
         periodic_trigger_thread_->Start();
     }
-    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
 }
 
 void Storage::UnInit() {
