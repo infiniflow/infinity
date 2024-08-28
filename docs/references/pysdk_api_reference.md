@@ -1245,7 +1245,7 @@ table_object.delete("c1 >= 70 and c1 <= 90")
 ## update
 
 ```python
-table_object.update(cond = None, data)
+table_object.update(cond, data)
 ```
 
 Searches for rows that match the specified condition and updates them accordingly.
@@ -1256,9 +1256,9 @@ Searches for rows that match the specified condition and updates them accordingl
 
 A non-empty string that defines the condition for selecting rows to update. It represents a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated.
 
-#### data: `list[dict[str, Any]]]`, *Required*
+#### data: `dict[str, Any]`, *Required*
 
-A non-empty list of dictionaries where each key indicates a column name and each value indicates the new value for the corresponding cell.
+A non-empty dictionary where each key indicates a column name and each value indicates the new value for the corresponding cell.
 
 ### Returns
 
@@ -1274,12 +1274,12 @@ A structure containing the following attributes:
 
 ```python
 # Update rows where column "c1" equals 1, setting "c2" to 90 and "c3" to 900
-table_object.update("c1 = 1", [{"c2": 90, "c3": 900}])
+table_object.update("c1 = 1", {"c2": 90, "c3": 900})
 ```
 
 ```python
 # Update rows where column "c1" is greater than 2, setting "c2" to 100 and "c3" to 1,000
-table_object.update("c1 > 2", [{"c2": 100, "c3": 1000}])
+table_object.update("c1 > 2", {"c2": 100, "c3": 1000})
 ```
 
 ---
