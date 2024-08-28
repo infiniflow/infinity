@@ -1,0 +1,17 @@
+[general]
+version = "0.3.0"
+time_zone = "utc-8"
+
+[network]
+[log]
+log_to_stdout = true
+
+[storage]
+mem_index_capacity = 1048576
+
+[buffer]
+[wal]
+
+[resource]
+
+[persistence]

@@ -51,6 +51,9 @@ SizeT VarBuffer::Append(const char *data, SizeT size, bool *free_success) {
 }
 
 const char *VarBuffer::Get(SizeT offset, SizeT size) const {
+    if (size == 0) {
+        return nullptr;
+    }
     std::shared_lock lock(mtx_);
     // find the last index i such that buffer_size_prefix_sum_[i] <= offset
     auto it = std::upper_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);

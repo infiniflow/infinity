@@ -28,8 +28,13 @@ TEST_F(VarBufferTest, test1) {
     for (int i = 0; i < 26; ++i) {
         data[i] = 'a' + i;
     }
+    char *empty_data = nullptr;
+
     SizeT offset1 = var_buffer.Append(data.get(), 26);
     EXPECT_EQ(offset1, 0);
+
+    SizeT offset1_1 = var_buffer.Append(empty_data, 0);
+    EXPECT_EQ(offset1_1, 26);
 
     SizeT offset2 = var_buffer.Append(data.get(), 26);
     EXPECT_EQ(offset2, 26);
@@ -37,6 +42,9 @@ TEST_F(VarBufferTest, test1) {
     auto test = [&](const VarBuffer &var_buffer) {
         const auto *res1 = var_buffer.Get(0, 26);
         EXPECT_EQ(std::string_view(res1, 26), std::string_view(data.get(), 26));
+
+        const auto *res1_1 = var_buffer.Get(26, 0);
+        EXPECT_EQ(nullptr, res1_1);
 
         const auto *res2 = var_buffer.Get(26, 26);
         EXPECT_EQ(std::string_view(res2, 26), std::string_view(data.get(), 26));
@@ -54,6 +62,7 @@ TEST_F(VarBufferTest, test1) {
     auto *p = buffer.get();
     p += var_buffer.Write(p);
     EXPECT_EQ(p, buffer.get() + size);
+
     VarBuffer var_buffer2;
     var_buffer2.Append(buffer.get(), size);
     test(var_buffer2);
