@@ -149,6 +149,12 @@ QueryResult QueryContext::Query(const String &query) {
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
     QueryResult query_result;
+    if (session_ptr_->MaintenanceMode()) {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
+        return query_result;
+    }
+
     Vector<SharedPtr<LogicalNode>> logical_plans{};
     Vector<UniquePtr<PhysicalOperator>> physical_plans{};
     SharedPtr<PlanFragment> plan_fragment{};
