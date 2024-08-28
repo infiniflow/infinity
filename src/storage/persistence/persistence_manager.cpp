@@ -604,6 +604,9 @@ HashMap<String, ObjAddr> PersistenceManager::GetAllFiles() const {
 }
 
 void AddrSerializer::Initialize(PersistenceManager *pm, const Vector<String> &path) {
+    if (pm == nullptr) {
+        return; // not use persistence manager
+    }
     if (!paths_.empty()) {
         UnrecoverableError("AddrSerializer has been initialized");
     }
