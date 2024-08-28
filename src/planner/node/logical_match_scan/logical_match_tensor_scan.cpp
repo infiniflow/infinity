@@ -36,8 +36,16 @@ import logger;
 namespace infinity {
 
 void LogicalMatchTensorScan::InitExtraOptions() {
+    static const std::set<String> valid_options =
+        {"topn", "emvb_centroid_nprobe", "emvb_threshold_first", "emvb_n_doc_to_score", "emvb_n_doc_out_second_stage", "emvb_threshold_final"};
     auto match_tensor_expr = static_cast<MatchTensorExpression *>(query_expression_.get());
     SearchOptions options(match_tensor_expr->options_text_);
+    for (const auto &[x, _] : options.options_) {
+        if (!valid_options.contains(x)) {
+            RecoverableError(
+                Status::SyntaxError(fmt::format(R"(Input option text "{}" has invalid part "{}".)", match_tensor_expr->options_text_, x)));
+        }
+    }
     // topn option
     if (auto top_n_it = options.options_.find("topn"); top_n_it != options.options_.end()) {
         const int top_n_option = std::stoi(top_n_it->second);
