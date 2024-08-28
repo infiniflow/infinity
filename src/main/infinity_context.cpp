@@ -55,24 +55,20 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool m_flag, De
 
         session_mgr_ = MakeUnique<SessionManager>();
 
-        if(maintenance_mode_) {
-            return;
-        } else {
-            task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
+        task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 
-            String persistence_dir = config_->PersistenceDir();
-            if (!persistence_dir.empty()) {
-                i64 persistence_object_size_limit = config_->PersistenceObjectSizeLimit();
-                persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_->DataDir(), (SizeT)persistence_object_size_limit);
-            }
-
-            storage_ = MakeUnique<Storage>(config_.get());
-            storage_->Init();
-
-            inverting_thread_pool_.resize(config_->CPULimit());
-            commiting_thread_pool_.resize(config_->CPULimit());
-            hnsw_build_thread_pool_.resize(config_->CPULimit());
+        String persistence_dir = config_->PersistenceDir();
+        if (!persistence_dir.empty()) {
+            i64 persistence_object_size_limit = config_->PersistenceObjectSizeLimit();
+            persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_->DataDir(), (SizeT)persistence_object_size_limit);
         }
+
+        storage_ = MakeUnique<Storage>(config_.get());
+        storage_->Init(maintenance_mode_);
+
+        inverting_thread_pool_.resize(config_->CPULimit());
+        commiting_thread_pool_.resize(config_->CPULimit());
+        hnsw_build_thread_pool_.resize(config_->CPULimit());
 
         initialized_ = true;
     }
@@ -83,15 +79,13 @@ void InfinityContext::UnInit() {
         return;
     }
     initialized_ = false;
-    if(!maintenance_mode_) {
-        storage_->UnInit();
-        storage_.reset();
+    storage_->UnInit(maintenance_mode_);
+    storage_.reset();
 
-        persistence_manager_.reset();
+    persistence_manager_.reset();
 
-        task_scheduler_->UnInit();
-        task_scheduler_.reset();
-    }
+    task_scheduler_->UnInit();
+    task_scheduler_.reset();
 
     session_mgr_.reset();
 

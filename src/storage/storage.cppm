@@ -50,9 +50,9 @@ public:
 
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
 
-    void Init();
+    void Init(bool maintenance_mode);
 
-    void UnInit();
+    void UnInit(bool maintenance_mode);
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, const String &data_dir);
 
