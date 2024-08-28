@@ -23,7 +23,7 @@ namespace infinity {
 
 export class HTTPServer {
 public:
-    void Start(u16 port);
+    void Start(const String& server_address, u16 port);
     void Shutdown();
 private:
     SharedPtr<HttpRouter> router_{};
