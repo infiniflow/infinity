@@ -3333,7 +3333,7 @@ void HTTPServer::Start(u16 port) {
 
     router->route("POST", "/variables", MakeShared<SetGlobalVariableHandler>());
 
-    SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({"localhost", port, WebAddress::IP_4});
+    SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({"0.0.0.0", port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler = HttpConnectionHandler::createShared(router);
 
     server_ = MakeShared<WebServer>(connection_provider, connection_handler);
