@@ -53,9 +53,9 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool m_flag, De
 
         resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
 
-        task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
-
         session_mgr_ = MakeUnique<SessionManager>();
+
+        task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 
         String persistence_dir = config_->PersistenceDir();
         if (!persistence_dir.empty()) {
@@ -64,11 +64,12 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool m_flag, De
         }
 
         storage_ = MakeUnique<Storage>(config_.get());
-        storage_->Init();
+        storage_->Init(maintenance_mode_);
 
         inverting_thread_pool_.resize(config_->CPULimit());
         commiting_thread_pool_.resize(config_->CPULimit());
         hnsw_build_thread_pool_.resize(config_->CPULimit());
+
         initialized_ = true;
     }
 }
@@ -78,17 +79,17 @@ void InfinityContext::UnInit() {
         return;
     }
     initialized_ = false;
-
-    storage_->UnInit();
+    storage_->UnInit(maintenance_mode_);
     storage_.reset();
 
-    session_mgr_.reset();
+    persistence_manager_.reset();
 
     task_scheduler_->UnInit();
     task_scheduler_.reset();
 
+    session_mgr_.reset();
+
     resource_manager_.reset();
-    persistence_manager_.reset();
 
     Logger::Shutdown();
 

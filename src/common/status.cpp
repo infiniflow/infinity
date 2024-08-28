@@ -127,6 +127,10 @@ Status Status::AdminOnlySupportInMaintenanceMode() {
     return Status(ErrorCode::kAdminOnlySupportInMaintenanceMode, MakeUnique<String>("Only maintanence mode supports ADMIN command"));
 }
 
+Status Status::NotSupportInMaintenanceMode() {
+    return Status(ErrorCode::kAdminOnlySupportInMaintenanceMode, MakeUnique<String>("Only maintanence mode supports ADMIN command"));
+}
+
 // 3. Syntax error or access rule violation
 Status Status::InvalidUserName(const String &user_name) {
     return Status(ErrorCode::kInvalidUsername, MakeUnique<String>(fmt::format("{} is a invalid user name", user_name)));

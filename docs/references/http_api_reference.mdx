@@ -37,8 +37,8 @@ curl --request POST \
 
 #### Request parameters
 
-- `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string indicating the name of the database, which must adhere to the following requirements:  
+- `database_name`: (*Path parameter*)  
+  The name of the database, which must adhere to the following requirements:  
   - Permitted characters include:
     - English letters (a-z, A-Z)
     - Digits (0-9)
@@ -48,7 +48,7 @@ curl --request POST \
   - Case-insensitive.
 - `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
   - `"error"`: (Default) Raise an error if a database with the same name exists.
-  - `"ignore_if_exist"`: Ignore the database creation requrest and keep the existing database with the same name.
+  - `"ignore_if_exists"`: Ignore the database creation request and keep the existing database.
 
 ### Response
 
@@ -122,12 +122,11 @@ curl --request DELETE \
 
 #### Request parameter
 
-- `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string indicating the name of the database to delete.
+- `database_name`: (*Path parameter*)  
+  The name of the database to delete.
 - `"drop_option"`: (*Body parameter*), `enum<string>`, *Optional*  
-  Conflict policy in `enum<string>` for handling situations where a database with the specified name does not exist.
   - `"error"`: (Default) Raise an error if the specified database does not exist.
-  - `"ignore_if_not exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
+  - `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
 
 ### Response
 
@@ -194,8 +193,8 @@ curl --request GET \
 
 #### Request parameter
 
-- `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string specifying the name of the database to retrieve.
+- `database_name`: (*Path parameter*)  
+  The name of the database to retrieve.
 
 ### Response
 
@@ -333,10 +332,10 @@ curl --request POST \
 
 #### Request parameters
 
-- `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string that specifies the name of the database.
-- `table_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string indicating the name of the table to create, which must adhere to the following requirements:  
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table to create, which must adhere to the following requirements:  
   - Permitted characters include:
     - English letters (a-z, A-Z)
     - Digits (0-9)
@@ -346,7 +345,7 @@ curl --request POST \
   - Case-insensitive.
 - `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
   - `"error"`: (Default) Raise an error if a table with the same name exists.
-  - `"ignore_if_exist"`: Ignore the table creation request and keep the existing table with the same name.
+  - `"ignore_if_exists"`: Ignore the table creation request and keep the existing table.
 - `field`: (*Body parameter*), `object[]`, *Required*
   - `"name"`: `string`, *Required*  
     A non-empty string indicating the name of the column to create, which must adhere to the following requirements:  
@@ -431,13 +430,13 @@ curl --request DELETE \
 
 #### Request parameters
 
-- `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string that specifies the name of the database.
-- `table_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string indicating the name of the table to delete.
-- `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
-  - `"error"`: (Default) Raise an error if a table with the same name exists.
-  - `"ignore_if_exist"`: Ignore the table creation request and keep the existing table with the same name.
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table to delete.
+- `"drop_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if the specified table does not exist.
+  - `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
 
 ### Response
 
@@ -504,8 +503,8 @@ curl --request GET \
 
 #### Request parameters
 
-- `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string that specifies the name of the database.
+- `database_name`: (*Path parameter*)  
+  The name of the database.
 
 ### Response
 
@@ -516,26 +515,10 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 0,
-    "tables": 
-    [
-        {
-            "name": "table1",
-            "type": "table",
-            "column_count": 3,
-            "block_count": 21,
-            "block_capacity": 8192,
-            "segment_count": 3,
-            "segment_capacity": 8388608
-        },
-        {
-            "name": "table2",
-            "type": "table",
-            "column_count": 5,
-            "block_count": 13,
-            "block_capacity": 8192,
-            "segment_count": 1,
-            "segment_capacity": 8388608
-        }
+    "tables": [
+        "table_1",
+        "table_2",
+        "table_n"
     ]
 }
 ```
@@ -567,10 +550,10 @@ curl --request GET \
 
 #### Request parameters
 
-- `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string that specifies the name of the database.
-- `table_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string indicating the name of the table.
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
 
 ### Response
 
@@ -589,7 +572,7 @@ The response includes a JSON object like the following:
     "error_code": 0,
     "database_name": "default_db",
     "table_name": "my_table",
-    "store_dir": "/var/infinity/data/nIHniKeHIB_db_default/h1abZcWuBs_table_my_table",
+    "storage_directory": "/var/infinity/data/nIHniKeHIB_db_default/h1abZcWuBs_table_my_table",
     "column_count" : 3,
     "segment_count" : 1,
     "row_count" : 5
@@ -625,7 +608,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/databases/{database_name}/tables/{table_name}/columns`
 
-Shows the column information about a specified table within a given database.
+Shows the column information about a specified table.
 
 ### Request
 
@@ -643,10 +626,10 @@ curl --request GET \
 
 #### Request parameters
 
-- `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string that specifies the name of the database.
-- `table_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string indicating the name of the table.
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
 
 ### Response
 
@@ -667,12 +650,14 @@ The response includes a JSON object like the following:
         {
             "column_name": "name",
             "column_type": "varchar",
-            "constraints": ""
+            "constraints": "",
+            "default": "Null"
         },
         {
             "column_name": "age",
             "column_type": "integer",
-            "constraints": ""
+            "constraints": "",
+            "default": "Null"
         },
         {
             "column_name": "score",
@@ -754,12 +739,12 @@ curl --request POST \
 
 #### Request parameters
 
-- `database_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string that specifies the name of the database.
-- `table_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string indicating the name of the table.  
-- `index_name`: (*Path parameter*), `string`, *Required*  
-  A non-empty string indicating the name of the index to create, which must adhere to the following requirements:  
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.  
+- `index_name`: (*Path parameter*)  
+  The name of the index to create, which must adhere to the following requirements:  
   - Permitted characters include:
     - English letters (a-z, A-Z)
     - Digits (0-9)
@@ -806,7 +791,7 @@ curl --request POST \
       - `"raw"`: Store the block-max index without compression.
 - `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
   - `"error"`: (Default) Raise an error if a table with the same name exists.
-  - `"ignore_if_exists"`: Ignore the table creation request and keep the existing table with the same name.
+  - `"ignore_if_exists"`: Ignore the table creation request and keep the existing table.
 
 ### Response
 
@@ -880,7 +865,15 @@ curl --request DELETE \
 
 #### Request parameters
 
-
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.  
+- `index_name`: (*Path parameter*)  
+  The name of the index to delete.
+- `"drop_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if the specified index does not exist.
+  - `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified index does not exist.
 
 ### Response
 
@@ -937,11 +930,23 @@ Shows detailed information about a specified index.
 - URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 - Headers: `accept: application/json`
 
+#### Request example
+
 ```shell
 curl --request GET \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json'
 ```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `index_name`: (*Path parameter*)  
+  The name of the index.
+
 
 ### Response
 
@@ -1017,6 +1022,15 @@ curl --request GET \
 
 #### Request parameters
 
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `index_name`: (*Path parameter*)  
+  The name of the index.
+- `segment_id`: (*Path parameter*)  
+  The segment ID.
+  
 
 
 ### Response
@@ -1088,6 +1102,17 @@ curl --request GET \
 
 #### Request parameters
 
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `index_name`: (*Path parameter*)  
+  The name of the index.
+- `segment_id`: (*Path parameter*)  
+  The segment ID.
+- `chunk_id`: (*Path parameter*)  
+  The chunk ID.
+
 ### Response
 
 <Tabs
@@ -1157,7 +1182,10 @@ curl --request GET \
 
 #### Request parameters
 
-
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
 
 ### Response
 
@@ -1223,21 +1251,25 @@ curl --request PUT \
 
 #### Request parameters
 
-- `"file_path"`: `string`, *Required*   
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"file_path"`: (*Body parameter*)   
   Absolute path to the file to import. Supported file types include:  
   - `csv`
   - `json`
   - `jsonl`
-- `"file_type"`: `string`, *Required*  
+- `"file_type"`: (*Body parameter*)  
   The type of the file to import. Supported file types include:
   - `csv`
   - `json`
   - `jsonl`
-- `"header"`: `boolean`, *Optional*  
+- `"header"`: (*Body parameter*), `boolean`, *Optional*  
   Whether to display table header or not. Works with **.csv** files only:
   - `True`: Display table header.
   - `False`: (Default) Do not display table header.
-- `"delimiter"`: `string`, *Optional*, Defaults to ","  
+- `"delimiter"`: (*Body parameter*), `string`, *Optional*, Defaults to ","  
   Delimiter to separate columns. Works with **.csv** files only.
 
 ### Response
@@ -1310,30 +1342,34 @@ curl --request GET \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' {
-         "file_path":"/var/infinity/filename.csv",
-         "file_type":"csv",
-         "header":false,
-         "delimiter":","
+         "file_path": "/var/infinity/filename.csv",
+         "file_type": "csv",
+         "header": false, 
+         "delimiter": ","
     } '
 ```
 
 #### Request parameters
 
-- `"file_path"`: `string`, *Required*   
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"file_path"`: (*Body parameter*)   
   Absolute path to the file for export. Supported file types include:  
   - `csv`
   - `json`
   - `jsonl`
-- `"file_type"`: `string`, *Required*  
+- `"file_type"`: (*Body parameter*)  
   The type of the file for export. Supported file types include:
   - `csv`
   - `json`
   - `jsonl`
-- `"header"`: `boolean`, *Optional*  
+- `"header"`: (*Body parameter*), `boolean`, *Optional*  
   Whether to display table header or not. Works with **.csv** files only:
   - `True`: Display table header.
   - `False`: (Default) Do not display table header.
-- `"delimiter"`: `string`, *Optional*, Defaults to ","  
+- `"delimiter"`: (*Body parameter*), `string`, *Optional*, Defaults to ","  
   Delimiter to separate columns. Works with **.csv** files only.
 
 ### Response
@@ -1402,24 +1438,35 @@ curl --request POST \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
-[    
+     --data ' [    
     {
-        "name": "Tom",
-        "age": 16,
-        "score": 95
+         "name": "Tom",
+         "score": 4.0
     },
     {
-        "name": "Jason",
-        "age": 15,
-        "score": 92
-    },
+         "name": "Toby",
+         "score": 5.0
+    }
 ] '
 ```
 
 #### Request parameters
 
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"file_path"`: (*Body parameter*), `string`, *Required* 
+- `data`: (*Body parameter*),  `object[]`, *Required*  
+  Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `object[]`. Each JSON object corresponds to a row to insert, and each key-value pair it corresponds to a column name and the table cell value.
 
+:::tip NOTE
+When inserting incomplete rows of data, ensure that all uninserted columns have default values when creating the table. Otherwise, an error will occur.  
+:::
+
+:::tip NOTE
+Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once.
+:::
 
 ### Response
 
@@ -1445,7 +1492,7 @@ The response includes a JSON object like the following:
 </TabItem>
   <TabItem value="s500">
 
-A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+The response includes a JSON object like the following:
 
 ```shell
 {
@@ -1487,13 +1534,33 @@ curl --request DELETE \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
-    --data ' \
-{
-    filter: "a > 0"
+    --data ' {
+        filter: "c1 >= 15 and c1 <=18"
+} '
+```
+
+```shell
+curl --request DELETE \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --header 'accept: application/json' \
+    --header 'content-type: application/json' \
+    --data ' {
+        filter: "c2 = 'Toby'"
 } '
 ```
 
 #### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"filter": (*Body parameter*), `string`, *Optional*  
+  A non-empty string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
+
+:::tip NOTE
+The `filter` parameter currently supports 'and' and 'or' logical expressions only.
+:::
 
 ### Response
 

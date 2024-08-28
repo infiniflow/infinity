@@ -644,7 +644,17 @@ WrapQueryResult WrapDropTable(Infinity &instance, const String &db_name, const S
 
 WrapQueryResult WrapListTables(Infinity &instance, const String &db_name) {
     auto query_result = instance.ListTables(db_name);
-    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+
+    WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
+
+    SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+    auto &names = result.names;
+    names.resize(data_block->row_count());
+    for (SizeT i = 0; i < names.size(); ++i) {
+        Value value = data_block->GetValue(1, i);
+        names[i] = value.GetVarchar();
+    }
+    return result;
 }
 
 WrapQueryResult WrapShowTable(Infinity &instance, const String &db_name, const String &table_name) {

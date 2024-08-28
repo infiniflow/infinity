@@ -889,7 +889,7 @@ class TestInfinity:
 
     @pytest.mark.slow
     def test_insert_with_large_data(self, suffix):
-        total_row_count = 3,000,000
+        total_row_count = 1000000
 
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("hr_data_mix"+suffix, ConflictType.Ignore)
@@ -940,3 +940,5 @@ class TestInfinity:
             table_obj.insert(insert_data)
         res = table_obj.output(["count(*)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == total_row_count
+
+        db_obj.drop_table("hr_data_mix"+suffix, ConflictType.Error)
