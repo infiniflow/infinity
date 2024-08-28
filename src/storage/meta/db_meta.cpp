@@ -101,7 +101,7 @@ DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, Transactio
     db_info->db_name_ = db_entry->db_name_ptr();
     db_info->db_entry_dir_ = db_entry->db_entry_dir();
     db_info->absolute_db_path_ = db_entry->AbsoluteDir();
-
+    db_info->table_count_ = db_entry->TableCollections(txn_id, begin_ts).size();
     return {db_info, Status::OK()};
 }
 
