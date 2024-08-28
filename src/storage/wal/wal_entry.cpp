@@ -71,7 +71,7 @@ i32 WalBlockInfo::GetSizeInBytes() const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm_size_ = addr_serializer_.GetSizeInBytes(pm, paths_);
+        pm_size_ = addr_serializer_.Initialize(pm, paths_);
         size += pm_size_;
     }
     return size;
@@ -90,7 +90,7 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
         char *start = buf;
-        addr_serializer_.WriteBufAdv(pm, buf, paths_);
+        addr_serializer_.WriteBufAdv(buf);
         SizeT size = buf - start;
         if (size != pm_size_) {
             String error_message = fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size);
@@ -115,7 +115,7 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        block_info.paths_ = block_info.addr_serializer_.ReadBufAdv(pm, ptr);
+        block_info.paths_ = block_info.addr_serializer_.ReadBufAdv(ptr);
     }
     return block_info;
 }
@@ -232,7 +232,7 @@ i32 WalChunkIndexInfo::GetSizeInBytes() const {
     bool use_object_cache = pm != nullptr;
     SizeT size = 0;
     if (use_object_cache) {
-        pm_size_= addr_serializer_.GetSizeInBytes(pm, paths_);
+        pm_size_= addr_serializer_.Initialize(pm, paths_);
         size += pm_size_;
     }
     return size + sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);
@@ -249,7 +249,7 @@ void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
         char *start = buf;
-        addr_serializer_.WriteBufAdv(pm, buf, paths_);
+        addr_serializer_.WriteBufAdv(buf);
         SizeT size = buf - start;
         if (size != pm_size_) {
             String error_message = fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size);
@@ -269,7 +269,7 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        chunk_index_info.paths_ = chunk_index_info.addr_serializer_.ReadBufAdv(pm, ptr);
+        chunk_index_info.paths_ = chunk_index_info.addr_serializer_.ReadBufAdv(ptr);
     }
     return chunk_index_info;
 }

@@ -163,12 +163,15 @@ private:
 };
 
 export struct AddrSerializer {
-    SizeT GetSizeInBytes(PersistenceManager *pm, const Vector<String> &path) const;
+    SizeT Initialize(PersistenceManager *pm, const Vector<String> &path) const;
 
-    void WriteBufAdv(PersistenceManager *pm, char *&buf, const Vector<String> &path) const;
+    void WriteBufAdv(char *&buf) const;
 
-    Vector<String> ReadBufAdv(PersistenceManager *pm, char *&buf);
+    Vector<String> ReadBufAdv(char *&buf);
 
+    void AddToPersistenceManager(PersistenceManager *pm) const;
+
+    mutable Vector<String> paths_;
     mutable Vector<ObjAddr> obj_addrs_; // set mutable to minimize refactor
     mutable Vector<ObjStat> obj_stats_;
 };

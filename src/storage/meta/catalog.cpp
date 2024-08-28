@@ -587,7 +587,8 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
 void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr) {
     auto delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
 
-    auto &delta_ops = delta_entry->operations();
+    Vector<UniquePtr<CatalogDeltaOperation>> &delta_ops = delta_entry->operations();
+    auto *pm = InfinityContext::instance().persistence_manager();
     for (auto &op : delta_ops) {
         auto type = op->GetType();
         LOG_INFO(fmt::format("Load delta op {}", op->ToString()));
@@ -600,6 +601,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
             // Ignore the old txn
             continue;
         }
+        op->addr_serializer_.AddToPersistenceManager(pm);
         switch (type) {
 
             // -----------------------------

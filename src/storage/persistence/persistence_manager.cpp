@@ -603,8 +603,9 @@ HashMap<String, ObjAddr> PersistenceManager::GetAllFiles() const {
     return local_path_obj_;
 }
 
-SizeT AddrSerializer::GetSizeInBytes(PersistenceManager *pm, const Vector<String> &path) const {
+SizeT AddrSerializer::Initialize(PersistenceManager *pm, const Vector<String> &path) const {
     for (const String &path : path) {
+        paths_.push_back(path);
         ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
         obj_addrs_.push_back(obj_addr);
         if (!obj_addr.Valid()) {
@@ -624,28 +625,33 @@ SizeT AddrSerializer::GetSizeInBytes(PersistenceManager *pm, const Vector<String
     return size;
 }
 
-void AddrSerializer::WriteBufAdv(PersistenceManager *pm, char *&buf, const Vector<String> &path) const {
-    ::infinity::WriteBufAdv(buf, path.size());
-    for (SizeT i = 0; i < path.size(); ++i) {
-        ::infinity::WriteBufAdv(buf, path[i]);
+void AddrSerializer::WriteBufAdv(char *&buf) const {
+    ::infinity::WriteBufAdv(buf, paths_.size());
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        ::infinity::WriteBufAdv(buf, paths_[i]);
         obj_addrs_[i].WriteBufAdv(buf);
         obj_stats_[i].WriteBufAdv(buf);
     }
 }
 
-Vector<String> AddrSerializer::ReadBufAdv(PersistenceManager *pm, char *&ptr) {
+Vector<String> AddrSerializer::ReadBufAdv(char *&ptr) {
     SizeT path_count = ::infinity::ReadBufAdv<SizeT>(ptr);
-    Vector<String> paths;
     for (SizeT i = 0; i < path_count; ++i) {
-        paths.push_back(::infinity::ReadBufAdv<String>(ptr));
+        paths_.push_back(::infinity::ReadBufAdv<String>(ptr));
         obj_addrs_.push_back(ObjAddr::ReadBufAdv(ptr));
         obj_stats_.push_back(ObjStat::ReadBufAdv(ptr));
     }
-    for (SizeT i = 0; i < path_count; ++i) {
-        pm->SaveLocalPath(paths[i], obj_addrs_[i]);
+    return paths_;
+}
+
+void AddrSerializer::AddToPersistenceManager(PersistenceManager *pm) const {
+    if (pm == nullptr) {
+        return;
+    }
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        pm->SaveLocalPath(paths_[i], obj_addrs_[i]);
         pm->SaveObjStat(obj_addrs_[i], obj_stats_[i]);
     }
-    return paths;
 }
 
 } // namespace infinity

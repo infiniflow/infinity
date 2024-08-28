@@ -27,7 +27,7 @@ import local_file_system;
 import third_party;
 import catalog;
 import table_entry_type;
-
+import infinity_context;
 import txn_store;
 import data_access_state;
 import status;
@@ -951,8 +951,10 @@ WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment
                                                              UNCOMMIT_TS /*deprecate_ts*/,
                                                              0 /*begin_ts*/, // FIXME
                                                              txn_id);
+    auto *pm = InfinityContext::instance().persistence_manager();
     for (BlockID block_id = 0; block_id < (BlockID)segment_info.block_infos_.size(); ++block_id) {
         auto &block_info = segment_info.block_infos_[block_id];
+        block_info.addr_serializer_.AddToPersistenceManager(pm);
         auto block_entry = BlockEntry::NewReplayBlockEntry(segment_entry.get(),
                                                            block_id,
                                                            block_info.row_count_,
@@ -1073,8 +1075,9 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
             segment_index_entry = segment_index_entry_ptr.get();
         }
     }
-
+    auto *pm = InfinityContext::instance().persistence_manager();
     for (const auto &chunk_info : cmd.chunk_infos_) {
+        chunk_info.addr_serializer_.AddToPersistenceManager(pm);
         segment_index_entry->AddChunkIndexEntryReplayWal(chunk_info.chunk_id_,
                                                          table_entry,
                                                          chunk_info.base_name_,
