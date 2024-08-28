@@ -107,7 +107,7 @@ DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, Transactio
 
 SharedPtr<String> DBMeta::ToString() {
     SharedPtr<String> res = MakeShared<String>(
-        fmt::format("DBMeta, data_dir: {}, db name: {}, entry count: ", *this->data_dir_, *this->db_name_, db_entry_list_.size()));
+        fmt::format("DBMeta, data_dir: {}, db name: {}, entry count: {}", *this->data_dir_, *this->db_name_, db_entry_list_.size()));
     return res;
 }
 
