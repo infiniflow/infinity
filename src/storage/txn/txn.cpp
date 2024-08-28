@@ -547,7 +547,7 @@ bool Txn::DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts)
     // Finalize current object to ensure PersistenceManager be in a consistent state
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
-        pm->CurrentObjFinalize();
+        pm->CurrentObjFinalize(true);
     }
 
     return true;
@@ -563,7 +563,7 @@ void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     // Finalize current object to ensure PersistenceManager be in a consistent state
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
-        pm->CurrentObjFinalize();
+        pm->CurrentObjFinalize(true);
     }
 }
 

@@ -179,6 +179,11 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
             UnrecoverableError(error_message);
         }
         local_path_obj_[local_path] = obj_addr;
+        LOG_TRACE(fmt::format("Persist local path {} to dedicated ObjAddr ({}, {}, {})",
+                              local_path,
+                              obj_addr.obj_key_,
+                              obj_addr.part_offset_,
+                              obj_addr.part_size_));
         return obj_addr;
     } else {
         std::lock_guard<std::mutex> lock(mtx_);
@@ -194,6 +199,11 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
             UnrecoverableError(error_message);
         }
         local_path_obj_[local_path] = obj_addr;
+        LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
+                              local_path,
+                              obj_addr.obj_key_,
+                              obj_addr.part_offset_,
+                              obj_addr.part_size_));
         return obj_addr;
     }
 }
@@ -248,9 +258,45 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size) {
 
 // TODO:
 // - Upload the finalized object to object store in background.
-void PersistenceManager::CurrentObjFinalize() {
+void PersistenceManager::CurrentObjFinalize(bool validate) {
     std::lock_guard<std::mutex> lock(mtx_);
     CurrentObjFinalizeNoLock();
+
+    if (!validate)
+        return;
+    for (auto &[local_path, obj_addr] : local_path_obj_) {
+        auto it = objects_.find(obj_addr.obj_key_);
+        if (it == objects_.end()) {
+            String error_message = fmt::format("CurrentObjFinalize Failed to find object for local path {}", local_path);
+            LOG_ERROR(error_message);
+        }
+    }
+    for (auto &[obj_key, obj_stat] : objects_) {
+        Set<Range> &deleted_ranges = obj_stat.deleted_ranges_;
+        if (deleted_ranges.size() >= 2) {
+            auto it1 = deleted_ranges.begin();
+            auto it2 = std::next(it1);
+            while (it2 != deleted_ranges.end()) {
+                if (it1->end_ >= it2->start_) {
+                    String error_message = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
+                                                       obj_key,
+                                                       it1->start_,
+                                                       it1->end_,
+                                                       it2->start_,
+                                                       it2->end_);
+                    LOG_ERROR(error_message);
+                }
+                it1 = it2;
+                it2 = std::next(it2);
+            }
+        } else if (deleted_ranges.size() == 1) {
+            auto it1 = deleted_ranges.begin();
+            if (it1->start_ == 0 && it1->end_ == current_object_size_) {
+                String error_message = fmt::format("CurrentObjFinalize Object {} is fully deleted", obj_key);
+                LOG_ERROR(error_message);
+            }
+        }
+    }
 }
 
 void PersistenceManager::CurrentObjFinalizeNoLock() {

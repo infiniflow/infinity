@@ -88,7 +88,7 @@ public:
     ObjAddr Persist(const char *data, SizeT len);
 
     // Force finalize current object. Subsequent append on the finalized object is forbidden.
-    void CurrentObjFinalize();
+    void CurrentObjFinalize(bool validate = false);
 
     /**
      * For dedicated objects
