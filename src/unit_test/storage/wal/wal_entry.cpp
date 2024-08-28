@@ -333,7 +333,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
                 break;
             }
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
-            if (!wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
+            if (!wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 replay_entries.push_back(wal_entry);
             } else {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
@@ -407,7 +407,7 @@ TEST_F(WalEntryTest, WalListIterator) {
                 break;
             }
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
-            if (!wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
+            if (!wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 replay_entries.push_back(wal_entry);
             } else {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;

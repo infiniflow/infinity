@@ -1158,47 +1158,15 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     return entry;
 }
 
-bool WalEntry::IsCheckPoint() const {
+bool WalEntry::IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const {
     for (auto &cmd : cmds_) {
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+            assert(cmds_.size() == 1);
+            checkpoint_cmd = static_cast<WalCmdCheckpoint *>(cmd.get());
             return true;
         }
     }
     return false;
-}
-
-bool WalEntry::IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const {
-    auto iter = cmds_.begin();
-    while (iter != cmds_.end()) {
-        if ((*iter)->GetType() == WalCommandType::CHECKPOINT) {
-            checkpoint_cmd = static_cast<WalCmdCheckpoint *>((*iter).get());
-            break;
-        }
-        ++iter;
-    }
-    if (iter == cmds_.end()) {
-        return false;
-    }
-    Vector<SharedPtr<WalCmd>> tail_cmds(iter + 1, cmds_.end());
-    if (!tail_cmds.empty()) {
-        auto tail_entry = MakeShared<WalEntry>();
-        tail_entry->txn_id_ = txn_id_;
-        tail_entry->commit_ts_ = commit_ts_;
-        tail_entry->cmds_ = std::move(tail_cmds);
-        replay_entries.push_back(std::move(tail_entry));
-    }
-    return true;
-}
-
-WalCmdCheckpoint *WalEntry::GetCheckPoint() const {
-    auto iter = cmds_.begin();
-    while (iter != cmds_.end()) {
-        if ((*iter)->GetType() == WalCommandType::CHECKPOINT) {
-            return static_cast<WalCmdCheckpoint *>((*iter).get());
-        }
-        ++iter;
-    }
-    return nullptr;
 }
 
 String WalEntry::ToString() const {
@@ -1380,7 +1348,8 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
         while (iter_->HasNext()) {
             auto entry = iter_->Next();
             if (entry.get() != nullptr) {
-                if (entry->IsCheckPoint()) {
+                WalCmdCheckpoint *checkpoint_cmd = nullptr;
+                if (entry->IsCheckPoint(checkpoint_cmd)) {
                     found_checkpoint = true;
                 }
             } else {

@@ -519,7 +519,7 @@ i64 WalManager::ReplayWalFile() {
             LOG_TRACE(wal_entry->ToString());
 
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
-            if (wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
+            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
                 catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
@@ -636,8 +636,8 @@ Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::Ge
             }
             LOG_TRACE(wal_entry->ToString());
 
-            WalCmdCheckpoint *checkpoint_cmd = wal_entry->GetCheckPoint();
-            if (checkpoint_cmd != nullptr) {
+            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
                 catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
@@ -705,7 +705,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
 
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
             wal_entries.push_back(wal_entry);
-            if (wal_entry->IsCheckPoint(wal_entries, checkpoint_cmd)) {
+            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 system_start_ts = wal_entry->commit_ts_;
                 break;
