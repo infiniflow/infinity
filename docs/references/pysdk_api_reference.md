@@ -643,12 +643,12 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
   - Parameter settings for an EMVB index:
     - `"pq_subspace_num"`: *Required*
       - `"8"`
-      - `"16"` (recommended)
+      - `"16"` (Recommended)
       - `"32"`
       - `"64"`
       - `"128"`
     - `"pq_subspace_bits"`: *Required*
-      - `"8"` (recommended)
+      - `"8"` (Recommended)
       - `"16"`
   - Parameter settings for a full-text index:
     - `"ANALYZER"`: *Optional*

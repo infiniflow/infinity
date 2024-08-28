@@ -171,6 +171,49 @@ The response includes a JSON object like the following:
 
 ---
 
+## List databases
+
+**GET** `/databases`
+
+Retrieves a list of all available databases within the Infinity system.
+
+### Request
+
+- Method: GET
+- URL: `/databases`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases \
+     --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "databases": [
+        "default_db",
+        "my_db"
+    ]  
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+- `databases`: `string[]`  
+  An array of strings representing the names of the databases in the system.
+
+---
+
 ## Show database
 
 **GET** `/databases/{database_name}`
@@ -221,7 +264,7 @@ The response includes a JSON object like the following:
   `0`: The operation succeeds.
 - `database_name`: `string`  
   The name of the database.
-- `store_dir`: `string`  
+- `storage_directory`: `string`  
   The directory path where the database is stored.
 - `table_count`: `integer`  
   The number of tables present in the database.
@@ -245,49 +288,6 @@ The response includes a JSON object like the following:
 
 </TabItem>
 </Tabs>
-
----
-
-## List databases
-
-**GET** `/databases`
-
-Retrieves a list of all available databases within the Infinity system.
-
-### Request
-
-- Method: GET
-- URL: `/databases`
-- Headers: `accept: application/json`
-
-#### Request example
-
-```shell
-curl --request GET \
-     --url http://localhost:23820/databases \
-     --header 'accept: application/json'
-```
-
-### Response
-
-#### Status code 200
-
-The response includes a JSON object like the following:
-
-```shell
-{
-    "error_code": 0,
-    "databases": [
-        "default_db",
-        "my_db"
-    ]  
-}
-```
-
-- `"error_code"`: `integer`  
-  `0`: The operation succeeds.
-- `databases`: `string[]`  
-  An array of strings representing the names of the databases in the system.
 
 ---
 
@@ -319,12 +319,16 @@ curl --request POST \
          "create_option": "ignore_if_exists",
          "fields": [
              {
-                 "name": "name",
-                 "type": "varchar"
+                  "name": "name",
+                  "type": "varchar"
              },
              {
-                 "name": "score",
-                 "type": "float"
+                  "name": "score",
+                  "type": "float"
+             },
+             {
+                  "name": "vector_column"
+                  "type": "vector,8,float"
              }
         ]
     } '
@@ -358,6 +362,20 @@ curl --request POST \
     - Case-insensitive.
   - `"type"`: `string`, *Required*  
     The data type of the column.  
+    - Primitive:  
+      - `"int8"`
+      - `"int16"`
+      - `"int"`/`"int32"`/`"integer"`, `"int64"`
+      - `"float"`/`"float32"`
+      - `"double"`/`"float64"`
+      - `"float16"`
+      - `"bfloat16"`
+    - String: `"varchar"`
+    - Dense vector: e.g., `"vector,128,float"`
+    - Sparse vector: e.g., `"sparse,128,float,int"`
+    - Tensor vector: e.g., `"tensor,4,float"`
+    - Tensor array: e.g., `"tensorarray,6,float"`
+    - Multivector: e.g., `"multivector,128,float"`
 
 ### Response
 
@@ -648,22 +666,23 @@ The response includes a JSON object like the following:
     "error_code": 0,
     "columns": [
         {
-            "column_name": "name",
-            "column_type": "varchar",
-            "constraints": "",
-            "default": "Null"
+             "column_name": "name",
+             "column_type": "Varchar",
+             "constraints": "",
+             "default": "Null"
         },
         {
-            "column_name": "age",
-            "column_type": "integer",
-            "constraints": "",
-            "default": "Null"
-        },
-        {
-            "column_name": "score",
-            "column_type": "integer",
-            "constraints": ""
+             "column_name": "score",
+             "column_type": "Float",
+             "constraints": "",
+             "default": "Null",
         }
+        {
+            "column_name": "vector_column",
+            "column_type": "Embedding(float,8)",
+            "constraints": "",
+            "default": "Null"
+        },
     ]
 }
 ```
@@ -707,7 +726,7 @@ Creates an index on a specified table. If an index with the same name exists, th
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-  - `"fields"`: `list[string]`
+  - `"fields"`: `string[]`
   - `"index"`: `object`
   - `"create_option"`: `enum<string>`
 
@@ -718,23 +737,20 @@ curl --request POST \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' \
---data '
-{
-    "fields": 
-    [
-        "col1"
-    ],
-    "index": 
-    {
-        "type": "HNSW",
-        "M": "16",
-        "ef_construction": "50",
-        "metric": "l2"
-    },
-     "create_option": "ignore_if_exists"
+     --data ' {
+        "fields": 
+        [
+            "vector_column"
+        ],
+        "index": 
+        {
+            "type": "HNSW",
+            "M": "16",
+            "ef_construction": "50",
+            "metric": "l2"
+        },
+        "create_option": "ignore_if_exists"
 } '
-
 ```
 
 #### Request parameters
@@ -768,12 +784,12 @@ curl --request POST \
   - Parameter settings for an EMVB index:
     - `"pq_subspace_num"`: *Required*
       - `"8"`
-      - `"16"` (recommended)
+      - `"16"` (Recommended)
       - `"32"`
       - `"64"`
       - `"128"`
     - `"pq_subspace_bits"`: *Required*
-      - `"8"` (recommended)
+      - `"8"` (Recommended)
       - `"16"`
   - Parameter settings for a full-text index:
     - `"ANALYZER"`: *Optional*
@@ -860,7 +876,9 @@ curl --request DELETE \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' {"drop_option": "ignore_if_not_exists"} '
+     --data ' {
+         "drop_option": "ignore_if_not_exists"
+} '
 ```
 
 #### Request parameters
@@ -964,14 +982,15 @@ The response includes a JSON object like the following:
 {
     "error_code": 0,
     "database_name": "default_db",
-    "table_name": "test_index_tbl",
+    "table_name": "test_vector_table",
     "index_name": "idx1",
-    "index_column_ids": "0",
-    "index_column_names": "col1",
-    "index_type": "EMVB",
-    "other_parameters": "pq_subspace_num = 16, pq_subspace_bits = 8",
+    "index_column_ids": "2",
+    "index_column_names": "vector_column",
+    "index_type": "HNSW",
+    "other_parameters": "metric = l2, encode_type = plain, M = 16, ef_construction = 50, block_size =8192",
     "segment_index_count": "0",
-    "storage_directory": "/var/infinity/data/yjamyYqzzt_db_default/CxmfWOUCdN_table_test_index_tbl/inlt9JpOyy_index_idx1"
+    "storage_directory": "/var/infinity/data/3C1tizeluV_db_default_db/O0wSJ88IrJ_table_test_vector_table/RYurmCbD5h_index_idx1"
+    "storage_size": "0B"
 }
 ```
 
@@ -1196,17 +1215,17 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 0,
-    "tables": 
+    "indexes": 
     [
         {
-            "name": "index1",
-            "index_type": "HNSW",
-            "columns": ["column1"]
+            "columns": "vector_column",
+            "index_name": "idx1",
+            "index_type": "HNSW"
         },
         {
-            "name": "index2",
-            "index_type": "HNSW",
-            "columns": ["column2"]
+            "columns": "vector_column_2",
+            "index_name": "idx2",
+            "index_type": "HNSW"
         }
     ]
 }
