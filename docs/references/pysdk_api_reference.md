@@ -624,7 +624,6 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
 - **index_type**: `IndexType`, *Required*  
   Index type. You may want to import `infinity.index` to set `IndexType`: `from infinity.index import IndexType`  
   - `Hnsw`: An HNSW index.
-  - `EMVB`: An EMVB index. Works with tensors only.
   - `FullText`: A full-text index.  
   - `Secondary`: A secondary index. Works with structured data only.
   - `BMP`: A Block-Max Pruning index. Works with sparse vectors only.
@@ -640,16 +639,6 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"encode"`: *Optional*
       - `"plain"`: (Default) Plain encoding.
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
-  - Parameter settings for an EMVB index:
-    - `"pq_subspace_num"`: *Required*
-      - `"8"`
-      - `"16"` (recommended)
-      - `"32"`
-      - `"64"`
-      - `"128"`
-    - `"pq_subspace_bits"`: *Required*
-      - `"8"` (recommended)
-      - `"16"`
   - Parameter settings for a full-text index:
     - `"ANALYZER"`: *Optional*
       - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs.
@@ -1185,7 +1174,7 @@ Deletes rows from the table based on the specified condition.
 
 #### cond: `str`, *Optional*
 
-A non-empty string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
+A string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
 
 :::tip NOTE
 
