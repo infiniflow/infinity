@@ -202,10 +202,10 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
     IndexType index_type = segment_index_entry->table_index_entry()->index_base()->index_type_;
     switch (index_type) {
         case IndexType::kFullText: {
-            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-            paths_.push_back(full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX);
-            paths_.push_back(full_path + chunk_index_entry->base_name_ + DICT_SUFFIX);
-            paths_.push_back(full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
+            paths_.push_back(full_dir + "/" + chunk_index_entry->base_name_ + POSTING_SUFFIX);
+            paths_.push_back(full_dir + "/" + chunk_index_entry->base_name_ + DICT_SUFFIX);
+            paths_.push_back(full_dir + "/" + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
             break;
         }
         case IndexType::kHnsw:
