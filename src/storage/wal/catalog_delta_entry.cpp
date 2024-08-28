@@ -379,7 +379,8 @@ AddBlockEntryOp::AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts
 AddColumnEntryOp::AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts) {
     outline_info_ = {column_entry->OutlineBufferCount(0), column_entry->LastChunkOff(0)};
-    local_paths_.push_back(column_entry->FilePath());
+    Vector<String> paths = column_entry->FilePaths();
+    local_paths_.insert(local_paths_.end(), paths.begin(), paths.end());
 }
 
 AddTableIndexEntryOp::AddTableIndexEntryOp(TableIndexEntry *table_index_entry, TxnTimeStamp commit_ts)

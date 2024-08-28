@@ -649,6 +649,7 @@ void AddrSerializer::AddToPersistenceManager(PersistenceManager *pm) const {
         return;
     }
     for (SizeT i = 0; i < paths_.size(); ++i) {
+        LOG_INFO(fmt::format("Add path {} to persistence manager", paths_[i]));
         pm->SaveLocalPath(paths_[i], obj_addrs_[i]);
         pm->SaveObjStat(obj_addrs_[i], obj_stats_[i]);
     }

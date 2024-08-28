@@ -52,7 +52,8 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
         auto &col_i_outline_info = outline_infos_[i];
         auto *column = block_entry->columns_[i].get();
         col_i_outline_info = {column->OutlineBufferCount(0), column->LastChunkOff(0)};
-        paths_.push_back(column->FilePath());
+        Vector<String> paths = column->FilePaths();
+        paths_.insert(paths_.end(), paths.begin(), paths.end());
     }
     String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
     String version_file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
