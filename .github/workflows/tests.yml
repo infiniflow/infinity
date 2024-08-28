@@ -78,8 +78,11 @@ jobs:
 
       - name: Collect restart test output
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        # remove symbolic link
         # find all log file like [debug.log.*] in directory, and cat to stdout
-        run: find . -name "restart_test.log.*" -exec cat {} \;
+        run: |
+          sudo rm -f test/data/benchmark/enwiki-10w.csv
+          find . -name "restart_test.log.*" -exec cat {} \;
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -206,8 +209,11 @@ jobs:
 
       - name: Collect restart test output
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        # remove symbolic link
         # find all log file like [debug.log.*] in directory, and cat to stdout
-        run: find . -name "restart_test.log.*" -exec cat {} \;
+        run: |
+          sudo rm -f test/data/benchmark/enwiki-10w.csv
+          find . -name "restart_test.log.*" -exec cat {} \;
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
