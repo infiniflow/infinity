@@ -911,7 +911,7 @@ void InfinityThriftService::ShowDatabase(infinity_thrift_rpc::ShowDatabaseRespon
 
         {
             Value value = data_block->GetValue(1, 2);
-            response.table_count = value.value_.big_int;
+            response.table_count = std::stol(value.GetVarchar());
         }
 
         response.__set_error_code((i64)(result.ErrorCode()));
@@ -953,17 +953,17 @@ void InfinityThriftService::ShowTable(infinity_thrift_rpc::ShowTableResponse &re
 
         {
             Value value = data_block->GetValue(1, 3);
-            response.column_count = value.value_.big_int;
+            response.column_count = std::stol(value.GetVarchar());
         }
 
         {
             Value value = data_block->GetValue(1, 4);
-            response.segment_count = value.value_.big_int;
+            response.segment_count = std::stol(value.GetVarchar());
         }
 
         {
             Value value = data_block->GetValue(1, 5);
-            response.row_count = value.value_.big_int;
+            response.row_count = std::stol(value.GetVarchar());
         }
 
         response.__set_error_code((i64)(result.ErrorCode()));
