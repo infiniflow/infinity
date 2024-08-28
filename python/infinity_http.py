@@ -575,7 +575,8 @@ class infinity_http:
         deprecated_api("match is deprecated, please use match_text instead")
         return self.match_text(*args, **kwargs)
 
-    def match_tensor(self, column_name: str, query_data, query_data_type: str, topn: int):
+    def match_tensor(self, column_name: str, query_data, query_data_type: str, topn: int,
+                     extra_option: Optional[dict] = None):
         self._match_tensor = {}
         self._match_tensor["search_method"] = "maxsim"
         if isinstance(column_name, list):
@@ -584,7 +585,11 @@ class infinity_http:
             column_name = [column_name]
         self._match_tensor["fields"] = column_name
         self._match_tensor["query_tensor"] = query_data
-        self._match_tensor["options"] = f"topn={topn}"
+        option_str = f"topn={topn}"
+        if extra_option is not None:
+            for k, v in extra_option.items():
+                option_str += f";{k}={v}"
+        self._match_tensor["options"] = option_str
         self._match_tensor["element_type"] = type_transfrom[query_data_type]
         return self
 
