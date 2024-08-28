@@ -603,7 +603,10 @@ HashMap<String, ObjAddr> PersistenceManager::GetAllFiles() const {
     return local_path_obj_;
 }
 
-SizeT AddrSerializer::Initialize(PersistenceManager *pm, const Vector<String> &path) const {
+void AddrSerializer::Initialize(PersistenceManager *pm, const Vector<String> &path) {
+    if (!paths_.empty()) {
+        UnrecoverableError("AddrSerializer has been initialized");
+    }
     for (const String &path : path) {
         paths_.push_back(path);
         ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
@@ -616,9 +619,12 @@ SizeT AddrSerializer::Initialize(PersistenceManager *pm, const Vector<String> &p
             obj_stats_.push_back(obj_stat);
         }
     }
+}
+
+SizeT AddrSerializer::GetSizeInBytes() const {
     SizeT size = sizeof(SizeT);
-    for (SizeT i = 0; i < path.size(); ++i) {
-        size += sizeof(i32) + path[i].size();
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        size += sizeof(i32) + paths_[i].size();
         size += obj_addrs_[i].GetSizeInBytes();
         size += obj_stats_[i].GetSizeInBytes();
     }

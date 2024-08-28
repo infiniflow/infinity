@@ -58,6 +58,8 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
     String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
     String version_file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
     paths_.push_back(version_file_path);
+    auto *pm = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(pm, paths_);
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
@@ -72,7 +74,7 @@ i32 WalBlockInfo::GetSizeInBytes() const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm_size_ = addr_serializer_.Initialize(pm, paths_);
+        pm_size_ = addr_serializer_.GetSizeInBytes();
         size += pm_size_;
     }
     return size;
@@ -221,6 +223,8 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
             UnrecoverableError(error_message);
         }
     }
+    auto *pm = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(pm, paths_);
 }
 
 bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
@@ -233,7 +237,7 @@ i32 WalChunkIndexInfo::GetSizeInBytes() const {
     bool use_object_cache = pm != nullptr;
     SizeT size = 0;
     if (use_object_cache) {
-        pm_size_= addr_serializer_.Initialize(pm, paths_);
+        pm_size_= addr_serializer_.GetSizeInBytes();
         size += pm_size_;
     }
     return size + sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);

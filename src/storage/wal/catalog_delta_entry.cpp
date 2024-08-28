@@ -87,10 +87,18 @@ SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm_size_ = addr_serializer_.Initialize(pm, GetFilePaths());
+        pm_size_ = addr_serializer_.GetSizeInBytes();
         size += pm_size_;
     }
     return size;
+}
+
+void CatalogDeltaOperation::InitializeAddrSerializer() {
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        addr_serializer_.Initialize(pm, GetFilePaths());
+    }
 }
 
 void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {

@@ -281,7 +281,8 @@ TEST_F(WalEntryTest, ReadWriteVFS) {
     pm.SaveLocalPath(paths[0], obj_addr1);
 
     AddrSerializer addr_serializer;
-    SizeT size = addr_serializer.Initialize(&pm, paths);
+    addr_serializer.Initialize(&pm, paths);
+    SizeT size = addr_serializer.GetSizeInBytes();
     auto buffer = MakeUnique<char[]>(size);
     char *ptr = buffer.get();
     addr_serializer.WriteBufAdv(ptr);
