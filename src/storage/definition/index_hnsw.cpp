@@ -133,7 +133,7 @@ String IndexHnsw::ToString() const {
 String IndexHnsw::BuildOtherParamsString() const {
     std::stringstream ss;
     ss << "metric = " << MetricTypeToString(metric_type_) << ", encode_type = " << HnswEncodeTypeToString(encode_type_) << ", M = " << M_
-       << ", ef_construction = " << ef_construction_ << ", block_size = " << block_size_;
+       << ", ef_construction = " << ef_construction_;
     return ss.str();
 }
 
