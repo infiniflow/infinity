@@ -529,7 +529,7 @@ WrapQueryResult WrapShowDatabase(Infinity &instance, const String &db_name) {
         }
         {
             Value value = data_block->GetValue(1, 2);
-            result.table_count = value.value_.big_int;
+            result.table_count = std::stol(value.GetVarchar());
         }
     }
     return result;
