@@ -107,8 +107,7 @@ Vector<SharedPtr<QueryProfiler>> ProfileHistory::GetElements() {
 }
 
 // TODO Consider letting it commit as a transaction.
-Catalog::Catalog(SharedPtr<String> data_dir)
-    : data_dir_(std::move(data_dir)), catalog_dir_(MakeShared<String>(*data_dir_ + "/" + String(CATALOG_FILE_DIR))), running_(true) {
+Catalog::Catalog(SharedPtr<String> data_dir) : data_dir_(std::move(data_dir)), catalog_dir_(MakeShared<String>(CATALOG_FILE_DIR)), running_(true) {
     LocalFileSystem fs;
     if (!fs.Exists(*catalog_dir_)) {
         fs.CreateDirectory(*catalog_dir_);

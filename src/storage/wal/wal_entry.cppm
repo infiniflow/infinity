@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <typeinfo>
 
 export module wal_entry;
@@ -168,7 +169,9 @@ export struct WalCmd {
 };
 
 export struct WalCmdCreateDatabase final : public WalCmd {
-    explicit WalCmdCreateDatabase(String db_name, String db_dir_tail) : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)) {}
+    explicit WalCmdCreateDatabase(String db_name, String db_dir_tail) : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)) {
+        assert(!std::filesystem::path(db_dir_tail_).is_absolute());
+    }
 
     WalCommandType GetType() const final { return WalCommandType::CREATE_DATABASE; }
     bool operator==(const WalCmd &other) const final {
@@ -236,7 +239,9 @@ export struct WalCmdDropTable final : public WalCmd {
 export struct WalCmdCreateIndex final : public WalCmd {
     WalCmdCreateIndex(String db_name, String table_name, String index_dir_tail_, SharedPtr<IndexBase> index_base)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_dir_tail_(std::move(index_dir_tail_)),
-          index_base_(std::move(index_base)) {}
+          index_base_(std::move(index_base)) {
+        assert(!std::filesystem::path(index_dir_tail_).is_absolute());
+    }
 
     WalCommandType GetType() const final { return WalCommandType::CREATE_INDEX; }
     bool operator==(const WalCmd &other) const final;
@@ -371,7 +376,9 @@ export struct WalCmdUpdateSegmentBloomFilterData final : public WalCmd {
 
 export struct WalCmdCheckpoint final : public WalCmd {
     WalCmdCheckpoint(i64 max_commit_ts, bool is_full_checkpoint, String catalog_path, String catalog_name)
-        : max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path), catalog_name_(catalog_name) {}
+        : max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path), catalog_name_(catalog_name) {
+        assert(!std::filesystem::path(catalog_path_).is_absolute());
+    }
     virtual WalCommandType GetType() const final { return WalCommandType::CHECKPOINT; }
     virtual bool operator==(const WalCmd &other) const final;
     virtual i32 GetSizeInBytes() const final;

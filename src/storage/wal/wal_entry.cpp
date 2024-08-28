@@ -15,7 +15,6 @@
 module;
 
 #include <cassert>
-#include <fstream>
 #include <vector>
 
 module wal_entry;
@@ -60,6 +59,9 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
     paths_.push_back(version_file_path);
     auto *pm = InfinityContext::instance().persistence_manager();
     addr_serializer_.Initialize(pm, paths_);
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
@@ -81,6 +83,9 @@ i32 WalBlockInfo::GetSizeInBytes() const {
 }
 
 void WalBlockInfo::WriteBufferAdv(char *&buf) const {
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
     WriteBufAdv(buf, block_id_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, row_capacity_);
@@ -244,6 +249,9 @@ i32 WalChunkIndexInfo::GetSizeInBytes() const {
 }
 
 void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
     WriteBufAdv(buf, chunk_id_);
     WriteBufAdv(buf, base_name_);
     WriteBufAdv(buf, base_rowid_);
@@ -661,6 +669,7 @@ i32 WalCmdDumpIndex::GetSizeInBytes() const {
 }
 
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
+    assert(!std::filesystem::path(db_dir_tail_).is_absolute());
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_dir_tail_);
@@ -754,6 +763,7 @@ void WalCmdUpdateSegmentBloomFilterData::WriteAdv(char *&buf) const {
 }
 
 void WalCmdCheckpoint::WriteAdv(char *&buf) const {
+    assert(!std::filesystem::path(catalog_path_).is_absolute());
     WriteBufAdv(buf, WalCommandType::CHECKPOINT);
     WriteBufAdv(buf, this->max_commit_ts_);
     WriteBufAdv(buf, i8(this->is_full_checkpoint_));

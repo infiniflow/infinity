@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <cstring>
 #include <errno.h>
 #include <fcntl.h>
@@ -54,6 +55,7 @@ LocalFileHandler::~LocalFileHandler() {
 }
 
 Pair<UniquePtr<FileHandler>, Status> LocalFileSystem::OpenFile(const String &path, u8 flags, FileLockType lock_type) {
+    assert(std::filesystem::path(path).is_absolute());
     i32 file_flags{O_RDWR};
     bool read_flag = flags & FileFlags::READ_FLAG;
     bool write_flag = flags & FileFlags::WRITE_FLAG;
@@ -122,6 +124,8 @@ void LocalFileSystem::Close(FileHandler &file_handler) {
 }
 
 void LocalFileSystem::Rename(const String &old_path, const String &new_path) {
+    assert(std::filesystem::path(old_path).is_absolute());
+    assert(std::filesystem::path(new_path).is_absolute());
     if (rename(old_path.c_str(), new_path.c_str()) != 0) {
         String error_message = fmt::format("Can't rename file: {}, {}", old_path, strerror(errno));
         UnrecoverableError(error_message);
@@ -209,6 +213,7 @@ SizeT LocalFileSystem::GetFileSize(FileHandler &file_handler) {
 }
 
 void LocalFileSystem::DeleteFile(const String &file_name) {
+    assert(std::filesystem::path(file_name).is_absolute());
     std::error_code error_code;
     Path p{file_name};
     bool is_deleted = std::filesystem::remove(p, error_code);
@@ -231,6 +236,8 @@ void LocalFileSystem::SyncFile(FileHandler &file_handler) {
 }
 
 void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path) {
+    assert(std::filesystem::path(dst_path).is_absolute());
+    assert(std::filesystem::path(src_path).is_absolute());
     Path dst{dst_path};
     Path src{src_path};
     std::ifstream srcFile(src, std::ios::binary);
@@ -255,6 +262,7 @@ void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path)
 }
 
 void LocalFileSystem::Truncate(const String &file_name, SizeT length) {
+    assert(std::filesystem::path(file_name).is_absolute());
     std::error_code error_code;
     std::filesystem::resize_file(file_name, length, error_code);
     if (error_code.value() != 0) {
@@ -265,6 +273,7 @@ void LocalFileSystem::Truncate(const String &file_name, SizeT length) {
 
 // Directory related methods
 bool LocalFileSystem::Exists(const String &path) {
+    assert(std::filesystem::path(path).is_absolute());
     std::error_code error_code;
     Path p{path};
     bool is_exists = std::filesystem::exists(p, error_code);
@@ -278,12 +287,14 @@ bool LocalFileSystem::Exists(const String &path) {
 }
 
 bool LocalFileSystem::CreateDirectoryNoExp(const String &path) {
+    assert(std::filesystem::path(path).is_absolute());
     std::error_code error_code;
     Path p{path};
     return std::filesystem::create_directories(p, error_code);
 }
 
 void LocalFileSystem::CreateDirectory(const String &path) {
+    assert(std::filesystem::path(path).is_absolute());
     std::error_code error_code;
     Path p{path};
     std::filesystem::create_directories(p, error_code);
@@ -294,6 +305,7 @@ void LocalFileSystem::CreateDirectory(const String &path) {
 }
 
 u64 LocalFileSystem::DeleteDirectory(const String &path) {
+    assert(std::filesystem::path(path).is_absolute());
     std::error_code error_code;
     Path p{path};
     u64 removed_count = std::filesystem::remove_all(p, error_code);
@@ -305,6 +317,7 @@ u64 LocalFileSystem::DeleteDirectory(const String &path) {
 }
 
 void LocalFileSystem::CleanupDirectory(const String &path) {
+    assert(std::filesystem::path(path).is_absolute());
     std::error_code error_code;
     Path p{path};
     if (!fs::exists(p)) {
@@ -324,6 +337,7 @@ void LocalFileSystem::CleanupDirectory(const String &path) {
 }
 
 Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
+    assert(std::filesystem::path(path).is_absolute());
     Path dir_path(path);
     if (!is_directory(dir_path)) {
         String error_message = fmt::format("{} isn't a directory", path);
@@ -337,13 +351,18 @@ Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
 }
 
 String LocalFileSystem::GetAbsolutePath(const String &path) {
+    assert(std::filesystem::path(path).is_absolute());
     Path p{path};
     return std::filesystem::absolute(p).string();
 }
 
-u64 LocalFileSystem::GetFileSizeByPath(const String &path) { return std::filesystem::file_size(path); }
+u64 LocalFileSystem::GetFileSizeByPath(const String &path) {
+    assert(std::filesystem::path(path).is_absolute());
+    return std::filesystem::file_size(path);
+}
 
 u64 LocalFileSystem::GetFolderSizeByPath(const String &path) {
+    assert(std::filesystem::path(path).is_absolute());
     u64 totalSize = 0;
 
     for (const auto &entry : std::filesystem::recursive_directory_iterator(path)) {
@@ -361,6 +380,7 @@ String LocalFileSystem::ConcatenateFilePath(const String &dir_path, const String
 }
 
 int LocalFileSystem::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len) {
+    assert(std::filesystem::path(file_path).is_absolute());
     data_ptr = nullptr;
     data_len = 0;
     std::lock_guard<std::mutex> lock(mtx_);
@@ -396,6 +416,7 @@ int LocalFileSystem::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &dat
 }
 
 int LocalFileSystem::MunmapFile(const String &file_path) {
+    assert(std::filesystem::path(file_path).is_absolute());
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = mapped_files_.find(file_path);
     if (it == mapped_files_.end()) {

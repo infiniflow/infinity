@@ -84,8 +84,9 @@ export struct BaseEntry {
         : deleted_(is_delete), entry_type_(entry_type), base_dir_(nullptr), encode_(MakeUnique<String>(std::move(encode))) {}
 
     explicit BaseEntry(EntryType entry_type, bool is_delete, SharedPtr<String> base_dir, String encode)
-        : deleted_(is_delete), entry_type_(entry_type), base_dir_(base_dir),
-          encode_(MakeUnique<String>(std::move(encode))) {}
+        : deleted_(is_delete), entry_type_(entry_type), base_dir_(base_dir), encode_(MakeUnique<String>(std::move(encode))) {
+        assert(!std::filesystem::path(*base_dir_).is_absolute());
+    }
 
     virtual ~BaseEntry() = default;
 
