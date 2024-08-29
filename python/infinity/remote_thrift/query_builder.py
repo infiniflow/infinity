@@ -191,7 +191,7 @@ class InfinityThriftQueryBuilder(ABC):
     def match_sparse(
         self,
         vector_column_name: str,
-        sparse_data: SparseVector,
+        sparse_data: SparseVector | dict,
         metric_type: str,
         topn: int,
         opt_params: Optional[dict] = None,

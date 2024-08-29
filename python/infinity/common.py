@@ -34,11 +34,19 @@ class SparseVector:
     def __post_init__(self):
         assert (self.values is None) or (len(self.indices) == len(self.values))
 
-    def to_dict(self):
+    def to_dict_old(self):
         d = {"indices": self.indices}
         if self.values is not None:
             d["values"] = self.values
         return d
+
+    def to_dict(self):
+        if self.values is None:
+            raise ValueError("SparseVector.values is None")
+        result = {}
+        for i, v in zip(self.indices, self.values):
+            result[str(i)] = v
+        return result
 
     @staticmethod
     def from_dict(d):
@@ -53,7 +61,7 @@ class SparseVector:
 
 URI = Union[NetworkAddress, Path]
 VEC = Union[list, np.ndarray]
-INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector]
+INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector, dict]
 
 LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
 

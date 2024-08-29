@@ -23,7 +23,7 @@ void MatchSparseExpr::SetSearchColumn(ParsedExpr *&column_expr) {
     column_expr = nullptr;
 }
 
-void MatchSparseExpr::SetQuerySparse(ConstantExpr *raw_sparse_expr) {
+void MatchSparseExpr::SetQuerySparse(ConstantExpr *&raw_sparse_expr) {
     query_sparse_expr_.reset(raw_sparse_expr);
     query_sparse_expr_->TrySortSparseVec(nullptr);
     raw_sparse_expr = nullptr;

@@ -37,6 +37,7 @@ import internal_types;
 import statement_common;
 import data_type;
 import logger;
+import sparse_info;
 
 namespace infinity {
 
@@ -140,6 +141,6 @@ private:
 };
 
 export SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_object);
-export  ConstantExpr * BuildConstantSparseExprFromJson(const nlohmann::json &json_object);
+export SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &json_object, const SparseInfo *sparse_info);
 
 } // namespace infinity
