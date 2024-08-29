@@ -460,9 +460,9 @@ class infinity_http:
         if len(self._fusion):
             tmp.update({"fusion": self._fusion})
         if len(self._knn):
-            tmp.update({"knn": self._knn})
+            tmp.update({"match_dense": self._knn})
         if len(self._match):
-            tmp.update({"match":self._match})
+            tmp.update({"match_text":self._match})
         if len(self._match_tensor):
             tmp.update({"match_tensor":self._match_tensor})
         if len(self._match_sparse):

@@ -147,7 +147,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     search_exprs->push_back(fusion_expr);
                     ++fusion_expr_count;
                 }
-            } else if (IsEqual(key, "knn")) {
+            } else if (IsEqual(key, "match_dense")) {
                 if (search_expr == nullptr) {
                     search_expr = new SearchExpr();
                 }
@@ -158,7 +158,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 }
                 search_exprs->push_back(knn_expr);
                 ++match_expr_count;
-            } else if (IsEqual(key, "match")) {
+            } else if (IsEqual(key, "match_text")) {
                 if (search_expr == nullptr) {
                     search_expr = new SearchExpr();
                 }

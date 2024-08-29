@@ -59,6 +59,7 @@ import command_statement;
 import data_block;
 import table_def;
 import extra_ddl_info;
+import defer_op;
 
 import column_vector;
 import query_result;
@@ -84,9 +85,9 @@ ClientVersions::ClientVersions() {
     client_version_map_[16] = String("0.3.0.dev7");
 }
 
-Pair<const char*, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
+Pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
     auto iter = client_version_map_.find(version_index);
-    if(iter == client_version_map_.end()) {
+    if (iter == client_version_map_.end()) {
         return {nullptr, Status::UnsupportedVersionIndex(version_index)};
     }
     return {iter->second.c_str(), Status::OK()};
@@ -96,19 +97,19 @@ std::mutex InfinityThriftService::infinity_session_map_mutex_;
 HashMap<u64, SharedPtr<Infinity>> InfinityThriftService::infinity_session_map_;
 ClientVersions InfinityThriftService::client_version_;
 
-void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ConnectRequest& request) {
+void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ConnectRequest &request) {
     i64 request_client_version = request.client_version;
-    if(request_client_version != current_version_index_) {
+    if (request_client_version != current_version_index_) {
         auto [request_version_ptr, status1] = client_version_.GetVersionByIndex(request_client_version);
-        if(!status1.ok()) {
+        if (!status1.ok()) {
             response.__set_error_code((i64)(status1.code()));
             response.__set_error_msg(status1.message());
             LOG_ERROR(status1.message());
-            return ;
+            return;
         }
 
         auto [expected_version_ptr, status2] = client_version_.GetVersionByIndex(current_version_index_);
-        if(!status2.ok()) {
+        if (!status2.ok()) {
             UnrecoverableError(status2.message());
         }
 
@@ -116,7 +117,7 @@ void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &respons
         response.__set_error_code((i64)(status3.code()));
         response.__set_error_msg(status3.message());
         LOG_ERROR(status3.message());
-        return ;
+        return;
     }
 
     auto infinity = Infinity::RemoteConnect();
@@ -403,20 +404,20 @@ void InfinityThriftService::Export(infinity_thrift_rpc::CommonResponse &response
 
     for (String column_name : request.columns) {
         ToLower(column_name);
-        if(column_name == "_row_id") {
-            FunctionExpr* expr = new FunctionExpr();
+        if (column_name == "_row_id") {
+            FunctionExpr *expr = new FunctionExpr();
             expr->func_name_ = "row_id";
             export_columns->emplace_back(expr);
-        } else if(column_name == "_create_timestamp") {
-            FunctionExpr* expr = new FunctionExpr();
+        } else if (column_name == "_create_timestamp") {
+            FunctionExpr *expr = new FunctionExpr();
             expr->func_name_ = "create_timestamp";
             export_columns->emplace_back(expr);
-        } else if(column_name == "_delete_timestamp") {
-            FunctionExpr* expr = new FunctionExpr();
+        } else if (column_name == "_delete_timestamp") {
+            FunctionExpr *expr = new FunctionExpr();
             expr->func_name_ = "delete_timestamp";
             export_columns->emplace_back(expr);
         } else {
-            ColumnExpr* expr = new ColumnExpr();
+            ColumnExpr *expr = new ColumnExpr();
             expr->names_.emplace_back(column_name);
             export_columns->emplace_back(expr);
         }
@@ -460,37 +461,58 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     }
 
     Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+    DeferFn defer_fn1([&]() {
+        if (output_columns != nullptr) {
+            for (auto &expr_ptr : *output_columns) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
+            delete output_columns;
+            output_columns = nullptr;
+        }
+    });
     output_columns->reserve(request.select_list.size());
 
     Status parsed_expr_status;
     for (auto &expr : request.select_list) {
         auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
-        if (!parsed_expr_status.ok()) {
-
-            if (output_columns != nullptr) {
-                for (auto &expr_ptr : *output_columns) {
-                    delete expr_ptr;
-                }
-                delete output_columns;
-                output_columns = nullptr;
-            }
-
+        DeferFn defer_fn4([&]() {
             if (parsed_expr != nullptr) {
                 delete parsed_expr;
                 parsed_expr = nullptr;
             }
+        });
 
+        if (!parsed_expr_status.ok()) {
             ProcessStatus(response, parsed_expr_status);
             return;
         }
         output_columns->emplace_back(parsed_expr);
+        parsed_expr = nullptr;
     }
 
     // search expr
     SearchExpr *search_expr = nullptr;
+    DeferFn defer_fn5([&]() {
+        if (search_expr != nullptr) {
+            delete search_expr;
+            search_expr = nullptr;
+        }
+    });
     if (request.__isset.search_expr) {
 
         auto search_expr_list = new Vector<ParsedExpr *>();
+        DeferFn defer_fn2([&]() {
+            if (search_expr_list != nullptr) {
+                for (auto &expr_ptr : *search_expr_list) {
+                    delete expr_ptr;
+                    expr_ptr = nullptr;
+                }
+                delete search_expr_list;
+                search_expr_list = nullptr;
+            }
+        });
+
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
         SizeT total_expr_count = match_expr_count + fusion_expr_count;
@@ -498,29 +520,18 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         for (SizeT idx = 0; idx < match_expr_count; ++idx) {
             Status status;
             ParsedExpr *match_expr = GetGenericMatchExprFromProto(status, request.search_expr.match_exprs[idx]);
-            if (!status.ok()) {
-                if (output_columns != nullptr) {
-                    for (auto &expr_ptr : *output_columns) {
-                        delete expr_ptr;
-                    }
-                    delete output_columns;
-                    output_columns = nullptr;
-                }
-                if (search_expr_list != nullptr) {
-                    for (auto &expr_ptr : *search_expr_list) {
-                        delete expr_ptr;
-                    }
-                    delete search_expr_list;
-                    search_expr_list = nullptr;
-                }
+            DeferFn defer_fn3([&]() {
                 if (match_expr != nullptr) {
                     delete match_expr;
+                    match_expr = nullptr;
                 }
-
+            });
+            if (!status.ok()) {
                 ProcessStatus(response, status);
                 return;
             }
             search_expr_list->emplace_back(match_expr);
+            match_expr = nullptr;
         }
 
         for (SizeT idx = 0; idx < fusion_expr_count; ++idx) {
@@ -530,32 +541,20 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
 
         search_expr = new SearchExpr();
         search_expr->SetExprs(search_expr_list);
+        search_expr_list = nullptr;
     }
 
     // filter
     ParsedExpr *filter = nullptr;
+    DeferFn defer_fn6([&]() {
+        if (filter != nullptr) {
+            delete filter;
+            filter = nullptr;
+        }
+    });
     if (request.__isset.where_expr == true) {
         filter = GetParsedExprFromProto(parsed_expr_status, request.where_expr);
         if (!parsed_expr_status.ok()) {
-
-            if (output_columns != nullptr) {
-                for (auto &expr_ptr : *output_columns) {
-                    delete expr_ptr;
-                }
-                delete output_columns;
-                output_columns = nullptr;
-            }
-
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
-
-            if (filter != nullptr) {
-                delete filter;
-                filter = nullptr;
-            }
-
             ProcessStatus(response, parsed_expr_status);
             return;
         }
@@ -577,7 +576,9 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     // auto start3 = std::chrono::steady_clock::now();
 
     const QueryResult result = infinity->Search(request.db_name, request.table_name, search_expr, filter, output_columns);
-
+    output_columns = nullptr;
+    filter = nullptr;
+    search_expr = nullptr;
     // auto end3 = std::chrono::steady_clock::now();
     //
     // phase_3_duration_ += end3 - start3;
@@ -639,6 +640,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             if (output_columns != nullptr) {
                 for (auto &expr_ptr : *output_columns) {
                     delete expr_ptr;
+                    expr_ptr = nullptr;
                 }
                 delete output_columns;
                 output_columns = nullptr;
@@ -670,6 +672,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
                 if (output_columns != nullptr) {
                     for (auto &expr_ptr : *output_columns) {
                         delete expr_ptr;
+                        expr_ptr = nullptr;
                     }
                     delete output_columns;
                     output_columns = nullptr;
@@ -678,6 +681,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
                 if (search_expr_list != nullptr) {
                     for (auto &expr_ptr : *search_expr_list) {
                         delete expr_ptr;
+                        expr_ptr = nullptr;
                     }
                     delete search_expr_list;
                     search_expr_list = nullptr;
@@ -685,6 +689,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
                 if (match_expr != nullptr) {
                     delete match_expr;
+                    match_expr = nullptr;
                 }
 
                 ProcessStatus(response, status);
@@ -711,6 +716,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             if (output_columns != nullptr) {
                 for (auto &expr_ptr : *output_columns) {
                     delete expr_ptr;
+                    expr_ptr = nullptr;
                 }
                 delete output_columns;
                 output_columns = nullptr;
@@ -825,7 +831,7 @@ void InfinityThriftService::Update(infinity_thrift_rpc::CommonResponse &response
     ProcessQueryResult(response, result);
 }
 
-void InfinityThriftService::Optimize(infinity_thrift_rpc::CommonResponse& response, const infinity_thrift_rpc::OptimizeRequest& request) {
+void InfinityThriftService::Optimize(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::OptimizeRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
     if (!infinity_status.ok()) {
         ProcessStatus(response, infinity_status);
@@ -1804,10 +1810,10 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
 
     knn_expr->opt_params_ = new Vector<InitParameter *>();
     for (auto &param : expr.opt_params) {
-        if(param.param_name == "index_name") {
+        if (param.param_name == "index_name") {
             knn_expr->index_name_ = param.param_value;
         }
-        if(param.param_name == "ignore_index" && param.param_value == "true") {
+        if (param.param_name == "ignore_index" && param.param_value == "true") {
             knn_expr->ignore_index_ = true;
         }
 
@@ -1821,17 +1827,34 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
 }
 
 MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &status, const infinity_thrift_rpc::MatchSparseExpr &expr) {
-    auto match_sparse_expr = new MatchSparseExpr(true);
+    auto *match_sparse_expr = new MatchSparseExpr(true);
+    DeferFn defer_fn1([&] {
+        if(match_sparse_expr != nullptr) {
+            delete match_sparse_expr;
+            match_sparse_expr = nullptr;
+        }
+    });
+
     auto *column_expr = static_cast<ParsedExpr *>(GetColumnExprFromProto(expr.column_expr));
+    DeferFn defer_fn2([&] {
+        if(column_expr != nullptr) {
+            delete column_expr;
+            column_expr = nullptr;
+        }
+    });
     match_sparse_expr->SetSearchColumn(column_expr);
+    column_expr = nullptr;
 
     auto *constant_expr = GetConstantFromProto(status, expr.query_sparse_expr);
-    if (!status.ok()) {
-        delete match_sparse_expr;
-        match_sparse_expr = nullptr;
-        return nullptr;
-    }
+    DeferFn defer_fn3([&] {
+        if(constant_expr != nullptr) {
+            delete constant_expr;
+            constant_expr = nullptr;
+        }
+    });
+
     match_sparse_expr->SetQuerySparse(constant_expr);
+    constant_expr = nullptr;
 
     match_sparse_expr->SetMetricType(expr.metric_type);
 
@@ -1845,7 +1868,10 @@ MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &stat
     match_sparse_expr->SetOptParams(expr.topn, opt_params_ptr);
 
     status = Status::OK();
-    return match_sparse_expr;
+
+    MatchSparseExpr *return_value = match_sparse_expr;
+    match_sparse_expr = nullptr;
+    return return_value;
 }
 
 MatchTensorExpr *InfinityThriftService::GetMatchTensorExprFromProto(Status &status, const infinity_thrift_rpc::MatchTensorExpr &expr) {
@@ -2040,7 +2066,6 @@ OptimizeOptions InfinityThriftService::GetParsedOptimizeOptionFromProto(const in
     }
     return opt;
 }
-
 
 infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColumnType(const SharedPtr<DataType> &data_type) {
     switch (data_type->type()) {
@@ -2522,7 +2547,9 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::CommonResponse &r
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowDatabaseResponse &response, const Status &status, const std::string_view error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowDatabaseResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2530,7 +2557,9 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowDatabaseRespo
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowTableResponse &response, const Status &status, const std::string_view error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowTableResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2538,7 +2567,9 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowTableResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowIndexResponse &response, const Status &status, const std::string_view error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowIndexResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2554,7 +2585,9 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::SelectResponse &r
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListDatabaseResponse &response, const Status &status, const std::string_view error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListDatabaseResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2562,7 +2595,9 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListDatabaseRespo
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListTableResponse &response, const Status &status, const std::string_view error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListTableResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2570,7 +2605,9 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListTableResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListIndexResponse &response, const Status &status, const std::string_view error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListIndexResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2578,7 +2615,9 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListIndexResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowSegmentResponse &response, const Status &status, const std::string_view error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowSegmentResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2586,7 +2625,9 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowSegmentRespon
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockResponse &response, const Status &status, const std::string_view error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2594,7 +2635,9 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockColumnResponse &response, const Status &status, const std::string_view error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockColumnResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2602,7 +2645,9 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockColumnRe
     }
 }
 
-void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result, const std::string_view error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response,
+                                               const QueryResult &result,
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2610,7 +2655,9 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonRespon
     }
 }
 
-void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response, const QueryResult &result, const std::string_view error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response,
+                                               const QueryResult &result,
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());

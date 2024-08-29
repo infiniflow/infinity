@@ -3376,6 +3376,7 @@ copy_option : FORMAT IDENTIFIER {
         free($2);
     } else if (strcasecmp($2, "parquet") == 0) {
         $$->file_type_ = infinity::CopyFileType::kPARQUET;
+        free($2);
     } else {
         free($2);
         delete $$;
