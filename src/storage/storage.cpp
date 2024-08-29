@@ -53,13 +53,6 @@ namespace infinity {
 Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {}
 
 void Storage::Init(bool maintenance_mode) {
-    // Construct buffer manager
-    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
-                                            MakeShared<String>(config_ptr_->DataDir()),
-                                            MakeShared<String>(config_ptr_->TempDir()),
-                                            config_ptr_->LRUNum());
-    buffer_mgr_->Start();
-
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
                                       config_ptr_->WALDir(),
@@ -71,6 +64,14 @@ void Storage::Init(bool maintenance_mode) {
     if(maintenance_mode) {
         return ;
     }
+
+    // Construct buffer manager
+    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
+                                            MakeShared<String>(config_ptr_->DataDir()),
+                                            MakeShared<String>(config_ptr_->TempDir()),
+                                            config_ptr_->LRUNum());
+    buffer_mgr_->Start();
+
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
     TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile();
@@ -100,9 +101,8 @@ void Storage::Init(bool maintenance_mode) {
     new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
     bg_processor_->Start();
-    if (compact_processor_.get() != nullptr) {
-        compact_processor_->Start();
-    }
+
+    compact_processor_->Start();
 
     auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
     auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true);
@@ -136,28 +136,28 @@ void Storage::UnInit(bool maintenance_mode) {
     LOG_INFO("Close storage ...");
     if(!maintenance_mode) {
         periodic_trigger_thread_->Stop();
-        if (compact_processor_.get() != nullptr) {
-            compact_processor_->Stop();
-        }
+
         bg_processor_->Stop();
+        compact_processor_->Stop();
 
         new_catalog_.reset();
 
         memory_index_tracer_.reset();
 
+        buffer_mgr_->Stop();
+        buffer_mgr_.reset();
+
         wal_mgr_->Stop();
 
         txn_mgr_.reset();
-        if (compact_processor_.get() != nullptr) {
-            compact_processor_.reset();
-        }
+
+        compact_processor_.reset();
         bg_processor_.reset();
     }
 
     wal_mgr_.reset();
 
-    buffer_mgr_->Stop();
-    buffer_mgr_.reset();
+
     config_ptr_ = nullptr;
     LOG_INFO("Close storage successfully\n");
 }
