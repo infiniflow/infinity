@@ -46,6 +46,7 @@ public:
 
     // General
     String Version();
+    String ServerMode();
     String TimeZone();
     i64 TimeZoneBias();
 
