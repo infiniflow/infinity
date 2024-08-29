@@ -1061,6 +1061,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
                 LOG_TRACE(fmt::format("Ignore delta op: {}", op->ToString()));
                 break;
         }
+        op->InitializeAddrSerializer();
     }
 
     // Save the global catalog delta entry to disk.
