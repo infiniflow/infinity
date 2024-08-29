@@ -98,6 +98,7 @@ public:
     virtual void WriteAdv(char *&ptr) const = 0;
     static UniquePtr<CatalogDeltaOperation> ReadAdv(char *&ptr, i32 max_bytes);
     SizeT GetBaseSizeInBytes() const;
+    void InitializeAddrSerializer();
     void WriteAdvBase(char *&buf) const;
     void ReadAdvBase(char *&ptr);
 

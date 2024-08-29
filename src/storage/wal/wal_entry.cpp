@@ -52,11 +52,14 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
         auto &col_i_outline_info = outline_infos_[i];
         auto *column = block_entry->columns_[i].get();
         col_i_outline_info = {column->OutlineBufferCount(0), column->LastChunkOff(0)};
-        paths_.push_back(column->FilePath());
+        Vector<String> paths = column->FilePaths();
+        paths_.insert(paths_.end(), paths.begin(), paths.end());
     }
     String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
     String version_file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
     paths_.push_back(version_file_path);
+    auto *pm = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(pm, paths_);
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
@@ -71,7 +74,7 @@ i32 WalBlockInfo::GetSizeInBytes() const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm_size_ = addr_serializer_.GetSizeInBytes(pm, paths_);
+        pm_size_ = addr_serializer_.GetSizeInBytes();
         size += pm_size_;
     }
     return size;
@@ -90,7 +93,7 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
         char *start = buf;
-        addr_serializer_.WriteBufAdv(pm, buf, paths_);
+        addr_serializer_.WriteBufAdv(buf);
         SizeT size = buf - start;
         if (size != pm_size_) {
             String error_message = fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size);
@@ -115,7 +118,7 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        block_info.paths_ = block_info.addr_serializer_.ReadBufAdv(pm, ptr);
+        block_info.paths_ = block_info.addr_serializer_.ReadBufAdv(ptr);
     }
     return block_info;
 }
@@ -220,6 +223,8 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
             UnrecoverableError(error_message);
         }
     }
+    auto *pm = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(pm, paths_);
 }
 
 bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
@@ -232,7 +237,7 @@ i32 WalChunkIndexInfo::GetSizeInBytes() const {
     bool use_object_cache = pm != nullptr;
     SizeT size = 0;
     if (use_object_cache) {
-        pm_size_= addr_serializer_.GetSizeInBytes(pm, paths_);
+        pm_size_= addr_serializer_.GetSizeInBytes();
         size += pm_size_;
     }
     return size + sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);
@@ -249,7 +254,7 @@ void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
         char *start = buf;
-        addr_serializer_.WriteBufAdv(pm, buf, paths_);
+        addr_serializer_.WriteBufAdv(buf);
         SizeT size = buf - start;
         if (size != pm_size_) {
             String error_message = fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size);
@@ -269,7 +274,7 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        chunk_index_info.paths_ = chunk_index_info.addr_serializer_.ReadBufAdv(pm, ptr);
+        chunk_index_info.paths_ = chunk_index_info.addr_serializer_.ReadBufAdv(ptr);
     }
     return chunk_index_info;
 }
@@ -1157,47 +1162,15 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     return entry;
 }
 
-bool WalEntry::IsCheckPoint() const {
+bool WalEntry::IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const {
     for (auto &cmd : cmds_) {
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+            assert(cmds_.size() == 1);
+            checkpoint_cmd = static_cast<WalCmdCheckpoint *>(cmd.get());
             return true;
         }
     }
     return false;
-}
-
-bool WalEntry::IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const {
-    auto iter = cmds_.begin();
-    while (iter != cmds_.end()) {
-        if ((*iter)->GetType() == WalCommandType::CHECKPOINT) {
-            checkpoint_cmd = static_cast<WalCmdCheckpoint *>((*iter).get());
-            break;
-        }
-        ++iter;
-    }
-    if (iter == cmds_.end()) {
-        return false;
-    }
-    Vector<SharedPtr<WalCmd>> tail_cmds(iter + 1, cmds_.end());
-    if (!tail_cmds.empty()) {
-        auto tail_entry = MakeShared<WalEntry>();
-        tail_entry->txn_id_ = txn_id_;
-        tail_entry->commit_ts_ = commit_ts_;
-        tail_entry->cmds_ = std::move(tail_cmds);
-        replay_entries.push_back(std::move(tail_entry));
-    }
-    return true;
-}
-
-WalCmdCheckpoint *WalEntry::GetCheckPoint() const {
-    auto iter = cmds_.begin();
-    while (iter != cmds_.end()) {
-        if ((*iter)->GetType() == WalCommandType::CHECKPOINT) {
-            return static_cast<WalCmdCheckpoint *>((*iter).get());
-        }
-        ++iter;
-    }
-    return nullptr;
 }
 
 String WalEntry::ToString() const {
@@ -1379,7 +1352,8 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
         while (iter_->HasNext()) {
             auto entry = iter_->Next();
             if (entry.get() != nullptr) {
-                if (entry->IsCheckPoint()) {
+                WalCmdCheckpoint *checkpoint_cmd = nullptr;
+                if (entry->IsCheckPoint(checkpoint_cmd)) {
                     found_checkpoint = true;
                 }
             } else {

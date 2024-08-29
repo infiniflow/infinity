@@ -281,15 +281,17 @@ TEST_F(WalEntryTest, ReadWriteVFS) {
     pm.SaveLocalPath(paths[0], obj_addr1);
 
     AddrSerializer addr_serializer;
-    SizeT size = addr_serializer.GetSizeInBytes(&pm, paths);
+    addr_serializer.Initialize(&pm, paths);
+    SizeT size = addr_serializer.GetSizeInBytes();
     auto buffer = MakeUnique<char[]>(size);
     char *ptr = buffer.get();
-    addr_serializer.WriteBufAdv(&pm, ptr, paths);
+    addr_serializer.WriteBufAdv(ptr);
     SizeT write_size = ptr - buffer.get();
     ASSERT_EQ(write_size, size);
 
+    AddrSerializer addr_serializer1;
     char *ptr1 = buffer.get();
-    Vector<String> paths1 = addr_serializer.ReadBufAdv(&pm, ptr1);
+    Vector<String> paths1 = addr_serializer1.ReadBufAdv(ptr1);
     SizeT read_size = ptr1 - buffer.get();
     ASSERT_EQ(read_size, size);
     ASSERT_EQ(paths1, paths);
@@ -333,7 +335,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
                 break;
             }
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
-            if (!wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
+            if (!wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 replay_entries.push_back(wal_entry);
             } else {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
@@ -407,7 +409,7 @@ TEST_F(WalEntryTest, WalListIterator) {
                 break;
             }
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
-            if (!wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
+            if (!wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 replay_entries.push_back(wal_entry);
             } else {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
