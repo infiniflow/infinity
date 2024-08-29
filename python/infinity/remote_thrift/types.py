@@ -387,7 +387,7 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     return match_tensor_expr
 
 
-def make_match_sparse_expr(vector_column_name: str, sparse_data: SparseVector, metric_type: str, topn: int,
+def make_match_sparse_expr(vector_column_name: str, sparse_data: SparseVector | dict, metric_type: str, topn: int,
                            opt_params: Optional[dict] = None):
     column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
 
@@ -405,6 +405,21 @@ def make_match_sparse_expr(vector_column_name: str, sparse_data: SparseVector, m
         case SparseVector([int(), *_], None):
             raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE,
                                     f"No values! Sparse data does not support bool value type now")
+        case dict():
+            if len(sparse_data) == 0:
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
+            match next(iter(sparse_data.values())):
+                case int():
+                    query_sparse_expr.literal_type = LiteralType.SparseIntegerArray
+                    query_sparse_expr.i64_array_idx = [int(kk) for kk in sparse_data.keys()]
+                    query_sparse_expr.i64_array_value = [int(vv) for vv in sparse_data.values()]
+                case float():
+                    query_sparse_expr.literal_type = LiteralType.SparseDoubleArray
+                    query_sparse_expr.i64_array_idx = [int(kk) for kk in sparse_data.keys()]
+                    query_sparse_expr.f64_array_value = [float(vv) for vv in sparse_data.values()]
+                case _:
+                    raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                            f"Invalid sparse vector value type: {type(next(iter(sparse_data.values())))}")
         case _:
             raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE, f"Invalid sparse data type {type(sparse_data)}")
 

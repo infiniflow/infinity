@@ -848,8 +848,8 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_obj
         }
         case nlohmann::json::value_t::string: {
             auto res = MakeShared<ConstantExpr>(LiteralType::kString);
-            auto str = json_object.get<String>();
-            res->str_value_ = strdup(json_object.get<String>().c_str());
+            const auto str = json_object.get<String>();
+            res->str_value_ = strdup(str.c_str());
             return res;
         }
         case nlohmann::json::value_t::array: {
@@ -999,147 +999,6 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
             RecoverableError(Status::ImportFileFormatError(error_info));
             return nullptr;
         }
-    }
-}
-
-ConstantExpr * BuildConstantSparseExprFromJson(const nlohmann::json &json_object) {
-    //SharedPtr<ConstantExpr> res = nullptr;
-    //auto res = new ConstantExpr(LiteralType::kDoubleSparseArray);
-    //res->double_sparse_array_.first.emplace_back(0);
-    //res->double_sparse_array_.first.emplace_back(20);
-    //res->double_sparse_array_.first.emplace_back(80);
-    //res->double_sparse_array_.second.emplace_back(1.0);
-    //res->double_sparse_array_.second.emplace_back(2.0);
-    //res->double_sparse_array_.second.emplace_back(3.0);
-    //return res;
-
-    auto it = json_object.items().begin();
-    auto index_itr = it;
-    ++it;
-    auto value_itr = it;
-    auto first_value_elem = value_itr.value()[0];
-    auto first_value_elem_type = first_value_elem.type();
-    if(first_value_elem_type == nlohmann::json::value_t::number_float) {
-        auto res = new ConstantExpr(LiteralType::kDoubleSparseArray);
-        res->double_sparse_array_.first.reserve(json_object.items().begin().value().size());
-        res->double_sparse_array_.second.reserve(json_object.items().begin().value().size());
-        for(auto &pairs : json_object.items()) {
-            if(pairs.key() == "indices") {
-                if(pairs.value().type() == nlohmann::json::value_t::array) {
-                    for (size_t idx = 0; idx < pairs.value().size(); ++idx) {
-                        const auto &value_ref = pairs.value()[idx];
-                        const auto &value_type = value_ref.type();
-                        switch (value_type) {
-                            case nlohmann::json::value_t::number_integer: {
-                                res->double_sparse_array_.first.emplace_back(value_ref.template get<int64_t>());
-                                break;
-                            }
-                            case nlohmann::json::value_t::number_unsigned: {
-                                res->double_sparse_array_.first.emplace_back(value_ref.template get<uint64_t>());
-                                break;
-                            }
-                            default: {
-                                const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-                                RecoverableError(Status::ImportFileFormatError(error_info));
-                                delete res;
-                                res = nullptr;
-                                return nullptr;
-                            }
-                        }
-                    }
-                }
-            } else if(pairs.key() == "values") {
-                if(pairs.value().type() == nlohmann::json::value_t::array) {
-                    for (size_t idx = 0; idx < pairs.value().size(); ++idx) {
-                        const auto &value_ref = pairs.value()[idx];
-                        const auto &value_type = value_ref.type();
-
-                        switch (value_type) {
-                            case nlohmann::json::value_t::number_integer: {
-                                res->double_sparse_array_.second.emplace_back(value_ref.template get<int64_t>());
-                                break;
-                            }
-                            case nlohmann::json::value_t::number_unsigned: {
-                                res->double_sparse_array_.second.emplace_back(value_ref.template get<uint64_t>());
-                                break;
-                            }
-                            case nlohmann::json::value_t::number_float: {
-                                res->double_sparse_array_.second.emplace_back(value_ref.template get<double>());
-                                break;
-                            }
-                            default: {
-                                const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-                                RecoverableError(Status::ImportFileFormatError(error_info));
-                                delete res;
-                                res = nullptr;
-                                return nullptr;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return res;
-    } else if(first_value_elem_type == nlohmann::json::value_t::number_integer or first_value_elem_type == nlohmann::json::value_t::number_unsigned) {
-        auto res = new ConstantExpr(LiteralType::kLongSparseArray);
-        res->long_sparse_array_.first.reserve(json_object.items().begin().value().size());
-        res->long_sparse_array_.second.reserve(json_object.items().begin().value().size());
-        for(auto &pairs : json_object.items()) {
-            if(pairs.key() == "indices") {
-                if(pairs.value().type() == nlohmann::json::value_t::array) {
-                    for (size_t idx = 0; idx < pairs.value().size(); ++idx) {
-                        const auto &value_ref = pairs.value()[idx];
-                        const auto &value_type = value_ref.type();
-                        switch (value_type) {
-                            case nlohmann::json::value_t::number_integer: {
-                                res->long_sparse_array_.first.emplace_back(value_ref.template get<int64_t>());
-                                break;
-                            }
-                            case nlohmann::json::value_t::number_unsigned: {
-                                res->long_sparse_array_.first.emplace_back(value_ref.template get<uint64_t>());
-                                break;
-                            }
-                            default: {
-                                const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-                                RecoverableError(Status::ImportFileFormatError(error_info));
-                                delete res;
-                                res = nullptr;
-                                return nullptr;
-                            }
-                        }
-                    }
-                }
-            } else if(pairs.key() == "values") {
-                if(pairs.value().type() == nlohmann::json::value_t::array) {
-                    for (size_t idx = 0; idx < pairs.value().size(); ++idx) {
-                        const auto &value_ref = pairs.value()[idx];
-                        const auto &value_type = value_ref.type();
-                        switch (value_type) {
-                            case nlohmann::json::value_t::number_integer: {
-                                res->long_sparse_array_.second.emplace_back(value_ref.template get<int64_t>());
-                                break;
-                            }
-                            case nlohmann::json::value_t::number_unsigned: {
-                                res->long_sparse_array_.second.emplace_back(value_ref.template get<uint64_t>());
-                                break;
-                            }
-                            default: {
-                                const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-                                RecoverableError(Status::ImportFileFormatError(error_info));
-                                delete res;
-                                res = nullptr;
-                                return nullptr;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return res;
-    } else {
-        const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-        RecoverableError(Status::ImportFileFormatError(error_info));
-        return nullptr;
     }
 }
 
