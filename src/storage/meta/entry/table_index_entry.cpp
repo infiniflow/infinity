@@ -41,8 +41,15 @@ import embedding_info;
 import block_entry;
 import segment_entry;
 import table_entry;
+import infinity_context;
 
 namespace infinity {
+
+SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, const String &index_name) {
+    auto abs_parent_dir = Path(InfinityContext::instance().config()->DataDir()) / parent_dir;
+    SharedPtr<String> temp_dir = DetermineRandomString(abs_parent_dir, fmt::format("index_{}", index_name));
+    return MakeShared<String>(Path(parent_dir) / *temp_dir);
+}
 
 Vector<std::string_view> TableIndexEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
@@ -68,10 +75,7 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                  const SharedPtr<String> &index_entry_dir,
                                  TransactionID txn_id,
                                  TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTableIndex,
-                is_delete,
-                table_index_meta->GetTableEntry()->base_dir_,
-                TableIndexEntry::EncodeIndex(*index_base->index_name_, table_index_meta)),
+    : BaseEntry(EntryType::kTableIndex, is_delete, TableIndexEntry::EncodeIndex(*index_base->index_name_, table_index_meta)),
       table_index_meta_(table_index_meta), index_base_(std::move(index_base)), index_dir_(index_entry_dir) {
     if (!is_delete) {
         assert(index_base.get() != nullptr);
@@ -91,10 +95,10 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     if (is_delete) {
         return MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, nullptr, txn_id, begin_ts);
     }
-    SharedPtr<String> temp_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->base_dir_,
-                                                   *table_index_meta->GetTableEntry()->TableEntryDir(),
-                                                   *index_base->index_name_);
-    SharedPtr<String> index_dir = temp_dir;
+    SharedPtr<String> temp_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
+
+    SharedPtr<String> index_dir =
+        MakeShared<String>(LocalFileSystem::ConcatenateFilePath(*table_index_meta->GetTableEntry()->TableEntryDir(), *temp_dir));
     auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_dir, txn_id, begin_ts);
 
     // Get column info

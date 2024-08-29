@@ -46,7 +46,7 @@ class AddFunctionsTest : public BaseTest {};
 TEST_F(AddFunctionsTest, add_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterAddFunction(catalog_ptr);
 

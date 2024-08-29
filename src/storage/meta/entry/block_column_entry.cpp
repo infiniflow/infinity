@@ -36,6 +36,7 @@ import catalog_delta_entry;
 import internal_types;
 import data_type;
 import logical_type;
+import infinity_context;
 
 namespace infinity {
 
@@ -54,13 +55,12 @@ String BlockColumnEntry::EncodeIndex(const ColumnID column_id, const BlockEntry 
     return fmt::format("{}#{}", block_entry->encode(), column_id);
 }
 
-BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref)
-    : BaseEntry(EntryType::kBlockColumn, false, block_entry->base_dir_, BlockColumnEntry::EncodeIndex(column_id, block_entry)),
-      block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
+BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id)
+    : BaseEntry(EntryType::kBlockColumn, false, BlockColumnEntry::EncodeIndex(column_id, block_entry)), block_entry_(block_entry),
+      column_id_(column_id) {}
 
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
-    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->block_dir()));
-    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
+    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id);
 
     auto begin_ts = txn->BeginTS();
     block_column_entry->begin_ts_ = begin_ts;
@@ -76,7 +76,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
         total_data_size = (row_capacity + 7) / 8;
     }
 
-    auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
+    auto file_worker =
+        MakeUnique<DataFileWorker>(MakeShared<String>(block_entry->AbsoluteBlockDir()), block_column_entry->file_name_, total_data_size);
 
     auto *buffer_mgr = txn->buffer_mgr();
     block_column_entry->buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
@@ -90,8 +91,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                                         const u32 next_outline_idx,
                                                                         const u64 last_chunk_offset,
                                                                         const TxnTimeStamp commit_ts) {
-    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->block_dir()));
-    UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
+    UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id);
     column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
     column_entry->column_type_ = block_entry->GetColumnType(column_id);
     column_entry->commit_ts_ = commit_ts;
@@ -100,13 +100,14 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     const LogicalType column_data_logical_type = column_type->type();
     const SizeT row_capacity = block_entry->row_capacity();
     const SizeT total_data_size = (column_data_logical_type == LogicalType::kBoolean) ? ((row_capacity + 7) / 8) : (row_capacity * column_type->Size());
-    auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->file_name_, total_data_size);
+    auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(block_entry->AbsoluteBlockDir()), column_entry->file_name_, total_data_size);
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker), true /*restart*/);
 
     if (next_outline_idx > 0) {
         SizeT buffer_size = last_chunk_offset;
-        auto outline_buffer_file_worker = MakeUnique<VarFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(0, 0), buffer_size);
+        auto outline_buffer_file_worker =
+            MakeUnique<VarFileWorker>(MakeShared<String>(block_entry->AbsoluteBlockDir()), column_entry->OutlineFilename(0, 0), buffer_size);
         auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker), true /*restart*/);
         column_entry->outline_buffers_.push_back(buffer_obj);
     }
@@ -114,6 +115,10 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
 
     return column_entry;
 }
+
+String BlockColumnEntry::FilePath() const { return Path(*block_entry_->block_dir()) / *file_name_; }
+
+SharedPtr<String> BlockColumnEntry::FileDir() const { return block_entry_->block_dir(); }
 
 ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) { return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadWrite); }
 
@@ -124,7 +129,7 @@ ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr) {
 ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
-        auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, this->file_name_, 0);
+        auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(block_entry_->AbsoluteBlockDir()), this->file_name_, 0);
         this->buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
 
@@ -146,10 +151,10 @@ SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, c
 }
 
 Vector<String> BlockColumnEntry::FilePaths() const {
-    Vector<String> res = {LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_)};
+    Vector<String> res = {LocalFileSystem::ConcatenateFilePath(*FileDir(), *file_name_)};
     for (SizeT file_idx = 0; file_idx < outline_buffers_.size(); ++file_idx) {
         String outline_file_path = *OutlineFilename(0, file_idx);
-        res.push_back(LocalFileSystem::ConcatenateFilePath(*base_dir_, outline_file_path));
+        res.push_back(LocalFileSystem::ConcatenateFilePath(*FileDir(), outline_file_path));
     }
     return res;
 }

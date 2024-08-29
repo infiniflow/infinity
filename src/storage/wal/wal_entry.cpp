@@ -54,8 +54,7 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
         Vector<String> paths = column->FilePaths();
         paths_.insert(paths_.end(), paths.begin(), paths.end());
     }
-    String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
-    String version_file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
+    String version_file_path = fmt::format("{}/{}", *block_entry->block_dir(), *BlockVersion::FileName());
     paths_.push_back(version_file_path);
     auto *pm = InfinityContext::instance().persistence_manager();
     addr_serializer_.Initialize(pm, paths_);
@@ -207,20 +206,19 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
     IndexType index_type = segment_index_entry->table_index_entry()->index_base()->index_type_;
     switch (index_type) {
         case IndexType::kFullText: {
-            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-            paths_.push_back(full_dir + "/" + chunk_index_entry->base_name_ + POSTING_SUFFIX);
-            paths_.push_back(full_dir + "/" + chunk_index_entry->base_name_ + DICT_SUFFIX);
-            paths_.push_back(full_dir + "/" + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            Path rela_dir = *(segment_index_entry->index_dir());
+            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + POSTING_SUFFIX));
+            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + DICT_SUFFIX));
+            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + LENGTH_SUFFIX));
             break;
         }
         case IndexType::kHnsw:
         case IndexType::kEMVB:
         case IndexType::kSecondary:
         case IndexType::kBMP: {
-            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
             String file_name = ChunkIndexEntry::IndexFileName(segment_index_entry->segment_id(), chunk_index_entry->chunk_id_);
-            String full_path = fmt::format("{}/{}", full_dir, file_name);
-            paths_.push_back(full_path);
+            String file_path = Path(*(segment_index_entry->index_dir())) / file_name;
+            paths_.push_back(file_path);
             break;
         }
         default: {

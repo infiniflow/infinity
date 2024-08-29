@@ -45,7 +45,7 @@ class LessEqualsFunctionsTest : public BaseTest {};
 TEST_F(LessEqualsFunctionsTest, less_equals_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterLessEqualsFunction(catalog_ptr);
 

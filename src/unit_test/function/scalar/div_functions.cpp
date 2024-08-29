@@ -45,7 +45,7 @@ class DivFunctionsTest : public BaseTest {};
 TEST_F(DivFunctionsTest, div_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterDivFunction(catalog_ptr);
 

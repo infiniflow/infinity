@@ -70,7 +70,7 @@ VectorHeapChunk FixHeapManager::AllocateChunk() {
         return VectorHeapChunk(current_chunk_size_);
     } else {
         // allocate by buffer_mgr, and store returned buffer_obj in `block_column_entry_`
-        auto file_worker = MakeUnique<DataFileWorker>(block_column_entry_->base_dir(),
+        auto file_worker = MakeUnique<DataFileWorker>(block_column_entry_->FileDir(),
                                                       block_column_entry_->OutlineFilename(heap_id_, current_chunk_idx_),
                                                       current_chunk_size_);
         auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
@@ -140,8 +140,7 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
     auto *outline_buffer = block_column_entry_->GetOutlineBuffer(heap_id_, chunk_id);
     if (outline_buffer == nullptr) {
         auto filename = block_column_entry_->OutlineFilename(heap_id_, chunk_id);
-        auto base_dir = block_column_entry_->base_dir();
-        auto file_worker = MakeUnique<DataFileWorker>(base_dir, filename, current_chunk_size_);
+        auto file_worker = MakeUnique<DataFileWorker>(block_column_entry_->FileDir(), filename, current_chunk_size_);
         outline_buffer = buffer_mgr_->GetBufferObject(std::move(file_worker));
 
         if (outline_buffer == nullptr) {

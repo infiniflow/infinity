@@ -14,6 +14,8 @@
 
 module;
 
+#include <cassert>
+
 export module file_worker;
 
 import stl;
@@ -29,7 +31,9 @@ export struct FileWorkerSaveCtx {};
 export class FileWorker {
 public:
     // spill_dir_ is not init here
-    explicit FileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name) : file_dir_(std::move(file_dir)), file_name_(std::move(file_name)) {}
+    explicit FileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name) : file_dir_(std::move(file_dir)), file_name_(std::move(file_name)) {
+        assert(!std::filesystem::path(*file_dir_).is_absolute());
+    }
 
     // No destruct here
     virtual ~FileWorker();
@@ -69,7 +73,7 @@ protected:
     virtual void ReadFromFileImpl(SizeT file_size) = 0;
 
 private:
-    String ChooseFileDir(bool spill) const { return spill ? fmt::format("{}{}", *temp_dir_, *file_dir_) : *file_dir_; }
+    String ChooseFileDir(bool spill) const { return spill ? (Path(*temp_dir_) / *file_dir_) : (Path(*base_dir_) / *file_dir_); }
 
 public:
     const SharedPtr<String> file_dir_{};

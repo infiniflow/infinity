@@ -47,7 +47,7 @@ class SubtractFunctionsTest : public BaseTest {};
 TEST_F(SubtractFunctionsTest, add_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterSubtractFunction(catalog_ptr);
 

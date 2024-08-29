@@ -54,7 +54,7 @@ public:
 
     void UnInit(bool maintenance_mode);
 
-    void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, const String &data_dir);
+    void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
 
     void InitNewCatalog();
 

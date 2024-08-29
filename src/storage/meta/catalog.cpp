@@ -107,10 +107,11 @@ Vector<SharedPtr<QueryProfiler>> ProfileHistory::GetElements() {
 }
 
 // TODO Consider letting it commit as a transaction.
-Catalog::Catalog(SharedPtr<String> data_dir) : data_dir_(std::move(data_dir)), catalog_dir_(MakeShared<String>(CATALOG_FILE_DIR)), running_(true) {
+Catalog::Catalog() : catalog_dir_(MakeShared<String>(CATALOG_FILE_DIR)), running_(true) {
     LocalFileSystem fs;
-    if (!fs.Exists(*catalog_dir_)) {
-        fs.CreateDirectory(*catalog_dir_);
+    String abs_catalog_dir = Path(InfinityContext::instance().config()->DataDir()) / String(CATALOG_FILE_DIR);
+    if (!fs.Exists(abs_catalog_dir)) {
+        fs.CreateDirectory(abs_catalog_dir);
     }
 
     ResizeProfileHistory(DEFAULT_PROFILER_HISTORY_SIZE);
@@ -136,7 +137,7 @@ Catalog::~Catalog() {
 // use Txn::CreateDatabase instead
 Tuple<DBEntry *, Status>
 Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-    auto init_db_meta = [&]() { return DBMeta::NewDBMeta(data_dir_, MakeShared<String>(db_name)); };
+    auto init_db_meta = [&]() { return DBMeta::NewDBMeta(MakeShared<String>(db_name)); };
     LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
     auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta));
     return db_meta->CreateNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
@@ -176,7 +177,7 @@ void Catalog::CreateDatabaseReplay(const SharedPtr<String> &db_name,
                                    std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
                                    TransactionID txn_id,
                                    TxnTimeStamp begin_ts) {
-    auto init_db_meta = [&]() { return DBMeta::NewDBMeta(this->DataDir(), db_name); };
+    auto init_db_meta = [&]() { return DBMeta::NewDBMeta(db_name); };
     LOG_TRACE(fmt::format("Adding new database entry: {}", *db_name));
     auto *db_meta = db_meta_map_.GetMetaNoLock(*db_name, std::move(init_db_meta));
     db_meta->CreateEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(db_meta, db_meta->db_name(), txn_id, begin_ts); },
@@ -496,7 +497,6 @@ Tuple<SpecialFunction *, Status> Catalog::GetSpecialFunctionByNameNoExcept(Catal
 
 nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
-    json_res["data_dir"] = *this->data_dir_;
     TransactionID next_txn_id = this->next_txn_id_;
     json_res["next_txn_id"] = next_txn_id;
     json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
@@ -518,12 +518,12 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
     return json_res;
 }
 
-UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, bool create_default_db) {
-    auto catalog = MakeUnique<Catalog>(data_dir);
+UniquePtr<Catalog> Catalog::NewCatalog(bool create_default_db) {
+    auto catalog = MakeUnique<Catalog>();
     if (create_default_db) {
         // db current dir is same level as catalog
-        UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default_db"));
-        SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
+        UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(MakeShared<String>("default_db"));
+        SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
         db_entry->commit_ts_ = 0;
         db_meta->PushFrontEntry(db_entry);
@@ -533,15 +533,13 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, bool create_d
     return catalog;
 }
 
-UniquePtr<Catalog> Catalog::LoadFromFiles(const String &data_dir,
-                                          const FullCatalogFileInfo &full_ckp_info,
-                                          const Vector<DeltaCatalogFileInfo> &delta_ckp_infos,
-                                          BufferManager *buffer_mgr) {
+UniquePtr<Catalog>
+Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, BufferManager *buffer_mgr) {
 
     // 1. load json
     // 2. load entries
     LOG_INFO(fmt::format("Load base FULL catalog json from: {}", full_ckp_info.path_));
-    auto catalog = Catalog::LoadFromFile(data_dir, full_ckp_info, buffer_mgr);
+    auto catalog = Catalog::LoadFromFile(full_ckp_info, buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
     TxnTimeStamp max_commit_ts = 0;
@@ -618,7 +616,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     this->DropDatabaseReplay(
                         *db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, true, data_dir_, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
+                            return DBEntry::ReplayDBEntry(db_meta, true, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);
@@ -627,7 +625,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     this->CreateDatabaseReplay(
                         db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, false, data_dir_, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
+                            return DBEntry::ReplayDBEntry(db_meta, false, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);
@@ -657,7 +655,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
                             return TableEntry::ReplayTableEntry(true,
                                                                 table_meta,
-                                                                table_meta->base_dir(),
                                                                 table_entry_dir,
                                                                 table_name,
                                                                 column_defs,
@@ -675,7 +672,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto init_table_entry = [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
                     return TableEntry::ReplayTableEntry(false,
                                                         table_meta,
-                                                        table_meta->base_dir(),
                                                         table_entry_dir,
                                                         table_name,
                                                         column_defs,
@@ -944,8 +940,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
     }
 }
 
-UniquePtr<Catalog> Catalog::LoadFromFile(const String &data_dir, const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
-    const auto &catalog_path = full_ckp_info.path_;
+UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
+    const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / full_ckp_info.path_;
 
     LocalFileSystem fs;
     auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
@@ -961,19 +957,17 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const String &data_dir, const FullCatal
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
-    return Deserialize(data_dir, catalog_json, buffer_mgr);
+    return Deserialize(catalog_json, buffer_mgr);
 }
 
-UniquePtr<Catalog> Catalog::Deserialize(const String &data_dir, const nlohmann::json &catalog_json, BufferManager *buffer_mgr) {
-    SharedPtr<String> data_dir_ptr = MakeShared<String>(data_dir);
-
+UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr) {
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
-    auto catalog = MakeUnique<Catalog>(std::move(data_dir_ptr));
+    auto catalog = MakeUnique<Catalog>();
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
     catalog->full_ckp_commit_ts_ = catalog_json["full_ckp_commit_ts"];
     if (catalog_json.contains("databases")) {
         for (const auto &db_json : catalog_json["databases"]) {
-            UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(*catalog->data_dir_, db_json, buffer_mgr);
+            UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
             catalog->db_meta_map_.AddNewMetaNoLock(*db_meta->db_name(), std::move(db_meta));
         }
     }

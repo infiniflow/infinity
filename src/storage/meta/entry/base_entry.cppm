@@ -81,12 +81,7 @@ export String ToString(EntryType entry_type) {
 
 export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type, bool is_delete, String encode)
-        : deleted_(is_delete), entry_type_(entry_type), base_dir_(nullptr), encode_(MakeUnique<String>(std::move(encode))) {}
-
-    explicit BaseEntry(EntryType entry_type, bool is_delete, SharedPtr<String> base_dir, String encode)
-        : deleted_(is_delete), entry_type_(entry_type), base_dir_(base_dir), encode_(MakeUnique<String>(std::move(encode))) {
-        assert(!std::filesystem::path(*base_dir_).is_absolute());
-    }
+        : deleted_(is_delete), entry_type_(entry_type), encode_(MakeUnique<String>(std::move(encode))) {}
 
     virtual ~BaseEntry() = default;
 
@@ -105,8 +100,6 @@ public:
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
 
     bool Deleted() const { return deleted_; }
-
-    SharedPtr<String> base_dir() const { return base_dir_; }
 
     const String &encode() const { return *encode_; }
 
@@ -138,8 +131,6 @@ public:
     const bool deleted_;
 
     const EntryType entry_type_;
-
-    SharedPtr<String> base_dir_;
 
 private:
     SharedPtr<String> encode_;

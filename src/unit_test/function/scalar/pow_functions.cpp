@@ -45,7 +45,7 @@ class PowFunctionsTest : public BaseTest {};
 TEST_F(PowFunctionsTest, mul_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterPowFunction(catalog_ptr);
 

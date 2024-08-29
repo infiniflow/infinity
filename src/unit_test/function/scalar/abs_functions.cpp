@@ -45,7 +45,7 @@ class AbsFunctionsTest : public BaseTest {};
 TEST_F(AbsFunctionsTest, abs_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterAbsFunction(catalog_ptr);
 

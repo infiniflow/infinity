@@ -52,7 +52,7 @@ class ExpressionEvaluatorTest : public BaseTest {};
 
 TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     using namespace infinity;
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
     RegisterAddFunction(catalog_ptr);
 
     String op = "+";
@@ -152,7 +152,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
 TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     using namespace infinity;
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
     RegisterSubtractFunction(catalog_ptr);
 
     String op = "-";

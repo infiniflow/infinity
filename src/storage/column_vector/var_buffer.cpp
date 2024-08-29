@@ -25,6 +25,7 @@ import block_column_entry;
 import buffer_manager;
 import var_file_worker;
 import logger;
+import infinity_context;
 
 namespace infinity {
 
@@ -126,8 +127,9 @@ void VarBufferManager::InitBuffer() {
     } else {
         if (!buffer_handle_.has_value()) {
             if (auto *block_obj = block_column_entry_->GetOutlineBuffer(0, 0); block_obj == nullptr) {
-                auto file_worker = MakeUnique<VarFileWorker>(block_column_entry_->base_dir(), block_column_entry_->OutlineFilename(0, 0), 0
-                                                             /*buffer_size*/);
+                auto file_worker =
+                    MakeUnique<VarFileWorker>(block_column_entry_->block_entry()->block_dir(), block_column_entry_->OutlineFilename(0, 0), 0
+                                              /*buffer_size*/);
                 auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
                 block_column_entry_->AppendOutlineBuffer(0, buffer_obj);
                 buffer_handle_ = buffer_obj->Load();

@@ -45,7 +45,7 @@ class EqualsFunctionsTest : public BaseTest {};
 TEST_F(EqualsFunctionsTest, equals_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterEqualsFunction(catalog_ptr);
 

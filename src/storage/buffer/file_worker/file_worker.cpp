@@ -171,5 +171,4 @@ void FileWorker::CleanupTempFile() const {
         UnrecoverableError(error_message);
     }
 }
-
 } // namespace infinity

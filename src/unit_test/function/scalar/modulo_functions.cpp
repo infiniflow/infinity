@@ -45,7 +45,7 @@ class ModuloFunctionsTest : public BaseTest {};
 TEST_F(ModuloFunctionsTest, mod_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterModuloFunction(catalog_ptr);
 

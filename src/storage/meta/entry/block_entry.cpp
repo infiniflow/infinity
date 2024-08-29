@@ -59,8 +59,8 @@ String BlockEntry::EncodeIndex(const BlockID block_id, const SegmentEntry *segme
 
 /// class BlockEntry
 BlockEntry::BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts)
-    : BaseEntry(EntryType::kBlock, false, segment_entry->base_dir_, BlockEntry::EncodeIndex(block_id, segment_entry)), segment_entry_(segment_entry),
-      block_id_(block_id), block_row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE), checkpoint_ts_(checkpoint_ts) {}
+    : BaseEntry(EntryType::kBlock, false, BlockEntry::EncodeIndex(block_id, segment_entry)), segment_entry_(segment_entry), block_id_(block_id),
+      block_row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE), checkpoint_ts_(checkpoint_ts) {}
 
 UniquePtr<BlockEntry>
 BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
@@ -69,15 +69,15 @@ BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, T
     block_entry->begin_ts_ = txn->BeginTS();
     block_entry->txn_id_ = txn->TxnID();
 
-    block_entry->block_dir_ = BlockEntry::DetermineDir(*block_entry->base_dir_, *segment_entry->segment_dir(), block_id);
+    block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
     block_entry->columns_.reserve(column_count);
     for (SizeT column_id = 0; column_id < column_count; ++column_id) {
         auto column_entry = BlockColumnEntry::NewBlockColumnEntry(block_entry.get(), column_id, txn);
         block_entry->columns_.emplace_back(std::move(column_entry));
     }
 
-    SharedPtr<String> file_dir = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->block_dir_));
-    auto version_file_worker = MakeUnique<VersionFileWorker>(file_dir, BlockVersion::FileName(), block_entry->row_capacity_);
+    auto version_file_worker =
+        MakeUnique<VersionFileWorker>(MakeShared<String>(block_entry->AbsoluteBlockDir()), BlockVersion::FileName(), block_entry->row_capacity_);
     auto *buffer_mgr = txn->buffer_mgr();
     block_entry->version_buffer_object_ = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
     return block_entry;
@@ -106,10 +106,10 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     block_entry->min_row_ts_ = min_row_ts;
     block_entry->max_row_ts_ = max_row_ts;
     block_entry->commit_ts_ = commit_ts;
-    block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->base_dir_, *segment_entry->segment_dir(), block_id);
+    block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
 
-    SharedPtr<String> file_dir = MakeShared<String>(fmt::format("{}/{}", *segment_entry->base_dir_, *block_entry->block_dir_));
-    auto version_file_worker = MakeUnique<VersionFileWorker>(file_dir, BlockVersion::FileName(), row_capacity);
+    auto version_file_worker =
+        MakeUnique<VersionFileWorker>(MakeShared<String>(block_entry->AbsoluteBlockDir()), BlockVersion::FileName(), row_capacity);
     block_entry->version_buffer_object_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
 
     block_entry->checkpoint_ts_ = check_point_ts;
@@ -128,6 +128,8 @@ void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String blo
         LoadFilterBinaryData(block_filter_binary_data);
     }
 }
+
+String BlockEntry::AbsoluteBlockDir() const { return Path(InfinityContext::instance().config()->DataDir()) / *block_dir_; }
 
 SizeT BlockEntry::row_count(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
@@ -430,7 +432,7 @@ void BlockEntry::Cleanup() {
     }
     version_buffer_object_->PickForCleanup();
 
-    String full_block_dir = fmt::format("{}/{}", *base_dir(), *block_dir_);
+    String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_dir_;
     LOG_DEBUG(fmt::format("Cleaning up block dir: {}", full_block_dir));
     CleanupScanner::CleanupDir(*block_dir_);
     LOG_DEBUG(fmt::format("Cleaned block dir: {}", full_block_dir));
@@ -511,11 +513,11 @@ i32 BlockEntry::GetAvailableCapacity() {
     return this->row_capacity_ - this->block_row_count_;
 }
 
-SharedPtr<String> BlockEntry::DetermineDir(const String &base_dir, const String &parent_dir, BlockID block_id) {
+SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID block_id) {
     LocalFileSystem fs;
     SharedPtr<String> relative_dir = MakeShared<String>(fmt::format("{}/blk_{}", parent_dir, block_id));
-    SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", base_dir, *relative_dir));
-    fs.CreateDirectoryNoExp(*full_dir);
+    String full_dir = Path(InfinityContext::instance().config()->DataDir()) / *relative_dir;
+    fs.CreateDirectoryNoExp(full_dir);
     return relative_dir;
 }
 
