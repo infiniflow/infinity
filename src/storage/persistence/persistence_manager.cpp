@@ -172,6 +172,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
         objects_.emplace(obj_key, ObjStat(src_size, 1, 0));
+        LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
         String local_path = RemovePrefix(file_path);
         if (local_path.empty()) {
@@ -223,6 +224,7 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size) {
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
         objects_.emplace(obj_key, ObjStat(src_size, 1, 0));
+        LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
         return obj_addr;
     } else {
         dst_fp.append(current_object_key_);
@@ -247,6 +249,7 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size) {
             }
 
             objects_.emplace(current_object_key_, ObjStat(src_size, current_object_parts_, 0));
+            LOG_TRACE(fmt::format("Persist added composed object {}", current_object_key_));
             current_object_key_ = ObjCreate();
             current_object_size_ = 0;
             current_object_parts_ = 0;
@@ -316,6 +319,7 @@ void PersistenceManager::CurrentObjFinalizeNoLock() {
         }
 
         objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, 0));
+        LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
         current_object_parts_ = 0;
@@ -395,6 +399,7 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
     {
         std::lock_guard<std::mutex> lock(mtx_);
         objects_.emplace(obj_key, ObjStat(0, 1, 1));
+        LOG_TRACE(fmt::format("ObjCreateRefCount added dedicated {}", obj_key));
     }
 
     fs::path src_fp = workspace_;
@@ -451,6 +456,7 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &file_path, SizeT f
         }
 
         objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, 0));
+        LOG_TRACE(fmt::format("CurrentObjAppendNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
         current_object_parts_ = 0;
@@ -568,6 +574,7 @@ void PersistenceManager::SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj
         it->second = obj_stat;
     } else {
         objects_.emplace(obj_addr.obj_key_, obj_stat);
+        LOG_TRACE(fmt::format("SaveObjStat added object {}", obj_addr.obj_key_));
     }
 }
 
@@ -608,9 +615,9 @@ nlohmann::json PersistenceManager::Serialize() {
     nlohmann::json json_obj;
     json_obj["obj_stat_size"] = objects_.size();
     json_obj["obj_stat_array"] = nlohmann::json::array();
-    for (auto &[path, obj_stat] : objects_) {
+    for (auto &[obj_key, obj_stat] : objects_) {
         nlohmann::json pair;
-        pair["obj_path"] = path;
+        pair["obj_key"] = obj_key;
         pair["obj_stat"] = obj_stat.Serialize();
         json_obj["obj_stat_array"].emplace_back(pair);
     }
@@ -633,10 +640,11 @@ void PersistenceManager::Deserialize(const nlohmann::json &obj) {
     }
     for (SizeT i = 0; i < len; ++i) {
         auto &json_pair = obj["obj_stat_array"][i];
-        String path = json_pair["obj_path"];
+        String obj_key = json_pair["obj_key"];
         ObjStat obj_stat;
         obj_stat.Deserialize(json_pair["obj_stat"]);
-        objects_.emplace(path, obj_stat);
+        objects_.emplace(obj_key, obj_stat);
+        LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
     }
     len = 0;
     if (obj.contains("obj_addr_size")) {
@@ -716,7 +724,7 @@ void AddrSerializer::AddToPersistenceManager(PersistenceManager *pm) const {
         return;
     }
     for (SizeT i = 0; i < paths_.size(); ++i) {
-        LOG_INFO(fmt::format("Add path {} to persistence manager", paths_[i]));
+        LOG_TRACE(fmt::format("Add path {} to persistence manager", paths_[i]));
         pm->SaveLocalPath(paths_[i], obj_addrs_[i]);
         pm->SaveObjStat(obj_addrs_[i], obj_stats_[i]);
     }
