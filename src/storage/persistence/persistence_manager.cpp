@@ -603,8 +603,15 @@ HashMap<String, ObjAddr> PersistenceManager::GetAllFiles() const {
     return local_path_obj_;
 }
 
-SizeT AddrSerializer::GetSizeInBytes(PersistenceManager *pm, const Vector<String> &path) const {
+void AddrSerializer::Initialize(PersistenceManager *pm, const Vector<String> &path) {
+    if (pm == nullptr) {
+        return; // not use persistence manager
+    }
+    if (!paths_.empty()) {
+        UnrecoverableError("AddrSerializer has been initialized");
+    }
     for (const String &path : path) {
+        paths_.push_back(path);
         ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
         obj_addrs_.push_back(obj_addr);
         if (!obj_addr.Valid()) {
@@ -615,37 +622,46 @@ SizeT AddrSerializer::GetSizeInBytes(PersistenceManager *pm, const Vector<String
             obj_stats_.push_back(obj_stat);
         }
     }
+}
+
+SizeT AddrSerializer::GetSizeInBytes() const {
     SizeT size = sizeof(SizeT);
-    for (SizeT i = 0; i < path.size(); ++i) {
-        size += sizeof(i32) + path[i].size();
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        size += sizeof(i32) + paths_[i].size();
         size += obj_addrs_[i].GetSizeInBytes();
         size += obj_stats_[i].GetSizeInBytes();
     }
     return size;
 }
 
-void AddrSerializer::WriteBufAdv(PersistenceManager *pm, char *&buf, const Vector<String> &path) const {
-    ::infinity::WriteBufAdv(buf, path.size());
-    for (SizeT i = 0; i < path.size(); ++i) {
-        ::infinity::WriteBufAdv(buf, path[i]);
+void AddrSerializer::WriteBufAdv(char *&buf) const {
+    ::infinity::WriteBufAdv(buf, paths_.size());
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        ::infinity::WriteBufAdv(buf, paths_[i]);
         obj_addrs_[i].WriteBufAdv(buf);
         obj_stats_[i].WriteBufAdv(buf);
     }
 }
 
-Vector<String> AddrSerializer::ReadBufAdv(PersistenceManager *pm, char *&ptr) {
+Vector<String> AddrSerializer::ReadBufAdv(char *&ptr) {
     SizeT path_count = ::infinity::ReadBufAdv<SizeT>(ptr);
-    Vector<String> paths;
     for (SizeT i = 0; i < path_count; ++i) {
-        paths.push_back(::infinity::ReadBufAdv<String>(ptr));
+        paths_.push_back(::infinity::ReadBufAdv<String>(ptr));
         obj_addrs_.push_back(ObjAddr::ReadBufAdv(ptr));
         obj_stats_.push_back(ObjStat::ReadBufAdv(ptr));
     }
-    for (SizeT i = 0; i < path_count; ++i) {
-        pm->SaveLocalPath(paths[i], obj_addrs_[i]);
+    return paths_;
+}
+
+void AddrSerializer::AddToPersistenceManager(PersistenceManager *pm) const {
+    if (pm == nullptr) {
+        return;
+    }
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        LOG_INFO(fmt::format("Add path {} to persistence manager", paths_[i]));
+        pm->SaveLocalPath(paths_[i], obj_addrs_[i]);
         pm->SaveObjStat(obj_addrs_[i], obj_stats_[i]);
     }
-    return paths;
 }
 
 } // namespace infinity

@@ -74,6 +74,8 @@ public:
 
     String FilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_); }
 
+    Vector<String> FilePaths() const;
+
     ColumnVector GetColumnVector(BufferManager *buffer_mgr);
 
     ColumnVector GetConstColumnVector(BufferManager *buffer_mgr);
