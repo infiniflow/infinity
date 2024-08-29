@@ -61,7 +61,7 @@ class SparseVector:
 
 URI = Union[NetworkAddress, Path]
 VEC = Union[list, np.ndarray]
-INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector]
+INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector, dict]
 
 LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
 
