@@ -465,6 +465,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         if (output_columns != nullptr) {
             for (auto &expr_ptr : *output_columns) {
                 delete expr_ptr;
+                expr_ptr = nullptr;
             }
             delete output_columns;
             output_columns = nullptr;
@@ -505,6 +506,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             if (search_expr_list != nullptr) {
                 for (auto &expr_ptr : *search_expr_list) {
                     delete expr_ptr;
+                    expr_ptr = nullptr;
                 }
                 delete search_expr_list;
                 search_expr_list = nullptr;
@@ -521,6 +523,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             DeferFn defer_fn3([&]() {
                 if (match_expr != nullptr) {
                     delete match_expr;
+                    match_expr = nullptr;
                 }
             });
             if (!status.ok()) {
@@ -637,6 +640,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             if (output_columns != nullptr) {
                 for (auto &expr_ptr : *output_columns) {
                     delete expr_ptr;
+                    expr_ptr = nullptr;
                 }
                 delete output_columns;
                 output_columns = nullptr;
@@ -668,6 +672,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
                 if (output_columns != nullptr) {
                     for (auto &expr_ptr : *output_columns) {
                         delete expr_ptr;
+                        expr_ptr = nullptr;
                     }
                     delete output_columns;
                     output_columns = nullptr;
@@ -676,6 +681,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
                 if (search_expr_list != nullptr) {
                     for (auto &expr_ptr : *search_expr_list) {
                         delete expr_ptr;
+                        expr_ptr = nullptr;
                     }
                     delete search_expr_list;
                     search_expr_list = nullptr;
@@ -683,6 +689,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
                 if (match_expr != nullptr) {
                     delete match_expr;
+                    match_expr = nullptr;
                 }
 
                 ProcessStatus(response, status);
@@ -709,6 +716,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             if (output_columns != nullptr) {
                 for (auto &expr_ptr : *output_columns) {
                     delete expr_ptr;
+                    expr_ptr = nullptr;
                 }
                 delete output_columns;
                 output_columns = nullptr;
