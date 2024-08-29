@@ -145,6 +145,15 @@ SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, c
     }
 }
 
+Vector<String> BlockColumnEntry::FilePaths() const {
+    Vector<String> res = {LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_)};
+    for (SizeT file_idx = 0; file_idx < outline_buffers_.size(); ++file_idx) {
+        String outline_file_path = *OutlineFilename(0, file_idx);
+        res.push_back(LocalFileSystem::ConcatenateFilePath(*base_dir_, outline_file_path));
+    }
+    return res;
+}
+
 void BlockColumnEntry::AppendOutlineBuffer(const u32 buffer_group_id, BufferObj *buffer) {
     std::unique_lock lock(mutex_);
     if (buffer_group_id == 0) {

@@ -32,7 +32,7 @@ class InfinityRunner:
         self.i += 1
 
     def uninit(self):
-        timeout = 3
+        timeout = 30
         pids = []
         for child in psutil.Process(self.process.pid).children(recursive=True):
             pids.append(child.pid)

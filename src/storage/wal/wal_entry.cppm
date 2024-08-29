@@ -471,11 +471,7 @@ export struct WalEntry : WalEntryHeader {
     Vector<SharedPtr<WalCmd>> cmds_{};
 
     // Return if the entry is a full checkpoint or delta checkpoint.
-    [[nodiscard]] bool IsCheckPoint() const;
-
-    [[nodiscard]] WalCmdCheckpoint *GetCheckPoint() const;
-
-    [[nodiscard]] bool IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const;
+    [[nodiscard]] bool IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const;
 
     [[nodiscard]] String ToString() const;
     [[nodiscard]] String CompactInfo() const;

@@ -87,10 +87,18 @@ SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm_size_ = addr_serializer_.GetSizeInBytes(pm, GetFilePaths());
+        pm_size_ = addr_serializer_.GetSizeInBytes();
         size += pm_size_;
     }
     return size;
+}
+
+void CatalogDeltaOperation::InitializeAddrSerializer() {
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        addr_serializer_.Initialize(pm, GetFilePaths());
+    }
 }
 
 void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
@@ -104,7 +112,7 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
         char *start = buf;
-        addr_serializer_.WriteBufAdv(pm, buf, GetFilePaths());
+        addr_serializer_.WriteBufAdv(buf);
         SizeT pm_size = buf - start;
         if (pm_size != pm_size_) {
             String error_message = fmt::format("Mismatched pm_size: {} != {}", pm_size, pm_size_);
@@ -123,7 +131,7 @@ void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        addr_serializer_.ReadBufAdv(pm, ptr); // discard return value
+        addr_serializer_.ReadBufAdv(ptr); // discard return value
     }
 }
 
@@ -379,7 +387,8 @@ AddBlockEntryOp::AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts
 AddColumnEntryOp::AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts) {
     outline_info_ = {column_entry->OutlineBufferCount(0), column_entry->LastChunkOff(0)};
-    local_paths_.push_back(column_entry->FilePath());
+    Vector<String> paths = column_entry->FilePaths();
+    local_paths_.insert(local_paths_.end(), paths.begin(), paths.end());
 }
 
 AddTableIndexEntryOp::AddTableIndexEntryOp(TableIndexEntry *table_index_entry, TxnTimeStamp commit_ts)
