@@ -102,7 +102,7 @@ try:
             },
             {
                 "num": 10,
-                "name": "Steven",
+                "name": "Steve",
                 "age": 20,
                 "score": 86.0,
             },

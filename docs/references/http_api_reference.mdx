@@ -255,8 +255,8 @@ The response includes a JSON object like the following:
 {
     "error_code": 0,
     "database_name": "default_db"
-    "store_dir": "/var/infinity/data/nIHniKeHIB_db_default"
-    "table_count": 0
+    "storage_directory": "/var/infinity/data/nIHniKeHIB_db_default"
+    "table_count": "4"
 }
 ```
 
@@ -327,9 +327,29 @@ curl --request POST \
                   "type": "float"
              },
              {
-                  "name": "vector_column"
+                  "name": "dense_column",
                   "type": "vector,8,float"
-             }
+             },
+             {
+                  "name": "body",
+                  "type": "varchar"
+             },
+             {
+                  "name": "sparse_column",
+                  "type": "sparse,8,float,int"
+             },
+             {
+                  "name": "tensor_column",
+                  "type": "tensor,8,float"
+             },  
+             {
+                  "name": "multivector_column",
+                  "type": "multivector,8,float"
+             },    
+             {
+                  "name": "tensorarray_column",
+                  "type": "tensorarray,8,float"
+             }          
         ]
     } '
 ```
@@ -373,10 +393,55 @@ curl --request POST \
       - `"bfloat16"`
     - String: `"varchar"`
     - Dense vector: e.g., `"vector,128,float"`
+      - `128`: The dimension of the dense vector.
+      - `float`: The element type of the dense vector. Can be:
+        - `"int8"`
+        - `"int16"`
+        - `"int"`/`"int32"`/`"integer"`
+        - `"int64"`
+        - `"float"`/`"float32"`
+        - `"double"`/`"float64"`
     - Sparse vector: e.g., `"sparse,128,float,int"`
+      - `128`: The dimension of the sparse vector.
+      - `float`: The element type of the sparse vector. Can be:
+        - `"int8"`
+        - `"int16"`
+        - `"int"`/`"int32"`/`"integer"`
+        - `"int64"`
+        - `"float"`/`"float32"`
+        - `"double"`/`"float64"`
+      - `int`: The data type of the sparse vector indices. Can be:
+        - `int8`
+        - `int16`
+        - `int`/`int32`/`integer`
+        - `int64`
     - Tensor vector: e.g., `"tensor,4,float"`
+      - `4`: The dimension of each vector unit in the tensor.
+      - `float`: The element type of the tensors. Can be:
+        - `"int8"`
+        - `"int16"`
+        - `"int"`/`"int32"`/`"integer"`
+        - `"int64"`
+        - `"float"`/`"float32"`
+        - `"double"`/`"float64"`
     - Tensor array: e.g., `"tensorarray,6,float"`
+      - `6`: The dimension of each vector unit in the tensor arrays.
+      - `float`: The element type of the tensors. Can be:
+        - `"int8"`
+        - `"int16"`
+        - `"int"`/`"int32"`/`"integer"`
+        - `"int64"`
+        - `"float"`/`"float32"`
+        - `"double"`/`"float64"`
     - Multivector: e.g., `"multivector,128,float"`
+      - `128`: The dimension of each vector unit.
+      - `float`: The element type of the tensors. Can be:
+        - `"int8"`
+        - `"int16"`
+        - `"int"`/`"int32"`/`"integer"`
+        - `"int64"`
+        - `"float"`/`"float32"`
+        - `"double"`/`"float64"`
 
 ### Response
 
@@ -534,10 +599,11 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 0,
-    "tables": [
-        "table_1",
-        "table_2",
-        "table_n"
+    "tables": 
+    [
+         "table_1",
+         "table_2",
+         "table_n"
     ]
 }
 ```
@@ -665,7 +731,8 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code": 0,
-    "columns": [
+    "columns": 
+    [
         {
              "column_name": "name",
              "column_type": "Varchar",
@@ -733,6 +800,8 @@ Creates an index on a specified table. If an index with the same name exists, th
 
 #### Request example
 
+- Creates an HNSW index on a vector column:
+
 ```shell
 curl --request POST \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
@@ -750,6 +819,49 @@ curl --request POST \
               "M": "16",
               "ef_construction": "50",
               "metric": "l2"
+          },
+          "create_option": "ignore_if_exists"
+     } '
+```
+
+- Creates a full-text index on a full-text column:
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' 
+     {
+          "fields": 
+          [
+              "fulltext_column"
+          ],
+          "index": 
+          {
+              "analyzer": "chinese"
+          },
+          "create_option": "ignore_if_exists"
+     } '
+```
+
+- Creates a BMP index on a tensor column
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' 
+     {
+          "fields": 
+          [
+              "vector_column"
+          ],
+          "index": 
+          {
+              "block_size": "16",
+              "compress_type": "raw"
           },
           "create_option": "ignore_if_exists"
      } '
@@ -844,7 +956,7 @@ The response includes a JSON object like the following:
 
 ---
 
-## Drop an index
+## Drop index
 
 **DELETE** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 
@@ -923,6 +1035,63 @@ The response includes a JSON object like the following:
 
 </TabItem>
 </Tabs>
+
+---
+
+## List indexes
+
+**GET** `/databases/{database_name}/tables/{table_name}/indexes`
+
+Retrieves a list of all indexes created on a given table.
+
+### Request
+
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/indexes`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "indexes": 
+    [
+        {
+            "columns": "vector_column",
+            "index_name": "idx1",
+            "index_type": "HNSW"
+        },
+        {
+            "columns": "vector_column_2",
+            "index_name": "idx2",
+            "index_type": "HNSW"
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
 
 ---
 
@@ -1006,63 +1175,6 @@ The response includes a JSON object like the following:
 
 </TabItem>
 </Tabs>
-
----
-
-## List indexes
-
-**GET** `/databases/{database_name}/tables/{table_name}/indexes`
-
-Retrieves a list of all indexes created on a given table.
-
-### Request
-
-- Method: GET
-- URL: `/databases/{database_name}/tables/{table_name}/indexes`
-- Headers: `accept: application/json`
-
-#### Request example
-
-```shell
-curl --request GET \
-     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes \
-     --header 'accept: application/json'
-```
-
-#### Request parameters
-
-- `database_name`: (*Path parameter*)  
-  The name of the database.
-- `table_name`: (*Path parameter*)  
-  The name of the table.
-
-### Response
-
-#### Status code 200
-
-The response includes a JSON object like the following:
-
-```shell
-{
-    "error_code": 0,
-    "indexes": 
-    [
-        {
-            "columns": "vector_column",
-            "index_name": "idx1",
-            "index_type": "HNSW"
-        },
-        {
-            "columns": "vector_column_2",
-            "index_name": "idx2",
-            "index_type": "HNSW"
-        }
-    ]
-}
-```
-
-- `"error_code"`: `integer`  
-  `0`: The operation succeeds.
 
 ---
 
@@ -1184,6 +1296,9 @@ Exports data from a specified table to a specified file.
   - `"file_type"`: `string`
   - `"header"`: `boolean`  
   - `"delimiter"`: `string`
+  - `"offset"`: `int`
+  - `"limit"`: `int`
+  - `"row_limit"`: `int`
 
 #### Request example
 
@@ -1196,7 +1311,10 @@ curl --request GET \
          "file_path": "/var/infinity/filename.csv",
          "file_type": "csv",
          "header": false, 
-         "delimiter": ","
+         "delimiter": "\t",
+         "offset": 2,
+         "limit": 6,
+         "row_limit": 2
     } '
 ```
 
@@ -1225,7 +1343,7 @@ curl --request GET \
 - `"limit"`: `int`, *Optional*  
   The maximum number of rows to export. Usually used in conjunction with `offset`. If the table's row count exceeds `offset` + `limit`, the excess rows are excluded from the export.
 - `"row_limit"`: (*Body parameter*), `int`, *Optional*  
-  Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so one.
+  Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so on.
 
 ### Response
 
@@ -1293,16 +1411,45 @@ curl --request POST \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' [    
-    {
-         "name": "Tom",
-         "score": 4.0
-    },
-    {
-         "name": "Toby",
-         "score": 5.0
-    }
-] '
+     --data ' 
+     [    
+          {
+               "name": "Riff",
+               "score": 4.0
+          },
+          {
+               "name": "Toby",
+               "score": 5.0
+          },
+          {
+               "name": "Jennifer",
+               "score": 5.0
+          },
+          {
+               "name": "Nick",
+               "score": 3.5
+          },
+          {
+               "name": "Ian",
+               "score": 3.5
+          },
+          {
+               "name": "Gabby",
+               "score": 4.0
+          },
+          {
+               "name": "John",
+               "score": 4.5
+          },
+          {
+               "name": "Neil",
+               "score": 2.0
+          },
+          {
+               "name": "Colleen",
+               "score": 4.5
+          }
+     ] '  
 ```
 
 #### Request parameters
@@ -1397,7 +1544,7 @@ curl --request DELETE \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
-    --data ' {"filter": "name = 'Toby'"} '
+    --data ' {"filter": "name = '"'Toby'"'"} '
 ```
 
 #### Request parameters
@@ -1457,7 +1604,7 @@ The response includes a JSON object like the following:
 
 ---
 
-## Update
+## Update data
 
 **PUT** `/databases/{database_name}/tables/{table_name}/docs`
 
@@ -1476,23 +1623,28 @@ Searches for rows that match the specified condition and updates them accordingl
 
 #### Request example
 
+The following code updates the score to `1.0` for rows where the `name` field is `Neil`.
+
 ```shell
 curl --request PUT \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
-    --data ' \
-{
-    "update":
+    --data ' 
     {
-        "score": 95
-    },
-    "filter": "name = 'Toby'"
-} '
+      "update": {"score": 1.0},
+      "filter": "name = '"'Neil'"'"
+    } '
 ```
 
 #### Request parameters
 
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"filter": (*Body parameter*), `string`, *Optional*  
+  A string that defines the condition for selecting rows to update. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be deleted. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.
 
 
 ### Response
@@ -1761,7 +1913,7 @@ The response includes a JSON object like the following:
 
 ---
 
-## Set a variable
+## Set variable
 
 **POST** `/variables/{variable_name}`
 
@@ -1960,7 +2112,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Set a config
+## Set config
 
 **PUT** `/configs/{config_name}`
 
