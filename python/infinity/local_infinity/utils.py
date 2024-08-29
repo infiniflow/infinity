@@ -203,6 +203,21 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
             constant_expression.literal_type = LiteralType.kDoubleSparseArray
             constant_expression.i64_array_idx = indices
             constant_expression.f64_array_value = values
+        case dict():
+            if len(value) == 0:
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
+            match next(iter(value.values())):
+                case int():
+                    constant_expression.literal_type = LiteralType.kLongSparseArray
+                    constant_expression.i64_array_idx = [int(k) for k in value.keys()]
+                    constant_expression.i64_array_value = [int(v) for v in value.values()]
+                case float():
+                    constant_expression.literal_type = LiteralType.kDoubleSparseArray
+                    constant_expression.i64_array_idx = [int(k) for k in value.keys()]
+                    constant_expression.f64_array_value = [float(v) for v in value.values()]
+                case _:
+                    raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                            f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
     return constant_expression

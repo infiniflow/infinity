@@ -503,20 +503,20 @@ class TestInfinity:
         assert table_obj
         res = table_obj.insert([{"c1": SparseVector(**{"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]})}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": SparseVector(**{"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]})}])
+        res = table_obj.insert([{"c1": SparseVector([40, 50, 60], [4.4, 5.5, 6.6])}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": SparseVector(**{"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]})},
-                                {"c1": SparseVector(**{"indices": [70, 80, 90], "values": [-7.7, -8.8, -9.9]})}])
+        res = table_obj.insert([{"c1": {"70": 7.7, "80": 8.8, "90": 9.9}},
+                                {"c1": {"70": -7.7, "80": -8.8, "90": -9.9}}])
         assert res.error_code == ErrorCode.OK
         print(table_obj.output(["*"]).to_pl())
         res = table_obj.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (
-                {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]},
-                {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]},
-                {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]},
-                {"indices": [70, 80, 90], "values": [-7.7, -8.8, -9.9]})}))
+                {"10": 1.1, "20": 2.2, "30": 3.3},
+                {"40": 4.4, "50": 5.5, "60": 6.6},
+                {"70": 7.7, "80": 8.8, "90": 9.9},
+                {"70": -7.7, "80": -8.8, "90": -9.9})}))
 
         res = db_obj.drop_table("test_insert_sparse"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

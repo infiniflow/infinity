@@ -185,40 +185,9 @@ class infinity_http:
         try:
             fields = []
             for col in columns_definition:
-                tmp = {}
-                tmp["name"] = col
+                tmp = {"name": col}
                 for param_name in columns_definition[col]:
-                    if param_name.lower() != "constraints" and param_name.lower() != "default": # not constraint and default, should be type
-                        tmp[param_name.lower()] = columns_definition[col][param_name]
-                    elif param_name.lower() == "default":
-                        type_tmp = {}
-                        params = tmp["type"].split(",")
-                        match params[0].strip().lower():
-                            case "vector" | "multivector" | "tensor" | "tensorarray":
-                                type_tmp["type"] = params[0].strip()
-                                type_tmp["dimension"] = int(params[1].strip())
-                                type_tmp["element_type"] = type_transfrom[params[2].strip()]
-                            case "sparse":
-                                type_tmp["type"] = params[0].strip()
-                                type_tmp["dimension"] = int(params[1].strip())
-                                type_tmp["data_type"] = type_transfrom[params[2].strip()]
-                                type_tmp["index_type"] = type_transfrom[params[3].strip()]
-                            case _:
-                                type_tmp["type"] = params[0].strip()
-
-                        default_field = {}
-                        if type_tmp["type"] == "vector":
-                            default_field["type"] = type_to_vector_literaltype[type_tmp["element_type"]]
-                        elif type_tmp["type"] == "tensor":
-                            pass
-                        elif type_tmp["type"] == "sparse":
-                            pass
-                        else:
-                            default_field["type"] = type_to_literaltype[type_tmp["type"]]
-                        default_field["value"] = columns_definition[col][param_name]
-                        tmp["default"] = default_field
-                    else:
-                        tmp[param_name.lower()] = columns_definition[col][param_name]
+                    tmp[param_name.lower()] = columns_definition[col][param_name]
                 fields.append(tmp)
         except:
             raise InfinityException(ErrorCode.SYNTAX_ERROR, "http adapter create table parse error")

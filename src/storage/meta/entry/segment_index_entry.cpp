@@ -789,12 +789,17 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                             UnrecoverableError("Invalid index type.");
                         } else {
                             using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
-                            if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
-                                UnrecoverableError("Invalid index type.");
-                            } else {
-                                auto *p = std::move(*index).CompressToLVQ().release();
-                                delete index;
-                                *abstract_hnsw = p;
+                            if (params->compress_to_lvq) {
+                                if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
+                                    UnrecoverableError("Invalid index type.");
+                                } else {
+                                    auto *p = std::move(*index).CompressToLVQ().release();
+                                    delete index;
+                                    *abstract_hnsw = p;
+                                }
+                            }
+                            if (params->lvq_avg) {
+                                index->Optimize();
                             }
                         }
                     },

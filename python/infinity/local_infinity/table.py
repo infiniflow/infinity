@@ -315,7 +315,7 @@ class LocalTable(Table, ABC):
         deprecated_api("knn is deprecated, please use match_dense instead")
         return self.match_dense(*args, **kwargs)
 
-    def match_sparse(self, vector_column_name: str, sparse_data: SparseVector, distance_type: str, topn: int,
+    def match_sparse(self, vector_column_name: str, sparse_data: SparseVector | dict, distance_type: str, topn: int,
                      opt_params: {} = None):
         self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
         return self

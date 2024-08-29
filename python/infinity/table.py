@@ -18,7 +18,7 @@ from typing import Optional, Union, Any
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.index import IndexInfo
-from infinity.common import InfinityException
+from infinity.common import InfinityException, INSERT_DATA
 from infinity.embedded_infinity_ext import ExplainType as LocalExplainType
 from infinity.errors import ErrorCode
 
@@ -76,7 +76,7 @@ class Table(ABC):
         pass
 
     @abstractmethod
-    def insert(self, data: list[dict[str, Union[str, int, float, list[Union[int, float]]]]]):
+    def insert(self, data: Union[INSERT_DATA, list[INSERT_DATA]]):
         pass
 
     @abstractmethod

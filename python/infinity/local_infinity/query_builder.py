@@ -179,7 +179,7 @@ class InfinityLocalQueryBuilder(ABC):
     def match_sparse(
         self,
         vector_column_name: str,
-        sparse_data: SparseVector,
+        sparse_data: SparseVector | dict,
         metric_type: str,
         topn: int,
         opt_params: {} = None,
@@ -220,6 +220,21 @@ class InfinityLocalQueryBuilder(ABC):
             case SparseVector([int(), *_], None):
                 raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE,
                                         f"No values! Sparse data does not support bool value type now")
+            case dict():
+                if len(sparse_data) == 0:
+                    raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
+                match next(iter(sparse_data.values())):
+                    case int():
+                        sparse_expr.literal_type = LiteralType.kLongSparseArray
+                        sparse_expr.i64_array_idx = [int(kk) for kk in sparse_data.keys()]
+                        sparse_expr.i64_array_value = [int(vv) for vv in sparse_data.values()]
+                    case float():
+                        sparse_expr.literal_type = LiteralType.kDoubleSparseArray
+                        sparse_expr.i64_array_idx = [int(kk) for kk in sparse_data.keys()]
+                        sparse_expr.f64_array_value = [float(vv) for vv in sparse_data.values()]
+                    case _:
+                        raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                                f"Invalid sparse vector value type: {type(next(iter(sparse_data.values())))}")
             case _:
                 raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE,
                                         f"Invalid sparse data type {type(sparse_data)}")
