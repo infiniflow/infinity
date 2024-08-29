@@ -1819,17 +1819,34 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
 }
 
 MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &status, const infinity_thrift_rpc::MatchSparseExpr &expr) {
-    auto match_sparse_expr = new MatchSparseExpr(true);
+    auto *match_sparse_expr = new MatchSparseExpr(true);
+    DeferFn defer_fn1([&] {
+        if(match_sparse_expr != nullptr) {
+            delete match_sparse_expr;
+            match_sparse_expr = nullptr;
+        }
+    });
+
     auto *column_expr = static_cast<ParsedExpr *>(GetColumnExprFromProto(expr.column_expr));
+    DeferFn defer_fn2([&] {
+        if(column_expr != nullptr) {
+            delete column_expr;
+            column_expr = nullptr;
+        }
+    });
     match_sparse_expr->SetSearchColumn(column_expr);
+    column_expr = nullptr;
 
     auto *constant_expr = GetConstantFromProto(status, expr.query_sparse_expr);
-    if (!status.ok()) {
-        delete match_sparse_expr;
-        match_sparse_expr = nullptr;
-        return nullptr;
-    }
+    DeferFn defer_fn3([&] {
+        if(constant_expr != nullptr) {
+            delete constant_expr;
+            constant_expr = nullptr;
+        }
+    });
+
     match_sparse_expr->SetQuerySparse(constant_expr);
+    constant_expr = nullptr;
 
     match_sparse_expr->SetMetricType(expr.metric_type);
 
@@ -1843,7 +1860,10 @@ MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &stat
     match_sparse_expr->SetOptParams(expr.topn, opt_params_ptr);
 
     status = Status::OK();
-    return match_sparse_expr;
+
+    MatchSparseExpr *return_value = match_sparse_expr;
+    match_sparse_expr = nullptr;
+    return return_value;
 }
 
 MatchTensorExpr *InfinityThriftService::GetMatchTensorExprFromProto(Status &status, const infinity_thrift_rpc::MatchTensorExpr &expr) {
