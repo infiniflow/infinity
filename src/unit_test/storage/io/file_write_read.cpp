@@ -140,7 +140,7 @@ TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
     EXPECT_EQ(file_writer.TotalWrittenBytes(), 4 * 1024 + buffer.size());
 }
 
-//write byte in '0', '1'...'1030'
+//write byte in '0', '1'...'1023'
 //read to '254', get pointer a, finish the read
 //seek a, finish
 TEST_F(FileWriteReadTest, TestFilePointerSeek) {
@@ -149,33 +149,28 @@ TEST_F(FileWriteReadTest, TestFilePointerSeek) {
     String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
     FileWriter file_writer(local_file_system, path, 128);
 
-    u8 ch = 0;
     for(i32 i = 0; i < 1024; i++) {
-        file_writer.WriteByte(ch);
-        ch++;
+        file_writer.WriteInt(i);
     }
     file_writer.Sync();
 
-
     FileReader file_reader(local_file_system, path, 128);
     u64 a;
-    ch = 0;
     for (i32 i = 0; i < 1024; ++i) {
         if(i == 254) {
             a = file_reader.GetFilePointer();
         }
-        EXPECT_EQ(file_reader.ReadByte(), ch);
-        ch++;
+        EXPECT_EQ(file_reader.ReadInt(), i);
     }
-    EXPECT_TRUE(FileReader.Finished());
+    EXPECT_TRUE(file_reader.Finished());
 
     file_reader.Seek(a);
-    ch = 253;
+    i32 exp = 254;
     while(!file_reader.Finished()) { 
-        EXPECT_EQ(file_reader.ReadByte(), ch);
-        ch++;
+        EXPECT_EQ(file_reader.ReadInt(), exp);
+        exp++;
     }
-    EXPECT_EQ(ch, (u8)1023);
+    EXPECT_EQ(exp, 1024);
 }
 
 //test if ReFill works fine.
