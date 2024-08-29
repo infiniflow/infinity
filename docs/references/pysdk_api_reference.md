@@ -1039,11 +1039,7 @@ Imports data from a specified file into the current table.
 
 #### file_path: `str`, *Required*
 
-Absolute path to the file for export. Supported file types include:
-
-- `csv`
-- `json`
-- `jsonl`
+Absolute path to the file for export.
 
 #### import_options: `dict[str, bool | str]`
 
@@ -1101,10 +1097,7 @@ Exports data in the current table to a specified file.
 
 #### file_path: `str`, *Required*
 
-Absolute path to the file for export. Supported file types include:
-
-- `csv`
-- `jsonl`
+Absolute path to the file for export.
   
 #### export_options: `dict[str, Any]`, *Required*
 

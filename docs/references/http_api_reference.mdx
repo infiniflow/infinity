@@ -393,8 +393,9 @@ curl --request POST \
       - `"bfloat16"`
     - String: `"varchar"`
     - Dense vector: e.g., `"vector,128,float"`
-      - `128`: The dimension of the dense vector.
-      - `float`: The element type of the dense vector. Can be:
+      - `vector`: The column is a dense vector column.
+      - The second unit in the string: The dimension of the dense vector.
+      - The third unit in the string: The element type of the dense vector. Can be:
         - `"int8"`
         - `"int16"`
         - `"int"`/`"int32"`/`"integer"`
@@ -402,22 +403,24 @@ curl --request POST \
         - `"float"`/`"float32"`
         - `"double"`/`"float64"`
     - Sparse vector: e.g., `"sparse,128,float,int"`
-      - `128`: The dimension of the sparse vector.
-      - `float`: The element type of the sparse vector. Can be:
+      - `sparse`: The column is a sparse vector column.
+      - The second unit in the string: The dimension of the sparse vector.
+      - The third unit in the string: The element type of the sparse vector. Can be:
         - `"int8"`
         - `"int16"`
         - `"int"`/`"int32"`/`"integer"`
         - `"int64"`
         - `"float"`/`"float32"`
         - `"double"`/`"float64"`
-      - `int`: The data type of the sparse vector indices. Can be:
+      - The fourth unit in the string: The data type of the sparse vector indices. Can be:
         - `int8`
         - `int16`
         - `int`/`int32`/`integer`
         - `int64`
     - Tensor vector: e.g., `"tensor,4,float"`
-      - `4`: The dimension of each vector unit in the tensor.
-      - `float`: The element type of the tensors. Can be:
+      - `tensor`: The column is a tensor column.
+      - The second unit in the string: The dimension of each vector unit in the tensor.
+      - The third unit in the string: The element type of the tensors. Can be:
         - `"int8"`
         - `"int16"`
         - `"int"`/`"int32"`/`"integer"`
@@ -425,8 +428,9 @@ curl --request POST \
         - `"float"`/`"float32"`
         - `"double"`/`"float64"`
     - Tensor array: e.g., `"tensorarray,6,float"`
-      - `6`: The dimension of each vector unit in the tensor arrays.
-      - `float`: The element type of the tensors. Can be:
+      - `tensorarray`: The column is a tensor-array column.
+      - The second unit in the string: The dimension of each vector unit in the tensor arrays.
+      - The third unit in the string: The element type of the tensors. Can be:
         - `"int8"`
         - `"int16"`
         - `"int"`/`"int32"`/`"integer"`
@@ -434,8 +438,9 @@ curl --request POST \
         - `"float"`/`"float32"`
         - `"double"`/`"float64"`
     - Multivector: e.g., `"multivector,128,float"`
-      - `128`: The dimension of each vector unit.
-      - `float`: The element type of the tensors. Can be:
+      - `multivector`: The column is a multi-vector column.
+      - The second unit in the string: The dimension of each vector unit.
+      - The third unit in the string: The element type of the tensors. Can be:
         - `"int8"`
         - `"int16"`
         - `"int"`/`"int32"`/`"integer"`
@@ -1219,10 +1224,7 @@ curl --request PUT \
 - `table_name`: (*Path parameter*)  
   The name of the table.
 - `"file_path"`: (*Body parameter*)   
-  Absolute path to the file to import. Supported file types include:  
-  - `csv`
-  - `json`
-  - `jsonl`
+  Absolute path to the file to import
 - `"file_type"`: (*Body parameter*)  
   The type of the file to import. Supported file types include:
   - `csv`
@@ -1325,9 +1327,7 @@ curl --request GET \
 - `table_name`: (*Path parameter*)  
   The name of the table.
 - `"file_path"`: (*Body parameter*)   
-  Absolute path to the file for export. Supported file types include:  
-  - `csv`
-  - `jsonl`
+  Absolute path to the file for export.
 - `"file_type"`: (*Body parameter*)  
   The type of the file for export. Supported file types include:
   - `csv`
@@ -1414,40 +1414,12 @@ curl --request POST \
      --data ' 
      [    
           {
-               "name": "Riff",
-               "score": 4.0
-          },
-          {
-               "name": "Toby",
-               "score": 5.0
-          },
-          {
                "name": "Jennifer",
                "score": 5.0
           },
           {
-               "name": "Nick",
-               "score": 3.5
-          },
-          {
-               "name": "Ian",
-               "score": 3.5
-          },
-          {
-               "name": "Gabby",
-               "score": 4.0
-          },
-          {
-               "name": "John",
-               "score": 4.5
-          },
-          {
                "name": "Neil",
                "score": 2.0
-          },
-          {
-               "name": "Colleen",
-               "score": 4.5
           }
      ] '  
 ```
@@ -1632,8 +1604,8 @@ curl --request PUT \
     --header 'content-type: application/json' \
     --data ' 
     {
-      "update": {"score": 1.0},
-      "filter": "name = '"'Neil'"'"
+        "update": {"score": 1.0},
+        "filter": "name = '"'Neil'"'"
     } '
 ```
 
