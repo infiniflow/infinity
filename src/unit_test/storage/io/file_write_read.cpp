@@ -195,3 +195,31 @@ TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
 
     EXPECT_STREQ(s.c_str(), read_s.c_str());
 }
+
+//test all types of data of reader and writer
+TEST_F(FileWriteReadTest, TestFileIODataTypes) {
+
+    using namespace infinity;
+    LocalFileSystem local_file_system;
+    String path = String(GetFullTmpDir()) + "/test_io_alltypes.abc";
+    FileWriter file_writer(local_file_system, path, 128);
+
+    file_writer.WriteByte('a');
+    file_writer.WriteInt(4);
+    file_writer.WriteVInt(23);
+    file_writer.WriteLong(4566);
+    file_writer.WriteVLong(45639);
+    file_writer.WriteShort(328);
+
+    String s = "linelineline";
+    file_writer.Write(s.data(), s.size());
+    file_writer.Sync();
+
+    FileReader file_reader(local_file_system, path, 128);
+    EXPECT_EQ(file_reader.ReadByte(), 'a');
+    EXPECT_EQ(file_reader.ReadInt(), 4);
+    EXPECT_EQ(file_reader.ReadVInt(), 23);
+    EXPECT_EQ(file_reader.ReadLong(), 4566);
+    EXPECT_EQ(file_reader.ReadVLong(), 45639);
+    EXPECT_EQ(file_reader.ReadShort(), 328);
+}
