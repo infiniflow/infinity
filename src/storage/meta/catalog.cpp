@@ -511,6 +511,9 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
+        // Finalize current object to ensure PersistenceManager be in a consistent state
+        pm->CurrentObjFinalize(true);
+
         json_res["obj_addr_map"] = pm->Serialize();
     }
     return json_res;
@@ -1062,6 +1065,12 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
                 break;
         }
         op->InitializeAddrSerializer();
+    }
+
+    // Finalize current object to ensure PersistenceManager be in a consistent state
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        pm->CurrentObjFinalize(true);
     }
 
     // Save the global catalog delta entry to disk.
