@@ -3269,7 +3269,7 @@ public:
 
 namespace infinity {
 
-void HTTPServer::Start(u16 port) {
+void HTTPServer::Start(const String& ip_address, u16 port) {
 
     WebEnvironment::init();
 
@@ -3333,12 +3333,12 @@ void HTTPServer::Start(u16 port) {
 
     router->route("POST", "/variables", MakeShared<SetGlobalVariableHandler>());
 
-    SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({"localhost", port, WebAddress::IP_4});
+    SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({ip_address, port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler = HttpConnectionHandler::createShared(router);
 
     server_ = MakeShared<WebServer>(connection_provider, connection_handler);
 
-    fmt::print("HTTP server listen on port: {}\n", port);
+    fmt::print("HTTP server listen on {}: {}\n", ip_address, port);
 
     server_->run();
 }
