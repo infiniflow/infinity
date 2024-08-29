@@ -1039,11 +1039,7 @@ Imports data from a specified file into the current table.
 
 #### file_path: `str`, *Required*
 
-Absolute path to the file for export. Supported file types include:
-
-- `csv`
-- `json`
-- `jsonl`
+Absolute path to the file for export.
 
 #### import_options: `dict[str, bool | str]`
 
@@ -1101,10 +1097,7 @@ Exports data in the current table to a specified file.
 
 #### file_path: `str`, *Required*
 
-Absolute path to the file for export. Supported file types include:
-
-- `csv`
-- `jsonl`
+Absolute path to the file for export.
   
 #### export_options: `dict[str, Any]`, *Required*
 
@@ -1130,7 +1123,7 @@ Example: `{"header": False, "delimiter": "\t", "file_type": "jsonl", "offset": 2
   The maximum number of rows to export. Usually used in conjunction with `offset`. If the table's row count exceeds `offset` + `limit`, the excess rows are excluded from the export.
 
 - **row_limit**: `int`, *Optional*  
-  Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so one.
+  Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so on.
 
 #### columns: `[str]`, *Optional*
 
@@ -1231,7 +1224,7 @@ table_object.delete("c1 >= 70 and c1 <= 90")
 
 ---
 
-## update
+## update data
 
 ```python
 table_object.update(cond, data)
@@ -1243,7 +1236,7 @@ Searches for rows that match the specified condition and updates them accordingl
 
 #### cond: `str`, *Required*
 
-A non-empty string that defines the condition for selecting rows to update. It represents a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated.
+A string that defines the condition for selecting rows to update. It represents a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated. If `cond` is not specified or set to `Null`, the method will update all rows in the table.
 
 #### data: `dict[str, Any]`, *Required*
 
