@@ -36,7 +36,7 @@ namespace infinity {
 
 export class ThreadedThriftServer {
 public:
-    void Init(i32 port_no);
+    void Init(const String& server_address, i32 port_no);
     void Start();
     void Shutdown();
 
@@ -46,7 +46,7 @@ private:
 
 export class PoolThriftServer {
 public:
-    void Init(i32 port_no, i32 pool_size);
+    void Init(const String& server_address, i32 port_no, i32 pool_size);
     void Start();
     void Shutdown();
 
@@ -56,7 +56,7 @@ private:
 
 export class NonBlockPoolThriftServer {
 public:
-    void Init(i32 port_no, i32 pool_size);
+    void Init(const String& server_address, i32 port_no, i32 pool_size);
     void Start();
     void Shutdown();
 

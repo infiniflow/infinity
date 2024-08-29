@@ -245,7 +245,7 @@ Tuple<Vector<String>, Vector<TableMeta*>, std::shared_lock<std::shared_mutex>> D
 
 SharedPtr<String> DBEntry::ToString() {
     SharedPtr<String> res =
-        MakeShared<String>(fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *AbsoluteDir(), txn_id_, table_meta_map_.Size()));
+        MakeShared<String>(fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: {}", *AbsoluteDir(), txn_id_, table_meta_map_.Size()));
     return res;
 }
 

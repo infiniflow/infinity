@@ -299,3 +299,98 @@ class TestDataBase(HttpTest):
             "error_code":3021,
         },"kError")
         self.clear_http_database()
+
+    def test_http_update_database_options(self):
+        '''
+            test the update database option
+        '''
+        db_name = "test_http_test_update_options"
+        self.create_database(db_name)
+
+        # update database option
+        new_options = {"new_option_key" : "new_option_value"}
+        self.update_database_options(db_name, new_options)
+
+        self.show_database(db_name, {
+            "error_code": 0,
+            "new_option_key": "new_option_value",
+        })
+
+        # delete database
+        self.drop_database(db_name)
+        self.clear_http_database()
+
+    def test_http_add_table(self):
+        '''
+            test adding table in database
+        '''
+        db_name = "test_http_test_add_table"
+        table_name = "test_table"
+        self.create_database(db_name)
+
+        # create table
+        self.create_table(db_name, table_name)
+
+        self.show_table(db_name, table_name, {
+            "error_code": 0,
+            "table_name": table_name,
+        })
+
+        # delete database
+        self.drop_database(db_name)
+        self.clear_http_database()
+    
+    def test_http_create_table_concurrently(self):
+        '''
+            create tables concurrently, test conflict handling and table display
+        '''
+        db_name = "test_http_test_create_table_concurrently"
+        table_name = "test_table"
+        self.create_database(db_name)
+
+        thread1 = threading.Thread(
+            target=self.create_table, args=(db_name, table_name)
+        )
+        thread2 = threading.Thread(
+            target=self.create_table, args=(db_name, table_name)
+        )
+
+        thread1.start()
+        thread2.start()
+
+        thread1.join()
+        thread2.join()
+
+        self.show_table(db_name, table_name, {
+            "error_code" : 0,
+            "table_name": table_name,
+        })
+
+        # delete database
+        self.drop_database(db_name)
+        self.clear_http_database()
+
+    def test_http_backup_and_restore_database(self):
+        '''
+            backup and recovery of test databases
+        '''
+
+        db_name = "test_http_test_backup_restore"
+        self.create_database(db_name)
+        
+        backup_name = "backup_test_http_test_backup_restore"
+        
+        self.backup_database(db_name, backup_name)
+
+        self.drop_database(db_name)
+
+        self.restore_database(backup_name, db_name)
+
+        self.show_database(db_name, {
+            "error_code": 0,
+            "database_name": db_name,
+        })
+
+        # delete database
+        self.drop_database(db_name)
+        self.clear_http_database()

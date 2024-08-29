@@ -191,14 +191,14 @@ auto main(int argc, char **argv) -> int {
 
     fmt::print("Currently enabled SIMD support: {}\n", fmt::join(GetSupportedSimdTypesList(), ", "));
 
-    http_server_thread = infinity::Thread([&]() { http_server.Start(InfinityContext::instance().config()->HTTPPort()); });
+    http_server_thread = infinity::Thread([&]() { http_server.Start(InfinityContext::instance().config()->ServerAddress(), InfinityContext::instance().config()->HTTPPort()); });
 
     u32 thrift_server_port = InfinityContext::instance().config()->ClientPort();
 
 #if THRIFT_SERVER_TYPE == 0
 
     i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
-    pool_thrift_server.Init(thrift_server_port, thrift_server_pool_size);
+    pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
     pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
 
 #elif THRIFT_SERVER_TYPE == 1
@@ -239,8 +239,6 @@ auto main(int argc, char **argv) -> int {
 #endif
 
     pg_thread.join();
-
-
 
     fmt::print("Server is shutdown\n");
     return 0;
