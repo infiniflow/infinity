@@ -1974,7 +1974,7 @@ The response includes a JSON object like the following:
 
 **PUT** `/configs/{config_name}`
 
-Assigns a value to a configuration entry.
+Assigns a value to a configuration parameter.
 
 ### Request
 
@@ -1998,7 +1998,7 @@ curl --request POST \
 #### Request parameter
 
 - `config_name`: (*Path parameter*)  
-  The name of the configuration entry, which must adhere to the following requirements:  
+  The name of the configuration parameter, which must adhere to the following requirements:  
   - Permitted characters include:
     - English letters (a-z, A-Z)
     - Digits (0-9)
@@ -2007,7 +2007,7 @@ curl --request POST \
   - Maximum 65,535 characters.
   - Case-insensitive.
 - `Body`:  (*Body parameter*),  `object`, *Required*  
-  The configuration entries to update, where each key (`string`) in the JSON object represents an entry, and the corresponding value (`string`) represents its value. 
+  The configuration parameters to update, where each key (`string`) in the JSON object represents an entry, and the corresponding value (`string`) represents its value. 
 
 
 ### Response
@@ -2057,7 +2057,7 @@ The response includes a JSON object like the following:
 
 **GET** `/configs`
 
-Retrieves the values of all configuration entries.
+Retrieves the values of all configuration parameters.
 
 ### Request
 
@@ -2119,7 +2119,7 @@ The response includes a JSON object like the following:
 
 **GET** `/configs/{config_name}`
 
-Retrieves the value of a configuration entry.
+Retrieves the value of a configuration parameter.
 
 ### Request
 
@@ -2138,7 +2138,7 @@ curl --request GET \
 #### Request parameters
 
 - `config_name`: (*Path parameter*)  
-  The name of the configuration entry.
+  The name of the configuration parameter.
 
 ### Response
 
