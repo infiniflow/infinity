@@ -28,6 +28,9 @@ import local_file_system;
 import file_system_type;
 import buffer_manager;
 import version_file_worker;
+import column_vector;
+import data_type;
+import logical_type;
 
 using namespace infinity;
 
@@ -163,4 +166,17 @@ TEST_P(BlockVersionTest, check_delete_test) {
     EXPECT_FALSE(block_version.CheckDelete(2, 29));
     EXPECT_FALSE(block_version.CheckDelete(3, 30));
     EXPECT_FALSE(block_version.CheckDelete(8193, 30));
+}
+
+TEST_P(BlockVersionTest, get_delete_ts_test) {
+    BlockVersion block_version(8192);
+    block_version.Delete(2, 30);
+    block_version.Delete(5, 40);
+    auto res = MakeShared<ColumnVector>(MakeShared<DataType>(LogicalType::kTinyInt));
+    res->Initialize();
+    block_version.GetDeleteTS(2, 4, *res);
+    EXPECT_EQ(res->ToString(0), "30");
+    EXPECT_EQ(res->ToString(1), "0");
+    EXPECT_EQ(res->ToString(2), "0");
+    EXPECT_EQ(res->ToString(3), "40");
 }
