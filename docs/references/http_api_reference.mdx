@@ -324,31 +324,38 @@ curl --request POST \
              },
              {
                   "name": "score",
-                  "type": "float"
+                  "type": "float",
+                  "default": 3.0
              },
              {
                   "name": "dense_column",
-                  "type": "vector,8,float"
+                  "type": "vector,8,float",
+                  "default`: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
              },
              {
-                  "name": "body",
-                  "type": "varchar"
+                  "name": "fulltext_column",
+                  "type": "varchar",
+                  "default": ""
              },
              {
                   "name": "sparse_column",
-                  "type": "sparse,8,float,int"
+                  "type": "sparse,128,float,int",
+                  "default": {"10":1.1, "20":2.2, "30": 3.3}
              },
              {
                   "name": "tensor_column",
-                  "type": "tensor,8,float"
+                  "type": "tensor,4,float",
+                  "default": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]
              },  
              {
                   "name": "multivector_column",
-                  "type": "multivector,8,float"
+                  "type": "multivector,4,float",
+                  "default": [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
              },    
              {
                   "name": "tensorarray_column",
-                  "type": "tensorarray,8,float"
+                  "type": "tensorarray,2,float",
+                  "default": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]]
              }          
         ]
     } '
@@ -402,6 +409,8 @@ curl --request POST \
         - `"int64"`
         - `"float"`/`"float32"`
         - `"double"`/`"float64"`
+        - `"float16"`
+        - `"bfloat16"`
     - Sparse vector: e.g., `"sparse,128,float,int"`
       - `sparse`: The column is a sparse vector column.
       - The second item in the string: The dimension of the sparse vector.
@@ -412,6 +421,8 @@ curl --request POST \
         - `"int64"`
         - `"float"`/`"float32"`
         - `"double"`/`"float64"`
+        - `"float16"`
+        - `"bfloat16"`
       - The fourth item in the string: The data type of the sparse vector indices. Can be:
         - `int8`
         - `int16`
@@ -427,6 +438,8 @@ curl --request POST \
         - `"int64"`
         - `"float"`/`"float32"`
         - `"double"`/`"float64"`
+        - `"float16"`
+        - `"bfloat16"`
     - Tensor array: e.g., `"tensorarray,6,float"`
       - `tensorarray`: The column is a tensor-array column.
       - The second item in the string: The dimension of each vector unit in the tensor arrays.
@@ -437,6 +450,8 @@ curl --request POST \
         - `"int64"`
         - `"float"`/`"float32"`
         - `"double"`/`"float64"`
+        - `"float16"`
+        - `"bfloat16"`
     - Multivector: e.g., `"multivector,128,float"`
       - `multivector`: The column is a multi-vector column.
       - The second item in the string: The dimension of each vector unit.
@@ -447,6 +462,10 @@ curl --request POST \
         - `"int64"`
         - `"float"`/`"float32"`
         - `"double"`/`"float64"`
+        - `"float16"`
+        - `"bfloat16"`
+  - `"default"`: `Any`, *Optional*  
+    The default value for unspecified cells in that column.
 
 ### Response
 
@@ -1081,7 +1100,7 @@ The response includes a JSON object like the following:
     "indexes": 
     [
         {
-            "columns": "vector_column",
+            "columns": "vector_column_1",
             "index_name": "idx1",
             "index_type": "HNSW"
         },
