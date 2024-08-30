@@ -497,7 +497,7 @@ You can build an HNSW index on the multi-vector column to accelerate match_dense
 # Create a table with a multi-vector column only:  
 # - `multivector`: The column is a multi-vector column
 # - `128`: The basic vector dimension
-# - `float`: The primitive data type of the basic vectors. Can be `float`/`float32`, `uint8` or `int8`
+# - `float`: The primitive data type of the basic vectors. Can be `float`/`float32`, `float16`, `bfloat16`, `uint8` or `int8`
 db_object.create_table("my_table", {"c1": {"type": "multivector,128,float"}}, None)
 
 ```
