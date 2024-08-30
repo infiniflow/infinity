@@ -1437,7 +1437,13 @@ curl --request POST \
           },
           {
                "name": "Neil",
-               "score": 2.0
+               "score": 2.0,
+               "fulltext_column": "You're absolutely lucky.",
+               "dense_column": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+               "sparse_column": {"10":1.1, "20":2.2, "30": 3.3},
+               "tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
+               "tensorarray_column": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]],
+               "multivector_column": [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
           }
      ] '  
 ```
