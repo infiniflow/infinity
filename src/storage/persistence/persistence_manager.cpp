@@ -399,7 +399,7 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
     {
         std::lock_guard<std::mutex> lock(mtx_);
         objects_.emplace(obj_key, ObjStat(0, 1, 1));
-        LOG_TRACE(fmt::format("ObjCreateRefCount added dedicated {}", obj_key));
+        LOG_TRACE(fmt::format("ObjCreateRefCount added dedicated {}, path: {}", obj_key, file_path));
     }
 
     fs::path src_fp = workspace_;
