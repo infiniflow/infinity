@@ -131,8 +131,8 @@ def is_list(str):
 def is_bool(str):
     return str.lower() == "true" or str.lower() == "false"
 
-def is_sparse(str):
-    tmp = str.replace("[", "")
+def is_sparse(str_input):
+    tmp = str_input.replace("[", "")
     tmp = tmp.replace("]", "")
     pairs = tmp.split(",")
     for pair in pairs:
@@ -143,17 +143,14 @@ def is_sparse(str):
             return False
     return True
 
-def str2sparse(str):
+def str2sparse(str_input):
     sparce_vec = {}
-    sparce_vec["indices"] = []
-    sparce_vec["values"] = []
-    tmp = str.replace("[", "")
+    tmp = str_input.replace("[", "")
     tmp = tmp.replace("]", "")
     pairs = tmp.split(",")
     for pair in pairs:
         t = pair.split(":")
-        sparce_vec["indices"].append(eval(t[0]))
-        sparce_vec["values"].append(eval(t[1]))
+        sparce_vec[str(eval(t[0]))] = eval(t[1])
 
     return sparce_vec
 

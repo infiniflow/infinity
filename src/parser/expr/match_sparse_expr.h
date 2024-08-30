@@ -31,7 +31,7 @@ public:
 
     void SetSearchColumn(ParsedExpr *&column_expr);
 
-    void SetQuerySparse(ConstantExpr *raw_sparse_expr);
+    void SetQuerySparse(ConstantExpr *&raw_sparse_expr);
 
     void SetMetricType(char *&raw_metric_type);
 

@@ -231,6 +231,23 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
                 literal_type=ttypes.LiteralType.SparseDoubleArray,
                 i64_array_idx=indices,
                 f64_array_value=values)
+        case dict():
+            if len(value) == 0:
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
+            match next(iter(value.values())):
+                case int():
+                    constant_expression = ttypes.ConstantExpr(
+                        literal_type=ttypes.LiteralType.SparseIntegerArray,
+                        i64_array_idx=[int(k) for k in value.keys()],
+                        i64_array_value=[int(v) for v in value.values()])
+                case float():
+                    constant_expression = ttypes.ConstantExpr(
+                        literal_type=ttypes.LiteralType.SparseDoubleArray,
+                        i64_array_idx=[int(k) for k in value.keys()],
+                        f64_array_value=[float(v) for v in value.values()])
+                case _:
+                    raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                            f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
     return constant_expression

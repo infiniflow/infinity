@@ -437,6 +437,11 @@ void TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<Uniq
                     }
                 }
             }
+            if (params->lvq_avg) {
+                for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+                    segment_index_entry->OptIndex(hnsw_index, txn_table_store, opt_params, false /*replay*/);
+                }
+            }
             break;
         }
         default: {

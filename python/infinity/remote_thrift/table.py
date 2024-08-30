@@ -345,7 +345,7 @@ class RemoteTable(Table, ABC):
         self.query_builder.match_tensor(column_name, query_data, query_data_type, topn, extra_option)
         return self
 
-    def match_sparse(self, vector_column_name: str, sparse_data: SparseVector, distance_type: str, topn: int,
+    def match_sparse(self, vector_column_name: str, sparse_data: SparseVector | dict, distance_type: str, topn: int,
                      opt_params: Optional[dict] = None):
         self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
         return self
