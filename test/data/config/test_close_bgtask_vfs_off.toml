@@ -4,9 +4,9 @@ time_zone = "utc-8"
 
 [network]
 [log]
-log_level = "critical"
 
 [storage]
+data_dir = "/var/infinity/data"
 # close auto optimize
 optimize_interval = "0s"
 # close auto cleanup task

@@ -53,14 +53,9 @@ protected:
     String config_path_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    TestWithDifferentParams,
-    PostingWriterTest,
-    ::testing::Values(
-        BaseTestParamStr::NULL_CONFIG_PATH,
-        BaseTestParamStr::VFS_CONFIG_PATH
-    )
-);
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         PostingWriterTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(PostingWriterTest, test1) {
     Vector<docid_t> expected = {1, 3, 5, 7, 9};

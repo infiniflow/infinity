@@ -70,7 +70,7 @@ class ColumnVectorBoolTest : public BaseTestParamStr {
 // INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 //                          ColumnVectorBoolTest,
 //                          ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_close_bgtask_silent.toml").c_str(),
-//                                            BaseTestParamStr::VFS_CONFIG_PATH));
+//                                            (std::string(infinity::test_data_path()) + "/config/test_close_bgtask_silent_vfs_off.toml").c_str()));
 
 TEST_F(ColumnVectorBoolTest, flat_boolean) {
     using namespace infinity;

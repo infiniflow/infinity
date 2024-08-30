@@ -414,10 +414,17 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
     return delete_row_n;
 }
 
-void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts) {
+void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts, WalSegmentInfo *segment_info) {
     std::shared_lock w_lock(rw_locker_);
     for (auto &block_entry : block_entries_) {
-        block_entry->CommitFlushed(commit_ts);
+        WalBlockInfo *block_info_ptr = nullptr;
+        for (auto &block_info : segment_info->block_infos_) {
+            if (block_info.block_id_ == block_entry->block_id()) {
+                block_info_ptr = &block_info;
+                break;
+            }
+        }
+        block_entry->CommitFlushed(commit_ts, block_info_ptr);
     }
 }
 

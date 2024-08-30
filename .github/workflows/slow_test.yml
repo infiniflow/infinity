@@ -5,7 +5,8 @@ on:
   create:
     tags:
       - "v*.*.*"                  # normal release
-      - "nightly"                 # the only one mutable tag
+      - "nightly"                 # mutable tag
+      - "slow-test"               # mutable tag
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
