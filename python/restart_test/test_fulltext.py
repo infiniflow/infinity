@@ -7,21 +7,12 @@ import csv
 from infinity_runner import InfinityRunner
 from common import common_values
 from infinity.common import ConflictType
-import infinity.index as index
+from infinity import index
 from infinity.errors import ErrorCode
-
+from restart_util import *
 
 @pytest.mark.slow
 class TestFullText:
-    def parse_enwiki(self, enwiki_path: str):
-        with open(enwiki_path, "r") as f:
-            reader = csv.reader(f, delimiter="\t")
-            for row in reader:
-                title = row[0]
-                date = row[1]
-                body = row[2]
-                yield title, date, body
-
     @pytest.mark.skip(reason="not tested")
     @pytest.mark.parametrize(
         "config",
@@ -33,6 +24,8 @@ class TestFullText:
     )
     def test_fulltext(self, infinity_runner: InfinityRunner, config: str):
         enwiki_path = "test/data/csv/enwiki-10w.csv"
+        enwiki_size = 100000
+
         table_name = "test_fulltext"
         gt_table_name = "test_fulltext_gt"
         matching_text = "American"
@@ -66,7 +59,8 @@ class TestFullText:
             },
             ConflictType.Error,
         )
-        for id, (title, date, body) in enumerate(self.parse_enwiki(enwiki_path)):
+        enwiki_gen1 = EnwikiGenerator.gen_factory(enwiki_path)
+        for id, (title, date, body) in enumerate(enwiki_gen1(enwiki_size)):
             gt_table_obj.insert(
                 [{"id": id, "title": title, "date": date, "body": body}]
             )
@@ -89,7 +83,7 @@ class TestFullText:
         infinity_runner.uninit()
 
         cur_insert_n = 0
-        enwiki_gen = self.parse_enwiki(enwiki_path)
+        enwiki_gen2 = EnwikiGenerator.gen_factory(enwiki_path)
         end = False
 
         def work_func(table_obj, gt_table_obj):
@@ -99,7 +93,7 @@ class TestFullText:
                 r = random.randint(0, 500 - 1)
                 try:
                     if r < 499:
-                        res = next(enwiki_gen, None)
+                        res = next(enwiki_gen2, None)
                         if res is None:
                             print("End")
                             end = True
