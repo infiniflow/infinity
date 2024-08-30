@@ -356,7 +356,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                     file_handler = std::move(result.first);
                 }
 
-                LOG_DEBUG(line_json.dump());
+                // LOG_DEBUG(line_json.dump());
                 String to_write = line_json.dump() + "\n";
                 fs.Write(*file_handler, to_write.c_str(), to_write.size());
                 ++row_count;

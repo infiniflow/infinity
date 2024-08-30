@@ -61,8 +61,7 @@ class DBTxnTest : public BaseTestParamStr {
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          DBTxnTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(DBTxnTest, test1) {
     using namespace infinity;

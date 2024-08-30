@@ -69,8 +69,9 @@ log_level               = "info"
 
 # storage-related configuration
 [storage]
-# The directory of data files
-data_dir                 = "/var/infinity/data"
+# The working directory of the persistence manager.
+# The persistence manager maps block and index files to remote stored objects and manage the local cache.
+persistence_dir          = "/var/infinity/persistence"
 
 # periodically activates garbage collection:
 # use "number + unit of time" to specify intervals
@@ -134,14 +135,4 @@ wal_flush                     = "only_write"
 [resource]
 # The resource files used by Infinity (such as the dictionary files used by the analyzer)
 resource_dir                  = "/var/infinity/resource"
-
-[persistence]
-# Persistent File Storage Path
-# When set to "" or not provided, persistent manager is diabled, and files are stored directly on the local file system.
-# When not empty, persistent manager is enabled. The generated files will be stored by the persistence manager on the path specified by persistence_dir.
-# For example, if the user adds three files: A, B, and C.
-# When persistence manager is disabled, the three files are stored on the local file system in their specified raw paths: A, B, C.
-# When persistence manager is enabled, the persistence manager determines how to store these files on the specified persistent path.
-# toggle persistence on to reduce possible file fragments in your local filesystem
-persistence_dir          = "/var/infinity/persistence"
 ```

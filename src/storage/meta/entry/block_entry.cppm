@@ -33,6 +33,7 @@ import fast_rough_filter;
 import value;
 import buffer_obj;
 import bitmask;
+import wal_entry;
 
 namespace infinity {
 
@@ -100,7 +101,7 @@ protected:
 
     SizeT DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
 
-    void CommitFlushed(TxnTimeStamp commit_ts);
+    void CommitFlushed(TxnTimeStamp commit_ts, WalBlockInfo *block_info);
 
     void CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts);
 

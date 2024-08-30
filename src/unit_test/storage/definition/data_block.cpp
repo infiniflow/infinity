@@ -63,14 +63,9 @@ class DataBlockTest : public BaseTestParamStr {
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    TestWithDifferentParams,
-    DataBlockTest,
-    ::testing::Values(
-        BaseTestParamStr::NULL_CONFIG_PATH,
-        BaseTestParamStr::VFS_CONFIG_PATH
-    )
-);
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         DataBlockTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(DataBlockTest, test1) {
     using namespace infinity;

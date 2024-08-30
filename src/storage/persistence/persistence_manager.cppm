@@ -42,22 +42,18 @@ export struct ObjAddr {
 };
 
 export struct Range {
-    SizeT start_{};
-    SizeT end_{};
+    SizeT start_{}; // inclusive
+    SizeT end_{};   // exclusive
     bool operator<(const Range &rhs) const { return start_ < rhs.start_; }
-
-    bool HasIntersection(const Range &rhs) const {
-        SizeT max_start = std::max(start_, rhs.start_);
-        SizeT min_end = std::min(end_, rhs.end_);
-        return max_start < min_end;
-    }
+    bool operator==(const Range &rhs) const { return start_ == rhs.start_ && end_ == rhs.end_; }
+    bool Cover(const Range &rhs) const { return start_ <= rhs.start_ && rhs.end_ <= end_; }
+    bool Intersect(const Range &rhs) const { return start_ < rhs.end_ && rhs.start_ < end_; }
 };
 
 export struct ObjStat {
     SizeT obj_size_{}; // footer (if present) is excluded
     SizeT parts_{};    // an object attribute
     SizeT ref_count_{}; // the number of user (R and W) of some part of this object
-    SizeT deleted_size_{};
     Set<Range> deleted_ranges_{};
 
     ObjStat() = default;
@@ -92,7 +88,7 @@ public:
     ObjAddr Persist(const char *data, SizeT len);
 
     // Force finalize current object. Subsequent append on the finalized object is forbidden.
-    void CurrentObjFinalize();
+    void CurrentObjFinalize(bool validate = false);
 
     /**
      * For dedicated objects
@@ -164,6 +160,8 @@ private:
 
 export struct AddrSerializer {
     void Initialize(PersistenceManager *pm, const Vector<String> &path);
+
+    void InitializeValid(PersistenceManager *pm);
 
     SizeT GetSizeInBytes() const;
  

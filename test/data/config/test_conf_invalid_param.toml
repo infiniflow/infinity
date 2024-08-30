@@ -24,6 +24,7 @@ log_1evel               = "tracewrong"
 
 [st0rage]
 data_dir                = "/var/infinity/datawrong"
+persistence_dirrr       = "/var/infinity/persistencewrong"
 
 [bufferrrr]
 buffer_mAnager_size        = "50GB"
@@ -36,6 +37,3 @@ wa1_dir                 = "/var/infinity/wawrong"
 
 [resourCEEe]
 resource_dffir          = "/var/infinity/resourcewrong"
-
-[persistence]
-persistence_dirrr       = "/var/infinity/persistencewrong"

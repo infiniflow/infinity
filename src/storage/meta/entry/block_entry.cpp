@@ -38,6 +38,7 @@ import cleanup_scanner;
 import buffer_manager;
 import buffer_obj;
 import logical_type;
+import infinity_context;
 
 namespace infinity {
 
@@ -306,13 +307,15 @@ SizeT BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const
     return delete_row_n;
 }
 
-void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts) {
+void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts, WalBlockInfo *block_info) {
     std::unique_lock w_lock(rw_locker_);
     auto block_version_handle = version_buffer_object_->Load();
     auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
     block_version->Append(commit_ts, this->block_row_count_);
 
     FlushVersionNoLock(commit_ts);
+    auto *pm = InfinityContext::instance().persistence_manager();
+    block_info->addr_serializer_.InitializeValid(pm);
 }
 
 void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {

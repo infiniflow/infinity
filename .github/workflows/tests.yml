@@ -110,11 +110,11 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: cat debug.log 2>/dev/null || true
 
-      - name: Start infinity debug version with vfs on
+      - name: Start infinity debug version with vfs off
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_vfs_conf.toml > vfs_debug.log 2>&1" &
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_vfs_off.toml > vfs_debug.log 2>&1" &
 
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -217,7 +217,11 @@ jobs:
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity/* && cp test/data/config/infinity_conf.toml /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+
+      - name: Collect embedded infinity log
+        if: ${{ !cancelled() && failure()}} # run this step if previous steps failed
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cat /var/infinity/log/infinity.log"
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
@@ -245,11 +249,11 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
         run: cat release.log 2>/dev/null || true
 
-      - name: Start infinity release version with vfs on
+      - name: Start infinity release version with vfs off
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_vfs_conf.toml > vfs_release.log 2>&1" &
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_vfs_off.toml > vfs_release.log 2>&1" &
 
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version
         if: ${{ !cancelled() && !failure() }}

@@ -65,15 +65,9 @@ protected:
     String config_path_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    TestWithDifferentParams,
-    PostingMergerTest,
-    ::testing::Values(
-        BaseTestParamStr::NULL_CONFIG_PATH,
-        BaseTestParamStr::VFS_CONFIG_PATH
-    )
-);
-
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         PostingMergerTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 void PostingMergerTest::CreateIndex() {
 

@@ -13,5 +13,3 @@ mem_index_capacity = 1048576
 [wal]
 
 [resource]
-
-[persistence]
