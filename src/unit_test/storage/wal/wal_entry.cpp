@@ -277,8 +277,10 @@ TEST_F(WalEntryTest, ReadWriteVFS) {
     String data_dir = "data_dir";
     SizeT object_size_limit = 100;
     PersistenceManager pm(workspace, data_dir, object_size_limit);
-    ObjAddr obj_addr1{.obj_key_ = "key1", .part_offset_ = 0, .part_size_ = 10};
-    pm.SaveLocalPath(paths[0], obj_addr1);
+    ObjAddr obj_addr0{.obj_key_ = "key1", .part_offset_ = 0, .part_size_ = 10};
+    ObjAddr obj_addr1{.obj_key_ = "key1", .part_offset_ = 10, .part_size_ = 20};
+    pm.SaveLocalPath(paths[0], obj_addr0);
+    pm.SaveLocalPath(paths[1], obj_addr1);
 
     AddrSerializer addr_serializer;
     addr_serializer.Initialize(&pm, paths);
