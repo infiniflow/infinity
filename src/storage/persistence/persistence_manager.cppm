@@ -161,6 +161,8 @@ private:
 export struct AddrSerializer {
     void Initialize(PersistenceManager *pm, const Vector<String> &path);
 
+    void InitializeValid(PersistenceManager *pm);
+
     SizeT GetSizeInBytes() const;
  
     void WriteBufAdv(char *&buf) const;

@@ -1064,13 +1064,15 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
                 LOG_TRACE(fmt::format("Ignore delta op: {}", op->ToString()));
                 break;
         }
-        op->InitializeAddrSerializer();
     }
 
     // Finalize current object to ensure PersistenceManager be in a consistent state
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
         pm->CurrentObjFinalize(true);
+        for (auto &op : flush_delta_entry->operations()) {
+            op->InitializeAddrSerializer();
+        }
     }
 
     // Save the global catalog delta entry to disk.

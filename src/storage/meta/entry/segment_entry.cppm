@@ -32,6 +32,7 @@ import meta_entry_interface;
 import cleanup_scanner;
 import logger;
 import bitmask;
+import wal_entry;
 
 namespace infinity {
 
@@ -209,7 +210,7 @@ public:
 
     SizeT DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, Txn *txn);
 
-    void CommitFlushed(TxnTimeStamp commit_ts);
+    void CommitFlushed(TxnTimeStamp commit_ts, WalSegmentInfo *segment_info);
 
     void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnSegmentStore &segment_store, const DeleteState *delete_state);
 

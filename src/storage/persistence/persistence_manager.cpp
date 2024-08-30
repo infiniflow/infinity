@@ -535,6 +535,10 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
     LOG_TRACE(fmt::format("Deleted object {} range [{}, {})", object_addr.obj_key_, orig_range.start_, orig_range.end_));
     if (range.start_ == 0 && range.end_ == it->second.obj_size_ && object_addr.obj_key_ != current_object_key_) {
         fs::path fp = workspace_;
+        if (object_addr.obj_key_.empty()) {
+            String error_message = fmt::format("Failed to find object key");
+            UnrecoverableError(error_message);
+        }
         fp.append(object_addr.obj_key_);
         fs::remove(fp);
         objects_.erase(it);
@@ -681,11 +685,31 @@ void AddrSerializer::Initialize(PersistenceManager *pm, const Vector<String> &pa
         ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
         obj_addrs_.push_back(obj_addr);
         if (!obj_addr.Valid()) {
+            // In ImportWal, version file is not flushed here, set before write wal
             ObjStat invaild_stat;
             obj_stats_.push_back(invaild_stat);
         } else {
             ObjStat obj_stat = pm->GetObjStatByObjAddr(obj_addr);
             obj_stats_.push_back(obj_stat);
+        }
+    }
+}
+
+void AddrSerializer::InitializeValid(PersistenceManager *pm) {
+    if (pm == nullptr) {
+        return; // not use persistence manager
+    }
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        if (obj_addrs_[i].Valid()) {
+            continue;
+        }
+        ObjAddr obj_addr = pm->GetObjFromLocalPath(paths_[i]);
+        obj_addrs_[i] = obj_addr;
+        if (!obj_addr.Valid()) {
+            UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
+        } else {
+            ObjStat obj_stat = pm->GetObjStatByObjAddr(obj_addr);
+            obj_stats_[i] = obj_stat;
         }
     }
 }
@@ -704,6 +728,9 @@ void AddrSerializer::WriteBufAdv(char *&buf) const {
     ::infinity::WriteBufAdv(buf, paths_.size());
     for (SizeT i = 0; i < paths_.size(); ++i) {
         ::infinity::WriteBufAdv(buf, paths_[i]);
+        if (!obj_addrs_[i].Valid()) {
+            UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
+        }
         obj_addrs_[i].WriteBufAdv(buf);
         obj_stats_[i].WriteBufAdv(buf);
     }
@@ -724,6 +751,9 @@ void AddrSerializer::AddToPersistenceManager(PersistenceManager *pm) const {
         return;
     }
     for (SizeT i = 0; i < paths_.size(); ++i) {
+        if (!obj_addrs_[i].Valid()) {
+            UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
+        }
         LOG_TRACE(fmt::format("Add path {} to persistence manager", paths_[i]));
         pm->SaveLocalPath(paths_[i], obj_addrs_[i]);
         pm->SaveObjStat(obj_addrs_[i], obj_stats_[i]);
