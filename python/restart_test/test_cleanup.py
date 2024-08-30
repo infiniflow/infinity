@@ -7,6 +7,7 @@ from restart_util import *
 import infinity
 
 
+# Test with cleanuped data but meta data not cleanuped
 class TestCleanup:
     @pytest.mark.parametrize(
         "config",

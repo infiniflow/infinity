@@ -5,75 +5,26 @@ from infinity.common import ConflictType
 from infinity_runner import InfinityRunner
 import time
 import threading
-import csv
+import itertools
 from restart_util import *
 
 
 @pytest.mark.slow
 class TestInsert:
-    def enwiki_generator(enwiki_path: str, insert_n: int):
-        for i in range(insert_n):
-            with open(enwiki_path, "r") as f:
-                reader = csv.reader(f, delimiter="\t")
-                for row in reader:
-                    title = row[0]
-                    date = row[1]
-                    body = row[2]
-                    yield title, date, body
-
-    @pytest.mark.parametrize(
-        "config",
-        [
-            "test/data/config/restart_test/test_insert/1.toml",
-            "test/data/config/restart_test/test_insert/2.toml",
-        ],
-    )
-    @pytest.mark.parametrize(
-        "columns, data_gen_factory",
-        [
-            (
-                SimpleEmbeddingGenerator.columns(),
-                SimpleEmbeddingGenerator.gen_factory(),
-            ),
-            (
-                SimpleVarcharGenerator.columns(),
-                SimpleVarcharGenerator.gen_factory(),
-            ),
-            (
-                SimpleTensorGenerator.columns(),
-                SimpleTensorGenerator.gen_factory(),
-            ),
-            (
-                {
-                    "title": {"type": "varchar"},
-                    "date": {"type": "varchar"},
-                    "body": {"type": "varchar"},
-                },
-                functools.partial(enwiki_generator, "test/data/csv/enwiki-10w.csv"),
-            ),
-        ],
-    )
-    def test_insert(
+    def insert_inner(
         self,
         infinity_runner: InfinityRunner,
         config: str,
         columns: dict,
         data_gen_factory,
     ):
-        insert_n = 100000
+        uri = common_values.TEST_LOCAL_HOST
+
+        insert_n = 1000000
         data_gen = data_gen_factory(insert_n)
 
         stop_n = 10
         uri = common_values.TEST_LOCAL_HOST
-        infinity_runner.clear()
-
-        infinity_runner.init(config)
-
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.create_table("test_insert", columns, ConflictType.Error)
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
 
         cur_insert_n = 0
         gen_finished = False
@@ -109,15 +60,14 @@ class TestInsert:
             nonlocal cur_insert_n, shutdown_time
             last_shutdown_insert_n = cur_insert_n
             while True:
-                if (
-                    gen_finished
-                    or cur_insert_n - last_shutdown_insert_n >= insert_n // stop_n
+                if gen_finished or (
+                    stop_n != 0
+                    and cur_insert_n - last_shutdown_insert_n >= insert_n // stop_n
                 ):
                     infinity_runner.uninit()
                     print("shutdown infinity")
                     shutdown_time += 1
                     return
-                print(f"cur_insert_n: {cur_insert_n}")
                 time.sleep(0.1)
 
         while not gen_finished:
@@ -129,15 +79,120 @@ class TestInsert:
 
             data_dict, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
-            if count_star != cur_insert_n:
-                print(f"Erorr: count_star: {count_star}, cur_insert_n: {cur_insert_n}")
-                # exit(1)
+            assert count_star == cur_insert_n
             print(f"cur_insert_n: {cur_insert_n}")
 
             t1 = threading.Thread(target=shutdown_func)
             t1.start()
             insert_func(table_obj)
             t1.join()
+
+    @pytest.mark.parametrize(
+        "config",
+        [
+            "test/data/config/restart_test/test_insert/1.toml",
+            "test/data/config/restart_test/test_insert/2.toml",
+        ],
+    )
+    @pytest.mark.parametrize(
+        "columns, data_gen_factory",
+        [
+            (
+                SimpleEmbeddingGenerator.columns(),
+                SimpleEmbeddingGenerator.gen_factory(),
+            ),
+            (
+                SimpleVarcharGenerator.columns(),
+                SimpleVarcharGenerator.gen_factory(),
+            ),
+            (
+                SimpleTensorGenerator.columns(),
+                SimpleTensorGenerator.gen_factory(),
+            ),
+            (
+                EnwikiGenerator.columns(),
+                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki-10w.csv"),
+            ),
+            (
+                SiftGenerator.columns(),
+                SiftGenerator.gen_factory(
+                    "test/data/benchmark/sift_1m/sift_base.fvecs"
+                ),
+            )
+        ],
+    )
+    def test_insert(
+        self,
+        infinity_runner: InfinityRunner,
+        config: str,
+        columns: dict,
+        data_gen_factory,
+    ):
+        uri = common_values.TEST_LOCAL_HOST
+        infinity_runner.clear()
+
+        infinity_runner.init(config)
+
+        infinity_obj = InfinityRunner.connect(uri)
+        db_obj = infinity_obj.get_database("default_db")
+        db_obj.create_table("test_insert", columns, ConflictType.Error)
+        infinity_obj.disconnect()
+        infinity_runner.uninit()
+
+        self.insert_inner(infinity_runner, config, columns, data_gen_factory)
+
+        infinity_runner.init(config)
+        infinity_obj = InfinityRunner.connect(uri)
+        db_obj = infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert", ConflictType.Error)
+        infinity_obj.disconnect()
+        infinity_runner.uninit()
+
+    @pytest.mark.parametrize(
+        "config",
+        [
+            "test/data/config/restart_test/test_insert/1.toml",
+            "test/data/config/restart_test/test_insert/3.toml",
+        ],
+    )
+    @pytest.mark.parametrize(
+        "columns, index, data_gen_factory",
+        [
+            (
+                EnwikiGenerator.columns(),
+                EnwikiGenerator.index(),
+                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki-10w.csv"),
+            ),
+            (
+                SiftGenerator.columns(),
+                SiftGenerator.index(),
+                SiftGenerator.gen_factory(
+                    "test/data/benchmark/sift_1m/sift_base.fvecs"
+                ),
+            ),
+        ],
+    )
+    def test_insert_index(
+        self,
+        infinity_runner: InfinityRunner,
+        config: str,
+        columns: dict,
+        index: index.IndexInfo,
+        data_gen_factory,
+    ):
+        uri = common_values.TEST_LOCAL_HOST
+        infinity_runner.clear()
+
+        infinity_runner.init(config)
+
+        infinity_obj = InfinityRunner.connect(uri)
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.create_table("test_insert", columns, ConflictType.Error)
+        table_obj.create_index("idx1", index)
+        infinity_obj.disconnect()
+        infinity_runner.uninit()
+
+        self.insert_inner(infinity_runner, config, columns, data_gen_factory)
 
         infinity_runner.init(config)
         infinity_obj = InfinityRunner.connect(uri)
