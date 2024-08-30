@@ -332,7 +332,82 @@ A non-empty string indicating the name of the table, which must adhere to the fo
 Definitions for all table columns as a dictionary. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value information in key-value pairs:
 
 - **Data type** (`"type"`)  
-  The data type of the column.
+  The data type of the column.  
+  - Numeric:  
+  - `"int8"`
+  - `"int16"`
+  - `"int"`/`"int32"`/`"integer"`
+  - `"int64"`
+  - `"float"`/`"float32"`
+  - `"double"`/`"float64"`
+  - `"float16"`
+  - `"bfloat16"`
+- String: `"varchar"`
+- Dense vector: e.g., `"vector,128,float"`
+  - `vector`: The column is a dense vector column.
+  - The second item in the string: The dimension of the dense vector.
+  - The third item in the string: The element type of the dense vector. Can be:
+    - `"int8"`
+    - `"int16"`
+    - `"int"`/`"int32"`/`"integer"`
+    - `"int64"`
+    - `"float"`/`"float32"`
+    - `"double"`/`"float64"`
+    - `"float16"`
+    - `"bfloat16"`
+- Sparse vector: e.g., `"sparse,128,float,int"`
+  - `sparse`: The column is a sparse vector column.
+  - The second item in the string: The dimension of the sparse vector.
+  - The third item in the string: The element type of the sparse vector. Can be:
+    - `"int8"`
+    - `"int16"`
+    - `"int"`/`"int32"`/`"integer"`
+    - `"int64"`
+    - `"float"`/`"float32"`
+    - `"double"`/`"float64"`
+    - `"float16"`
+    - `"bfloat16"`
+  - The fourth item in the string: The data type of the sparse vector indices. Can be:
+    - `int8`
+    - `int16`
+    - `int`/`int32`/`integer`
+    - `int64`
+- Tensor vector: e.g., `"tensor,4,float"`
+  - `tensor`: The column is a tensor column.
+  - The second item in the string: The dimension of each vector unit in the tensor.
+  - The third item in the string: The element type of the tensors. Can be:
+    - `"int8"`
+    - `"int16"`
+    - `"int"`/`"int32"`/`"integer"`
+    - `"int64"`
+    - `"float"`/`"float32"`
+    - `"double"`/`"float64"`
+    - `"float16"`
+    - `"bfloat16"`
+- Tensor array: e.g., `"tensorarray,6,float"`
+  - `tensorarray`: The column is a tensor-array column.
+  - The second item in the string: The dimension of each vector unit in the tensor arrays.
+  - The third item in the string: The element type of the tensors. Can be:
+    - `"int8"`
+    - `"int16"`
+    - `"int"`/`"int32"`/`"integer"`
+    - `"int64"`
+    - `"float"`/`"float32"`
+    - `"double"`/`"float64"`
+    - `"float16"`
+    - `"bfloat16"`
+- Multivector: e.g., `"multivector,128,float"`
+  - `multivector`: The column is a multi-vector column.
+  - The second item in the string: The dimension of each vector unit.
+  - The third item in the string: The element type of the tensors. Can be:
+    - `"int8"`
+    - `"int16"`
+    - `"int"`/`"int32"`/`"integer"`
+    - `"int64"`
+    - `"float"`/`"float32"`
+    - `"double"`/`"float64"`
+    - `"float16"`
+    - `"bfloat16"`
 - **Default value** (`"default"`)  
   The default value for unspecified cells in that column.  
 
