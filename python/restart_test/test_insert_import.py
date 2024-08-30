@@ -21,7 +21,7 @@ class TestInsertImport:
     ):
         uri = common_values.TEST_LOCAL_HOST
 
-        total_n = 10000
+        total_n = 1000000
         data_gen = data_gen_factory(total_n)
 
         stop_n = 10
@@ -102,7 +102,7 @@ class TestInsertImport:
             insert_import_func(table_obj)
             t1.join()
 
-    @pytest.mark.skip(reason="skip")
+    @pytest.mark.slow
     @pytest.mark.parametrize(
         "config",
         [
@@ -174,6 +174,7 @@ class TestInsertImport:
         infinity_obj.disconnect()
         infinity_runner.uninit()
 
+    @pytest.mark.slow
     @pytest.mark.parametrize(
         "config",
         [
@@ -232,7 +233,7 @@ class TestInsertImport:
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.create_table("test_insert", columns, ConflictType.Error)
         for idx in indexes:
-            table_obj.create_index(f"idx_{idx.column_name}", index)
+            table_obj.create_index(f"idx_{idx.column_name}", idx)
         infinity_obj.disconnect()
         infinity_runner.uninit()
 

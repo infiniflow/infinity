@@ -82,7 +82,7 @@ class TestCleanup:
         ["test/data/config/restart_test/test_cleanup/1.toml"],
     )
     @pytest.mark.parametrize(
-        "columns, index, data_gen_factory",
+        "columns, indexes, data_gen_factory",
         [
             (
                 SimpleEmbeddingGenerator.columns(),
@@ -101,7 +101,7 @@ class TestCleanup:
         infinity_runner: InfinityRunner,
         config: str,
         columns: dict,
-        index: index.IndexInfo,
+        indexes: list[index.IndexInfo],
         data_gen_factory,
     ):
         uri = common_values.TEST_LOCAL_HOST
@@ -114,8 +114,10 @@ class TestCleanup:
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table(table_name, ConflictType.Ignore)
         table_obj = db_obj.create_table(table_name, columns, ConflictType.Error)
-        res = table_obj.create_index("idx1", index)
-        assert res.error_code == infinity.ErrorCode.OK
+
+        for idx in indexes:
+            res = table_obj.create_index("idx1", idx)
+            assert res.error_code == infinity.ErrorCode.OK
 
         insert_n = 100
         data_gen = data_gen_factory(insert_n)
