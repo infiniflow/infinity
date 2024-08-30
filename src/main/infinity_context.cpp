@@ -62,7 +62,12 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool m_flag, De
 
     maintenance_mode_ = m_flag;
     storage_ = MakeUnique<Storage>(config_.get());
-    storage_->Init(maintenance_mode_);
+
+    storage_->AdminModeInit();
+
+    if(!maintenance_mode_) {
+        storage_->WorkingModeInit();
+    }
 
     task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 
@@ -83,7 +88,12 @@ void InfinityContext::UnInit() {
     task_scheduler_->UnInit();
     task_scheduler_.reset();
 
-    storage_->UnInit(maintenance_mode_);
+    if(!maintenance_mode_) {
+        storage_->WorkingModeUnInit();
+    }
+
+    storage_->AdminModeUnInit();
+
     storage_.reset();
 
     persistence_manager_.reset();
