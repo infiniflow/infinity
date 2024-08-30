@@ -926,10 +926,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 for (auto &[segment_id, segment_index_entry] : segment_index_guard.index_by_segment_) {
                     SegmentEntry *segment_entry = GetSegmentByID(segment_id, begin_ts).get();
                     if (segment_entry != nullptr) {
-                        auto *merged_chunk_entry = segment_index_entry->RebuildChunkIndexEntries(txn_table_store, segment_entry);
-                        if (merged_chunk_entry != nullptr) {
-                            merged_chunk_entry->SaveIndexFile();
-                        }
+                        [[maybe_unused]] auto *merged_chunk_entry = segment_index_entry->RebuildChunkIndexEntries(txn_table_store, segment_entry);
                     }
                 }
                 break;

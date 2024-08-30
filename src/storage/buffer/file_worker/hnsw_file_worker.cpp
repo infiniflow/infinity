@@ -47,7 +47,8 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> file_dir,
 
         String index_path = GetFilePath();
         auto [file_handler, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
-        if (status.ok()) { // file may deleted if cleaned up happens
+        if (status.ok()) {
+            // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
             index_size = fs.GetFileSize(*file_handler);
         }
     }

@@ -71,7 +71,7 @@ class ColumnVectorUuidTest : public BaseTestParamStr {
 // INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 //                          ColumnVectorUuidTest,
 //                          ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_close_bgtask_silent.toml").c_str(),
-//                                            BaseTestParamStr::VFS_CONFIG_PATH));
+//                                            (std::string(infinity::test_data_path()) + "/config/test_close_bgtask_silent_vfs_off.toml").c_str()));
 
 TEST_F(ColumnVectorUuidTest, flat_uuid) {
     using namespace infinity;

@@ -175,14 +175,9 @@ class QueryBuilderTest : public BaseTestParamStr {
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    TestWithDifferentParams,
-    QueryBuilderTest,
-    ::testing::Values(
-        BaseTestParamStr::NULL_CONFIG_PATH,
-        BaseTestParamStr::VFS_CONFIG_PATH
-    )
-);
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         QueryBuilderTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 union FakeQueryBuilder {
     char empty_space[2 * sizeof(QueryBuilder)];

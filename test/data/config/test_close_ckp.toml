@@ -14,4 +14,3 @@ wal_compact_threshold            = "10KB"
 [storage]
 [buffer]
 [resource]
-[persistence]
