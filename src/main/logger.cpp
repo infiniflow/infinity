@@ -48,11 +48,13 @@ void Logger::Initialize(Config *config_ptr) {
 
         infinity_logger = MakeShared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
         infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
+        infinity_logger->flush_on(spdlog::level::warn);
         spdlog::details::registry::instance().register_logger(infinity_logger);
     } else {
         Vector<spdlog::sink_ptr> sinks{rotating_file_sinker};
         infinity_logger = MakeShared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
         infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
+        infinity_logger->flush_on(spdlog::level::warn);
         spdlog::details::registry::instance().register_logger(infinity_logger);
     }
 

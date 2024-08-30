@@ -399,7 +399,7 @@ export struct WalCmdCompact final : public WalCmd {
 
     const String db_name_{};
     const String table_name_{};
-    const Vector<WalSegmentInfo> new_segment_infos_{};
+    Vector<WalSegmentInfo> new_segment_infos_{};
     const Vector<SegmentID> deprecated_segment_ids_{};
 };
 

@@ -89,9 +89,11 @@ void FileWorker::ReadFromFile(bool from_spill) {
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
         obj_addr_ = pm->GetObjFromLocalPath(read_path);
-        if (obj_addr_.Valid()) {
-            read_path = pm->GetObjCache(read_path);
+        if (!obj_addr_.Valid()) {
+            String error_message = fmt::format("Failed to find object for local path {}", read_path);
+            UnrecoverableError(error_message);
         }
+        read_path = pm->GetObjCache(read_path);
     }
     SizeT file_size = 0;
     u8 flags = FileFlags::READ_FLAG;

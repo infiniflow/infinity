@@ -75,8 +75,7 @@ class TableIndexEntryTest : public BaseTestParamStr {
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TableIndexEntryTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 void InsertData(const String& db_name, const String& table_name);
 
