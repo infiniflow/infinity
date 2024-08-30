@@ -976,7 +976,6 @@ Deletes an index by its name.
   - `content-Type: application/json`
 - Body:
   - `"drop_option"`: `enum<string>`
-  ```
 
 #### Request example
 
@@ -1431,7 +1430,7 @@ curl --request POST \
 - `table_name`: (*Path parameter*)  
   The name of the table.
 - `"file_path"`: (*Body parameter*), `string`, *Required* 
-- `data`: (*Body parameter*),  `object[]`, *Required*  
+- `Body`: (*Body parameter*),  `object[]`, *Required*  
   Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `object[]`. Each JSON object corresponds to a row to insert, and each key-value pair it corresponds to a column name and the table cell value.
 
 :::tip NOTE
@@ -1507,16 +1506,16 @@ Deletes rows from a table based on the specified condition.
 curl --request DELETE \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
-    --header 'content-type: application/json' \
-    --data ' {"filter": "score >= 4.0 and score <= 5.0"} '
+     --header 'content-type: application/json' \
+     --data ' {"filter": "score >= 4.0 and score <= 5.0"} '
 ```
 
 ```shell
 curl --request DELETE \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
-    --header 'content-type: application/json' \
-    --data ' {"filter": "name = '"'Toby'"'"} '
+     --header 'content-type: application/json' \
+     --data ' {"filter": "name = '"'Toby'"'"} '
 ```
 
 #### Request parameters
@@ -1525,7 +1524,7 @@ curl --request DELETE \
   The name of the database.
 - `table_name`: (*Path parameter*)  
   The name of the table.
-- `"filter": (*Body parameter*), `string`, *Optional*  
+- `"filter"`: (*Body parameter*), `string`, *Optional*  
   A string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `"filter"` is not specified or set to `Null`, the method will delete all rows in the table.
 
 :::tip NOTE
@@ -1615,8 +1614,8 @@ curl --request PUT \
   The name of the database.
 - `table_name`: (*Path parameter*)  
   The name of the table.
-- `"filter": (*Body parameter*), `string`, *Optional*  
-  A string that defines the condition for selecting rows to update. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be deleted. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.
+- `"filter"`: (*Body parameter*), `string`, *Optional*  
+  A string that defines the condition for selecting rows to update. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be updated. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.
 
 
 ### Response
@@ -1677,7 +1676,7 @@ Searches for data in a specified table. The search can range from a simple vecto
   - `accept: application/json`
   - `content-Type: application/json`
 - Body:
-  - `"output"`: `list[string]`
+  - `"output"`: `string[]`
   - `"filter"`: `string`
   - `"fusion"`: `object`
 
@@ -1693,9 +1692,9 @@ curl --request GET \
     "output":
     [
         "name",
-        "age"
+        "score"
     ],
-    "filter": "age > 15",
+    "filter": "score >= 4.0",
     "fusion": 
     {
         "method": "rrf",
@@ -1716,6 +1715,10 @@ curl --request GET \
     }
 } '
 ```
+
+#### Request parameters
+
+
 
 ### Response
 
@@ -1753,6 +1756,87 @@ The response includes a JSON object like the following:
 {
     "error_code": 3005,
     "error_message": "Column {column_name} doesn't exist in {table_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Set variable
+
+**POST** `/variables/{variable_name}`
+
+Assigns a value to a global variable.
+
+### Request
+
+- Method: POST
+- URL: `/variables/{variable_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"profile_record_capacity"`: `integer`
+
+#### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/variables/{variable_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' { "profile_record_capacity" : 120 } '
+```
+
+#### Request parameter
+
+- `variable_name`: (*Path parameter*)  
+  The name of the variable, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3076,
+    "error_message": "Invalid command: unknown global variable {variable_name}"
 }
 ```
 
@@ -1839,7 +1923,8 @@ curl --request GET \
 
 #### Request parameters
 
-
+- `variable_name`: (*Path parameter*)  
+  The name of the variable.
 
 ### Response
 
@@ -1885,31 +1970,45 @@ The response includes a JSON object like the following:
 
 ---
 
-## Set variable
+## Set config
 
-**POST** `/variables/{variable_name}`
+**PUT** `/configs/{config_name}`
 
-Assigns a value to a global variable.
+Assigns a value to a configuration parameter.
 
 ### Request
 
-- Method: POST
-- URL: `/variables/{variable_name}`
+- Method: PUT
+- URL: `/config/{config_name}`
 - Headers:
   - `accept: application/json`
   - `content-Type: application/json`
-- Body:
-  - `"profile_record_capacity"`: `integer`
+- Body: `object`
 
 #### Request example
 
 ```shell
 curl --request POST \
-     --url http://localhost:23820/variables/{variable_name} \
+     --url http://localhost:23820/configs/{config_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' { "profile_record_capacity" : 120 } '
+     --data ' { "log_level": "trace" } '
 ```
+
+#### Request parameter
+
+- `config_name`: (*Path parameter*)  
+  The name of the configuration parameter, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+- `Body`:  (*Body parameter*),  `object`, *Required*  
+  The configuration parameters to update, where each key (`string`) in the JSON object represents an entry, and the corresponding value (`string`) represents its value. 
+
 
 ### Response
 
@@ -1939,8 +2038,8 @@ The response includes a JSON object like the following:
 
 ```shell
 {
-    "error_code": 3076,
-    "error_message": "Invalid command: unknown global variable {variable_name}"
+    "error_code": 3028,
+    "error_message": "log level value range is trace, debug, info, warning, error, critical"
 }
 ```
 
@@ -1958,7 +2057,7 @@ The response includes a JSON object like the following:
 
 **GET** `/configs`
 
-Retrieves all configs in the Infinity system.
+Retrieves the values of all configuration parameters.
 
 ### Request
 
@@ -2020,7 +2119,7 @@ The response includes a JSON object like the following:
 
 **GET** `/configs/{config_name}`
 
-Retrieves the value of a config in the Infinity system.
+Retrieves the value of a configuration parameter.
 
 ### Request
 
@@ -2038,7 +2137,8 @@ curl --request GET \
 
 #### Request parameters
 
-
+- `config_name`: (*Path parameter*)  
+  The name of the configuration parameter.
 
 ### Response
 
@@ -2071,75 +2171,6 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 {
     "error_code": 1008,
     "error_message": "Attempt to get option: {config_name} which doesn't exist."
-}
-```
-
-- `"error_code"`: `integer`  
-  A non-zero value indicates a specific error condition.
-- `"error_message"`: `string`  
-  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
-
-</TabItem>
-</Tabs>
-
----
-
-## Set config
-
-**PUT** `/configs/{config_name}`
-
-Assigns a value to a config.
-
-### Request
-
-- Method: PUT
-- URL: `/config/{config_name}`
-- Headers:
-  - `accept: application/json`
-  - `content-Type: application/json`
-- Body:
-  - `"log_level"`: `enum<string>`
-
-#### Request example
-
-```shell
-curl --request POST \
-     --url http://localhost:23820/configs/{config_name} \
-     --header 'accept: application/json' \
-     --header 'content-type: application/json' \
-     --data ' { "log_level": "trace" } '
-```
-
-### Response
-
-<Tabs
-  defaultValue="s200"
-  values={[
-    {label: 'Status code 200', value: 's200'},
-    {label: 'Status code 500', value: 's500'},
-  ]}>
-  <TabItem value="s200">
-
-The response includes a JSON object like the following:
-
-```shell
-{
-    "error_code": 0
-}
-```
-
-- `"error_code"`: `integer`  
-  `0`: The operation succeeds.
-
-</TabItem>
-  <TabItem value="s500">
-
-The response includes a JSON object like the following:
-
-```shell
-{
-    "error_code": 3028,
-    "error_message": "log level value range is trace, debug, info, warning, error, critical"
 }
 ```
 
