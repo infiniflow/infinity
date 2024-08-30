@@ -148,3 +148,19 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
         }
     }
 }
+
+TEST_P(BlockVersionTest, delete_test) {
+    BlockVersion block_version(8192);
+    block_version.Delete(2, 30);
+    EXPECT_THROW(block_version.Delete(2, 30), UnrecoverableException);
+}
+
+TEST_P(BlockVersionTest, check_delete_test) {
+    BlockVersion block_version(8192);
+    block_version.Delete(2, 30);
+    EXPECT_TRUE(block_version.CheckDelete(2, 30));
+    EXPECT_TRUE(block_version.CheckDelete(2, 40));
+    EXPECT_FALSE(block_version.CheckDelete(2, 29));
+    EXPECT_FALSE(block_version.CheckDelete(3, 30));
+    EXPECT_FALSE(block_version.CheckDelete(8193, 30));
+}
