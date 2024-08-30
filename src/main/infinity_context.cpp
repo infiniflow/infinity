@@ -66,9 +66,10 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool m_flag, De
 
     task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 
-    inverting_thread_pool_.resize(config_->CPULimit());
-    commiting_thread_pool_.resize(config_->CPULimit());
-    hnsw_build_thread_pool_.resize(config_->CPULimit());
+    i64 cpu_limit = config_->CPULimit();
+    inverting_thread_pool_.resize(cpu_limit);
+    commiting_thread_pool_.resize(cpu_limit);
+    hnsw_build_thread_pool_.resize(cpu_limit);
 
     initialized_ = true;
 }
@@ -78,10 +79,6 @@ void InfinityContext::UnInit() {
         return;
     }
     initialized_ = false;
-
-    hnsw_build_thread_pool_.stop(true);
-    commiting_thread_pool_.stop(true);
-    inverting_thread_pool_.stop(true);
 
     task_scheduler_->UnInit();
     task_scheduler_.reset();
