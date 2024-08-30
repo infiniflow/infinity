@@ -21,6 +21,3 @@ wal_dir                  = "/var/infinity/wal"
 
 [resource]
 resource_dir             = "/var/infinity/resource"
-
-[persistence]
-persistence_dir          = "/var/infinity/persistence"

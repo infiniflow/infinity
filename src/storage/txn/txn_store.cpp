@@ -367,10 +367,21 @@ bool TxnTableStore::CheckConflict(const TxnTableStore *other_table_store) const 
     return false;
 }
 
-void TxnTableStore::PrepareCommit1() const {
+void TxnTableStore::PrepareCommit1(const Vector<WalSegmentInfo *> &segment_infos) const {
     TxnTimeStamp commit_ts = txn_->CommitTS();
     for (auto *segment_entry : flushed_segments_) {
-        segment_entry->CommitFlushed(commit_ts);
+        WalSegmentInfo *segment_info_ptr = nullptr;
+        for (auto *segment_info : segment_infos) {
+            if (segment_info->segment_id_ == segment_entry->segment_id()) {
+                segment_info_ptr = segment_info;
+                break;
+            }
+        }
+        if (segment_info_ptr == nullptr) {
+            String error_message = fmt::format("Segment info not found, segment id: {}", segment_entry->segment_id());
+            UnrecoverableError(error_message);
+        }
+        segment_entry->CommitFlushed(commit_ts, segment_info_ptr);
     }
 }
 
@@ -591,8 +602,21 @@ bool TxnStore::CheckConflict(const TxnStore &other_txn_store) {
 }
 
 void TxnStore::PrepareCommit1() {
+    WalEntry *wal_entry = txn_->GetWALEntry();
+    Vector<WalSegmentInfo *> segment_infos;
+    for (auto &cmd : wal_entry->cmds_) {
+        if (cmd->GetType() == WalCommandType::IMPORT) {
+            auto *import_cmd = static_cast<WalCmdImport *>(cmd.get());
+            segment_infos.emplace_back(&import_cmd->segment_info_);
+        } else if (cmd->GetType() == WalCommandType::COMPACT) {
+            auto *compact_cmd = static_cast<WalCmdCompact *>(cmd.get());
+            for (auto &segment_info : compact_cmd->new_segment_infos_) {
+                segment_infos.emplace_back(&segment_info);
+            }
+        }
+    }
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        table_store->PrepareCommit1();
+        table_store->PrepareCommit1(segment_infos);
     }
 }
 

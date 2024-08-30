@@ -52,7 +52,7 @@ class DBMetaTest : public BaseTestParamStr {
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          DBMetaTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(DBMetaTest, to_string_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();

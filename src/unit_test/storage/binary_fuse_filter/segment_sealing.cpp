@@ -106,9 +106,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          SealingTaskTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
-
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(SealingTaskTest, append_unsealed_segment_sealed) {
     GTEST_SKIP() << "Skipping slow test.";

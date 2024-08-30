@@ -407,9 +407,9 @@ AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, T
     switch (index_type) {
         case IndexType::kFullText: {
             String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX);
-            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + DICT_SUFFIX);
-            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            local_paths_.push_back(full_path + "/" + chunk_index_entry->base_name_ + POSTING_SUFFIX);
+            local_paths_.push_back(full_path + "/" + chunk_index_entry->base_name_ + DICT_SUFFIX);
+            local_paths_.push_back(full_path + "/" + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
             break;
         }
         case IndexType::kHnsw:

@@ -14,5 +14,3 @@ optimize_interval = "0s"
 mem_index_capacity = 10000
 
 [resource]
-
-[persistence]

@@ -61,7 +61,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          QueryParserAndOptimizerTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 struct LogHelper {
     void Reset() {

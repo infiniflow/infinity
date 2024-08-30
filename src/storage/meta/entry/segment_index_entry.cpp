@@ -1012,6 +1012,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
         }
     }
     ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
+    merged_chunk_index_entry->SaveIndexFile();
     AddWalIndexDump(merged_chunk_index_entry.get(), txn, std::move(old_ids));
     return merged_chunk_index_entry.get();
 }
