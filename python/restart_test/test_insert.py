@@ -118,10 +118,10 @@ class TestInsert:
                 SiftGenerator.gen_factory(
                     "test/data/benchmark/sift_1m/sift_base.fvecs"
                 ),
-            )
+            ),
         ],
     )
-    def test_insert(
+    def test_data(
         self,
         infinity_runner: InfinityRunner,
         config: str,
@@ -156,7 +156,7 @@ class TestInsert:
         ],
     )
     @pytest.mark.parametrize(
-        "columns, index, data_gen_factory",
+        "columns, indexes, data_gen_factory",
         [
             (
                 EnwikiGenerator.columns(),
@@ -170,14 +170,19 @@ class TestInsert:
                     "test/data/benchmark/sift_1m/sift_base.fvecs"
                 ),
             ),
+            (
+                LChYDataGenerato.columns(),
+                LChYDataGenerato.index(),
+                LChYDataGenerato.gen_factory("test/data/jsonl/test_table.jsonl"),
+            ),
         ],
     )
-    def test_insert_index(
+    def test_index(
         self,
         infinity_runner: InfinityRunner,
         config: str,
         columns: dict,
-        index: index.IndexInfo,
+        indexes: list[index.IndexInfo],
         data_gen_factory,
     ):
         uri = common_values.TEST_LOCAL_HOST
@@ -188,7 +193,8 @@ class TestInsert:
         infinity_obj = InfinityRunner.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.create_table("test_insert", columns, ConflictType.Error)
-        table_obj.create_index("idx1", index)
+        for idx in indexes:
+            table_obj.create_index(f"idx_{idx.column_name}", idx)
         infinity_obj.disconnect()
         infinity_runner.uninit()
 

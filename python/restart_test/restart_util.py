@@ -1,6 +1,8 @@
 from infinity import index
 import csv
+import json
 import numpy as np
+from infinity.common import SparseVector
 
 
 class SimpleEmbeddingGenerator:
@@ -15,11 +17,13 @@ class SimpleEmbeddingGenerator:
         return gen
 
     def index():
-        return index.IndexInfo(
-            "c2",
-            index.IndexType.Hnsw,
-            {"M": "16", "ef_construction": "20", "metric": "l2"},
-        )
+        return [
+            index.IndexInfo(
+                "c2",
+                index.IndexType.Hnsw,
+                {"M": "16", "ef_construction": "20", "metric": "l2"},
+            )
+        ]
 
 
 class SimpleVarcharGenerator:
@@ -37,7 +41,7 @@ class SimpleVarcharGenerator:
         return gen
 
     def index():
-        return index.IndexInfo("c2", index.IndexType.FullText)
+        return [index.IndexInfo("c2", index.IndexType.FullText)]
 
 
 class SimpleTensorGenerator:
@@ -64,11 +68,13 @@ class EnwikiGenerator:
         }
 
     def gen_factory(enwiki_path: str):
-        f = open(enwiki_path, "r")
+        if not enwiki_path.endswith(".csv"):
+            raise ValueError("enwiki_path should be csv file")
 
         def gen(insert_n: int):
             i = 0
             while i < insert_n:
+                f = open(enwiki_path, "r")
                 reader = csv.reader(f, delimiter="\t")
                 for row in reader:
                     title = row[0]
@@ -82,7 +88,7 @@ class EnwikiGenerator:
         return gen
 
     def index():
-        return index.IndexInfo("body", index.IndexType.FullText)
+        return [index.IndexInfo("body", index.IndexType.FullText)]
 
 
 class SiftGenerator:
@@ -90,6 +96,9 @@ class SiftGenerator:
         return {"vec": {"type": "vector,128,float"}}
 
     def gen_factory(sift_path: str):
+        if not sift_path.endswith(".fvecs"):
+            raise ValueError("sift_path should be fvecs file")
+
         def gen(insert_n: int):
             i = 0
             while i < insert_n:
@@ -108,8 +117,75 @@ class SiftGenerator:
         return gen
 
     def index():
-        return index.IndexInfo(
-            "vec",
-            index.IndexType.Hnsw,
-            {"M": "16", "ef_construction": "20", "metric": "l2"},
-        )
+        return [
+            index.IndexInfo(
+                "vec",
+                index.IndexType.Hnsw,
+                {"M": "16", "ef_construction": "20", "metric": "l2"},
+            )
+        ]
+
+
+class LChYDataGenerato:
+    def columns():
+        return {
+            "id": {"type": "varchar"},
+            "content": {"type": "varchar"},
+            "dense_vec": {"type": "vector, 1024, float"},
+            "sparse_vec": {"type": "sparse,250002,float,int"},
+        }
+
+    def gen_factory(data_path: str):
+        # check data_path is jsonl file
+        if not data_path.endswith(".jsonl"):
+            raise ValueError("data_path should be jsonl file")
+
+        def gen(insert_n: int):
+            def convert_sparse(sparse_data: dict[str, float]):
+                indices = []
+                values = []
+                for k, v in sparse_data.items():
+                    indices.append(int(k))
+                    values.append(v)
+                return SparseVector(indices, values)
+
+            i = 0
+            while i < insert_n:
+                f = open(data_path, "r")
+                for line in f:
+                    data = json.loads(line)
+
+                    yield [
+                        data["id"],
+                        data["content"],
+                        data["dense_vec"],
+                        convert_sparse(data["sparse_vec"]),
+                    ]
+                    i += 1
+                    if i >= insert_n:
+                        break
+
+        return gen
+
+    def index():
+        return [
+            index.IndexInfo("content", index.IndexType.FullText),
+            index.IndexInfo(
+                "dense_vec",
+                index.IndexType.Hnsw,
+                {
+                    "m": "16",
+                    "ef_construction": "200",
+                    "metric": "l2",
+                },
+            ),
+            index.IndexInfo(
+                "sparse_vec",
+                index.IndexType.BMP,
+                {"block_size": "8", "compress_type": "compress"},
+            ),
+        ]
+
+
+if __name__ == "__main__":
+    pass

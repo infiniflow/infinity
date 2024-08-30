@@ -178,20 +178,20 @@ class TestInsertImport:
         "config",
         [
             "test/data/config/restart_test/test_insert/4.toml",
-            # "test/data/config/restart_test/test_insert/5.toml",
+            "test/data/config/restart_test/test_insert/5.toml",
         ],
     )
     @pytest.mark.parametrize(
-        "columns, index, data_gen_factory, import_file, import_size, import_options",
+        "columns, indexes, data_gen_factory, import_file, import_size, import_options",
         [
-            # (
-            #     EnwikiGenerator.columns(),
-            #     EnwikiGenerator.index(),
-            #     EnwikiGenerator.gen_factory("test/data/benchmark/enwiki-10w.csv"),
-            #     "test/data/csv/enwiki_99.csv",
-            #     99,
-            #     {"file_type": "csv", "delimiter": "\t"},
-            # ),
+            (
+                EnwikiGenerator.columns(),
+                EnwikiGenerator.index(),
+                EnwikiGenerator.gen_factory("test/data/benchmark/enwiki-10w.csv"),
+                "test/data/csv/enwiki_99.csv",
+                99,
+                {"file_type": "csv", "delimiter": "\t"},
+            ),
             (
                 SiftGenerator.columns(),
                 SiftGenerator.index(),
@@ -202,6 +202,14 @@ class TestInsertImport:
                 128,
                 {"file_type": "fvecs"},
             ),
+            (
+                LChYDataGenerato.columns(),
+                LChYDataGenerato.index(),
+                LChYDataGenerato.gen_factory("test/data/jsonl/test_table.jsonl"),
+                "test/data/jsonl/test_table.jsonl",
+                10,
+                {"file_type": "jsonl"},
+            ),
         ],
     )
     def test_index(
@@ -209,7 +217,7 @@ class TestInsertImport:
         infinity_runner: InfinityRunner,
         config: str,
         columns: dict,
-        index: index.IndexInfo,
+        indexes: list[index.IndexInfo],
         data_gen_factory,
         import_file: str,
         import_size: int,
@@ -223,7 +231,8 @@ class TestInsertImport:
         infinity_obj = InfinityRunner.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.create_table("test_insert", columns, ConflictType.Error)
-        table_obj.create_index("idx1", index)
+        for idx in indexes:
+            table_obj.create_index(f"idx_{idx.column_name}", index)
         infinity_obj.disconnect()
         infinity_runner.uninit()
 
