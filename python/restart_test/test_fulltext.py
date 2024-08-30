@@ -7,7 +7,7 @@ import csv
 from infinity_runner import InfinityRunner
 from common import common_values
 from infinity.common import ConflictType
-import infinity.index as index
+from infinity import index
 from infinity.errors import ErrorCode
 
 

@@ -1,4 +1,3 @@
-from abc import abstractmethod
 import functools
 import pytest
 from common import common_values
@@ -7,28 +6,11 @@ from infinity_runner import InfinityRunner
 import time
 import threading
 import csv
+from restart_util import *
 
 
 @pytest.mark.slow
 class TestInsert:
-    def simple_embedding_generator(insert_n: int):
-        for i in range(insert_n):
-            yield i, [0.1, 0.2, 0.3, 0.4]
-
-    def simple_varchar_generator(insert_n: int):
-        for i in range(insert_n):
-            if i % 2 == 0:
-                yield i, "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
-            else:
-                yield i, "test"
-
-    def simple_tensor_generator(insert_n: int):
-        for i in range(insert_n):
-            if i % 2 == 0:
-                yield i, [0.1, 0.2, 0.3, 0.4]
-            else:
-                yield i, [[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]
-
     def enwiki_generator(enwiki_path: str, insert_n: int):
         for i in range(insert_n):
             with open(enwiki_path, "r") as f:
@@ -50,16 +32,16 @@ class TestInsert:
         "columns, data_gen_factory",
         [
             (
-                {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}},
-                simple_embedding_generator,
+                SimpleEmbeddingGenerator.columns(),
+                SimpleEmbeddingGenerator.gen_factory(),
             ),
             (
-                {"c1": {"type": "int"}, "c2": {"type": "varchar"}},
-                simple_varchar_generator,
+                SimpleVarcharGenerator.columns(),
+                SimpleVarcharGenerator.gen_factory(),
             ),
             (
-                {"c1": {"type": "int"}, "c2": {"type": "tensor,4,float"}},
-                simple_tensor_generator,
+                SimpleTensorGenerator.columns(),
+                SimpleTensorGenerator.gen_factory(),
             ),
             (
                 {

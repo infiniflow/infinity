@@ -1,7 +1,7 @@
 import infinity
 from common import common_values
 from infinity_runner import InfinityRunner
-import infinity.index as index
+from infinity import index
 import time
 
 
