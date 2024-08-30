@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #if 0
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import user_defined_term_weight;

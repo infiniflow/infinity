@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -26,6 +27,7 @@ import infinity_context;
 import default_values;
 import vector_heap_chunk;
 
+using namespace infinity;
 class VectorHeapTest : public BaseTest {};
 #if 0
 TEST_F(VectorHeapTest, var_heap1) {

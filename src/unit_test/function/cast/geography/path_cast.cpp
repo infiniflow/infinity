@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -41,6 +42,8 @@ import logical_type;
 import data_type;
 
 #if 0
+
+using namespace infinity;
 class PathCastTest : public BaseTest {};
 
 TEST_F(PathCastTest, path_cast0) {

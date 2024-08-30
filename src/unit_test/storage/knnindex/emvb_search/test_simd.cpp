@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-#include <algorithm>
 #include <cstdlib>
 #include <immintrin.h>
-#include <random>
-#include <vector>
 
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import emvb_simd_funcs;
 import simd_common_tools;

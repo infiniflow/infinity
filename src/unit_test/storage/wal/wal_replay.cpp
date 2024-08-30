@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "type/complex/embedding_type.h"
-#include "unit_test/base_test.h"
-#include <memory>
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import global_resource_usage;

@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
 #include <numeric>
 #include <random>
 
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import storage;
 import global_resource_usage;

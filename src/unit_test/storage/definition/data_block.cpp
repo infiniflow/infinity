@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -34,6 +35,8 @@ import embedding_info;
 import array_info;
 import knn_expr;
 import data_type;
+
+using namespace infinity;
 
 class DataBlockTest : public BaseTestParamStr {
     void SetUp() override {

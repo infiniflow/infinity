@@ -1,10 +1,11 @@
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
 #include <cassert>
 #include <charconv>
 #include <cstdio>
 #include <iostream>
 #include <limits>
 #include <string>
+import base_test;
 
 import infinity_exception;
 
@@ -12,6 +13,7 @@ import third_party;
 import stl;
 import data_type;
 
+using namespace infinity;
 class FloatSerializeTest : public BaseTest {};
 
 TEST_F(FloatSerializeTest, test_precision) {

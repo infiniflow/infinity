@@ -1,6 +1,5 @@
-#include "unit_test/base_test.h"
 #include <gtest/gtest.h>
-
+import base_test;
 import infinity_exception;
 
 import stl;
@@ -15,6 +14,8 @@ import file_reader;
 import infinity_context;
 import stream_io;
 import file_system_type;
+
+using namespace infinity;
 
 class StreamIOTest : public BaseTest {};
 
