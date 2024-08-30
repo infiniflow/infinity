@@ -124,5 +124,5 @@ def generate_commas_enwiki(in_filename, out_filename, is_embedding):
 def check_data(data_dir):
     # path not exists
     if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+        os.makedirs(data_dir, exist_ok=True)
         return False
