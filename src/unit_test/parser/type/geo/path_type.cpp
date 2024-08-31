@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -25,6 +26,8 @@ import infinity_context;
 import parser_assert;
 
 #if 0
+
+using namespace infinity;
 class PathTypeTest : public BaseTest {};
 
 TEST_F(PathTypeTest, path1) {

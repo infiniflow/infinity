@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #include "type/complex/row_id.h"
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 import index_base;

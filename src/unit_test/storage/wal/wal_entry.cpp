@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-
-#include <filesystem>
-
+#include "gtest/gtest.h"
+import base_test;
 import infinity_context;
 import infinity_exception;
 
@@ -39,9 +37,9 @@ import statement_common;
 import data_type;
 import persistence_manager;
 
-class WalEntryTest : public BaseTest {};
-
 using namespace infinity;
+
+class WalEntryTest : public BaseTest {};
 
 SharedPtr<TableDef> MockTableDesc2() {
     // Define columns

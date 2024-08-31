@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #include "statement/statement_common.h"
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import index_base;
@@ -23,6 +24,7 @@ import index_full_text;
 
 import statement_common;
 
+using namespace infinity;
 class IndexBaseTest : public BaseTest {};
 
 TEST_F(IndexBaseTest, ivfflat_readwrite) {

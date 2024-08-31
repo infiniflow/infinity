@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -22,6 +23,8 @@ import third_party;
 import stl;
 import infinity_context;
 import global_resource_usage;
+
+using namespace infinity;
 
 class BitmaskTest : public BaseTestParamStr {
     void SetUp() override {
