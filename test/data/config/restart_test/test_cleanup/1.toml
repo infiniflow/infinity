@@ -1,0 +1,19 @@
+[general]
+version = "0.3.0"
+time_zone = "utc-8"
+
+[network]
+[log]
+log_to_stdout = true
+
+[storage]
+optimize_interval = "0s"
+cleanup_interval = "1s"
+compact_interval = "0s"
+
+[buffer]
+[wal]
+delta_checkpoint_interval = "0s"
+full_checkpoint_interval = "0s"
+
+[resource]

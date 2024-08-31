@@ -1,5 +1,5 @@
 from infinity.common import ConflictType, InfinityException
-import infinity.index as index
+from infinity import index
 from numpy import dtype
 import ast
 from enum import Enum

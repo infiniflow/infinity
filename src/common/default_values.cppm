@@ -187,7 +187,7 @@ export {
     constexpr SizeT INSERT_BATCH_ROW_LIMIT = 8192;
 
     // default persistence parameter
-    constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "";                        // Empty means disabled
+    constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence"; // Empty means disabled
     constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "100MB"; // 100MB
     constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 100 * 1024lu * 1024lu;  // 100MB
 

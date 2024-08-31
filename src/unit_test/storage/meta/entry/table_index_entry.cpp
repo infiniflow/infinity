@@ -23,8 +23,10 @@ import column_def;
 import data_type;
 import logical_type;
 import embedding_info;
+import sparse_info;
 import index_hnsw;
 import index_full_text;
+import index_bmp;
 import statement_common;
 import data_access_state;
 import txn_store;
@@ -73,8 +75,7 @@ class TableIndexEntryTest : public BaseTestParamStr {
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TableIndexEntryTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 void InsertData(const String& db_name, const String& table_name);
 
@@ -210,5 +211,155 @@ TEST_P(TableIndexEntryTest, get_mem_index_test){
     }
 
     DropIndex();
+    DropTable();
+}
+
+TEST_P(TableIndexEntryTest, opt_hnsw_index_test){
+    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+
+    {
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        Vector<SharedPtr<ColumnDef>> columns;
+        {
+            std::set<ConstraintType> constraints;
+            constraints.insert(ConstraintType::kNotNull);
+            i64 column_id = 0;
+            auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            columns.emplace_back(column_def_ptr);
+        }
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn1);
+    }
+
+    {
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        Vector<String> columns{"col1"};
+        Vector<InitParameter *> parameters;
+        parameters.emplace_back(new InitParameter("metric", "l2"));
+        parameters.emplace_back(new InitParameter("m", "16"));
+        parameters.emplace_back(new InitParameter("ef_construction", "200"));
+        parameters.emplace_back(new InitParameter("encode", "plain"));
+
+        auto index_base = IndexHnsw::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
+    //    std::cout << "index_base: " << index_base->ToString() << std::endl;
+
+        for (auto parameter : parameters) {
+            delete parameter;
+        }
+
+        const String &db_name = "default_db";
+        const String &table_name = "tbl1";
+        auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
+        EXPECT_EQ(table_status.ok(), true);
+
+        auto [index_entry, index_status] = txn1->CreateIndexDef(table_entry, index_base, ConflictType::kInvalid);
+        EXPECT_EQ(index_status.ok(), true);
+        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn1);
+        auto [_, status3] = txn1->CreateIndexPrepare(index_entry, table_ref.get(), true, true);
+        txn1->CreateIndexFinish(table_entry, index_entry);
+        EXPECT_TRUE(status3.ok());
+
+        txn_mgr->CommitTxn(txn1); 
+    }
+
+    {
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("opt"));
+        const String &db_name = "default_db";
+        const String &table_name = "tbl1";
+        const String &index_name = "idx1";
+        auto [index_entry, index_status] = txn1->GetIndexByName(db_name, table_name, index_name);
+        EXPECT_TRUE(index_status.ok());
+        auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
+        EXPECT_TRUE(table_status.ok());
+        Vector<UniquePtr<InitParameter>> opt_params;
+        opt_params.emplace_back(MakeUnique<InitParameter>("compress_to_lvq", ""));
+        TxnTableStore *txn_table_store = txn1->GetTxnTableStore(table_entry);
+        index_entry->OptIndex(txn_table_store, opt_params, false);
+
+        opt_params.clear();
+        opt_params.emplace_back(MakeUnique<InitParameter>("lvq_avg", ""));
+        index_entry->OptIndex(txn_table_store, opt_params, false);
+
+        opt_params.clear();
+        opt_params.emplace_back(MakeUnique<InitParameter>("compress_to_lvq", ""));
+        opt_params.emplace_back(MakeUnique<InitParameter>("lvq_avg", ""));
+        EXPECT_THROW(index_entry->OptIndex(txn_table_store, opt_params, false), RecoverableException);
+        txn_mgr->CommitTxn(txn1);
+    }
+
+    DropTable();
+}
+
+TEST_P(TableIndexEntryTest, opt_bmp_index_test){
+    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+
+    {
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        Vector<SharedPtr<ColumnDef>> columns;
+        {
+            std::set<ConstraintType> constraints;
+            constraints.insert(ConstraintType::kNotNull);
+            i64 column_id = 0;
+            auto sparseInfo = MakeShared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kSparse, sparseInfo), "col1", constraints);
+            columns.emplace_back(column_def_ptr);
+        }
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn1);
+    }
+
+    {
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        Vector<String> columns{"col1"};
+        Vector<InitParameter *> parameters;
+        parameters.emplace_back(new InitParameter("block_size", "16"));
+        parameters.emplace_back(new InitParameter("compress_type", "compress"));
+
+        auto index_base = IndexBMP::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
+    //    std::cout << "index_base: " << index_base->ToString() << std::endl;
+
+        for (auto parameter : parameters) {
+            delete parameter;
+        }
+
+        const String &db_name = "default_db";
+        const String &table_name = "tbl1";
+        auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
+        EXPECT_EQ(table_status.ok(), true);
+
+        auto [index_entry, index_status] = txn1->CreateIndexDef(table_entry, index_base, ConflictType::kInvalid);
+        EXPECT_EQ(index_status.ok(), true);
+        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn1);
+        auto [_, status3] = txn1->CreateIndexPrepare(index_entry, table_ref.get(), true, true);
+        txn1->CreateIndexFinish(table_entry, index_entry);
+        EXPECT_TRUE(status3.ok());
+
+        txn_mgr->CommitTxn(txn1); 
+    }
+
+    {
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("opt"));
+        const String &db_name = "default_db";
+        const String &table_name = "tbl1";
+        const String &index_name = "idx1";
+        auto [index_entry, index_status] = txn1->GetIndexByName(db_name, table_name, index_name);
+        EXPECT_TRUE(index_status.ok());
+        auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
+        EXPECT_TRUE(table_status.ok());
+        Vector<UniquePtr<InitParameter>> opt_params;
+        opt_params.emplace_back(MakeUnique<InitParameter>("topk", "10"));
+        opt_params.emplace_back(MakeUnique<InitParameter>("bp_reorder", ""));
+        TxnTableStore *txn_table_store = txn1->GetTxnTableStore(table_entry);
+        index_entry->OptIndex(txn_table_store, opt_params, false);
+        txn_mgr->CommitTxn(txn1);
+    }
+
     DropTable();
 }

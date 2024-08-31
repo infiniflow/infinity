@@ -1,7 +1,7 @@
 import infinity
 from common import common_values
 from infinity_runner import InfinityRunner
-import infinity.index as index
+from infinity import index
 import time
 
 
@@ -93,3 +93,28 @@ class TestMemIdx:
 
         infinity_obj.disconnect()
         infinity_runner.uninit()
+
+# create table test_memidx1(c1 int, c2 embedding(float, 4));
+# create index idx1 on test_memidx1(c2) using hnsw with(m=16, ef_construction=200, metric=l2,block_size=1);
+# insert into test_memidx1 values(2, [0.1,0.2,0.3,-0.2]),(2, [0.1,0.2,0.3,-0.2]),(2, [0.1,0.2,0.3,-0.2]),(2, [0.1,0.2,0.3,-0.2]),(2, [0.1,0.2,0.3,-0.2]);
+# insert into test_memidx1 values(4,[0.2,0.1,0.3,0.4]);
+# # wait 5s
+# insert into test_memidx1 values(4,[0.2,0.1,0.3,0.4]),(4,[0.2,0.1,0.3,0.4]),(4,[0.2,0.1,0.3,0.4]),(4,[0.2,0.1,0.3,0.4]);
+
+# select c1 from test_memidx1 search match vector(c2, [0.3,0.3,0.2,0.2],'float','l2',6);
+# # result: 4, 4, 4, 4, 4, 2
+# select count(*) from test_memidx1;
+# # result: 10
+# insert into test_memidx1 values(6,[0.3,0.2,0.1,0.4]),(6,[0.3,0.2,0.1,0.4]);
+# # wait 5s
+# insert into test_memidx1 values(8,[0.4,0.3,0.2,0.1]);
+
+# select c1 from test_memidx1 search match vector(c2, [0.3,0.3,0.2,0.2],'float','l2',6);
+# # result: 8, 6, 6, 4, 4, 4
+# select count(*) from test_memidx1;
+# # result: 13
+# # wait 3s
+# select c1 from test_memidx1 search match vector(c2, [0.3,0.3,0.2,0.2],'float','l2',6);
+# # result: 8, 6, 6, 4, 4, 4
+# select count(*) from test_memidx1;
+# # result: 13

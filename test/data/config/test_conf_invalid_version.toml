@@ -20,6 +20,7 @@ log_level                = "info"
 
 [storage]
 data_dir                 = "/var/infinity/data"
+persistence_dir          = "/var/infinity/persistence"
 
 optimize_interval        = "10s"
 cleanup_interval         = "60s"
@@ -44,6 +45,3 @@ wal_flush                     = "only_write"
 
 [resource]
 resource_dir                  = "/var/infinity/resource"
-
-[persistence]
-persistence_dir               = "/var/infinity/persistence"

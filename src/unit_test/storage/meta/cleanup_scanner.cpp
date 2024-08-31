@@ -48,7 +48,7 @@ class CleanUpScannerTest : public BaseTestParamStr {
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CleanUpScannerTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(CleanUpScannerTest, nonexist_dir_test) {
     String dir = "/nonexist_dir";

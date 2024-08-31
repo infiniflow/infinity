@@ -20,8 +20,8 @@ log_file_rotate_count    = 10
 log_level               = "info"
 
 [storage]
-data_dir                 = "/var/infinity/data"
-
+persistence_dir         = "/var/infinity/persistence"
+data_dir                = "/var/infinity/data"
 # periodically activates garbage collection:
 # 0 means real-time,
 # s means seconds, for example "60s", 60 seconds
@@ -55,5 +55,3 @@ wal_flush                     = "only_write"
 
 [resource]
 resource_dir                  = "/var/infinity/resource"
-
-[persistence]

@@ -5304,7 +5304,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         MakeShared<ColumnDef>(1, bigint_type, "reference_count", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(2, bigint_type, "size", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(2, bigint_type, "parts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(3, bigint_type, "deleted_size", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "deleted_ranges", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_persistence_objects"), column_defs);
@@ -5315,7 +5315,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         bigint_type,
         bigint_type,
         bigint_type,
-        bigint_type,
+        varchar_type,
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -5360,8 +5360,12 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
             value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
         }
         {
-            // delete size
-            Value value = Value::MakeBigInt(object_pair.second.deleted_size_);
+            // deleted ranges
+            OStringStream oss;
+            for (const auto &range : object_pair.second.deleted_ranges_) {
+                oss << "[" << range.start_ << ", " << range.end_ << ") ";
+            }
+            Value value = Value::MakeVarchar(oss.str());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }

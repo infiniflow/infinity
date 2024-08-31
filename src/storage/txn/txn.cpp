@@ -49,6 +49,8 @@ import base_table_ref;
 import compact_statement;
 import default_values;
 import chunk_index_entry;
+import persistence_manager;
+import infinity_context;
 
 namespace infinity {
 
@@ -541,6 +543,7 @@ bool Txn::DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts)
         return false;
     }
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path, delta_name));
+
     return true;
 }
 

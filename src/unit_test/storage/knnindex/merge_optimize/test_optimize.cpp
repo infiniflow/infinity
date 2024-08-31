@@ -92,7 +92,7 @@ protected:
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          OptimizeKnnTest,
                          ::testing::Values((std::string(test_data_path()) + "/config/test_optimize.toml").c_str(),
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+                                           (std::string(test_data_path()) + "/config/test_optimize_vfs_off.toml").c_str()));
 
 TEST_P(OptimizeKnnTest, test1) {
     Storage *storage = InfinityContext::instance().storage();

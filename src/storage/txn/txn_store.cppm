@@ -23,6 +23,7 @@ import status;
 import internal_types;
 import index_base;
 import extra_ddl_info;
+import wal_entry;
 
 namespace infinity {
 
@@ -125,7 +126,7 @@ public:
 
     bool CheckConflict(const TxnTableStore *txn_table_store) const;
 
-    void PrepareCommit1() const;
+    void PrepareCommit1(const Vector<WalSegmentInfo *> &segment_infos) const;
 
     void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
