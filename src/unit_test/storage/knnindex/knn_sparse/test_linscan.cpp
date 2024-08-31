@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
 #include <cassert>
+import base_test;
 
 import stl;
 import linscan_alg;

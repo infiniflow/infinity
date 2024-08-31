@@ -12,22 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+module;
 
 #include "gtest/gtest.h"
-#include <type_traits>
 
-#include <algorithm>
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <type_traits>
 #include <unistd.h>
+
+export module base_test;
+
+import stl;
+import infinity_context;
+import global_resource_usage;
 
 namespace fs = std::filesystem;
 
-template <typename T>
+namespace infinity {
+
+export template <typename T>
 class BaseTestWithParam : public std::conditional_t<std::is_same_v<T, void>, ::testing::Test, ::testing::TestWithParam<T>> {
 public:
     BaseTestWithParam() {
@@ -44,8 +49,9 @@ public:
 
     void SetUp() override {}
     void TearDown() override {}
+
 public:
-    static constexpr const char* NULL_CONFIG_PATH = "";
+    static constexpr const char *NULL_CONFIG_PATH = "";
 
     static constexpr const char *CONFIG_PATH = "/config/test.toml";
 
@@ -125,8 +131,9 @@ private:
             }
         }
         try {
-            std::ranges::for_each(std::filesystem::directory_iterator{dir},
-                                  [&](const auto &dir_entry) { std::filesystem::remove_all(dir_entry.path(), error_code); });
+            for (const auto &dir_entry : std::filesystem::directory_iterator{dir}) {
+                std::filesystem::remove_all(dir_entry.path());
+            };
         } catch (const std::filesystem::filesystem_error &e) {
             std::cerr << "Failed to cleanup " << dir << ", exception: " << e.what() << std::endl;
             abort();
@@ -145,5 +152,31 @@ private:
     }
 };
 
-using BaseTest = BaseTestWithParam<void>;
-using BaseTestParamStr = BaseTestWithParam<std::string>;
+export using BaseTest = BaseTestWithParam<void>;
+
+export class BaseTestParamStr : public BaseTestWithParam<std::string> {
+public:
+    void SetUp() override {
+        CleanupDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::string config_path_str = GetParam();
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = std::make_shared<std::string>(config_path_str);
+        }
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+    }
+};
+
+} // namespace infinity

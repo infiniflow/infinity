@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #include "statement/command_statement.h"
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import infinity;
@@ -31,6 +32,7 @@ import column_expr;
 import column_def;
 import data_type;
 
+using namespace infinity;
 class InfinityTest : public BaseTest {};
 
 TEST_F(InfinityTest, test1) {

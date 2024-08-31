@@ -1,4 +1,5 @@
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import logical_type;
@@ -46,29 +47,7 @@ class QueryMatchTest : public BaseTestParamStr {
 protected:
     void SetUp() override {
         BaseTestParamStr::SetUp();
-        BaseTestParamStr::RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-        config_path_ = GetParam();
-        SharedPtr<String> config_path = nullptr;
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = MakeShared<String>(config_path_);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
         InitData();
-    }
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
     }
 
     void CreateDBAndTable(const String& db_name, const String& table_name);

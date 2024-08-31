@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -25,6 +26,8 @@ import knn_flat_l2_reservoir;
 import infinity_context;
 import knn_expr;
 import internal_types;
+
+using namespace infinity;
 
 class KnnFlatL2ReservoirTest : public BaseTest {};
 

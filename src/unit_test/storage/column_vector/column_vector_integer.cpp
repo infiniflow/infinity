@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 import internal_types;
@@ -30,6 +31,8 @@ import global_resource_usage;
 import infinity_context;
 import data_type;
 import compilation_config;
+
+using namespace infinity;
 
 class ColumnVectorIntegerTest : public BaseTestParamStr {
     void SetUp() override {

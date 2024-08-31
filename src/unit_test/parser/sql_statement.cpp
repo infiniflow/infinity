@@ -14,7 +14,8 @@
 
 #include "base_statement.h"
 #include "statement/show_statement.h"
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -44,6 +45,7 @@ import table_reference;
 import parser_result;
 import statement_common;
 
+using namespace infinity;
 class StatementParsingTest : public BaseTest {};
 
 TEST_F(StatementParsingTest, good_test1) {

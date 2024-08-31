@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_context;
 import infinity_exception;
@@ -30,6 +31,8 @@ import txn_manager;
 import txn;
 import status;
 import extra_ddl_info;
+
+using namespace infinity;
 
 class DBTxnTest : public BaseTestParamStr {
     void SetUp() override {

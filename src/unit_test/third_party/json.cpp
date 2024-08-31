@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -22,6 +23,8 @@ import third_party;
 import logger;
 import compilation_config;
 import infinity_context;
+
+using namespace infinity;
 
 class JsonTest : public BaseTest {
     void SetUp() override {

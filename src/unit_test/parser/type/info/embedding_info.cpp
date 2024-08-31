@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
 #include "json.hpp"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -28,6 +29,7 @@ import knn_expr;
 import parser_assert;
 import parser_defaults;
 
+using namespace infinity;
 class EmbeddingInfoTest : public BaseTest {};
 
 TEST_F(EmbeddingInfoTest, embedding_info_A) {
