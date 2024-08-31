@@ -354,6 +354,13 @@ void ChunkIndexEntry::LoadPartsReader(BufferManager *buffer_mgr) {
     }
 }
 
+void ChunkIndexEntry::DeprecateChunk(TxnTimeStamp commit_ts) {
+    assert(commit_ts_.load() < commit_ts);
+    deprecate_ts_.store(commit_ts);
+    LOG_INFO(fmt::format("Deprecate chunk {}.", encode()));
+    ResetOptimizing();
+}
+
 BufferHandle ChunkIndexEntry::GetIndexPartAt(u32 i) { return part_buffer_objs_.at(i)->Load(); }
 
 bool ChunkIndexEntry::CheckVisible(Txn *txn) const {
