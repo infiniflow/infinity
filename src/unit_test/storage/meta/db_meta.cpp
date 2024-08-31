@@ -40,7 +40,7 @@ TEST_P(DBMetaTest, to_string_test) {
         auto [base_entry, status] = catalog->CreateDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
         std::cout<<base_entry->db_meta_->ToString()->c_str()<<std::endl;
-        ASSERT_STREQ(base_entry->db_meta_->ToString()->c_str(), "DBMeta, data_dir: /var/infinity/data, db name: db1, entry count: 1");
+        ASSERT_STREQ(base_entry->db_meta_->ToString()->c_str(), "DBMeta, db name: db1, entry count: 1");
     }
 
     // drop db should be success
@@ -48,7 +48,7 @@ TEST_P(DBMetaTest, to_string_test) {
         auto [base_entry, status] = catalog->DropDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
         std::cout<<base_entry->db_meta_->ToString()->c_str()<<std::endl;
-        ASSERT_STREQ(base_entry->db_meta_->ToString()->c_str(), "DBMeta, data_dir: /var/infinity/data, db name: db1, entry count: 0");
+        ASSERT_STREQ(base_entry->db_meta_->ToString()->c_str(), "DBMeta, db name: db1, entry count: 0");
     }
 
     txn_mgr->CommitTxn(txn1);

@@ -76,8 +76,7 @@ BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, T
         block_entry->columns_.emplace_back(std::move(column_entry));
     }
 
-    auto version_file_worker =
-        MakeUnique<VersionFileWorker>(MakeShared<String>(block_entry->AbsoluteBlockDir()), BlockVersion::FileName(), block_entry->row_capacity_);
+    auto version_file_worker = MakeUnique<VersionFileWorker>(block_entry->block_dir(), BlockVersion::FileName(), block_entry->row_capacity_);
     auto *buffer_mgr = txn->buffer_mgr();
     block_entry->version_buffer_object_ = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
     return block_entry;
@@ -108,8 +107,7 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     block_entry->commit_ts_ = commit_ts;
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
 
-    auto version_file_worker =
-        MakeUnique<VersionFileWorker>(MakeShared<String>(block_entry->AbsoluteBlockDir()), BlockVersion::FileName(), row_capacity);
+    auto version_file_worker = MakeUnique<VersionFileWorker>(block_entry->block_dir(), BlockVersion::FileName(), row_capacity);
     block_entry->version_buffer_object_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
 
     block_entry->checkpoint_ts_ = check_point_ts;
@@ -128,8 +126,6 @@ void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String blo
         LoadFilterBinaryData(block_filter_binary_data);
     }
 }
-
-String BlockEntry::AbsoluteBlockDir() const { return Path(InfinityContext::instance().config()->DataDir()) / *block_dir_; }
 
 SizeT BlockEntry::row_count(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);

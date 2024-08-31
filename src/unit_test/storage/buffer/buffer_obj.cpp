@@ -99,13 +99,13 @@ TEST_F(BufferObjTest, test1) {
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
     SizeT test_size1 = 1024;
-    auto file_dir1 = MakeShared<String>(data_dir + "/dir1");
+    auto file_dir1 = MakeShared<String>("dir1");
     auto test_fname1 = MakeShared<String>("test1");
     auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
     auto buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
     SizeT test_size2 = 1024;
-    auto file_dir2 = MakeShared<String>(data_dir + "/dir2");
+    auto file_dir2 = MakeShared<String>("dir2");
     auto test_fname2 = MakeShared<String>("test2");
     auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
     auto buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
@@ -282,13 +282,13 @@ TEST_F(BufferObjTest, test1) {
 //     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
 //     SizeT test_size1 = 1024;
-//     auto file_dir1 = MakeShared<String>(data_dir + "/dir1");
+//     auto file_dir1 = MakeShared<String>("dir1");
 //     auto test_fname1 = MakeShared<String>("test1");
 //     auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
 //     auto *buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
 //     SizeT test_size2 = 1024;
-//     auto file_dir2 = MakeShared<String>(data_dir + "/dir2");
+//     auto file_dir2 = MakeShared<String>("dir2");
 //     auto test_fname2 = MakeShared<String>("test2");
 //     auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
 //     auto *buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));

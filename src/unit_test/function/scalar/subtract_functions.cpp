@@ -42,9 +42,11 @@ import data_type;
 import catalog;
 
 using namespace infinity;
-class SubtractFunctionsTest : public BaseTest {};
+class SubtractFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(SubtractFunctionsTest, add_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, SubtractFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(SubtractFunctionsTest, add_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();

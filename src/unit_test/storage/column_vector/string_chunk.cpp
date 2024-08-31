@@ -27,54 +27,9 @@ import default_values;
 
 using namespace infinity;
 
-class StringChunkTest : public BaseTestParamStr {
-    void SetUp() override {
-        RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        std::string config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
-    }
+class StringChunkTest : public BaseTest {};
 
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
-    }
-};
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         StringChunkTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
-
-//
-//
-//TEST_P(StringChunkTest, heap_chunk_test) {
-//    using namespace infinity;
-//
-//    {
-//        HeapChunk heap_chunk(0);
-//        EXPECT_EQ(heap_chunk.ptr_, nullptr);
-//    }
-//
-//    {
-//        HeapChunk heap_chunk(MIN_VECTOR_CHUNK_SIZE);
-//        EXPECT_NE(heap_chunk.ptr_, nullptr);
-//    }
-//}
-
-TEST_P(StringChunkTest, string_chunk_a) {
+TEST_F(StringChunkTest, string_chunk_a) {
     using namespace infinity;
 
     StringHeapMgr string_chunk_mgr;

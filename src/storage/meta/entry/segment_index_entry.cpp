@@ -156,7 +156,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
         LocalFileSystem fs;
         for (ChunkID chunk_id = next_chunk_id;; ++chunk_id) {
             String chunk_file_name = ChunkIndexEntry::IndexFileName(segment_id, chunk_id);
-            String file_path = *table_index_entry->index_dir() + "/" + chunk_file_name;
+            String file_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry->index_dir() / chunk_file_name;
             if (!fs.Exists(file_path)) {
                 break;
             }

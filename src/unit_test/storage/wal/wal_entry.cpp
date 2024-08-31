@@ -271,8 +271,8 @@ TEST_F(WalEntryTest, ReadWriteVFS) {
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
 
     Vector<String> paths = {"path1", "path2"};
-    String workspace = "workspace";
-    String data_dir = "data_dir";
+    String workspace = GetFullPersistDir();
+    String data_dir = GetFullDataDir();
     SizeT object_size_limit = 100;
     PersistenceManager pm(workspace, data_dir, object_size_limit);
     ObjAddr obj_addr0{.obj_key_ = "key1", .part_offset_ = 0, .part_size_ = 10};

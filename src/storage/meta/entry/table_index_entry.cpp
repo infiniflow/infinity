@@ -95,10 +95,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     if (is_delete) {
         return MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, nullptr, txn_id, begin_ts);
     }
-    SharedPtr<String> temp_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
-
-    SharedPtr<String> index_dir =
-        MakeShared<String>(LocalFileSystem::ConcatenateFilePath(*table_index_meta->GetTableEntry()->TableEntryDir(), *temp_dir));
+    SharedPtr<String> index_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
     auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_dir, txn_id, begin_ts);
 
     // Get column info

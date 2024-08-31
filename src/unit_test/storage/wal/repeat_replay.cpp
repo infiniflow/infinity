@@ -56,19 +56,14 @@ protected:
                    : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp_vfs_off.toml");
     }
 
-    void SetUp() override {
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-    }
+    void SetUp() override { CleanupDbDirs(); }
 
-    void TearDown() override { RemoveDbDirs(); }
+    void TearDown() override {}
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          RepeatReplayTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(RepeatReplayTest, append) {
     std::shared_ptr<std::string> config_path = RepeatReplayTest::close_ckp_config();

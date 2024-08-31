@@ -43,9 +43,11 @@ import data_type;
 #if 0
 
 using namespace infinity;
-class SubstrFunctionTest : public BaseTest {};
+class SubstrFunctionTest : public BaseTestParamStr {};
 
-TEST_F(SubstrFunctionTest, varchar_substr) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, SubstrFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(SubstrFunctionTest, varchar_substr) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();

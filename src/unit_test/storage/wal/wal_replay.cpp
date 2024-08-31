@@ -71,10 +71,7 @@ protected:
     }
 
     void SetUp() override {
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        CleanupDbDirs();
         tree_cmd = "tree ";
         tree_cmd += GetFullDataDir();
     }
@@ -89,7 +86,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          WalReplayTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(WalReplayTest, wal_replay_database) {
     {

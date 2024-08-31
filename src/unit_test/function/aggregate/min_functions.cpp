@@ -38,25 +38,11 @@ import logical_type;
 import data_type;
 
 using namespace infinity;
-class MinFunctionTest : public BaseTest {
-    void SetUp() override {
-        BaseTest::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-    }
+class MinFunctionTest : public BaseTestParamStr {};
 
-    void TearDown() override {
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTest::TearDown();
-    }
-};
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, MinFunctionTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
 
-TEST_F(MinFunctionTest, min_func) {
+TEST_P(MinFunctionTest, min_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();

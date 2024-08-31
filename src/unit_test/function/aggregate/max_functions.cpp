@@ -38,25 +38,11 @@ import logical_type;
 import data_type;
 
 using namespace infinity;
-class MaxFunctionTest : public BaseTest {
-    void SetUp() override {
-        BaseTest::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-    }
+class MaxFunctionTest : public BaseTestParamStr {};
 
-    void TearDown() override {
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTest::TearDown();
-    }
-};
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, MaxFunctionTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
 
-TEST_F(MaxFunctionTest, max_func) {
+TEST_P(MaxFunctionTest, max_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();

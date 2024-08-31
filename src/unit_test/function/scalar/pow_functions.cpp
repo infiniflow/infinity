@@ -40,9 +40,11 @@ import internal_types;
 import data_type;
 
 using namespace infinity;
-class PowFunctionsTest : public BaseTest {};
+class PowFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(PowFunctionsTest, mul_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, PowFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(PowFunctionsTest, mul_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();

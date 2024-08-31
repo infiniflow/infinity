@@ -41,9 +41,11 @@ import data_type;
 
 using namespace infinity;
 
-class AndFunctionsTest : public BaseTest {};
+class AndFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(AndFunctionsTest, and_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, AndFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(AndFunctionsTest, and_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();

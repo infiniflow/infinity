@@ -983,8 +983,9 @@ UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json, Buff
 void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_path, String &full_catalog_name) {
     full_catalog_path = *catalog_dir_;
     full_catalog_name = CatalogFile::FullCheckpointFilename(max_commit_ts);
-    String full_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::FullCheckpointFilename(max_commit_ts));
-    String catalog_tmp_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::TempFullCheckpointFilename(max_commit_ts));
+    String full_path = Path(InfinityContext::instance().config()->DataDir()) / *catalog_dir_ / CatalogFile::FullCheckpointFilename(max_commit_ts);
+    String catalog_tmp_path =
+        Path(InfinityContext::instance().config()->DataDir()) / *catalog_dir_ / CatalogFile::TempFullCheckpointFilename(max_commit_ts);
 
     // Serialize catalog to string
     full_ckp_commit_ts_ = max_commit_ts;
@@ -1028,7 +1029,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 
     delta_catalog_path = *catalog_dir_;
     delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
-    String full_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
+    String full_path = fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
 
     if(flush_delta_entry->commit_ts() != max_commit_ts) {
         String error_message = "Expect flush_delta_entry->commit_ts() == max_commit_ts";
@@ -1079,8 +1080,12 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
         UnrecoverableError(error_message);
     }
 
-    std::ofstream outfile;
-    outfile.open(full_path, std::ios::binary);
+    std::ofstream outfile = std::ofstream(full_path, std::ios::binary);
+    if (!outfile.is_open()) {
+        String error_message = fmt::format("Failed to open delta catalog file: {}", full_path);
+        UnrecoverableError(error_message);
+    }
+
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
 

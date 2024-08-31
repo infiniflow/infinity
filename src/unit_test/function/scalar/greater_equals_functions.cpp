@@ -40,9 +40,11 @@ import internal_types;
 import data_type;
 
 using namespace infinity;
-class GreaterEqualsFunctionsTest : public BaseTest {};
+class GreaterEqualsFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, GreaterEqualsFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(GreaterEqualsFunctionsTest, greater_equals_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();

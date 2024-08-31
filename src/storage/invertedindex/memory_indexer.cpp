@@ -79,6 +79,7 @@ MemoryIndexer::MemoryIndexer(const String &index_dir, const String &base_name, R
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), posting_format_(PostingFormatOption(flag_)),
       analyzer_(analyzer), inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
       commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL) {
+    assert(std::filesystem::path(index_dir).is_absolute());
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
     Path path = Path(index_dir) / (base_name + ".tmp.merge");

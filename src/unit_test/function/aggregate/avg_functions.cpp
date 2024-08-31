@@ -38,25 +38,11 @@ import logical_type;
 import data_type;
 using namespace infinity;
 
-class AvgFunctionTest : public BaseTest {
-    void SetUp() override {
-        BaseTest::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-    }
+class AvgFunctionTest : public BaseTestParamStr {};
 
-    void TearDown() override {
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTest::TearDown();
-    }
-};
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, AvgFunctionTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
 
-TEST_F(AvgFunctionTest, avg_func) {
+TEST_P(AvgFunctionTest, avg_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
