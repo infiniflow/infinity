@@ -70,7 +70,7 @@ void Infinity::Hello() {
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
 
-    SharedPtr<String> config_path = MakeShared<String>(path + "/infinity_conf.toml");
+    SharedPtr<String> config_path = MakeShared<String>(std::filesystem::absolute(path + "/infinity_conf.toml"));
     if (fs.Exists(*config_path)) {
         InfinityContext::instance().Init(config_path);
     } else {
