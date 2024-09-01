@@ -29,6 +29,7 @@ GlobalOptions::GlobalOptions() {
     options_.resize(invalid_option_index);
 
     name2index_[String(VERSION_OPTION_NAME)] = GlobalOptionIndex::kVersion;
+    name2index_[String(SERVER_MODE_OPTION_NAME)] = GlobalOptionIndex::kServerMode;
     name2index_[String(TIME_ZONE_OPTION_NAME)] = GlobalOptionIndex::kTimeZone;
     name2index_[String(TIME_ZONE_BIAS_OPTION_NAME)] = GlobalOptionIndex::kTimeZoneBias;
     name2index_[String(CPU_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kWorkerCPULimit;

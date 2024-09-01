@@ -193,6 +193,7 @@ export {
 
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";
+    constexpr std::string_view SERVER_MODE_OPTION_NAME = "server_mode";
     constexpr std::string_view TIME_ZONE_OPTION_NAME = "time_zone";
     constexpr std::string_view TIME_ZONE_BIAS_OPTION_NAME = "time_zone_bias";
     constexpr std::string_view CPU_LIMIT_OPTION_NAME = "cpu_limit";

@@ -140,6 +140,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Server mode
+        String server_mode = "standalone";
+        UniquePtr<StringOption> server_mode_option = MakeUnique<StringOption>(SERVER_MODE_OPTION_NAME, server_mode);
+        status = global_options_.AddOption(std::move(server_mode_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Timezone
         String time_zone_str = "UTC";
         UniquePtr<StringOption> time_zone_option = MakeUnique<StringOption>(TIME_ZONE_OPTION_NAME, time_zone_str);
@@ -517,6 +526,27 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                 }
                             } else {
                                 return Status::InvalidConfig("'version' field isn't string.");
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kServerMode: {
+                            // Server Mode
+                            String server_mode = "standalone";
+                            if(elem.second.is_string()) {
+                                server_mode = elem.second.value_or(server_mode);
+                            } else {
+                                return Status::InvalidConfig("'server_mode' field isn't string.");
+                            }
+
+                            ToLower(server_mode);
+                            if(server_mode == "standalone" or server_mode == "cluster") {
+                                UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_mode);
+                                Status status = global_options_.AddOption(std::move(server_address_option));
+                                if(!status.ok()) {
+                                    UnrecoverableError(status.message());
+                                }
+                            } else {
+                                return Status::InvalidConfig(fmt::format("Invalid server mode: {}", server_mode));
                             }
                             break;
                         }
