@@ -189,15 +189,13 @@ void Storage::WorkingModeUnInit() {
     LOG_INFO("Working mode: Close storage successfully\n");
 }
 
-void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, const String &data_dir) {
-    new_catalog_ = Catalog::LoadFromFiles(data_dir, full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
+void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
+    new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
 void Storage::InitNewCatalog() {
     LOG_INFO("Init new catalog");
-    auto data_dir = config_ptr_->DataDir();
-    SharedPtr<String> data_dir_ptr = MakeShared<String>(data_dir);
-    new_catalog_ = Catalog::NewCatalog(std::move(data_dir_ptr), true);
+    new_catalog_ = Catalog::NewCatalog(true);
 }
 
 } // namespace infinity

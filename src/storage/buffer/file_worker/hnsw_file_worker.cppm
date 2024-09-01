@@ -39,7 +39,9 @@ export struct CreateHnswParam : public CreateIndexParam {
 
 export class HnswFileWorker : public IndexFileWorker {
 public:
-    explicit HnswFileWorker(SharedPtr<String> file_dir,
+    explicit HnswFileWorker(SharedPtr<String> data_dir,
+                            SharedPtr<String> temp_dir,
+                            SharedPtr<String> file_dir,
                             SharedPtr<String> file_name,
                             SharedPtr<IndexBase> index_base,
                             SharedPtr<ColumnDef> column_def,

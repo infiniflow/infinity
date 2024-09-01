@@ -24,7 +24,7 @@ ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
 
-    Path path = Path(index_dir) / base_name;
+    Path path = Path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
     String dict_file = path.string();
     dict_file.append(DICT_SUFFIX);
     String posting_file = path.string();

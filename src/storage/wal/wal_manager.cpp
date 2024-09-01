@@ -563,7 +563,7 @@ i64 WalManager::ReplayWalFile() {
         UnrecoverableError(error_message);
     }
     auto &[full_catalog_fileinfo, delta_catalog_fileinfo_array] = catalog_fileinfo.value();
-    storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfo_array, data_path_);
+    storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfo_array);
 
     // phase 3: replay the entries
     LOG_INFO(fmt::format("Replay phase 3: replay {} entries", replay_entries.size()));
@@ -824,7 +824,7 @@ void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, Tra
     catalog->CreateDatabaseReplay(
         MakeShared<String>(cmd.db_name_),
         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return DBEntry::ReplayDBEntry(db_meta, false, catalog->DataDir(), db_dir, db_name, txn_id, begin_ts, commit_ts);
+            return DBEntry::ReplayDBEntry(db_meta, false, db_dir, db_name, txn_id, begin_ts, commit_ts);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -838,7 +838,6 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
             return TableEntry::ReplayTableEntry(false,
                                                 table_meta,
-                                                table_meta->base_dir(),
                                                 table_dir,
                                                 table_name,
                                                 cmd.table_def_->columns(),
@@ -859,7 +858,7 @@ void WalManager::WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, Transac
     storage_->catalog()->DropDatabaseReplay(
         cmd.db_name_,
         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return DBEntry::ReplayDBEntry(db_meta, true, data_path_ptr, db_meta->data_dir(), db_name, txn_id, begin_ts, commit_ts);
+            return DBEntry::ReplayDBEntry(db_meta, true, data_path_ptr, db_name, txn_id, begin_ts, commit_ts);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -872,7 +871,6 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID
         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
             return TableEntry::ReplayTableEntry(true,
                                                 table_meta,
-                                                table_meta->base_dir(),
                                                 nullptr,
                                                 table_name,
                                                 Vector<SharedPtr<ColumnDef>>{},

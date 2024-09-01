@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 #include <iostream>
 #include <unistd.h>
@@ -63,16 +64,7 @@ protected:
 
 public:
     void SetUp() override {
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-        CleanupDbDirs();
-        config_path_ = GetParam();
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            std::shared_ptr<std::string> config_path = std::make_shared<std::string>(config_path_);
-            infinity::InfinityContext::instance().Init(config_path);
-        }
-
+        BaseTestParamStr::SetUp();
         // https://en.wikipedia.org/wiki/Finite-state_transducer
         const char *paragraphs[] = {
             R"#(A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.)#",

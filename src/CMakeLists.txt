@@ -466,6 +466,7 @@ file(GLOB_RECURSE
 file(GLOB_RECURSE
         ut_dependent_cppm
         CONFIGURE_DEPENDS
+        unit_test/base_test.cppm
         unit_test/test_helper/sql_runner.cppm
 )
 

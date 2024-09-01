@@ -1,6 +1,8 @@
-#include "unit_test/base_test.h"
 #include "type/complex/embedding_type.h"
 #include <regex>
+
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_context;
 import infinity_exception;
@@ -31,34 +33,7 @@ import txn_store;
 
 using namespace infinity;
 
-class TableMetaTest : public BaseTestParamStr {
-    void SetUp() override {
-        BaseTestParamStr::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        std::shared_ptr<std::string> config_path = nullptr;
-        RemoveDbDirs();
-        system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + infinity::String(GetFullTmpDir())).c_str());
-        std::string config_path_str = GetParam();
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
-    }
-};
+class TableMetaTest : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TableMetaTest,
@@ -121,13 +96,11 @@ TEST_P(TableMetaTest, name_test) {
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
         auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
-        std::cout << *(table_entry->GetTableMeta()->table_name_ptr()) << std::endl;     
-        std::cout << table_entry->GetTableMeta()->table_name() << std::endl; 
-        std::cout << *(table_entry->GetTableMeta()->base_dir()) << std::endl; 
+        std::cout << *(table_entry->GetTableMeta()->table_name_ptr()) << std::endl;
+        std::cout << table_entry->GetTableMeta()->table_name() << std::endl;
         std::cout << *(table_entry->GetTableMeta()->db_entry_dir()) << std::endl;
         EXPECT_STREQ(table_entry->GetTableMeta()->table_name_ptr()->c_str(), "tbl1");
         EXPECT_STREQ(table_entry->GetTableMeta()->table_name().c_str(), "tbl1");
-        EXPECT_STREQ(table_entry->GetTableMeta()->base_dir()->c_str(), infinity::String(GetFullDataDir()).c_str());
         EXPECT_TRUE(std::regex_match(*(table_entry->GetTableMeta()->db_entry_dir()), 
                     std::regex("(.*)default_db")));
 

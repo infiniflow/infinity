@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
 #include <cstdint>
 #include <random>
 
+#include "gtest/gtest.h"
+import base_test;
 import dist_func_ip;
 import data_store;
 import vec_store_type;

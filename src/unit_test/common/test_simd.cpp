@@ -1,13 +1,11 @@
-#include "unit_test/base_test.h"
-#include <iostream>
-#include <vector>
-
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import simd_init;
 
-class SimdInitTest : public BaseTest {};
-
 using namespace infinity;
+
+class SimdInitTest : public BaseTest {};
 
 TEST_F(SimdInitTest, GetSupportedSimdTypesList) {
     std::cout << "Supported SIMD types:";

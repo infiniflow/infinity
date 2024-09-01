@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-#include <iomanip>
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -39,12 +39,15 @@ import logical_type;
 import internal_types;
 import data_type;
 
-class ExtractFunctionTest : public BaseTest {};
+using namespace infinity;
+class ExtractFunctionTest : public BaseTestParamStr {};
 
-TEST_F(ExtractFunctionTest, extract_year_test) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, ExtractFunctionTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(ExtractFunctionTest, extract_year_test) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterExtractFunction(catalog_ptr);
 

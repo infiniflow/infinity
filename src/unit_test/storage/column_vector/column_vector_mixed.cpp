@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -32,6 +33,7 @@ import logical_type;
 
 // mask the unittest because BUG1213_1
 #if 0
+using namespace infinity;
 class ColumnVectorMixedTest : public BaseTest {};
 
 TEST_F(ColumnVectorMixedTest, mixed_integer_a) {

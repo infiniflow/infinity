@@ -25,7 +25,11 @@ namespace infinity {
 
 export class VarFileWorker : public FileWorker {
 public:
-    explicit VarFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size);
+    explicit VarFileWorker(SharedPtr<String> data_dir,
+                           SharedPtr<String> temp_dir,
+                           SharedPtr<String> file_dir,
+                           SharedPtr<String> file_name,
+                           SizeT buffer_size);
 
     virtual ~VarFileWorker() override;
 

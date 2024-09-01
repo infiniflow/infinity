@@ -379,8 +379,7 @@ AddBlockEntryOp::AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts
       row_capacity_(block_entry->row_capacity()), row_count_(block_entry->row_count()), min_row_ts_(block_entry->min_row_ts()),
       max_row_ts_(block_entry->max_row_ts()), checkpoint_ts_(block_entry->checkpoint_ts()),
       checkpoint_row_count_(block_entry->checkpoint_row_count()), block_filter_binary_data_(std::move(block_filter_binary_data)) {
-    String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
-    String file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
+    String file_path = fmt::format("{}/{}", *block_entry->block_dir(), *BlockVersion::FileName());
     local_paths_.push_back(file_path);
 }
 
@@ -406,20 +405,20 @@ AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, T
     IndexType index_type = segment_index_entry->table_index_entry()->index_base()->index_type_;
     switch (index_type) {
         case IndexType::kFullText: {
-            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-            local_paths_.push_back(full_path + "/" + chunk_index_entry->base_name_ + POSTING_SUFFIX);
-            local_paths_.push_back(full_path + "/" + chunk_index_entry->base_name_ + DICT_SUFFIX);
-            local_paths_.push_back(full_path + "/" + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            Path rela_dir = *(segment_index_entry->index_dir());
+            local_paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + POSTING_SUFFIX));
+            local_paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + DICT_SUFFIX));
+            local_paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + LENGTH_SUFFIX));
             break;
         }
         case IndexType::kHnsw:
         case IndexType::kEMVB:
         case IndexType::kSecondary:
         case IndexType::kBMP: {
-            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
+            Path rela_dir = *(segment_index_entry->index_dir());
             String file_name = ChunkIndexEntry::IndexFileName(segment_index_entry->segment_id(), chunk_index_entry->chunk_id_);
-            String full_path = fmt::format("{}/{}", full_dir, file_name);
-            local_paths_.push_back(full_path);
+            String rela_path = rela_dir / file_name;
+            local_paths_.push_back(rela_path);
             break;
         }
         default: {
@@ -950,7 +949,10 @@ void AddChunkIndexEntryOp::Merge(CatalogDeltaOperation &other) {
         String error_message = fmt::format("Merge failed, other type: {}", other.GetTypeStr());
         UnrecoverableError(error_message);
     }
-    *this = std::move(static_cast<AddChunkIndexEntryOp &>(other));
+    auto &add_chunk_index_op = static_cast<AddChunkIndexEntryOp &>(other);
+    MergeFlag flag = this->NextDeleteFlag(add_chunk_index_op.merge_flag_);
+    *this = std::move(add_chunk_index_op);
+    this->merge_flag_ = flag;
 }
 
 void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
@@ -1204,6 +1206,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(new_op.get());
             if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
                 add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
+                LOG_DEBUG(fmt::format("Delete chunk: {}", *new_op->encode_));
             }
         }
         const String &encode = *new_op->encode_;

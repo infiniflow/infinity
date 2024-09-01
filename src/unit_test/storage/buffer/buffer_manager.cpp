@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
 #include <future>
 
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import buffer_manager;
 import buffer_obj;
@@ -108,7 +109,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
 
         for (SizeT i = 0; i < file_num; ++i) {
             auto file_name = MakeShared<String>(fmt::format("file_{}", i));
-            auto file_worker = MakeUnique<DataFileWorker>(data_dir_, file_name, file_size);
+            auto file_worker = MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_size);
             auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
             buffer_objs.push_back(buffer_obj);
             {
@@ -194,7 +195,7 @@ TEST_F(BufferManagerTest, varfile_test) {
     Vector<BufferObj *> buffer_objs;
     for (SizeT i = 0; i < file_num; ++i) {
         auto file_name = MakeShared<String>(fmt::format("file_{}", i));
-        auto file_worker = MakeUnique<VarFileWorker>(data_dir_, file_name, 0);
+        auto file_worker = MakeUnique<VarFileWorker>(data_dir_, temp_dir_, MakeShared<String>(), file_name, 0);
         auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
         buffer_objs.push_back(buffer_obj);
     }
@@ -351,13 +352,14 @@ protected:
 
 class Test1Obj : public TestObj {
 public:
-    Test1Obj(SizeT avg_file_size, BufferManager *buffer_mgr, SharedPtr<String> data_dir)
-        : avg_file_size(avg_file_size), buffer_mgr_(buffer_mgr), data_dir_(data_dir) {}
+    Test1Obj(SizeT avg_file_size, BufferManager *buffer_mgr, SharedPtr<String> data_dir, SharedPtr<String> temp_dir)
+        : avg_file_size(avg_file_size), buffer_mgr_(buffer_mgr), data_dir_(data_dir), temp_dir_(temp_dir) {}
 
 private:
     const SizeT avg_file_size;
     BufferManager *buffer_mgr_;
     SharedPtr<String> data_dir_;
+    SharedPtr<String> temp_dir_;
 
 public:
     void Init(bool alloc_new, FileInfo &file_info) override {
@@ -365,10 +367,10 @@ public:
         if (alloc_new) {
             SizeT file_size = rand() % avg_file_size + avg_file_size / 2;
             file_info.file_size_ = file_size;
-            auto file_worker = MakeUnique<DataFileWorker>(data_dir_, file_name, file_size);
+            auto file_worker = MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_size);
             file_info.buffer_obj_ = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
         } else {
-            auto file_worker = MakeUnique<DataFileWorker>(data_dir_, file_name, file_info.file_size_);
+            auto file_worker = MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_info.file_size_);
             file_info.buffer_obj_ = buffer_mgr_->GetBufferObject(std::move(file_worker));
         }
     }
@@ -395,7 +397,7 @@ public:
 TEST_F(BufferManagerParallelTest, parallel_test1) {
     for (int i = 0; i < 1; ++i) {
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
-        auto test1_obj = MakeUnique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_);
+        auto test1_obj = MakeUnique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_, temp_dir_);
         LocalFileSystem fs;
 
         Vector<FileInfo> file_infos;
@@ -427,22 +429,23 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
 
 class Test2Obj : public TestObj {
 public:
-    Test2Obj(SizeT var_file_step, BufferManager *buffer_mgr, SharedPtr<String> data_dir)
-        : var_file_step(var_file_step), buffer_mgr_(buffer_mgr), data_dir_(data_dir) {}
+    Test2Obj(SizeT var_file_step, BufferManager *buffer_mgr, SharedPtr<String> data_dir, SharedPtr<String> temp_dir)
+        : var_file_step(var_file_step), buffer_mgr_(buffer_mgr), data_dir_(data_dir), temp_dir_(temp_dir) {}
 
 private:
     const SizeT var_file_step;
     BufferManager *buffer_mgr_;
     SharedPtr<String> data_dir_;
+    SharedPtr<String> temp_dir_;
 
 public:
     void Init(bool alloc_new, FileInfo &file_info) override {
         auto file_name = MakeShared<String>(fmt::format("file_{}", file_info.file_id_));
         if (alloc_new) {
-            auto file_worker = MakeUnique<VarFileWorker>(data_dir_, file_name, 0);
+            auto file_worker = MakeUnique<VarFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, 0);
             file_info.buffer_obj_ = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
         } else {
-            auto file_worker = MakeUnique<VarFileWorker>(data_dir_, file_name, file_info.file_size_);
+            auto file_worker = MakeUnique<VarFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_info.file_size_);
             file_info.buffer_obj_ = buffer_mgr_->GetBufferObject(std::move(file_worker));
         }
     }
@@ -476,7 +479,7 @@ public:
 TEST_F(BufferManagerParallelTest, parallel_test2) {
     for (int i = 0; i < 1; ++i) {
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
-        auto test2_obj = MakeUnique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_);
+        auto test2_obj = MakeUnique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_, temp_dir_);
         LocalFileSystem fs;
 
         Vector<FileInfo> file_infos;

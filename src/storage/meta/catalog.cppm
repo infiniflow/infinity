@@ -87,7 +87,7 @@ class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
 export struct Catalog {
 public:
-    explicit Catalog(SharedPtr<String> data_dir);
+    Catalog();
 
     ~Catalog();
 
@@ -232,25 +232,23 @@ public:
 
     void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
-    static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, bool create_default_db);
+    static UniquePtr<Catalog> NewCatalog(bool create_default_db);
 
-    static UniquePtr<Catalog> LoadFromFiles(const String &data_dir,
-                                            const FullCatalogFileInfo &full_ckp_info,
-                                            const Vector<DeltaCatalogFileInfo> &delta_ckp_infos,
-                                            BufferManager *buffer_mgr);
+    static UniquePtr<Catalog>
+    LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, BufferManager *buffer_mgr);
 
     SizeT GetDeltaLogCount() const;
 
     Vector<CatalogDeltaOpBrief> GetDeltaLogBriefs() const;
 
 private:
-    static UniquePtr<Catalog> Deserialize(const String &data_dir, const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
 
     static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info);
 
     void LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr);
 
-    static UniquePtr<Catalog> LoadFromFile(const String &data_dir, const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods
@@ -266,14 +264,12 @@ public:
     SizeT ProfileHistorySize() const { return history_.HistoryCapacity(); }
 
 public:
-    const SharedPtr<String> &DataDir() const { return data_dir_; }
-
+    // Relative to the `data_dir` config item
     const SharedPtr<String> &CatalogDir() const { return catalog_dir_; }
 
     TransactionID next_txn_id() const { return next_txn_id_; }
 
 public:
-    SharedPtr<String> data_dir_{};
     SharedPtr<String> catalog_dir_{};
 
     MetaMap<DBMeta> db_meta_map_{};

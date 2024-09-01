@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #include "type/complex/row_id.h"
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 import index_base;
@@ -31,25 +32,11 @@ import constant_expr;
 
 using namespace infinity;
 
-class CatalogDeltaEntryTest : public BaseTestParamStr {
-public:
-    void SetUp() override {
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-        config_path_ = GetParam();
-        SharedPtr<String> config_path =
-            config_path_ == BaseTestParamStr::NULL_CONFIG_PATH ? nullptr : MakeShared<String>(std::string("test/data") + config_path_);
-        InfinityContext::instance().Init(config_path);
-    }
-
-    String config_path_{};
-};
+class CatalogDeltaEntryTest : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CatalogDeltaEntryTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     auto db_name = String("db_test");

@@ -5,8 +5,10 @@ time_zone = "utc-8"
 [network]
 [log]
 log_to_stdout = true
+log_level               = "trace"
 
 [storage]
+mem_index_capacity       = 8192
 
 [buffer]
 [wal]
