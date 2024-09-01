@@ -29,12 +29,19 @@ namespace infinity {
 // TODO:now only suppor f32
 export class EMVBIndexFileWorker final : public IndexFileWorker {
 public:
-    explicit EMVBIndexFileWorker(SharedPtr<String> file_dir,
+    explicit EMVBIndexFileWorker(SharedPtr<String> data_dir,
+                                 SharedPtr<String> temp_dir,
+                                 SharedPtr<String> file_dir,
                                  SharedPtr<String> file_name,
                                  SharedPtr<IndexBase> index_base,
                                  SharedPtr<ColumnDef> column_def,
                                  const u32 start_segment_offset)
-        : IndexFileWorker(std::move(file_dir), std::move(file_name), std::move(index_base), std::move(column_def)),
+        : IndexFileWorker(std::move(data_dir),
+                          std::move(temp_dir),
+                          std::move(file_dir),
+                          std::move(file_name),
+                          std::move(index_base),
+                          std::move(column_def)),
           start_segment_offset_(start_segment_offset) {}
 
     ~EMVBIndexFileWorker() override;

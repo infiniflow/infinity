@@ -25,8 +25,12 @@ import logger;
 
 namespace infinity {
 
-DataFileWorker::DataFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size)
-    : FileWorker(std::move(file_dir), std::move(file_name)), buffer_size_(buffer_size) {}
+DataFileWorker::DataFileWorker(SharedPtr<String> data_dir,
+                               SharedPtr<String> temp_dir,
+                               SharedPtr<String> file_dir,
+                               SharedPtr<String> file_name,
+                               SizeT buffer_size)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), buffer_size_(buffer_size) {}
 
 DataFileWorker::~DataFileWorker() {
     if (data_ != nullptr) {

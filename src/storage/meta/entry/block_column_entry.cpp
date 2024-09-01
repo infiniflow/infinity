@@ -76,7 +76,11 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
         total_data_size = (row_capacity + 7) / 8;
     }
 
-    auto file_worker = MakeUnique<DataFileWorker>(block_entry->block_dir(), block_column_entry->file_name_, total_data_size);
+    auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                  MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                  block_entry->block_dir(),
+                                                  block_column_entry->file_name_,
+                                                  total_data_size);
 
     auto *buffer_mgr = txn->buffer_mgr();
     block_column_entry->buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
@@ -98,14 +102,23 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     DataType *column_type = column_entry->column_type_.get();
     const LogicalType column_data_logical_type = column_type->type();
     const SizeT row_capacity = block_entry->row_capacity();
-    const SizeT total_data_size = (column_data_logical_type == LogicalType::kBoolean) ? ((row_capacity + 7) / 8) : (row_capacity * column_type->Size());
-    auto file_worker = MakeUnique<DataFileWorker>(block_entry->block_dir(), column_entry->file_name_, total_data_size);
+    const SizeT total_data_size =
+        (column_data_logical_type == LogicalType::kBoolean) ? ((row_capacity + 7) / 8) : (row_capacity * column_type->Size());
+    auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                  MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                  block_entry->block_dir(),
+                                                  column_entry->file_name_,
+                                                  total_data_size);
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker), true /*restart*/);
 
     if (next_outline_idx > 0) {
         SizeT buffer_size = last_chunk_offset;
-        auto outline_buffer_file_worker = MakeUnique<VarFileWorker>(block_entry->block_dir(), column_entry->OutlineFilename(0, 0), buffer_size);
+        auto outline_buffer_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                    MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                    block_entry->block_dir(),
+                                                                    column_entry->OutlineFilename(0, 0),
+                                                                    buffer_size);
         auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker), true /*restart*/);
         column_entry->outline_buffers_.push_back(buffer_obj);
     }
@@ -127,7 +140,11 @@ ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr) {
 ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
-        auto file_worker = MakeUnique<DataFileWorker>(block_entry_->block_dir(), this->file_name_, 0);
+        auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                      block_entry_->block_dir(),
+                                                      this->file_name_,
+                                                      0);
         this->buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
 

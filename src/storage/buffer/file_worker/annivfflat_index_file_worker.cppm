@@ -48,12 +48,20 @@ class AnnIVFFlatIndexFileWorker : public IndexFileWorker {
     u32 default_centroid_num_;
 
 public:
-    explicit AnnIVFFlatIndexFileWorker(SharedPtr<String> file_dir,
+    explicit AnnIVFFlatIndexFileWorker(SharedPtr<String> data_dir,
+                                       SharedPtr<String> temp_dir,
+                                       SharedPtr<String> file_dir,
                                        SharedPtr<String> file_name,
                                        SharedPtr<IndexBase> index_base,
                                        SharedPtr<ColumnDef> column_def,
                                        SizeT row_count)
-        : IndexFileWorker(std::move(file_dir), std::move(file_name), index_base, column_def), default_centroid_num_((u32)std::sqrt(row_count)) {}
+        : IndexFileWorker(std::move(data_dir),
+                          std::move(temp_dir),
+                          std::move(file_dir),
+                          std::move(file_name),
+                          std::move(index_base),
+                          std::move(column_def)),
+          default_centroid_num_((u32)std::sqrt(row_count)) {}
 
     virtual ~AnnIVFFlatIndexFileWorker() override;
 

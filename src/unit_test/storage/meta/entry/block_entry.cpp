@@ -73,7 +73,11 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
 
-        auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
+        auto file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(String(GetFullDataDir())),
+                                                         MakeShared<String>(String(GetFullTmpDir())),
+                                                         block_dir,
+                                                         version_file_name,
+                                                         8192);
         auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
 
         {
@@ -92,7 +96,11 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
 
-        auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
+        auto file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(String(GetFullDataDir())),
+                                                         MakeShared<String>(String(GetFullTmpDir())),
+                                                         block_dir,
+                                                         version_file_name,
+                                                         8192);
         auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
 
         {
@@ -116,7 +124,11 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
 
-        auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
+        auto file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(String(GetFullDataDir())),
+                                                         MakeShared<String>(String(GetFullTmpDir())),
+                                                         block_dir,
+                                                         version_file_name,
+                                                         8192);
         auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
 
         {

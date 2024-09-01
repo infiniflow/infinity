@@ -143,11 +143,11 @@ void FileWorker::MoveFile() {
 }
 
 // Get absolute file path. As key of buffer handle.
-String FileWorker::GetFilePath() const { return Path(InfinityContext::instance().config()->DataDir()) / *file_dir_ / *file_name_; }
+String FileWorker::GetFilePath() const { return Path(*data_dir_) / *file_dir_ / *file_name_; }
 
 String FileWorker::ChooseFileDir(bool spill) const {
-    return spill ? (Path(InfinityContext::instance().config()->TempDir()) / *file_dir_)
-                 : (Path(InfinityContext::instance().config()->DataDir()) / *file_dir_);
+    return spill ? (Path(*temp_dir_) / *file_dir_)
+                 : (Path(*data_dir_) / *file_dir_);
 }
 
 void FileWorker::CleanupFile() const {

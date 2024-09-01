@@ -28,6 +28,7 @@ import block_column_entry;
 import buffer_manager;
 import data_file_worker;
 import logger;
+import infinity_context;
 
 namespace infinity {
 
@@ -70,7 +71,9 @@ VectorHeapChunk FixHeapManager::AllocateChunk() {
         return VectorHeapChunk(current_chunk_size_);
     } else {
         // allocate by buffer_mgr, and store returned buffer_obj in `block_column_entry_`
-        auto file_worker = MakeUnique<DataFileWorker>(block_column_entry_->FileDir(),
+        auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                      block_column_entry_->FileDir(),
                                                       block_column_entry_->OutlineFilename(heap_id_, current_chunk_idx_),
                                                       current_chunk_size_);
         auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
@@ -140,7 +143,11 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
     auto *outline_buffer = block_column_entry_->GetOutlineBuffer(heap_id_, chunk_id);
     if (outline_buffer == nullptr) {
         auto filename = block_column_entry_->OutlineFilename(heap_id_, chunk_id);
-        auto file_worker = MakeUnique<DataFileWorker>(block_column_entry_->FileDir(), filename, current_chunk_size_);
+        auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                      block_column_entry_->FileDir(),
+                                                      filename,
+                                                      current_chunk_size_);
         outline_buffer = buffer_mgr_->GetBufferObject(std::move(file_worker));
 
         if (outline_buffer == nullptr) {

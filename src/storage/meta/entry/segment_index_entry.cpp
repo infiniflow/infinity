@@ -206,8 +206,13 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
             auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
             switch (elem_type) {
                 case EmbeddingDataType::kElemFloat: {
-                    file_worker =
-                        MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(index_dir, file_name, index_base, column_def, create_annivfflat_param->row_count_);
+                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                             index_dir,
+                                                                             file_name,
+                                                                             index_base,
+                                                                             column_def,
+                                                                             create_annivfflat_param->row_count_);
                     break;
                 }
                 default: {

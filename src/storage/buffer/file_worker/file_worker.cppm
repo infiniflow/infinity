@@ -31,7 +31,8 @@ export struct FileWorkerSaveCtx {};
 export class FileWorker {
 public:
     // spill_dir_ is not init here
-    explicit FileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name) : file_dir_(std::move(file_dir)), file_name_(std::move(file_name)) {
+    explicit FileWorker(SharedPtr<String> data_dir, SharedPtr<String> temp_dir, SharedPtr<String> file_dir, SharedPtr<String> file_name)
+        : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)) {
         assert(!std::filesystem::path(*file_dir_).is_absolute());
     }
 
@@ -71,6 +72,8 @@ private:
     String ChooseFileDir(bool spill) const;
 
 public:
+    const SharedPtr<String> data_dir_{};
+    const SharedPtr<String> temp_dir_{};
     const SharedPtr<String> file_dir_{};
     const SharedPtr<String> file_name_{};
     ObjAddr obj_addr_{};
