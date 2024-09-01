@@ -40,12 +40,14 @@ import internal_types;
 import data_type;
 
 using namespace infinity;
-class LessFunctionsTest : public BaseTest {};
+class LessFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(LessFunctionsTest, less_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, LessFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(LessFunctionsTest, less_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterLessFunction(catalog_ptr);
 

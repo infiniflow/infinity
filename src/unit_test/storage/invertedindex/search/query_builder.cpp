@@ -144,11 +144,7 @@ auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<RowID> 
 // 3. (((A or B) or C) and not D) and not E -> (A or B or C) and not (D, E)
 // 4. (((A and B) and not C) and D) and not E -> (A and B and D) and not (C, E)
 
-class QueryBuilderTest : public BaseTestParamStr {};
-
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         QueryBuilderTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+class QueryBuilderTest : public BaseTest {};
 
 union FakeQueryBuilder {
     char empty_space[2 * sizeof(QueryBuilder)];
@@ -158,7 +154,7 @@ union FakeQueryBuilder {
 };
 
 // 1. (A and B) and ((C and D) and E) -> A and B and C and D and E
-TEST_P(QueryBuilderTest, test_and) {
+TEST_F(QueryBuilderTest, test_and) {
     // prepare random seed
     std::random_device rd;
     std::mt19937 rng{rd()};
@@ -228,7 +224,7 @@ TEST_P(QueryBuilderTest, test_and) {
 }
 
 // 2. (A or B) or ((C or D) or E) -> A or B or C or D or E
-TEST_P(QueryBuilderTest, test_or) {
+TEST_F(QueryBuilderTest, test_or) {
     // prepare random seed
     std::random_device rd;
     std::mt19937 rng{rd()};
@@ -300,7 +296,7 @@ TEST_P(QueryBuilderTest, test_or) {
 }
 
 // 3. (((A or B) or C) and not D) and not E -> (A or B or C) and not (D, E)
-TEST_P(QueryBuilderTest, test_and_not) {
+TEST_F(QueryBuilderTest, test_and_not) {
     // prepare random seed
     std::random_device rd;
     std::mt19937 rng{rd()};
@@ -382,7 +378,7 @@ TEST_P(QueryBuilderTest, test_and_not) {
 }
 
 // 4. (((A and B) and not C) and D) and not E -> (A and B and D) and not (C, E)
-TEST_P(QueryBuilderTest, test_and_not2) {
+TEST_F(QueryBuilderTest, test_and_not2) {
     // prepare random seed
     std::random_device rd;
     std::mt19937 rng{rd()};

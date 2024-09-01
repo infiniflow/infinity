@@ -37,12 +37,17 @@ import internal_types;
 import logical_type;
 #if 0
 using namespace infinity;
-class FirstFunctionTest : public BaseTest {};
+class FirstFunctionTest : public BaseTestParamStr {};
 
-TEST_F(FirstFunctionTest, first_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         FirstFunctionTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+
+TEST_P(FirstFunctionTest, first_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterFirstFunction(catalog_ptr);
 

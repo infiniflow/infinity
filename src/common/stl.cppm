@@ -217,6 +217,7 @@ export namespace std {
     using std::dynamic_pointer_cast;
 
     namespace filesystem {
+    using std::filesystem::absolute;
     using std::filesystem::canonical;
     using std::filesystem::copy;
     using std::filesystem::copy_file;

@@ -41,12 +41,14 @@ import data_type;
 
 using namespace infinity;
 
-class AddFunctionsTest : public BaseTest {};
+class AddFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(AddFunctionsTest, add_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, AddFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(AddFunctionsTest, add_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterAddFunction(catalog_ptr);
 

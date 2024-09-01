@@ -40,12 +40,14 @@ import internal_types;
 import data_type;
 
 using namespace infinity;
-class GreaterFunctionsTest : public BaseTest {};
+class GreaterFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(GreaterFunctionsTest, greater_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, GreaterFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(GreaterFunctionsTest, greater_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterGreaterFunction(catalog_ptr);
 

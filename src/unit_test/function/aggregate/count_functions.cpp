@@ -38,12 +38,14 @@ import logical_type;
 import data_type;
 
 using namespace infinity;
-class CountFunctionTest : public BaseTest {};
+class CountFunctionTest : public BaseTestParamStr {};
 
-TEST_F(CountFunctionTest, count_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, CountFunctionTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(CountFunctionTest, count_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterCountFunction(catalog_ptr);
 

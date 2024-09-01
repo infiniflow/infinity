@@ -31,7 +31,11 @@ export struct VersionFileWorkerSaveCtx : public FileWorkerSaveCtx {
 
 export class VersionFileWorker : public FileWorker {
 public:
-    explicit VersionFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT capacity);
+    explicit VersionFileWorker(SharedPtr<String> data_dir,
+                               SharedPtr<String> temp_dir,
+                               SharedPtr<String> file_dir,
+                               SharedPtr<String> file_name,
+                               SizeT capacity);
 
     virtual ~VersionFileWorker() override;
 

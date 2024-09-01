@@ -34,46 +34,21 @@ import compilation_config;
 
 using namespace infinity;
 
-class ColumnVectorBoolTest : public BaseTestParamStr {
+class ColumnVectorBoolTest : public BaseTest {
     void SetUp() override {
         using namespace infinity;
 
         LoggerConfig logger_config;
         logger_config.log_level_ = LogLevel::kOff;
         Logger::Initialize(logger_config);
-//        RemoveDbDirs();
-//#ifdef INFINITY_DEBUG
-//        infinity::GlobalResourceUsage::Init();
-//#endif
-//        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
-//        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-//        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-//        std::string config_path_str = GetParam();
-//        std::shared_ptr<std::string> config_path = nullptr;
-//        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-//            config_path = infinity::MakeShared<std::string>(config_path_str);
-//        }
-//        infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
         using namespace infinity;
 
         Logger::Shutdown();
-//        infinity::InfinityContext::instance().UnInit();
-//#ifdef INFINITY_DEBUG
-//        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-//        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-//        infinity::GlobalResourceUsage::UnInit();
-//#endif
-//        BaseTestParamStr::TearDown();
     }
 };
-
-// INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-//                          ColumnVectorBoolTest,
-//                          ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_close_bgtask_silent.toml").c_str(),
-//                                            (std::string(infinity::test_data_path()) + "/config/test_close_bgtask_silent_vfs_off.toml").c_str()));
 
 TEST_F(ColumnVectorBoolTest, flat_boolean) {
     using namespace infinity;
@@ -139,13 +114,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
-    //    EXPECT_EQ(column_vector.data_type(), DataType(LogicalType::kInvalid));
-    //    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kInvalid);
 
-    // ====
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
-    //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kCompactBit), UnrecoverableException);
 

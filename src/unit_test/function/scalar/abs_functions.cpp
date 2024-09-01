@@ -40,12 +40,14 @@ import internal_types;
 import data_type;
 
 using namespace infinity;
-class AbsFunctionsTest : public BaseTest {};
+class AbsFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(AbsFunctionsTest, abs_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, AbsFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(AbsFunctionsTest, abs_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterAbsFunction(catalog_ptr);
 

@@ -40,12 +40,14 @@ import internal_types;
 import data_type;
 
 using namespace infinity;
-class MinusFunctionsTest : public BaseTest {};
+class MinusFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(MinusFunctionsTest, plus_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, MinusFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(MinusFunctionsTest, plus_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterMinusFunction(catalog_ptr);
 

@@ -52,9 +52,8 @@ void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentI
         auto [chunk_index_entries, memory_indexer] = segment_index_entry->GetFullTextIndexSnapshot();
         // segment_readers
         for (u32 i = 0; i < chunk_index_entries.size(); ++i) {
-            String full_dir = (Path(*chunk_index_entries[i]->base_dir_) / index_dir_).string();
             SharedPtr<DiskIndexSegmentReader> segment_reader =
-                MakeShared<DiskIndexSegmentReader>(full_dir, chunk_index_entries[i]->base_name_, chunk_index_entries[i]->base_rowid_, flag);
+                MakeShared<DiskIndexSegmentReader>(index_dir_, chunk_index_entries[i]->base_name_, chunk_index_entries[i]->base_rowid_, flag);
             segment_readers_.push_back(std::move(segment_reader));
         }
         chunk_index_entries_.insert(chunk_index_entries_.end(),

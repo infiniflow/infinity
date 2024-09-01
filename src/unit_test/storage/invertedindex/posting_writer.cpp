@@ -37,13 +37,8 @@ public:
     PostingWriterTest() {}
 
     void SetUp() override {
-        CleanupDbDirs();
+        BaseTestParamStr::SetUp();
         file_ = String(GetFullTmpDir()) + "/posting_writer";
-        config_path_ = GetParam();
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            std::shared_ptr<std::string> config_path = std::make_shared<std::string>(config_path_);
-            infinity::InfinityContext::instance().Init(config_path);
-        }
     }
 
 protected:

@@ -89,10 +89,7 @@ String SegmentIndexEntry::EncodeIndex(const SegmentID segment_id, const TableInd
 }
 
 SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
-    : BaseEntry(EntryType::kSegmentIndex,
-                false,
-                table_index_entry ? table_index_entry->base_dir_ : MakeShared<String>(),
-                SegmentIndexEntry::EncodeIndex(segment_id, table_index_entry)),
+    : BaseEntry(EntryType::kSegmentIndex, false, SegmentIndexEntry::EncodeIndex(segment_id, table_index_entry)),
       table_index_entry_(table_index_entry), segment_id_(segment_id), vector_buffer_(std::move(vector_buffer)) {
     if (table_index_entry != nullptr)
         index_dir_ = table_index_entry->index_dir();
@@ -110,8 +107,7 @@ SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID s
     auto *buffer_mgr = txn->buffer_mgr();
 
     // FIXME: estimate index size.
-    SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *table_index_entry->base_dir_, *table_index_entry->index_dir()));
-    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(full_dir, param, segment_id);
+    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_mgr->AllocateBufferObject(std::move(vector_file_worker[i]));
@@ -143,8 +139,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     String column_name = table_index_entry->index_base()->column_name();
     auto create_index_param =
         SegmentIndexEntry::GetCreateIndexParam(table_index_entry->table_index_def(), segment_row_count, table_entry->GetColumnDefByName(column_name));
-    SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *table_index_entry->base_dir_, *table_index_entry->index_dir()));
-    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(full_dir, create_index_param.get(), segment_id);
+    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), create_index_param.get(), segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
@@ -161,7 +156,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
         LocalFileSystem fs;
         for (ChunkID chunk_id = next_chunk_id;; ++chunk_id) {
             String chunk_file_name = ChunkIndexEntry::IndexFileName(segment_id, chunk_id);
-            String file_path = *table_index_entry->index_dir() + "/" + chunk_file_name;
+            String file_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry->index_dir() / chunk_file_name;
             if (!fs.Exists(file_path)) {
                 break;
             }
@@ -211,8 +206,13 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
             auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
             switch (elem_type) {
                 case EmbeddingDataType::kElemFloat: {
-                    file_worker =
-                        MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(index_dir, file_name, index_base, column_def, create_annivfflat_param->row_count_);
+                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                             index_dir,
+                                                                             file_name,
+                                                                             index_base,
+                                                                             column_def,
+                                                                             create_annivfflat_param->row_count_);
                     break;
                 }
                 default: {
@@ -240,8 +240,7 @@ String SegmentIndexEntry::IndexFileName(SegmentID segment_id) { return fmt::form
 
 UniquePtr<SegmentIndexEntry>
 SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *param) {
-    SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *table_index_entry->base_dir_, *table_index_entry->index_dir()));
-    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(full_dir, param, segment_id);
+    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
@@ -272,7 +271,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 String base_name = fmt::format("ft_{:016x}", begin_row_id.ToUint64());
                 {
                     std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                    String full_path = fmt::format("{}/{}", *table_index_entry_->base_dir_, *table_index_entry_->index_dir());
+                    String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
                     memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, begin_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
                 }
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
@@ -456,7 +455,7 @@ void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id)
     // Init the mem index from previously spilled one.
     assert(memory_indexer_.get() == nullptr);
     const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-    String full_path = fmt::format("{}/{}", *table_index_entry_->base_dir_, *table_index_entry_->index_dir());
+    String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
     memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
     memory_indexer_->Load();
 }
@@ -499,7 +498,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
             String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
-            String full_path = fmt::format("{}/{}", *table_index_entry_->base_dir_, *table_index_entry_->index_dir());
+            String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
             memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
             u64 column_id = column_def->id();
             auto block_entry_iter = BlockEntryIter(segment_entry);
