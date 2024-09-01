@@ -55,13 +55,8 @@ public:
 
     void *GetData() { return data_; }
 
-    void SetBaseTempDir(SharedPtr<String> base_dir, SharedPtr<String> temp_dir) {
-        base_dir_ = std::move(base_dir);
-        temp_dir_ = std::move(temp_dir);
-    }
-
     // Get absolute file path. As key of buffer handle.
-    String GetFilePath() const { return Path(*base_dir_) / *file_dir_ / *file_name_; }
+    String GetFilePath() const;
 
     void CleanupFile() const;
 
@@ -73,7 +68,7 @@ protected:
     virtual void ReadFromFileImpl(SizeT file_size) = 0;
 
 private:
-    String ChooseFileDir(bool spill) const { return spill ? (Path(*temp_dir_) / *file_dir_) : (Path(*base_dir_) / *file_dir_); }
+    String ChooseFileDir(bool spill) const;
 
 public:
     const SharedPtr<String> file_dir_{};
@@ -83,10 +78,5 @@ public:
 protected:
     void *data_{nullptr};
     UniquePtr<FileHandler> file_handler_{nullptr};
-
-private:
-    // following members are not init in constructor
-    SharedPtr<String> base_dir_{};
-    SharedPtr<String> temp_dir_{};
 };
 } // namespace infinity
