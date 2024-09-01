@@ -297,20 +297,25 @@ void ChunkIndexEntry::Cleanup() {
             String posting_file = index_prefix + POSTING_SUFFIX;
             String dict_file = index_prefix + DICT_SUFFIX;
 
+            String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
+            String absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
+
             LocalFileSystem fs;
-            fs.DeleteFile(posting_file);
-            fs.DeleteFile(dict_file);
-            LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}", index_prefix, posting_file, dict_file));
+            fs.DeleteFile(absolute_posting_file);
+            fs.DeleteFile(absolute_dict_file);
+            LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}", index_prefix, absolute_posting_file, absolute_dict_file));
         } else {
             Path path = Path(*index_dir) / base_name_;
             String index_prefix = path.string();
             String posting_file = index_prefix + POSTING_SUFFIX;
             String dict_file = index_prefix + DICT_SUFFIX;
+            String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
+            String absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
 
             LocalFileSystem fs;
-            fs.DeleteFile(posting_file);
-            fs.DeleteFile(dict_file);
-            LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}", index_prefix, posting_file, dict_file));
+            fs.DeleteFile(absolute_posting_file);
+            fs.DeleteFile(absolute_dict_file);
+            LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}", index_prefix, absolute_posting_file, absolute_dict_file));
         }
     } else {
         LOG_DEBUG(fmt::format("Cleaned chunk index entry {}/{}", *index_dir, chunk_id_));

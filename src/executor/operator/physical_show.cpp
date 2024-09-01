@@ -1080,8 +1080,8 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            const String *table_dir = table_index_info->index_entry_dir_.get();
-            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*table_dir));
+            const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
+            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(table_dir));
             Value value = Value::MakeVarchar(index_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
