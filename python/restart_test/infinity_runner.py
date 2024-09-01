@@ -16,7 +16,7 @@ class InfinityRunner:
         self.i = 0
 
     def clear(self):
-        os.system(f"rm -rf {self.data_dir}/*")
+        os.system(f"rm -rf {self.data_dir}/data {self.data_dir}/log {self.data_dir}/persistence {self.data_dir}/tmp {self.data_dir}/wal")
         print(f"clear {self.data_dir}")
 
     def init(self, config_path: str | None = None):

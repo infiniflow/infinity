@@ -63,7 +63,10 @@ jobs:
     
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
-        run : sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && pytest python/restart_test/test_insert.py -k "test_index[infinity_runner0-columns2-indexes2-gen-test/data/config/restart_test/test_insert/1.toml]" -s --infinity_path=cmake-build-release/src/infinity"
+        run : |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pytest python/restart_test/test_insert.py -k "test_data[infinity_runner0-columns5-gen-test/data/config/restart_test/test_insert/1.toml]" -s --infinity_path=cmake-build-release/src/infinity"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pytest python/restart_test/test_insert.py -k "test_data[infinity_runner0-columns2-indexes2-gen-test/data/config/restart_test/test_insert/1.toml]" -s --infinity_path=cmake-build-release/src/infinity"
 
       - name: Collect restart test output
         if: ${{ !cancelled() }} # always run this step even if previous steps failed

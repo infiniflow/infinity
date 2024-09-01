@@ -950,7 +950,10 @@ void AddChunkIndexEntryOp::Merge(CatalogDeltaOperation &other) {
         String error_message = fmt::format("Merge failed, other type: {}", other.GetTypeStr());
         UnrecoverableError(error_message);
     }
-    *this = std::move(static_cast<AddChunkIndexEntryOp &>(other));
+    auto &add_chunk_index_op = static_cast<AddChunkIndexEntryOp &>(other);
+    MergeFlag flag = this->NextDeleteFlag(add_chunk_index_op.merge_flag_);
+    *this = std::move(add_chunk_index_op);
+    this->merge_flag_ = flag;
 }
 
 void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
@@ -1204,6 +1207,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(new_op.get());
             if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
                 add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
+                LOG_DEBUG(fmt::format("Delete chunk: {}", *new_op->encode_));
             }
         }
         const String &encode = *new_op->encode_;
