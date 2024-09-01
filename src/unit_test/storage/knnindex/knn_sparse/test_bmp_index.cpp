@@ -52,7 +52,7 @@ protected:
         const SparseMatrix query_set = SparseTestUtil<DataType, IdxType>::GenerateDataset(query_n, ncol, sparsity, 0.0, 10.0);
         const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<DataType, IdxType>::GenerateGroundtruth(dataset, query_set, topk, false);
 
-        String save_path = String(tmp_data_path()) + "/bmindex_test1.index";
+        String save_path = String(GetFullTmpDir()) + "/bmindex_test1.index";
         LocalFileSystem fs;
 
         auto test_query = [&](const BMPAlg &index) {
@@ -101,14 +101,14 @@ protected:
 
             auto [file_handler, status] = fs.OpenFile(save_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
             if (!status.ok()) {
-                UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
+                UnrecoverableError(fmt::format("Failed to open file for write: {}", save_path));
             }
             index.Save(*file_handler);
         }
         {
             auto [file_handler, status] = fs.OpenFile(save_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
             if (!status.ok()) {
-                UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
+                UnrecoverableError(fmt::format("Failed to open file for read: {}", save_path));
             }
             auto index = BMPAlg::Load(*file_handler);
 

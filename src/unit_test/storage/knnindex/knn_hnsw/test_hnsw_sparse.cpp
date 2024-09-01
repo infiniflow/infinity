@@ -57,10 +57,10 @@ protected:
             hnsw_index->InsertVecs(std::move(iter));
 
             {
-                Path dump_path = Path(tmp_data_path()) / "dump.txt";
+                String dump_path = Path(save_dir_) / "dump.txt";
                 std::fstream ss(dump_path, std::fstream::out);
                 if (!ss.is_open()) {
-                    UnrecoverableError("Failed to open file");
+                    UnrecoverableError(fmt::format("Failed to open file for dump: {}", dump_path));
                 }
                 hnsw_index->Dump(ss);
                 hnsw_index->Check();
