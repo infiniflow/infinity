@@ -41,19 +41,17 @@ export struct DBMeta : public MetaInterface {
     friend struct Catalog;
 
 public:
-    explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> db_name) : db_name_(std::move(db_name)), data_dir_(data_dir) {}
+    explicit DBMeta(SharedPtr<String> db_name) : db_name_(std::move(db_name)) {}
 
-    static UniquePtr<DBMeta> NewDBMeta(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name);
+    static UniquePtr<DBMeta> NewDBMeta(const SharedPtr<String> &db_name);
 
     SharedPtr<String> ToString();
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static UniquePtr<DBMeta> Deserialize(const String &data_dir, const nlohmann::json &db_meta_json, BufferManager *buffer_mgr);
+    static UniquePtr<DBMeta> Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr);
 
     SharedPtr<String> db_name() const { return db_name_; }
-
-    SharedPtr<String> data_dir() const { return data_dir_; }
 
     List<SharedPtr<DBEntry>> GetAllEntries() const {
         return db_entry_list_.GetAllEntries();
@@ -96,7 +94,6 @@ private:
 
 private:
     SharedPtr<String> db_name_{};
-    SharedPtr<String> data_dir_{};
 
 public:
     void Cleanup() override;

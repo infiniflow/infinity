@@ -36,14 +36,7 @@ import internal_types;
 import data_type;
 
 using namespace infinity;
-class ExpressionExecutorSelectTest : public BaseTest {
-    void SetUp() override {
-    }
-
-    void TearDown() override {
-        BaseTest::TearDown();
-    }
-};
+class ExpressionExecutorSelectTest : public BaseTest {};
 
 TEST_F(ExpressionExecutorSelectTest, test1) {
     using namespace infinity;

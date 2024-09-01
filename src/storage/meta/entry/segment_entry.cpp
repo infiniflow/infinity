@@ -43,6 +43,7 @@ import compact_state_data;
 import cleanup_scanner;
 import background_process;
 import wal_entry;
+import infinity_context;
 
 namespace infinity {
 
@@ -70,12 +71,8 @@ SegmentEntry::SegmentEntry(TableEntry *table_entry,
                            SizeT row_capacity,
                            SizeT column_count,
                            SegmentStatus status)
-    : BaseEntry(EntryType::kSegment,
-                false,
-                table_entry ? table_entry->base_dir_ : MakeShared<String>(),
-                SegmentEntry::EncodeIndex(segment_id, table_entry)),
-      table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity), column_count_(column_count),
-      status_(status) {}
+    : BaseEntry(EntryType::kSegment, false, SegmentEntry::EncodeIndex(segment_id, table_entry)), table_entry_(table_entry), segment_dir_(segment_dir),
+      segment_id_(segment_id), row_capacity_(row_capacity), column_count_(column_count), status_(status) {}
 
 SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
@@ -604,7 +601,7 @@ void SegmentEntry::Cleanup() {
         block_entry->Cleanup();
     }
 
-    String full_segment_dir = fmt::format("{}/{}", *base_dir(), *segment_dir_);
+    String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_dir_;
     LOG_DEBUG(fmt::format("Cleaning up segment dir: {}", full_segment_dir));
     CleanupScanner::CleanupDir(full_segment_dir);
     LOG_DEBUG(fmt::format("Cleaned segment dir: {}", full_segment_dir));
@@ -640,8 +637,6 @@ String SegmentEntry::SegmentStatusToString(const SegmentStatus &type) {
             return "Invalid Status";
     }
 }
-
-SharedPtr<String> SegmentEntry::base_dir() const { return table_entry_->base_dir(); }
 
 String SegmentEntry::ToString() const {
     return fmt::format("Segment path: {}, id: {}, row_count: {}, block_count: {}, status: {}", *segment_dir_, segment_id_, row_count_, block_entries_.size(), SegmentStatusToString(status_));

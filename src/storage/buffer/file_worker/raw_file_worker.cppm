@@ -28,7 +28,11 @@ namespace infinity {
 // - The file size is consistant since creation.
 export class RawFileWorker : public FileWorker {
 public:
-    explicit RawFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, u32 file_size);
+    explicit RawFileWorker(SharedPtr<String> data_dir,
+                           SharedPtr<String> temp_dir,
+                           SharedPtr<String> file_dir,
+                           SharedPtr<String> file_name,
+                           u32 file_size);
 
     virtual ~RawFileWorker() override;
 

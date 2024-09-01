@@ -96,13 +96,11 @@ TEST_P(TableMetaTest, name_test) {
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
         auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
-        std::cout << *(table_entry->GetTableMeta()->table_name_ptr()) << std::endl;     
-        std::cout << table_entry->GetTableMeta()->table_name() << std::endl; 
-        std::cout << *(table_entry->GetTableMeta()->base_dir()) << std::endl; 
+        std::cout << *(table_entry->GetTableMeta()->table_name_ptr()) << std::endl;
+        std::cout << table_entry->GetTableMeta()->table_name() << std::endl;
         std::cout << *(table_entry->GetTableMeta()->db_entry_dir()) << std::endl;
         EXPECT_STREQ(table_entry->GetTableMeta()->table_name_ptr()->c_str(), "tbl1");
         EXPECT_STREQ(table_entry->GetTableMeta()->table_name().c_str(), "tbl1");
-        EXPECT_STREQ(table_entry->GetTableMeta()->base_dir()->c_str(), infinity::String(GetFullDataDir()).c_str());
         EXPECT_TRUE(std::regex_match(*(table_entry->GetTableMeta()->db_entry_dir()), 
                     std::regex("(.*)default_db")));
 

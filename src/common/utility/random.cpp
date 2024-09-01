@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <cstdlib>
 
 module random;
@@ -41,6 +42,7 @@ String RandomString(SizeT len) {
 }
 
 SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &name) {
+    assert(std::filesystem::path(parent_dir).is_absolute());
     LocalFileSystem fs;
     String rand, temp, result;
     int cnt = 0;
@@ -51,27 +53,8 @@ SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &
     }
     do {
         rand = RandomString(DEFAULT_RANDOM_NAME_LEN);
-        temp = fmt::format("{}/{}_{}", parent_dir, rand, name);
         result = fmt::format("{}_{}", rand, name);
-        ++cnt;
-    } while (!fs.CreateDirectoryNoExp(temp));
-    LOG_DEBUG(fmt::format("Created directory {} in {} times", temp, cnt));
-    return MakeShared<String>(std::move(temp));
-}
-
-SharedPtr<String> DetermineRandomString(const String &base_dir, const String &parent_dir, const String &name) {
-    LocalFileSystem fs;
-    String rand, temp, result;
-    int cnt = 0;
-    static bool initialized = false;
-    if (!initialized) {
-        initialized = true;
-        srand(std::time(nullptr));
-    }
-    do {
-        rand = RandomString(DEFAULT_RANDOM_NAME_LEN);
-        temp = fmt::format("{}/{}/{}_{}", base_dir, parent_dir, rand, name);
-        result = fmt::format("{}/{}_{}", parent_dir, rand, name);
+        temp = LocalFileSystem::ConcatenateFilePath(parent_dir, result);
         ++cnt;
     } while (!fs.CreateDirectoryNoExp(temp));
     LOG_DEBUG(fmt::format("Created directory {} in {} times", temp, cnt));

@@ -40,12 +40,14 @@ import internal_types;
 import data_type;
 
 using namespace infinity;
-class NotFunctionsTest : public BaseTest {};
+class NotFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(NotFunctionsTest, not_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, NotFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(NotFunctionsTest, not_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterNotFunction(catalog_ptr);
 

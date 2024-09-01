@@ -59,6 +59,12 @@ import persistence_manager;
 
 namespace infinity {
 
+SharedPtr<String> TableEntry::DetermineTableDir(const String &parent_dir, const String &table_name) {
+    auto abs_parent_dir = Path(InfinityContext::instance().config()->DataDir()) / parent_dir;
+    SharedPtr<String> temp_dir = DetermineRandomString(abs_parent_dir, fmt::format("table_{}", table_name));
+    return MakeShared<String>(Path(parent_dir) / *temp_dir);
+}
+
 Vector<std::string_view> TableEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
@@ -78,7 +84,6 @@ String TableEntry::EncodeIndex(const String &table_name, TableMeta *table_meta) 
 }
 
 TableEntry::TableEntry(bool is_delete,
-                       const SharedPtr<String> &base_dir,
                        const SharedPtr<String> &table_entry_dir,
                        SharedPtr<String> table_name,
                        const Vector<SharedPtr<ColumnDef>> &columns,
@@ -88,9 +93,9 @@ TableEntry::TableEntry(bool is_delete,
                        TxnTimeStamp begin_ts,
                        SegmentID unsealed_id,
                        SegmentID next_segment_id)
-    : BaseEntry(EntryType::kTable, is_delete, table_meta ? base_dir : MakeShared<String>(), TableEntry::EncodeIndex(*table_name, table_meta)),
-      table_meta_(table_meta), table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns),
-      table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
+    : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
+      table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type),
+      unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
@@ -107,7 +112,6 @@ TableEntry::TableEntry(bool is_delete,
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
-                                                const SharedPtr<String> &base_dir,
                                                 const SharedPtr<String> &db_entry_dir,
                                                 SharedPtr<String> table_name,
                                                 const Vector<SharedPtr<ColumnDef>> &columns,
@@ -119,10 +123,9 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
     if (is_delete) {
         table_entry_dir = MakeShared<String>("deleted");
     } else {
-        table_entry_dir = TableEntry::DetermineTableDir(*base_dir, *db_entry_dir, *table_name);
+        table_entry_dir = TableEntry::DetermineTableDir(*db_entry_dir, *table_name);
     }
     return MakeShared<TableEntry>(is_delete,
-                                  std::move(base_dir),
                                   std::move(table_entry_dir),
                                   std::move(table_name),
                                   columns,
@@ -136,7 +139,6 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
 
 SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
                                                    TableMeta *table_meta,
-                                                   SharedPtr<String> base_dir,
                                                    SharedPtr<String> table_entry_dir,
                                                    SharedPtr<String> table_name,
                                                    const Vector<SharedPtr<ColumnDef>> &column_defs,
@@ -148,7 +150,6 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
                                                    SegmentID unsealed_id,
                                                    SegmentID next_segment_id) noexcept {
     auto table_entry = MakeShared<TableEntry>(is_delete,
-                                              std::move(base_dir),
                                               std::move(table_entry_dir),
                                               std::move(table_name),
                                               column_defs,
@@ -897,8 +898,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
                     msg += " -> " + dst_base_name;
                     LOG_INFO(msg);
-                    Path full_path = Path(*base_dir()) / *table_index_entry->index_dir_;
-                    ColumnIndexMerger column_index_merger(std::move(full_path), index_fulltext->flag_);
+                    ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_, index_fulltext->flag_);
                     column_index_merger.Merge(base_names, base_rowids, dst_base_name);
 
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
@@ -1122,17 +1122,8 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     SegmentID unsealed_id = table_entry_json["unsealed_id"];
     SegmentID next_segment_id = table_entry_json["next_segment_id"];
 
-    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted,
-                                                               table_meta->base_dir(),
-                                                               table_entry_dir,
-                                                               table_name,
-                                                               columns,
-                                                               table_entry_type,
-                                                               table_meta,
-                                                               txn_id,
-                                                               begin_ts,
-                                                               unsealed_id,
-                                                               next_segment_id);
+    UniquePtr<TableEntry> table_entry = MakeUnique<
+        TableEntry>(deleted, table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts, unsealed_id, next_segment_id);
     table_entry->row_count_ = row_count;
 
     if (table_entry_json.contains("segments")) {
@@ -1258,7 +1249,7 @@ void TableEntry::Cleanup() {
     }
     index_meta_map_.Cleanup();
 
-    String full_table_dir = fmt::format("{}/{}", *base_dir_, *table_entry_dir_);
+    String full_table_dir = Path(InfinityContext::instance().config()->DataDir()) / *table_entry_dir_;
     LOG_DEBUG(fmt::format("Cleaning up dir: {}", full_table_dir));
     CleanupScanner::CleanupDir(full_table_dir);
     LOG_DEBUG(fmt::format("Cleaned dir: {}", full_table_dir));

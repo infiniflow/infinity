@@ -24,6 +24,7 @@ import third_party;
 import infinity_exception;
 import logger;
 import default_values;
+import infinity_context;
 
 namespace infinity {
 
@@ -91,7 +92,7 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &c
 
 Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::ParseCheckpointFilenames(const String &catalog_dir) {
     LocalFileSystem fs;
-    const auto &entries = fs.ListDirectory(catalog_dir);
+    const auto &entries = fs.ListDirectory(Path(InfinityContext::instance().config()->DataDir()) / catalog_dir);
     if (entries.empty()) {
         return {Vector<FullCatalogFileInfo>{}, Vector<DeltaCatalogFileInfo>{}};
     }

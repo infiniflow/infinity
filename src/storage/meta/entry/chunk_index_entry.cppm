@@ -126,11 +126,7 @@ public:
 
     BufferObj *GetBufferObj() { return buffer_obj_; }
 
-    void DeprecateChunk(TxnTimeStamp commit_ts) {
-        assert(commit_ts_.load() < commit_ts);
-        deprecate_ts_.store(commit_ts);
-        ResetOptimizing();
-    }
+    void DeprecateChunk(TxnTimeStamp commit_ts);
 
     bool CheckVisible(Txn *txn) const override;
 

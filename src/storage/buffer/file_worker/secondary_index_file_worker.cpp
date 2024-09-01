@@ -87,13 +87,21 @@ void SecondaryIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
     }
 }
 
-SecondaryIndexFileWorkerParts::SecondaryIndexFileWorkerParts(SharedPtr<String> file_dir,
+SecondaryIndexFileWorkerParts::SecondaryIndexFileWorkerParts(SharedPtr<String> data_dir,
+                                                             SharedPtr<String> temp_dir,
+                                                             SharedPtr<String> file_dir,
                                                              SharedPtr<String> file_name,
                                                              SharedPtr<IndexBase> index_base,
                                                              SharedPtr<ColumnDef> column_def,
                                                              u32 row_count,
                                                              u32 part_id)
-    : IndexFileWorker(file_dir, file_name, index_base, column_def), row_count_(row_count), part_id_(part_id) {
+    : IndexFileWorker(std::move(data_dir),
+                      std::move(temp_dir),
+                      std::move(file_dir),
+                      std::move(file_name),
+                      std::move(index_base),
+                      column_def),
+      row_count_(row_count), part_id_(part_id) {
     data_pair_size_ = GetSecondaryIndexDataPairSize(column_def_->type());
 }
 

@@ -28,7 +28,9 @@ namespace infinity {
 
 export class BMPIndexFileWorker final : public IndexFileWorker {
 public:
-    explicit BMPIndexFileWorker(SharedPtr<String> file_dir,
+    explicit BMPIndexFileWorker(SharedPtr<String> data_dir,
+                                SharedPtr<String> temp_dir,
+                                SharedPtr<String> file_dir,
                                 SharedPtr<String> file_name,
                                 SharedPtr<IndexBase> index_base,
                                 SharedPtr<ColumnDef> column_def,

@@ -1,11 +1,12 @@
 module;
 
+#include <cassert>
+#include <cstring>
 #include <fcntl.h>
 #include <filesystem>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <cstring>
 
 import stl;
 import infinity_exception;
@@ -24,6 +25,7 @@ export int MmapFile(const String &fp,
                                   | MADV_DONTDUMP
 #endif
                                   )) {
+    assert(std::filesystem::path(fp).is_absolute());
     data_ptr = nullptr;
     data_len = 0;
     long len_f = fs::file_size(fp);
@@ -113,6 +115,7 @@ export struct MmapReader {
 #endif
                                    ),
                      SizeT offset = 0) {
+        assert(std::filesystem::path(fp).is_absolute());
         data_ptr = nullptr;
         long len_f = fs::file_size(fp);
         if (len_f == 0) {

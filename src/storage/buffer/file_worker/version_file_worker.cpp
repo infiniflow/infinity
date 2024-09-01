@@ -25,8 +25,12 @@ import third_party;
 
 namespace infinity {
 
-VersionFileWorker::VersionFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT capacity)
-    : FileWorker(std::move(file_dir), std::move(file_name)), capacity_(capacity) {}
+VersionFileWorker::VersionFileWorker(SharedPtr<String> data_dir,
+                                     SharedPtr<String> temp_dir,
+                                     SharedPtr<String> file_dir,
+                                     SharedPtr<String> file_name,
+                                     SizeT capacity)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), capacity_(capacity) {}
 
 VersionFileWorker::~VersionFileWorker() {
     if (data_ != nullptr) {
@@ -68,7 +72,7 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
     }
     auto *data = static_cast<BlockVersion *>(data_);
     TxnTimeStamp latest_change_ts = data->latest_change_ts();
-    
+
     if (to_spill) {
         data->SpillToFile(*file_handler_);
         return true;

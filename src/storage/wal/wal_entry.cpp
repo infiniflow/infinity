@@ -15,7 +15,6 @@
 module;
 
 #include <cassert>
-#include <fstream>
 #include <vector>
 
 module wal_entry;
@@ -55,11 +54,15 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
         Vector<String> paths = column->FilePaths();
         paths_.insert(paths_.end(), paths.begin(), paths.end());
     }
-    String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
-    String version_file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
+    String version_file_path = fmt::format("{}/{}", *block_entry->block_dir(), *BlockVersion::FileName());
     paths_.push_back(version_file_path);
     auto *pm = InfinityContext::instance().persistence_manager();
     addr_serializer_.Initialize(pm, paths_);
+#ifdef INFINITY_DEBUG
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
+#endif
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
@@ -81,6 +84,11 @@ i32 WalBlockInfo::GetSizeInBytes() const {
 }
 
 void WalBlockInfo::WriteBufferAdv(char *&buf) const {
+#ifdef INFINITY_DEBUG
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
+#endif
     WriteBufAdv(buf, block_id_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, row_capacity_);
@@ -202,20 +210,19 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
     IndexType index_type = segment_index_entry->table_index_entry()->index_base()->index_type_;
     switch (index_type) {
         case IndexType::kFullText: {
-            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-            paths_.push_back(full_dir + "/" + chunk_index_entry->base_name_ + POSTING_SUFFIX);
-            paths_.push_back(full_dir + "/" + chunk_index_entry->base_name_ + DICT_SUFFIX);
-            paths_.push_back(full_dir + "/" + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            Path rela_dir = *(segment_index_entry->index_dir());
+            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + POSTING_SUFFIX));
+            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + DICT_SUFFIX));
+            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + LENGTH_SUFFIX));
             break;
         }
         case IndexType::kHnsw:
         case IndexType::kEMVB:
         case IndexType::kSecondary:
         case IndexType::kBMP: {
-            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
             String file_name = ChunkIndexEntry::IndexFileName(segment_index_entry->segment_id(), chunk_index_entry->chunk_id_);
-            String full_path = fmt::format("{}/{}", full_dir, file_name);
-            paths_.push_back(full_path);
+            String file_path = Path(*(segment_index_entry->index_dir())) / file_name;
+            paths_.push_back(file_path);
             break;
         }
         default: {
@@ -244,6 +251,11 @@ i32 WalChunkIndexInfo::GetSizeInBytes() const {
 }
 
 void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
+#ifdef INFINITY_DEBUG
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
+#endif
     WriteBufAdv(buf, chunk_id_);
     WriteBufAdv(buf, base_name_);
     WriteBufAdv(buf, base_rowid_);
@@ -661,6 +673,7 @@ i32 WalCmdDumpIndex::GetSizeInBytes() const {
 }
 
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
+    assert(!std::filesystem::path(db_dir_tail_).is_absolute());
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_dir_tail_);
@@ -754,6 +767,7 @@ void WalCmdUpdateSegmentBloomFilterData::WriteAdv(char *&buf) const {
 }
 
 void WalCmdCheckpoint::WriteAdv(char *&buf) const {
+    assert(!std::filesystem::path(catalog_path_).is_absolute());
     WriteBufAdv(buf, WalCommandType::CHECKPOINT);
     WriteBufAdv(buf, this->max_commit_ts_);
     WriteBufAdv(buf, i8(this->is_full_checkpoint_));

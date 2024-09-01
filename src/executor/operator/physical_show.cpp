@@ -76,6 +76,7 @@ import catalog_delta_entry;
 import memindex_tracer;
 import persistence_manager;
 import global_resource_usage;
+import infinity_context;
 
 namespace infinity {
 
@@ -1079,8 +1080,8 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            const String *table_dir = table_index_info->index_entry_dir_.get();
-            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*table_dir));
+            const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
+            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(table_dir));
             Value value = Value::MakeVarchar(index_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1156,7 +1157,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         }
     }
 
-    String full_segment_index_dir = fmt::format("{}/{}", *segment_index_entry->base_dir(), *segment_index_entry->index_dir());
+    String full_segment_index_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_index_entry->index_dir();
     {
         SizeT column_id = 0;
         {
@@ -1902,7 +1903,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            String full_segment_dir = fmt::format("{}/{}", *segment_entry->base_dir(), *segment_entry->segment_dir());
+            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
             const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_segment_dir));
             Value value = Value::MakeVarchar(seg_size);
             ValueExpression value_expr(value);
@@ -1974,7 +1975,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            String full_segment_dir = fmt::format("{}/{}", *segment_entry->base_dir(), *segment_entry->segment_dir());
+            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
             const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_segment_dir));
             Value value = Value::MakeVarchar(seg_size);
             ValueExpression value_expr(value);
@@ -2077,7 +2078,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            String full_block_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
+            String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
             const auto &blk_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_block_dir));
             Value value = Value::MakeVarchar(blk_size);
             ValueExpression value_expr(value);
@@ -2144,7 +2145,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
     }
 
-    String full_block_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
+    String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
     ++column_id;
     {
         Value value = Value::MakeVarchar(full_block_dir);

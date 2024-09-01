@@ -68,6 +68,7 @@ class TestInsert:
                     print("shutdown infinity")
                     shutdown_time += 1
                     return
+                print(f"cur_insert_n: {cur_insert_n}")
                 time.sleep(0.1)
 
         while not gen_finished:
@@ -118,6 +119,10 @@ class TestInsert:
                 SiftGenerator.gen_factory(
                     "test/data/benchmark/sift_1m/sift_base.fvecs"
                 ),
+            ),
+            (
+                LChYDataGenerato.columns(),
+                LChYDataGenerato.gen_factory("test/data/jsonl/test_table.jsonl"),
             ),
         ],
     )
