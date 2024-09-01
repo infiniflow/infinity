@@ -79,6 +79,8 @@ protected:
         }
     }
 
+    void CleanupDataDir() { CleanupDirectory(GetFullDataDir()); }
+
     void CleanupTmpDir() { CleanupDirectory(GetFullTmpDir()); }
 
     void RemoveDbDirs() {

@@ -40,9 +40,12 @@ private:
     Vector<SharedPtr<DirEntry>> ListAllFile(const String &path) {
         Vector<SharedPtr<DirEntry>> res;
         std::function<void(const String &)> f = [&](const String &path) {
+            Path catalog_path = Path(path) / "catalog"; // The catalog directory is not under control of BufferManager.
             auto entries = fs.ListDirectory(path);
             for (auto &entry : entries) {
                 if (entry->is_directory()) {
+                    if (entry->path() == catalog_path)
+                        continue;
                     f(entry->path());
                 } else {
                     res.push_back(entry);
@@ -62,29 +65,21 @@ protected:
     SharedPtr<String> temp_dir_;
 
     void SetUp() override {
-        Config config;
-        config.Init(nullptr, nullptr);
-        // config.SetLogToStdout(true);
-
-        Logger::Initialize(&config);
-
-        data_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/data");
-        temp_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/temp");
-        ResetDir();
+        CleanupDbDirs();
+        InfinityContext::instance().Init(MakeShared<String>(VFS_OFF_CONFIG_PATH));
+        data_dir_ = MakeShared<String>(InfinityContext::instance().config()->DataDir());
+        temp_dir_ = MakeShared<String>(InfinityContext::instance().config()->TempDir());
     }
 
     void ResetDir() {
-        fs.DeleteDirectory(*data_dir_);
-        fs.DeleteDirectory(*temp_dir_);
-        fs.CreateDirectory(*data_dir_);
-        fs.CreateDirectory(*temp_dir_);
+        CleanupDataDir();
+        CleanupTmpDir();
     }
 
     void TearDown() override {
-        fs.DeleteDirectory(*data_dir_);
-        fs.DeleteDirectory(*temp_dir_);
-
-        Logger::Shutdown();
+        InfinityContext::instance().UnInit();
+        CleanupDataDir();
+        CleanupTmpDir();
     }
 };
 
