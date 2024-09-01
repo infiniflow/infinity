@@ -428,7 +428,10 @@ String LocalFileSystem::ConcatenateFilePath(const String &dir_path, const String
 }
 
 int LocalFileSystem::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len) {
-    assert(std::filesystem::path(file_path).is_absolute());
+    if (!std::filesystem::path(file_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", file_path);
+        UnrecoverableError(error_message);
+    }
     data_ptr = nullptr;
     data_len = 0;
     std::lock_guard<std::mutex> lock(mtx_);
