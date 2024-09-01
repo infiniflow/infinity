@@ -60,8 +60,8 @@ public:
         temp_dir_ = std::move(temp_dir);
     }
 
-    // Get file path. As key of buffer handle.
-    String GetFilePath() const { return fmt::format("{}/{}", *file_dir_, *file_name_); }
+    // Get absolute file path. As key of buffer handle.
+    String GetFilePath() const { return Path(*base_dir_) / *file_dir_ / *file_name_; }
 
     void CleanupFile() const;
 

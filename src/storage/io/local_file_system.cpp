@@ -55,7 +55,10 @@ LocalFileHandler::~LocalFileHandler() {
 }
 
 Pair<UniquePtr<FileHandler>, Status> LocalFileSystem::OpenFile(const String &path, u8 flags, FileLockType lock_type) {
-    assert(std::filesystem::path(path).is_absolute());
+    if (!std::filesystem::path(path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", path);
+        UnrecoverableError(error_message);
+    }
     i32 file_flags{O_RDWR};
     bool read_flag = flags & FileFlags::READ_FLAG;
     bool write_flag = flags & FileFlags::WRITE_FLAG;
@@ -124,8 +127,14 @@ void LocalFileSystem::Close(FileHandler &file_handler) {
 }
 
 void LocalFileSystem::Rename(const String &old_path, const String &new_path) {
-    assert(std::filesystem::path(old_path).is_absolute());
-    assert(std::filesystem::path(new_path).is_absolute());
+    if (!std::filesystem::path(old_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", old_path);
+        UnrecoverableError(error_message);
+    }
+    if (!std::filesystem::path(new_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", new_path);
+        UnrecoverableError(error_message);
+    }
     if (rename(old_path.c_str(), new_path.c_str()) != 0) {
         String error_message = fmt::format("Can't rename file: {}, {}", old_path, strerror(errno));
         UnrecoverableError(error_message);
@@ -213,7 +222,10 @@ SizeT LocalFileSystem::GetFileSize(FileHandler &file_handler) {
 }
 
 void LocalFileSystem::DeleteFile(const String &file_name) {
-    assert(std::filesystem::path(file_name).is_absolute());
+    if (!std::filesystem::path(file_name).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", file_name);
+        UnrecoverableError(error_message);
+    }
     std::error_code error_code;
     Path p{file_name};
     bool is_deleted = std::filesystem::remove(p, error_code);
@@ -236,8 +248,14 @@ void LocalFileSystem::SyncFile(FileHandler &file_handler) {
 }
 
 void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path) {
-    assert(std::filesystem::path(dst_path).is_absolute());
-    assert(std::filesystem::path(src_path).is_absolute());
+    if (!std::filesystem::path(dst_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", dst_path);
+        UnrecoverableError(error_message);
+    }
+    if (!std::filesystem::path(src_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", src_path);
+        UnrecoverableError(error_message);
+    }
     Path dst{dst_path};
     Path src{src_path};
     std::ifstream srcFile(src, std::ios::binary);
@@ -262,7 +280,10 @@ void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path)
 }
 
 void LocalFileSystem::Truncate(const String &file_name, SizeT length) {
-    assert(std::filesystem::path(file_name).is_absolute());
+    if (!std::filesystem::path(file_name).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", file_name);
+        UnrecoverableError(error_message);
+    }
     std::error_code error_code;
     std::filesystem::resize_file(file_name, length, error_code);
     if (error_code.value() != 0) {
