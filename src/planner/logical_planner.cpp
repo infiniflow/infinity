@@ -246,13 +246,18 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     }
 
     for (SizeT idx = 0; idx < value_count; ++idx) {
-        const auto *parsed_expr_list = statement->values_->at(idx);
-
+        const auto *parsed_expr_list = (*(statement->values_))[idx];
+        if (parsed_expr_list == nullptr) {
+            RecoverableError(Status::SyntaxError("INSERT: Input value list is empty."));
+        }
         SizeT expr_count = parsed_expr_list->size();
         Vector<SharedPtr<BaseExpression>> value_list;
         value_list.reserve(expr_count);
         for (SizeT expr_idx = 0; expr_idx < expr_count; ++expr_idx) {
-            const auto *parsed_expr = parsed_expr_list->at(expr_idx);
+            const auto *parsed_expr = (*parsed_expr_list)[expr_idx];
+            if (parsed_expr == nullptr) {
+                RecoverableError(Status::SyntaxError("INSERT: Input value count mismatch across rows."));
+            }
             SharedPtr<BaseExpression> value_expr =
                 bind_context_ptr->expression_binder_->BuildExpression(*parsed_expr, bind_context_ptr.get(), 0, true);
             value_list.emplace_back(value_expr);

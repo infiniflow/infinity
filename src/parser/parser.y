@@ -2309,6 +2309,12 @@ expr_array_list : '(' expr_array ')' {
             delete (arr_ptr);
         }
         delete $1;
+        $1 = nullptr;
+        for (auto ptr : *$4) {
+            delete ptr;
+        }
+        delete $4;
+        $4 = nullptr;
         YYERROR;
     }
     $1->push_back($4);
