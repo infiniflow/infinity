@@ -30,9 +30,7 @@ curl --request POST \
      --url http://localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data ' {
-       "create_option": "ignore_if_exists"
-       } ' 
+     --data ' {"create_option": "ignore_if_exists"} '
 ```
 
 #### Request parameters
@@ -1248,6 +1246,7 @@ curl --request PUT \
   - `csv`
   - `json`
   - `jsonl`
+  - `parquet`
 - `"header"`: (*Body parameter*), `boolean`, *Optional*  
   Whether to display table header or not. Works with **.csv** files only:
   - `True`: Display table header.
@@ -1350,7 +1349,8 @@ curl --request GET \
   The type of the file for export. Supported file types include:
   - `csv`
   - `jsonl`
-- `"header"`: (*Body parameter*), `boolean`, *Optional*  
+  - `parquet`
+- `"header"`: (*Body parameter*), `boolean`, *Optional*
   Whether to display table header or not. Works with **.csv** files only:
   - `True`: Display table header.
   - `False`: (Default) Do not display table header.

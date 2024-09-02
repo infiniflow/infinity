@@ -2710,24 +2710,68 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
     }
 
-    {
+    if (InfinityContext::instance().persistence_manager() != nullptr) {
         {
-            // option name
-            Value value = Value::MakeVarchar(DATA_DIR_OPTION_NAME);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            {
+                // option name
+                Value value = Value::MakeVarchar(PERSISTENCE_DIR_OPTION_NAME);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar(global_config->PersistenceDir());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar("Virtual filesystem directory");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            }
         }
+
         {
-            // option name type
-            Value value = Value::MakeVarchar(global_config->DataDir());
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            {
+                // option name
+                Value value = Value::MakeVarchar(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar(std::to_string(global_config->PersistenceObjectSizeLimit()));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar("Virtual file limitation");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            }
         }
+    } else {
         {
-            // option name type
-            Value value = Value::MakeVarchar("Data directory");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            {
+                // option name
+                Value value = Value::MakeVarchar(DATA_DIR_OPTION_NAME);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar(global_config->DataDir());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar("Data directory");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            }
         }
     }
 
