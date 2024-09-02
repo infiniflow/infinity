@@ -1,23 +1,23 @@
 [C7.9.2009-base]
 name=CentOS-7.9.2009 - Base
-baseurl=http://mirrors.aliyun.com/centos-vault/7.9.2009/os/$basearch/
+baseurl=http://mirrors.tuna.tsinghua.edu.cn/centos-vault/7.9.2009/os/$basearch/
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
 
 [C7.9.2009-updates]
 name=CentOS-7.9.2009 - Updates
-baseurl=http://mirrors.aliyun.com/centos-vault/7.9.2009/updates/$basearch/
+baseurl=http://mirrors.tuna.tsinghua.edu.cn/centos-vault/7.9.2009/updates/$basearch/
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
 
 [C7.9.2009-extras]
 name=CentOS-7.9.2009 - Extras
-baseurl=http://mirrors.aliyun.com/centos-vault/7.9.2009/extras/$basearch/
+baseurl=http://mirrors.tuna.tsinghua.edu.cn/centos-vault/7.9.2009/extras/$basearch/
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
 
 [C7.9.2009-centosplus]
 name=CentOS-7.9.2009 - Plus
-baseurl=http://mirrors.aliyun.com/centos-vault/7.9.2009/centosplus/$basearch/
+baseurl=http://mirrors.tuna.tsinghua.edu.cn/centos-vault/7.9.2009/centosplus/$basearch/
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
