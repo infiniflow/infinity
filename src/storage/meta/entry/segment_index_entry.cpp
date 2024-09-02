@@ -143,7 +143,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
-    };
+    }
     auto segment_index_entry = SharedPtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
     if (segment_index_entry.get() == nullptr) {
         String error_message = "Failed to load index entry";
@@ -152,17 +152,6 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     segment_index_entry->min_ts_ = min_ts;
     segment_index_entry->max_ts_ = max_ts;
     segment_index_entry->next_chunk_id_ = next_chunk_id;
-    {
-        LocalFileSystem fs;
-        for (ChunkID chunk_id = next_chunk_id;; ++chunk_id) {
-            String chunk_file_name = ChunkIndexEntry::IndexFileName(segment_id, chunk_id);
-            String file_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry->index_dir() / chunk_file_name;
-            if (!fs.Exists(file_path)) {
-                break;
-            }
-            fs.DeleteFile(file_path);
-        }
-    }
     segment_index_entry->commit_ts_.store(commit_ts);
     segment_index_entry->buffer_manager_ = buffer_manager;
     return segment_index_entry;
