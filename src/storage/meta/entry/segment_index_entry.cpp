@@ -152,17 +152,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     segment_index_entry->min_ts_ = min_ts;
     segment_index_entry->max_ts_ = max_ts;
     segment_index_entry->next_chunk_id_ = next_chunk_id;
-    {
-        LocalFileSystem fs;
-        for (ChunkID chunk_id = next_chunk_id;; ++chunk_id) {
-            String chunk_file_name = ChunkIndexEntry::IndexFileName(segment_id, chunk_id);
-            String file_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry->index_dir() / chunk_file_name;
-            if (!fs.Exists(file_path)) {
-                break;
-            }
-            fs.DeleteFile(file_path);
-        }
-    }
+
     segment_index_entry->commit_ts_.store(commit_ts);
     segment_index_entry->buffer_manager_ = buffer_manager;
     return segment_index_entry;

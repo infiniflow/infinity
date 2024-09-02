@@ -40,6 +40,7 @@ import memindex_tracer;
 import segment_entry;
 import table_index_entry;
 import base_memindex;
+import segment_index_entry;
 
 namespace infinity {
 
@@ -180,6 +181,32 @@ void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
     }
 }
 
+void CompactionProcessor::DoDumpByline(DumpIndexBylineTask *dump_task) {
+    String msg = fmt::format("Dump index by line, table name: {}, index name: {}", *dump_task->table_name_, *dump_task->index_name_);
+    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>(msg));
+    try {
+        auto [table_index_entry, status] = txn->GetIndexByName(*dump_task->db_name_, *dump_task->table_name_, *dump_task->index_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+        TxnTableStore *txn_table_store = txn->GetTxnTableStore(table_entry);
+        txn_table_store->AddChunkIndexStore(table_index_entry, dump_task->dumped_chunk_.get());
+
+        SharedPtr<SegmentIndexEntry> segment_index_entry;
+        bool created = table_index_entry->GetOrCreateSegment(dump_task->segment_id_, txn, segment_index_entry);
+        if (created) {
+            UnrecoverableError(fmt::format("DumpByline: Cannot find segment index entry with id: {}", dump_task->segment_id_));
+        }
+        segment_index_entry->AddWalIndexDump(dump_task->dumped_chunk_.get(), txn);
+
+        txn_mgr_->CommitTxn(txn);
+    } catch (const RecoverableException &e) {
+        txn_mgr_->RollBackTxn(txn);
+        LOG_WARN(fmt::format("Rollback {}", msg));
+    }
+}
+
 void CompactionProcessor::Process() {
     bool running = true;
     while (running) {
@@ -208,6 +235,13 @@ void CompactionProcessor::Process() {
                     LOG_DEBUG(dump_task->ToString());
                     DoDump(dump_task);
                     LOG_DEBUG("Dump index done.");
+                    break;
+                }
+                case BGTaskType::kDumpIndexByline: {
+                    auto dump_task = static_cast<DumpIndexBylineTask *>(bg_task.get());
+                    LOG_DEBUG(dump_task->ToString());
+                    DoDumpByline(dump_task);
+                    LOG_DEBUG("Dump index byline done.");
                     break;
                 }
                 default: {
