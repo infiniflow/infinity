@@ -32,7 +32,7 @@ readme = "README.md"
 [tool.scikit-build]
 minimum-version = "0.4"
 cmake.targets = ["embedded_infinity_ext"]
-cmake.build-type = "RelWithDebInfo"
+cmake.build-type = "Release"
 build-dir = "build/{build_type}"
 
 wheel.py-api = "cp310"
