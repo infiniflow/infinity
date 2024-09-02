@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from infinity.errors import ErrorCode as PyErrorCode
-from infinity.common import LOCAL_INFINITY_PATH
-from infinity.embedded_infinity_ext import *
+from infinity_embedded.errors import ErrorCode as PyErrorCode
+from infinity_embedded.common import LOCAL_INFINITY_PATH
+from infinity_embedded.embedded_infinity_ext import *
 
 
 class LocalQueryResult:

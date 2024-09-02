@@ -19,11 +19,11 @@ import pandas as pd
 import polars as pl
 import sqlglot.expressions as exp
 import numpy as np
-from infinity.errors import ErrorCode
-from infinity.common import InfinityException, SparseVector
-from infinity.local_infinity.types import build_result, logic_type_to_dtype
-from infinity.utils import binary_exp_to_paser_exp
-from infinity.embedded_infinity_ext import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapSearchExpr, WrapConstantExpr, ParsedExprType, LiteralType
+from infinity_embedded.errors import ErrorCode
+from infinity_embedded.common import InfinityException, SparseVector
+from infinity_embedded.local_infinity.types import build_result, logic_type_to_dtype
+from infinity_embedded.utils import binary_exp_to_paser_exp
+from infinity_embedded.embedded_infinity_ext import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapSearchExpr, WrapConstantExpr, ParsedExprType, LiteralType
 
 
 def traverse_conditions(cons, fn=None):

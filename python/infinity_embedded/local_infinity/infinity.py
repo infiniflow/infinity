@@ -1,12 +1,12 @@
 import os
-from infinity import InfinityConnection
+from infinity_embedded import InfinityConnection
 from abc import ABC
-from infinity.common import ConflictType, LOCAL_INFINITY_PATH, InfinityException
-from infinity.local_infinity.client import LocalInfinityClient
-from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
-from infinity.errors import ErrorCode
-from infinity.local_infinity.db import LocalDatabase
-from infinity.remote_thrift.utils import name_validity_check
+from infinity_embedded.common import ConflictType, LOCAL_INFINITY_PATH, InfinityException
+from infinity_embedded.local_infinity.client import LocalInfinityClient
+from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflictType
+from infinity_embedded.errors import ErrorCode
+from infinity_embedded.local_infinity.db import LocalDatabase
+from infinity_embedded.local_infinity.utils import name_validity_check
 import logging
 
 

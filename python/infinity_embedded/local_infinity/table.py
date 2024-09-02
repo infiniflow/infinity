@@ -17,22 +17,21 @@ from abc import ABC
 from typing import Optional, Union, List, Any
 
 import numpy as np
-from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
-from infinity.embedded_infinity_ext import WrapIndexInfo, ImportOptions, CopyFileType, WrapParsedExpr, \
+from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflictType
+from infinity_embedded.embedded_infinity_ext import WrapIndexInfo, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions
-from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
-from infinity.common import INSERT_DATA, VEC, SparseVector, InfinityException
-from infinity.errors import ErrorCode
-from infinity.index import IndexInfo
-from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
-from infinity.local_infinity.types import build_result
-from infinity.local_infinity.utils import traverse_conditions, select_res_to_polars
-from infinity.local_infinity.utils import get_local_constant_expr_from_python_value
-from infinity.remote_thrift.utils import name_validity_check
-from infinity.table import Table, ExplainType
-import infinity.index as index
-from infinity.index import InitParameter
-from infinity.utils import deprecated_api
+from infinity_embedded.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
+from infinity_embedded.common import INSERT_DATA, VEC, SparseVector, InfinityException
+from infinity_embedded.errors import ErrorCode
+from infinity_embedded.index import IndexInfo
+from infinity_embedded.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
+from infinity_embedded.local_infinity.types import build_result
+from infinity_embedded.local_infinity.utils import traverse_conditions, select_res_to_polars
+from infinity_embedded.local_infinity.utils import get_local_constant_expr_from_python_value
+from infinity_embedded.local_infinity.utils import name_validity_check
+from infinity_embedded.table import Table, ExplainType
+from infinity_embedded.index import InitParameter
+from infinity_embedded.utils import deprecated_api
 from sqlglot import condition
 
 
