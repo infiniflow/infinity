@@ -330,7 +330,7 @@ curl --request POST \
              {
                   "name": "dense_column",
                   "type": "vector,8,float",
-                  "default`: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                  "default": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
              },
              {
                   "name": "fulltext_column",
@@ -1433,7 +1433,13 @@ curl --request POST \
      [    
           {
                "name": "Jennifer",
-               "score": 5.0
+               "score": 5.0,
+               "fulltext_column": "You have a heart like gold.",
+               "dense_column": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+               "sparse_column": {"10":1.1, "20":2.2, "30": 3.3},
+               "tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
+               "tensorarray_column": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]],
+               "multivector_column": [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
           },
           {
                "name": "Neil",
@@ -1459,7 +1465,8 @@ curl --request POST \
   Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `object[]`. Each JSON object corresponds to a row to insert, and each key-value pair it corresponds to a column name and the table cell value.
 
 :::tip NOTE
-When inserting incomplete rows of data, ensure that all uninserted columns have default values when creating the table. Otherwise, an error will occur.  
+- When inserting incomplete rows of data, ensure that all uninserted columns have default values when creating the table. Otherwise, an error will occur.  
+- You are not allowed to insert both complete and incomplete rows of data in one request. 
 :::
 
 :::tip NOTE
@@ -1712,38 +1719,143 @@ curl --request GET \
      --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
-    --data ' \
-{
-    "output":
-    [
-        "name",
-        "score"
-    ],
-    "filter": "score >= 4.0",
-    "fusion": 
+    --data ' 
     {
-        "method": "rrf",
-        "match":
+        "output":
+        [
+            "name",
+            "score"
+        ],
+        "filter": "score >= 4.0",
+        "match_dense":
         {
-            "fields": "body", 
-            "query": "bloom",
-            "operator": "topn=1"
-        }
-        "knn":
+            "fields": "dense_column",
+            "query_vector": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            "metric_type": "l2",
+            "topn": 2,
+            "params": {"ef": "10"}
+        },
+        "match_text":
         {
-            "fields": "vector_column",
+            "fields": "body",
+            "matching_text": "bloom",
+            "topn": 1,
+            "params":
+            {
+                "default_fields": "body",
+                "operator": "or"
+            }
+        },
+        "match_sparse":
+        {
+            "fields": "sparse_column",
             "query_vector": [1.0, 2.0],
-            "ef" : "150",
-            "top_k": 3,
-            "metric_type": L2
+            "metric_type": "l2",
+            "topn": 3,
+            "params": {"ef": "150"}   
+        },
+        "fusion": 
+        {
+            "method": "rrf",
+            "topn": 2,
+            "params":{"rank_constant": 60}
         }
-    }
 } '
 ```
 
 #### Request parameters
 
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"output"`: (*Body parameter*), `string[]`, *Required*  
+  A non-empty list of strings specifying the columns to include in the output. Each string in the list can represent:  
+  - A user-defined column name: The name of the column to include in the output, e.g., `"body"`.
+  - All user-defined columns: Use a wildcard `"*"` to select all columns.
+  - A special system column: system-generated columns include:
+    - `_row_id`:  An automatically generated, unique identifier for each row in the table. It serves as a unique key for each row but does not necessarily correspond to the actual row number. When the data in a row is updated, the `_row_id` for that row is also changed to reflect the update.
+    - `_score`: A BM25 score used in full-text search.
+    - `_similarity`: Used by IP and cosine metrics in dense or sparse vector search.
+    - `_distance`: Used by L2 metric in dense vector search.
+  - An aggregation function: Apply an aggregation operation on specified columns. Supported aggragation functions include:
+    - `count`
+    - `min`
+    - `max`
+    - `sum`
+    - `avg`
+  - An arithmetic function: Apply an arithmetic operation on specified columns (e.g., `c1+5`).  
+  > The list must contain at least one element. Empty lists are not allowed.
+- `"filter"`: (*Body parameter*), `string`, *Optional*  
+  A string that defines the condition for selecting rows. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be updated. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.  
+  > The `filter` parameter currently supports 'and' and 'or' logical expressions only.  
+- `"match_dense"`: (*Body parameter*), `object`, *Optional*  
+  Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).  
+  - `fields`: `string`, *Required*  
+    A non-empty string indicating the name of the vector column or multi-vector column to search on.  
+  - `query_vector`: `[]/np.ndarray`, *Required*  
+    The query vector data to compare against. This should be provided as a list or a one-dimensional NumPy array of numerical values.  
+  - `element_type`: `str`, *Required*  
+    Specifies the data type of the embedding vector. Commonly used types (values) include:  
+    - `"float"`
+    - `"uint8"`.
+  - `metric_type`: `string`, *Required*  
+    The distance metric to use in similarity search.  
+    - `"ip"`: Inner product.
+    - `"l2"`: Euclidean distance.
+    - `"cosine"`: Cosine similarity.
+  - `topn`: `int`, *Required*  
+  An integer indicating the number of nearest neighbours to return.  
+  - `params`: `dict[string, string]`, *Optional*  
+    A dictionary representing additional KNN or ANN search parameters. Currently only `"ef"` is supported.  
+    - `"ef"`: `str`, Recommended value: one to ten times the value of `topn`.  
+      - For example, if you set `topn` to `10`, you can set `"ef"` to `"50"`.
+      - If you set `"ef"` too high, search performance may worsen.  
+      - If you do not set `"ef"` or set it to a value lower than `topn`, the search uses the `topn` value as the value for `"ef"`.
 
+- `"fusion"`: (*Body parameter*), `object`, *Optional*  
+  Creates a reranking expression for multiple retrieval ways to identify the top n closest rows.
+  - `method`: `str`, *Required*  
+    A non-empty string indicating the reranking methods to use:  
+    - `"rrf"`: [Reciprocal rank fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)  
+      RRF is a method for combining multiple result sets with varying relevance indicators into a single result set. It requires no tuning, and the relevance indicators need not be related to achieve high-quality results. RRF is particularly useful when you are uncertain of the relative importance of each retrieval way.  
+      RRF uses the following formula to calculate the score for ranking each document:  
+      ```python
+      score = 0.0
+      for q in queries:
+          if d in result(q):
+              score += 1.0 / ( k + rank( result(q), d ) )
+      return score
+
+      # Where
+      # k is the ranking constant,
+      # q is a query in a set of queries,
+      # d is a document in the result set of q,
+      # result(q) is the result set of q, and
+      # rank( result(q), d ) is the rank of d within the result(q), starting from 1.
+      ```
+
+    - `"weighted_sum"`  
+      The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.  
+    - `"match_tensor"`  
+      Infinity's tensor-based late interaction reranking approach.  
+
+  - `topn`: `int`, *Required*  
+    An integer indicating the number of the most relevant rows to retrieve.
+  - `params`: `dict[str, Any]`, *Optional*  
+    A dictionary representing additional options for the selected reranking method:
+    - **RRF-specific options**: *Optional*  
+      Settings when employing RRF for reranking.  
+      - `"rank_constant"`: The smoothing constant for RRF reranking, e.g., `{"rank_constant": 60}`. Defaults to `60`.  
+    - **weighted_sum-specific options**: *Optional*  
+      Settings when employing Weighted Sum for reranking.  
+      - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assiged the default weight of `1.0`.
+    - **match_tensor-specific options**: *Optional*  
+      Settings when employing match_tensor for reranking.
+      - `"field"`: The name of the tensor column for reranking.
+      - `"query_data"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy
+    array of numerical values.
+      - `"element_type"`: The element data type of the query tensor. Usually `"float"`.
 
 ### Response
 

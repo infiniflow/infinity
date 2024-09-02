@@ -1011,7 +1011,8 @@ Inserts rows of data into the current table.
 Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `dict[str, Any]` (one row) or `list[dict[str, Any]]` (multiple rows), with each key-value pair corresponding to a column name and a table cell value.
 
 :::tip NOTE
-When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table()`. Otherwise, an error will occur.  
+- When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table()`. Otherwise, an error will occur.
+- You are not allowed to insert both complete and incomplete rows of data in one request.
 For information about setting default column values, see `create_table()`.
 :::
 
@@ -1500,7 +1501,7 @@ To display your query results, you must chain this method with `output(columns)`
 
 #### vector_column_name: `str`, *Required*
 
-A non-empty string indicating the name of the vector column or multi-vector column to search on.
+A non-empty string indicating the name of the vector multi-vector column to search on.
 
 #### embedding_data: `list/np.ndarray`, *Required*
 
