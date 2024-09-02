@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -36,6 +37,7 @@ import cast_table;
 import column_vector;
 import logical_type;
 
+using namespace infinity;
 class CastTableTest : public BaseTest {};
 
 TEST_F(CastTableTest, casttable_boolean) {

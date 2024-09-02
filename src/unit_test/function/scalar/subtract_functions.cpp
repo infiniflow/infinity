@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -40,12 +41,15 @@ import internal_types;
 import data_type;
 import catalog;
 
-class SubtractFunctionsTest : public BaseTest {};
+using namespace infinity;
+class SubtractFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(SubtractFunctionsTest, add_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, SubtractFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(SubtractFunctionsTest, add_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterSubtractFunction(catalog_ptr);
 

@@ -49,22 +49,16 @@ public:
 public:
     explicit DBEntry(DBMeta *db_meta,
                      bool is_delete,
-                     const SharedPtr<String> &base_dir,
                      const SharedPtr<String> &db_entry_dir,
                      const SharedPtr<String> &db_name,
                      TransactionID txn_id,
                      TxnTimeStamp begin_ts);
 
-    static SharedPtr<DBEntry> NewDBEntry(DBMeta *db_meta,
-                                         bool is_delete,
-                                         const SharedPtr<String> &base_dir,
-                                         const SharedPtr<String> &db_name,
-                                         TransactionID txn_id,
-                                         TxnTimeStamp begin_ts);
+    static SharedPtr<DBEntry>
+    NewDBEntry(DBMeta *db_meta, bool is_delete, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry> ReplayDBEntry(DBMeta *db_meta,
                                             bool is_delete,
-                                            const SharedPtr<String> &base_dir,
                                             const SharedPtr<String> &db_entry_dir,
                                             const SharedPtr<String> &db_name,
                                             TransactionID txn_id,
@@ -128,9 +122,7 @@ public:
     Tuple<Vector<String>, Vector<TableMeta*>, std::shared_lock<std::shared_mutex>> GetAllTableMetas() const;
 
 private:
-    static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
-        return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));
-    }
+    static SharedPtr<String> DetermineDBDir(const String &db_name);
 
     friend void RecreateSegmentSealingTasksInStorageInit(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp system_start_ts);
 

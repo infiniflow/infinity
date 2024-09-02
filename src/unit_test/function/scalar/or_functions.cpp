@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -38,12 +39,15 @@ import logical_type;
 import internal_types;
 import data_type;
 
-class OrFunctionsTest : public BaseTest {};
+using namespace infinity;
+class OrFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(OrFunctionsTest, or_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, OrFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(OrFunctionsTest, or_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterOrFunction(catalog_ptr);
 

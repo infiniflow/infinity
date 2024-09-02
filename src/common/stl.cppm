@@ -31,6 +31,7 @@ module;
 #include <filesystem>
 #include <forward_list>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <list>
@@ -38,6 +39,7 @@ module;
 #include <memory>
 #include <optional>
 #include <random>
+#include <ranges>
 #include <set>
 #include <shared_mutex>
 #include <source_location>
@@ -54,7 +56,6 @@ module;
 #include <utility>
 #include <variant>
 #include <vector>
-#include <ranges>
 
 export module stl;
 
@@ -197,6 +198,9 @@ export namespace std {
     using std::cerr;
     using std::endl;
 
+    using std::setfill;
+    using std::setw;
+
     using std::ostream;
     using std::ofstream;
     using std::ifstream;
@@ -213,16 +217,25 @@ export namespace std {
     using std::dynamic_pointer_cast;
 
     namespace filesystem {
+    using std::filesystem::absolute;
     using std::filesystem::canonical;
     using std::filesystem::copy;
     using std::filesystem::copy_file;
     using std::filesystem::copy_options;
+    using std::filesystem::create_directories;
+    using std::filesystem::directory_iterator;
+    using std::filesystem::directory_options;
     using std::filesystem::exists;
     using std::filesystem::file_size;
+    using std::filesystem::filesystem_error;
     using std::filesystem::path;
+    using std::filesystem::read_symlink;
     using std::filesystem::remove;
     using std::filesystem::remove_all;
+
+    using std::filesystem::is_directory;
     using std::filesystem::is_regular_file;
+    using std::filesystem::is_symlink;
     }
 
     namespace this_thread {

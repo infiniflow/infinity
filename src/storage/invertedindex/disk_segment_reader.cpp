@@ -41,7 +41,7 @@ namespace infinity {
 
 DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag)
     : base_row_id_(base_row_id) {
-    Path path = Path(index_dir) / base_name;
+    Path path = Path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
     String path_str = path.string();
     dict_file_ = path_str;
     dict_file_.append(DICT_SUFFIX);

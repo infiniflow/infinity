@@ -811,10 +811,9 @@ Tuple<UniquePtr<Catalog>, Status> AdminExecutor::LoadCatalogFiles(QueryContext* 
         delta_catalog_fileinfo_array.emplace_back(delta_catalog_file_info);
     }
 
-    BufferManager* buffer_mgr = query_context->storage()->buffer_manager();
-    const String& data_dir = query_context->storage()->wal_manager()->data_path();
+    BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
-    UniquePtr<Catalog> catalog_ptr = Catalog::LoadFromFiles(data_dir, full_catalog_file_info, delta_catalog_fileinfo_array, buffer_mgr);
+    UniquePtr<Catalog> catalog_ptr = Catalog::LoadFromFiles(full_catalog_file_info, delta_catalog_fileinfo_array, buffer_mgr);
     return {std::move(catalog_ptr), Status::OK()};
 }
 
@@ -834,9 +833,8 @@ QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const Admi
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
         bigint_type,
-        varchar_type,
         varchar_type,
     };
 
@@ -877,13 +875,6 @@ QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const Admi
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
 
-        {
-            // dir
-            Value value = Value::MakeVarchar(*db_meta->data_dir());
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-        }
-
         ++row_count;
         if (row_count % output_block_ptr->capacity() == 0) {
             output_block_ptr->Finalize();
@@ -913,24 +904,13 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
         MakeShared<ColumnDef>(4, bigint_type, "begin_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(5, bigint_type, "commit_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(6, bool_type, "deleted", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(7, varchar_type, "base_dir", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(8, varchar_type, "encode", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(7, varchar_type, "encode", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
-        bigint_type,
-        varchar_type,
-        varchar_type,
-        bigint_type,
-        bigint_type,
-        bigint_type,
-        bool_type,
-        varchar_type,
-        varchar_type
-    };
+    Vector<SharedPtr<DataType>> column_types{bigint_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bool_type, varchar_type};
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
@@ -1015,13 +995,6 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
         }
 
         {
-            // base_dir
-            Value value = Value::MakeVarchar(*db_entry->base_dir_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
-        }
-
-        {
             // encode
             Value value = Value::MakeVarchar(db_entry->encode());
             ValueExpression value_expr(value);
@@ -1052,16 +1025,14 @@ QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminSt
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "base_dir", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(3, varchar_type, "db_entry_dir", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "db_entry_dir", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
         bigint_type,
-        varchar_type,
         varchar_type,
         varchar_type,
     };
@@ -1132,13 +1103,6 @@ QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminSt
         }
 
         {
-            // base dir
-            Value value = Value::MakeVarchar(*table_meta_ptr->base_dir());
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-        }
-
-        {
             // db_entry dir
             Value value = Value::MakeVarchar(*table_meta_ptr->db_entry_dir());
             ValueExpression value_expr(value);
@@ -1173,19 +1137,18 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
         MakeShared<ColumnDef>(4, bigint_type, "begin_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(5, bigint_type, "commit_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(6, bool_type, "deleted", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(7, varchar_type, "base_dir", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(8, varchar_type, "encode", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(9, bigint_type, "column_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(10, bigint_type, "row_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(11, bigint_type, "segment_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(12, bigint_type, "unsealed_segment", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(13, bigint_type, "next_segment", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(7, varchar_type, "encode", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(8, bigint_type, "column_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(9, bigint_type, "row_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(10, bigint_type, "segment_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(11, bigint_type, "unsealed_segment", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(12, bigint_type, "next_segment", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
         bigint_type,
         varchar_type,
         varchar_type,
@@ -1193,7 +1156,6 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
         bigint_type,
         bigint_type,
         bool_type,
-        varchar_type,
         varchar_type,
         bigint_type,
         bigint_type,
@@ -1313,13 +1275,6 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
         }
 
         {
-            // base_dir
-            Value value = Value::MakeVarchar(*table_entry->base_dir_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
-        }
-
-        {
             // encode
             Value value = Value::MakeVarchar(table_entry->encode());
             ValueExpression value_expr(value);
@@ -1388,32 +1343,30 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
         MakeShared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(5, bool_type, "deleted", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(6, varchar_type, "base_dir", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(7, varchar_type, "encode", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(8, bigint_type, "row_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(9, bigint_type, "row_capacity", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(10, bigint_type, "column_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(11, bigint_type, "actual_row_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(12, bigint_type, "checkpoint_row_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(13, bigint_type, "min_row_ts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(14, bigint_type, "max_row_ts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(15, bigint_type, "first_delete_ts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(16, bigint_type, "deprecate_ts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(17, bigint_type, "block_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(18, varchar_type, "status", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(7, bigint_type, "row_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(8, bigint_type, "row_capacity", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(9, bigint_type, "column_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(10, bigint_type, "actual_row_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(11, bigint_type, "checkpoint_row_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(12, bigint_type, "min_row_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(13, bigint_type, "max_row_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(14, bigint_type, "first_delete_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(15, bigint_type, "deprecate_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(16, bigint_type, "block_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(17, varchar_type, "status", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
         bigint_type,
         varchar_type,
         bigint_type,
         bigint_type,
         bigint_type,
         bool_type,
-        varchar_type,
         varchar_type,
         bigint_type,
         bigint_type,
@@ -1551,13 +1504,6 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
         }
 
         {
-            // base_dir
-            Value value = Value::MakeVarchar(*segment_entry->base_dir_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
-        }
-
-        {
             // encode
             Value value = Value::MakeVarchar(segment_entry->encode());
             ValueExpression value_expr(value);
@@ -1675,27 +1621,25 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
         MakeShared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(5, bool_type, "deleted", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(6, varchar_type, "base_dir", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(7, varchar_type, "encode", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(8, bigint_type, "row_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(9, bigint_type, "row_capacity", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(10, bigint_type, "checkpoint_row_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(11, bigint_type, "min_row_ts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(12, bigint_type, "max_row_ts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(13, bigint_type, "checkpoint_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(7, bigint_type, "row_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(8, bigint_type, "row_capacity", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(9, bigint_type, "checkpoint_row_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(10, bigint_type, "min_row_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(11, bigint_type, "max_row_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(12, bigint_type, "checkpoint_ts", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
         bigint_type,
         varchar_type,
         bigint_type,
         bigint_type,
         bigint_type,
         bool_type,
-        varchar_type,
         varchar_type,
         bigint_type,
         bigint_type,
@@ -1841,13 +1785,6 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
         }
 
         {
-            // base_dir
-            Value value = Value::MakeVarchar(*block_entry->base_dir_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
-        }
-
-        {
             // encode
             Value value = Value::MakeVarchar(block_entry->encode());
             ValueExpression value_expr(value);
@@ -1928,22 +1865,20 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
         MakeShared<ColumnDef>(1, bigint_type, "transaction", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(2, bigint_type, "begin_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(3, bigint_type, "commit_ts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(4, varchar_type, "base_dir", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(5, varchar_type, "file_name", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(7, bigint_type, "l1_outline_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(8, bigint_type, "l2_outline_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "file_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(5, varchar_type, "encode", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(6, bigint_type, "l1_outline_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(7, bigint_type, "l2_outline_count", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
         bigint_type,
         bigint_type,
         bigint_type,
         bigint_type,
-        varchar_type,
         varchar_type,
         varchar_type,
         bigint_type,
@@ -2076,13 +2011,6 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
             Value value = Value::MakeBigInt(block_column_entry->commit_ts_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
-        }
-
-        {
-            // base_dir
-            Value value = Value::MakeVarchar(*block_column_entry->base_dir());
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
 
         {
@@ -2424,24 +2352,22 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
         MakeShared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(5, bool_type, "deleted", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(6, varchar_type, "base_dir", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(7, varchar_type, "encode", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(8, bigint_type, "segment_update_ts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(9, varchar_type, "index_info", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(10, bigint_type, "segment_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(7, bigint_type, "segment_update_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(8, varchar_type, "index_info", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(9, bigint_type, "segment_count", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
         bigint_type,
         varchar_type,
         bigint_type,
         bigint_type,
         bigint_type,
         bool_type,
-        varchar_type,
         varchar_type,
         bigint_type,
         varchar_type,
@@ -2586,13 +2512,6 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
         }
 
         {
-            // base dir
-            Value value = Value::MakeVarchar(*table_index_entry->base_dir_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
-        }
-
-        {
             // encode
             Value value = Value::MakeVarchar(table_index_entry->encode());
             ValueExpression value_expr(value);
@@ -2646,22 +2565,20 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
         MakeShared<ColumnDef>(2, bigint_type, "transaction", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(3, bigint_type, "begin_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(4, bigint_type, "commit_ts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(5, varchar_type, "base_dir", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(6, varchar_type, "encode", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(7, bigint_type, "next_chunk_id", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(8, bigint_type, "chunk_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(5, varchar_type, "encode", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(6, bigint_type, "next_chunk_id", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(7, bigint_type, "chunk_count", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
         bigint_type,
         varchar_type,
         bigint_type,
         bigint_type,
         bigint_type,
-        varchar_type,
         varchar_type,
         bigint_type,
         bigint_type,
@@ -2810,13 +2727,6 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
             Value value = Value::MakeBigInt(segment_index_ptr->commit_ts_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
-        }
-
-        {
-            // base dir
-            Value value = Value::MakeVarchar(*segment_index_ptr->base_dir_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
         }
 
         {

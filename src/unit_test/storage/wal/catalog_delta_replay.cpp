@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import statement_common;
 import internal_types;
@@ -57,14 +58,13 @@ using namespace infinity;
 class CatalogDeltaReplayTest : public BaseTestParamStr {
 public:
     void SetUp() override {
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        CleanupDbDirs();
         config_path = GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
                           ? MakeShared<String>(std::string(test_data_path()) + "/config/test_close_bgtask.toml")
                           : MakeShared<String>(std::string(test_data_path()) + "/config/test_close_bgtask_vfs_off.toml");
     }
+
+    void TearDown() override {}
 
     SharedPtr<String> config_path{};
 
@@ -111,7 +111,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CatalogDeltaReplayTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
     auto db_name1 = std::make_shared<std::string>("db1");
@@ -133,7 +133,7 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
             txn->DropDatabase(*db_name2, ConflictType::kError);
 
             auto [db_entry, status] = txn->GetDatabase(*db_name1);
-            EXPECT_TRUE(status.ok());
+            EXPECT_TRUE(status.ok() && db_entry != nullptr);
             db_entry_dir1 = db_entry->db_entry_dir();
 
             txn_mgr->CommitTxn(txn);
@@ -157,7 +157,7 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
             {
                 auto [db_entry, status] = txn->GetDatabase(*db_name1);
-                EXPECT_TRUE(status.ok());
+                ASSERT_TRUE(status.ok() && db_entry != nullptr);
                 EXPECT_EQ(*db_entry->db_name_ptr(), *db_name1);
                 EXPECT_EQ(*db_entry->db_entry_dir(), *db_entry_dir1);
             }

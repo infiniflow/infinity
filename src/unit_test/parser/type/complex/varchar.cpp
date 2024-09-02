@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
 #include "parser/type/complex/varchar.h"
+#include "gtest/gtest.h"
+import base_test;
 
+using namespace infinity;
 class VarcharTest : public BaseTest {};
 
 TEST_F(VarcharTest, structure_check) {

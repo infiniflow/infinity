@@ -117,19 +117,16 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
 
 // extern SharedPtr<spdlogger> infinity_logger;
 
-Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default_config) {
-
+Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
     LocalFileSystem fs;
 
     toml::table config_toml{};
-    if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
-        if (config_path.get() == nullptr) {
+    if (config_path.get() == nullptr || config_path->empty() || !fs.Exists(std::filesystem::absolute(*config_path))) {
+        if (config_path.get() == nullptr || config_path->empty()) {
 //            fmt::print("No config file is given, use default configs.\n");
             ;
         } else {
-            if (!fs.Exists(*config_path)) {
-                fmt::print("Config file: {} is not existent.\n", *config_path);
-            }
+            fmt::print("Config file: {} is not existent.\n", *config_path);
         }
 
         Status status;
@@ -138,6 +135,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
         String current_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
         UniquePtr<StringOption> version_option = MakeUnique<StringOption>(VERSION_OPTION_NAME, current_version);
         status = global_options_.AddOption(std::move(version_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Server mode
+        String server_mode = "standalone";
+        UniquePtr<StringOption> server_mode_option = MakeUnique<StringOption>(SERVER_MODE_OPTION_NAME, server_mode);
+        status = global_options_.AddOption(std::move(server_mode_option));
         if(!status.ok()) {
             fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
@@ -520,6 +526,27 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                                 }
                             } else {
                                 return Status::InvalidConfig("'version' field isn't string.");
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kServerMode: {
+                            // Server Mode
+                            String server_mode = "standalone";
+                            if(elem.second.is_string()) {
+                                server_mode = elem.second.value_or(server_mode);
+                            } else {
+                                return Status::InvalidConfig("'server_mode' field isn't string.");
+                            }
+
+                            ToLower(server_mode);
+                            if(server_mode == "standalone" or server_mode == "cluster") {
+                                UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_mode);
+                                Status status = global_options_.AddOption(std::move(server_address_option));
+                                if(!status.ok()) {
+                                    UnrecoverableError(status.message());
+                                }
+                            } else {
+                                return Status::InvalidConfig(fmt::format("Invalid server mode: {}", server_mode));
                             }
                             break;
                         }

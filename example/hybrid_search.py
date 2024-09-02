@@ -86,6 +86,12 @@ try:
     # TODO: dense vector + sparse vector + full-text + structured data filter + tensor reranker
     # result = table_instance.output(["num", "body"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match_text("body", "blooms","topn=1").fusion(method="rrf").to_pl()
 
+    res = table_instance.create_index(
+        "my_index",
+        infinity.index.IndexInfo("body", infinity.index.IndexType.FullText),
+        infinity.common.ConflictType.Error,
+    )
+
     result = (
         table_instance.output(
             ["num", "body", "vec", "sparse", "year", "tensor", "_score"]

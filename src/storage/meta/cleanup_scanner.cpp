@@ -26,6 +26,7 @@ import infinity_exception;
 import status;
 import logger;
 import third_party;
+import infinity_context;
 
 namespace infinity {
 
@@ -49,7 +50,8 @@ void CleanupScanner::Cleanup() && {
 void CleanupScanner::CleanupDir(const String &dir) {
     LocalFileSystem fs;
     try {
-        fs.DeleteDirectory(dir);
+        auto abs_dir = Path(InfinityContext::instance().config()->DataDir()) / dir;
+        fs.DeleteDirectory(abs_dir);
     } catch (const RecoverableException &e) {
         if (e.ErrorCode() == ErrorCode::kDirNotFound) {
             // this happens when delta checkpoint records "drop table/db/...", and cleanup is called.

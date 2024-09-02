@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-#include <string>
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity;
 import infinity_exception;
@@ -34,24 +34,7 @@ import logical_type;
 
 using namespace infinity;
 
-class BlockVersionTest : public BaseTestParamStr {
-protected:
-    void SetUp() override {
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-
-        std::string config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        InfinityContext::instance().Init(config_path);
-    }
-
-    void TearDown() override { InfinityContext::instance().UnInit(); }
-};
+class BlockVersionTest : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          BlockVersionTest,
@@ -87,13 +70,17 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
 TEST_P(BlockVersionTest, SaveAndLoad2) {
     auto data_dir = MakeShared<String>(String(GetFullDataDir()) + "/block_version_test");
     auto temp_dir = MakeShared<String>(String(GetFullTmpDir()) + "/temp/block_version_test");
-    auto block_dir = MakeShared<String>(*data_dir + "/block");
+    auto block_dir = MakeShared<String>("block_version_test/block");
     auto version_file_name = MakeShared<String>("block_version_test");
 
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
 
-        auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
+        auto file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(String(GetFullDataDir())),
+                                                         MakeShared<String>(String(GetFullTmpDir())),
+                                                         block_dir,
+                                                         version_file_name,
+                                                         8192);
         auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
 
         {
@@ -112,7 +99,11 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
 
-        auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
+        auto file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(String(GetFullDataDir())),
+                                                         MakeShared<String>(String(GetFullTmpDir())),
+                                                         block_dir,
+                                                         version_file_name,
+                                                         8192);
         auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
 
         {
@@ -136,7 +127,11 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
     {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
 
-        auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
+        auto file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(String(GetFullDataDir())),
+                                                         MakeShared<String>(String(GetFullTmpDir())),
+                                                         block_dir,
+                                                         version_file_name,
+                                                         8192);
         auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
 
         {

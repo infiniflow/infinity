@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -40,12 +41,16 @@ import internal_types;
 import data_type;
 
 #if 0
-class SubstrFunctionTest : public BaseTest {};
 
-TEST_F(SubstrFunctionTest, varchar_substr) {
+using namespace infinity;
+class SubstrFunctionTest : public BaseTestParamStr {};
+
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, SubstrFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(SubstrFunctionTest, varchar_substr) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterSubstringFunction(catalog_ptr);
 

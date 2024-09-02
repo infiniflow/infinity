@@ -37,12 +37,20 @@ export struct CreateSecondaryIndexParam : public CreateIndexParam {
 // pgm index
 export class SecondaryIndexFileWorker final : public IndexFileWorker {
 public:
-    explicit SecondaryIndexFileWorker(SharedPtr<String> file_dir,
+    explicit SecondaryIndexFileWorker(SharedPtr<String> data_dir,
+                                      SharedPtr<String> temp_dir,
+                                      SharedPtr<String> file_dir,
                                       SharedPtr<String> file_name,
                                       SharedPtr<IndexBase> index_base,
                                       SharedPtr<ColumnDef> column_def,
                                       u32 row_count)
-        : IndexFileWorker(file_dir, file_name, index_base, column_def), row_count_(row_count) {}
+        : IndexFileWorker(std::move(data_dir),
+                          std::move(temp_dir),
+                          std::move(file_dir),
+                          std::move(file_name),
+                          std::move(index_base),
+                          std::move(column_def)),
+          row_count_(row_count) {}
 
     ~SecondaryIndexFileWorker() override;
 
@@ -63,7 +71,9 @@ protected:
 // row_count * pair<T, u32>
 export class SecondaryIndexFileWorkerParts final : public IndexFileWorker {
 public:
-    explicit SecondaryIndexFileWorkerParts(SharedPtr<String> file_dir,
+    explicit SecondaryIndexFileWorkerParts(SharedPtr<String> data_dir,
+                                           SharedPtr<String> temp_dir,
+                                           SharedPtr<String> file_dir,
                                            SharedPtr<String> file_name,
                                            SharedPtr<IndexBase> index_base,
                                            SharedPtr<ColumnDef> column_def,

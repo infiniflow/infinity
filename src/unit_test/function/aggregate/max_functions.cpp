@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -36,28 +37,15 @@ import internal_types;
 import logical_type;
 import data_type;
 
-class MaxFunctionTest : public BaseTest {
-    void SetUp() override {
-        BaseTest::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-    }
+using namespace infinity;
+class MaxFunctionTest : public BaseTestParamStr {};
 
-    void TearDown() override {
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTest::TearDown();
-    }
-};
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, MaxFunctionTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
 
-TEST_F(MaxFunctionTest, max_func) {
+TEST_P(MaxFunctionTest, max_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterMaxFunction(catalog_ptr);
 

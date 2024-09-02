@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
 #include <numeric>
 #include <random>
 
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import storage;
 import global_resource_usage;
@@ -46,36 +47,6 @@ import logger;
 using namespace infinity;
 
 class SealingTaskTest : public BaseTestParamStr {
-    void SetUp() override {
-        tree_cmd = "tree ";
-        tree_cmd += GetFullDataDir();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        std::shared_ptr<std::string> config_path = nullptr;
-        RemoveDbDirs();
-        system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + infinity::String(GetFullTmpDir())).c_str());
-        std::string config_path_str = GetParam();
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        // system(tree_cmd.c_str());
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-    }
-
-    String tree_cmd;
-
 protected:
     void AppendBlocks(TxnManager *txn_mgr, const String &table_name, u32 row_cnt_input, BufferManager *buffer_mgr) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import blocks"));
@@ -104,9 +75,7 @@ protected:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         SealingTaskTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, SealingTaskTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
 
 TEST_P(SealingTaskTest, append_unsealed_segment_sealed) {
     GTEST_SKIP() << "Skipping slow test.";

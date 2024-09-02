@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+#include <filesystem>
+import base_test;
 
 import statement_common;
 import internal_types;
@@ -63,14 +65,9 @@ protected:
                    : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_bgtask_vfs_off.toml");
     }
 
-    void SetUp() override {
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-    }
+    void SetUp() override { CleanupDbDirs(); }
 
-    void TearDown() override { RemoveDbDirs(); }
+    void TearDown() override {}
 
     void WaitCleanup(Storage *storage) {
         Catalog *catalog = storage->catalog();
@@ -132,7 +129,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CheckpointTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(CheckpointTest, test_cleanup_and_checkpoint) {
     auto db_name = MakeShared<String>("default_db");

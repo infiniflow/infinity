@@ -51,7 +51,7 @@ struct InfinityClient {
         transport->open();
         CommonResponse response;
         ConnectRequest request;
-        request.__set_client_version(16); // 0.3.0.dev7
+        request.__set_client_version(17); // 0.3.0.dev8
         client->Connect(response, request);
         session_id = response.session_id;
     }

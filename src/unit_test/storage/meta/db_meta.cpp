@@ -1,4 +1,5 @@
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity;
 import infinity_context;
@@ -21,34 +22,7 @@ import catalog;
 
 using namespace infinity;
 
-class DBMetaTest : public BaseTestParamStr {
-    void SetUp() override {
-        BaseTestParamStr::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        std::shared_ptr<std::string> config_path = nullptr;
-        RemoveDbDirs();
-        system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + infinity::String(GetFullTmpDir())).c_str());
-        std::string config_path_str = GetParam();
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
-    }
-};
+class DBMetaTest : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          DBMetaTest,
@@ -66,7 +40,7 @@ TEST_P(DBMetaTest, to_string_test) {
         auto [base_entry, status] = catalog->CreateDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
         std::cout<<base_entry->db_meta_->ToString()->c_str()<<std::endl;
-        ASSERT_STREQ(base_entry->db_meta_->ToString()->c_str(), "DBMeta, data_dir: /var/infinity/data, db name: db1, entry count: 1");
+        ASSERT_STREQ(base_entry->db_meta_->ToString()->c_str(), "DBMeta, db name: db1, entry count: 1");
     }
 
     // drop db should be success
@@ -74,7 +48,7 @@ TEST_P(DBMetaTest, to_string_test) {
         auto [base_entry, status] = catalog->DropDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
         std::cout<<base_entry->db_meta_->ToString()->c_str()<<std::endl;
-        ASSERT_STREQ(base_entry->db_meta_->ToString()->c_str(), "DBMeta, data_dir: /var/infinity/data, db name: db1, entry count: 0");
+        ASSERT_STREQ(base_entry->db_meta_->ToString()->c_str(), "DBMeta, db name: db1, entry count: 0");
     }
 
     txn_mgr->CommitTxn(txn1);

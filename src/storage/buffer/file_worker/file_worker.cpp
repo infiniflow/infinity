@@ -142,6 +142,14 @@ void FileWorker::MoveFile() {
     }
 }
 
+// Get absolute file path. As key of buffer handle.
+String FileWorker::GetFilePath() const { return Path(*data_dir_) / *file_dir_ / *file_name_; }
+
+String FileWorker::ChooseFileDir(bool spill) const {
+    return spill ? (Path(*temp_dir_) / *file_dir_)
+                 : (Path(*data_dir_) / *file_dir_);
+}
+
 void FileWorker::CleanupFile() const {
     if (InfinityContext::instance().persistence_manager() != nullptr) {
         String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
@@ -171,5 +179,4 @@ void FileWorker::CleanupTempFile() const {
         UnrecoverableError(error_message);
     }
 }
-
 } // namespace infinity

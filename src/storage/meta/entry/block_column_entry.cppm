@@ -43,7 +43,7 @@ public:
     static String EncodeIndex(const ColumnID column_id, const BlockEntry *block_entry);
 
 public:
-    explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref);
+    explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id);
 
     static UniquePtr<BlockColumnEntry> NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn);
 
@@ -66,13 +66,16 @@ public:
     inline const SharedPtr<DataType> &column_type() const { return column_type_; }
     inline BufferObj *buffer() const { return buffer_; }
     inline u64 column_id() const { return column_id_; }
-    inline const SharedPtr<String> &base_dir() const { return base_dir_; }
     inline const SharedPtr<String> &filename() const { return file_name_; }
     inline const BlockEntry *block_entry() const { return block_entry_; }
 
     SharedPtr<String> OutlineFilename(u32 buffer_group_id, SizeT file_idx) const;
 
-    String FilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_); }
+    // Relative to `data_dir` config item
+    String FilePath() const;
+
+    // Relative to `data_dir` config item
+    SharedPtr<String> FileDir() const;
 
     Vector<String> FilePaths() const;
 
@@ -107,7 +110,6 @@ private:
     SharedPtr<DataType> column_type_{};
     BufferObj *buffer_{};
 
-    SharedPtr<String> base_dir_{};
     SharedPtr<String> file_name_{};
 
     mutable std::shared_mutex mutex_{};

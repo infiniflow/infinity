@@ -67,7 +67,6 @@ public:
 
 public:
     explicit TableEntry(bool is_delete,
-                        const SharedPtr<String> &base_dir,
                         const SharedPtr<String> &table_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
@@ -79,7 +78,6 @@ public:
                         SegmentID next_segment_id);
 
     static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
-                                               const SharedPtr<String> &base_dir,
                                                const SharedPtr<String> &db_entry_dir,
                                                SharedPtr<String> table_collection_name,
                                                const Vector<SharedPtr<ColumnDef>> &columns,
@@ -90,7 +88,6 @@ public:
 
     static SharedPtr<TableEntry> ReplayTableEntry(bool is_delete,
                                                   TableMeta *table_meta,
-                                                  SharedPtr<String> base_dir,
                                                   SharedPtr<String> table_entry_dir,
                                                   SharedPtr<String> table_name,
                                                   const Vector<SharedPtr<ColumnDef>> &column_defs,
@@ -180,9 +177,7 @@ public:
 
     SegmentID next_segment_id() const { return next_segment_id_; }
 
-    static SharedPtr<String> DetermineTableDir(const String&base_dir, const String &parent_dir, const String &table_name) {
-        return DetermineRandomString(base_dir, parent_dir, fmt::format("table_{}", table_name));
-    }
+    static SharedPtr<String> DetermineTableDir(const String &parent_dir, const String &table_name);
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges);

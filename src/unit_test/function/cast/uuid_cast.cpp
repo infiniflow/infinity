@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -38,6 +39,7 @@ import bound_cast_func;
 import internal_types;
 import logical_type;
 #if 0
+using namespace infinity;
 class UuidCastTest : public BaseTest {};
 
 TEST_F(UuidCastTest, uuid_cast0) {

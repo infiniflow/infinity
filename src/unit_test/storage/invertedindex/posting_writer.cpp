@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 
 import index_defines;
@@ -36,13 +37,8 @@ public:
     PostingWriterTest() {}
 
     void SetUp() override {
-        CleanupDbDirs();
+        BaseTestParamStr::SetUp();
         file_ = String(GetFullTmpDir()) + "/posting_writer";
-        config_path_ = GetParam();
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            std::shared_ptr<std::string> config_path = std::make_shared<std::string>(config_path_);
-            infinity::InfinityContext::instance().Init(config_path);
-        }
     }
 
 protected:

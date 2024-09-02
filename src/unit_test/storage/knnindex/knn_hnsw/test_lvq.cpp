@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-
+#include "gtest/gtest.h"
 #include <random>
+import base_test;
 
 import local_file_system;
 import file_system;
