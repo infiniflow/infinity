@@ -1798,15 +1798,15 @@ curl --request GET \
   A list of JSON objects, each representing a matching or fusion method. Note that if you have specified multiple matching methods, you must specify a fusion method.  
   - `"match_method"`: (*Body parameter*), `enum<string>`, *Required*  
     The matching method for a specified column/field:  
-    - `"dense"`: Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).  
-    - `"sparse"`: Creates a sparse vector search expression to identify the top n closest rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
-    - `"text"`: Creates a full-text search expression on the specified field(s)/column(s) to identify the most relevant rows.  
+    - `"dense"`: Creates a dense vector search expression to identify the top n most similar rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).  
+    - `"sparse"`: Creates a sparse vector search expression to identify the top n most similar rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
+    - `"text"`: Creates a full-text search expression on the specified field(s)/column(s) to identify the top n most similar rows.  
       > Ensure that a full-text index has been successfully built on each column involved before executing a full-text search; otherwise, an error will occur.  
 
   - `"fields"`: `string`, *Required*  
     A non-empty string indicating the name of the column/field to search on.  
-  - `"query_vector"`: `[]/np.ndarray/object`, *Optional*  
-    The query vector data to compare against. This should be provided as a list or a one-dimensional NumPy array of numerical values.  
+  - `"query_vector"`: `[]/object`, *Optional*  
+    The query vector data to compare against. This should be provided as a list or a JSON object.  
     Used *only* when `"match_method"` is set to `"dense"` or `"sparse"`.  
     - Dense query vector example:  
       - `[1.0, 2.2, 3.4, 1.5]`
@@ -1899,7 +1899,7 @@ curl --request GET \
       - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assiged the default weight of `1.0`.
     - If you set `"fusion_method"` to `"match_tensor"`, use a separate JSON to set the following parameters:  
       - `"field"`: The name of the tensor column for reranking.
-      - `"query_data"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy array of numerical values.
+      - `"query_data"`: The tensor data to compare against. This should be provided as a list of lists of numerical values.
       - `"element_type"`: The element data type of the query tensor. Usually `"float"`.
 
 
