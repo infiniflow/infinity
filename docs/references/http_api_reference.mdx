@@ -1808,9 +1808,7 @@ curl --request GET \
   - `"query_vector"`: `[]/object`, *Optional*  
     The query vector data to compare against. This should be provided as a list or a JSON object.  
     Used *only* when `"match_method"` is set to `"dense"` or `"sparse"`.  
-    - Dense query vector example:  
-      - `[1.0, 2.2, 3.4, 1.5]`
-      - `[[1.0, 2.0, 3.0, 1.0], [5.0, 6.0, 3.0, 6.0]]`
+    - Dense query vector example:  `[1.0, 2.2, 3.4, 1.5]`
     - Sparse query vector example: `{"10":1.1, "20":2.2, "30": 3.3}`
   - `"matching_text"`: `string`, *Optional*  
     A non-empty text string to search for. Used *only* when `"match_method"` is set to `"text"`.  
