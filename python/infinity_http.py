@@ -457,16 +457,8 @@ class infinity_http:
         tmp = {}
         if len(self._filter):
             tmp.update({"filter": self._filter})
-        if len(self._fusion):
-            tmp.update({"fusion": self._fusion})
-        if len(self._knn):
-            tmp.update({"match_dense": self._knn})
-        if len(self._match):
-            tmp.update({"match_text":self._match})
-        if len(self._match_tensor):
-            tmp.update({"match_tensor":self._match_tensor})
-        if len(self._match_sparse):
-            tmp.update({"match_sparse":self._match_sparse})
+        if len(self._search_exprs):
+            tmp.update({"search": self._search_exprs})
         if len(self._output):
             tmp.update({"output":self._output})
         #print(tmp)
@@ -522,22 +514,14 @@ class infinity_http:
         self.output_res = []
         self._output = output
         self._filter = ""
-        self._fusion = []
-        self._knn = {}
-        self._match = {}
-        self._match_tensor = {}
-        self._match_sparse = {}
+        self._search_exprs = []
         return self
 
     def match_text(self, fields: str, query: str, topn: int, opt_params: Optional[dict] = None):
-        self._match = {}
-        self._match["fields"] = fields
-        self._match["query"] = query
-        operator_str = f"topn={topn}"
+        tmp_match_expr = {"match_method": "text", "fields": fields, "matching_text": query, "topn": topn}
         if opt_params is not None:
-            for k, v in opt_params.items():
-                operator_str += f";{k}={v}"
-        self._match["operator"] = operator_str
+            tmp_match_expr["params"] = opt_params
+        self._search_exprs.append(tmp_match_expr)
         return self
 
     def match(self, *args, **kwargs):
@@ -546,49 +530,33 @@ class infinity_http:
 
     def match_tensor(self, column_name: str, query_data, query_data_type: str, topn: int,
                      extra_option: Optional[dict] = None):
-        self._match_tensor = {}
-        self._match_tensor["search_method"] = "maxsim"
-        if isinstance(column_name, list):
-            pass
-        else:
-            column_name = [column_name]
-        self._match_tensor["fields"] = column_name
-        self._match_tensor["query_tensor"] = query_data
-        option_str = f"topn={topn}"
+        tmp_match_tensor = {"match_method": "tensor", "fields": column_name, "query_tensor": query_data,
+                            "element_type": query_data_type, "topn": topn}
         if extra_option is not None:
-            for k, v in extra_option.items():
-                option_str += f";{k}={v}"
-        self._match_tensor["options"] = option_str
-        self._match_tensor["element_type"] = type_transfrom[query_data_type]
+            tmp_match_tensor["params"] = extra_option
+        self._search_exprs.append(tmp_match_tensor)
         return self
 
-    def match_sparse(self, vector_column_name, sparse_data, distance_type="ip", topn=10, opt_params = {"alpha": "1.0", "beta": "1.0"}):
-        self._match_sparse = {}
-        if isinstance(vector_column_name, list):
-            pass
-        else:
-            vector_column_name = [vector_column_name]
-        self._match_sparse["fields"] = vector_column_name
-        self._match_sparse["query_sparse"] = sparse_data.to_dict()
-        self._match_sparse["metric_type"] = distance_type
-        self._match_sparse["topn"] = topn
-        self._match_sparse["opt_params"] = opt_params
-        return self
-
-    def filter(self, filter):
-        self._filter = filter
-        return self
-
-    def match_dense(self, fields, query_vector, element_type, metric_type, top_k, opt_params : {} = None):
-        self._knn = {}
-        self._knn["fields"] = [fields]
-        self._knn["query_vector"] = query_vector
-        self._knn["element_type"] = type_transfrom[element_type]
-        self._knn["metric_type"] = metric_type
-        self._knn["top_k"] = top_k
+    def match_sparse(self, vector_column_name: str, sparse_data: SparseVector | dict, distance_type: str, topn: int,
+                     opt_params: Optional[dict] = None):
+        tmp_match_sparse = {"match_method": "sparse", "fields": vector_column_name,
+                            "query_vector": sparse_data.to_dict(), "metric_type": distance_type, "topn": topn}
         if opt_params is not None:
-            for key in opt_params:
-                self._knn[key] = opt_params[key]
+            tmp_match_sparse["params"] = opt_params
+        self._search_exprs.append(tmp_match_sparse)
+        return self
+
+    def filter(self, filter_expr):
+        self._filter = filter_expr
+        return self
+
+    def match_dense(self, fields: str, query_vector: list, element_type: str, metric_type: str, top_k: int,
+                    opt_params: Optional[dict] = None):
+        tmp_match_dense = {"match_method": "dense", "fields": fields, "query_vector": query_vector,
+                           "element_type": element_type, "metric_type": metric_type, "topn": top_k}
+        if opt_params is not None:
+            tmp_match_dense["params"] = opt_params
+        self._search_exprs.append(tmp_match_dense)
         return self
 
     def knn(self, *args, **kwargs):
@@ -596,27 +564,20 @@ class infinity_http:
         return self.match_dense(*args, **kwargs)
 
     def fusion(self, method: str, topn: int, fusion_params: Optional[dict] = None):
-        _fusion = {"method": method}
-        fusion_option_str = f"topn={topn}"
+        tmp_fusion_expr = {"fusion_method": method, "topn": topn}
         if method == "match_tensor":
-            _fusion["optional_match_tensor"] = {}
-            vector_column_name = fusion_params["field"]
-            if isinstance(vector_column_name, list):
-                pass
-            else:
-                vector_column_name = [vector_column_name]
-            _fusion["optional_match_tensor"]["fields"] = vector_column_name
-            _fusion["optional_match_tensor"]["query_tensor"] = fusion_params["data"]
-            _fusion["optional_match_tensor"]["element_type"] = type_transfrom[fusion_params["data_type"]]
-            _fusion["optional_match_tensor"]["search_method"] = "maxsim"
+            tmp_new_params = {"fields": fusion_params["field"], "query_tensor": fusion_params["data"],
+                              "element_type": fusion_params["data_type"]}
+            # handle left params
+            fusion_params.pop("field")
+            fusion_params.pop("data")
+            fusion_params.pop("data_type")
+            tmp_new_params.update(fusion_params)
+            tmp_fusion_expr["params"] = tmp_new_params
         else:
-            if isinstance(fusion_params, dict):
-                for k, v in fusion_params.items():
-                    if k == "topn":
-                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, "topn is not allowed in fusion params")
-                    fusion_option_str += f";{k}={v}"
-        _fusion["option"] = fusion_option_str
-        self._fusion.append(_fusion)
+            if fusion_params is not None:
+                tmp_fusion_expr["params"] = fusion_params
+        self._search_exprs.append(tmp_fusion_expr)
         return self
 
     def to_result(self):
