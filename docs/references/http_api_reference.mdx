@@ -1751,7 +1751,7 @@ curl --request GET \
             {
                 "match_method": "sparse",
                 "fields": "sparse_column",
-                "query_vector": [1.0, 2.0],
+                "query_vector": {"10":1.1, "20":2.2, "30": 3.3},
                 "metric_type": "l2",
                 "topn": 3,
                 "params": {"ef": "150"}   
