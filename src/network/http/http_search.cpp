@@ -595,104 +595,99 @@ FusionExpr* HTTPSearch::ParseFusion(const nlohmann::json &fusion_json_object,
     }
     return fusion_expr.release();
 }
-KnnExpr *HTTPSearch::ParseMatchDense(const nlohmann::json &knn_json_object, HTTPStatus &http_status, nlohmann::json &response) {
-    if (!knn_json_object.is_object()) {
+KnnExpr *HTTPSearch::ParseMatchDense(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+    if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = "KNN field should be object";
+        response["error_message"] = "MatchDense field should be object";
         return nullptr;
     }
-
     auto knn_expr = MakeUnique<KnnExpr>();
-
-    for (auto &field_json_obj : knn_json_object.items()) {
+    i64 topn = -1;
+    nlohmann::json query_vector_json;
+    // must have: "fields", "query_vector", "element_type", "metric_type", "topn"
+    // may have: "params"
+    constexpr std::array possible_keys{"fields", "query_vector", "element_type", "metric_type", "topn", "params"};
+    std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
+    for (auto &field_json_obj : json_object.items()) {
         String key = field_json_obj.key();
         ToLower(key);
+        if (!possible_keys_set.erase(key)) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = fmt::format("Unknown MatchDense expression key: {}", key);
+            return nullptr;
+        }
         if (IsEqual(key, "fields")) {
             auto column_expr = MakeUnique<ColumnExpr>();
-            const auto &fields_value = field_json_obj.value();
-            if (!fields_value.is_array()) {
-                response["error_code"] = ErrorCode::kInvalidExpression;
-                response["error_message"] = "Fields should be array";
-                return nullptr;
-            }
-            for (SizeT i = 0; i < fields_value.size(); ++i) {
-                column_expr->names_.emplace_back(fields_value[i]);
-            }
+            auto column_str = field_json_obj.value().get<String>();
+            column_expr->names_.push_back(std::move(column_str));
             knn_expr->column_expr_ = column_expr.release();
         } else if (IsEqual(key, "query_vector")) {
-            if (!knn_json_object.contains("element_type")) {
-                response["error_code"] = ErrorCode::kInvalidExpression;
-                response["error_message"] = "Missing element_type for query_vector";
-                return nullptr;
-            }
-            String element_type = knn_json_object["element_type"];
-            if (IsEqual(element_type, "float")) {
-                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
-            } else if(IsEqual(element_type, "float16")) {
-                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat16;
-            } else if(IsEqual(element_type, "bfloat16")) {
-                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemBFloat16;
-            } else if(IsEqual(element_type, "double")) {
-                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemDouble;
-            } else if(IsEqual(element_type, "integer")) {
-                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemInt32;
-            } else if(IsEqual(element_type, "int8")) {
-                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemInt8;
-            } else if(IsEqual(element_type, "uint8")) {
-                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemUInt8;
-            } else {
+            query_vector_json = field_json_obj.value();
+        } else if (IsEqual(key, "element_type")) {
+            String element_type = field_json_obj.value();
+            ToUpper(element_type);
+            try {
+                knn_expr->embedding_data_type_ = EmbeddingT::String2EmbeddingDataType(element_type);
+            } catch (std::exception &e) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = fmt::format("Not supported vector element type: {}", element_type);
-                return nullptr;
-            }
-
-            auto [dimension, embedding_ptr] = ParseVector(field_json_obj.value(), knn_expr->embedding_data_type_, http_status, response);
-            knn_expr->dimension_ = dimension;
-            knn_expr->embedding_data_ptr_ = embedding_ptr;
-        } else if (IsEqual(key, "element_type")) {
-            ;
-        } else if (IsEqual(key, "top_k")) {
-            if (field_json_obj.value().is_number_unsigned()) {
-                knn_expr->topn_ = field_json_obj.value();
-            } else {
-                response["error_code"] = ErrorCode::kInvalidTopKType;
-                response["error_message"] = "Top K field should be integer";
                 return nullptr;
             }
         } else if (IsEqual(key, "metric_type")) {
             String metric_type = field_json_obj.value();
             ToLower(metric_type);
-            if (IsEqual(metric_type, "l2")) {
-                knn_expr->distance_type_ = KnnDistanceType::kL2;
-            } else if (IsEqual(metric_type, "inner_product") or IsEqual(metric_type, "ip")) {
-                knn_expr->distance_type_ = KnnDistanceType::kInnerProduct;
-            } else if (IsEqual(metric_type, "cosine") or IsEqual(metric_type, "cos")) {
-                knn_expr->distance_type_ = KnnDistanceType::kCosine;
-            } else if (IsEqual(metric_type, "hamming")) {
-                knn_expr->distance_type_ = KnnDistanceType::kHamming;
-            } else {
+            if (!knn_expr->InitDistanceType(metric_type.c_str())) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = fmt::format("Unknown knn distance: {}", metric_type);
                 return nullptr;
             }
-        } else {
-            if (knn_expr->opt_params_ == nullptr) {
-                knn_expr->opt_params_ = new Vector<InitParameter *>();
+        } else if (IsEqual(key, "topn")) {
+            topn = field_json_obj.value().get<i64>();
+        } else if (IsEqual(key, "params")) {
+            const auto &params = field_json_obj.value();
+            if (!params.is_object()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "MatchDense params should be object";
+                return nullptr;
             }
-            if(key  == "index_name") {
-                knn_expr->index_name_ = field_json_obj.value();
+            for (const auto &[param_k, param_v] : params.items()) {
+                if (param_k == "index_name") {
+                    knn_expr->index_name_ = param_v;
+                }
+                if (param_k == "ignore_index" && param_v.get<String>() == "true") {
+                    knn_expr->ignore_index_ = true;
+                }
+                if (knn_expr->opt_params_ == nullptr) {
+                    knn_expr->opt_params_ = new Vector<InitParameter *>();
+                }
+                auto parameter = MakeUnique<InitParameter>();
+                parameter->param_name_ = param_k;
+                parameter->param_value_ = param_v;
+                knn_expr->opt_params_->emplace_back(parameter.release());
             }
-            if(key == "ignore_index" && field_json_obj.value() == "true") {
-                knn_expr->ignore_index_ = true;
-            }
-
-            auto parameter = MakeUnique<InitParameter>();
-            parameter->param_name_ = key;
-            parameter->param_value_ = field_json_obj.value();
-            knn_expr->opt_params_->emplace_back(parameter.release());
         }
     }
-
+    // "params" is optional
+    possible_keys_set.erase("params");
+    // check if all required fields are set
+    if (!possible_keys_set.empty()) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] =
+            fmt::format("Invalid MatchDense expression: following fields are required but not found: {}", fmt::join(possible_keys_set, ", "));
+        return nullptr;
+    }
+    if (topn <= 0) {
+        response["error_code"] = ErrorCode::kInvalidTopKType;
+        response["error_message"] = "MatchDense expression topn field should be positive integer";
+        return nullptr;
+    }
+    knn_expr->topn_ = topn;
+    const auto [dimension, embedding_ptr] = ParseVector(query_vector_json, knn_expr->embedding_data_type_, http_status, response);
+    if (embedding_ptr == nullptr) {
+        return nullptr;
+    }
+    knn_expr->dimension_ = dimension;
+    knn_expr->embedding_data_ptr_ = embedding_ptr;
     return knn_expr.release();
 }
 
