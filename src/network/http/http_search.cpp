@@ -14,7 +14,7 @@
 
 module;
 
-#include <expr/match_sparse_expr.h>
+#include <cassert>
 #include <string>
 
 module http_search;
@@ -23,10 +23,10 @@ import stl;
 import third_party;
 import parsed_expr;
 import knn_expr;
-import match_tensor_expr;
 import match_expr;
 import search_expr;
 import match_tensor_expr;
+import match_sparse_expr;
 import fusion_expr;
 import column_expr;
 import function_expr;
@@ -40,6 +40,7 @@ import data_block;
 import value;
 import physical_import;
 import explain_statement;
+import internal_types;
 
 namespace infinity {
 
@@ -152,7 +153,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     search_expr = new SearchExpr();
                 }
                 auto &knn_json = elem.value();
-                const auto knn_expr = ParseKnn(knn_json, http_status, response);
+                const auto knn_expr = ParseMatchDense(knn_json, http_status, response);
                 if (knn_expr == nullptr) {
                     return;
                 }
@@ -163,7 +164,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     search_expr = new SearchExpr();
                 }
                 auto &match_json = elem.value();
-                const auto match_expr = ParseMatch(match_json, http_status, response);
+                const auto match_expr = ParseMatchText(match_json, http_status, response);
                 if (match_expr == nullptr) {
                     return;
                 }
@@ -356,7 +357,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                     search_expr = new SearchExpr();
                 }
                 auto &knn_json = elem.value();
-                const auto knn_expr = ParseKnn(knn_json, http_status, response);
+                const auto knn_expr = ParseMatchDense(knn_json, http_status, response);
                 if (knn_expr == nullptr) {
                     return;
                 }
@@ -367,7 +368,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                     search_expr = new SearchExpr();
                 }
                 auto &match_json = elem.value();
-                const auto match_expr = ParseMatch(match_json, http_status, response);
+                const auto match_expr = ParseMatchText(match_json, http_status, response);
                 if (match_expr == nullptr) {
                     return;
                 }
@@ -539,62 +540,83 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
     output_columns = nullptr;
     return res;
 }
-FusionExpr* HTTPSearch::ParseFusion(const nlohmann::json &fusion_json_object,
-                             HTTPStatus &http_status,
-                             nlohmann::json &response) {
-    if (!fusion_json_object.is_object()) {
+
+FusionExpr *HTTPSearch::ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+    if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = fmt::format("Fusion expression must be a json object: {}", fusion_json_object);
+        response["error_message"] = fmt::format("Fusion expression must be a json object: {}", json_object);
         return nullptr;
     }
-
-    u32 method_cnt = 0;
-
-    UniquePtr<FusionExpr> fusion_expr = nullptr;
-    for (const auto &expression : fusion_json_object.items()) {
+    i64 topn = -1;
+    nlohmann::json fusion_params;
+    auto fusion_expr = MakeUnique<FusionExpr>();
+    // must have: "fusion_method", "topn"
+    // may have: "params"
+    constexpr std::array possible_keys{"fusion_method", "topn", "params"};
+    std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
+    for (const auto &expression : json_object.items()) {
         String key = expression.key();
         ToLower(key);
-        if (IsEqual(key, "method")) {
-            if (method_cnt++) {
+        if (!possible_keys_set.erase(key)) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = fmt::format("Unknown Fusion expression key: {}", key);
+            return nullptr;
+        }
+        if (IsEqual(key, "fusion_method")) {
+            String method_str = expression.value();
+            ToLower(method_str);
+            fusion_expr->method_ = std::move(method_str);
+        } else if (IsEqual(key, "topn")) {
+            topn = expression.value().get<i64>();
+        } else if (IsEqual(key, "params")) {
+            const auto &params = expression.value();
+            if (!params.is_object()) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
-                response["error_message"] = "Method is already given";
+                response["error_message"] = "Fusion params should be object";
                 return nullptr;
             }
-            if (!fusion_expr) {
-                fusion_expr = MakeUnique<FusionExpr>();
-            }
-            fusion_expr->method_ = expression.value();
-        } else if (IsEqual(key, "option")) {
-            if (!fusion_expr) {
-                fusion_expr = MakeUnique<FusionExpr>();
-            }
-            fusion_expr->SetOptions(expression.value());
-        } else if (IsEqual(key, "optional_match_tensor")) {
-            if (!fusion_expr) {
-                fusion_expr = MakeUnique<FusionExpr>();
-            }
-            auto &match_tensor_json = expression.value();
-            const auto match_tensor_expr = ParseMatchTensor(match_tensor_json, http_status, response);
-            if (match_tensor_expr == nullptr) {
-                return nullptr;
-            }
-            fusion_expr->match_tensor_expr_.reset(match_tensor_expr);
-        } else {
-            response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = "Error fusion clause";
-            return nullptr;
+            fusion_params = params;
         }
     }
-
-    if (fusion_expr) {
-        if (fusion_expr->method_.empty()) {
+    // "params" is optional
+    possible_keys_set.erase("params");
+    // check if all required fields are set
+    if (!possible_keys_set.empty()) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] =
+            fmt::format("Invalid Fusion expression: following fields are required but not found: {}", fmt::join(possible_keys_set, ", "));
+        return nullptr;
+    }
+    if (topn <= 0) {
+        response["error_code"] = ErrorCode::kInvalidTopKType;
+        response["error_message"] = "Fusion expression topn field should be positive integer";
+        return nullptr;
+    }
+    String extra_params_str{};
+    if (fusion_expr->method_ == "match_tensor") {
+        nlohmann::json match_tensor_json = fusion_params;
+        match_tensor_json["match_method"] = "match_tensor";
+        if (match_tensor_json.contains("topn")) {
             response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = "Error fusion clause : empty method";
+            response["error_message"] = "Fusion expression topn field should not be set in params";
             return nullptr;
         }
+        match_tensor_json["topn"] = topn;
+        const auto match_tensor_expr = ParseMatchTensor(match_tensor_json, http_status, response);
+        if (match_tensor_expr == nullptr) {
+            return nullptr;
+        }
+        fusion_expr->match_tensor_expr_.reset(match_tensor_expr);
+    } else {
+        for (auto &param : fusion_params.items()) {
+            String param_k = param.key(), param_v = param.value();
+            extra_params_str += fmt::format(";{}={}", param_k, param_v);
+        }
     }
+    fusion_expr->SetOptions(fmt::format("topn={}{}", topn, extra_params_str));
     return fusion_expr.release();
 }
+
 KnnExpr *HTTPSearch::ParseMatchDense(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1113,7 +1135,7 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
             return {dimension, res};
         }
         case EmbeddingDataType::kElemFloat16: {
-            float16_t *embedding_data_ptr = new float16_t[dimension];
+            Float16T *embedding_data_ptr = new Float16T[dimension];
             DeferFn defer_free_embedding([&]() {
                 if (embedding_data_ptr != nullptr) {
                     delete[] embedding_data_ptr;
@@ -1141,12 +1163,12 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
                 }
             }
 
-            float16_t *res = embedding_data_ptr;
+            Float16T *res = embedding_data_ptr;
             embedding_data_ptr = nullptr;
             return {dimension, res};
         }
         case EmbeddingDataType::kElemBFloat16: {
-            bfloat16_t *embedding_data_ptr = new bfloat16_t[dimension];
+            BFloat16T *embedding_data_ptr = new BFloat16T[dimension];
             DeferFn defer_free_embedding([&]() {
                 if (embedding_data_ptr != nullptr) {
                     delete[] embedding_data_ptr;
@@ -1174,7 +1196,7 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
                 }
             }
 
-            bfloat16_t *res = embedding_data_ptr;
+            BFloat16T *res = embedding_data_ptr;
             embedding_data_ptr = nullptr;
             return {dimension, res};
         }
