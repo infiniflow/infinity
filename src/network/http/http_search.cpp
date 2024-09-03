@@ -743,23 +743,27 @@ MatchTensorExpr *HTTPSearch::ParseMatchTensor(const nlohmann::json &json_object,
         return nullptr;
     }
     auto match_tensor_expr = MakeUnique<MatchTensorExpr>();
-
+    match_tensor_expr->SetSearchMethodStr("maxsim");
+    String element_type{};
+    SharedPtr<ConstantExpr> tensor_expr{};
+    i64 topn = -1;
+    String extra_params{};
+    // must have: "fields", "query_tensor", "element_type", "topn"
+    // may have: "params"
+    constexpr std::array possible_keys{"fields", "query_tensor", "element_type", "topn", "params"};
+    std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
     for (auto &field_json_obj : json_object.items()) {
         String key = field_json_obj.key();
         ToLower(key);
-        if (IsEqual(key, "search_method")) {
-            match_tensor_expr->SetSearchMethodStr(field_json_obj.value());
-        } else if (IsEqual(key, "fields")) {
+        if (!possible_keys_set.erase(key)) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = fmt::format("Unknown MatchTensor expression key: {}", key);
+            return nullptr;
+        }
+        if (IsEqual(key, "fields")) {
+            auto column_str = field_json_obj.value().get<String>();
             auto column_expr = MakeUnique<ColumnExpr>();
-            const auto &fields_value = field_json_obj.value();
-            if (!fields_value.is_array()) {
-                response["error_code"] = ErrorCode::kInvalidExpression;
-                response["error_message"] = "Fields should be array";
-                return nullptr;
-            }
-            for (SizeT i = 0; i < fields_value.size(); i++) {
-                column_expr->names_.emplace_back(fields_value[i]);
-            }
+            column_expr->names_.push_back(std::move(column_str));
             match_tensor_expr->column_expr_ = std::move(column_expr);
         } else if (IsEqual(key, "query_tensor")) {
             if (!json_object.contains("element_type")) {
@@ -767,18 +771,40 @@ MatchTensorExpr *HTTPSearch::ParseMatchTensor(const nlohmann::json &json_object,
                 response["error_message"] = "Missing element_type for query_tensor";
                 return nullptr;
             }
-            String element_type = json_object["element_type"];
-            const auto tensor_expr = BuildConstantExprFromJson(field_json_obj.value());
-            match_tensor_expr->SetQueryTensorStr(std::move(element_type), tensor_expr.get());
-        } else if (IsEqual(key, "options")) {
-            match_tensor_expr->options_text_ = field_json_obj.value();
-        } else if (!IsEqual(key, "element_type")) {
-            response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Unknown match expression key: {}", key);
-            return nullptr;
+            tensor_expr = BuildConstantExprFromJson(field_json_obj.value());
+        } else if (IsEqual(key, "element_type")) {
+            element_type = field_json_obj.value();
+        } else if (IsEqual(key, "topn")) {
+            topn = field_json_obj.value().get<i64>();
+        } else if (IsEqual(key, "params")) {
+            const auto &params = field_json_obj.value();
+            if (!params.is_object()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "MatchTensor params should be object";
+                return nullptr;
+            }
+            for (auto &param : params.items()) {
+                String param_k = param.key(), param_v = param.value();
+                extra_params += fmt::format(";{}={}", param_k, param_v);
+            }
         }
     }
-
+    // "params" is optional
+    possible_keys_set.erase("params");
+    // check if all required fields are set
+    if (!possible_keys_set.empty()) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] =
+            fmt::format("Invalid MatchTensor expression: following fields are required but not found: {}", fmt::join(possible_keys_set, ", "));
+        return nullptr;
+    }
+    if (topn <= 0) {
+        response["error_code"] = ErrorCode::kInvalidTopKType;
+        response["error_message"] = "MatchTensor expression topn field should be positive integer";
+        return nullptr;
+    }
+    match_tensor_expr->options_text_ = fmt::format("topn={}{}", topn, extra_params);
+    match_tensor_expr->SetQueryTensorStr(std::move(element_type), tensor_expr.get());
     return match_tensor_expr.release();
 }
 
