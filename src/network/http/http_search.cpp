@@ -479,6 +479,11 @@ UniquePtr<FusionExpr> HTTPSearch::ParseFusion(const nlohmann::json &json_object,
             ToLower(method_str);
             fusion_expr->method_ = std::move(method_str);
         } else if (IsEqual(key, "topn")) {
+            if (!expression.value().is_number_integer()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "Fusion expression topn field should be integer";
+                return nullptr;
+            }
             topn = expression.value().get<i64>();
         } else if (IsEqual(key, "params")) {
             const auto &params = expression.value();
@@ -584,6 +589,11 @@ UniquePtr<KnnExpr> HTTPSearch::ParseMatchDense(const nlohmann::json &json_object
                 return nullptr;
             }
         } else if (IsEqual(key, "topn")) {
+            if (!field_json_obj.value().is_number_integer()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "MatchDense topn field should be integer";
+                return nullptr;
+            }
             topn = field_json_obj.value().get<i64>();
         } else if (IsEqual(key, "params")) {
             const auto &params = field_json_obj.value();
@@ -669,6 +679,11 @@ UniquePtr<MatchExpr> HTTPSearch::ParseMatchText(const nlohmann::json &json_objec
         } else if (IsEqual(key, "matching_text")) {
             match_expr->matching_text_ = field_json_obj.value();
         } else if (IsEqual(key, "topn")) {
+            if (!field_json_obj.value().is_number_integer()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "MatchText topn field should be integer";
+                return nullptr;
+            }
             topn = field_json_obj.value().get<i64>();
         } else if (IsEqual(key, "params")) {
             const auto &params = field_json_obj.value();
@@ -748,6 +763,11 @@ UniquePtr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(const nlohmann::json &js
         } else if (IsEqual(key, "element_type")) {
             element_type = field_json_obj.value();
         } else if (IsEqual(key, "topn")) {
+            if (!field_json_obj.value().is_number_integer()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "MatchTensor topn field should be integer";
+                return nullptr;
+            }
             topn = field_json_obj.value().get<i64>();
         } else if (IsEqual(key, "params")) {
             const auto &params = field_json_obj.value();
@@ -835,6 +855,11 @@ UniquePtr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(const nlohmann::json &js
         } else if (IsEqual(key, "metric_type")) {
             match_sparse_expr->SetMetricType(field_json_obj.value().get<String>());
         } else if (IsEqual(key, "topn")) {
+            if (!field_json_obj.value().is_number_integer()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "MatchSparse topn field should be integer";
+                return nullptr;
+            }
             topn = field_json_obj.value().get<i64>();
         } else if (IsEqual(key, "params")) {
             const auto &params = field_json_obj.value();
