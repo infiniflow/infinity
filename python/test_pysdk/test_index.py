@@ -1,18 +1,21 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import infinity
+import infinity_embedded
 import os
 import time
 import infinity.index as index
 import pandas
 import pytest
 from common import common_values
+from common import common_index
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 TEST_DATA_DIR = "/test/data/"
@@ -31,11 +34,19 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.index")
+        globals()["index"] = module
+        module = importlib.import_module("infinity_embedded.common")
+        func = getattr(module, 'ConflictType')
+        globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
         uri = common_values.TEST_LOCAL_PATH
+        request.cls.infinity_obj = infinity_embedded.connect(uri)
     else:
         uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    request.cls.infinity_obj = infinity.connect(uri)
     if http:
         request.cls.infinity_obj = infinity_http()
     yield
@@ -266,8 +277,8 @@ class TestInfinity:
         ("$#%dfva", False),
         ((1, 2), False),
         ({"1": 2}, False),
-        (index.IndexType.Hnsw, False),
-        (index.IndexType.IVFFlat, True)
+        (common_index.IndexType.Hnsw, False),
+        (common_index.IndexType.IVFFlat, True)
     ])
     @pytest.mark.parametrize("params", [
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((1, 2), False), ({"1": 2}, False),
@@ -304,7 +315,7 @@ class TestInfinity:
         ((1, 2), False),
         ({"1": 2}, False),
         ("c1", True)])
-    @pytest.mark.parametrize("index_type", [(index.IndexType.FullText, True)])
+    @pytest.mark.parametrize("index_type", [(common_index.IndexType.FullText, True)])
     @pytest.mark.parametrize("params", [
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False),
         ((1, 2), False), ({"1": 2}, False), (None, True)
@@ -409,9 +420,9 @@ class TestInfinity:
 
     @pytest.mark.parametrize("types", ["vector, 3, float"])
     @pytest.mark.parametrize("index_type", [
-        (index.IndexType.Hnsw, False, ErrorCode.INVALID_INDEX_PARAM),
-        (index.IndexType.IVFFlat, True),
-        (index.IndexType.FullText, False, ErrorCode.INVALID_INDEX_DEFINITION)
+        (common_index.IndexType.Hnsw, False, ErrorCode.INVALID_INDEX_PARAM),
+        (common_index.IndexType.IVFFlat, True),
+        (common_index.IndexType.FullText, False, ErrorCode.INVALID_INDEX_DEFINITION)
     ])
     def test_create_index_on_different_type_of_column(self, types, index_type, suffix):
         # connect
@@ -444,7 +455,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("index_type", [
-        index.IndexType.IVFFlat
+        common_index.IndexType.IVFFlat
     ])
     def test_insert_data_create_index(self, index_type, suffix):
         # connect
@@ -465,8 +476,8 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("index_type", [
-        (index.IndexType.IVFFlat, True),
-        (index.IndexType.FullText, False, ErrorCode.INVALID_INDEX_DEFINITION)
+        (common_index.IndexType.IVFFlat, True),
+        (common_index.IndexType.FullText, False, ErrorCode.INVALID_INDEX_DEFINITION)
     ])
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_import_data_create_index(self, index_type, file_format, suffix):
@@ -503,7 +514,7 @@ class TestInfinity:
             "test_import_data_create_index"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat])
+    @pytest.mark.parametrize("index_type", [common_index.IndexType.IVFFlat])
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_create_vector_index_import_data(self, index_type, file_format, suffix):
         # connect
@@ -528,7 +539,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("index_type", [
-        pytest.param(index.IndexType.FullText)
+        pytest.param(common_index.IndexType.FullText)
     ])
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_create_index_import_data(self, index_type, file_format, suffix):
@@ -1145,19 +1156,19 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("index_type", [
-        index.IndexType.IVFFlat,
-        index.IndexType.Hnsw,
-        index.IndexType.BMP,
-        index.IndexType.FullText,
-        index.IndexType.EMVB,
-        index.IndexType.Secondary,
+        common_index.IndexType.IVFFlat,
+        common_index.IndexType.Hnsw,
+        common_index.IndexType.BMP,
+        common_index.IndexType.FullText,
+        common_index.IndexType.EMVB,
+        common_index.IndexType.Secondary,
     ])
     def test_create_index_with_converse_param_name(self, index_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_index"+suffix, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
-        if index_type == index.IndexType.IVFFlat:
+        if index_type == common_index.IndexType.IVFFlat:
             table_obj = db_obj.create_table("test_index"+suffix, {
                 "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
             assert table_obj is not None
@@ -1168,7 +1179,7 @@ class TestInfinity:
                                                          {"CENTROIDS_COUNT": "128", "METRIC": "l2"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.Hnsw:
+        elif index_type == common_index.IndexType.Hnsw:
             table_obj = db_obj.create_table(
                 "test_index"+suffix, {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
             assert table_obj is not None
@@ -1183,7 +1194,7 @@ class TestInfinity:
                                                          }), ConflictType.Error)
 
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.BMP:
+        elif index_type == common_index.IndexType.BMP:
             table_obj = db_obj.create_table(
                 "test_index"+suffix, {"col1": {"type": "int"}, "col2": {"type": "sparse,30000,float,int16"}},
                 ConflictType.Error)
@@ -1196,7 +1207,7 @@ class TestInfinity:
                                                          {"BLOCK_SIZE": "8", "COMPRESS_TYPE": "compress"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.FullText:
+        elif index_type == common_index.IndexType.FullText:
             table_obj = db_obj.create_table(
                 "test_index"+suffix, {
                     "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}
@@ -1210,7 +1221,7 @@ class TestInfinity:
                                          ConflictType.Error)
 
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.EMVB:
+        elif index_type == common_index.IndexType.EMVB:
             table_obj = db_obj.create_table(
                 "test_index"+suffix, {
                     "c1": {"type": "int"}, "c2": {"type": "tensor, 128, float"}
@@ -1222,7 +1233,7 @@ class TestInfinity:
                                                          {"PQ_SUBSPACE_NUM": "32", "PQ_SUBSPACE_BITS": "8"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.Secondary:
+        elif index_type == common_index.IndexType.Secondary:
             table_obj = db_obj.create_table(
                 "test_index"+suffix, {
                     "c1": {"type": "int"}, "body": {"type": "varchar"}
@@ -1243,18 +1254,18 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("index_type", [
-        index.IndexType.IVFFlat,
-        index.IndexType.Hnsw,
-        index.IndexType.BMP,
-        index.IndexType.FullText,
-        index.IndexType.EMVB,
-        index.IndexType.Secondary,
+        common_index.IndexType.IVFFlat,
+        common_index.IndexType.Hnsw,
+        common_index.IndexType.BMP,
+        common_index.IndexType.FullText,
+        common_index.IndexType.EMVB,
+        common_index.IndexType.Secondary,
     ])
     def test_create_index_with_converse_param_value(self, index_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_index"+suffix, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
-        if index_type == index.IndexType.IVFFlat:
+        if index_type == common_index.IndexType.IVFFlat:
             table_obj = db_obj.create_table("test_index"+suffix, {
                 "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
             assert table_obj is not None
@@ -1265,7 +1276,7 @@ class TestInfinity:
                                                          {"centroids_count": "128", "metric": "l2"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.Hnsw:
+        elif index_type == common_index.IndexType.Hnsw:
             table_obj = db_obj.create_table(
                 "test_index"+suffix, {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
             assert table_obj is not None
@@ -1280,7 +1291,7 @@ class TestInfinity:
                                                          }), ConflictType.Error)
 
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.BMP:
+        elif index_type == common_index.IndexType.BMP:
             table_obj = db_obj.create_table(
                 "test_index"+suffix, {"col1": {"type": "int"}, "col2": {"type": "sparse,30000,float,int16"}},
                 ConflictType.Error)
@@ -1293,7 +1304,7 @@ class TestInfinity:
                                                          {"block_size": "8", "compress_type": "COMPRESS"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.FullText:
+        elif index_type == common_index.IndexType.FullText:
             table_obj = db_obj.create_table(
                 "test_index"+suffix, {
                     "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}
@@ -1307,7 +1318,7 @@ class TestInfinity:
                                          ConflictType.Error)
 
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.EMVB:
+        elif index_type == common_index.IndexType.EMVB:
             table_obj = db_obj.create_table(
                 "test_index"+suffix, {
                     "c1": {"type": "int"}, "c2": {"type": "tensor, 128, float"}
@@ -1319,7 +1330,7 @@ class TestInfinity:
                                                          {"pq_subspace_num": "32", "pq_subspace_bits": "8"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.Secondary:
+        elif index_type == common_index.IndexType.Secondary:
             table_obj = db_obj.create_table(
                 "test_index"+suffix, {
                     "c1": {"type": "int"}, "body": {"type": "varchar"}

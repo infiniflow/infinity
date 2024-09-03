@@ -1,15 +1,16 @@
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import pytest
 from common import common_values
 from sqlglot import condition
 from infinity.remote_thrift.table import traverse_conditions
 import infinity
+import infinity_embedded
 from infinity.errors import ErrorCode
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 
@@ -21,9 +22,10 @@ class TestInfinity:
     def setup(self, local_infinity, http):
         if local_infinity:
             self.uri = common_values.TEST_LOCAL_PATH
+            self.infinity_obj = infinity_embedded.connect(self.uri)
         else:
             self.uri = common_values.TEST_LOCAL_HOST
-        self.infinity_obj = infinity.connect(self.uri)
+            self.infinity_obj = infinity.connect(self.uri)
         if http:
             self.infinity_obj = infinity_http()
         assert self.infinity_obj

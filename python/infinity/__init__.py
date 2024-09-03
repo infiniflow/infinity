@@ -23,13 +23,10 @@ import os
 from infinity.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFINITY_PATH, InfinityException
 from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
-from infinity.local_infinity.infinity import LocalInfinityConnection
 from infinity.errors import ErrorCode
 
 def connect(uri) -> InfinityConnection:
     if isinstance(uri, NetworkAddress):
         return RemoteThriftInfinityConnection(uri)
-    elif isinstance(uri, str) and len(uri) != 0:
-        return LocalInfinityConnection(uri)
     else:
         raise InfinityException(ErrorCode.INVALID_SERVER_ADDRESS, f"Unknown uri: {uri}")

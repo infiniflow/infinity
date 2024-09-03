@@ -243,22 +243,24 @@ identifier_limit = 65536
 
 def check_valid_name(name, name_type: str = "Table"):
     if not isinstance(name, str):
-        raise ValueError(f"{name_type} name must be a string, got {type(name)}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name must be a string, got {type(name)}")
     if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
-        raise ValueError(
-            f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
     if len(name) > identifier_limit:
-        raise ValueError(f"{name_type} name '{name}' is not of appropriate length")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name '{name}' is not of appropriate length")
     if name is None:
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name.isspace():
-        raise ValueError(f"{name_type} name cannot be composed of whitespace characters only")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"{name_type} name cannot be composed of whitespace characters only")
     if name == '':
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name == ' ':
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name.isdigit():
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
 
 
 def name_validity_check(arg_name: str, name_type: str = "Table"):

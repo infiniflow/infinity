@@ -16,10 +16,6 @@ from enum import Enum
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.common import InfinityException
-
-from infinity.embedded_infinity_ext import IndexType as LocalIndexType, WrapIndexInfo
-from infinity.embedded_infinity_ext import InitParameter as LocalInitParameter
-from infinity.embedded_infinity_ext import WrapIndexInfo as LocalIndexInfo
 from infinity.errors import ErrorCode
 
 
@@ -51,25 +47,6 @@ class IndexType(Enum):
             case _:
                 raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
 
-    def to_local_type(self):
-        match self:
-            case IndexType.IVFFlat:
-                return LocalIndexType.kIVFFlat
-            case IndexType.Hnsw:
-                return LocalIndexType.kHnsw
-            case IndexType.FullText:
-                return LocalIndexType.kFullText
-            case IndexType.Secondary:
-                return LocalIndexType.kSecondary
-            case IndexType.EMVB:
-                return LocalIndexType.kEMVB
-            case IndexType.BMP:
-                return LocalIndexType.kBMP
-            case IndexType.DiskAnn:
-                return LocalIndexType.kDiskAnn
-            case _:
-                raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
-
 
 class InitParameter:
     def __init__(self, param_name: str, param_value: str):
@@ -84,12 +61,6 @@ class InitParameter:
 
     def to_ttype(self):
         return ttypes.InitParameter(self.param_name, self.param_value)
-
-    def to_local_type(self):
-        local_init_parameter = LocalInitParameter()
-        local_init_parameter.param_name = self.param_name
-        local_init_parameter.param_value = self.param_value
-        return local_init_parameter
 
 
 class IndexInfo:
@@ -130,22 +101,3 @@ class IndexInfo:
             self.index_type.to_ttype(),
             init_params_list
         )
-
-    def to_local_type(self):
-        index_info_to_use = WrapIndexInfo()
-        index_info_to_use.index_type = self.index_type.to_local_type()
-        index_info_to_use.column_name = self.column_name.strip()
-
-        index_param_list = []
-        if self.params is not None:
-            for key, value in self.params.items():
-                if isinstance(value, str):
-                    local_init_parameter = LocalInitParameter()
-                    local_init_parameter.param_name = key
-                    local_init_parameter.param_value = value
-                    index_param_list.append(local_init_parameter)
-                else:
-                    raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"{value} should be string type")
-
-        index_info_to_use.index_param_list = index_param_list
-        return index_info_to_use
