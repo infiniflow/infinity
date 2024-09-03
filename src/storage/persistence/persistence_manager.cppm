@@ -28,7 +28,7 @@ export struct ObjAddr {
     SizeT part_offset_{};
     SizeT part_size_{};
 
-    bool Valid() const { return !obj_key_.empty() && part_size_ > 0; }
+    bool Valid() const { return !obj_key_.empty(); }
 
     nlohmann::json Serialize() const;
 

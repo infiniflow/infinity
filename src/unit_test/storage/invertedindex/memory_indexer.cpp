@@ -60,6 +60,7 @@ protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     SharedPtr<ColumnVector> column_;
     Vector<ExpectedPosting> expected_postings_;
+    SharedPtr<ColumnVector> empty_column_;
     String config_path_{};
 
 public:
@@ -82,6 +83,13 @@ public:
             column_->AppendValue(v);
         }
         expected_postings_ = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
+
+        empty_column_ = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
+        empty_column_->Initialize();
+        for (SizeT i = 0; i < 10; ++i) {
+            Value v = Value::MakeVarchar(String(""));
+            empty_column_->AppendValue(v);
+        }
     }
 
     void Check(ColumnIndexReader &reader) {
@@ -154,6 +162,22 @@ TEST_P(MemoryIndexerTest, test2) {
     ColumnIndexReader reader;
     reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
     Check(reader);
+}
+
+TEST_P(MemoryIndexerTest, test3) {
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    indexer1.Insert(empty_column_, 0, 10, true);
+    indexer1.Dump(true);
+    fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
+
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
+
+    ColumnIndexReader reader;
+    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
+    Pair<u64, float> res = reader.GetTotalDfAndAvgColumnLength();
+    ASSERT_EQ(res.first, 0U);
+    ASSERT_EQ(res.second, 0.0f);
 }
 
 TEST_P(MemoryIndexerTest, SpillLoadTest) {
