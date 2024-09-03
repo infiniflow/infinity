@@ -2507,6 +2507,7 @@ public:
         });
         {
             index_info->column_name_ = fields[0];
+            ToLower(index_info->column_name_);
             auto index_param_list = new Vector<InitParameter *>();
             DeferFn release_index_param_list([&]() {
                 if(index_param_list != nullptr) {
@@ -2520,6 +2521,7 @@ public:
 
             for (auto &ele : index.items()) {
                 String name = ele.key();
+                ToLower(name);
                 auto value = ele.value();
                 if (!ele.value().is_string()) {
                     value = ele.value().dump();

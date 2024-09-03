@@ -417,7 +417,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             if (auto index_type = table_index_entry->index_base()->index_type_;
                 index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
                 LOG_ERROR("Invalid index type");
-                Status error_status = Status::InvalidIndexType();
+                Status error_status = Status::InvalidIndexType("invalid index");
                 RecoverableError(std::move(error_status));
             }
 

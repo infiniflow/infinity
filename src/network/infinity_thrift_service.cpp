@@ -1070,7 +1070,7 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
         delete index_info_to_use;
         index_info_to_use = nullptr;
 
-        ProcessStatus(response, Status::InvalidIndexType());
+        ProcessStatus(response, Status::InvalidIndexType("Invalid index"));
         return;
     }
 
