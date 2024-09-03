@@ -759,7 +759,13 @@ UniquePtr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(const nlohmann::json &js
                 response["error_message"] = "Missing element_type for query_tensor";
                 return nullptr;
             }
-            tensor_expr = BuildConstantExprFromJson(field_json_obj.value());
+            try {
+                tensor_expr = BuildConstantExprFromJson(field_json_obj.value());
+            } catch (std::exception &e) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("Invalid query_tensor, error info: {}", e.what());
+                return nullptr;
+            }
         } else if (IsEqual(key, "element_type")) {
             element_type = field_json_obj.value();
         } else if (IsEqual(key, "topn")) {
@@ -797,7 +803,13 @@ UniquePtr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(const nlohmann::json &js
         return nullptr;
     }
     match_tensor_expr->options_text_ = fmt::format("topn={}{}", topn, extra_params);
-    match_tensor_expr->SetQueryTensorStr(std::move(element_type), tensor_expr.get());
+    try {
+        match_tensor_expr->SetQueryTensorStr(std::move(element_type), tensor_expr.get());
+    } catch (std::exception &e) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = fmt::format("Invalid query_tensor, error info: {}", e.what());
+        return nullptr;
+    }
     return match_tensor_expr;
 }
 
@@ -853,7 +865,13 @@ UniquePtr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(const nlohmann::json &js
             match_sparse_expr->SetQuerySparse(const_sparse_expr);
             assert(const_sparse_expr == nullptr);
         } else if (IsEqual(key, "metric_type")) {
-            match_sparse_expr->SetMetricType(field_json_obj.value().get<String>());
+            try {
+                match_sparse_expr->SetMetricType(field_json_obj.value().get<String>());
+            } catch (std::exception &e) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("Invalid metric_type: {}, error info: {}", field_json_obj.value().get<String>(), e.what());
+                return nullptr;
+            }
         } else if (IsEqual(key, "topn")) {
             if (!field_json_obj.value().is_number_integer()) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
