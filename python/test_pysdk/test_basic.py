@@ -133,8 +133,13 @@ class TestInfinity:
 
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
-                                                     index.IndexType.IVFFlat,
-                                                     {"centroids_count": "128", "metric": "l2"}),
+                                                     index.IndexType.Hnsw,
+                                                     {
+                                                         "m": "16",
+                                                         "ef_construction": "200",
+                                                         "metric": "l2",
+                                                         "encode": "lvq"
+                                                     }),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 

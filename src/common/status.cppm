@@ -262,7 +262,7 @@ public:
     static Status InvalidEmbeddingDataType(const String& type_str);
     static Status InvalidConstantType();
     static Status InvalidParsedExprType();
-    static Status InvalidIndexType();
+    static Status InvalidIndexType(const String& message);
     static Status InvalidIndexParam(const String &param_name);
     static Status LackIndexParam();
     static Status InvalidFilterExpression(const String &expr);

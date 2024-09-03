@@ -344,7 +344,13 @@ Status Status::InvalidConstantType() { return Status(ErrorCode::kInvalidConstant
 
 Status Status::InvalidParsedExprType() { return Status(ErrorCode::kInvalidParsedExprType, MakeUnique<String>("Invalid parsed expression type.")); }
 
-Status Status::InvalidIndexType() { return Status(ErrorCode::kInvalidIndexType, MakeUnique<String>("Invalid index type.")); }
+Status Status::InvalidIndexType(const String& message) {
+    if(message.empty()) {
+        return Status(ErrorCode::kInvalidIndexType, MakeUnique<String>("No index type is given"));
+    } else {
+        return Status(ErrorCode::kInvalidIndexType, MakeUnique<String>(fmt::format("Invalid index type: ", message)));
+    }
+}
 
 Status Status::InvalidIndexParam(const String &param_name) {
     return Status(ErrorCode::kInvalidIndexParam, MakeUnique<String>(fmt::format("Invalid index parameter type: {}", param_name)));
