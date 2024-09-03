@@ -13,11 +13,6 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-#include <__chrono/time_point.h>
-#include <chrono>
-#include <cmath>
-#include <ctime>
-#include <sstream>
 import base_test;
 
 import infinity_exception;
@@ -61,15 +56,7 @@ TEST_F(DateTypeTest, test1) {
 
 TEST_F(DateTypeTest, TestEqStdChronoForward) {
     using namespace infinity;
-    using std::chrono::year_month_day;
-    using std::chrono::sys_days;
-    using std::chrono::system_clock;
-    using std::chrono::ceil;
-    using std::chrono::days;
-    using std::tm;
-    using std::time_t;
-    using std::mktime;
-    using std::format;
+    using namespace std::chrono;
 
     //2020-1-31
     DateT date;
@@ -100,18 +87,11 @@ TEST_F(DateTypeTest, TestEqStdChronoForward) {
 }
 
 TEST_F(DateTypeTest, TestEqStdChronoBackward) {
-    using namespace infinity;
-    using std::chrono::year_month_day;
-    using std::chrono::sys_days;
-    using std::chrono::system_clock;
-    using std::chrono::ceil;
-    using std::chrono::days;
-    using std::tm;
-    using std::time_t;
-    using std::mktime;
-    using std::format;
+    using namespace infinity; 
+    using namespace std::chrono;
 
     //2020-1-31
+    //std::chrono::
     DateT date;
     date.FromString("2020-01-31");
 
