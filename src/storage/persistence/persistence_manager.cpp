@@ -160,7 +160,11 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
         String error_message = fmt::format("Failed to get file size of {}.", file_path);
         UnrecoverableError(error_message);
     }
-    if (src_size >= object_size_limit_) {
+    if (src_size == 0) {
+        String error_message = fmt::format("Persist skipped empty local path {}.", file_path);
+        LOG_WARN(error_message);
+        return ObjAddr();
+    } else if (src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         fs::path dst_fp = workspace_;
         dst_fp.append(obj_key);
@@ -211,7 +215,11 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
 
 ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size) {
     fs::path dst_fp = workspace_;
-    if (src_size >= object_size_limit_) {
+    if (src_size == 0) {
+        String error_message = fmt::format("Persist skipped empty data.");
+        LOG_WARN(error_message);
+        return ObjAddr();
+    } else if (src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         dst_fp.append(obj_key);
         std::ofstream outFile(dst_fp, std::ios::app);
@@ -337,7 +345,8 @@ String PersistenceManager::GetObjCache(const String &file_path) {
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("GetObjCache Failed to find object for local path {}", local_path);
-        UnrecoverableError(error_message);
+        LOG_WARN(error_message);
+        return "";
     }
     auto oit = objects_.find(it->second.obj_key_);
     if (oit != objects_.end()) {
@@ -381,13 +390,22 @@ void PersistenceManager::PutObjCache(const String &file_path) {
 
     assert(oit->second.ref_count_ > 0);
     oit->second.ref_count_--;
-    // For large files linked, fill in the file size when putting to ensure obj valid
     if (it->second.part_size_ == 0 && it->second.part_offset_ == 0) {
+        assert(oit->second.ref_count_ == 0);
+        // For large files linked, fill in the file size when putting to ensure obj valid
         // There's no footer in dedicated objects.
         String obj_full_path = fs::path(workspace_).append(it->second.obj_key_).string();
         oit->second.obj_size_ = fs::file_size(obj_full_path);
         oit->second.parts_ = 1;
         it->second.part_size_ = oit->second.obj_size_;
+
+        if (oit->second.obj_size_ == 0) {
+            // Avoid to persist empty objects.
+            objects_.erase(oit);
+            local_path_obj_.erase(it);
+            String error_message = fmt::format("PutObjCache skipped empty local path {}", file_path);
+            LOG_WARN(error_message);
+        }
     }
 }
 
