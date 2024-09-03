@@ -514,9 +514,6 @@ void MemoryIndexer::OfflineDump() {
     // 2. Generate posting
     // 3. Dump disk segment data
     // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}\n", num_runs_));
-    if (tuple_count_ == 0) {
-        return;
-    }
     FinalSpillFile();
     constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
     UniquePtr<SortMergerTermTuple<TermTuple, u32>> merger =

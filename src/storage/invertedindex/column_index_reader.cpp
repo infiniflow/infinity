@@ -97,12 +97,10 @@ Pair<u64, float> ColumnIndexReader::GetTotalDfAndAvgColumnLength() {
             column_len_sum += sum;
             column_len_cnt += cnt;
         }
-        if (column_len_cnt == 0) {
-            String error_message = "column_len_cnt is 0";
-            UnrecoverableError(error_message);
+        if (column_len_cnt != 0) {
+            total_df_ = column_len_cnt;
+            avg_column_length_ = static_cast<float>(column_len_sum) / column_len_cnt;
         }
-        total_df_ = column_len_cnt;
-        avg_column_length_ = static_cast<float>(column_len_sum) / column_len_cnt;
     }
     return Pair<u64, float>(total_df_, avg_column_length_);
 }

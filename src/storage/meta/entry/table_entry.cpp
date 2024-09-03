@@ -56,6 +56,7 @@ import parsed_expr;
 import constant_expr;
 import infinity_context;
 import persistence_manager;
+import bg_task;
 
 namespace infinity {
 
@@ -729,13 +730,16 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
             LOG_INFO(message);
             if (chunk_index_entry.get() != nullptr) {
                 chunk_index_entry->Commit(txn->CommitTS());
-                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
 
-                segment_index_entry->AddWalIndexDump(chunk_index_entry.get(), txn);
+                auto *compaction_process = InfinityContext::instance().storage()->compaction_processor();
+
+                compaction_process->Submit(MakeShared<DumpIndexBylineTask>(GetDBName(), GetTableName(), table_index_entry->GetIndexName(), seg_id, chunk_index_entry));
 
                 if (index_base->index_type_ == IndexType::kFullText) {
                     table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
                 }
+            } else {
+                LOG_WARN("MemIndexDump failed.");
             }
         }
     }

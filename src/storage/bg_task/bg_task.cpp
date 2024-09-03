@@ -17,9 +17,18 @@ module;
 module bg_task;
 
 import base_memindex;
+import chunk_index_entry;
 
 namespace infinity {
 
 DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, Txn *txn) : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), txn_(txn) {}
+
+DumpIndexBylineTask::DumpIndexBylineTask(SharedPtr<String> db_name,
+                                         SharedPtr<String> table_name,
+                                         SharedPtr<String> index_name,
+                                         SegmentID segment_id,
+                                         SharedPtr<ChunkIndexEntry> dumped_chunk)
+    : BGTask(BGTaskType::kDumpIndexByline, true), db_name_(db_name), table_name_(table_name), index_name_(index_name), segment_id_(segment_id),
+      dumped_chunk_(dumped_chunk) {}
 
 } // namespace infinity
