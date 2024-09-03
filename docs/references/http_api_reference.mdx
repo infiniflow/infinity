@@ -861,6 +861,7 @@ curl --request POST \
           ],
           "index": 
           {
+              "type": "fulltext",
               "analyzer": "chinese"
           },
           "create_option": "ignore_if_exists"
@@ -908,6 +909,7 @@ curl --request POST \
   A non-empty list of strings indicating the names of the columns to build index on. For now, you are only allowed to create an index on one column.
 - `"index"`: (*Body parameter*), `dict[string, string]`  
   - Parameter settings for an HNSW index:
+    - `"type"`: `"hnsw"`
     - `"M"`: *Optional* - Defaults to`"16"`.
     - `"ef_construction"`: *Optional* - Defaults to`"50"`.
     - `"metric"` *Required* - The distance metric to use in similarity search.
@@ -917,7 +919,8 @@ curl --request POST \
     - `"encode"`: *Optional*
       - `"plain"`: (Default) Plain encoding.
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
-  - Parameter settings for a full-text index:
+  - Parameter settings for a full-text index:  
+    - `"type"`: `"fulltext"`
     - `"ANALYZER"`: *Optional*
       - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs.
       - `"chinese"`: Simplified Chinese
@@ -925,8 +928,9 @@ curl --request POST \
       - `"japanese"`: Japanese
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
   - Parameter settings for a secondary index:  
-    No parameters are required. For now, keep it empty.
-  - Parameter settings for a BMP index:
+    - `"type"`: `"secondary"`
+  - Parameter settings for a BMP index:  
+    - `"type"`: `"bmp"`
     - `block_size`: *Optional* - The size of the block in a BMP index. Range: `"1"` ~ `"256"`. Defaults to `"16"`.
     - `"compress_type"`: *Optional*  
       - `"compress"`: (Default) Store the block-max index in sparse format. Works best with small block size situations.
@@ -1733,6 +1737,7 @@ curl --request GET \
                 "match_method": "dense",
                 "fields": "dense_column",
                 "query_vector": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                "element_type": "float",
                 "metric_type": "l2",
                 "topn": 2,
                 "params": {"ef": "10"}
@@ -1759,7 +1764,7 @@ curl --request GET \
             {
                 "fusion_method": "rrf",
                 "topn": 2,
-                "params":{"rank_constant": 60}
+                "params":{"rank_constant": "60"}
             }
         ]
     } '
@@ -1855,7 +1860,7 @@ curl --request GET \
 
   - `"topn"`: `int`, *Required*  
     An integer indicating the number of nearest neighbours (vector search) or most relevant rows (full-text search) to return.  
-  - `"params"`: `dict[string, string | integer]`, *Optional*  
+  - `"params"`: `object`, *Optional*  
     Additional matching or reranking parameters. 
     - If you set `"match_method"` to `"dense"`:  
       - `"ef"`: `str`, Recommended value: one to ten times the value of `topn`.  
@@ -1896,8 +1901,8 @@ curl --request GET \
     - If you set `"fusion_method"` to `"weighted_sum"`, use a separate JSON to set the following parameter:  
       - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assiged the default weight of `1.0`.
     - If you set `"fusion_method"` to `"match_tensor"`, use a separate JSON to set the following parameters:  
-      - `"field"`: The name of the tensor column for reranking.
-      - `"query_data"`: The tensor data to compare against. This should be provided as a list of lists of numerical values.
+      - `"fields"`: The name of the tensor column for reranking.
+      - `"query_tensor"`: The tensor data to compare against. This should be provided as a list of lists of numerical values.
       - `"element_type"`: The element data type of the query tensor. Usually `"float"`.
 
 
