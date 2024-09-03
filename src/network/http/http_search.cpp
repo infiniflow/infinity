@@ -695,45 +695,63 @@ KnnExpr *HTTPSearch::ParseMatchDense(const nlohmann::json &knn_json_object, HTTP
 
     return knn_expr.release();
 }
-MatchExpr *HTTPSearch::ParseMatchText(const nlohmann::json &match_json_object, HTTPStatus &http_status, nlohmann::json &response) {
-    if (!match_json_object.is_object()) {
+
+MatchExpr *HTTPSearch::ParseMatchText(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+    if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = "MATCH field should be object";
+        response["error_message"] = "MatchText field should be object";
         return nullptr;
     }
-    MatchExpr *match_expr = new MatchExpr();
-    DeferFn defer_fn([&]() {
-        if (match_expr != nullptr) {
-            delete match_expr;
-            match_expr = nullptr;
-        }
-    });
-
-    for (auto &field_json_obj : match_json_object.items()) {
+    auto match_expr = MakeUnique<MatchExpr>();
+    i64 topn = -1;
+    String extra_params{};
+    // must have: "fields", "matching_text", "topn"
+    // may have: "params"
+    constexpr std::array possible_keys{"fields", "matching_text", "topn", "params"};
+    std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
+    for (auto &field_json_obj : json_object.items()) {
         String key = field_json_obj.key();
         ToLower(key);
-        if (IsEqual(key, "operator")) {
-            match_expr->options_text_ = field_json_obj.value();
-        } else if (IsEqual(key, "fields")) {
-            match_expr->fields_ = field_json_obj.value();
-        } else if (IsEqual(key, "query")) {
-            match_expr->matching_text_ = field_json_obj.value();
-        } else {
+        if (!possible_keys_set.erase(key)) {
             response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Unknown match expression key: {}", key);
+            response["error_message"] = fmt::format("Unknown MatchText expression key: {}", key);
             return nullptr;
         }
+        if (IsEqual(key, "fields")) {
+            match_expr->fields_ = field_json_obj.value();
+        } else if (IsEqual(key, "matching_text")) {
+            match_expr->matching_text_ = field_json_obj.value();
+        } else if (IsEqual(key, "topn")) {
+            topn = field_json_obj.value().get<i64>();
+        } else if (IsEqual(key, "params")) {
+            const auto &params = field_json_obj.value();
+            if (!params.is_object()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "MatchText params should be object";
+                return nullptr;
+            }
+            for (auto &param : params.items()) {
+                String param_k = param.key(), param_v = param.value();
+                extra_params += fmt::format(";{}={}", param_k, param_v);
+            }
+        }
     }
-
-    if (match_expr->options_text_.empty() || match_expr->matching_text_.empty()) {
+    // "params" is optional
+    possible_keys_set.erase("params");
+    // check if all required fields are set
+    if (!possible_keys_set.empty()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = fmt::format("Invalid match expression");
+        response["error_message"] =
+            fmt::format("Invalid MatchText expression: following fields are required but not found: {}", fmt::join(possible_keys_set, ", "));
         return nullptr;
     }
-
-    MatchExpr *res = match_expr;
-    match_expr = nullptr;
-    return res;
+    if (topn <= 0) {
+        response["error_code"] = ErrorCode::kInvalidTopKType;
+        response["error_message"] = "MatchText expression topn field should be positive integer";
+        return nullptr;
+    }
+    match_expr->options_text_ = fmt::format("topn={}{}", topn, extra_params);
+    return match_expr.release();
 }
 
 MatchTensorExpr *HTTPSearch::ParseMatchTensor(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
