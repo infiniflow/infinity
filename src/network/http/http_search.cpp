@@ -114,7 +114,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
 
                 if (filter != nullptr) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] = "More than one output field.";
+                    response["error_message"] = "More than one filter field.";
                     return;
                 }
 
@@ -595,7 +595,7 @@ FusionExpr* HTTPSearch::ParseFusion(const nlohmann::json &fusion_json_object,
     }
     return fusion_expr.release();
 }
-KnnExpr *HTTPSearch::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus &http_status, nlohmann::json &response) {
+KnnExpr *HTTPSearch::ParseMatchDense(const nlohmann::json &knn_json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!knn_json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = "KNN field should be object";
@@ -695,7 +695,7 @@ KnnExpr *HTTPSearch::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus 
 
     return knn_expr.release();
 }
-MatchExpr *HTTPSearch::ParseMatch(const nlohmann::json &match_json_object, HTTPStatus &http_status, nlohmann::json &response) {
+MatchExpr *HTTPSearch::ParseMatchText(const nlohmann::json &match_json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!match_json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = "MATCH field should be object";
@@ -789,107 +789,54 @@ MatchSparseExpr *HTTPSearch::ParseMatchSparse(const nlohmann::json &json_object,
         return nullptr;
     }
     auto match_sparse_expr = MakeUnique<MatchSparseExpr>();
-    i64 topn = DEFAULT_MATCH_SPARSE_TOP_N;
     auto *opt_params_ptr = new Vector<InitParameter *>();
     DeferFn release_opt([&]() {
-            if(opt_params_ptr != nullptr) {
-                for (auto &params_ptr : *opt_params_ptr) {
-                    delete params_ptr;
-                }
-                delete opt_params_ptr;
-                opt_params_ptr = nullptr;
+        if (opt_params_ptr != nullptr) {
+            for (auto &params_ptr : *opt_params_ptr) {
+                delete params_ptr;
             }
-        });
+            delete opt_params_ptr;
+            opt_params_ptr = nullptr;
+        }
+    });
+    i64 topn = -1;
+    // must have: "fields", "query_vector", "metric_type", "topn"
+    // may have: "params"
+    constexpr std::array possible_keys{"fields", "query_vector", "metric_type", "topn", "params"};
+    std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
     for (auto &field_json_obj : json_object.items()) {
         String key = field_json_obj.key();
         ToLower(key);
-        if (IsEqual(key, "metric_type")) {
-            match_sparse_expr->SetMetricType(field_json_obj.value());
-        } else if (IsEqual(key, "fields")) {
+        if (!possible_keys_set.erase(key)) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = fmt::format("Unknown MatchSparse expression key: {}", key);
+            return nullptr;
+        }
+        if (IsEqual(key, "fields")) {
             auto column_expr = MakeUnique<ColumnExpr>();
-            const auto &fields_value = field_json_obj.value();
-            if (!fields_value.is_array()) {
-                response["error_code"] = ErrorCode::kInvalidExpression;
-                response["error_message"] = "Fields should be array";
-                return nullptr;
-            }
-            for (SizeT i = 0; i < fields_value.size(); i++) {
-                column_expr->names_.emplace_back(fields_value[i]);
-            }
+            auto column_str = field_json_obj.value().get<String>();
+            column_expr->names_.push_back(std::move(column_str));
             match_sparse_expr->column_expr_ = std::move(column_expr);
-        } else if (IsEqual(key, "query_sparse")) {
-            ConstantExpr *const_sparse_expr = nullptr;
-            DeferFn defer_free_sparse([&]() {
-                if (const_sparse_expr != nullptr) {
-                    delete const_sparse_expr;
-                    const_sparse_expr = nullptr;
-                }
-            });
-            auto &value = field_json_obj.value();
-            if (value.size() == 0) {
-                response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                response["error_message"] = fmt::format("Empty sparse vector, cannot decide type");
+        } else if (IsEqual(key, "query_vector")) {
+            UniquePtr<ConstantExpr> query_sparse_expr = ParseSparseVector(field_json_obj.value(), http_status, response);
+            if (!query_sparse_expr) {
                 return nullptr;
             }
-            switch (value.begin().value().type()) {
-                case nlohmann::json::value_t::number_unsigned:
-                case nlohmann::json::value_t::number_integer: {
-                    const_sparse_expr = new ConstantExpr(LiteralType::kLongSparseArray);
-                    break;
-                }
-                case nlohmann::json::value_t::number_float: {
-                    const_sparse_expr = new ConstantExpr(LiteralType::kDoubleSparseArray);
-                    break;
-                }
-                default: {
-                    response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                    response["error_message"] = fmt::format("Sparse value element type error");
-                    return nullptr;
-                }
-            }
-            HashSet<i64> key_set;
-            for (const auto &[sparse_k, sparse_v] : value.items()) {
-                i64 key_val = std::stoll(sparse_k);
-                if (const auto [_, insert_ok] = key_set.insert(key_val); !insert_ok) {
-                    response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                    response["error_message"] = fmt::format("Duplicate key {} in sparse array!", key);
-                    return nullptr;
-                }
-                bool good_v = false;
-                switch (sparse_v.type()) {
-                    case nlohmann::json::value_t::number_unsigned:
-                    case nlohmann::json::value_t::number_integer: {
-                        if (const_sparse_expr->literal_type_ == LiteralType::kLongSparseArray) {
-                            const_sparse_expr->long_sparse_array_.first.push_back(key_val);
-                            const_sparse_expr->long_sparse_array_.second.push_back(sparse_v.get<i64>());
-                            good_v = true;
-                        }
-                        break;
-                    }
-                    case nlohmann::json::value_t::number_float: {
-                        if (const_sparse_expr->literal_type_ == LiteralType::kDoubleSparseArray) {
-                            const_sparse_expr->double_sparse_array_.first.push_back(key_val);
-                            const_sparse_expr->double_sparse_array_.second.push_back(sparse_v.get<double>());
-                            good_v = true;
-                        }
-                        break;
-                    }
-                    default: {
-                        break;
-                    }
-                }
-                if (!good_v) {
-                    response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                    response["error_message"] = fmt::format("Sparse value element type error");
-                    return nullptr;
-                }
-            }
+            ConstantExpr *const_sparse_expr = query_sparse_expr.release();
             match_sparse_expr->SetQuerySparse(const_sparse_expr);
             assert(const_sparse_expr == nullptr);
+        } else if (IsEqual(key, "metric_type")) {
+            match_sparse_expr->SetMetricType(field_json_obj.value().get<String>());
         } else if (IsEqual(key, "topn")) {
             topn = field_json_obj.value().get<i64>();
-        } else if (IsEqual(key, "opt_params")) {
-            for(auto &param : field_json_obj.value().items()) {
+        } else if (IsEqual(key, "params")) {
+            const auto &params = field_json_obj.value();
+            if (!params.is_object()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "MatchSparse params should be object";
+                return nullptr;
+            }
+            for (auto &param : params.items()) {
                 auto *init_parameter = new InitParameter();
                 init_parameter->param_name_ = param.key();
                 init_parameter->param_value_ = param.value();
@@ -897,9 +844,98 @@ MatchSparseExpr *HTTPSearch::ParseMatchSparse(const nlohmann::json &json_object,
             }
         }
     }
+    // "params" is optional
+    possible_keys_set.erase("params");
+    // check if all required fields are set
+    if (!possible_keys_set.empty()) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] =
+            fmt::format("Invalid MatchSparse expression: following fields are required but not found: {}", fmt::join(possible_keys_set, ", "));
+        return nullptr;
+    }
+    if (topn <= 0) {
+        response["error_code"] = ErrorCode::kInvalidTopKType;
+        response["error_message"] = "MatchSparse expression topn field should be positive integer";
+        return nullptr;
+    }
     match_sparse_expr->SetOptParams(topn, opt_params_ptr);
     opt_params_ptr = nullptr;
     return match_sparse_expr.release();
+}
+
+UniquePtr<ConstantExpr> HTTPSearch::ParseSparseVector(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+    if (!json_object.is_object()) {
+        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+        response["error_message"] = "Sparse vector should be object";
+        return nullptr;
+    }
+    if (json_object.size() == 0) {
+        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+        response["error_message"] = "Empty sparse vector, cannot decide type";
+        return nullptr;
+    }
+    UniquePtr<ConstantExpr> const_sparse_expr{};
+    switch (json_object.begin().value().type()) {
+        case nlohmann::json::value_t::number_unsigned:
+        case nlohmann::json::value_t::number_integer: {
+            const_sparse_expr = MakeUnique<ConstantExpr>(LiteralType::kLongSparseArray);
+            break;
+        }
+        case nlohmann::json::value_t::number_float: {
+            const_sparse_expr = MakeUnique<ConstantExpr>(LiteralType::kDoubleSparseArray);
+            break;
+        }
+        default: {
+            response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+            response["error_message"] = "Sparse value element type error";
+            return nullptr;
+        }
+    }
+    HashSet<i64> key_set;
+    for (const auto &[sparse_k, sparse_v] : json_object.items()) {
+        i64 key_val = {};
+        try {
+            key_val = std::stoll(sparse_k);
+        } catch (std::exception &e) {
+            response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+            response["error_message"] = fmt::format("Error when try to cast sparse key '{}' to integer, error info: {}", sparse_k, e.what());
+            return nullptr;
+        }
+        if (const auto [_, insert_ok] = key_set.insert(key_val); !insert_ok) {
+            response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+            response["error_message"] = fmt::format("Duplicate key {} in sparse array!", key_val);
+            return nullptr;
+        }
+        bool good_v = false;
+        switch (sparse_v.type()) {
+            case nlohmann::json::value_t::number_unsigned:
+            case nlohmann::json::value_t::number_integer: {
+                if (const_sparse_expr->literal_type_ == LiteralType::kLongSparseArray) {
+                    const_sparse_expr->long_sparse_array_.first.push_back(key_val);
+                    const_sparse_expr->long_sparse_array_.second.push_back(sparse_v.get<i64>());
+                    good_v = true;
+                }
+                break;
+            }
+            case nlohmann::json::value_t::number_float: {
+                if (const_sparse_expr->literal_type_ == LiteralType::kDoubleSparseArray) {
+                    const_sparse_expr->double_sparse_array_.first.push_back(key_val);
+                    const_sparse_expr->double_sparse_array_.second.push_back(sparse_v.get<double>());
+                    good_v = true;
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+        if (!good_v) {
+            response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+            response["error_message"] = "Sparse value element type error";
+            return nullptr;
+        }
+    }
+    return const_sparse_expr;
 }
 
 Tuple<i64, void *>
