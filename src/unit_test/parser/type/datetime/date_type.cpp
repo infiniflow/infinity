@@ -13,6 +13,11 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include <__chrono/time_point.h>
+#include <chrono>
+#include <cmath>
+#include <ctime>
+#include <sstream>
 import base_test;
 
 import infinity_exception;
@@ -29,6 +34,8 @@ import parser_assert;
 using namespace infinity;
 class DateTypeTest : public BaseTest {};
 
+
+//
 TEST_F(DateTypeTest, test1) {
     using namespace infinity;
 
@@ -50,4 +57,84 @@ TEST_F(DateTypeTest, test1) {
 
     EXPECT_THROW(date1.FromString("0-0-0"), ParserException);
     EXPECT_THROW(date1.FromString("0/0/0"), ParserException);
+}
+
+TEST_F(DateTypeTest, TestEqStdChronoForward) {
+    using namespace infinity;
+    using std::chrono::year_month_day;
+    using std::chrono::sys_days;
+    using std::chrono::system_clock;
+    using std::chrono::ceil;
+    using std::chrono::days;
+    using std::tm;
+    using std::time_t;
+    using std::mktime;
+    using std::format;
+
+    //2020-1-31
+    DateT date;
+    date.FromString("2020-01-31");
+
+    tm tmdate = {};
+    tmdate.tm_year = 2020 - 1900;
+    tmdate.tm_mon = 1 - 1;
+    tmdate.tm_mday = 31;
+    time_t time_c = mktime(&tmdate);
+    system_clock::time_point tp = system_clock::from_time_t(time_c);
+    sys_days sysdays = ceil<days>(tp);
+    
+    for(i32 i = 0; i < 30000; i++) {
+        year_month_day ymd = year_month_day(sysdays);
+        String ymd_s = format("{:%Y-%m-%d}", ymd);
+        EXPECT_STREQ(date.ToString().c_str(), ymd_s.c_str());
+
+        sysdays += days{1};
+
+        DateT date_output;
+        IntervalT oneday_interval(1);
+        oneday_interval.unit = TimeUnit::kDay;
+        EXPECT_TRUE(date.Add(date, oneday_interval, date_output));
+        date = date_output;
+    }
+
+}
+
+TEST_F(DateTypeTest, TestEqStdChronoBackward) {
+    using namespace infinity;
+    using std::chrono::year_month_day;
+    using std::chrono::sys_days;
+    using std::chrono::system_clock;
+    using std::chrono::ceil;
+    using std::chrono::days;
+    using std::tm;
+    using std::time_t;
+    using std::mktime;
+    using std::format;
+
+    //2020-1-31
+    DateT date;
+    date.FromString("2020-01-31");
+
+    tm tmdate = {};
+    tmdate.tm_year = 2020 - 1900;
+    tmdate.tm_mon = 1 - 1;
+    tmdate.tm_mday = 31;
+    time_t time_c = mktime(&tmdate);
+    system_clock::time_point tp = system_clock::from_time_t(time_c);
+    sys_days sysdays = ceil<days>(tp);
+    
+    for(i32 i = 0; i < 30000; i++) {
+        year_month_day ymd = year_month_day(sysdays);
+        String ymd_s = format("{:%Y-%m-%d}", ymd);
+        EXPECT_STREQ(date.ToString().c_str(), ymd_s.c_str());
+
+        sysdays -= days{1};
+
+        DateT date_output;
+        IntervalT oneday_interval(1);
+        oneday_interval.unit = TimeUnit::kDay;
+        EXPECT_TRUE(date.Subtract(date, oneday_interval, date_output));
+        date = date_output;
+    }
+
 }
