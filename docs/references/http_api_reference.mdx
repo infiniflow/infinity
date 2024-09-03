@@ -1727,40 +1727,43 @@ curl --request GET \
             "score"
         ],
         "filter": "score >= 4.0",
-        "match_dense":
-        {
-            "fields": "dense_column",
-            "query_vector": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            "metric_type": "l2",
-            "topn": 2,
-            "params": {"ef": "10"}
-        },
-        "match_text":
-        {
-            "fields": "body",
-            "matching_text": "bloom",
-            "topn": 1,
-            "params":
+        "search":
+        [
             {
-                "default_fields": "body",
-                "operator": "or"
+                "match_method": "dense",
+                "fields": "dense_column",
+                "query_vector": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                "metric_type": "l2",
+                "topn": 2,
+                "params": {"ef": "10"}
+            },
+            {
+                "match_method": "text",
+                "fields": "body",
+                "matching_text": "bloom",
+                "topn": 1,
+                "params":
+                {
+                    "default_fields": "body",
+                    "operator": "or"
+                }
+            },
+            {
+                "match_method": "sparse",
+                "fields": "sparse_column",
+                "query_vector": [1.0, 2.0],
+                "metric_type": "l2",
+                "topn": 3,
+                "params": {"ef": "150"}   
+            },
+            {
+                "match_method": "fusion",
+                "method": "rrf",
+                "topn": 2,
+                "params":{"rank_constant": 60}
             }
-        },
-        "match_sparse":
-        {
-            "fields": "sparse_column",
-            "query_vector": [1.0, 2.0],
-            "metric_type": "l2",
-            "topn": 3,
-            "params": {"ef": "150"}   
-        },
-        "fusion": 
-        {
-            "method": "rrf",
-            "topn": 2,
-            "params":{"rank_constant": 60}
-        }
-} '
+        ]
+    } '
 ```
 
 #### Request parameters
@@ -1769,6 +1772,7 @@ curl --request GET \
   The name of the database.
 - `table_name`: (*Path parameter*)  
   The name of the table.
+
 - `"output"`: (*Body parameter*), `string[]`, *Required*  
   A non-empty list of strings specifying the columns to include in the output. Each string in the list can represent:  
   - A user-defined column name: The name of the column to include in the output, e.g., `"body"`.
@@ -1786,37 +1790,49 @@ curl --request GET \
     - `avg`
   - An arithmetic function: Apply an arithmetic operation on specified columns (e.g., `c1+5`).  
   > The list must contain at least one element. Empty lists are not allowed.
+
 - `"filter"`: (*Body parameter*), `string`, *Optional*  
   A string that defines the condition for selecting rows. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be updated. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.  
   > The `filter` parameter currently supports 'and' and 'or' logical expressions only.  
-- `"match_dense"`: (*Body parameter*), `object`, *Optional*  
-  Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).  
-  - `fields`: `string`, *Required*  
-    A non-empty string indicating the name of the vector column or multi-vector column to search on.  
-  - `query_vector`: `[]/np.ndarray`, *Required*  
+
+- `"search"`: (*Body parameter*), `object[]`, *Required*  
+  A list of JSON objects, each representing a ranking or fusion method. Note that if you have specified multiple ranking methods, you must specify a fusion method.  
+  - `"match_method"`: (*Body parameter*), `enum<string>`, *Required*  
+    The ranking method for a specified column/field:  
+    - `"dense"`: Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).  
+    - `"sparse"`: Creates a sparse vector search expression to identify the top n closest rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
+    - `"text"`: Creates a full-text search expression on the specified field(s)/column(s) to identify the most relevant rows.  
+      > Ensure that a full-text index has been successfully built on each column involved before executing a full-text search; otherwise, an error will occur.  
+
+  - `"fields"`: `string`, *Required*  
+    A non-empty string indicating the name of the column/field to search on.  
+  - `"query_vector"`: `[]/np.ndarray/object`, *Optional*  
     The query vector data to compare against. This should be provided as a list or a one-dimensional NumPy array of numerical values.  
+    Used *only* when `"match_method"` is set to `"dense"` or `"sparse"`.  
+    - Dense query vector example:  
+      - `[1.0, 2.2, 3.4, 1.5]`
+      - `[[1.0, 2.0, 3.0, 1.0], [5.0, 6.0, 3.0, 6.0]]`
+    - Sparse query vector example: `{"10":1.1, "20":2.2, "30": 3.3}`
+  - `"matching_text"`: `string`, *Optional*  
+    A non-empty text string to search for. Used *only* when `"match_method"` is set to `"text"`.  
+    You can use various search options within the matching text, including:  
+    - Single terms: `"blooms"`
+    - OR multiple terms: `"Bloom OR filter"`, `"Bloom || filter"` or just `"Bloom filter"`
+    - Phrase search: `'"Bloom filter"'`
+    - AND multiple terms: `"space AND efficient"`, `"space && efficient"` or `"space + efficient"`
+    - Escaping reserved characters: `"space\-efficient"`
+    - Sloppy phrase search: `'"harmful chemical"~10'`
+    - Field-specific search: `"title:(quick OR brown) AND body:foobar"`
   - `element_type`: `str`, *Required*  
-    Specifies the data type of the embedding vector. Commonly used types (values) include:  
+    Specifies the data type of the embedding vector. Used *only* when `"match_method"` is set to `"dense"`. Commonly used types (values) include:  
     - `"float"`
     - `"uint8"`.
   - `metric_type`: `string`, *Required*  
-    The distance metric to use in similarity search.  
+    The distance metric to use in similarity search. Used *only* when `"match_method"` is set to `"dense"` or `"sparse"`.  
     - `"ip"`: Inner product.
     - `"l2"`: Euclidean distance.
     - `"cosine"`: Cosine similarity.
-  - `topn`: `int`, *Required*  
-  An integer indicating the number of nearest neighbours to return.  
-  - `params`: `dict[string, string]`, *Optional*  
-    A dictionary representing additional KNN or ANN search parameters. Currently only `"ef"` is supported.  
-    - `"ef"`: `str`, Recommended value: one to ten times the value of `topn`.  
-      - For example, if you set `topn` to `10`, you can set `"ef"` to `"50"`.
-      - If you set `"ef"` too high, search performance may worsen.  
-      - If you do not set `"ef"` or set it to a value lower than `topn`, the search uses the `topn` value as the value for `"ef"`.
-
-- `"fusion"`: (*Body parameter*), `object`, *Optional*  
-  Creates a reranking expression for multiple retrieval ways to identify the top n closest rows.
-  - `method`: `str`, *Required*  
-    A non-empty string indicating the reranking methods to use:  
+  - `"reranking_method"`: (*Body parameter*), `enum<string>`, *Required when you have specified multiple ranking methods*  
     - `"rrf"`: [Reciprocal rank fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)  
       RRF is a method for combining multiple result sets with varying relevance indicators into a single result set. It requires no tuning, and the relevance indicators need not be related to achieve high-quality results. RRF is particularly useful when you are uncertain of the relative importance of each retrieval way.  
       RRF uses the following formula to calculate the score for ranking each document:  
@@ -1840,22 +1856,54 @@ curl --request GET \
     - `"match_tensor"`  
       Infinity's tensor-based late interaction reranking approach.  
 
-  - `topn`: `int`, *Required*  
-    An integer indicating the number of the most relevant rows to retrieve.
-  - `params`: `dict[str, Any]`, *Optional*  
-    A dictionary representing additional options for the selected reranking method:
-    - **RRF-specific options**: *Optional*  
-      Settings when employing RRF for reranking.  
+  - `"topn"`: `int`, *Required*  
+    An integer indicating the number of nearest neighbours (vector search) or most relevant rows (full-text search) to return.  
+  - `"params"`: `dict[string, string | integer]`, *Optional*  
+    Additional ranking or reranking parameters. 
+    - If you set `"match_method"` to `"dense"`:  
+      - `"ef"`: `str`, Recommended value: one to ten times the value of `topn`.  
+        - For example, if you set `topn` to `10`, you can set `"ef"` to `"50"`.
+        - If you set `"ef"` too high, search performance may worsen.  
+        - If you do not set `"ef"` or set it to a value lower than `topn`, the search uses the `topn` value as the value for `"ef"`.
+    - If you set `"match_method"` to `"sparse"`:  
+      - `"alpha"`: `str`  
+        `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Termination Conditions" parameter. The smaller the value, the more aggressive the pruning.
+      - `"beta"`: `str`  
+        `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Query Term Pruning" parameter. The smaller the value, the more aggressive the pruning.
+
+    - If you set `"match_method"` to `"text"`:  
+      - **"default_field"**: `str`, *Optional*  
+        - If `"fields"` is an empty string, this parameter specifies the default field to search on.  
+      - **"operator"**: `str`, *Optional*  
+        - If not specified, the search follows Infinity's full-text search syntax, meaning that logical and arithmetic operators, quotation marks and escape characters will function as full-text search operators, such as:
+          - AND operator: `AND`, `&&`, `+`
+          - OR operator: `OR`, `||`
+          - NOT operator: `NOT`, `!`, `-`
+          - PAREN operator: `(`, `)`, need to appear in pairs, and can be nested.
+          - COLON operator: `:`: Used to specify field-specific search, e.g., `body:foobar` searches for `foobar` in the `body` field.
+          - CARAT operator: `^`: Used to boost the importance of a term, e.g., `quick^2 brown` boosts the importance of `quick` by a factor of 2, making it twice as important as `brown`.
+          - TILDE operator: `~`: Used for sloppy phrase search, e.g., `"harmful chemical"~10` searches for the phrase `"harmful chemical"` within a tolerable distance of 10 words.
+          - SINGLE_QUOTED_STRING: Used to search for a phrase, e.g., `'Bloom filter'`.
+          - DOUBLE_QUOTED_STRING: Used to search for a phrase, e.g., `"Bloom filter"`.
+          - Escape characters: Used to escape reserved characters, e.g., `space\-efficient`. Starting with a backslash `\` will escape the following characters:   
+            `' '`, `'+'`, `'-'`, `'='`, `'&'`, `'|'`, `'!'`, `'('`, `')'`, `'{'`, `'}'`, `'['`, `']'`, `'^'`, `'"'`, `'~'`, `'*'`, `'?'`, `':'`, `'\'`, `'/'`
+        - If specified, Infinity's full-text search syntax will not take effect, and the specified operator will be interpolated into `matching_text`.  
+          Useful for searching text including code numbers like `"A01-233:BC"`.  
+          - `{"operator": "or"}`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.  
+            For example, reinterprets `"A01-233:BC"` as `'"A01" OR "-233" OR "BC"'`.  
+          - `{"operator": "and"}`: Interpolates the `AND` operator between words in `matching_text` to create a new search text.  
+            For example, reinterprets `"A01-233:BC"` as `'"A01" AND "-233" AND "BC"'`.      
+
+    - If you set `"fusion_method"` to `"rrf"`, use a separate JSON to set the following parameter:  
       - `"rank_constant"`: The smoothing constant for RRF reranking, e.g., `{"rank_constant": 60}`. Defaults to `60`.  
-    - **weighted_sum-specific options**: *Optional*  
-      Settings when employing Weighted Sum for reranking.  
+    - If you set `"fusion_method"` to `"weighted_sum"`, use a separate JSON to set the following parameter:  
       - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assiged the default weight of `1.0`.
-    - **match_tensor-specific options**: *Optional*  
-      Settings when employing match_tensor for reranking.
+    - If you set `"fusion_method"` to `"match_tensor"`, use a separate JSON to set the following parameters:  
       - `"field"`: The name of the tensor column for reranking.
-      - `"query_data"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy
-    array of numerical values.
+      - `"query_data"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy array of numerical values.
       - `"element_type"`: The element data type of the query tensor. Usually `"float"`.
+
+
 
 ### Response
 

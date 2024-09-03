@@ -1631,7 +1631,7 @@ sparse_vector = SparseVector(**dic_sparse_vector)
 
 An integer indicating the number of nearest neighbours to return.
 
-#### opt_params: `dict[str, str]`, *Required*
+#### opt_params: `dict[str, str]`, *Optional*
 
 A dictionary representing additional parameters for the sparse vector search. Following are parameters for the BMP index:
 
@@ -1755,11 +1755,11 @@ An optional dictionary specifying the following search options:
     - DOUBLE_QUOTED_STRING: Used to search for a phrase, e.g., `"Bloom filter"`.
     - Escape characters: Used to escape reserved characters, e.g., `space\-efficient`. Starting with a backslash `\` will escape the following characters:   
       `' '`, `'+'`, `'-'`, `'='`, `'&'`, `'|'`, `'!'`, `'('`, `')'`, `'{'`, `'}'`, `'['`, `']'`, `'^'`, `'"'`, `'~'`, `'*'`, `'?'`, `':'`, `'\'`, `'/'`
-  - If specified, Infinity's full-text search syntax will not take effect, and the specified operator will be interpolated into `matching_text`.
+  - If specified, Infinity's full-text search syntax will not take effect, and the specified operator will be interpolated into `matching_text`.  
     Useful for searching text including code numbers like `"A01-233:BC"`.
-    - `{"operator": "or"}`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.
+    - `{"operator": "or"}`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.  
       For example, reinterprets `"A01-233:BC"` as `'"A01" OR "-233" OR "BC"'`.
-    - `{"operator": "and"}`: Interpolates the `AND` operator between words in `matching_text` to create a new search text.
+    - `{"operator": "and"}`: Interpolates the `AND` operator between words in `matching_text` to create a new search text.  
       For example, reinterprets `"A01-233:BC"` as `'"A01" AND "-233" AND "BC"'`.
 
 ### Returns
