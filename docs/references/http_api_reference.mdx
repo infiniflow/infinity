@@ -1831,7 +1831,7 @@ curl --request GET \
     - `"ip"`: Inner product.
     - `"l2"`: Euclidean distance.
     - `"cosine"`: Cosine similarity.
-  - `"reranking_method"`: (*Body parameter*), `enum<string>`, *Required when you have specified multiple ranking methods*  
+  - `"fusion_method"`: (*Body parameter*), `enum<string>`, *Required when you have specified multiple ranking methods*  
     - `"rrf"`: [Reciprocal rank fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)  
       RRF is a method for combining multiple result sets with varying relevance indicators into a single result set. It requires no tuning, and the relevance indicators need not be related to achieve high-quality results. RRF is particularly useful when you are uncertain of the relative importance of each retrieval way.  
       RRF uses the following formula to calculate the score for ranking each document:  
