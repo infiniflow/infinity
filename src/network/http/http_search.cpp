@@ -16,6 +16,7 @@ module;
 
 #include <cassert>
 #include <string>
+#include <vector>
 
 module http_search;
 
@@ -57,13 +58,9 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             response["error_code"] = ErrorCode::kInvalidJsonFormat;
             response["error_message"] = "HTTP Body isn't json object";
         }
-
-        SizeT match_expr_count = 0;
-        SizeT fusion_expr_count = 0;
+        UniquePtr<ParsedExpr> filter{};
+        UniquePtr<SearchExpr> search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
-        Vector<ParsedExpr *> *search_exprs{nullptr};
-        ParsedExpr *filter{nullptr};
-        SearchExpr *search_expr{nullptr};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
@@ -72,25 +69,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 delete output_columns;
                 output_columns = nullptr;
             }
-            if (filter != nullptr) {
-                delete filter;
-                filter = nullptr;
-            }
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
-            if (search_exprs != nullptr) {
-                for (auto &expr : *search_exprs) {
-                    delete expr;
-                    expr = nullptr;
-                }
-                delete search_exprs;
-                search_exprs = nullptr;
-            }
         });
-
-        search_exprs = new Vector<ParsedExpr *>();
         for (const auto &elem : input_json.items()) {
             String key = elem.key();
             ToLower(key);
@@ -113,7 +92,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 }
             } else if (IsEqual(key, "filter")) {
 
-                if (filter != nullptr) {
+                if (filter) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
                     response["error_message"] = "More than one filter field.";
                     return;
@@ -127,71 +106,19 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 }
 
                 filter = ParseFilter(filter_json, http_status, response);
-                if (filter == nullptr) {
+                if (!filter) {
                     return;
                 }
-            } else if (IsEqual(key, "fusion")) {
-                if (search_expr == nullptr) {
-                    search_expr = new SearchExpr();
-                }
-                auto &fusion_json_list = elem.value();
-                if (fusion_json_list.type() != nlohmann::json::value_t::array) {
+            } else if (IsEqual(key, "search")) {
+                if (search_expr) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] = "Fusion field should be list";
+                    response["error_message"] = "More than one search field.";
                     return;
                 }
-                for (auto &fusion_json : fusion_json_list) {
-                    const auto fusion_expr = ParseFusion(fusion_json, http_status, response);
-                    if (fusion_expr == nullptr) {
-                        return;
-                    }
-                    search_exprs->push_back(fusion_expr);
-                    ++fusion_expr_count;
-                }
-            } else if (IsEqual(key, "match_dense")) {
-                if (search_expr == nullptr) {
-                    search_expr = new SearchExpr();
-                }
-                auto &knn_json = elem.value();
-                const auto knn_expr = ParseMatchDense(knn_json, http_status, response);
-                if (knn_expr == nullptr) {
+                search_expr = ParseSearchExpr(elem.value(), http_status, response);
+                if (!search_expr) {
                     return;
                 }
-                search_exprs->push_back(knn_expr);
-                ++match_expr_count;
-            } else if (IsEqual(key, "match_text")) {
-                if (search_expr == nullptr) {
-                    search_expr = new SearchExpr();
-                }
-                auto &match_json = elem.value();
-                const auto match_expr = ParseMatchText(match_json, http_status, response);
-                if (match_expr == nullptr) {
-                    return;
-                }
-                search_exprs->push_back(match_expr);
-                ++match_expr_count;
-            } else if (IsEqual(key, "match_tensor")) {
-                if (search_expr == nullptr) {
-                    search_expr = new SearchExpr();
-                }
-                auto &match_json = elem.value();
-                const auto match_expr = ParseMatchTensor(match_json, http_status, response);
-                if (match_expr == nullptr) {
-                    return;
-                }
-                search_exprs->push_back(match_expr);
-                ++match_expr_count;
-            } else if (IsEqual(key, "match_sparse")) {
-                if (search_expr == nullptr) {
-                    search_expr = new SearchExpr();
-                }
-                auto &match_json = elem.value();
-                const auto match_expr = ParseMatchSparse(match_json, http_status, response);
-                if (match_expr == nullptr) {
-                    return;
-                }
-                search_exprs->push_back(match_expr);
-                ++match_expr_count;
             } else {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = "Unknown expression: " + key;
@@ -199,21 +126,9 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             }
         }
 
-        if (match_expr_count > 1 && fusion_expr_count == 0) {
-            response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = "More than one knn or match experssion with no fusion experssion!";
-            return;
-        }
-
-        if (search_exprs != nullptr && !search_exprs->empty()) {
-            search_expr->SetExprs(search_exprs);
-            search_exprs = nullptr;
-        }
-        const QueryResult result = infinity_ptr->Search(db_name, table_name, search_expr, filter, output_columns);
+        const QueryResult result = infinity_ptr->Search(db_name, table_name, search_expr.release(), filter.release(), output_columns);
 
         output_columns = nullptr;
-        filter = nullptr;
-        search_expr = nullptr;
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
@@ -260,13 +175,9 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
             response["error_code"] = ErrorCode::kInvalidJsonFormat;
             response["error_message"] = "HTTP Body isn't json object";
         }
-
-        SizeT match_expr_count = 0;
-        SizeT fusion_expr_count = 0;
+        UniquePtr<ParsedExpr> filter{};
+        UniquePtr<SearchExpr> search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
-        Vector<ParsedExpr *> *search_exprs{nullptr};
-        ParsedExpr *filter{nullptr};
-        SearchExpr *search_expr{nullptr};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
@@ -275,25 +186,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                 delete output_columns;
                 output_columns = nullptr;
             }
-            if (filter != nullptr) {
-                delete filter;
-                filter = nullptr;
-            }
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
-            if (search_exprs != nullptr) {
-                for (auto &expr : *search_exprs) {
-                    delete expr;
-                    expr = nullptr;
-                }
-                delete search_exprs;
-                search_exprs = nullptr;
-            }
         });
-
-        search_exprs = new Vector<ParsedExpr *>();
         ExplainType explain_type  = ExplainType::kInvalid;
         for (const auto &elem : input_json.items()) {
             String key = elem.key();
@@ -334,68 +227,16 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                 if (filter == nullptr) {
                     return;
                 }
-            } else if (IsEqual(key, "fusion")) {
-                if (search_expr == nullptr) {
-                    search_expr = new SearchExpr();
-                }
-                auto &fusion_json_list = elem.value();
-                if (fusion_json_list.type() != nlohmann::json::value_t::array) {
+            } else if (IsEqual(key, "search")) {
+                if (search_expr) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] = "Fusion field should be list";
+                    response["error_message"] = "More than one search field.";
                     return;
                 }
-                for (auto &fusion_json : fusion_json_list) {
-                    const auto fusion_expr = ParseFusion(fusion_json, http_status, response);
-                    if (fusion_expr == nullptr) {
-                        return;
-                    }
-                    search_exprs->push_back(fusion_expr);
-                    ++fusion_expr_count;
-                }
-            } else if (IsEqual(key, "knn")) {
-                if (search_expr == nullptr) {
-                    search_expr = new SearchExpr();
-                }
-                auto &knn_json = elem.value();
-                const auto knn_expr = ParseMatchDense(knn_json, http_status, response);
-                if (knn_expr == nullptr) {
+                search_expr = ParseSearchExpr(elem.value(), http_status, response);
+                if (!search_expr) {
                     return;
                 }
-                search_exprs->push_back(knn_expr);
-                ++match_expr_count;
-            } else if (IsEqual(key, "match")) {
-                if (search_expr == nullptr) {
-                    search_expr = new SearchExpr();
-                }
-                auto &match_json = elem.value();
-                const auto match_expr = ParseMatchText(match_json, http_status, response);
-                if (match_expr == nullptr) {
-                    return;
-                }
-                search_exprs->push_back(match_expr);
-                ++match_expr_count;
-            } else if (IsEqual(key, "match_tensor")) {
-                if (search_expr == nullptr) {
-                    search_expr = new SearchExpr();
-                }
-                auto &match_json = elem.value();
-                const auto match_expr = ParseMatchTensor(match_json, http_status, response);
-                if (match_expr == nullptr) {
-                    return;
-                }
-                search_exprs->push_back(match_expr);
-                ++match_expr_count;
-            } else if (IsEqual(key, "match_sparse")) {
-                if (search_expr == nullptr) {
-                    search_expr = new SearchExpr();
-                }
-                auto &match_json = elem.value();
-                const auto match_expr = ParseMatchSparse(match_json, http_status, response);
-                if (match_expr == nullptr) {
-                    return;
-                }
-                search_exprs->push_back(match_expr);
-                ++match_expr_count;
             } else if (IsEqual(key, "explain_type")) {
                 String type = elem.value();
                 if (IsEqual(type, "analyze")) {
@@ -422,21 +263,9 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
             }
         }
 
-        if (match_expr_count > 1 && fusion_expr_count == 0) {
-            response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = "More than one knn or match experssion with no fusion experssion!";
-            return;
-        }
-
-        if (search_exprs != nullptr && !search_exprs->empty()) {
-            search_expr->SetExprs(search_exprs);
-            search_exprs = nullptr;
-        }
-        const QueryResult result = infinity_ptr->Explain(db_name, table_name, explain_type, search_expr, filter, output_columns);
+        const QueryResult result = infinity_ptr->Explain(db_name, table_name, explain_type, search_expr.release(), filter.release(), output_columns);
 
         output_columns = nullptr;
-        filter = nullptr;
-        search_expr = nullptr;
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
@@ -470,7 +299,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
     return;
 }
 
-ParsedExpr *HTTPSearch::ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+UniquePtr<ParsedExpr> HTTPSearch::ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
 
     UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
     ExprParser expr_parser;
@@ -483,7 +312,8 @@ ParsedExpr *HTTPSearch::ParseFilter(const nlohmann::json &json_object, HTTPStatu
 
     ParsedExpr *res = expr_parsed_result->exprs_ptr_->at(0);
     expr_parsed_result->exprs_ptr_->at(0) = nullptr;
-    return res;
+    UniquePtr<ParsedExpr> filter_expr(res);
+    return filter_expr;
 }
 
 Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list, HTTPStatus &http_status, nlohmann::json &response) {
@@ -541,7 +371,89 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
     return res;
 }
 
-FusionExpr *HTTPSearch::ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+UniquePtr<SearchExpr> HTTPSearch::ParseSearchExpr(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+    if (json_object.type() != nlohmann::json::value_t::array) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = "Search field should be list";
+        return {};
+    }
+    auto child_expr = new std::vector<ParsedExpr *>();
+    DeferFn defer_fn([&] {
+        if (child_expr) {
+            for (const auto expr : *child_expr) {
+                delete expr;
+            }
+            delete child_expr;
+            child_expr = nullptr;
+        }
+    });
+    child_expr->reserve(json_object.size());
+    for (const auto &sub_search_it : json_object.items()) {
+        const auto &search_obj = sub_search_it.value();
+        if (!search_obj.is_object()) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = "Search field should be list of objects";
+            return {};
+        }
+        if (search_obj.contains("fusion_method") && search_obj.contains("match_method")) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = "Every single search expression should not contain both fusion_method and match_method fields";
+            return {};
+        }
+        if (search_obj.contains("fusion_method")) {
+            auto fusion_expr = ParseFusion(search_obj, http_status, response);
+            if (!fusion_expr) {
+                return {};
+            }
+            child_expr->push_back(fusion_expr.release());
+        } else {
+            // match type
+            String match_method = search_obj.at("match_method");
+            ToLower(match_method);
+            if (match_method == "dense") {
+                auto match_dense_expr = ParseMatchDense(search_obj, http_status, response);
+                if (!match_dense_expr) {
+                    return {};
+                }
+                child_expr->push_back(match_dense_expr.release());
+            } else if (match_method == "sparse") {
+                auto match_sparse_expr = ParseMatchSparse(search_obj, http_status, response);
+                if (!match_sparse_expr) {
+                    return {};
+                }
+                child_expr->push_back(match_sparse_expr.release());
+            } else if (match_method == "text") {
+                auto match_text_expr = ParseMatchText(search_obj, http_status, response);
+                if (!match_text_expr) {
+                    return {};
+                }
+                child_expr->push_back(match_text_expr.release());
+            } else if (match_method == "tensor") {
+                auto match_tensor_expr = ParseMatchTensor(search_obj, http_status, response);
+                if (!match_tensor_expr) {
+                    return {};
+                }
+                child_expr->push_back(match_tensor_expr.release());
+            } else {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("Unknown match method: {}", match_method);
+                return {};
+            }
+        }
+    }
+    auto search_expr = MakeUnique<SearchExpr>();
+    try {
+        search_expr->SetExprs(child_expr);
+        child_expr = nullptr;
+    } catch (std::exception &e) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = fmt::format("Invalid Search expression, error info: {}", e.what());
+        return nullptr;
+    }
+    return search_expr;
+}
+
+UniquePtr<FusionExpr> HTTPSearch::ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = fmt::format("Fusion expression must be a json object: {}", json_object);
@@ -595,18 +507,18 @@ FusionExpr *HTTPSearch::ParseFusion(const nlohmann::json &json_object, HTTPStatu
     String extra_params_str{};
     if (fusion_expr->method_ == "match_tensor") {
         nlohmann::json match_tensor_json = fusion_params;
-        match_tensor_json["match_method"] = "match_tensor";
+        match_tensor_json["match_method"] = "tensor";
         if (match_tensor_json.contains("topn")) {
             response["error_code"] = ErrorCode::kInvalidExpression;
             response["error_message"] = "Fusion expression topn field should not be set in params";
             return nullptr;
         }
         match_tensor_json["topn"] = topn;
-        const auto match_tensor_expr = ParseMatchTensor(match_tensor_json, http_status, response);
-        if (match_tensor_expr == nullptr) {
+        auto match_tensor_expr = ParseMatchTensor(match_tensor_json, http_status, response);
+        if (!match_tensor_expr) {
             return nullptr;
         }
-        fusion_expr->match_tensor_expr_.reset(match_tensor_expr);
+        fusion_expr->match_tensor_expr_ = std::move(match_tensor_expr);
     } else {
         for (auto &param : fusion_params.items()) {
             String param_k = param.key(), param_v = param.value();
@@ -614,10 +526,10 @@ FusionExpr *HTTPSearch::ParseFusion(const nlohmann::json &json_object, HTTPStatu
         }
     }
     fusion_expr->SetOptions(fmt::format("topn={}{}", topn, extra_params_str));
-    return fusion_expr.release();
+    return fusion_expr;
 }
 
-KnnExpr *HTTPSearch::ParseMatchDense(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+UniquePtr<KnnExpr> HTTPSearch::ParseMatchDense(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = "MatchDense field should be object";
@@ -626,19 +538,27 @@ KnnExpr *HTTPSearch::ParseMatchDense(const nlohmann::json &json_object, HTTPStat
     auto knn_expr = MakeUnique<KnnExpr>();
     i64 topn = -1;
     nlohmann::json query_vector_json;
-    // must have: "fields", "query_vector", "element_type", "metric_type", "topn"
+    // must have: "match_method", "fields", "query_vector", "element_type", "metric_type", "topn"
     // may have: "params"
-    constexpr std::array possible_keys{"fields", "query_vector", "element_type", "metric_type", "topn", "params"};
+    constexpr std::array possible_keys{"match_method", "fields", "query_vector", "element_type", "metric_type", "topn", "params"};
     std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
     for (auto &field_json_obj : json_object.items()) {
         String key = field_json_obj.key();
         ToLower(key);
         if (!possible_keys_set.erase(key)) {
             response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Unknown MatchDense expression key: {}", key);
+            response["error_message"] = fmt::format("Unknown or duplicate MatchDense expression key: {}", key);
             return nullptr;
         }
-        if (IsEqual(key, "fields")) {
+        if (IsEqual(key, "match_method")) {
+            String match_method = field_json_obj.value();
+            ToLower(match_method);
+            if (!IsEqual(match_method, "dense")) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("MatchDense expression match_method should be dense, but got: {}", match_method);
+                return nullptr;
+            }
+        } else if (IsEqual(key, "fields")) {
             auto column_expr = MakeUnique<ColumnExpr>();
             auto column_str = field_json_obj.value().get<String>();
             column_expr->names_.push_back(std::move(column_str));
@@ -672,7 +592,9 @@ KnnExpr *HTTPSearch::ParseMatchDense(const nlohmann::json &json_object, HTTPStat
                 response["error_message"] = "MatchDense params should be object";
                 return nullptr;
             }
-            for (const auto &[param_k, param_v] : params.items()) {
+            for (const auto &param_it : params.items()) {
+                const auto &param_k = param_it.key();
+                const auto &param_v = param_it.value();
                 if (param_k == "index_name") {
                     knn_expr->index_name_ = param_v;
                 }
@@ -710,10 +632,10 @@ KnnExpr *HTTPSearch::ParseMatchDense(const nlohmann::json &json_object, HTTPStat
     }
     knn_expr->dimension_ = dimension;
     knn_expr->embedding_data_ptr_ = embedding_ptr;
-    return knn_expr.release();
+    return knn_expr;
 }
 
-MatchExpr *HTTPSearch::ParseMatchText(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+UniquePtr<MatchExpr> HTTPSearch::ParseMatchText(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = "MatchText field should be object";
@@ -722,19 +644,27 @@ MatchExpr *HTTPSearch::ParseMatchText(const nlohmann::json &json_object, HTTPSta
     auto match_expr = MakeUnique<MatchExpr>();
     i64 topn = -1;
     String extra_params{};
-    // must have: "fields", "matching_text", "topn"
+    // must have: "match_method", "fields", "matching_text", "topn"
     // may have: "params"
-    constexpr std::array possible_keys{"fields", "matching_text", "topn", "params"};
+    constexpr std::array possible_keys{"match_method", "fields", "matching_text", "topn", "params"};
     std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
     for (auto &field_json_obj : json_object.items()) {
         String key = field_json_obj.key();
         ToLower(key);
         if (!possible_keys_set.erase(key)) {
             response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Unknown MatchText expression key: {}", key);
+            response["error_message"] = fmt::format("Unknown or duplicate MatchText expression key: {}", key);
             return nullptr;
         }
-        if (IsEqual(key, "fields")) {
+        if (IsEqual(key, "match_method")) {
+            String match_method = field_json_obj.value();
+            ToLower(match_method);
+            if (!IsEqual(match_method, "text")) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("MatchText expression match_method should be text, but got: {}", match_method);
+                return nullptr;
+            }
+        } else if (IsEqual(key, "fields")) {
             match_expr->fields_ = field_json_obj.value();
         } else if (IsEqual(key, "matching_text")) {
             match_expr->matching_text_ = field_json_obj.value();
@@ -768,10 +698,10 @@ MatchExpr *HTTPSearch::ParseMatchText(const nlohmann::json &json_object, HTTPSta
         return nullptr;
     }
     match_expr->options_text_ = fmt::format("topn={}{}", topn, extra_params);
-    return match_expr.release();
+    return match_expr;
 }
 
-MatchTensorExpr *HTTPSearch::ParseMatchTensor(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+UniquePtr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = "MatchTensor field should be object";
@@ -783,19 +713,27 @@ MatchTensorExpr *HTTPSearch::ParseMatchTensor(const nlohmann::json &json_object,
     SharedPtr<ConstantExpr> tensor_expr{};
     i64 topn = -1;
     String extra_params{};
-    // must have: "fields", "query_tensor", "element_type", "topn"
+    // must have: "match_method", "fields", "query_tensor", "element_type", "topn"
     // may have: "params"
-    constexpr std::array possible_keys{"fields", "query_tensor", "element_type", "topn", "params"};
+    constexpr std::array possible_keys{"match_method", "fields", "query_tensor", "element_type", "topn", "params"};
     std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
     for (auto &field_json_obj : json_object.items()) {
         String key = field_json_obj.key();
         ToLower(key);
         if (!possible_keys_set.erase(key)) {
             response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Unknown MatchTensor expression key: {}", key);
+            response["error_message"] = fmt::format("Unknown or duplicate MatchTensor expression key: {}", key);
             return nullptr;
         }
-        if (IsEqual(key, "fields")) {
+        if (IsEqual(key, "match_method")) {
+            String match_method = field_json_obj.value();
+            ToLower(match_method);
+            if (!IsEqual(match_method, "tensor")) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("MatchTensor expression match_method should be tensor, but got: {}", match_method);
+                return nullptr;
+            }
+        } else if (IsEqual(key, "fields")) {
             auto column_str = field_json_obj.value().get<String>();
             auto column_expr = MakeUnique<ColumnExpr>();
             column_expr->names_.push_back(std::move(column_str));
@@ -840,10 +778,10 @@ MatchTensorExpr *HTTPSearch::ParseMatchTensor(const nlohmann::json &json_object,
     }
     match_tensor_expr->options_text_ = fmt::format("topn={}{}", topn, extra_params);
     match_tensor_expr->SetQueryTensorStr(std::move(element_type), tensor_expr.get());
-    return match_tensor_expr.release();
+    return match_tensor_expr;
 }
 
-MatchSparseExpr *HTTPSearch::ParseMatchSparse(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+UniquePtr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = "MatchSparse field should be object";
@@ -861,19 +799,27 @@ MatchSparseExpr *HTTPSearch::ParseMatchSparse(const nlohmann::json &json_object,
         }
     });
     i64 topn = -1;
-    // must have: "fields", "query_vector", "metric_type", "topn"
+    // must have: "match_method", "fields", "query_vector", "metric_type", "topn"
     // may have: "params"
-    constexpr std::array possible_keys{"fields", "query_vector", "metric_type", "topn", "params"};
+    constexpr std::array possible_keys{"match_method", "fields", "query_vector", "metric_type", "topn", "params"};
     std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
     for (auto &field_json_obj : json_object.items()) {
         String key = field_json_obj.key();
         ToLower(key);
         if (!possible_keys_set.erase(key)) {
             response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Unknown MatchSparse expression key: {}", key);
+            response["error_message"] = fmt::format("Unknown or duplicate MatchSparse expression key: {}", key);
             return nullptr;
         }
-        if (IsEqual(key, "fields")) {
+        if (IsEqual(key, "match_method")) {
+            String match_method = field_json_obj.value();
+            ToLower(match_method);
+            if (!IsEqual(match_method, "sparse")) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("MatchSparse expression match_method should be sparse, but got: {}", match_method);
+                return nullptr;
+            }
+        } else if (IsEqual(key, "fields")) {
             auto column_expr = MakeUnique<ColumnExpr>();
             auto column_str = field_json_obj.value().get<String>();
             column_expr->names_.push_back(std::move(column_str));
@@ -921,7 +867,7 @@ MatchSparseExpr *HTTPSearch::ParseMatchSparse(const nlohmann::json &json_object,
     }
     match_sparse_expr->SetOptParams(topn, opt_params_ptr);
     opt_params_ptr = nullptr;
-    return match_sparse_expr.release();
+    return match_sparse_expr;
 }
 
 UniquePtr<ConstantExpr> HTTPSearch::ParseSparseVector(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
@@ -953,7 +899,9 @@ UniquePtr<ConstantExpr> HTTPSearch::ParseSparseVector(const nlohmann::json &json
         }
     }
     HashSet<i64> key_set;
-    for (const auto &[sparse_k, sparse_v] : json_object.items()) {
+    for (const auto &sparse_it : json_object.items()) {
+        const auto &sparse_k = sparse_it.key();
+        const auto &sparse_v = sparse_it.value();
         i64 key_val = {};
         try {
             key_val = std::stoll(sparse_k);

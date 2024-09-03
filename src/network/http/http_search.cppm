@@ -28,6 +28,7 @@ import match_sparse_expr;
 import infinity;
 import internal_types;
 import constant_expr;
+import search_expr;
 
 namespace infinity {
 
@@ -46,13 +47,14 @@ public:
                         HTTPStatus &http_status,
                         nlohmann::json &response);
 
-    static ParsedExpr *ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static Vector<ParsedExpr *> *ParseOutput(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static FusionExpr *ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static KnnExpr *ParseMatchDense(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static MatchExpr *ParseMatchText(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static MatchTensorExpr *ParseMatchTensor(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static MatchSparseExpr *ParseMatchSparse(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<ParsedExpr> ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<SearchExpr> ParseSearchExpr(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<FusionExpr> ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<KnnExpr> ParseMatchDense(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<MatchExpr> ParseMatchText(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<MatchTensorExpr> ParseMatchTensor(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<MatchSparseExpr> ParseMatchSparse(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static Tuple<i64, void *>
     ParseVector(const nlohmann::json &json_object, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response);
     static UniquePtr<ConstantExpr> ParseSparseVector(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
