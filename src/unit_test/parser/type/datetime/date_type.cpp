@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include <chrono>
 import base_test;
 
 import infinity_exception;
@@ -95,13 +96,9 @@ TEST_F(DateTypeTest, TestEqStdChronoBackward) {
     DateT date;
     date.FromString("2020-01-31");
 
-    tm tmdate = {};
-    tmdate.tm_year = 2020 - 1900;
-    tmdate.tm_mon = 1 - 1;
-    tmdate.tm_mday = 31;
-    time_t time_c = mktime(&tmdate);
-    system_clock::time_point tp = system_clock::from_time_t(time_c);
-    sys_days sysdays = ceil<days>(tp);
+    
+    year_month_day ymd = 2020y/January/31d;
+    sys_days sysdays = sys_days{ymd};
     
     for(i32 i = 0; i < 30000; i++) {
         year_month_day ymd = year_month_day(sysdays);

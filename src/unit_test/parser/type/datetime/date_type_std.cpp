@@ -1,4 +1,3 @@
-#include "type/datetime/interval_type.h"
 #include "gtest/gtest.h"
 
 import base_test;
