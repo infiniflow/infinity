@@ -909,7 +909,9 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                         auto &chunk_index_entry = chunk_index_entries[i];
                         old_chunks.push_back(chunk_index_entry.get());
                     }
+                    ChunkID chunk_id = segment_index_entry->GetNextChunkID();
                     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
+                                                                                                                chunk_id, /*chunk_id*/
                                                                                                                 dst_base_name,
                                                                                                                 base_rowid,
                                                                                                                 total_row_count,

@@ -257,13 +257,13 @@ public:
     void SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
     static SharedPtr<SegmentIndexEntry> CreateFakeEntry(const String &index_dir);
 
+    ChunkID GetNextChunkID() { return next_chunk_id_++; }
+
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer);
     // Load from disk. Is called by SegmentIndexEntry::Deserialize.
     static UniquePtr<SegmentIndexEntry>
     LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *create_index_param);
-
-    ChunkID GetNextChunkID() { return next_chunk_id_++; }
 
 private:
     BufferManager *buffer_manager_{};

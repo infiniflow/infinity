@@ -99,11 +99,12 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewHnswIndexChunkIndexEntry(ChunkID 
 }
 
 SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry,
+                                                                 ChunkID chunk_id,
                                                                  const String &base_name,
                                                                  RowID base_rowid,
                                                                  u32 row_count,
                                                                  BufferManager *buffer_mgr) {
-    auto chunk_index_entry = SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(0, segment_index_entry, base_name, base_rowid, row_count));
+    auto chunk_index_entry = SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(chunk_id, segment_index_entry, base_name, base_rowid, row_count));
     const auto &index_dir = segment_index_entry->index_dir();
     assert(index_dir.get() != nullptr);
     if (buffer_mgr != nullptr) {
