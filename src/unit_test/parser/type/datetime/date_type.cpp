@@ -94,9 +94,8 @@ TEST_F(DateTypeTest, TestEqStdChronoBackward) {
     //std::chrono::
     DateT date;
     date.FromString("2020-01-31");
-
-    
-    year_month_day ymd = 2020y/January/31d;
+ 
+    year_month_day ymd(year{2020}, month{1}, day{31});
     sys_days sysdays = sys_days{ymd};
     
     for(i32 i = 0; i < 30000; i++) {
