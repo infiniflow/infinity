@@ -25,7 +25,7 @@ import block_index;
 import block_column_entry;
 import segment_index_entry;
 import merge_knn;
-import bitmask;
+import roaring_bitmap;
 import data_block;
 import column_vector;
 import base_expression;

@@ -17,10 +17,9 @@ module;
 export module knn_distance;
 
 import stl;
-
-import bitmask;
 import knn_expr;
 import internal_types;
+import roaring_bitmap;
 
 namespace infinity {
 

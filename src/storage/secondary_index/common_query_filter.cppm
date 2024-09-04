@@ -15,7 +15,7 @@
 module;
 export module common_query_filter;
 import stl;
-import bitmask;
+import roaring_bitmap;
 import secondary_index_scan_execute_expression;
 import internal_types;
 import default_values;
@@ -48,7 +48,7 @@ export struct CommonQueryFilter {
     // result will not be populated if always_true_ be true
     atomic_flag finish_build_;
     std::mutex result_mutex_;
-    Map<SegmentID, std::variant<Vector<u32>, Bitmask>> filter_result_;
+    Map<SegmentID, Bitmask> filter_result_;
     SizeT filter_result_count_ = 0;
 
     // task info
@@ -102,11 +102,7 @@ private:
 
     // for PassFilter
     SegmentID current_segment_id_ = INVALID_SEGMENT_ID;
-    i8 decode_status_ = 0;
-    const Vector<u32> *doc_id_list_ = nullptr;
     const Bitmask *doc_id_bitmask_ = nullptr;
-    u32 doc_id_list_size_ = 0;
-    u32 pos_ = 0; // index to doc_id_list_
     bool always_true_ = false;
 };
 

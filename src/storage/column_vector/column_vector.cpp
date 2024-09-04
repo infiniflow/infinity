@@ -25,7 +25,7 @@ import selection;
 import type_info;
 import infinity_exception;
 import default_values;
-import bitmask;
+import roaring_bitmap;
 import vector_buffer;
 import fix_heap;
 import serialize;
@@ -117,10 +117,10 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
     if (buffer_.get() == nullptr) {
         if (vector_type_ == ColumnVectorType::kConstant) {
             buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_type);
-            nulls_ptr_ = Bitmask::Make(8);
+            nulls_ptr_ = Bitmask::MakeSharedAllTrue(1);
         } else {
             buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
-            nulls_ptr_ = Bitmask::Make(std::bit_ceil(capacity_));
+            nulls_ptr_ = Bitmask::MakeSharedAllTrue(capacity_);
         }
         data_ptr_ = buffer_->GetDataMut();
     } else {
@@ -144,10 +144,10 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr,
 
     if (vector_type_ == ColumnVectorType::kConstant) {
         buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, 1, vector_buffer_type);
-        nulls_ptr_ = Bitmask::Make(8);
+        nulls_ptr_ = Bitmask::MakeSharedAllTrue(1);
     } else {
         buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_type);
-        nulls_ptr_ = Bitmask::Make(capacity_);
+        nulls_ptr_ = Bitmask::MakeSharedAllTrue(capacity_);
     }
     switch (vector_tipe) {
         case ColumnVectorTipe::kReadWrite: {

@@ -25,7 +25,6 @@ import file_system_type;
 import infinity_exception;
 import knn_result_handler;
 import multivector_result_handler;
-import bitmask;
 import logical_type;
 import hnsw_common;
 import data_store;

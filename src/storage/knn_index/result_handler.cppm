@@ -21,7 +21,7 @@ export module knn_result_handler;
 import stl;
 
 import infinity_exception;
-import bitmask;
+import roaring_bitmap;
 import internal_types;
 
 namespace infinity {

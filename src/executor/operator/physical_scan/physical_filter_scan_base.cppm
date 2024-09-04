@@ -22,7 +22,7 @@ import common_query_filter;
 import physical_operator_type;
 import base_table_ref;
 import load_meta;
-import bitmask;
+import roaring_bitmap;
 
 namespace infinity {
 
