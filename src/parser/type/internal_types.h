@@ -15,6 +15,7 @@
 #pragma once
 
 
+#include "type/datetime/date_type_std.h"
 #include "type/number/float16.h"
 #include "type/number/bfloat16.h"
 #include "type/number/huge_int.h"
@@ -64,6 +65,7 @@ using VarcharT = Varchar;
 
 // Date and Time
 using DateT = DateType;
+using DateStdT = DateTypeStd;
 using TimeT = TimeType;
 using DateTimeT = DateTimeType;
 using TimestampT = TimestampType;

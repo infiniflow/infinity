@@ -38,6 +38,7 @@ export using infinity::DateT;
 
 export using infinity::TimeT;
 export using infinity::DateTimeT;
+export using infinity::DateStdT;
 export using infinity::TimestampT;
 export using infinity::IntervalT;
 
