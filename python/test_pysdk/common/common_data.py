@@ -156,7 +156,7 @@ def str2sparse(str_input):
     return sparce_vec
 
 index_type_transfrom = {
-    1:"IVFFlat",
+    1:"IVFFLAT",
     2:"HNSW",
     3:"FULLTEXT",
     4:"SECONDARY",

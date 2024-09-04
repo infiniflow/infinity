@@ -22,7 +22,7 @@ namespace infinity {
 std::string IndexInfo::IndexTypeToString(IndexType index_type) {
     switch (index_type) {
         case IndexType::kIVFFlat: {
-            return "IVFFlat";
+            return "IVFFLAT";
         }
         case IndexType::kHnsw: {
             return "HNSW";
