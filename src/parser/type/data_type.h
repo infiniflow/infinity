@@ -174,7 +174,7 @@ public:
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static std::shared_ptr<DataType> ReadAdv(char *&ptr, int32_t maxbytes);
+    static std::shared_ptr<DataType> ReadAdv(const char *&ptr, int32_t maxbytes);
 
     [[nodiscard]] inline bool Plain() const { return plain_type_; }
 

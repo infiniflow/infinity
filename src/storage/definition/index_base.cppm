@@ -57,7 +57,7 @@ public:
     virtual void WriteAdv(char *&ptr) const;
 
     // Read char from buffer
-    static SharedPtr<IndexBase> ReadAdv(char *&ptr, i32 maxbytes);
+    static SharedPtr<IndexBase> ReadAdv(const char *&ptr, i32 maxbytes);
 
     virtual String ToString() const;
     virtual String BuildOtherParamsString() const { return ""; }

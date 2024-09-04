@@ -96,11 +96,11 @@ public:
     virtual String GetTypeStr() const = 0;
     [[nodiscard]] virtual SizeT GetSizeInBytes() const = 0;
     virtual void WriteAdv(char *&ptr) const = 0;
-    static UniquePtr<CatalogDeltaOperation> ReadAdv(char *&ptr, i32 max_bytes);
+    static UniquePtr<CatalogDeltaOperation> ReadAdv(const char *&ptr, i32 max_bytes);
     SizeT GetBaseSizeInBytes() const;
     void InitializeAddrSerializer();
     void WriteAdvBase(char *&buf) const;
-    void ReadAdvBase(char *&ptr);
+    void ReadAdvBase(const char *&ptr);
 
     virtual const String ToString() const;
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
@@ -127,7 +127,7 @@ public:
 /// class AddDBEntryOp
 export class AddDBEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddDBEntryOp> ReadAdv(char *&ptr);
+    static UniquePtr<AddDBEntryOp> ReadAdv(const char *&ptr);
 
     AddDBEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY) {}
 
@@ -147,7 +147,7 @@ public:
 /// class AddTableEntryOp
 export class AddTableEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddTableEntryOp> ReadAdv(char *&ptr, char *ptr_end);
+    static UniquePtr<AddTableEntryOp> ReadAdv(const char *&ptr, const char *ptr_end);
 
     AddTableEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY) {}
 
@@ -172,7 +172,7 @@ public:
 /// class AddSegmentEntryOp
 export class AddSegmentEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddSegmentEntryOp> ReadAdv(char *&ptr);
+    static UniquePtr<AddSegmentEntryOp> ReadAdv(const char *&ptr);
 
     AddSegmentEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY){};
 
@@ -201,7 +201,7 @@ public:
 /// class AddBlockEntryOp
 export class AddBlockEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddBlockEntryOp> ReadAdv(char *&ptr);
+    static UniquePtr<AddBlockEntryOp> ReadAdv(const char *&ptr);
 
     AddBlockEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY){};
 
@@ -235,7 +235,7 @@ public:
 /// class AddColumnEntryOp
 export class AddColumnEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddColumnEntryOp> ReadAdv(char *&ptr);
+    static UniquePtr<AddColumnEntryOp> ReadAdv(const char *&ptr);
 
     AddColumnEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY){};
 
@@ -257,7 +257,7 @@ public:
 /// class AddTableIndexEntryOp
 export class AddTableIndexEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddTableIndexEntryOp> ReadAdv(char *&ptr, char *ptr_end);
+    static UniquePtr<AddTableIndexEntryOp> ReadAdv(const char *&ptr, const char *ptr_end);
 
     AddTableIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY) {}
 
@@ -278,7 +278,7 @@ public:
 /// class AddSegmentColumnEntryOperation
 export class AddSegmentIndexEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddSegmentIndexEntryOp> ReadAdv(char *&ptr);
+    static UniquePtr<AddSegmentIndexEntryOp> ReadAdv(const char *&ptr);
 
     AddSegmentIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY) {}
 
@@ -303,7 +303,7 @@ public:
 /// class AddSegmentColumnEntryOperation
 export class AddChunkIndexEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddChunkIndexEntryOp> ReadAdv(char *&ptr);
+    static UniquePtr<AddChunkIndexEntryOp> ReadAdv(const char *&ptr);
 
     AddChunkIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {}
 
@@ -349,7 +349,7 @@ public:
 
     void WriteAdv(char *&ptr);
 
-    static UniquePtr<CatalogDeltaEntry> ReadAdv(char *&ptr, i32 max_bytes);
+    static UniquePtr<CatalogDeltaEntry> ReadAdv(const char *&ptr, i32 max_bytes);
 
     [[nodiscard]] String ToString() const;
 

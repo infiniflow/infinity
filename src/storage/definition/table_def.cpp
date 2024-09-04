@@ -115,8 +115,8 @@ void TableDef::WriteAdv(char *&ptr) const {
     return;
 }
 
-SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
+SharedPtr<TableDef> TableDef::ReadAdv(const char *&ptr, i32 maxbytes) {
+    const char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
         String error_message = "ptr goes out of range when reading TableDef";
         UnrecoverableError(error_message);

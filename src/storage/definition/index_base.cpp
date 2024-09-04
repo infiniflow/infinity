@@ -101,8 +101,8 @@ void IndexBase::WriteAdv(char *&ptr) const {
     }
 }
 
-SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
+SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
+    const char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
         String error_message = "ptr goes out of range when reading IndexBase";
         UnrecoverableError(error_message);

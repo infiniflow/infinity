@@ -111,7 +111,7 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     }
 }
 
-WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
+WalBlockInfo WalBlockInfo::ReadBufferAdv(const char *&ptr) {
     WalBlockInfo block_info;
     block_info.block_id_ = ReadBufAdv<BlockID>(ptr);
     block_info.row_count_ = ReadBufAdv<u16>(ptr);
@@ -182,7 +182,7 @@ void WalSegmentInfo::WriteBufferAdv(char *&buf) const {
     }
 }
 
-WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
+WalSegmentInfo WalSegmentInfo::ReadBufferAdv(const char *&ptr) {
     WalSegmentInfo segment_info;
     segment_info.segment_id_ = ReadBufAdv<SegmentID>(ptr);
     segment_info.column_count_ = ReadBufAdv<u64>(ptr);
@@ -276,7 +276,7 @@ void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
     }
 }
 
-WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
+WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(const char *&ptr) {
     WalChunkIndexInfo chunk_index_info;
     chunk_index_info.chunk_id_ = ReadBufAdv<ChunkID>(ptr);
     chunk_index_info.base_name_ = ReadBufAdv<String>(ptr);
@@ -299,8 +299,8 @@ String WalChunkIndexInfo::ToString() const {
     return ss.str();
 }
 
-SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
-    char *const ptr_end = ptr + max_bytes;
+SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
+    const char *const ptr_end = ptr + max_bytes;
     SharedPtr<WalCmd> cmd = nullptr;
     auto cmd_type = ReadBufAdv<WalCommandType>(ptr);
     switch (cmd_type) {
@@ -1135,27 +1135,31 @@ void WalEntry::WriteAdv(char *&ptr) const {
     header->checksum_ = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
 }
 
-SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
-    char *const ptr_end = ptr + max_bytes;
+SharedPtr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
+    const char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
         String error_message = "ptr goes out of range when reading WalEntry";
         LOG_WARN(error_message);
         return nullptr;
     }
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
-    auto *header = (WalEntryHeader *)ptr;
+    auto *header = (const WalEntryHeader *)ptr;
     entry->size_ = header->size_;
     entry->checksum_ = header->checksum_;
     entry->txn_id_ = header->txn_id_;
     entry->commit_ts_ = header->commit_ts_;
-    i32 size2 = *(i32 *)(ptr + entry->size_ - sizeof(i32));
-    if (entry->size_ != size2) {
+    if (const i32 size2 = ReadBuf<i32>(ptr + entry->size_ - sizeof(i32)); entry->size_ != size2) {
         return nullptr;
     }
-    header->checksum_ = 0;
-    u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size_);
-    if (entry->checksum_ != checksum2) {
-        return nullptr;
+    {
+        const auto tmp_header_copy = MakeUnique<char[]>(entry->size_);
+        std::memcpy(tmp_header_copy.get(), ptr, entry->size_);
+        auto *header_copy = reinterpret_cast<WalEntryHeader *>(tmp_header_copy.get());
+        header_copy->checksum_ = 0;
+        if (const u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(tmp_header_copy.get()), entry->size_);
+            entry->checksum_ != checksum2) {
+            return nullptr;
+        }
     }
     ptr += sizeof(WalEntryHeader);
     i32 cnt = ReadBufAdv<i32>(ptr);
@@ -1302,7 +1306,7 @@ SharedPtr<WalEntry> WalEntryIterator::Next() {
         if ((SizeT)entry_size > off_) {
             return nullptr;
         }
-        char *ptr = buf_.data() + off_ - (SizeT)entry_size;
+        const char *ptr = buf_.data() + off_ - (SizeT)entry_size;
         auto entry = WalEntry::ReadAdv(ptr, entry_size);
         if (entry.get() != nullptr) {
             off_ -= entry_size;
@@ -1314,7 +1318,7 @@ SharedPtr<WalEntry> WalEntryIterator::Next() {
         if (off_ + (SizeT)entry_size > buf_.size()) {
             return nullptr;
         }
-        char *ptr = buf_.data() + off_;
+        const char *ptr = buf_.data() + off_;
         auto entry = WalEntry::ReadAdv(ptr, entry_size);
         if (entry.get() != nullptr) {
             off_ += (SizeT)entry_size;

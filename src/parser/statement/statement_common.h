@@ -76,7 +76,7 @@ struct InitParameter {
         WriteBufAdv(p, param_value_);
     }
 
-    static std::unique_ptr<InitParameter> ReadAdv(char *&p) {
+    static std::unique_ptr<InitParameter> ReadAdv(const char *&p) {
         auto init_param = std::make_unique<InitParameter>();
         init_param->param_name_ = ReadBufAdv<std::string>(p);
         init_param->param_value_ = ReadBufAdv<std::string>(p);

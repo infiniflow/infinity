@@ -260,8 +260,8 @@ void DataType::WriteAdv(char *&ptr) const {
     return;
 }
 
-std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
+std::shared_ptr<DataType> DataType::ReadAdv(const char *&ptr, int32_t maxbytes) {
+    const char *const ptr_end = ptr + maxbytes;
     LogicalType type = ReadBufAdv<LogicalType>(ptr);
     std::shared_ptr<TypeInfo> type_info{nullptr};
     switch (type) {

@@ -39,7 +39,7 @@ struct Posting {
         WriteBufAdv<DataType>(p, val_);
     }
 
-    static Posting<DataType> ReadAdv(char *&p) {
+    static Posting<DataType> ReadAdv(const char *&p) {
         Posting<DataType> res;
         res.doc_id_ = ReadBufAdv<u32>(p);
         res.val_ = ReadBufAdv<DataType>(p);
@@ -168,7 +168,7 @@ private:
         }
     }
 
-    static LinScan ReadAdv(char *&p) {
+    static LinScan ReadAdv(const char *&p) {
         SizeT row_num = ReadBufAdv<u32>(p);
         SizeT inverted_idx_size = ReadBufAdv<SizeT>(p);
         LinScan res(inverted_idx_size);

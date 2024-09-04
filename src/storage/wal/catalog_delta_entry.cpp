@@ -121,7 +121,7 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     }
 }
 
-void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
+void CatalogDeltaOperation::ReadAdvBase(const char *&ptr) {
     begin_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     merge_flag_ = ReadBufAdv<MergeFlag>(ptr);
     txn_id_ = ReadBufAdv<TransactionID>(ptr);
@@ -164,8 +164,8 @@ CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry 
     // LOG_TRACE(fmt::format("Create delta op: {} ", this->ToString()));
 }
 
-UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 max_bytes) {
-    char *const ptr_end = ptr + max_bytes;
+UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(const char *&ptr, i32 max_bytes) {
+    const char *const ptr_end = ptr + max_bytes;
     UniquePtr<CatalogDeltaOperation> operation{nullptr};
     auto operation_type = ReadBufAdv<CatalogDeltaOpType>(ptr);
     switch (operation_type) {
@@ -428,7 +428,7 @@ AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, T
     }
 }
 
-UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(const char *&ptr) {
     auto add_db_op = MakeUnique<AddDBEntryOp>();
     add_db_op->ReadAdvBase(ptr);
 
@@ -436,7 +436,7 @@ UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(char *&ptr) {
     return add_db_op;
 }
 
-UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
+UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(const char *&ptr, const char *ptr_end) {
     auto add_table_op = MakeUnique<AddTableEntryOp>();
     add_table_op->ReadAdvBase(ptr);
 
@@ -470,7 +470,7 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
     return add_table_op;
 }
 
-UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(const char *&ptr) {
     auto add_segment_op = MakeUnique<AddSegmentEntryOp>();
     add_segment_op->ReadAdvBase(ptr);
 
@@ -487,7 +487,7 @@ UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(char *&ptr) {
     return add_segment_op;
 }
 
-UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(const char *&ptr) {
     auto add_block_op = MakeUnique<AddBlockEntryOp>();
     add_block_op->ReadAdvBase(ptr);
 
@@ -501,7 +501,7 @@ UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(char *&ptr) {
     return add_block_op;
 }
 
-UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(const char *&ptr) {
     auto add_column_op = MakeUnique<AddColumnEntryOp>();
     add_column_op->ReadAdvBase(ptr);
     auto &[outline_buffer_count, last_chunk_offset] = add_column_op->outline_info_;
@@ -510,7 +510,7 @@ UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(char *&ptr) {
     return add_column_op;
 }
 
-UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
+UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(const char *&ptr, const char *ptr_end) {
     auto add_table_index_op = MakeUnique<AddTableIndexEntryOp>();
     add_table_index_op->ReadAdvBase(ptr);
 
@@ -521,7 +521,7 @@ UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(char *&ptr, char *
     return add_table_index_op;
 }
 
-UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(const char *&ptr) {
     auto add_segment_index_op = MakeUnique<AddSegmentIndexEntryOp>();
     add_segment_index_op->ReadAdvBase(ptr);
 
@@ -531,7 +531,7 @@ UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(char *&ptr) {
     return add_segment_index_op;
 }
 
-UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(const char *&ptr) {
     auto add_chunk_index_op = MakeUnique<AddChunkIndexEntryOp>();
     add_chunk_index_op->ReadAdvBase(ptr);
 
@@ -977,9 +977,9 @@ i32 CatalogDeltaEntry::GetSizeInBytes() const {
     return size;
 }
 
-UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_bytes) {
-    char *const ptr_start = ptr;
-    char *const ptr_end = ptr + max_bytes;
+UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
+    const char *const ptr_start = ptr;
+    const char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
         String error_message = "ptr goes out of range when reading WalEntry";
         UnrecoverableError(error_message);
@@ -988,19 +988,16 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     header.size_ = ReadBufAdv<i32>(ptr);
     header.checksum_ = ReadBufAdv<u32>(ptr);
     auto entry = MakeUnique<CatalogDeltaEntry>();
-    i32 size2 = *(i32 *)(ptr_start + header.size_ - sizeof(i32));
-    if (header.size_ != size2) {
+    if (const i32 size2 = ReadBuf<i32>(ptr_start + header.size_ - sizeof(i32)); header.size_ != size2) {
         return nullptr;
     }
     {
-        ptr = ptr_start;
-        WriteBufAdv(ptr, header.size_);
-        u32 init_checksum = 0;
-        WriteBufAdv(ptr, init_checksum);
-        u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr_start), header.size_);
-        if (header.checksum_ != checksum2) {
-            String error_message = fmt::format("checksum failed, checksum: {}, checksum2: {}", header.checksum_, checksum2);
-            UnrecoverableError(error_message);
+        const auto tmp_copy_header = MakeUniqueForOverwrite<char[]>(header.size_);
+        std::memcpy(tmp_copy_header.get(), ptr_start, header.size_);
+        WriteBuf<u32>(tmp_copy_header.get() + sizeof(header.size_), 0);
+        if (const u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(tmp_copy_header.get()), header.size_);
+            header.checksum_ != checksum2) {
+            UnrecoverableError(fmt::format("checksum failed, checksum: {}, checksum2: {}", header.checksum_, checksum2));
         }
     }
     entry->max_commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
