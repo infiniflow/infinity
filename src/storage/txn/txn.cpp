@@ -440,7 +440,7 @@ TxnTimeStamp Txn::Commit() {
 
     // register commit ts in wal manager here, define the commit sequence
     TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampW(this);
-    LOG_TRACE(fmt::format("Txn: {} is committing, committing ts: {}", txn_id_, commit_ts));
+    LOG_TRACE(fmt::format("Txn: {} is committing, begin_ts:{} committing ts: {}", txn_id_, BeginTS(), commit_ts));
 
     this->SetTxnCommitting(commit_ts);
 

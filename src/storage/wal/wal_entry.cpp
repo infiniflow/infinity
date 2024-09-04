@@ -16,6 +16,7 @@ module;
 
 #include <cassert>
 #include <vector>
+#include <sstream>
 
 module wal_entry;
 

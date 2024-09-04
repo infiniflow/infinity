@@ -427,7 +427,7 @@ void ChunkIndexEntry::LoadPartsReader(BufferManager *buffer_mgr) {
 void ChunkIndexEntry::DeprecateChunk(TxnTimeStamp commit_ts) {
     assert(commit_ts_.load() < commit_ts);
     deprecate_ts_.store(commit_ts);
-    LOG_INFO(fmt::format("Deprecate chunk {}.", encode()));
+    LOG_INFO(fmt::format("Deprecate chunk {}, ts: {}", encode(), commit_ts));
     ResetOptimizing();
 }
 

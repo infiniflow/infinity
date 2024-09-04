@@ -516,7 +516,7 @@ i64 WalManager::ReplayWalFile() {
                 String error_message = "Found unexpected bad wal entry";
                 UnrecoverableError(error_message);
             }
-            LOG_TRACE(wal_entry->ToString());
+            // LOG_TRACE(wal_entry->ToString());
 
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
             if (wal_entry->IsCheckPoint(checkpoint_cmd)) {

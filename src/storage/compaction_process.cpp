@@ -143,6 +143,7 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
 
 void CompactionProcessor::ScanAndOptimize() {
     Txn *opt_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanAndOptimize"));
+    LOG_INFO(fmt::format("ScanAndOptimize opt begin ts: {}", opt_txn->BeginTS()));
     TransactionID txn_id = opt_txn->TxnID();
     TxnTimeStamp begin_ts = opt_txn->BeginTS();
 
