@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-#include <chrono>
 import base_test;
 
 import infinity_exception;
