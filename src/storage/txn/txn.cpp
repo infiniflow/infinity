@@ -531,6 +531,11 @@ void Txn::Rollback() {
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { 
     std::lock_guard guard(txn_store_.mtx_);
+    auto state = txn_context_.GetTxnState();
+    if (state != TxnState::kStarted) {
+        auto begin_ts = BeginTS();
+        UnrecoverableError(fmt::format("Should add wal cmd in started state, begin_ts: {}", begin_ts));
+    }
     wal_entry_->cmds_.push_back(cmd);
 }
 
