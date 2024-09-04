@@ -540,8 +540,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                             ToLower(server_mode);
                             if(server_mode == "standalone" or server_mode == "cluster") {
-                                UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_mode);
-                                Status status = global_options_.AddOption(std::move(server_address_option));
+                                UniquePtr<StringOption> server_mode_option = MakeUnique<StringOption>(SERVER_MODE_OPTION_NAME, server_mode);
+                                Status status = global_options_.AddOption(std::move(server_mode_option));
                                 if(!status.ok()) {
                                     UnrecoverableError(status.message());
                                 }
@@ -632,6 +632,16 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     String error_message = "Missing version field";
                     fmt::print("Fatal: {}",error_message);
                     UnrecoverableError(error_message);
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kServerMode) == nullptr) {
+                    // Server mode
+                    String server_mode = "standalone";
+                    UniquePtr<StringOption> server_mode_option = MakeUnique<StringOption>(SERVER_MODE_OPTION_NAME, server_mode);
+                    Status status = global_options_.AddOption(std::move(server_mode_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
                 }
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZone) == nullptr) {
@@ -1730,6 +1740,11 @@ String Config::Version() {
     return global_options_.GetStringValue(GlobalOptionIndex::kVersion);
 }
 
+String Config::ServerMode() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kServerMode);
+}
+
 String Config::TimeZone() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetStringValue(GlobalOptionIndex::kTimeZone);
@@ -2026,6 +2041,7 @@ void Config::PrintAll() {
     fmt::print(" - version: {}\n", Version());
     fmt::print(" - timezone: {}{}\n", TimeZone(), TimeZoneBias());
     fmt::print(" - cpu_limit: {}\n", CPULimit());
+    fmt::print(" - server mode: {}\n", ServerMode());
 
     //    // Profiler
     //    fmt::print(" - enable_profiler: {}\n", system_option_.enable_profiler);
@@ -2048,6 +2064,8 @@ void Config::PrintAll() {
     fmt::print(" - log_level: {}\n", LogLevel2Str(LogLevel()));
 
     // Storage
+    fmt::print(" - persistence_dir: {}\n", PersistenceDir());
+    fmt::print(" - persistence_file_size: {}\n", PersistenceObjectSizeLimit());
     fmt::print(" - data_dir: {}\n", DataDir());
     fmt::print(" - cleanup_interval: {}\n", Utility::FormatTimeInfo(CleanupInterval()));
     fmt::print(" - compact_interval: {}\n", Utility::FormatTimeInfo(CompactInterval()));

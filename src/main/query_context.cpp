@@ -111,7 +111,7 @@ QueryResult QueryContext::Query(const String &query) {
 
     BaseStatement *base_statement = parsed_result->statements_ptr_->at(0);
 
-    if (session_ptr_->MaintenanceMode()) {
+    if (session_ptr_->AdminMode()) {
         if (base_statement->Type() == StatementType::kAdmin) {
             AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
             QueryResult query_result = HandleAdminStatement(admin_statement);
@@ -131,7 +131,7 @@ QueryResult QueryContext::Query(const String &query) {
         }
     }
     if (base_statement->Type() == StatementType::kAdmin) {
-        if (session_ptr_->MaintenanceMode()) {
+        if (session_ptr_->AdminMode()) {
             AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
             QueryResult query_result = HandleAdminStatement(admin_statement);
             return query_result;
@@ -149,7 +149,7 @@ QueryResult QueryContext::Query(const String &query) {
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
     QueryResult query_result;
-    if (session_ptr_->MaintenanceMode()) {
+    if (session_ptr_->AdminMode()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
         return query_result;

@@ -85,7 +85,7 @@ Status GlobalOptions::AddOption(UniquePtr<BaseOption> option) {
     }
 
     if(options_[option_index].get() != nullptr) {
-        return Status::InvalidConfig(fmt::format("Attempt to exists option", option->name_));
+        return Status::InvalidConfig(fmt::format("Attempt to add an existed option", option->name_));
     }
 
     options_[option_index] = std::move(option);

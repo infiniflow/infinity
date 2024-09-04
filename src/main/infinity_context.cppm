@@ -29,6 +29,15 @@ import global_resource_usage;
 
 namespace infinity {
 
+enum class InfinityRole {
+    kUnInitialized,
+    kAdmin,
+    kStandalone,
+    kLeader,
+    kFollower,
+    kLearner,
+};
+
 export class InfinityContext : public Singleton<InfinityContext> {
 public:
     [[nodiscard]] inline TaskScheduler *task_scheduler() noexcept { return task_scheduler_.get(); }
@@ -46,9 +55,14 @@ public:
     [[nodiscard]] inline ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetHnswBuildThreadPool() { return hnsw_build_thread_pool_; }
-    [[nodiscard]] inline bool &MaintenanceMode() { return maintenance_mode_; }
 
-    void Init(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
+    InfinityRole GetServerRole() const;
+    void SetServerRole(InfinityRole server_role);
+
+    void Init(const SharedPtr<String> &config_path, bool admin_flag = false, DefaultConfig *default_config = nullptr);
+//    void InitAdminMode(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
+    void ChangeRole(InfinityRole target_role);
+    bool IsAdminRole() const { return GetServerRole() == InfinityRole::kAdmin; }
 
     void UnInit();
 
@@ -70,8 +84,8 @@ private:
     // For hnsw index
     ThreadPool hnsw_build_thread_pool_{4};
 
-    bool initialized_{false};
-    bool maintenance_mode_{false};
+    mutable std::mutex mutex_;
+    InfinityRole current_server_role_{InfinityRole::kUnInitialized};
 };
 
 } // namespace infinity
