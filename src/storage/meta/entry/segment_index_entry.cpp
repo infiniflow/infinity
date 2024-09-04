@@ -1091,12 +1091,16 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
 
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, param.get(), base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    if (chunk_id == chunk_index_entries_.size()) {
+    bool add = false;
+    for (auto &chunk : chunk_index_entries_) {
+        if (chunk->chunk_id_ == chunk_id) {
+            chunk = chunk_index_entry;
+            add = true;
+            break;
+        }
+    }
+    if (!add) {
         chunk_index_entries_.push_back(chunk_index_entry);
-    } else if (chunk_id < chunk_index_entries_.size()) {
-        chunk_index_entries_[chunk_id] = chunk_index_entry;
-    } else {
-        UnrecoverableError(fmt::format("Chunk id: {} is larger than chunk index entries size: {}", chunk_id, chunk_index_entries_.size()));
     }
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
         try {
