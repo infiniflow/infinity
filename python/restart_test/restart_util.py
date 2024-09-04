@@ -174,6 +174,7 @@ class LChYDataGenerato:
                 "dense_vec",
                 index.IndexType.Hnsw,
                 {
+                    "encode": "lvq",
                     "m": "16",
                     "ef_construction": "200",
                     "metric": "l2",

@@ -8,7 +8,7 @@ log_to_stdout = true
 log_level               = "trace"
 
 [storage]
-mem_index_capacity       = 8192
+mem_index_capacity       = 10000
 
 [buffer]
 [wal]

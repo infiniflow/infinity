@@ -235,7 +235,9 @@ SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segmen
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
     }
-    return UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
+    auto res = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
+    res->buffer_manager_ = buffer_manager;
+    return res;
 }
 
 BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
@@ -1052,8 +1054,9 @@ void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_inde
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
     std::shared_lock lock(rw_locker_);
+    ChunkID chunk_id = this->GetNextChunkID();
     // row range of chunk_index_entries_ may overlop and misorder due to deprecated ones.
-    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, base_name, base_rowid, row_count, buffer_manager_);
+    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, chunk_id, base_name, base_rowid, row_count, buffer_manager_);
     chunk_index_entries_.push_back(chunk_index_entry);
     return chunk_index_entry;
 }
@@ -1088,10 +1091,28 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
 
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, param.get(), base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    chunk_index_entries_.push_back(chunk_index_entry); // replay not need lock
+    bool add = false;
+    for (auto &chunk : chunk_index_entries_) {
+        if (chunk->chunk_id_ == chunk_id) {
+            chunk = chunk_index_entry;
+            add = true;
+            break;
+        }
+    }
+    if (!add) {
+        chunk_index_entries_.push_back(chunk_index_entry);
+    }
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
-        u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
-        UpdateFulltextColumnLenInfo(column_length_sum, row_count);
+        try {
+            u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
+            UpdateFulltextColumnLenInfo(column_length_sum, row_count);
+        } catch (const UnrecoverableException &e) {
+            String msg(e.what());
+            if (!msg.find("No such file or directory")) {
+                throw e;
+            }
+            LOG_WARN("Fulltext index file not found, skip update column length info");
+        }
     };
     return chunk_index_entry;
 }
