@@ -41,6 +41,8 @@ import segment_entry;
 import table_index_entry;
 import base_memindex;
 import segment_index_entry;
+import status;
+import default_values;
 
 namespace infinity {
 
@@ -190,16 +192,20 @@ void CompactionProcessor::DoDumpByline(DumpIndexBylineTask *dump_task) {
         if (!status.ok()) {
             RecoverableError(status);
         }
+        auto *dumped_chunk = dump_task->dumped_chunk_.get();
+        if (dumped_chunk->deprecate_ts_ != UNCOMMIT_TS) {
+            RecoverableError(Status::TxnRollback(txn->TxnID(), fmt::format("Dumped chunk {} is deleted.", dumped_chunk->encode())));
+        }
         auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
         TxnTableStore *txn_table_store = txn->GetTxnTableStore(table_entry);
-        txn_table_store->AddChunkIndexStore(table_index_entry, dump_task->dumped_chunk_.get());
+        txn_table_store->AddChunkIndexStore(table_index_entry, dumped_chunk);
 
         SharedPtr<SegmentIndexEntry> segment_index_entry;
         bool created = table_index_entry->GetOrCreateSegment(dump_task->segment_id_, txn, segment_index_entry);
         if (created) {
             UnrecoverableError(fmt::format("DumpByline: Cannot find segment index entry with id: {}", dump_task->segment_id_));
         }
-        segment_index_entry->AddWalIndexDump(dump_task->dumped_chunk_.get(), txn);
+        segment_index_entry->AddWalIndexDump(dumped_chunk, txn);
 
         txn_mgr_->CommitTxn(txn);
     } catch (const RecoverableException &e) {
