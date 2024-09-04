@@ -235,7 +235,9 @@ SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segmen
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
     }
-    return UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
+    auto res = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
+    res->buffer_manager_ = buffer_manager;
+    return res;
 }
 
 BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
