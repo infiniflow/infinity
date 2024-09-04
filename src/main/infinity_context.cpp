@@ -140,6 +140,12 @@ void InfinityContext::ChangeRole(InfinityRole target_role) {
             switch (target_role) {
                 case InfinityRole::kAdmin: {
                     storage_->SetStorageMode(StorageMode::kAdmin);
+                    inverting_thread_pool_.resize(0);
+                    commiting_thread_pool_.resize(0);
+                    hnsw_build_thread_pool_.resize(0);
+
+                    task_scheduler_->UnInit();
+                    task_scheduler_.reset();
                     break;
                 }
                 case InfinityRole::kUnInitialized: {
@@ -157,6 +163,12 @@ void InfinityContext::ChangeRole(InfinityRole target_role) {
             switch (target_role) {
                 case InfinityRole::kAdmin: {
                     storage_->SetStorageMode(StorageMode::kAdmin);
+                    inverting_thread_pool_.resize(0);
+                    commiting_thread_pool_.resize(0);
+                    hnsw_build_thread_pool_.resize(0);
+
+                    task_scheduler_->UnInit();
+                    task_scheduler_.reset();
                     break;
                 }
                 case InfinityRole::kStandalone: {
@@ -185,6 +197,12 @@ void InfinityContext::ChangeRole(InfinityRole target_role) {
                 switch (target_role) {
                     case InfinityRole::kAdmin: {
                         storage_->SetStorageMode(StorageMode::kAdmin);
+                        inverting_thread_pool_.resize(0);
+                        commiting_thread_pool_.resize(0);
+                        hnsw_build_thread_pool_.resize(0);
+
+                        task_scheduler_->UnInit();
+                        task_scheduler_.reset();
                         break;
                     }
                     case InfinityRole::kStandalone: {
@@ -212,20 +230,22 @@ void InfinityContext::ChangeRole(InfinityRole target_role) {
 }
 
 void InfinityContext::UnInit() {
-    if (GetServerRole() == InfinityRole::kUnInitialized) {
-        LOG_INFO("Infinity is already un-initialized.");
-        return;
+    InfinityRole current_role = GetServerRole();
+
+    switch(current_role) {
+        case InfinityRole::kUnInitialized: {
+            LOG_INFO("Infinity is already un-initialized.");
+            return;
+        }
+        case InfinityRole::kAdmin: {
+            ChangeRole(InfinityRole::kUnInitialized);
+            break;
+        }
+        default: {
+            ChangeRole(InfinityRole::kAdmin);
+            ChangeRole(InfinityRole::kUnInitialized);
+        }
     }
-
-    inverting_thread_pool_.resize(0);
-    commiting_thread_pool_.resize(0);
-    hnsw_build_thread_pool_.resize(0);
-
-    task_scheduler_->UnInit();
-    task_scheduler_.reset();
-
-    storage_->SetStorageMode(StorageMode::kAdmin);
-    storage_->SetStorageMode(StorageMode::kUnInitialized);
 
     storage_.reset();
     persistence_manager_.reset();
