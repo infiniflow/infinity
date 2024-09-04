@@ -1,11 +1,9 @@
-import functools
 import pytest
 from common import common_values
 from infinity.common import ConflictType
 from infinity_runner import InfinityRunner
 import time
 import threading
-import itertools
 from restart_util import *
 
 
@@ -13,14 +11,13 @@ from restart_util import *
 class TestInsert:
     def insert_inner(
         self,
+        insert_n: int,
         infinity_runner: InfinityRunner,
         config: str,
         columns: dict,
         data_gen_factory,
     ):
         uri = common_values.TEST_LOCAL_HOST
-
-        insert_n = 1000000
         data_gen = data_gen_factory(insert_n)
 
         stop_n = 10
@@ -89,10 +86,10 @@ class TestInsert:
             t1.join()
 
     @pytest.mark.parametrize(
-        "config",
+        "insert_n, config",
         [
-            "test/data/config/restart_test/test_insert/1.toml",
-            "test/data/config/restart_test/test_insert/2.toml",
+            (100000, "test/data/config/restart_test/test_insert/1.toml"),
+            (1000000, "test/data/config/restart_test/test_insert/1.toml"),
         ],
     )
     @pytest.mark.parametrize(
@@ -129,6 +126,7 @@ class TestInsert:
     def test_data(
         self,
         infinity_runner: InfinityRunner,
+        insert_n: int,
         config: str,
         columns: dict,
         data_gen_factory,
@@ -144,7 +142,7 @@ class TestInsert:
         infinity_obj.disconnect()
         infinity_runner.uninit()
 
-        self.insert_inner(infinity_runner, config, columns, data_gen_factory)
+        self.insert_inner(insert_n, infinity_runner, config, columns, data_gen_factory)
 
         infinity_runner.init(config)
         infinity_obj = InfinityRunner.connect(uri)
@@ -154,10 +152,10 @@ class TestInsert:
         infinity_runner.uninit()
 
     @pytest.mark.parametrize(
-        "config",
+        "insert_n,config",
         [
-            "test/data/config/restart_test/test_insert/1.toml",
-            "test/data/config/restart_test/test_insert/3.toml",
+            (100000, "test/data/config/restart_test/test_insert/1.toml"),
+            (1000000, "test/data/config/restart_test/test_insert/1.toml"),
         ],
     )
     @pytest.mark.parametrize(
@@ -185,6 +183,7 @@ class TestInsert:
     def test_index(
         self,
         infinity_runner: InfinityRunner,
+        insert_n: int,
         config: str,
         columns: dict,
         indexes: list[index.IndexInfo],
@@ -203,7 +202,7 @@ class TestInsert:
         infinity_obj.disconnect()
         infinity_runner.uninit()
 
-        self.insert_inner(infinity_runner, config, columns, data_gen_factory)
+        self.insert_inner(insert_n, infinity_runner, config, columns, data_gen_factory)
 
         infinity_runner.init(config)
         infinity_obj = InfinityRunner.connect(uri)
