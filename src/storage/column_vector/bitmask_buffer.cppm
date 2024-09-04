@@ -16,7 +16,7 @@ module;
 
 import stl;
 
-export module bitmask_buffer;
+export module deprecated_bitmask_buffer;
 
 namespace infinity {
 
