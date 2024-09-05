@@ -60,7 +60,11 @@ SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_conte
     }
 
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
-    SharedPtr<LogicalNode> update_node = MakeShared<LogicalUpdate>(bind_context->GetNewLogicalNodeId(), base_table_ref->table_entry_ptr_, update_columns_);
+    auto update_node = MakeShared<LogicalUpdate>(bind_context->GetNewLogicalNodeId(),
+                                                 base_table_ref->table_entry_ptr_,
+                                                 update_columns_,
+                                                 all_columns_in_table_,
+                                                 final_result_columns_);
     update_node->set_left_node(current_node);
     return update_node;
 }

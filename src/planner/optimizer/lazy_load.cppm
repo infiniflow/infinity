@@ -62,7 +62,6 @@ public:
     inline void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) final {
         auto logic_op_type = logical_plan->operator_type();
         switch (logic_op_type) {
-            case LogicalNodeType::kUpdate:
             case LogicalNodeType::kInsert:
             case LogicalNodeType::kImport:
             case LogicalNodeType::kExport:

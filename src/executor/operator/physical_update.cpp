@@ -49,59 +49,51 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
 
         auto txn = query_context->GetTxn();
         Vector<RowID> row_ids;
-        Vector<SharedPtr<ColumnVector>> column_vectors;
         for (SizeT i = 0; i < input_data_block_ptr->column_count(); i++) {
-            SharedPtr<ColumnVector> column_vector = input_data_block_ptr->column_vectors[i];
-            if (column_vector->data_type()->type() == LogicalType::kRowID) {
+            if (auto &column_vector = input_data_block_ptr->column_vectors[i]; column_vector->data_type()->type() == LogicalType::kRowID) {
                 row_ids.resize(column_vector->Size());
                 std::memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));
                 break;
-            } else {
-                column_vectors.push_back(column_vector);
             }
         }
         if (!row_ids.empty()) {
+            Vector<SharedPtr<ColumnVector>> output_column_vectors(final_result_columns_.size());
             ExpressionEvaluator evaluator;
             evaluator.Init(input_data_block_ptr);
-            for (SizeT expr_idx = 0; expr_idx < update_columns_.size(); ++expr_idx) {
-                SizeT column_idx = update_columns_[expr_idx].first;
-                const SharedPtr<BaseExpression> &expr = update_columns_[expr_idx].second;
-                SharedPtr<ColumnVector> value_column = ColumnVector::Make(column_vectors[column_idx]->data_type());
+            for (SizeT i = 0; i < final_result_columns_.size(); ++i) {
+                auto &output_column_vector = output_column_vectors[i];
+                const auto &expr = final_result_columns_[i];
                 SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(expr);
-                value_column->Initialize(expr_state->OutputColumnVector()->vector_type());
-                evaluator.Execute(expr, expr_state, value_column);
-
-                if(value_column->Size() == input_data_block_ptr->row_count()) {
-                    column_vectors[column_idx] = value_column;
+                if (expr->type() == ExpressionType::kReference) {
+                    evaluator.Execute(expr, expr_state, output_column_vector);
                 } else {
-                    // value_column only have one row;
-                    if(value_column->Size() != 1) {
-                        String error_message = "Expect the column vector has only one row";
-                        UnrecoverableError(error_message);
-                        return 0;
+                    output_column_vector = ColumnVector::Make(MakeShared<DataType>(expr->Type()));
+                    output_column_vector->Initialize();
+                    evaluator.Execute(expr, expr_state, output_column_vector);
+                    if (output_column_vector->Size() != input_data_block_ptr->row_count()) {
+                        // output_column_vector only have one row;
+                        if (output_column_vector->Size() != 1) {
+                            UnrecoverableError("Expect the column vector has only one row");
+                            return false;
+                        }
+                        Value value = output_column_vector->GetValue(0);
+                        SizeT row_count = input_data_block_ptr->row_count();
+                        output_column_vector = ColumnVector::Make(MakeShared<DataType>(expr->Type()));
+                        output_column_vector->Initialize();
+                        for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
+                            output_column_vector->AppendValue(value);
+                        }
+                        output_column_vector->Finalize(row_count);
                     }
-
-                    Value value = value_column->GetValue(0);
-                    SizeT row_count = input_data_block_ptr->row_count();
-
-                    SharedPtr<ColumnVector> output_column = ColumnVector::Make(value_column->data_type());
-                    output_column->Initialize();
-                    for(SizeT row_idx = 0; row_idx < row_count; ++ row_idx) {
-                        output_column->AppendValue(value);
-                    }
-                    output_column->Finalize(row_count);
-                    column_vectors[column_idx] = output_column;
                 }
-
             }
-
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
-            output_data_block->Init(column_vectors);
+            output_data_block->Init(output_column_vectors);
             txn->Append(table_entry_ptr_, output_data_block);
             txn->Delete(table_entry_ptr_, row_ids);
 
-            UpdateOperatorState* update_operator_state = static_cast<UpdateOperatorState*>(operator_state);
-            ++ update_operator_state->count_;
+            UpdateOperatorState *update_operator_state = static_cast<UpdateOperatorState *>(operator_state);
+            ++update_operator_state->count_;
             update_operator_state->sum_ += row_ids.size();
         }
     }

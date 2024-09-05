@@ -31,13 +31,13 @@ namespace infinity {
 
 export class PhysicalScanBase : public PhysicalOperator {
 public:
-    PhysicalScanBase(u64 id,
-                     PhysicalOperatorType type,
+    PhysicalScanBase(const u64 id,
+                     const PhysicalOperatorType type,
                      UniquePtr<PhysicalOperator> left,
                      UniquePtr<PhysicalOperator> right,
                      SharedPtr<BaseTableRef> base_table_ref,
                      SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(type, std::move(left), std::move(right), id, load_metas), base_table_ref_(base_table_ref) {}
+        : PhysicalOperator(type, std::move(left), std::move(right), id, std::move(load_metas)), base_table_ref_(std::move(base_table_ref)) {}
 
     virtual Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
 

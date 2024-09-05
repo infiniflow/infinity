@@ -55,25 +55,7 @@ private:
 export class ColumnPruner : public OptimizerRule {
 public:
     inline void ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) final {
-        auto logic_op_type = logical_plan->operator_type();
-        switch (logic_op_type) {
-            case LogicalNodeType::kUpdate:
-            case LogicalNodeType::kInsert:
-            case LogicalNodeType::kImport:
-            case LogicalNodeType::kExport:
-            case LogicalNodeType::kCreateTable:
-            case LogicalNodeType::kCreateIndex:
-            case LogicalNodeType::kDropTable:
-            case LogicalNodeType::kDropIndex:
-            case LogicalNodeType::kCreateSchema:
-            case LogicalNodeType::kDropSchema:
-            case LogicalNodeType::kShow:
-            case LogicalNodeType::kCommand:
-            case LogicalNodeType::kPrepare:
-                return;
-            default:
-                remove_visitor.VisitNode(*logical_plan);
-        }
+        return remove_visitor.VisitNode(*logical_plan);
     }
 
     [[nodiscard]] inline String name() const final { return "Column Pruner"; }
