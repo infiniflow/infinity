@@ -1,12 +1,11 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import pytest
 from common import common_values
+from common import common_index
 import infinity
+import infinity_embedded
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 import infinity.index as index
 from infinity.errors import ErrorCode
@@ -14,6 +13,10 @@ from infinity.common import ConflictType, InfinityException, SparseVector
 from common.utils import copy_data, generate_commas_enwiki
 import pandas as pd
 from numpy import dtype
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 
@@ -30,11 +33,21 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.index")
+        globals()["index"] = module
+        module = importlib.import_module("infinity_embedded.common")
+        func = getattr(module, 'ConflictType')
+        globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
+        func = getattr(module, 'SparseVector')
+        globals()['SparseVector'] = func
         uri = common_values.TEST_LOCAL_PATH
+        request.cls.infinity_obj = infinity_embedded.connect(uri)
     else:
         uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    request.cls.infinity_obj = infinity.connect(uri)
     if http:
         request.cls.infinity_obj = infinity_http()
     yield
@@ -997,7 +1010,7 @@ class TestInfinity:
     @pytest.mark.parametrize("knn_column_name", ["gender_vector"])
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip", "cosine", "cos"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip", "cosine", "cos"])
-    @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw]) # Remove index.IndexType.IVFFlat, after IVFFlat support cosine metric
+    @pytest.mark.parametrize("index_type", [common_index.IndexType.Hnsw]) # Remove index.IndexType.IVFFlat, after IVFFlat support cosine metric
     def test_with_various_index_knn_distance_combination(self, check_data, index_column_name, knn_column_name,
                                                          index_distance_type, knn_distance_type, index_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -1018,7 +1031,7 @@ class TestInfinity:
             copy_data("pysdk_test_knn.csv")
         test_csv_dir = "/var/infinity/test_data/pysdk_test_knn.csv"
         table_obj.import_data(test_csv_dir, None)
-        if index_type == index.IndexType.Hnsw:
+        if index_type == common_index.IndexType.Hnsw:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo(index_column_name,
                                                          index.IndexType.Hnsw,
@@ -1033,7 +1046,7 @@ class TestInfinity:
             print(res)
             res = table_obj.drop_index("my_index", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.IVFFlat:
+        elif index_type == common_index.IndexType.IVFFlat:
             if index_distance_type == "cosine" or index_distance_type == "cos":
                 with pytest.raises(InfinityException) as e:
                     res = table_obj.create_index("my_index",
@@ -1340,11 +1353,11 @@ class TestInfinity:
                                                 ConflictType.Error)
             assert e.value.args[0] == ErrorCode.INVALID_EMBEDDING_DATA_TYPE
 
-    @pytest.mark.parametrize("index_type", [#index.IndexType.IVFFlat,
-                                            index.IndexType.Hnsw,
-                                            index.IndexType.EMVB,
-                                            index.IndexType.FullText,
-                                            index.IndexType.Secondary, ])
+    @pytest.mark.parametrize("index_type", [#common_index.IndexType.IVFFlat,
+                                            common_index.IndexType.Hnsw,
+                                            common_index.IndexType.EMVB,
+                                            common_index.IndexType.FullText,
+                                            common_index.IndexType.Secondary, ])
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_sparse_knn_with_invalid_index_type(self, check_data, index_type, suffix):
@@ -1359,13 +1372,13 @@ class TestInfinity:
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
 
         with pytest.raises(InfinityException) as e:
-            if index_type == index.IndexType.IVFFlat:
+            if index_type == common_index.IndexType.IVFFlat:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
                                                              index.IndexType.IVFFlat,
                                                              {"centroids_count": "128", "metric": "L2"}),
                                              ConflictType.Error)
-            elif index_type == index.IndexType.Hnsw:
+            elif index_type == common_index.IndexType.Hnsw:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
                                                              index.IndexType.Hnsw,
@@ -1374,19 +1387,19 @@ class TestInfinity:
                                                                  "ef_construction": "50",
                                                                  "metric": "L2"
                                                              }), ConflictType.Error)
-            elif index_type == index.IndexType.EMVB:
+            elif index_type == common_index.IndexType.EMVB:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
                                                              index.IndexType.EMVB,
                                                              {"pq_subspace_num": "32", "pq_subspace_bits": "8"}),
                                              ConflictType.Error)
-            elif index_type == index.IndexType.FullText:
+            elif index_type == common_index.IndexType.FullText:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
                                                              index.IndexType.FullText,
                                                              {"ANALYZER": "STANDARD"}),
                                              ConflictType.Error)
-            elif index_type == index.IndexType.Secondary:
+            elif index_type == common_index.IndexType.Secondary:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
                                                              index.IndexType.Secondary),

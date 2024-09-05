@@ -10,12 +10,12 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SparseVector, InfinityException
-from infinity.embedded_infinity_ext import *
-from infinity.local_infinity.types import logic_type_to_dtype, make_match_tensor_expr
-from infinity.local_infinity.utils import traverse_conditions, parse_expr
-from infinity.table import ExplainType as BaseExplainType
-from infinity.errors import ErrorCode
+from infinity_embedded.common import VEC, SparseVector, InfinityException
+from infinity_embedded.embedded_infinity_ext import *
+from infinity_embedded.local_infinity.types import logic_type_to_dtype, make_match_tensor_expr
+from infinity_embedded.local_infinity.utils import traverse_conditions, parse_expr
+from infinity_embedded.table import ExplainType as BaseExplainType
+from infinity_embedded.errors import ErrorCode
 
 class Query(ABC):
     def __init__(

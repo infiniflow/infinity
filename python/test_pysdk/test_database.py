@@ -1,15 +1,17 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import threading
 import pytest
 from infinity.common import ConflictType, InfinityException
 from common import common_values
 import infinity
+import infinity_embedded
 from infinity.errors import ErrorCode
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 
@@ -26,11 +28,17 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.common")
+        func = getattr(module, 'ConflictType')
+        globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
         uri = common_values.TEST_LOCAL_PATH
+        request.cls.infinity_obj = infinity_embedded.connect(uri)
     else:
         uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    request.cls.infinity_obj = infinity.connect(uri)
     if http:
         request.cls.infinity_obj = infinity_http()
     yield
@@ -71,25 +79,25 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.create_database("test_pysdk_my_database!@#")
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.create_database("test_pysdk_my-database-dash")
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.create_database("123_database_test_pysdk")
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.create_database("")
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         res = self.infinity_obj.list_databases()
@@ -138,7 +146,7 @@ class TestInfinity:
         for db_name in common_values.invalid_name_array:
             with pytest.raises(InfinityException) as e:
                 self.infinity_obj.create_database(db_name)
-            assert e.type == infinity.common.InfinityException
+            assert e.type == InfinityException
             assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
     def _test_create_drop_show_1K_databases(self, suffix):
@@ -234,7 +242,7 @@ class TestInfinity:
         for db_name in common_values.invalid_name_array:
             with pytest.raises(InfinityException) as e:
                 self.infinity_obj.drop_database(db_name)
-            assert e.type == infinity.common.InfinityException
+            assert e.type == InfinityException
             assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
     def _test_get_db(self, suffix):
@@ -252,7 +260,7 @@ class TestInfinity:
         # other options are invalid
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.get_database("db1")
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.DB_NOT_EXIST
 
         db_name = "my_database"+suffix
@@ -277,7 +285,7 @@ class TestInfinity:
         for db_name in common_values.invalid_name_array:
             with pytest.raises(InfinityException) as e:
                 self.infinity_obj.drop_database(db_name)
-            assert e.type == infinity.common.InfinityException
+            assert e.type == InfinityException
             assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
     def _test_drop_non_existent_db(self, suffix):
@@ -285,7 +293,7 @@ class TestInfinity:
         for db_name in common_values.invalid_name_array:
             with pytest.raises(InfinityException) as e:
                 res = self.infinity_obj.drop_database("my_database")
-            assert e.type == infinity.common.InfinityException
+            assert e.type == InfinityException
             assert e.value.args[0] == ErrorCode.DB_NOT_EXIST
 
     def _test_get_drop_db_with_two_threads(self, suffix):
@@ -307,21 +315,21 @@ class TestInfinity:
             thread1.join()
             thread2.join()
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.DB_NOT_EXIST
 
         # with pytest.raises(Exception, match="ERROR:3021, Not existed entry*"):
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.get_database("test_get_drop_db_with_two_thread"+suffix)
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.DB_NOT_EXIST
 
         # with pytest.raises(Exception, match="ERROR:3021, Not existed entry*"):
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.drop_database("test_get_drop_db_with_two_thread"+suffix)
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.DB_NOT_EXIST
 
     def _test_create_same_db_in_different_threads(self, suffix):
@@ -340,7 +348,7 @@ class TestInfinity:
             thread1.join()
             thread2.join()
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.DUPLICATE_DATABASE_NAME
 
         # drop
@@ -397,7 +405,7 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.create_database("test_create_invalid_option"+suffix, conflict_type)
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
 
     @pytest.mark.parametrize("conflict_type", [
@@ -430,7 +438,7 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             self.infinity_obj.drop_database("test_drop_option"+suffix, conflict_type)
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
 
         self.infinity_obj.drop_database("test_drop_option"+suffix, ConflictType.Error)
@@ -463,7 +471,7 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             db_obj.show_table(table_name)
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         # with pytest.raises(Exception):
@@ -481,7 +489,7 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             db_obj.show_table(table_name)
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
         db_obj.drop_table("test_show_table"+suffix, ConflictType.Error)
@@ -516,7 +524,7 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             db_obj.show_columns(column_name)
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST or e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         db_obj.drop_table("test_show_table_columns"+suffix, ConflictType.Error)

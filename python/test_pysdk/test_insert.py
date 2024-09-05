@@ -1,18 +1,20 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import pandas as pd
 import pytest
 import numpy as np
 from numpy import dtype
 from common import common_values
 import infinity
+import infinity_embedded
 import infinity.index as index
 from infinity.common import ConflictType, InfinityException, SparseVector
 from infinity.errors import ErrorCode
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 
@@ -29,11 +31,21 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.index")
+        globals()["index"] = module
+        module = importlib.import_module("infinity_embedded.common")
+        func = getattr(module, 'ConflictType')
+        globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
+        func = getattr(module, 'SparseVector')
+        globals()['SparseVector'] = func
         uri = common_values.TEST_LOCAL_PATH
+        request.cls.infinity_obj = infinity_embedded.connect(uri)
     else:
         uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    request.cls.infinity_obj = infinity.connect(uri)
     if http:
         request.cls.infinity_obj = infinity_http()
     yield

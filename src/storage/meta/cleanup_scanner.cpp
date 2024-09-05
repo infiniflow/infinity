@@ -47,18 +47,17 @@ void CleanupScanner::Cleanup() && {
     buffer_mgr_->RemoveClean();
 }
 
-void CleanupScanner::CleanupDir(const String &dir) {
+void CleanupScanner::CleanupDir(const String &abs_dir) {
     LocalFileSystem fs;
     try {
-        auto abs_dir = Path(InfinityContext::instance().config()->DataDir()) / dir;
         fs.DeleteDirectory(abs_dir);
     } catch (const RecoverableException &e) {
         if (e.ErrorCode() == ErrorCode::kDirNotFound) {
             // this happens when delta checkpoint records "drop table/db/...", and cleanup is called.
             // then restart the system, table entry will be created but no directory will be found
-            LOG_WARN(fmt::format("Cleanup: Dir {} not found. Skip", dir));
+            LOG_WARN(fmt::format("Cleanup: Dir {} not found. Skip", abs_dir));
         } else {
-            String error_message = fmt::format("Cleanup {} encounter unexpected error: {}", dir, e.what());
+            String error_message = fmt::format("Cleanup {} encounter unexpected error: {}", abs_dir, e.what());
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }

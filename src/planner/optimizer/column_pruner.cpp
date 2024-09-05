@@ -44,6 +44,22 @@ namespace infinity {
 
 void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
     switch (op.operator_type()) {
+        case LogicalNodeType::kUpdate:
+        case LogicalNodeType::kInsert:
+        case LogicalNodeType::kImport:
+        case LogicalNodeType::kExport:
+        case LogicalNodeType::kCreateTable:
+        case LogicalNodeType::kCreateIndex:
+        case LogicalNodeType::kDropTable:
+        case LogicalNodeType::kDropIndex:
+        case LogicalNodeType::kCreateSchema:
+        case LogicalNodeType::kDropSchema:
+        case LogicalNodeType::kShow:
+        case LogicalNodeType::kCommand:
+        case LogicalNodeType::kPrepare: {
+            // skip
+            return;
+        }
         case LogicalNodeType::kAggregate: {
             if (!all_referenced_) {
                 auto &aggr = op.Cast<LogicalAggregate>();
@@ -157,8 +173,6 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             scan.base_table_ref_->RetainColumnByIndices(project_indices);
             return;
         }
-        case LogicalNodeType::kShow:
-            break;
         case LogicalNodeType::kExplain:
             break;
         case LogicalNodeType::kOptimize:
