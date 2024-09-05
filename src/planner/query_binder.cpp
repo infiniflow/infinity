@@ -77,6 +77,7 @@ import view_entry;
 import table_entry;
 import txn;
 import logger;
+import defer_op;
 
 namespace infinity {
 
@@ -1036,6 +1037,12 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         fake_star->star_ = true;
         const Vector<ParsedExpr *> fake_input = {fake_star.get()};
         Vector<ParsedExpr *> all_columns;
+        DeferFn defer([&all_columns] {
+            for (auto &expr : all_columns) {
+                delete expr;
+                expr = nullptr;
+            }
+        });
         UnfoldStarExpression(query_context_ptr_, fake_input, all_columns);
         bound_update_statement->all_columns_in_table_.reserve(all_columns.size());
         for (const auto expr : all_columns) {
