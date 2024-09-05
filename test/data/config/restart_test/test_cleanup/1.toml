@@ -7,6 +7,7 @@ time_zone = "utc-8"
 log_to_stdout = true
 
 [storage]
+data_dir = "/var/infinity/data"
 optimize_interval = "0s"
 cleanup_interval = "1s"
 compact_interval = "0s"
