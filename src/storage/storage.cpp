@@ -111,6 +111,10 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             BuiltinFunctions builtin_functions(new_catalog_);
             builtin_functions.Init();
             // Catalog finish init here.
+            if (bg_processor_ != nullptr) {
+                UnrecoverableError("Background processor was initialized before.");
+            }
+            bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
 
             // Construct txn manager
             if (txn_mgr_ != nullptr) {
@@ -135,10 +139,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             new_catalog_->StartMemoryIndexCommit();
             new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
-            if (bg_processor_ != nullptr) {
-                UnrecoverableError("Background processor was initialized before.");
-            }
-            bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
             bg_processor_->Start();
 
             if (target_mode == StorageMode::kWritable) {
