@@ -31,8 +31,13 @@ namespace infinity {
 export class LogicalUpdate final : public LogicalNode {
 
 public:
-    LogicalUpdate(u64 node_id, TableEntry *table_entry_ptr, const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns)
-        : LogicalNode(node_id, LogicalNodeType::kUpdate), table_entry_ptr_(table_entry_ptr), update_columns_(update_columns) {}
+    LogicalUpdate(u64 node_id,
+                  TableEntry *table_entry_ptr,
+                  const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns,
+                  const Vector<SharedPtr<BaseExpression>> &all_columns_in_table,
+                  const Vector<SharedPtr<BaseExpression>> &final_result_columns)
+        : LogicalNode(node_id, LogicalNodeType::kUpdate), table_entry_ptr_(table_entry_ptr), update_columns_(update_columns),
+          all_columns_in_table_(all_columns_in_table), final_result_columns_(final_result_columns) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -46,6 +51,8 @@ public:
 
     TableEntry *table_entry_ptr_{};
     Vector<Pair<SizeT, SharedPtr<BaseExpression>>> update_columns_; // Column ID = Expression
+    Vector<SharedPtr<BaseExpression>> all_columns_in_table_{};      // columns in the table
+    Vector<SharedPtr<BaseExpression>> final_result_columns_{};      // columns for the new blocks
 };
 
 } // namespace infinity

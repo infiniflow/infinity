@@ -1,9 +1,6 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import numpy as np
 import time
 import pandas as pd
@@ -11,9 +8,14 @@ import pytest
 from numpy import dtype
 from common import common_values
 import infinity
+import infinity_embedded
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
 from common.utils import trace_expected_exceptions
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 
@@ -28,11 +30,17 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.common")
+        func = getattr(module, 'ConflictType')
+        globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
         uri = common_values.TEST_LOCAL_PATH
+        request.cls.infinity_obj = infinity_embedded.connect(uri)
     else:
         uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    request.cls.infinity_obj = infinity.connect(uri)
     if http:
         request.cls.infinity_obj = infinity_http()
     yield
@@ -133,7 +141,7 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             db_obj.get_table("test_delete_non_existent_table"+suffix).delete()
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
     @trace_expected_exceptions
@@ -293,7 +301,7 @@ class TestInfinity:
             assert table_obj
             db_obj.drop_table("test_delete_dropped_table"+suffix)
 
-        assert e.type == infinity.common.InfinityException
+        assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
     @trace_expected_exceptions

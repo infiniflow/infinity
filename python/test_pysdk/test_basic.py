@@ -1,20 +1,22 @@
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-import os
 import pandas as pd
 from numpy import dtype
 import pytest
 from common import common_values
 import infinity
+import infinity_embedded
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 from common.utils import copy_data
+import importlib
 
 test_csv_file = "embedding_int_dim3.csv"
 test_export_csv_file = "export_embedding_int_dim3.csv"
@@ -30,10 +32,13 @@ class TestInfinity:
     @pytest.fixture(autouse=True)
     def setup(self, local_infinity, http):
         if local_infinity:
+            module = importlib.import_module("infinity_embedded.index")
+            globals()["index"] = module
             self.uri = common_values.TEST_LOCAL_PATH
+            self.infinity_obj = infinity_embedded.connect(self.uri)
         else:
             self.uri = common_values.TEST_LOCAL_HOST
-        self.infinity_obj = infinity.connect(self.uri)
+            self.infinity_obj = infinity.connect(self.uri)
         if http:
             self.infinity_obj = infinity_http()
 
@@ -43,23 +48,29 @@ class TestInfinity:
 
     # def test_version(self):
     #     self.test_infinity_obj._test_version()
-    def test_connection(self):
+    def test_connection(self, local_infinity):
         """
         target: test connect and disconnect server ok
         method: connect server
         expect: connect and disconnect successfully
         """
-        infinity_obj = infinity.connect(self.uri)
+        if local_infinity:
+            infinity_obj = infinity_embedded.connect(self.uri)
+        else:
+            infinity_obj = infinity.connect(self.uri)
         assert infinity_obj
         assert infinity_obj.disconnect()
 
-    def test_create_db_with_invalid_name(self):
+    def test_create_db_with_invalid_name(self, local_infinity):
         """
         target: test db name limitation
         method: create db with empty name
         expect: create db fail with error message
         """
-        infinity_obj = infinity.connect(self.uri)
+        if local_infinity:
+            infinity_obj = infinity_embedded.connect(self.uri)
+        else:
+            infinity_obj = infinity.connect(self.uri)
         assert infinity_obj
 
         db_name = ""

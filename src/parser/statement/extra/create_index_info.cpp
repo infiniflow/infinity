@@ -50,7 +50,7 @@ std::string IndexInfo::IndexTypeToString(IndexType index_type) {
 }
 
 IndexType IndexInfo::StringToIndexType(const std::string &index_type_str) {
-    if (index_type_str == "IVFFlat") {
+    if (index_type_str == "IVFFLAT") {
         return IndexType::kIVFFlat;
     } else if (index_type_str == "HNSW") {
         return IndexType::kHnsw;

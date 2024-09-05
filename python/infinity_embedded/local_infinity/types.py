@@ -18,9 +18,9 @@ from typing import Any, Tuple, Dict, List
 import polars as pl
 import numpy as np
 from numpy import dtype
-from infinity.common import VEC, SparseVector, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
-from infinity.embedded_infinity_ext import *
-from infinity.errors import ErrorCode
+from infinity_embedded.common import VEC, SparseVector, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
+from infinity_embedded.embedded_infinity_ext import *
+from infinity_embedded.errors import ErrorCode
 
 def logic_type_to_dtype(ttype: WrapDataType):
     match ttype.logical_type:

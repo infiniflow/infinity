@@ -19,11 +19,11 @@ import pandas as pd
 import polars as pl
 import sqlglot.expressions as exp
 import numpy as np
-from infinity.errors import ErrorCode
-from infinity.common import InfinityException, SparseVector
-from infinity.local_infinity.types import build_result, logic_type_to_dtype
-from infinity.utils import binary_exp_to_paser_exp
-from infinity.embedded_infinity_ext import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapSearchExpr, WrapConstantExpr, ParsedExprType, LiteralType
+from infinity_embedded.errors import ErrorCode
+from infinity_embedded.common import InfinityException, SparseVector
+from infinity_embedded.local_infinity.types import build_result, logic_type_to_dtype
+from infinity_embedded.utils import binary_exp_to_paser_exp
+from infinity_embedded.embedded_infinity_ext import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapSearchExpr, WrapConstantExpr, ParsedExprType, LiteralType
 
 
 def traverse_conditions(cons, fn=None):
@@ -243,22 +243,24 @@ identifier_limit = 65536
 
 def check_valid_name(name, name_type: str = "Table"):
     if not isinstance(name, str):
-        raise ValueError(f"{name_type} name must be a string, got {type(name)}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name must be a string, got {type(name)}")
     if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
-        raise ValueError(
-            f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
     if len(name) > identifier_limit:
-        raise ValueError(f"{name_type} name '{name}' is not of appropriate length")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name '{name}' is not of appropriate length")
     if name is None:
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name.isspace():
-        raise ValueError(f"{name_type} name cannot be composed of whitespace characters only")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"{name_type} name cannot be composed of whitespace characters only")
     if name == '':
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name == ' ':
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name.isdigit():
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
 
 
 def name_validity_check(arg_name: str, name_type: str = "Table"):

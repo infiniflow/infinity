@@ -6,7 +6,6 @@ from threading import Thread
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
-from infinity.table import Table
 from infinity.db import Database
 
 kRunningTime = 30

@@ -1,9 +1,5 @@
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import pytest
 from common import common_values
 import time
@@ -11,7 +7,12 @@ from infinity.connection_pool import ConnectionPool
 from infinity.common import ConflictType
 
 import infinity
+import infinity_embedded
 from infinity.errors import ErrorCode
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 
@@ -23,9 +24,10 @@ class TestInfinity:
     def setup(self, local_infinity, http):
         if local_infinity:
             self.uri = common_values.TEST_LOCAL_PATH
+            self.infinity_obj = infinity_embedded.connect(self.uri)
         else:
             self.uri = common_values.TEST_LOCAL_HOST
-        self.infinity_obj = infinity.connect(self.uri)
+            self.infinity_obj = infinity.connect(self.uri)
         if http:
             self.infinity_obj = infinity_http()
         assert self.infinity_obj
@@ -34,6 +36,7 @@ class TestInfinity:
         res = self.infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_connection_pool(self, suffix):
         connection_pool = ConnectionPool(uri=self.uri, min_size=4, max_size=8)
         assert len(connection_pool.free_pool_) == 4
@@ -68,6 +71,7 @@ class TestInfinity:
             assert "no exception when double release" == 0
         connection_pool.destroy()
 
+    @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_time_out(self):
         #test timeout is ok
         connection_pool = ConnectionPool(uri=self.uri, min_size=4, max_size=8, timeout=5.0)

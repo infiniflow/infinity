@@ -46,6 +46,20 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
     };
 
     switch (op.operator_type()) {
+        case LogicalNodeType::kInsert:
+        case LogicalNodeType::kImport:
+        case LogicalNodeType::kExport:
+        case LogicalNodeType::kCreateTable:
+        case LogicalNodeType::kDropTable:
+        case LogicalNodeType::kDropIndex:
+        case LogicalNodeType::kCreateSchema:
+        case LogicalNodeType::kDropSchema:
+        case LogicalNodeType::kShow:
+        case LogicalNodeType::kCommand:
+        case LogicalNodeType::kPrepare: {
+            // skip
+            return;
+        }
         case LogicalNodeType::kJoin:
         case LogicalNodeType::kMatch:
         case LogicalNodeType::kMatchSparseScan:

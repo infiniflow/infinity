@@ -46,23 +46,7 @@ private:
 export class ColumnRemapper : public OptimizerRule {
 public:
     inline void ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) final {
-        auto logic_op_type = logical_plan->operator_type();
-        switch (logic_op_type) {
-            case LogicalNodeType::kInsert:
-            case LogicalNodeType::kImport:
-            case LogicalNodeType::kExport:
-            case LogicalNodeType::kCreateTable:
-            case LogicalNodeType::kDropTable:
-            case LogicalNodeType::kDropIndex:
-            case LogicalNodeType::kCreateSchema:
-            case LogicalNodeType::kDropSchema:
-            case LogicalNodeType::kShow:
-            case LogicalNodeType::kCommand:
-            case LogicalNodeType::kPrepare:
-                return;
-            default:
-                remapper_.VisitNode(*logical_plan);
-        }
+        return remapper_.VisitNode(*logical_plan);
     }
 
     [[nodiscard]] inline String name() const final { return "Column Remapper"; }

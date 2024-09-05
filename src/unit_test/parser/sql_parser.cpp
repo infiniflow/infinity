@@ -573,7 +573,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(index_info->column_name_, "a");
         EXPECT_TRUE(index_info->index_param_list_->empty());
         EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
 
         result->Reset();
     }
@@ -600,7 +600,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(index_info->column_name_, "a");
         EXPECT_TRUE(index_info->index_param_list_->empty());
         EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
 
         result->Reset();
     }
@@ -627,7 +627,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(index_info->column_name_, "a");
         EXPECT_TRUE(index_info->index_param_list_->empty());
         EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
 
         result->Reset();
     }
@@ -657,7 +657,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ((*index_info->index_param_list_)[0]->param_value_, "l2");
 
         EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
 
         result->Reset();
     }

@@ -16,10 +16,10 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Optional, Union, Any
 
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-from infinity.index import IndexInfo
-from infinity.common import InfinityException, INSERT_DATA
-from infinity.errors import ErrorCode
+from infinity_embedded.index import IndexInfo
+from infinity_embedded.common import InfinityException, INSERT_DATA
+from infinity_embedded.embedded_infinity_ext import ExplainType as LocalExplainType
+from infinity_embedded.errors import ErrorCode
 
 class ExplainType(Enum):
     Analyze = 1
@@ -30,20 +30,21 @@ class ExplainType(Enum):
     Pipeline = 6
     Fragment = 7
 
-    def to_ttype(self):
+
+    def to_local_ttype(self):
         if self is ExplainType.Ast:
-            return ttypes.ExplainType.Ast
+            return LocalExplainType.kAst
         elif self is ExplainType.Analyze:
-            return ttypes.ExplainType.Analyze
+            return LocalExplainType.kAnalyze
         elif self is ExplainType.UnOpt:
-            return ttypes.ExplainType.UnOpt
+            return LocalExplainType.kUnOpt
         elif self is ExplainType.Opt:
-            return ttypes.ExplainType.Opt
+            return LocalExplainType.kOpt
         elif self is ExplainType.Physical:
-            return ttypes.ExplainType.Physical
+            return LocalExplainType.kPhysical
         elif self is ExplainType.Pipeline:
-            return ttypes.ExplainType.Pipeline
+            return LocalExplainType.kPipeline
         elif self is ExplainType.Fragment:
-            return ttypes.ExplainType.Fragment
+            return LocalExplainType.kFragment
         else:
             raise InfinityException(ErrorCode.INVALID_EXPLAIN_TYPE, "Unknown explain type")

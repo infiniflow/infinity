@@ -1,9 +1,6 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import concurrent.futures
 import os
 import pytest
@@ -11,8 +8,13 @@ import polars as pl
 from common import common_values
 from infinity.common import ConflictType, InfinityException
 import infinity
+import infinity_embedded
 from infinity.errors import ErrorCode
 from common.utils import trace_expected_exceptions
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 @pytest.fixture(scope="class")
@@ -26,11 +28,17 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.common")
+        func = getattr(module, 'ConflictType')
+        globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
         uri = common_values.TEST_LOCAL_PATH
+        request.cls.infinity_obj = infinity_embedded.connect(uri)
     else:
         uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    request.cls.infinity_obj = infinity.connect(uri)
     if http:
         request.cls.infinity_obj = infinity_http()
     yield
@@ -636,7 +644,7 @@ class TestInfinity:
             assert table_obj
             db_obj.drop_table("test_create_invalid_column_name"+suffix, ConflictType.Error)
 
-    def _test_table_with_different_column_name(self, suffix):
+    def _test_table_with_different_column_name(self, suffix, local_infinity):
         """
         target: test create/drop/show/get valid table name with different column names
         methods:
@@ -647,7 +655,10 @@ class TestInfinity:
         expect: all operations successfully
 
         """
-        infinity_obj = infinity.connect(self.uri)
+        if local_infinity:
+            infinity_obj = infinity_embedded.connect(self.uri)
+        else:
+            infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         table_name = "test_table_with_different_column_name"+suffix
         db_obj.drop_table(table_name, ConflictType.Ignore)
@@ -687,7 +698,7 @@ class TestInfinity:
         except Exception as e:
             print(e)
 
-    def _test_table_with_different_column_types(self, suffix):
+    def _test_table_with_different_column_types(self, suffix, local_infinity):
         """
         target: test create/drop/show/get valid table name with different column types
         methods:
@@ -726,7 +737,10 @@ class TestInfinity:
         expect: all operations successfully
 
         """
-        infinity_obj = infinity.connect(self.uri)
+        if local_infinity:
+            infinity_obj = infinity_embedded.connect(self.uri)
+        else:
+            infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_table_with_different_column_types"+suffix, ConflictType.Ignore)
 
@@ -768,14 +782,17 @@ class TestInfinity:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def _test_table_with_various_column_types(self, suffix):
+    def _test_table_with_various_column_types(self, suffix, local_infinity):
         """
         target: create/drop/show/get table with 10000 columns with various column types.
         methods: create table with various column types
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(self.uri)
+        if local_infinity:
+            infinity_obj = infinity_embedded.connect(self.uri)
+        else:
+            infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_table_with_various_column_types"+suffix, ConflictType.Ignore)
         c_count = 10000
@@ -818,14 +835,17 @@ class TestInfinity:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def _test_table_with_invalid_options(self, suffix):
+    def _test_table_with_invalid_options(self, suffix, local_infinity):
         """
         target: create/drop table with invalid options.
         methods: create table with various options
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(self.uri)
+        if local_infinity:
+            infinity_obj = infinity_embedded.connect(self.uri)
+        else:
+            infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_table_with_invalid_options"+suffix, ConflictType.Ignore)
 
@@ -842,14 +862,17 @@ class TestInfinity:
         # except Exception as e:
         #     print(e)
 
-    def _test_create_drop_table(self, suffix):
+    def _test_create_drop_table(self, suffix, local_infinity):
         """
         target: create created table, drop dropped table
         methods: create table ,drop table
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(self.uri)
+        if local_infinity:
+            infinity_obj = infinity_embedded.connect(self.uri)
+        else:
+            infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_create_drop_table"+suffix, ConflictType.Ignore)
 
@@ -872,7 +895,7 @@ class TestInfinity:
         except Exception as e:
             print(e)
 
-    def test_table(self, suffix):
+    def test_table(self, suffix, local_infinity):
         # self.test_infinity_obj._test_version()
         self._test_table(suffix)
         self._test_show_tables(suffix)
@@ -881,18 +904,18 @@ class TestInfinity:
         self._test_create_tensor_table(suffix)
         self._test_create_tensorarray_table(suffix)
         self._test_create_table_with_invalid_column_name(suffix)
-        self._test_table_with_different_column_name(suffix)
+        self._test_table_with_different_column_name(suffix, local_infinity)
         # create/drop/show/get valid table name with different column types
-        self._test_table_with_different_column_types(suffix)
+        self._test_table_with_different_column_types(suffix, local_infinity)
         # create/drop/show/get table with 10000 columns with various column types.
-        self._test_table_with_various_column_types(suffix)
-        self._test_table_with_invalid_options(suffix)
-        self._test_create_drop_table(suffix)
+        self._test_table_with_various_column_types(suffix, local_infinity)
+        self._test_table_with_invalid_options(suffix, local_infinity)
+        self._test_create_drop_table(suffix, local_infinity)
 
     # todo fix
     # local infinity disconnect = uninit, db obj cannot know weather disconnected
     @pytest.mark.usefixtures("skip_if_local_infinity")
-    def test_after_disconnect_use_table(self, suffix):
+    def test_after_disconnect_use_table(self, suffix, local_infinity):
         """
         target: after disconnection, create / drop / show / list / get table
         methods:
@@ -901,7 +924,10 @@ class TestInfinity:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(self.uri)
+        if local_infinity:
+            infinity_obj = infinity_embedded.connect(self.uri)
+        else:
+            infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_after_disconnect_use_table"+suffix, ConflictType.Ignore)
 
@@ -956,14 +982,17 @@ class TestInfinity:
         for i in range(tb_count):
             res = db_obj.drop_table(table_name + str(i), ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-    def test_create_1K_table(self, suffix):
+    def test_create_1K_table(self, suffix, local_infinity):
         """
         target: create/drop/list/get 1K table
         methods: show table
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(self.uri)
+        if local_infinity:
+            infinity_obj = infinity_embedded.connect(self.uri)
+        else:
+            infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         table_name = "test_create_1K_table"+suffix
         db_obj.drop_table(table_name, ConflictType.Ignore)
