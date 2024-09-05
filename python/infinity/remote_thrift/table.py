@@ -28,12 +28,12 @@ from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuild
 from infinity.remote_thrift.types import build_result
 from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
 from infinity.remote_thrift.utils import get_remote_constant_expr_from_python_value
-from infinity.table import Table, ExplainType
+from infinity.table import ExplainType
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.utils import deprecated_api
 
 
-class RemoteTable(Table, ABC):
+class RemoteTable():
 
     def __init__(self, conn, db_name, table_name):
         self._conn = conn

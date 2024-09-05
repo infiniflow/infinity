@@ -36,7 +36,7 @@ cmake.build-type = "Release"
 build-dir = "build/{build_type}"
 
 wheel.py-api = "cp310"
-wheel.packages = ["python/infinity"]
+wheel.packages = ["python/infinity","python/infinity_embedded"]
 
 [tool.pytest.ini_options]
 addopts = "--strict-markers"

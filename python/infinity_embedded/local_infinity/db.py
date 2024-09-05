@@ -1,15 +1,13 @@
 from abc import ABC
 
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-import numpy as np
-from infinity.db import Database
-from infinity.errors import ErrorCode
-from infinity.local_infinity.table import LocalTable
-from infinity.remote_thrift.utils import check_valid_name, name_validity_check
-from infinity.common import ConflictType, InfinityException
-from infinity.local_infinity.utils import select_res_to_polars, get_local_constant_expr_from_python_value
-from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
-from infinity.embedded_infinity_ext import WrapColumnDef, WrapDataType, LogicalType, ConstraintType, LiteralType, WrapConstantExpr, \
+from infinity_embedded.db import Database
+from infinity_embedded.errors import ErrorCode
+from infinity_embedded.local_infinity.table import LocalTable
+from infinity_embedded.local_infinity.utils import check_valid_name, name_validity_check
+from infinity_embedded.common import ConflictType, InfinityException
+from infinity_embedded.local_infinity.utils import select_res_to_polars, get_local_constant_expr_from_python_value
+from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflictType
+from infinity_embedded.embedded_infinity_ext import WrapColumnDef, WrapDataType, LogicalType, ConstraintType, LiteralType, WrapConstantExpr, \
     EmbeddingDataType, WrapEmbeddingType, WrapSparseType, WrapIndexInfo
 
 def get_constant_expr(column_info):

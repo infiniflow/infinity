@@ -15,6 +15,7 @@ from numpy import dtype
 import ast
 from enum import Enum
 from infinity.table import ExplainType
+from . import common_index
 
 default_url = "http://localhost:23820/"
 
@@ -155,12 +156,12 @@ def str2sparse(str_input):
     return sparce_vec
 
 index_type_transfrom = {
-    index.IndexType.IVFFlat:"IVFFlat",
-    index.IndexType.Hnsw:"HNSW",
-    index.IndexType.FullText:"FULLTEXT",
-    index.IndexType.Secondary:"SECONDARY",
-    index.IndexType.BMP:"BMP",
-    index.IndexType.EMVB:"EMVB",
+    1:"IVFFlat",
+    2:"HNSW",
+    3:"FULLTEXT",
+    4:"SECONDARY",
+    5:"EMVB",
+    6:"BMP",
 }
 
 baseResponse = {
