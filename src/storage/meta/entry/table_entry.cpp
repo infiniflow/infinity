@@ -733,7 +733,8 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
 
                 auto *compaction_process = InfinityContext::instance().storage()->compaction_processor();
 
-                compaction_process->Submit(MakeShared<DumpIndexBylineTask>(GetDBName(), GetTableName(), table_index_entry->GetIndexName(), seg_id, chunk_index_entry));
+                compaction_process->Submit(
+                    MakeShared<DumpIndexBylineTask>(GetDBName(), GetTableName(), table_index_entry->GetIndexName(), seg_id, chunk_index_entry));
 
                 if (index_base->index_type_ == IndexType::kFullText) {
                     table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
@@ -783,15 +784,15 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
             SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
             if (iter == table_index_entry->index_by_segment().end()) {
                 segment_index_entry = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
-                                                                               this,
-                                                                               segment_id,
-                                                                               buffer_manager,
-                                                                               ts /*min_ts*/,
-                                                                               ts /*max_ts*/,
-                                                                               0 /*next_chunk_id*/,
-                                                                               0 /*txn_id*/,
-                                                                               ts /*begin_ts*/,
-                                                                               ts /*commit_ts*/);
+                                                                                    this,
+                                                                                    segment_id,
+                                                                                    buffer_manager,
+                                                                                    ts /*min_ts*/,
+                                                                                    ts /*max_ts*/,
+                                                                                    0 /*next_chunk_id*/,
+                                                                                    0 /*txn_id*/,
+                                                                                    ts /*begin_ts*/,
+                                                                                    ts /*commit_ts*/);
                 table_index_entry->index_by_segment().emplace(segment_id, segment_index_entry);
             } else {
                 segment_index_entry = iter->second;
@@ -1277,6 +1278,50 @@ bool TableEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
         }
     }
     return false;
+}
+
+bool TableEntry::AddWriteTxnNum() {
+    std::lock_guard lock(mtx_);
+    if (locked_ || wait_lock_) {
+        LOG_WARN(fmt::format("Table {} is locked or waiting for lock", *GetTableName()));
+        return false;
+    }
+    ++write_txn_num_;
+    return true;
+}
+
+void TableEntry::DecWriteTxnNum() {
+    std::lock_guard lock(mtx_);
+    if (write_txn_num_ == 0) {
+        UnrecoverableError(fmt::format("Table {} has mismatch txn num", *GetTableName()));
+    }
+    --write_txn_num_;
+    if (write_txn_num_ == 0 && wait_lock_) {
+        cv_.notify_one();
+    }
+}
+
+void TableEntry::SetLocked() {
+    std::unique_lock lock(mtx_);
+    if (locked_) {
+        LOG_WARN(fmt::format("Table {} has already been locked", *GetTableName()));
+        return;
+    }
+    if (write_txn_num_ > 0) {
+        wait_lock_ = true;
+        cv_.wait(lock, [&] { return write_txn_num_ == 0; });
+        wait_lock_ = false;
+    }
+    locked_ = true;
+}
+
+void TableEntry::SetUnlock() {
+    std::lock_guard lock(mtx_);
+    if (!locked_) {
+        LOG_WARN(fmt::format("Table {} is not locked", *GetTableName()));
+        return;
+    }
+    locked_ = false;
 }
 
 } // namespace infinity
