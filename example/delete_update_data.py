@@ -17,6 +17,7 @@ This example is to connect local infinity instance, create table, insert data, d
 '''
 
 import infinity
+import sys
 
 try:
     # open a local directory to store the data
@@ -39,6 +40,7 @@ try:
     })
 
     # Insert 3 rows of data into the 'my_table'
+    print('about to insert data')
     table_instance.insert(
         [
             {
@@ -61,9 +63,11 @@ try:
 
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
+    print('about to delete data')
     table_instance.delete("num = 2")
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
+    print('about to insert data again')
     table_instance.insert([
         {
             "num": 2,
@@ -79,11 +83,15 @@ try:
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
 
-    table_instance.update("num = 2", [{"body": "unnecessary and harmful", "vec": [14.0, 7.2, 0.8, 10.9]}])
+    print('about to update data')
+    table_instance.update("num = 2", {"body": "unnecessary and harmful", "vec": [14.0, 7.2, 0.8, 10.9]})
     result = table_instance.output(["*"]).to_pl()
     print(result)
 
     infinity_instance.disconnect()
+    print('test done')
+    sys.exit(0)
 
 except Exception as e:
     print(str(e))
+    sys.exit(-1)

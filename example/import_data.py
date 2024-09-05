@@ -18,6 +18,7 @@ This example is about connecting local infinity instance, creating table, ing da
 
 import infinity
 import os
+import sys
 
 current_path = os.path.abspath(__file__)
 project_directory = os.path.dirname(current_path)
@@ -50,5 +51,8 @@ try:
 
     infinity_instance.disconnect()
 
+    print('test done')
+    sys.exit(0)
 except Exception as e:
     print(str(e))
+    sys.exit(-1)

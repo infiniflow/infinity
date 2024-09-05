@@ -14,7 +14,7 @@
 
 
 import infinity
-from infinity.common import ConflictType, LOCAL_HOST
+import sys
 
 try:
     # Open a local directory to store the data
@@ -96,5 +96,8 @@ try:
     print(result)
     infinity_instance.disconnect()
 
+    print('test done')
+    sys.exit(0)
 except Exception as e:
     print(str(e))
+    sys.exit(-1)

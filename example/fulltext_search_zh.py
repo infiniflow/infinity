@@ -17,6 +17,7 @@ This example is to connect local infinity instance, create table, insert data, s
 """
 
 import infinity
+import sys
 
 """
 Checkout https://github.com/infiniflow/resource.git under /var/infinity (defined by 'resource_dir' of config file). The jieba dict is
@@ -117,5 +118,8 @@ try:
 
     infinity_instance.disconnect()
 
+    print('test done')
+    sys.exit(0)
 except Exception as e:
     print(str(e))
+    sys.exit(-1)
