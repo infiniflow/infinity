@@ -29,13 +29,13 @@ from infinity_embedded.local_infinity.types import build_result
 from infinity_embedded.local_infinity.utils import traverse_conditions, select_res_to_polars
 from infinity_embedded.local_infinity.utils import get_local_constant_expr_from_python_value
 from infinity_embedded.local_infinity.utils import name_validity_check
-from infinity_embedded.table import Table, ExplainType
+from infinity_embedded.table import ExplainType
 from infinity_embedded.index import InitParameter
 from infinity_embedded.utils import deprecated_api
 from sqlglot import condition
 
 
-class LocalTable(Table, ABC):
+class LocalTable():
 
     def __init__(self, conn, db_name, table_name):
         self._conn = conn
