@@ -438,7 +438,7 @@ void BlockEntry::Cleanup() {
 
     String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_dir_;
     LOG_DEBUG(fmt::format("Cleaning up block dir: {}", full_block_dir));
-    CleanupScanner::CleanupDir(*block_dir_);
+    CleanupScanner::CleanupDir(full_block_dir);
     LOG_DEBUG(fmt::format("Cleaned block dir: {}", full_block_dir));
 }
 

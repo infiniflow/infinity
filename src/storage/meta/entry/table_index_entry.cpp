@@ -365,7 +365,6 @@ void TableIndexEntry::Cleanup() {
 
     LOG_DEBUG(fmt::format("Cleaning up dir: {}", *index_dir_));
 
-    // FIXME(sys): delete full text index by whole directory tmply, should call CleanupScanner::CleanupDir
     LocalFileSystem fs;
     String absolute_index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir_);
     if (!fs.Exists(absolute_index_dir)) {
