@@ -39,6 +39,7 @@ import column_expression;
 import expression_transformer;
 import third_party;
 import logger;
+import expression_binder;
 import where_binder;
 import join_binder;
 import group_binder;
@@ -1026,10 +1027,26 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         Status status = Status::SyntaxError(fmt::format("Update expr array is empty"));
         RecoverableError(status);
     }
-
     const Vector<String> &column_names = *base_table_ref->column_names_;
     const Vector<SharedPtr<DataType>> &column_types = *base_table_ref->column_types_;
-    //    const Vector<String> &column_names = *base_table_ref->column_names_;
+    // add all columns in table to all_columns_in_table_
+    {
+        ExpressionBinder expression_binder(query_context_ptr_);
+        const auto fake_star = MakeUnique<ColumnExpr>();
+        fake_star->star_ = true;
+        const Vector<ParsedExpr *> fake_input = {fake_star.get()};
+        Vector<ParsedExpr *> all_columns;
+        UnfoldStarExpression(query_context_ptr_, fake_input, all_columns);
+        bound_update_statement->all_columns_in_table_.reserve(all_columns.size());
+        for (const auto expr : all_columns) {
+            auto bound_expr = expression_binder.Bind(*expr, this->bind_context_ptr_.get(), 0, true);
+            bound_update_statement->all_columns_in_table_.push_back(std::move(bound_expr));
+        }
+        if (column_names.size() != column_types.size() || bound_update_statement->all_columns_in_table_.size() != column_names.size()) {
+            RecoverableError(
+                Status::SyntaxError(fmt::format("Column count mismatch, failed to bind table {}.{}", statement.schema_name_, statement.table_name_)));
+        }
+    }
     auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
     for (UpdateExpr *upd_expr : *statement.update_expr_array_) {
         std::string &column_name = upd_expr->column_name;
@@ -1046,6 +1063,25 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         bound_update_statement->update_columns_.emplace_back(column_id, update_expr);
     }
     std::sort(bound_update_statement->update_columns_.begin(), bound_update_statement->update_columns_.end());
+    // check duplicate in update_columns_
+    for (SizeT i = 1; i < bound_update_statement->update_columns_.size(); i++) {
+        if (bound_update_statement->update_columns_[i].first == bound_update_statement->update_columns_[i - 1].first) {
+            RecoverableError(Status::SyntaxError("Duplicate column in update statement"));
+        }
+    }
+    {
+        // generate final_result_columns_
+        bound_update_statement->final_result_columns_.reserve(column_names.size());
+        auto update_iter = bound_update_statement->update_columns_.begin();
+        for (SizeT i = 0; i < column_names.size(); ++i) {
+            if (update_iter != bound_update_statement->update_columns_.end() && update_iter->first == i) {
+                bound_update_statement->final_result_columns_.push_back(update_iter->second);
+                ++update_iter;
+            } else {
+                bound_update_statement->final_result_columns_.push_back(bound_update_statement->all_columns_in_table_[i]);
+            }
+        }
+    }
     return bound_update_statement;
 }
 

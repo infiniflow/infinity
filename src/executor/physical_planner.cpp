@@ -537,6 +537,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<Logical
                                                       std::move(input_physical_operator),
                                                       logical_update->table_entry_ptr_,
                                                       logical_update->update_columns_,
+                                                      logical_update->all_columns_in_table_,
+                                                      logical_update->final_result_columns_,
                                                       logical_operator->load_metas());
     return physical_update;
 }
@@ -876,6 +878,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const SharedPtr<Logi
                                          std::move(logical_index_scan->filter_execute_command_),
                                          std::move(logical_index_scan->fast_rough_filter_evaluator_),
                                          logical_operator->load_metas(),
+                                         logical_operator->GetOutputNames(),
+                                         logical_operator->GetOutputTypes(),
                                          logical_index_scan->add_row_id_);
 }
 

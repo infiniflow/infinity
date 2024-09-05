@@ -39,30 +39,36 @@ import segment_entry;
 import fast_rough_filter;
 import bitmask;
 import filter_value_type_classification;
+import physical_scan_base;
 
 namespace infinity {
 
-PhysicalIndexScan::PhysicalIndexScan(u64 id,
+PhysicalIndexScan::PhysicalIndexScan(const u64 id,
                                      SharedPtr<BaseTableRef> base_table_ref,
                                      SharedPtr<BaseExpression> index_filter_qualified,
                                      HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
                                      Vector<FilterExecuteElem> &&filter_execute_command,
                                      UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                                      SharedPtr<Vector<LoadMeta>> load_metas,
-                                     bool add_row_id)
-    : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id, load_metas), base_table_ref_(std::move(base_table_ref)),
+                                     SharedPtr<Vector<String>> output_names,
+                                     SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                                     const bool add_row_id)
+    : PhysicalScanBase(id, PhysicalOperatorType::kIndexScan, nullptr, nullptr, std::move(base_table_ref), std::move(load_metas)),
       index_filter_qualified_(std::move(index_filter_qualified)), column_index_map_(std::move(column_index_map)),
       filter_execute_command_(std::move(filter_execute_command)), fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)),
-      add_row_id_(add_row_id) {
-    // output only one hidden column: RowID
-    // create empty output_names_ and output_types_
-    output_names_ = MakeShared<Vector<String>>();
-    output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
-    // TODO: what if add_row_id_ is false?
-    if (add_row_id_) {
-        output_names_->emplace_back(COLUMN_NAME_ROW_ID);
-        output_types_->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+      output_names_(std::move(output_names)), output_types_(std::move(output_types)), add_row_id_(add_row_id) {
+    // check last output column
+    if (output_types_->size() != output_names_->size()) {
+        UnrecoverableError("PhysicalIndexScan::PhysicalIndexScan(): output_names_ mismatch with output_types_");
     }
+    if (!(add_row_id_ ? (output_types_->size() == 1 && output_types_->back()->type() == LogicalType::kRowID) : (output_types_->size() == 0))) {
+        UnrecoverableError("PhysicalIndexScan::PhysicalIndexScan(): add_row_id_ mismatch with output_types_");
+    }
+}
+
+Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalIndexScan::PlanBlockEntries(i64) const {
+    UnrecoverableError("PhysicalIndexScan::PlanBlockEntries(): should not be called.");
+    return {};
 }
 
 Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 parallel_count) const {

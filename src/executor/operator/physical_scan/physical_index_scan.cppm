@@ -22,6 +22,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import physical_scan_base;
 import base_expression;
 import load_meta;
 import infinity_exception;
@@ -35,6 +36,7 @@ import secondary_index_scan_execute_expression;
 import table_index_entry;
 import segment_index_entry;
 import fast_rough_filter;
+import global_block_id;
 import bitmask;
 
 namespace infinity {
@@ -47,7 +49,7 @@ class Txn;
 
 // output: only selected RowIDs
 // load columns by LoadMeta
-export class PhysicalIndexScan final : public PhysicalOperator {
+export class PhysicalIndexScan final : public PhysicalScanBase {
 public:
     explicit PhysicalIndexScan(u64 id,
                                SharedPtr<BaseTableRef> base_table_ref,
@@ -56,13 +58,15 @@ public:
                                Vector<FilterExecuteElem> &&filter_execute_command,
                                UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                                SharedPtr<Vector<LoadMeta>> load_metas,
+                               SharedPtr<Vector<String>> output_names,
+                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                bool add_row_id = true);
 
     ~PhysicalIndexScan() final = default;
 
-    void Init() final;
+    void Init() override;
 
-    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
@@ -72,6 +76,8 @@ public:
     // table scan: one tasklet scan one block
     // index scan: one tasklet scan one segment
     SizeT TaskletCount() final { return base_table_ref_->block_index_->SegmentCount(); }
+
+    Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64) const override;
 
     // for InputLoad
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
@@ -92,9 +98,6 @@ private:
     void ExecuteInternal(QueryContext *query_context, IndexScanOperatorState *index_scan_operator_state) const;
 
 private:
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
-    SharedPtr<BaseTableRef> base_table_ref_{};
     // input from optimizer
     SharedPtr<BaseExpression> index_filter_qualified_{};
     HashMap<ColumnID, TableIndexEntry *> column_index_map_{};
@@ -103,15 +106,17 @@ private:
 
     UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
 
+    SharedPtr<Vector<String>> output_names_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
     bool add_row_id_{};
     mutable Vector<SizeT> column_ids_{};
 };
 
 export std::variant<Vector<u32>, Bitmask> SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_execute_command,
                                                                     const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
-                                                                    const SegmentID segment_id,
-                                                                    const u32 segment_row_count,
-                                                                    const u32 segment_row_actual_count,
+                                                                    SegmentID segment_id,
+                                                                    u32 segment_row_count,
+                                                                    u32 segment_row_actual_count,
                                                                     Txn *txn);
 
 } // namespace infinity
