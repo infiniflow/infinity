@@ -1,6 +1,5 @@
 #include "date_type_std.h"
 #include "parser_assert.h"
-#include <format>
 #include <chrono>
 
 constexpr static int32_t DAY_HOUR = 24;
@@ -23,12 +22,11 @@ void DateTypeStd::FromString(const char *date_ptr, size_t length, size_t &end_le
 }
 
 std::string DateTypeStd::ToString() const {
-    int32_t year{0}, month{0}, day{0};
-    if (!Date2YMD(value, year, month, day)) {
-        ParserError(std::format("Invalid date: {}-{}-{}", year, month, day));
-    }
-    // TODO: format for negative year?
-    return std::format("{:04d}-{:02d}-{:02d}", year, month, day);
+    std::stringstream ss;
+    std::chrono::sys_days sysdays {std::chrono::days{value}};
+    std::chrono::year_month_day ymd {sysdays};
+    ss << ymd;
+    return ss.str();
 }
 
 bool DateTypeStd::ConvertFromString(const char *date_ptr, size_t length, DateTypeStd &date, size_t &end_length) {
@@ -70,7 +68,7 @@ bool DateTypeStd::ConvertFromString(const char *date_ptr, size_t length, DateTyp
     ++pos; // skip - and /
 
     // Get month
-    int32_t month{0};
+    unsigned month{0};
     while (pos < length && std::isdigit(date_ptr[pos])) {
         if (std::isspace(date_ptr[pos])) {
             ++pos;
@@ -91,7 +89,7 @@ bool DateTypeStd::ConvertFromString(const char *date_ptr, size_t length, DateTyp
     ++pos; // skip - and /
 
     // Get day
-    int32_t day{0};
+    unsigned day{0};
     while (pos < length && std::isdigit(date_ptr[pos])) {
         if (std::isspace(date_ptr[pos])) {
             ++pos;
@@ -108,49 +106,54 @@ bool DateTypeStd::ConvertFromString(const char *date_ptr, size_t length, DateTyp
     }
     end_length = pos;
 
-    return YMD2Date(year, month, day, date);
+    return YMD2Date(YMD2YMD(year, month, day), date);
 }
 
-bool DateTypeStd::YMD2Date(int32_t year, int32_t month, int32_t day, DateTypeStd &date) { 
-    std::chrono::year_month_day ymd (
-        std::chrono::year{year},
-        std::chrono::month{static_cast<unsigned int>(month)},
-        std::chrono::day{static_cast<unsigned int>(day)}
-    );
+bool DateTypeStd::YMD2Date(const std::chrono::year_month_day &ymd, DateTypeStd &date) {
+    if(!ymd.ok()) {
+        return false;
+    }
     auto sd = std::chrono::sys_days{ymd};
     date.value = sd.time_since_epoch().count();
+    return true;
+}
+
+bool DateTypeStd::Date2YMD(int32_t days, std::chrono::year_month_day& ymd) {
+    auto sd = std::chrono::sys_days{std::chrono::days{days}};
+    ymd = std::chrono::year_month_day{sd};
     return ymd.ok();
 }
 
-bool DateTypeStd::Date2YMD(int32_t days, int32_t &year, int32_t &month, int32_t &day) {
-    auto sd = std::chrono::sys_days{std::chrono::days{days}};
-    auto ymd = std::chrono::year_month_day{sd};
-
-    year = static_cast<int>(ymd.year());
-    month = static_cast<unsigned>(ymd.month());
-    day = static_cast<unsigned>(ymd.day());
-    return IsDateValid(year, month, day);
+std::chrono::year_month_day DateTypeStd::YMD2YMD(int32_t year, unsigned month, unsigned day) {
+    return std::chrono::year_month_day {
+        std::chrono::year{year},
+        std::chrono::month{month},
+        std::chrono::day{day},
+    };
 }
 
 bool DateTypeStd::IsDateValid(int32_t year, int32_t month, int32_t day) {
     DateTypeStd date;
-    return YMD2Date(year, month, day, date);
+    return YMD2Date(YMD2YMD(year, month, day), date);
 }
 
 bool DateTypeStd::Add(DateTypeStd input, IntervalType interval, DateTypeStd &output) {
-    int32_t year{0}, month{0}, day{0};
-    if (!Date2YMD(input.value, year, month, day)) {
+    std::chrono::year_month_day ymd;
+    if (!Date2YMD(input.value, ymd)) {
         return false;
     }
     switch (interval.unit) {
         case kYear: {
-            std::chrono::sys_days output_sd(std::chrono::days{input.value} + std::chrono::duration_cast<std::chrono::days>(std::chrono::years{interval.value}));
-            output.value = output_sd.time_since_epoch().count();
+            ymd += std::chrono::years{interval.value};
+            output.value = std::chrono::sys_days{ymd}.time_since_epoch().count();
             return true;
         }
         case kMonth: {
-            std::chrono::sys_days output_sd(std::chrono::days{input.value} + std::chrono::duration_cast<std::chrono::days>(std::chrono::months{interval.value}));
-            output.value = output_sd.time_since_epoch().count();
+            ymd += std::chrono::months{interval.value};
+            if(!ymd.ok()) {
+                ymd = ymd.year()/ymd.month()/std::chrono::last;
+            }
+            output.value = std::chrono::sys_days{ymd}.time_since_epoch().count();
             return true;
         }
         case kDay: {
@@ -182,18 +185,18 @@ bool DateTypeStd::Subtract(DateTypeStd input, IntervalType interval, DateTypeStd
 }
 
 int64_t DateTypeStd::GetDatePart(DateTypeStd input, TimeUnit unit) {
-    int32_t year{}, month{}, day{};
-    auto result = Date2YMD(input.value, year, month, day);
+    std::chrono::year_month_day ymd;
+    auto result = Date2YMD(input.value, ymd);
     ParserAssert(result, "Invalid date value");
     switch (unit) {
         case TimeUnit::kYear: {
-            return year;
+            return static_cast<int>(ymd.year());
         }
         case TimeUnit::kMonth: {
-            return month;
+            return static_cast<unsigned>(ymd.month());
         }
         case TimeUnit::kDay: {
-            return day;
+            return static_cast<unsigned>(ymd.day());
         }
         case TimeUnit::kHour: {
             ParserError("Can't extract hour from date");

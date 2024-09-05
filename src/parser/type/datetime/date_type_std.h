@@ -1,6 +1,7 @@
 #pragma once
 
 #include "interval_type.h"
+#include <chrono>
 #include <string>
 
 namespace infinity {
@@ -29,9 +30,12 @@ struct DateTypeStd {
 private:
     static bool ConvertFromString(const char *date_ptr, size_t length, DateTypeStd &date, size_t &end_length);
 
-    static bool YMD2Date(int32_t year, int32_t month, int32_t day, DateTypeStd &date);
+    inline static std::chrono::year_month_day YMD2YMD(int32_t year, unsigned month, unsigned day);
+    // static bool YMD2Date(int32_t year, int32_t month, int32_t day, DateTypeStd &date);
+    static bool YMD2Date(const std::chrono::year_month_day &ymd, DateTypeStd &date);
 
-    static bool Date2YMD(int32_t days, int32_t &year, int32_t &month, int32_t &day);
+    // static bool Date2YMD(int32_t days, int32_t &year, int32_t &month, int32_t &day);
+    static bool Date2YMD(int32_t days, std::chrono::year_month_day& ymd);
 
     inline static bool IsLeapYear(int32_t year) { return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0); }
 

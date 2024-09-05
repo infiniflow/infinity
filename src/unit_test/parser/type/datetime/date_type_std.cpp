@@ -54,10 +54,23 @@ TEST_F(DateTypeStdTest, TestAddSubstract) {
     EXPECT_TRUE(DateStdT::Add(date_std_input, interval, date_std_output));
     EXPECT_EQ(date_std_output.ToString(), "2020-02-29");
 
+    EXPECT_TRUE(DateStdT::Add(date_std_input, interval, date_std_output));
+    EXPECT_EQ(date_std_output.ToString(), "2020-02-29");
+
     interval.value = 1;
     interval.unit = kYear;
     EXPECT_TRUE(DateStdT::Add(date_std_input, interval, date_std_output));
-    EXPECT_EQ(date_std_output.ToString(), "2021-01-29");
+    EXPECT_EQ(date_std_output.ToString(), "2021-01-30");
+
+    interval.value = 25;
+    interval.unit = kMonth;
+    EXPECT_TRUE(DateStdT::Add(date_std_input, interval, date_std_output));
+    EXPECT_EQ(date_std_output.ToString(), "2022-02-28");
+
+    interval.value = 23;
+    interval.unit = kMonth;
+    EXPECT_TRUE(DateStdT::Subtract(date_std_input, interval, date_std_output));
+    EXPECT_EQ(date_std_output.ToString(), "2018-02-28");
 }
 
 // TEST_F(DateTypeStdTest, TestLeapYear) {
@@ -74,16 +87,16 @@ TEST_F(DateTypeStdTest, TestNegativeYears) {
     interval.unit = kYear;
     interval.value = 3;
 
-    EXPECT_EQ(date.ToString(), "-001-05-04");
+    EXPECT_EQ(date.ToString(), "-0001-05-04");
     EXPECT_EQ(DateStdT::GetDatePart(date, kYear), -1);
     EXPECT_EQ(DateStdT::GetDatePart(date, kMonth), 5);
     EXPECT_EQ(DateStdT::GetDatePart(date, kDay), 4);
 
     EXPECT_TRUE(DateStdT::Add(date, interval, date_shift));
-    EXPECT_EQ(date_shift.ToString(), "0002-05-03");
+    EXPECT_EQ(date_shift.ToString(), "0002-05-04");
 
     EXPECT_TRUE(DateStdT::Subtract(date_shift, interval, date_shift));
-    EXPECT_EQ(date_shift.ToString(), "-001-05-04");
+    EXPECT_EQ(date_shift.ToString(), "-0001-05-04");
 }
 
 // TEST_F(DateTypeStdTest, TestComparator) {
