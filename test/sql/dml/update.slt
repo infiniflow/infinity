@@ -60,6 +60,66 @@ SELECT * FROM products;
 7 8
 
 statement ok
+CREATE index idx1 on products(product_no);
+
+statement ok
+UPDATE products SET price=200 WHERE product_no = 3;
+
+query II rowsort
+SELECT * FROM products;
+----
+1 5
+3 200
+5 9
+7 8
+
+query II
+SELECT count(*) FROM products;
+----
+4
+
+statement ok
+UPDATE products SET price=price+3 WHERE product_no = 1 OR product_no = 5;
+
+query II rowsort
+SELECT * FROM products;
+----
+1 8
+3 200
+5 12
+7 8
+
+statement ok
+DROP INDEX idx1 ON products;
+
+statement ok
+UPDATE products SET price=800 WHERE product_no = 3;
+
+query II rowsort
+SELECT * FROM products;
+----
+1 8
+3 800
+5 12
+7 8
+
+query II
+SELECT count(*) FROM products;
+----
+4
+
+statement ok
+UPDATE products SET price=price+3 WHERE product_no = 1 OR product_no = 5;
+
+query II rowsort
+SELECT * FROM products;
+----
+1 11
+3 800
+5 15
+7 8
+
+statement ok
 DROP TABLE products;
 
 statement ok
