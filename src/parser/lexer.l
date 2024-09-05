@@ -61,6 +61,7 @@ COLUMNS         { return COLUMNS; }
 COMPACT         { return COMPACT; }
 CONFIGS         { return CONFIGS; }
 CONFIG          { return CONFIG; }
+CONNECT         { return CONNECT; }
 COPY            { return COPY; }
 CREATE          { return CREATE; }
 CROSS           { return CROSS; }
@@ -94,6 +95,7 @@ FILES           { return FILES; }
 FLOAT           { return FLOAT; }
 FLOAT16         { return FLOAT16; }
 FLUSH           { return FLUSH; }
+FOLLOWER        { return FOLLOWER; }
 FORMAT          { return FORMAT; }
 FRAGMENT        { return FRAGMENT; }
 FROM            { return FROM; }
@@ -121,6 +123,8 @@ INTO            { return INTO; }
 IS              { return IS; }
 JOIN            { return JOIN; }
 KEY             { return KEY; }
+LEADER          { return LEADER; }
+LEARNER         { return LEARNER; }
 LEFT            { return LEFT; }
 LIKE            { return LIKE; }
 LIMIT           { return LIMIT; }
@@ -178,6 +182,7 @@ SEGMENTS        { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
 SPARSE          { return SPARSE; }
+STANDALONE      { return STANDALONE; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
 TENSOR          { return TENSOR; }

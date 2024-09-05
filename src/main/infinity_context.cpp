@@ -34,6 +34,17 @@ import infinity_exception;
 
 namespace infinity {
 
+String ToString(InfinityRole role) {
+    switch(role) {
+        case InfinityRole::kUnInitialized: return "uninitialized";
+        case InfinityRole::kAdmin: return "admin";
+        case InfinityRole::kStandalone: return "standalone";
+        case InfinityRole::kLeader: return "leader";
+        case InfinityRole::kFollower: return "follower";
+        case InfinityRole::kLearner: return "learner";
+    }
+}
+
 InfinityRole InfinityContext::GetServerRole() const {
     std::unique_lock<std::mutex> lock(mutex_);
     return current_server_role_;

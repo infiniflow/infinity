@@ -38,6 +38,8 @@ enum class InfinityRole {
     kLearner,
 };
 
+export String ToString(InfinityRole);
+
 export class InfinityContext : public Singleton<InfinityContext> {
 public:
     [[nodiscard]] inline TaskScheduler *task_scheduler() noexcept { return task_scheduler_.get(); }

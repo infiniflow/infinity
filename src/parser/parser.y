@@ -387,7 +387,7 @@ struct SQL_LTYPE {
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
 %token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
-%token ADMIN
+%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
 
 %token NUMBER
@@ -2281,7 +2281,43 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->log_file_index_ = $4;
      $$->log_index_in_file_ = $6;
 }
-
+| ADMIN SHOW CONFIGS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListConfigs;
+}
+| ADMIN SHOW VARIABLES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListVariables;
+}
+| ADMIN SET ADMIN {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kSetRole;
+     $$->admin_server_role_ = infinity::AdminServerRole::kAdmin;
+}
+| ADMIN SET STANDALONE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kSetRole;
+     $$->admin_server_role_ = infinity::AdminServerRole::kStandalone;
+}
+| ADMIN SET LEADER {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kSetRole;
+     $$->admin_server_role_ = infinity::AdminServerRole::kLeader;
+}
+| ADMIN CONNECT STRING AS FOLLOWER {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kSetRole;
+     $$->admin_server_role_ = infinity::AdminServerRole::kFollower;
+     $$->leader_address_ = $3;
+     free($3);
+}
+| ADMIN CONNECT STRING AS LEARNER {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kSetRole;
+     $$->admin_server_role_ = infinity::AdminServerRole::kLearner;
+     $$->leader_address_ = $3;
+     free($3);
+}
 /*
  * EXPRESSION
  */
