@@ -61,18 +61,23 @@ class TestInfinity:
         assert infinity_obj
         assert infinity_obj.disconnect()
 
-    def test_create_db_with_invalid_name(self):
+    def test_create_db_with_invalid_name(self, local_infinity):
         """
         target: test db name limitation
         method: create db with empty name
         expect: create db fail with error message
         """
+        if local_infinity:
+            infinity_obj = infinity_embedded.connect(self.uri)
+        else:
+            infinity_obj = infinity.connect(self.uri)
+        assert infinity_obj
 
         db_name = ""
         with pytest.raises(Exception,
                            match=f"DB name '{db_name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores"):
-            db = self.infinity_obj.create_database("")
-        assert self.infinity_obj.disconnect()
+            db = infinity_obj.create_database("")
+        assert infinity_obj.disconnect()
 
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
