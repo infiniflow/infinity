@@ -64,8 +64,8 @@ using DecimalT = DecimalType;
 using VarcharT = Varchar;
 
 // Date and Time
-using DateT = DateType;
-using DateStdT = DateTypeStd;
+using DateTOld = DateType;
+using DateT = DateTypeStd;
 using TimeT = TimeType;
 using DateTimeT = DateTimeType;
 using TimestampT = TimestampType;
