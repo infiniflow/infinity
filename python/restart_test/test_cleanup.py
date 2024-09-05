@@ -1,3 +1,4 @@
+import os
 import time
 from infinity_runner import InfinityRunner
 import pytest
@@ -5,14 +6,11 @@ from common import common_values
 from infinity.common import ConflictType
 from restart_util import *
 import infinity
+import pathlib
 
 
 # Test with cleanuped data but meta data not cleanuped
 class TestCleanup:
-    @pytest.mark.parametrize(
-        "config",
-        ["test/data/config/restart_test/test_cleanup/1.toml"],
-    )
     @pytest.mark.parametrize(
         "columns, data_gen_factory",
         [
@@ -33,10 +31,11 @@ class TestCleanup:
     def test_cleanuped_data(
         self,
         infinity_runner: InfinityRunner,
-        config: str,
         columns: dict,
         data_gen_factory,
     ):
+        config = "test/data/config/restart_test/test_cleanup/1.toml"
+        data_dir = "/var/infinity/data"
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
         table_name = "test_cleanup"
@@ -61,6 +60,11 @@ class TestCleanup:
 
         time.sleep(2)  # sleep 2 wait for the data to be cleaned up
 
+        # check
+        for table_dir in pathlib.Path(data_dir).glob(f"*{table_name}*"):
+            print(f"table_dir: {table_dir}")
+            assert False
+
         infinity_obj.disconnect()
         infinity_runner.uninit()
 
@@ -77,10 +81,6 @@ class TestCleanup:
         infinity_obj.disconnect()
         infinity_runner.uninit()
 
-    @pytest.mark.parametrize(
-        "config",
-        ["test/data/config/restart_test/test_cleanup/1.toml"],
-    )
     @pytest.mark.parametrize(
         "columns, indexes, data_gen_factory",
         [
@@ -99,14 +99,16 @@ class TestCleanup:
     def test_cleanuped_index(
         self,
         infinity_runner: InfinityRunner,
-        config: str,
         columns: dict,
         indexes: list[index.IndexInfo],
         data_gen_factory,
     ):
+        config = "test/data/config/restart_test/test_cleanup/1.toml"
+        data_dir = "var/infinity/data"
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
         table_name = "test_cleanup_index"
+        index_name = "idx1"
 
         infinity_runner.init(config)
         infinity_obj = InfinityRunner.connect(uri)
@@ -116,7 +118,7 @@ class TestCleanup:
         table_obj = db_obj.create_table(table_name, columns, ConflictType.Error)
 
         for idx in indexes:
-            res = table_obj.create_index("idx1", idx)
+            res = table_obj.create_index(index_name, idx)
             assert res.error_code == infinity.ErrorCode.OK
 
         insert_n = 100
@@ -128,10 +130,15 @@ class TestCleanup:
                 data_line[column_name] = column_data
             table_obj.insert([data_line])
 
-        res = table_obj.drop_index("idx1")
+        res = table_obj.drop_index(index_name)
         assert res.error_code == infinity.ErrorCode.OK
 
         time.sleep(2)  # sleep 2 wait for the data to be cleaned up
+
+        # check
+        for index_dir in pathlib.Path(data_dir).glob(f"*{index_name}*"):
+            print(f"index_dir: {index_dir}")
+            assert False
 
         infinity_obj.disconnect()
         infinity_runner.uninit()
@@ -146,6 +153,12 @@ class TestCleanup:
         assert count_star == insert_n
 
         db_obj.drop_table(table_name, ConflictType.Error)
+
+        time.sleep(2)  # sleep 2 wait for the data to be cleaned up
+
+        for table_dir in pathlib.Path(data_dir).glob(f"*{table_name}*"):
+            print(f"table_dir: {table_dir}")
+            assert False
 
         infinity_obj.disconnect()
         infinity_runner.uninit()
