@@ -56,6 +56,7 @@ TEST_F(DateTypeTest, test1) {
 
 TEST_F(DateTypeTest, TestEqStdChronoForward) {
     using namespace infinity;
+    using namespace std;
     using namespace std::chrono;
 
     //2020-1-31
@@ -88,6 +89,7 @@ TEST_F(DateTypeTest, TestEqStdChronoForward) {
 
 TEST_F(DateTypeTest, TestEqStdChronoBackward) {
     using namespace infinity; 
+    using namespace std;
     using namespace std::chrono;
 
     //2020-1-31
