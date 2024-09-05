@@ -2507,6 +2507,7 @@ public:
         });
         {
             index_info->column_name_ = fields[0];
+            ToLower(index_info->column_name_);
             auto index_param_list = new Vector<InitParameter *>();
             DeferFn release_index_param_list([&]() {
                 if(index_param_list != nullptr) {
@@ -2520,13 +2521,16 @@ public:
 
             for (auto &ele : index.items()) {
                 String name = ele.key();
+                ToLower(name);
                 auto value = ele.value();
                 if (!ele.value().is_string()) {
                     value = ele.value().dump();
                 }
 
                 if (strcmp(name.c_str(), "type") == 0) {
-                    index_info->index_type_ = IndexInfo::StringToIndexType(value);
+                    String version_str = value;
+                    ToUpper(version_str);
+                    index_info->index_type_ = IndexInfo::StringToIndexType(version_str);
                     if (index_info->index_type_ == IndexType::kInvalid) {
                         json_response["error_code"] = ErrorCode::kInvalidIndexType;
                         json_response["error_message"] = fmt::format("Invalid index type: {}", name);

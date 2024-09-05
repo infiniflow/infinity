@@ -83,7 +83,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[14] = String("0.3.0.dev5");
     client_version_map_[15] = String("0.3.0.dev6");
     client_version_map_[16] = String("0.3.0.dev7");
-    client_version_map_[17] = String("0.3.0.dev8");
+    client_version_map_[17] = String("0.3.0");
 }
 
 Pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -1070,7 +1070,7 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
         delete index_info_to_use;
         index_info_to_use = nullptr;
 
-        ProcessStatus(response, Status::InvalidIndexType());
+        ProcessStatus(response, Status::InvalidIndexType("Invalid index"));
         return;
     }
 

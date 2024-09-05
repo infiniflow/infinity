@@ -1206,7 +1206,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(new_op.get());
             if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
                 add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
-                LOG_DEBUG(fmt::format("Delete chunk: {}", *new_op->encode_));
+                LOG_DEBUG(fmt::format("Delete chunk: {} at {}", *new_op->encode_, add_chunk_index_op->deprecate_ts_));
             }
         }
         const String &encode = *new_op->encode_;

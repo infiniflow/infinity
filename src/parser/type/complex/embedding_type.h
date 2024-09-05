@@ -150,11 +150,11 @@ public:
     static EmbeddingDataType String2EmbeddingDataType(std::string_view sv) {
         if (sv == "BIT") {
             return EmbeddingDataType::kElemBit;
-        } else if (sv == "INT8") {
+        } else if (sv == "INT8" || sv == "I8") {
             return EmbeddingDataType::kElemInt8;
-        } else if (sv == "INT16") {
+        } else if (sv == "INT16" || sv == "I16") {
             return EmbeddingDataType::kElemInt16;
-        } else if (sv == "INT32" || sv == "INT") {
+        } else if (sv == "INT32" || sv == "I32" || sv == "INT" || sv == "INTEGER") {
             return EmbeddingDataType::kElemInt32;
         } else if (sv == "INT64") {
             return EmbeddingDataType::kElemInt64;
@@ -162,7 +162,7 @@ public:
             return EmbeddingDataType::kElemFloat;
         } else if (sv == "FLOAT64" || sv == "DOUBLE" || sv == "F64") {
             return EmbeddingDataType::kElemDouble;
-        } else if (sv == "UINT8") {
+        } else if (sv == "UINT8" || sv == "U8") {
             return EmbeddingDataType::kElemUInt8;
         } else if (sv == "FLOAT16" || sv == "F16") {
             return EmbeddingDataType::kElemFloat16;
