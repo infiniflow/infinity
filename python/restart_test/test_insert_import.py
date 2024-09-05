@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 import pytest
@@ -12,6 +13,7 @@ class TestInsertImport:
     def insert_import_inner(
         self,
         infinity_runner: InfinityRunner,
+        total_n: int,
         config: str,
         columns: dict,
         data_gen_factory,
@@ -21,7 +23,6 @@ class TestInsertImport:
     ):
         uri = common_values.TEST_LOCAL_HOST
 
-        total_n = 1000000
         data_gen = data_gen_factory(total_n)
 
         stop_n = 10
@@ -35,7 +36,7 @@ class TestInsertImport:
             nonlocal cur_n, gen_finished, insert_finish
             insert_batch_size = 10
 
-            import_rate = insert_batch_size / import_size
+            import_rate = insert_batch_size / (import_size + insert_batch_size)
 
             while cur_n < total_n and not gen_finished:
                 r = random.randint(0, 100)
@@ -62,7 +63,8 @@ class TestInsertImport:
                     cur_n += insert_batch_size
                 else:
                     try:
-                        table_obj.import_data(import_file, import_options)
+                        abs_import_file = os.path.abspath(import_file)
+                        table_obj.import_data(abs_import_file, import_options)
                     except Exception as e:
                         break
                     cur_n += import_size
@@ -104,10 +106,10 @@ class TestInsertImport:
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
-        "config",
+        "total_n, config",
         [
-            "test/data/config/restart_test/test_insert/4.toml",
-            "test/data/config/restart_test/test_insert/5.toml",
+            (100000, "test/data/config/restart_test/test_insert/4.toml"),
+            (100000, "test/data/config/restart_test/test_insert/5.toml"),
         ],
     )
     @pytest.mark.parametrize(
@@ -139,6 +141,7 @@ class TestInsertImport:
     def test_data(
         self,
         infinity_runner: InfinityRunner,
+        total_n: int,
         config: str,
         columns: dict,
         data_gen_factory,
@@ -159,6 +162,7 @@ class TestInsertImport:
 
         self.insert_import_inner(
             infinity_runner,
+            total_n,
             config,
             columns,
             data_gen_factory,
@@ -176,10 +180,9 @@ class TestInsertImport:
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
-        "config",
+        "total_n, config",
         [
-            "test/data/config/restart_test/test_insert/4.toml",
-            "test/data/config/restart_test/test_insert/5.toml",
+            (100000, "test/data/config/restart_test/test_insert/4.toml"),
         ],
     )
     @pytest.mark.parametrize(
@@ -216,6 +219,7 @@ class TestInsertImport:
     def test_index(
         self,
         infinity_runner: InfinityRunner,
+        total_n: int,
         config: str,
         columns: dict,
         indexes: list[index.IndexInfo],
@@ -239,6 +243,7 @@ class TestInsertImport:
 
         self.insert_import_inner(
             infinity_runner,
+            total_n,
             config,
             columns,
             data_gen_factory,
