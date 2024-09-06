@@ -1172,6 +1172,32 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             }
             break;
         }
+        case CommandType::kLockTable: {
+            auto *lock_table = static_cast<LockCmd *>(command_statement->command_info_.get());
+            if (lock_table->db_name().empty()) {
+                lock_table->SetDBName(query_context_ptr_->schema_name());
+            }
+            auto [table_entry, status] = txn->GetTableByName(lock_table->db_name(), lock_table->table_name());
+            if (!status.ok()) {
+                return status;
+            }
+            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+            this->logical_plan_ = logical_command;
+            break;
+        }
+        case CommandType::kUnlockTable: {
+            auto *unlock_table = static_cast<UnlockCmd *>(command_statement->command_info_.get());
+            if (unlock_table->db_name().empty()) {
+                unlock_table->SetDBName(query_context_ptr_->schema_name());
+            }
+            auto [table_entry, status] = txn->GetTableByName(unlock_table->db_name(), unlock_table->table_name());
+            if (!status.ok()) {
+                return status;
+            }
+            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+            this->logical_plan_ = logical_command;
+            break;
+        }
         default: {
             String error_message = "Invalid command type.";
             UnrecoverableError(error_message);

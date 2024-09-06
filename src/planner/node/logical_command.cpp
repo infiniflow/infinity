@@ -104,6 +104,16 @@ String LogicalCommand::ToString(i64 &space) const {
             ss << String(space, ' ') << arrow_str << "Check table: " << check_table_info->table_name();
             break;
         }
+        case CommandType::kLockTable: {
+            auto *lock_table_info = static_cast<LockCmd *>(command_info_.get());
+            ss << String(space, ' ') << arrow_str << "Lock table: " << lock_table_info->db_name() << "." << lock_table_info->table_name();
+            break;
+        }
+        case CommandType::kUnlockTable: {
+            auto *unlock_table_info = static_cast<UnlockCmd *>(command_info_.get());
+            ss << String(space, ' ') << arrow_str << "Lock table: " << unlock_table_info->db_name() << "." << unlock_table_info->table_name();
+            break;
+        }
         case CommandType::kInvalid: {
             String error_message = "Invalid command type.";
             UnrecoverableError(error_message);

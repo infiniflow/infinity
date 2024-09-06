@@ -15,6 +15,7 @@
 #pragma once
 
 #include "base_statement.h"
+#include "statement_common.h"
 #include <memory>
 #include <string>
 #include <utility>
@@ -27,6 +28,8 @@ enum class CommandType {
     kSet,
     kExport,
     kCheckTable,
+    kLockTable,
+    kUnlockTable,
 };
 
 class CommandInfo {
@@ -168,6 +171,48 @@ public:
     const std::string &table_name() const { return table_name_; }
 
 private:
+    std::string table_name_;
+};
+
+class LockCmd final : public CommandInfo {
+public:
+    explicit LockCmd(const char *db_name, const char *table_name)
+        : CommandInfo(CommandType::kLockTable), db_name_(db_name == nullptr ? "" : db_name), table_name_(table_name) {}
+
+    ~LockCmd() final = default;
+
+    [[nodiscard]] std::string ToString() const final;
+
+    const std::string &db_name() const { return db_name_; }
+    const std::string &table_name() const { return table_name_; }
+
+    void SetDBName(const std::string &db_name) {
+        db_name_ = db_name;
+    }
+
+private:
+    std::string db_name_;
+    std::string table_name_;
+};
+
+class UnlockCmd final : public CommandInfo {
+public:
+    explicit UnlockCmd(const char *db_name, const char *table_name)
+        : CommandInfo(CommandType::kUnlockTable), db_name_(db_name == nullptr ? "" : db_name), table_name_(table_name) {}
+
+    ~UnlockCmd() final = default;
+
+    [[nodiscard]] std::string ToString() const final;
+
+    const std::string &db_name() const { return db_name_; }
+    const std::string &table_name() const { return table_name_; }
+
+    void SetDBName(const std::string &db_name) {
+        db_name_ = db_name;
+    }
+
+private:
+    std::string db_name_;
     std::string table_name_;
 };
 
