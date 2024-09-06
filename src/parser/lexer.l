@@ -129,6 +129,7 @@ LEFT            { return LEFT; }
 LIKE            { return LIKE; }
 LIMIT           { return LIMIT; }
 LINE            { return LINE; }
+LOCK            { return LOCK; }
 LOG             { return LOG; }
 LOGS            { return LOGS; }
 LOGICAL         { return LOGICAL; }
@@ -198,6 +199,7 @@ TRANSACTIONS    { return TRANSACTIONS; }
 TRUE            { return TRUE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
+UNLOCK          { return UNLOCK; }
 UNSIGNED        { return UNSIGNED; }
 USING           { return USING; }
 UPDATE          { return UPDATE; }

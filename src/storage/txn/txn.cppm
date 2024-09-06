@@ -218,6 +218,8 @@ public:
 
     void SetDBName(const String &db_name) { db_name_ = db_name; }
 
+    void AddWriteTxnNum(TableEntry *table_entry);
+
 private:
     void CheckTxnStatus();
 

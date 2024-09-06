@@ -279,6 +279,9 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
 }
 
 void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
+    if (added_txn_num_) {
+        table_entry_->DecWriteTxnNum();
+    }
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
         Catalog::RollbackAppend(table_entry_, txn_id, abort_ts, this);
@@ -432,6 +435,9 @@ void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
                 break;
             }
         }
+    }
+    if (added_txn_num_) {
+        table_entry_->DecWriteTxnNum();
     }
 }
 
