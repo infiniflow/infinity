@@ -33,11 +33,16 @@ print(res)
 ```shell
 pip install -e .
 ```
-Build the release version of infinity-sdk in the target location `cmake-build-release`
+Build infinity-sdk 
+```shell
+cd python/infinity_sdk
+pip install . -v
+```
+Build the release version of infinity-embedded-sdk in the target location `cmake-build-release`
 ```shell
 pip install . -v --config-settings=cmake.build-type="Release"  --config-settings=build-dir="cmake-build-release"
 ```
-Build the debug version of infinity-sdk in the target location `cmake-build-debug`
+Build the debug version of infinity-embedded-sdk in the target location `cmake-build-debug`
 ```shell
 pip install . -v --config-settings=cmake.build-type="Debug"  --config-settings=build-dir="cmake-build-debug"
 ```
