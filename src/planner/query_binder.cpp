@@ -984,6 +984,12 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     UniquePtr<BoundDeleteStatement> bound_delete_statement = BoundDeleteStatement::Make(bind_context_ptr_);
     SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
 
+    Txn *txn = query_context_ptr_->GetTxn();
+    auto status = base_table_ref->table_entry_ptr_->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
     if (base_table_ref.get() == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
         RecoverableError(status);
@@ -1007,6 +1013,12 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     // refers to QueryBinder::BindSelect
     UniquePtr<BoundUpdateStatement> bound_update_statement = BoundUpdateStatement::Make(bind_context_ptr_);
     SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_, true);
+
+    Txn *txn = query_context_ptr_->GetTxn();
+    auto status = base_table_ref->table_entry_ptr_->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
 
     bound_update_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
@@ -1106,7 +1118,11 @@ UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement
         }
         base_table_ref = MakeShared<BaseTableRef>(compact_statement.table_entry_, std::move(block_index));
     }
-    TableEntry *table_entry = base_table_ref->table_entry_ptr_;
+    TableEntry *table_entry = base_table_ref->table_entry_ptr_;\
+    auto status = table_entry->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
     base_table_ref->index_index_ = table_entry->GetIndexIndex(txn);
 
     return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref, statement.compact_type_);

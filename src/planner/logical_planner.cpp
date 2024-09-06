@@ -233,6 +233,10 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     if (!status.ok()) {
         RecoverableError(status);
     }
+    status = table_entry->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
 
     if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
         RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
@@ -690,6 +694,7 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
 
 Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_index_info = (CreateIndexInfo *)statement->create_info_.get();
+    Txn *txn = query_context_ptr_->GetTxn();
 
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
@@ -704,6 +709,10 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     SharedPtr<String> index_name = MakeShared<String>(std::move(create_index_info->index_name_));
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
+    auto status = base_table_ref->table_entry_ptr_->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
 
     IndexInfo *index_info = create_index_info->index_info_;
     SharedPtr<IndexBase> base_index_ptr{nullptr};
@@ -1094,6 +1103,10 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     if (!status.ok()) {
         RecoverableError(status);
     }
+    status = table_entry->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
 
     // Check the file existence
     LocalFileSystem fs;
@@ -1162,6 +1175,32 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             } else {
                 return status;
             }
+            break;
+        }
+        case CommandType::kLockTable: {
+            auto *lock_table = static_cast<LockCmd *>(command_statement->command_info_.get());
+            if (lock_table->db_name().empty()) {
+                lock_table->SetDBName(query_context_ptr_->schema_name());
+            }
+            auto [table_entry, status] = txn->GetTableByName(lock_table->db_name(), lock_table->table_name());
+            if (!status.ok()) {
+                return status;
+            }
+            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+            this->logical_plan_ = logical_command;
+            break;
+        }
+        case CommandType::kUnlockTable: {
+            auto *unlock_table = static_cast<UnlockCmd *>(command_statement->command_info_.get());
+            if (unlock_table->db_name().empty()) {
+                unlock_table->SetDBName(query_context_ptr_->schema_name());
+            }
+            auto [table_entry, status] = txn->GetTableByName(unlock_table->db_name(), unlock_table->table_name());
+            if (!status.ok()) {
+                return status;
+            }
+            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+            this->logical_plan_ = logical_command;
             break;
         }
         default: {

@@ -560,4 +560,9 @@ void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, full_path, full_name));
 }
 
+void Txn::AddWriteTxnNum(TableEntry *table_entry) {
+    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
+    table_store->AddWriteTxnNum();
+}
+
 } // namespace infinity

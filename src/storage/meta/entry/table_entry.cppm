@@ -316,6 +316,22 @@ public:
     void PickCleanup(CleanupScanner *scanner) override;
 
     void Cleanup() override;
+
+public:
+    Status AddWriteTxnNum(Txn *txn);
+
+    void DecWriteTxnNum();
+
+    void SetLocked();
+
+    void SetUnlock();
+
+private:
+    std::mutex mtx_; // when table is locked, write is not allowed.
+    std::condition_variable cv_;
+    bool locked_ = false;
+    bool wait_lock_ = false;
+    SizeT write_txn_num_ = 0;
 };
 
 } // namespace infinity
