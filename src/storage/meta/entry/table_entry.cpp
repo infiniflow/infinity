@@ -1280,14 +1280,16 @@ bool TableEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
     return false;
 }
 
-bool TableEntry::AddWriteTxnNum() {
+Status TableEntry::AddWriteTxnNum(Txn *txn) {
     std::lock_guard lock(mtx_);
     if (locked_ || wait_lock_) {
-        LOG_WARN(fmt::format("Table {} is locked or waiting for lock", *GetTableName()));
-        return false;
+        String error_msg = fmt::format("Table {} is locked or waiting for lock", *GetTableName());
+        LOG_WARN(error_msg);
+        return Status::TxnRollback(txn->TxnID(), error_msg);
     }
     ++write_txn_num_;
-    return true;
+    txn->GetTxnTableStore(this);
+    return Status::OK();
 }
 
 void TableEntry::DecWriteTxnNum() {

@@ -318,7 +318,7 @@ public:
     void Cleanup() override;
 
 public:
-    bool AddWriteTxnNum();
+    Status AddWriteTxnNum(Txn *txn);
 
     void DecWriteTxnNum();
 

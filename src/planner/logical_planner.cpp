@@ -233,6 +233,10 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     if (!status.ok()) {
         RecoverableError(status);
     }
+    status = table_entry->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
 
     if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
         RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
@@ -1091,6 +1095,10 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
     auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    status = table_entry->AddWriteTxnNum(txn);
     if (!status.ok()) {
         RecoverableError(status);
     }
