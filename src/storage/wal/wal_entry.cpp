@@ -28,7 +28,7 @@ import index_base;
 import infinity_exception;
 
 import stl;
-
+import defer_op;
 import third_party;
 import internal_types;
 import logger;
@@ -1143,7 +1143,7 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
         return nullptr;
     }
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
-    auto *header = (const WalEntryHeader *)ptr;
+    auto *header = reinterpret_cast<WalEntryHeader *>(const_cast<char *>(ptr));
     entry->size_ = header->size_;
     entry->checksum_ = header->checksum_;
     entry->txn_id_ = header->txn_id_;
@@ -1152,12 +1152,9 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
         return nullptr;
     }
     {
-        const auto tmp_header_copy = MakeUnique<char[]>(entry->size_);
-        std::memcpy(tmp_header_copy.get(), ptr, entry->size_);
-        auto *header_copy = reinterpret_cast<WalEntryHeader *>(tmp_header_copy.get());
-        header_copy->checksum_ = 0;
-        if (const u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(tmp_header_copy.get()), entry->size_);
-            entry->checksum_ != checksum2) {
+        header->checksum_ = 0;
+        DeferFn defer([&] { header->checksum_ = entry->checksum_; });
+        if (const u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size_); entry->checksum_ != checksum2) {
             return nullptr;
         }
     }
@@ -1302,7 +1299,7 @@ UniquePtr<WalEntryIterator> WalEntryIterator::Make(const String &wal_path, bool 
 SharedPtr<WalEntry> WalEntryIterator::Next() {
     if (is_backward_) {
         assert(off_ > 0);
-        i32 entry_size = *(i32 *)(buf_.data() + off_ - sizeof(i32));
+        const i32 entry_size = ReadBuf<i32>(buf_.data() + off_ - sizeof(i32));
         if ((SizeT)entry_size > off_) {
             return nullptr;
         }
@@ -1314,7 +1311,7 @@ SharedPtr<WalEntry> WalEntryIterator::Next() {
         return entry;
     } else {
         assert(off_ < buf_.size());
-        i32 entry_size = *(i32 *)(buf_.data() + off_);
+        const i32 entry_size = ReadBuf<i32>(buf_.data() + off_);
         if (off_ + (SizeT)entry_size > buf_.size()) {
             return nullptr;
         }

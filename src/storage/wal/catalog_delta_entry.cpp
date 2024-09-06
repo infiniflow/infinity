@@ -34,7 +34,7 @@ import create_index_info;
 import infinity_context;
 import index_defines;
 import persistence_manager;
-
+import defer_op;
 import third_party;
 import logger;
 
@@ -992,10 +992,10 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(const char *&ptr, i32 ma
         return nullptr;
     }
     {
-        const auto tmp_copy_header = MakeUniqueForOverwrite<char[]>(header.size_);
-        std::memcpy(tmp_copy_header.get(), ptr_start, header.size_);
-        WriteBuf<u32>(tmp_copy_header.get() + sizeof(header.size_), 0);
-        if (const u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(tmp_copy_header.get()), header.size_);
+        const auto ptr_start_mutable = const_cast<char *>(ptr_start);
+        WriteBuf<u32>(ptr_start_mutable + sizeof(header.size_), 0);
+        DeferFn defer([&] { WriteBuf<u32>(ptr_start_mutable + sizeof(header.size_), header.checksum_); });
+        if (const u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr_start), header.size_);
             header.checksum_ != checksum2) {
             UnrecoverableError(fmt::format("checksum failed, checksum: {}, checksum2: {}", header.checksum_, checksum2));
         }
