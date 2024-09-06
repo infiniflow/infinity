@@ -570,7 +570,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
     Vector<char> buf(file_size);
     fs.Read(*catalog_file_handler, buf.data(), file_size);
     fs.Close(*catalog_file_handler);
-    char *ptr = buf.data();
+    const char *ptr = buf.data();
     auto catalog_delta_entry = CatalogDeltaEntry::ReadAdv(ptr, file_size);
     if (catalog_delta_entry.get() == nullptr) {
         String error_message = fmt::format("Load catalog delta entry failed: {}", catalog_path);

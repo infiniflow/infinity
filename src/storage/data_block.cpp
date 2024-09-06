@@ -377,8 +377,8 @@ void DataBlock::WriteAdv(char *&ptr) const {
     }
 }
 
-SharedPtr<DataBlock> DataBlock::ReadAdv(char *&ptr, i32 maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
+SharedPtr<DataBlock> DataBlock::ReadAdv(const char *&ptr, i32 maxbytes) {
+    const char *const ptr_end = ptr + maxbytes;
     i32 column_count = ReadBufAdv<i32>(ptr);
     Vector<SharedPtr<ColumnVector>> column_vectors;
     for (int i = 0; i < column_count; i++) {

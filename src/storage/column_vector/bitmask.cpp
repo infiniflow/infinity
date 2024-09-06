@@ -319,7 +319,7 @@ void Bitmask::WriteAdv(char *&ptr) const {
     }
 }
 
-SharedPtr<Bitmask> Bitmask::ReadAdv(char *&ptr, i32) {
+SharedPtr<Bitmask> Bitmask::ReadAdv(const char *&ptr, i32) {
     i32 count = ReadBufAdv<i32>(ptr);
     auto bitmask = Bitmask::Make(count);
     i8 all_true = ReadBufAdv<i8>(ptr);

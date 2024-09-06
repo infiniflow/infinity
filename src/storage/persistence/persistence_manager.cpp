@@ -52,7 +52,7 @@ void ObjAddr::WriteBufAdv(char *&buf) const {
     ::infinity::WriteBufAdv(buf, part_size_);
 }
 
-ObjAddr ObjAddr::ReadBufAdv(char *&buf) {
+ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
     ObjAddr ret;
     ret.obj_key_ = ::infinity::ReadBufAdv<String>(buf);
     ret.part_offset_ = ::infinity::ReadBufAdv<SizeT>(buf);
@@ -109,7 +109,7 @@ void ObjStat::WriteBufAdv(char *&buf) const {
     }
 }
 
-ObjStat ObjStat::ReadBufAdv(char *&buf) {
+ObjStat ObjStat::ReadBufAdv(const char *&buf) {
     ObjStat ret;
     ret.obj_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
     ret.parts_ = ::infinity::ReadBufAdv<SizeT>(buf);
@@ -754,7 +754,7 @@ void AddrSerializer::WriteBufAdv(char *&buf) const {
     }
 }
 
-Vector<String> AddrSerializer::ReadBufAdv(char *&ptr) {
+Vector<String> AddrSerializer::ReadBufAdv(const char *&ptr) {
     SizeT path_count = ::infinity::ReadBufAdv<SizeT>(ptr);
     for (SizeT i = 0; i < path_count; ++i) {
         paths_.push_back(::infinity::ReadBufAdv<String>(ptr));

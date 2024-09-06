@@ -93,7 +93,7 @@ export struct WalBlockInfo {
 
     void WriteBufferAdv(char *&buf) const;
 
-    static WalBlockInfo ReadBufferAdv(char *&ptr);
+    static WalBlockInfo ReadBufferAdv(const char *&ptr);
 
     String ToString() const;
 };
@@ -116,7 +116,7 @@ export struct WalSegmentInfo {
 
     void WriteBufferAdv(char *&buf) const;
 
-    static WalSegmentInfo ReadBufferAdv(char *&ptr);
+    static WalSegmentInfo ReadBufferAdv(const char *&ptr);
 
     String ToString() const;
 };
@@ -141,7 +141,7 @@ export struct WalChunkIndexInfo {
 
     void WriteBufferAdv(char *&buf) const;
 
-    static WalChunkIndexInfo ReadBufferAdv(char *&ptr);
+    static WalChunkIndexInfo ReadBufferAdv(const char *&ptr);
 
     String ToString() const;
 };
@@ -163,7 +163,7 @@ export struct WalCmd {
     virtual String CompactInfo() const = 0;
 
     // Read from a serialized version
-    static SharedPtr<WalCmd> ReadAdv(char *&ptr, i32 max_bytes);
+    static SharedPtr<WalCmd> ReadAdv(const char *&ptr, i32 max_bytes);
 
     static String WalCommandTypeToString(WalCommandType type);
 };
@@ -339,7 +339,7 @@ export struct WalCmdSetSegmentStatusSealed final : public WalCmd {
     String ToString() const final;
     String CompactInfo() const final;
 
-    static WalCmdSetSegmentStatusSealed ReadBufferAdv(char *&ptr);
+    static WalCmdSetSegmentStatusSealed ReadBufferAdv(const char *&ptr);
 
     const String db_name_{};
     const String table_name_{};
@@ -365,7 +365,7 @@ export struct WalCmdUpdateSegmentBloomFilterData final : public WalCmd {
     String ToString() const final;
     String CompactInfo() const final;
 
-    static WalCmdUpdateSegmentBloomFilterData ReadBufferAdv(char *&ptr);
+    static WalCmdUpdateSegmentBloomFilterData ReadBufferAdv(const char *&ptr);
 
     const String db_name_{};
     const String table_name_{};
@@ -473,7 +473,7 @@ export struct WalEntry : WalEntryHeader {
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<WalEntry> ReadAdv(char *&ptr, i32 max_bytes);
+    static SharedPtr<WalEntry> ReadAdv(const char *&ptr, i32 max_bytes);
 
     Vector<SharedPtr<WalCmd>> cmds_{};
 

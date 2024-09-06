@@ -149,9 +149,9 @@ TEST_F(ColumnVectorTest, ReadWrite) {
         act_size = ptr - buf.data();
         EXPECT_EQ(act_size, exp_size);
 
-        ptr = buf.data();
-        SharedPtr<ColumnVector> column2 = ColumnVector::ReadAdv(ptr, exp_size);
-        act_size = ptr - buf.data();
+        const char *ptr_r = buf.data();
+        SharedPtr<ColumnVector> column2 = ColumnVector::ReadAdv(ptr_r, exp_size);
+        act_size = ptr_r - buf.data();
         EXPECT_EQ(act_size, exp_size);
         EXPECT_NE(column2, nullptr);
         EXPECT_EQ(*columns[i] == *column2, true);
