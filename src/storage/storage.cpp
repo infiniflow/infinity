@@ -298,6 +298,9 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 periodic_trigger_thread_->Stop();
                 periodic_trigger_thread_.reset();
 
+                compact_processor_->Stop(); // Different from Readable
+                compact_processor_.reset(); // Different from Readable
+
                 i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
 
                 periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();

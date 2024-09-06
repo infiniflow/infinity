@@ -198,15 +198,14 @@ Status InfinityContext::ChangeRole(InfinityRole target_role) {
                     Status status = Status::InvalidServerRole("Can't switch leader role to un-init");
                     return status;
                 }
-                case InfinityRole::kFollower: {
-                    case InfinityRole::kLeader: {
-                        storage_->SetStorageMode(StorageMode::kReadable);
-                        break;
-                    }
-                    default: {
-                        Status status = Status::InvalidServerRole("Error to switch infinity role");
-                        return status;
-                    }
+                case InfinityRole::kFollower:
+                case InfinityRole::kLeader: {
+                    storage_->SetStorageMode(StorageMode::kReadable);
+                    break;
+                }
+                default: {
+                    Status status = Status::InvalidServerRole("Error to switch infinity role");
+                    return status;
                 }
             }
             break;
