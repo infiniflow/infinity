@@ -27,23 +27,23 @@ import infinity_exception;
 import internal_types;
 import data_type;
 import logger;
+import table_entry;
+import alter_statement;
 
 namespace infinity {
 
-export class PhysicalAlter final : public PhysicalOperator {
+export class PhysicalAlter : public PhysicalOperator {
 public:
-    explicit PhysicalAlter(SharedPtr<Vector<String>> output_names,
+    explicit PhysicalAlter(TableEntry *table_entry,
+                           AlterStatementType type,
+                           SharedPtr<Vector<String>> output_names,
                            SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                            u64 id,
                            SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id, load_metas),
+        : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id, load_metas), table_entry_(table_entry),
           output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
 
     ~PhysicalAlter() override = default;
-
-    void Init() override;
-
-    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     SizeT TaskletCount() override {
         String error_message = "Not implement: TaskletCount not Implement";
@@ -56,8 +56,29 @@ public:
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
 private:
+    AlterStatementType type_;
+    TableEntry *table_entry_{};
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+};
+
+export class PhysicalRenameTable final : public PhysicalAlter {
+public:
+    PhysicalRenameTable(TableEntry *table_entry,
+                        String &&new_table_name,
+                        SharedPtr<Vector<String>> output_names,
+                        SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                        u64 id,
+                        SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalAlter(table_entry, AlterStatementType::kRenameTable, std::move(output_names), std::move(output_types), id, load_metas),
+          new_table_name_(std::move(new_table_name)) {}
+
+    void Init() override;
+
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
+
+public:
+    String new_table_name_;
 };
 
 } // namespace infinity

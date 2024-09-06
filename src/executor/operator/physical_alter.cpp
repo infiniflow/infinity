@@ -19,11 +19,14 @@ module physical_alter;
 import query_context;
 import operator_state;
 
-
 namespace infinity {
 
-void PhysicalAlter::Init() {}
+void PhysicalRenameTable::Init() {}
 
-bool PhysicalAlter::Execute(QueryContext *, OperatorState *) { return true; }
+bool PhysicalRenameTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    LOG_INFO("PhysicalRenameTable::Execute");
+    operator_state->SetComplete();
+    return true;
+}
 
 } // namespace infinity
