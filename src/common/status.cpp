@@ -128,7 +128,7 @@ Status Status::AdminOnlySupportInMaintenanceMode() {
 }
 
 Status Status::NotSupportInMaintenanceMode() {
-    return Status(ErrorCode::kAdminOnlySupportInMaintenanceMode, MakeUnique<String>("Only maintanence mode supports ADMIN command"));
+    return Status(ErrorCode::kAdminOnlySupportInMaintenanceMode, MakeUnique<String>("Not support in maintenance mode"));
 }
 
 // 3. Syntax error or access rule violation

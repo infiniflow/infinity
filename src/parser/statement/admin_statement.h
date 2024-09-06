@@ -41,6 +41,7 @@ enum class AdminStmtType {
     kShowIndexSegment,
     kListConfigs,
     kListVariables,
+    kShowVariable,
     kSetRole,
     kInvalid,
 };
@@ -76,6 +77,7 @@ public:
     std::optional<int64_t> log_index_in_file_{};
     std::optional<AdminServerRole> admin_server_role_{};
     std::optional<std::string> leader_address_{};
+    std::optional<std::string> variable_name_{};
 };
 
 } // namespace infinity

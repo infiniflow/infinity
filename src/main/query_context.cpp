@@ -125,22 +125,25 @@ QueryResult QueryContext::Query(const String &query) {
         }
     } else {
         if (base_statement->Type() == StatementType::kAdmin) {
-            QueryResult query_result;
-            query_result.result_table_ = nullptr;
-            query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
-            return query_result;
-        }
-    }
-    if (base_statement->Type() == StatementType::kAdmin) {
-        if (InfinityContext::instance().IsAdminRole()) {
             AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
-            QueryResult query_result = HandleAdminStatement(admin_statement);
-            return query_result;
-        } else {
+            if(admin_statement->admin_type_ == AdminStmtType::kShowVariable) {
+                String var_name = admin_statement->variable_name_.value();
+                ToLower(var_name);
+                if(var_name == "server_role") {
+                    QueryResult query_result = HandleAdminStatement(admin_statement);
+                    return query_result;
+                }
+            }
+            if(admin_statement->admin_type_ == AdminStmtType::kSetRole) {
+                QueryResult query_result = HandleAdminStatement(admin_statement);
+                return query_result;
+            }
+
             QueryResult query_result;
             query_result.result_table_ = nullptr;
             query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
             return query_result;
+
         }
     }
 

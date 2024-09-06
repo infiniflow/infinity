@@ -124,6 +124,9 @@ QueryResult AdminExecutor::Execute(QueryContext *query_context, const AdminState
         case AdminStmtType::kListVariables: {
             return ListVariables(query_context, admin_statement);
         }
+        case AdminStmtType::kShowVariable: {
+            return ShowVariable(query_context, admin_statement);
+        }
         case AdminStmtType::kSetRole: {
             return SetRole(query_context, admin_statement);
         }
@@ -3519,6 +3522,41 @@ QueryResult AdminExecutor::ListVariables(QueryContext* query_context, const Admi
 
     output_block_ptr->Finalize();
     query_result.result_table_->Append(std::move(output_block_ptr));
+    return query_result;
+}
+
+QueryResult AdminExecutor::ShowVariable(QueryContext* query_context, const AdminStatement* admin_statement) {
+    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+//    SharedPtr<DataType> integer_type = MakeShared<DataType>(LogicalType::kBigInt);
+//    SharedPtr<DataType> double_type = MakeShared<DataType>(LogicalType::kDouble);
+//    SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+
+    Vector<SharedPtr<ColumnDef>> output_column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
+
+    QueryResult query_result;
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+    Vector<SharedPtr<DataType>> output_column_types{
+        varchar_type,
+    };
+
+    String variable_name = admin_statement->variable_name_.value();
+    ToLower(variable_name);
+
+    if(variable_name == "server_role") {
+        output_block_ptr->Init(output_column_types);
+        Value value = Value::MakeVarchar(ToString(InfinityContext::instance().GetServerRole()));
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+    }
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
+
     return query_result;
 }
 

@@ -51,6 +51,7 @@ private:
     static QueryResult ShowIndexSegment(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult ListConfigs(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult ListVariables(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ShowVariable(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult SetRole(QueryContext* query_context, const AdminStatement* admin_statement);
 
     static Vector<SharedPtr<WalEntry>> GetAllCheckpointEntries(QueryContext* query_context, const AdminStatement* admin_statement);

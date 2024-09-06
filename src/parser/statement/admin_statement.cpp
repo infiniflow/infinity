@@ -108,6 +108,10 @@ std::string AdminStatement::ToString() const {
             ss << "Admin list variables";
             break;
         }
+        case AdminStmtType::kShowVariable: {
+            ss << "Admin show variable";
+            break;
+        }
         case AdminStmtType::kSetRole: {
             ss << "Admin set role";
             break;

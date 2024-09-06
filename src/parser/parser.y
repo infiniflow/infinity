@@ -2307,6 +2307,12 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListVariables;
 }
+| ADMIN SHOW VARIABLE IDENTIFIER {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowVariable;
+     $$->variable_name_ = $4;
+     free($4);
+}
 | ADMIN SET ADMIN {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;

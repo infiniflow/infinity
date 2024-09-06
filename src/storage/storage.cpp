@@ -206,8 +206,15 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 memory_index_tracer_.reset();
 
                 wal_mgr_->Stop();
-                if(target_mode == StorageMode::kUnInitialized) {
-                    wal_mgr_.reset();
+                wal_mgr_.reset();
+                if(target_mode == StorageMode::kAdmin) {
+                    // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
+                    wal_mgr_ = MakeUnique<WalManager>(this,
+                                                      config_ptr_->WALDir(),
+                                                      config_ptr_->DataDir(),
+                                                      config_ptr_->WALCompactThreshold(),
+                                                      config_ptr_->DeltaCheckpointThreshold(),
+                                                      config_ptr_->FlushMethodAtCommit());
                 }
 
                 txn_mgr_->Stop();
@@ -269,8 +276,15 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 memory_index_tracer_.reset();
 
                 wal_mgr_->Stop();
-                if(target_mode == StorageMode::kUnInitialized) {
-                    wal_mgr_.reset();
+                wal_mgr_.reset();
+                if(target_mode == StorageMode::kAdmin) {
+                    // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
+                    wal_mgr_ = MakeUnique<WalManager>(this,
+                                                      config_ptr_->WALDir(),
+                                                      config_ptr_->DataDir(),
+                                                      config_ptr_->WALCompactThreshold(),
+                                                      config_ptr_->DeltaCheckpointThreshold(),
+                                                      config_ptr_->FlushMethodAtCommit());
                 }
 
                 txn_mgr_->Stop();
