@@ -28,6 +28,9 @@ DELETE FROM products WHERE product_no=1;
 statement error
 COMPACT TABLE products;
 
+statement error
+CREATE INDEX idx_c1 ON products (product_no);
+
 query
 SELECT * FROM products;
 ----
