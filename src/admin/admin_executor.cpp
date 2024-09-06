@@ -3523,9 +3523,42 @@ QueryResult AdminExecutor::ListVariables(QueryContext* query_context, const Admi
 }
 
 QueryResult AdminExecutor::SetRole(QueryContext* query_context, const AdminStatement* admin_statement) {
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+
+    AdminServerRole admin_server_role = admin_statement->admin_server_role_.value();
+    Status status;
+    switch(admin_server_role) {
+        case AdminServerRole::kAdmin: {
+            status = InfinityContext::instance().ChangeRole(InfinityRole::kAdmin);
+            break;
+        }
+        case AdminServerRole::kStandalone: {
+            status = InfinityContext::instance().ChangeRole(InfinityRole::kStandalone);
+            break;
+        }
+        case AdminServerRole::kLeader: {
+            status = InfinityContext::instance().ChangeRole(InfinityRole::kLeader);
+            break;
+        }
+        case AdminServerRole::kFollower: {
+            status = InfinityContext::instance().ChangeRole(InfinityRole::kFollower);
+            break;
+        }
+        case AdminServerRole::kLearner: {
+            status = InfinityContext::instance().ChangeRole(InfinityRole::kLearner);
+            break;
+        }
+    }
+
     QueryResult query_result;
-    query_result.result_table_ = nullptr;
-    query_result.status_ = Status::NotSupport("Not support to handle admin statement");
+    if(status.ok()) {
+        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), column_defs);
+        query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+    } else {
+        query_result.status_ = status;
+    }
+
     return query_result;
 }
 

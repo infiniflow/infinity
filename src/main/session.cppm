@@ -34,9 +34,9 @@ export enum class SessionType {
 export class BaseSession {
 
 public:
-    BaseSession(u64 session_id, bool admin_mode, SessionType session_type)
+    BaseSession(u64 session_id, SessionType session_type)
         : connected_time_(std::time(nullptr)), current_database_("default_db"), session_type_(session_type),
-        session_id_(session_id), admin_mode_(admin_mode) {}
+        session_id_(session_id) {}
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
@@ -65,8 +65,6 @@ public:
 
     [[nodiscard]] bool GetProfile() const { return enable_profile_; }
 
-    [[nodiscard]] bool AdminMode() const { return admin_mode_; }
-
 protected:
     std::time_t connected_time_;
 
@@ -79,7 +77,6 @@ protected:
     SessionType session_type_{SessionType::kRemote};
 
     u64 session_id_{0};
-    bool admin_mode_{false};
 
     u64 query_count_{0};
 
@@ -92,13 +89,13 @@ protected:
 export class LocalSession : public BaseSession {
 
 public:
-    explicit LocalSession(u64 session_id, bool admin_mode) : BaseSession(session_id, admin_mode, SessionType::kLocal) {}
+    explicit LocalSession(u64 session_id) : BaseSession(session_id, SessionType::kLocal) {}
 };
 
 export class RemoteSession : public BaseSession {
 
 public:
-    explicit RemoteSession(u64 session_id, bool admin_mode) : BaseSession(session_id, admin_mode, SessionType::kRemote) {}
+    explicit RemoteSession(u64 session_id) : BaseSession(session_id, SessionType::kRemote) {}
 
     [[nodiscard]] inline const String &user_name() const { return user_name_; }
 

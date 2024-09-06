@@ -67,7 +67,7 @@ void Connection::Run() {
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
 
     SessionManager *session_manager = InfinityContext::instance().session_manager();
-    SharedPtr<RemoteSession> remote_session = session_manager->CreateRemoteSession(InfinityContext::instance().IsAdminRole());
+    SharedPtr<RemoteSession> remote_session = session_manager->CreateRemoteSession();
     if(remote_session == nullptr) {
         HandleError("Infinity is running under maintenance mode, only one connection is allowed.");
         return ;

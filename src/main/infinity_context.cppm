@@ -26,10 +26,11 @@ import session_manager;
 import persistence_manager;
 import third_party;
 import global_resource_usage;
+import status;
 
 namespace infinity {
 
-enum class InfinityRole {
+export enum class InfinityRole {
     kUnInitialized,
     kAdmin,
     kStandalone,
@@ -63,10 +64,13 @@ public:
 
     void Init(const SharedPtr<String> &config_path, bool admin_flag = false, DefaultConfig *default_config = nullptr);
 //    void InitAdminMode(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
-    void ChangeRole(InfinityRole target_role);
+    Status ChangeRole(InfinityRole target_role);
     bool IsAdminRole() const { return GetServerRole() == InfinityRole::kAdmin; }
 
     void UnInit();
+
+    void SetIndexThreadPool(SizeT thread_num);
+    void RestoreIndexThreadPoolToDefault();
 
 private:
     friend class Singleton;

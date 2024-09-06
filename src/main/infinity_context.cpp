@@ -85,25 +85,33 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
         persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_->DataDir(), (SizeT)persistence_object_size_limit);
     }
 
-    ChangeRole(InfinityRole::kAdmin);
+    Status change_result = ChangeRole(InfinityRole::kAdmin);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+        return;
+    }
+
     if (admin_flag or config_->ServerMode() == "cluster") {
         // Admin mode or cluster start phase
         return;
     }
 
     if (config_->ServerMode() == "standalone") {
-        ChangeRole(InfinityRole::kStandalone);
+        Status change_to_standalone = ChangeRole(InfinityRole::kStandalone);
+        if(!change_to_standalone.ok()) {
+            UnrecoverableError(change_to_standalone.message());
+            return;
+        }
     } else {
         UnrecoverableError(fmt::format("Unexpected server mode: {}", config_->ServerMode()));
         return;
     }
 }
 
-void InfinityContext::ChangeRole(InfinityRole target_role) {
+Status InfinityContext::ChangeRole(InfinityRole target_role) {
     InfinityRole current_role = GetServerRole();
     if (current_role == target_role) {
-        Status status = Status::InvalidServerRole("Infinity switch to same role");
-        RecoverableError(status);
+        return Status::InvalidServerRole(fmt::format("Infinity is already the role of {}", ToString(current_role)));
     }
 
     switch (current_role) {
@@ -132,7 +140,7 @@ void InfinityContext::ChangeRole(InfinityRole target_role) {
                     storage_->SetStorageMode(StorageMode::kUnInitialized);
                     storage_.reset();
                     SetServerRole(InfinityRole::kUnInitialized);
-                    return;
+                    return Status::OK();
                 }
                 case InfinityRole::kAdmin: {
                     Status status = Status::InvalidServerRole("Can't switch admin role to admin");
@@ -142,18 +150,14 @@ void InfinityContext::ChangeRole(InfinityRole target_role) {
             task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 
             i64 cpu_limit = config_->CPULimit();
-            inverting_thread_pool_.resize(cpu_limit);
-            commiting_thread_pool_.resize(cpu_limit);
-            hnsw_build_thread_pool_.resize(cpu_limit);
+            SetIndexThreadPool(cpu_limit);
             break;
         }
         case InfinityRole::kStandalone: {
             switch (target_role) {
                 case InfinityRole::kAdmin: {
                     storage_->SetStorageMode(StorageMode::kAdmin);
-                    inverting_thread_pool_.resize(0);
-                    commiting_thread_pool_.resize(0);
-                    hnsw_build_thread_pool_.resize(0);
+                    RestoreIndexThreadPoolToDefault();
 
                     task_scheduler_->UnInit();
                     task_scheduler_.reset();
@@ -174,9 +178,7 @@ void InfinityContext::ChangeRole(InfinityRole target_role) {
             switch (target_role) {
                 case InfinityRole::kAdmin: {
                     storage_->SetStorageMode(StorageMode::kAdmin);
-                    inverting_thread_pool_.resize(0);
-                    commiting_thread_pool_.resize(0);
-                    hnsw_build_thread_pool_.resize(0);
+                    RestoreIndexThreadPoolToDefault();
 
                     task_scheduler_->UnInit();
                     task_scheduler_.reset();
@@ -208,9 +210,7 @@ void InfinityContext::ChangeRole(InfinityRole target_role) {
                 switch (target_role) {
                     case InfinityRole::kAdmin: {
                         storage_->SetStorageMode(StorageMode::kAdmin);
-                        inverting_thread_pool_.resize(0);
-                        commiting_thread_pool_.resize(0);
-                        hnsw_build_thread_pool_.resize(0);
+                        RestoreIndexThreadPoolToDefault();
 
                         task_scheduler_->UnInit();
                         task_scheduler_.reset();
@@ -238,6 +238,7 @@ void InfinityContext::ChangeRole(InfinityRole target_role) {
         }
     }
     SetServerRole(target_role);
+    return Status::OK();
 }
 
 void InfinityContext::UnInit() {
@@ -249,12 +250,24 @@ void InfinityContext::UnInit() {
             return;
         }
         case InfinityRole::kAdmin: {
-            ChangeRole(InfinityRole::kUnInitialized);
+            Status status = ChangeRole(InfinityRole::kUnInitialized);
+            if(!status.ok()) {
+                UnrecoverableError(status.message());
+                return;
+            }
             break;
         }
         default: {
-            ChangeRole(InfinityRole::kAdmin);
-            ChangeRole(InfinityRole::kUnInitialized);
+            Status status = ChangeRole(InfinityRole::kAdmin);
+            if(!status.ok()) {
+                UnrecoverableError(status.message());
+                return;
+            }
+            status = ChangeRole(InfinityRole::kUnInitialized);
+            if(!status.ok()) {
+                UnrecoverableError(status.message());
+                return;
+            }
         }
     }
 
@@ -266,6 +279,18 @@ void InfinityContext::UnInit() {
     config_.reset();
 
     //    PythonInstance::UnInit();
+}
+
+void InfinityContext::SetIndexThreadPool(SizeT thread_num) {
+    inverting_thread_pool_.resize(thread_num);
+    commiting_thread_pool_.resize(thread_num);
+    hnsw_build_thread_pool_.resize(thread_num);
+}
+
+void InfinityContext::RestoreIndexThreadPoolToDefault() {
+    inverting_thread_pool_.resize(4);
+    commiting_thread_pool_.resize(2);
+    hnsw_build_thread_pool_.resize(4);
 }
 
 } // namespace infinity

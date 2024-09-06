@@ -57,6 +57,7 @@ import admin_statement;
 import admin_executor;
 import persistence_manager;
 import global_resource_usage;
+import infinity_context;
 
 namespace infinity {
 
@@ -111,7 +112,7 @@ QueryResult QueryContext::Query(const String &query) {
 
     BaseStatement *base_statement = parsed_result->statements_ptr_->at(0);
 
-    if (session_ptr_->AdminMode()) {
+    if (InfinityContext::instance().IsAdminRole()) {
         if (base_statement->Type() == StatementType::kAdmin) {
             AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
             QueryResult query_result = HandleAdminStatement(admin_statement);
@@ -131,7 +132,7 @@ QueryResult QueryContext::Query(const String &query) {
         }
     }
     if (base_statement->Type() == StatementType::kAdmin) {
-        if (session_ptr_->AdminMode()) {
+        if (InfinityContext::instance().IsAdminRole()) {
             AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
             QueryResult query_result = HandleAdminStatement(admin_statement);
             return query_result;
@@ -149,7 +150,7 @@ QueryResult QueryContext::Query(const String &query) {
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
     QueryResult query_result;
-    if (session_ptr_->AdminMode()) {
+    if (InfinityContext::instance().IsAdminRole()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
         return query_result;
