@@ -1288,7 +1288,7 @@ Status TableEntry::AddWriteTxnNum(Txn *txn) {
         return Status::TxnRollback(txn->TxnID(), error_msg);
     }
     ++write_txn_num_;
-    txn->GetTxnTableStore(this);
+    txn->AddWriteTxnNum(this);
     return Status::OK();
 }
 

@@ -694,6 +694,7 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
 
 Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_index_info = (CreateIndexInfo *)statement->create_info_.get();
+    Txn *txn = query_context_ptr_->GetTxn();
 
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
@@ -708,6 +709,10 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     SharedPtr<String> index_name = MakeShared<String>(std::move(create_index_info->index_name_));
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
+    auto status = base_table_ref->table_entry_ptr_->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
 
     IndexInfo *index_info = create_index_info->index_info_;
     SharedPtr<IndexBase> base_index_ptr{nullptr};

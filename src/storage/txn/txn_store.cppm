@@ -141,37 +141,24 @@ public: // Setter, Getter
 
     const Vector<SegmentEntry *> &flushed_segments() const { return flushed_segments_; }
 
-    Txn* GetTxn() const {
-        return txn_;
-    }
+    Txn *GetTxn() const { return txn_; }
 
-    TableEntry* GetTableEntry() const {
-        return table_entry_;
-    }
+    TableEntry *GetTableEntry() const { return table_entry_; }
 
-    inline bool HasUpdate() const {
-        return has_update_;
-    }
+    inline bool HasUpdate() const { return has_update_; }
 
-    DeleteState& GetDeleteStateRef() {
-        return delete_state_;
-    }
+    DeleteState &GetDeleteStateRef() { return delete_state_; }
 
-    inline DeleteState* GetDeleteStatePtr() {
-        return &delete_state_;
-    }
+    inline DeleteState *GetDeleteStatePtr() { return &delete_state_; }
 
-    inline const Vector<SharedPtr<DataBlock>>& GetBlocks() const {
-        return blocks_;
-    }
+    inline const Vector<SharedPtr<DataBlock>> &GetBlocks() const { return blocks_; }
 
-    inline void SetAppendState(UniquePtr<AppendState> append_state) {
-        append_state_ = std::move(append_state);
-    }
+    inline void SetAppendState(UniquePtr<AppendState> append_state) { append_state_ = std::move(append_state); }
 
-    inline AppendState* GetAppendState() const {
-        return append_state_.get();
-    }
+    inline AppendState *GetAppendState() const { return append_state_.get(); }
+
+    void AddWriteTxnNum() { added_txn_num_ = true; }
+
 private:
     HashMap<SegmentID, TxnSegmentStore> txn_segments_store_{};
     Vector<SegmentEntry *> flushed_segments_{};
@@ -192,6 +179,7 @@ private:
     SizeT current_block_id_{0};
 
     TableEntry *table_entry_{};
+    bool added_txn_num_{false};
 
     bool has_update_{false};
 };
