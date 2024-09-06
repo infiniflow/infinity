@@ -22,6 +22,7 @@ module utility;
 
 import stl;
 import third_party;
+import default_values;
 
 namespace infinity::Utility {
 
@@ -69,5 +70,31 @@ String FormatTimeInfo(u64 seconds) {
     return fmt::format("{}h", seconds);
 }
 
-
 } // namespace infinity
+
+namespace infinity {
+
+IdentifierValidationStatus IdentifierValidation(const String &identifier) {
+    if (identifier.empty()) {
+        return IdentifierValidationStatus::kEmpty;
+    }
+
+    u64 identifier_len = identifier.length();
+    if (identifier_len >= MAX_IDENTIFIER_NAME_LENGTH) {
+        return IdentifierValidationStatus::kExceedLimit;
+    }
+
+    if (!std::isalpha(identifier[0]) && identifier[0] != '_') {
+        return IdentifierValidationStatus::kInvalidName;
+    }
+    for (SizeT i = 1; i < identifier_len; i++) {
+        char ch = identifier[i];
+        if (!std::isalnum(ch) && ch != '_') {
+            return IdentifierValidationStatus::kInvalidName;
+        }
+    }
+
+    return IdentifierValidationStatus::kOk;
+}
+
+}

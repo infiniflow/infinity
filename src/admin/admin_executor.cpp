@@ -127,6 +127,12 @@ QueryResult AdminExecutor::Execute(QueryContext *query_context, const AdminState
         case AdminStmtType::kShowVariable: {
             return ShowVariable(query_context, admin_statement);
         }
+        case AdminStmtType::kListNodes: {
+            return ListNodes(query_context, admin_statement);
+        }
+        case AdminStmtType::kShowNode: {
+            return ShowNode(query_context, admin_statement);
+        }
         case AdminStmtType::kSetRole: {
             return SetRole(query_context, admin_statement);
         }
@@ -3560,30 +3566,45 @@ QueryResult AdminExecutor::ShowVariable(QueryContext* query_context, const Admin
     return query_result;
 }
 
+QueryResult AdminExecutor::ListNodes(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport("Not support");
+    return query_result;
+}
+
+QueryResult AdminExecutor::ShowNode(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport("Not support");
+    return query_result;
+}
+
+
 QueryResult AdminExecutor::SetRole(QueryContext* query_context, const AdminStatement* admin_statement) {
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
 
-    AdminServerRole admin_server_role = admin_statement->admin_server_role_.value();
+    AdminNodeRole admin_server_role = admin_statement->admin_node_role_.value();
     Status status;
     switch(admin_server_role) {
-        case AdminServerRole::kAdmin: {
+        case AdminNodeRole::kAdmin: {
             status = InfinityContext::instance().ChangeRole(InfinityRole::kAdmin);
             break;
         }
-        case AdminServerRole::kStandalone: {
+        case AdminNodeRole::kStandalone: {
             status = InfinityContext::instance().ChangeRole(InfinityRole::kStandalone);
             break;
         }
-        case AdminServerRole::kLeader: {
+        case AdminNodeRole::kLeader: {
             status = InfinityContext::instance().ChangeRole(InfinityRole::kLeader);
             break;
         }
-        case AdminServerRole::kFollower: {
+        case AdminNodeRole::kFollower: {
             status = InfinityContext::instance().ChangeRole(InfinityRole::kFollower);
             break;
         }
-        case AdminServerRole::kLearner: {
+        case AdminNodeRole::kLearner: {
             status = InfinityContext::instance().ChangeRole(InfinityRole::kLearner);
             break;
         }

@@ -42,11 +42,13 @@ enum class AdminStmtType {
     kListConfigs,
     kListVariables,
     kShowVariable,
+    kListNodes,
+    kShowNode,
     kSetRole,
     kInvalid,
 };
 
-enum class AdminServerRole {
+enum class AdminNodeRole {
     kAdmin,
     kStandalone,
     kLeader,
@@ -75,9 +77,10 @@ public:
     std::optional<int64_t> index_entry_index_{};
     std::optional<int64_t> log_file_index_{};
     std::optional<int64_t> log_index_in_file_{};
-    std::optional<AdminServerRole> admin_server_role_{};
+    std::optional<AdminNodeRole> admin_node_role_{};
     std::optional<std::string> leader_address_{};
     std::optional<std::string> variable_name_{};
+    std::optional<std::string> node_name_{};
 };
 
 } // namespace infinity

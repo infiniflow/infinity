@@ -100,42 +100,7 @@ import column_expr;
 import function_expr;
 import catalog;
 import special_function;
-
-namespace {
-
-using namespace infinity;
-
-enum class IdentifierValidationStatus {
-    kOk,
-    kEmpty,
-    kExceedLimit,
-    kInvalidName,
-};
-
-IdentifierValidationStatus IdentifierValidation(const String &identifier) {
-    if (identifier.empty()) {
-        return IdentifierValidationStatus::kEmpty;
-    }
-
-    u64 identifier_len = identifier.length();
-    if (identifier_len >= MAX_IDENTIFIER_NAME_LENGTH) {
-        return IdentifierValidationStatus::kExceedLimit;
-    }
-
-    if (!std::isalpha(identifier[0]) && identifier[0] != '_') {
-        return IdentifierValidationStatus::kInvalidName;
-    }
-    for (SizeT i = 1; i < identifier_len; i++) {
-        char ch = identifier[i];
-        if (!std::isalnum(ch) && ch != '_') {
-            return IdentifierValidationStatus::kInvalidName;
-        }
-    }
-
-    return IdentifierValidationStatus::kOk;
-}
-
-} // namespace
+import utility;
 
 namespace infinity {
 

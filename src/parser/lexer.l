@@ -145,6 +145,8 @@ MONTHS          { return MONTHS; }
 MULTIVECTOR     { return MULTIVECTOR; }
 NATURAL         { return NATURAL; }
 NULL            { return NULLABLE; }
+NODE            { return NODE; }
+NODES           { return NODES; }
 NOT             { return NOT; }
 OBJECT          { return OBJECT; }
 OBJECTS         { return OBJECTS; }

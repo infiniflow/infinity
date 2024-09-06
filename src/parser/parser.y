@@ -387,7 +387,7 @@ struct SQL_LTYPE {
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
 %token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
-%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE
+%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
 
 %token NUMBER
@@ -2313,35 +2313,52 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->variable_name_ = $4;
      free($4);
 }
+| ADMIN SHOW NODES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListNodes;
+}
+| ADMIN SHOW NODE IDENTIFIER {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowNode;
+     $$->node_name_ = $4;
+     free($4);
+}
 | ADMIN SET ADMIN {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_server_role_ = infinity::AdminServerRole::kAdmin;
+     $$->admin_node_role_ = infinity::AdminNodeRole::kAdmin;
 }
 | ADMIN SET STANDALONE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_server_role_ = infinity::AdminServerRole::kStandalone;
+     $$->admin_node_role_ = infinity::AdminNodeRole::kStandalone;
 }
-| ADMIN SET LEADER {
+| ADMIN SET LEADER USING IDENTIFIER {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_server_role_ = infinity::AdminServerRole::kLeader;
+     $$->admin_node_role_ = infinity::AdminNodeRole::kLeader;
+     $$->node_name_ = $5;
+     free($5);
 }
-| ADMIN CONNECT STRING AS FOLLOWER {
+| ADMIN CONNECT STRING AS FOLLOWER USING IDENTIFIER {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_server_role_ = infinity::AdminServerRole::kFollower;
+     $$->admin_node_role_ = infinity::AdminNodeRole::kFollower;
      $$->leader_address_ = $3;
+     $$->node_name_ = $7;
      free($3);
+     free($7);
 }
-| ADMIN CONNECT STRING AS LEARNER {
+| ADMIN CONNECT STRING AS LEARNER USING IDENTIFIER {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_server_role_ = infinity::AdminServerRole::kLearner;
+     $$->admin_node_role_ = infinity::AdminNodeRole::kLearner;
      $$->leader_address_ = $3;
+     $$->node_name_ = $7;
      free($3);
+     free($7);
 }
+
 /*
  * EXPRESSION
  */
