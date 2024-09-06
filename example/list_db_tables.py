@@ -17,6 +17,7 @@ This example is about connecting to the local infinity instance, creating table,
 '''
 
 import infinity
+import sys
 
 try:
     # open a local directory to store the data
@@ -81,5 +82,8 @@ try:
 
     infinity_instance.disconnect()
 
+    print('test done')
+    sys.exit(0)
 except Exception as e:
     print(str(e))
+    sys.exit(-1)
