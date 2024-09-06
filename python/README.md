@@ -35,8 +35,7 @@ pip install -e .
 ```
 Build infinity-sdk 
 ```shell
-cd python/infinity_sdk
-pip install . -v
+pip install ./python/infinity_sdk 
 ```
 Build the release version of infinity-embedded-sdk in the target location `cmake-build-release`
 ```shell
