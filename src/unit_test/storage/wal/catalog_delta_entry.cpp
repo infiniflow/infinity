@@ -155,7 +155,7 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     }
 
     {
-        char *ptr = buffer.get();
+        const char *ptr = buffer.get();
         auto catalog_delta_entry2 = CatalogDeltaEntry::ReadAdv(ptr, buffer_size);
 
         size_t op_size = catalog_delta_entry1->operations().size();

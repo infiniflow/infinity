@@ -84,9 +84,9 @@ TEST_P(BitmaskBufferTest, ReadWrite) {
         bitmask->WriteAdv(ptr);
         EXPECT_EQ(ptr - buf.data(), exp_size);
 
-        ptr = buf.data();
-        auto bitmask2 = Bitmask::ReadAdv(ptr, exp_size);
-        EXPECT_EQ(ptr - buf.data(), exp_size);
+        const char* ptr_r = buf.data();
+        auto bitmask2 = Bitmask::ReadAdv(ptr_r, exp_size);
+        EXPECT_EQ(ptr_r - buf.data(), exp_size);
         EXPECT_NE(bitmask2, nullptr);
         EXPECT_EQ(*bitmask, *bitmask2);
     }
