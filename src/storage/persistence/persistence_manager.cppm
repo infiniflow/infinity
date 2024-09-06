@@ -38,7 +38,7 @@ export struct ObjAddr {
 
     void WriteBufAdv(char *&buf) const;
 
-    static ObjAddr ReadBufAdv(char *&buf);
+    static ObjAddr ReadBufAdv(const char *&buf);
 };
 
 export struct Range {
@@ -68,7 +68,7 @@ export struct ObjStat {
 
     void WriteBufAdv(char *&buf) const;
 
-    static ObjStat ReadBufAdv(char *&buf);
+    static ObjStat ReadBufAdv(const char *&buf);
 };
 
 export class PersistenceManager {
@@ -167,7 +167,7 @@ export struct AddrSerializer {
  
     void WriteBufAdv(char *&buf) const;
 
-    Vector<String> ReadBufAdv(char *&buf);
+    Vector<String> ReadBufAdv(const char *&buf);
 
     void AddToPersistenceManager(PersistenceManager *pm) const;
 

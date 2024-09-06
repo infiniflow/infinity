@@ -328,7 +328,7 @@ void VectorBuffer::WriteAdv(char *&ptr, const DataType *data_type) const {
     }
 }
 
-void VectorBuffer::ReadAdv(char *&ptr, const DataType *data_type) {
+void VectorBuffer::ReadAdv(const char *&ptr, const DataType *data_type) {
     switch (data_type->type()) {
         case LogicalType::kVarchar:
         case LogicalType::kSparse:

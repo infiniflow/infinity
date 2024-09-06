@@ -173,11 +173,26 @@ void IndexHnsw::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table
         if (param->param_name_ == "encode" && StringToHnswEncodeType(param->param_value_) == HnswEncodeType::kLVQ) {
             // TODO: now only support float?
             if (embedding_data_type != EmbeddingDataType::kElemFloat) {
-                RecoverableError(
-                    Status::InvalidIndexDefinition(fmt::format("Attempt to create HNSW index with LVQ encoding on column: {}, data type: {}.",
-                                                               column_name,
-                                                               data_type_ptr->ToString())));
+                RecoverableError(Status::InvalidIndexDefinition(
+                    fmt::format("Attempt to create HNSW index with LVQ encoding on column: {}, data type: {}. now only support float element type.",
+                                column_name,
+                                data_type_ptr->ToString())));
             }
+        }
+    }
+    // TODO: now only support float, int8, uint8?
+    switch (embedding_data_type) {
+        case EmbeddingDataType::kElemFloat:
+        case EmbeddingDataType::kElemInt8:
+        case EmbeddingDataType::kElemUInt8: {
+            // supported
+            break;
+        }
+        default: {
+            RecoverableError(Status::InvalidIndexDefinition(
+                fmt::format("Attempt to create HNSW index on column: {}, data type: {}. now only support float, int8, uint8 element type.",
+                            column_name,
+                            data_type_ptr->ToString())));
         }
     }
 }

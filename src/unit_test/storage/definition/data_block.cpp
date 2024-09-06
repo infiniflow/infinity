@@ -294,9 +294,9 @@ TEST_P(DataBlockTest, ReadWrite) {
     data_block.WriteAdv(ptr);
     EXPECT_EQ(ptr - buf.data(), exp_size);
 
-    ptr = buf.data();
-    SharedPtr<DataBlock> data_block2 = DataBlock::ReadAdv(ptr, exp_size);
-    EXPECT_EQ(ptr - buf.data(), exp_size);
+    const char *ptr_r = buf.data();
+    SharedPtr<DataBlock> data_block2 = DataBlock::ReadAdv(ptr_r, exp_size);
+    EXPECT_EQ(ptr_r - buf.data(), exp_size);
     EXPECT_NE(data_block2, nullptr);
     EXPECT_EQ(data_block == *data_block2, true);
 }

@@ -2259,7 +2259,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
     return;
 }
 
-SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
+SharedPtr<ColumnVector> ColumnVector::ReadAdv(const char *&ptr, i32 maxbytes) {
     const char *ptr_end = ptr + maxbytes;
     SharedPtr<DataType> data_type = DataType::ReadAdv(ptr, maxbytes);
     ColumnVectorType vector_type = ReadBufAdv<ColumnVectorType>(ptr);
