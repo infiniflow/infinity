@@ -325,6 +325,7 @@ public:
     static Status MmapFileError(const String &detailed_info);
     static Status MunmapFileError(const String &detailed_info);
     static Status InvalidFileFlag(u8 flag);
+    static Status InvalidServerAddress(const String &error_address);
     static Status FailToRunPython(const String &reason);
 
     // meta

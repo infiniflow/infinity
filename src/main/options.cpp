@@ -34,6 +34,8 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(TIME_ZONE_BIAS_OPTION_NAME)] = GlobalOptionIndex::kTimeZoneBias;
     name2index_[String(CPU_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kWorkerCPULimit;
     name2index_[String(SERVER_ADDRESS_OPTION_NAME)] = GlobalOptionIndex::kServerAddress;
+    name2index_[String(PEER_SERVER_IP_OPTION_NAME)] = GlobalOptionIndex::kPeerServerIP;
+    name2index_[String(PEER_SERVER_PORT_OPTION_NAME)] = GlobalOptionIndex::kPeerServerPort;
 
     name2index_[String(POSTGRES_PORT_OPTION_NAME)] = GlobalOptionIndex::kPostgresPort;
     name2index_[String(HTTP_PORT_OPTION_NAME)] = GlobalOptionIndex::kHTTPPort;

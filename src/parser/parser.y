@@ -2337,14 +2337,14 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
      $$->admin_node_role_ = infinity::AdminNodeRole::kStandalone;
 }
-| ADMIN SET LEADER USING IDENTIFIER {
+| ADMIN SET LEADER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
      $$->admin_node_role_ = infinity::AdminNodeRole::kLeader;
      $$->node_name_ = $5;
      free($5);
 }
-| ADMIN CONNECT STRING AS FOLLOWER USING IDENTIFIER {
+| ADMIN CONNECT STRING AS FOLLOWER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
      $$->admin_node_role_ = infinity::AdminNodeRole::kFollower;
@@ -2353,7 +2353,7 @@ admin_statement: ADMIN SHOW CATALOGS {
      free($3);
      free($7);
 }
-| ADMIN CONNECT STRING AS LEARNER USING IDENTIFIER {
+| ADMIN CONNECT STRING AS LEARNER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
      $$->admin_node_role_ = infinity::AdminNodeRole::kLearner;

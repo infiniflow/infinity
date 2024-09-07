@@ -14,9 +14,9 @@
 
 module;
 
-
-#include <sstream>
 #include <iomanip>
+#include <regex>
+#include <sstream>
 
 module utility;
 
@@ -38,7 +38,7 @@ SizeT NextPowerOfTwo(SizeT input) {
 }
 
 String FormatByteSize(u64 byte_size) {
-    static const char* sizeSuffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
+    static const char *sizeSuffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
 
     if (byte_size == 0) {
         return "0B";
@@ -55,14 +55,14 @@ String FormatByteSize(u64 byte_size) {
 String FormatTimeInfo(u64 seconds) {
     u64 second = seconds % 60;
     seconds -= second;
-    if(seconds == 0) {
+    if (seconds == 0) {
         return fmt::format("{}s", second);
     }
 
     seconds /= 60;
     u64 minute = seconds % 60;
     seconds -= minute;
-    if(seconds == 0) {
+    if (seconds == 0) {
         return fmt::format("{}m", minute);
     }
 
@@ -70,7 +70,7 @@ String FormatTimeInfo(u64 seconds) {
     return fmt::format("{}h", seconds);
 }
 
-} // namespace infinity
+} // namespace infinity::Utility
 
 namespace infinity {
 
@@ -97,4 +97,21 @@ IdentifierValidationStatus IdentifierValidation(const String &identifier) {
     return IdentifierValidationStatus::kOk;
 }
 
+bool ParseIPPort(const String &str, String &ip, i64 &port) {
+    static const std::regex pattern("^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}):(\\d{1,5})$");
+    std::smatch matches;
+
+    try {
+        if (std::regex_match(str, matches, pattern)) {
+            ip = matches[1];
+            port = std::stoi(matches[2]);
+            return true;
+        }
+
+        return false;
+    } catch (std::exception &e) {
+        return false;
+    }
 }
+
+} // namespace infinity

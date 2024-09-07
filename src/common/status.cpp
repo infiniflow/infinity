@@ -549,6 +549,10 @@ Status Status::InvalidFileFlag(u8 flag) {
 
 Status Status::FailToRunPython(const String &reason) { return Status(ErrorCode::kFailToRunPython, MakeUnique<String>(reason)); }
 
+Status Status::InvalidServerAddress(const String &error_address) {
+    return Status(ErrorCode::kInvalidServerAddress, MakeUnique<String>(fmt::format("Invalid server address: {}", error_address)));
+}
+
 Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
 }

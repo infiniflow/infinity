@@ -3942,7 +3942,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 query_result.status_ = status;
                 return query_result;
             }
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, node_name, "ip", 10000);
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, node_name);
             break;
         }
         case AdminNodeRole::kFollower: {
@@ -3967,7 +3967,16 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 query_result.status_ = status;
                 return query_result;
             }
-            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, node_name, "ip", 10000);
+
+            String leader_address = admin_statement->leader_address_.value();
+            String leader_ip;
+            i64 leader_port;
+            if(!ParseIPPort(leader_address, leader_ip, leader_port)) {
+                query_result.status_ = Status::InvalidServerAddress(leader_address);
+                return query_result;
+            }
+
+            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, node_name, leader_ip, leader_port);
             break;
         }
         case AdminNodeRole::kLearner: {
@@ -3992,7 +4001,16 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 query_result.status_ = status;
                 return query_result;
             }
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, node_name, "ip", 10000);
+
+            String leader_address = admin_statement->leader_address_.value();
+            String leader_ip;
+            i64 leader_port;
+            if(!ParseIPPort(leader_address, leader_ip, leader_port)) {
+                query_result.status_ = Status::InvalidServerAddress(leader_address);
+                return query_result;
+            }
+
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, node_name, leader_ip, leader_port);
             break;
         }
     }

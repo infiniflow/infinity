@@ -24,7 +24,6 @@ SizeT NextPowerOfTwo(SizeT input);
 String FormatByteSize(u64 byte_size);
 String FormatTimeInfo(u64 seconds);
 
-
 }
 
 export namespace infinity {
@@ -37,6 +36,8 @@ enum class IdentifierValidationStatus {
 };
 
 IdentifierValidationStatus IdentifierValidation(const String &identifier);
+
+bool ParseIPPort(const String &str, String &ip, i64 &port);
 
 }
 

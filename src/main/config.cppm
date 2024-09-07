@@ -59,6 +59,8 @@ public:
 
     // Network
     String ServerAddress();
+    String PeerServerIP();
+    i64 PeerServerPort();
     i64 PostgresPort();
     i64 HTTPPort();
     i64 ClientPort();

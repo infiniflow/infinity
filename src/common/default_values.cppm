@@ -198,6 +198,8 @@ export {
     constexpr std::string_view TIME_ZONE_BIAS_OPTION_NAME = "time_zone_bias";
     constexpr std::string_view CPU_LIMIT_OPTION_NAME = "cpu_limit";
     constexpr std::string_view SERVER_ADDRESS_OPTION_NAME = "server_address";
+    constexpr std::string_view PEER_SERVER_IP_OPTION_NAME = "peer_ip";
+    constexpr std::string_view PEER_SERVER_PORT_OPTION_NAME = "peer_port";
 
     constexpr std::string_view POSTGRES_PORT_OPTION_NAME = "postgres_port";
     constexpr std::string_view HTTP_PORT_OPTION_NAME = "http_port";

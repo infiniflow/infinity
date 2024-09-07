@@ -17,6 +17,7 @@ module;
 module cluster_manager;
 
 import stl;
+import infinity_context;
 // import third_party;
 //
 // import infinity_exception;
@@ -64,8 +65,8 @@ Status ClusterManager::InitAsLeader(const String& node_name) {
     this_node_->node_role_ = NodeRole::kLeader;
     this_node_->node_status_ = NodeStatus::kReady;
     this_node_->node_name_ = node_name;
-//    this_node_->ip_address_ = node_ip;
-//    this_node_->port_ = node_port;
+    this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
+    this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
 
     auto now = std::chrono::system_clock::now();
     auto time_since_epoch = now.time_since_epoch();
@@ -74,7 +75,7 @@ Status ClusterManager::InitAsLeader(const String& node_name) {
     return Status::OK();
 }
 
-Status ClusterManager::InitAsFollower(const String& node_name, const String& leader_ip, i16 leader_port) {
+Status ClusterManager::InitAsFollower(const String& node_name, const String& leader_ip, i64 leader_port) {
     std::unique_lock<std::mutex> lock(mutex_);
     if(this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as follower error: already initialized.");
@@ -83,8 +84,8 @@ Status ClusterManager::InitAsFollower(const String& node_name, const String& lea
     this_node_->node_role_ = NodeRole::kFollower;
     this_node_->node_status_ = NodeStatus::kReady;
     this_node_->node_name_ = node_name;
-//    this_node_->ip_address_ = node_ip;
-//    this_node_->port_ = node_port;
+    this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
+    this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
 
     auto now = std::chrono::system_clock::now();
     auto time_since_epoch = now.time_since_epoch();
@@ -92,7 +93,7 @@ Status ClusterManager::InitAsFollower(const String& node_name, const String& lea
 
     return Status::OK();
 }
-Status ClusterManager::InitAsLearner(const String& node_name, const String& leader_ip, i16 leader_port) {
+Status ClusterManager::InitAsLearner(const String& node_name, const String& leader_ip, i64 leader_port) {
     std::unique_lock<std::mutex> lock(mutex_);
     if(this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as learner error: already initialized.");
@@ -101,8 +102,8 @@ Status ClusterManager::InitAsLearner(const String& node_name, const String& lead
     this_node_->node_role_ = NodeRole::kLearner;
     this_node_->node_status_ = NodeStatus::kReady;
     this_node_->node_name_ = node_name;
-//    this_node_->ip_address_ = node_ip;
-//    this_node_->port_ = node_port;
+    this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
+    this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
 
     auto now = std::chrono::system_clock::now();
     auto time_since_epoch = now.time_since_epoch();

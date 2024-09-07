@@ -49,7 +49,7 @@ export struct ServerNode {
     NodeStatus node_status_{NodeStatus::kInvalid};
     String node_name_{};
     String ip_address_{};
-    i16 port_{};
+    i64 port_{};
     u64 last_update_ts_{};
     // u64 update_interval_{}; // seconds
     // String from_{}; // Which node the information comes from.
@@ -61,8 +61,8 @@ public:
     ~ClusterManager() = default;
 
     Status InitAsLeader(const String& node_name);
-    Status InitAsFollower(const String& node_name, const String& leader_ip, i16 leader_port);
-    Status InitAsLearner(const String& node_name, const String& leader_ip, i16 leader_port);
+    Status InitAsFollower(const String& node_name, const String& leader_ip, i64 leader_port);
+    Status InitAsLearner(const String& node_name, const String& leader_ip, i64 leader_port);
     Status UnInit();
 
 

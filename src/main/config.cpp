@@ -194,6 +194,24 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Peer server address
+        String peer_server_ip_str = "0.0.0.0";
+        UniquePtr<StringOption> peer_server_ip_option = MakeUnique<StringOption>(PEER_SERVER_IP_OPTION_NAME, peer_server_ip_str);
+        status = global_options_.AddOption(std::move(peer_server_ip_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Peer server port
+        i64 peer_server_port = 23850;
+        UniquePtr<IntegerOption> peer_server_port_option = MakeUnique<IntegerOption>(PEER_SERVER_PORT_OPTION_NAME, peer_server_port, 65535, 1024);
+        status = global_options_.AddOption(std::move(peer_server_port_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Postgres port
         i64 pg_port = 5432;
         UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>(POSTGRES_PORT_OPTION_NAME, pg_port, 65535, 1024);
@@ -717,6 +735,48 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kPeerServerIP: {
+                            // Server address
+                            String peer_server_ip = "0.0.0.0";
+                            if(elem.second.is_string()) {
+                                peer_server_ip = elem.second.value_or(peer_server_ip);
+                            } else {
+                                return Status::InvalidConfig("'peer_server_ip' field isn't string.");
+                            }
+
+                            // Validate the address format
+                            boost::system::error_code error;
+                            boost::asio::ip::make_address(peer_server_ip, error);
+                            if (error) {
+                                return Status::InvalidIPAddr(peer_server_ip);
+                            }
+
+                            UniquePtr<StringOption> peer_server_ip_option = MakeUnique<StringOption>(PEER_SERVER_IP_OPTION_NAME, peer_server_ip);
+                            Status status = global_options_.AddOption(std::move(peer_server_ip_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kPeerServerPort: {
+                            // Peer server port
+                            i64 peer_server_port = 23850;
+                            if (elem.second.is_integer()) {
+                                peer_server_port = elem.second.value_or(peer_server_port);
+                            } else {
+                                return Status::InvalidConfig("'peer_server_port' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> peer_server_port_option = MakeUnique<IntegerOption>(PEER_SERVER_PORT_OPTION_NAME, peer_server_port, 65535, 1024);
+                            if (!peer_server_port_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid peer server port: {}", peer_server_port));
+                            }
+                            Status status = global_options_.AddOption(std::move(peer_server_port_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
                         case GlobalOptionIndex::kPostgresPort: {
                             // Postgres port
                             i64 pg_port = 5432;
@@ -806,6 +866,26 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     String server_address_str = "0.0.0.0";
                     UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_address_str);
                     Status status = global_options_.AddOption(std::move(server_address_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerServerIP) == nullptr) {
+                    // Peer server address
+                    String peer_server_ip_str = "0.0.0.0";
+                    UniquePtr<StringOption> peer_server_ip_str_option = MakeUnique<StringOption>(PEER_SERVER_IP_OPTION_NAME, peer_server_ip_str);
+                    Status status = global_options_.AddOption(std::move(peer_server_ip_str_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerServerPort) == nullptr) {
+                    // Peer server port
+                    i64 pg_port = 23850;
+                    UniquePtr<IntegerOption> peer_server_port_option = MakeUnique<IntegerOption>(PEER_SERVER_PORT_OPTION_NAME, pg_port, 65535, 1024);
+                    Status status = global_options_.AddOption(std::move(peer_server_port_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -1780,6 +1860,16 @@ String Config::ServerAddress() {
     return global_options_.GetStringValue(GlobalOptionIndex::kServerAddress);
 }
 
+String Config::PeerServerIP() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kPeerServerIP);
+}
+
+i64 Config::PeerServerPort() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerServerPort);
+}
+
 i64 Config::PostgresPort() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kPostgresPort);
@@ -2049,6 +2139,8 @@ void Config::PrintAll() {
 
     // Network
     fmt::print(" - server address: {}\n", ServerAddress());
+    fmt::print(" - peer server ip: {}\n", PeerServerIP());
+    fmt::print(" - peer server port: {}\n", PeerServerPort());
     fmt::print(" - postgres port: {}\n", PostgresPort());
     fmt::print(" - http port: {}\n", HTTPPort());
     fmt::print(" - rpc client port: {}\n", ClientPort());
