@@ -2323,6 +2323,10 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->node_name_ = $4;
      free($4);
 }
+| ADMIN SHOW NODE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowCurrentNode;
+}
 | ADMIN SET ADMIN {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;

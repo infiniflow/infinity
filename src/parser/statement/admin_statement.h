@@ -44,6 +44,7 @@ enum class AdminStmtType {
     kShowVariable,
     kListNodes,
     kShowNode,
+    kShowCurrentNode,
     kSetRole,
     kInvalid,
 };

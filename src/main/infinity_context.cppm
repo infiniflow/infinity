@@ -27,19 +27,9 @@ import persistence_manager;
 import third_party;
 import global_resource_usage;
 import status;
+import cluster_manager;
 
 namespace infinity {
-
-export enum class InfinityRole {
-    kUnInitialized,
-    kAdmin,
-    kStandalone,
-    kLeader,
-    kFollower,
-    kLearner,
-};
-
-export String ToString(InfinityRole);
 
 export class InfinityContext : public Singleton<InfinityContext> {
 public:
@@ -55,17 +45,20 @@ public:
 
     [[nodiscard]] inline SessionManager *session_manager() noexcept { return session_mgr_.get(); }
 
+    [[nodiscard]] inline ClusterManager *cluster_manager() noexcept { return cluster_manager_.get(); }
+
     [[nodiscard]] inline ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetHnswBuildThreadPool() { return hnsw_build_thread_pool_; }
 
-    InfinityRole GetServerRole() const;
-    void SetServerRole(InfinityRole server_role);
+    NodeRole GetServerRole() const;
+    void SetServerRole(NodeRole server_role);
 
     void Init(const SharedPtr<String> &config_path, bool admin_flag = false, DefaultConfig *default_config = nullptr);
 //    void InitAdminMode(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
-    Status ChangeRole(InfinityRole target_role);
-    bool IsAdminRole() const { return GetServerRole() == InfinityRole::kAdmin; }
+    Status ChangeRole(NodeRole target_role, const String& node_name = {}, String leader_ip = {}, i16 leader_port = {});
+    bool IsAdminRole() const { return GetServerRole() == NodeRole::kAdmin; }
+    bool IsClusterRole() const;
 
     void UnInit();
 
@@ -83,6 +76,8 @@ private:
     UniquePtr<Storage> storage_{};
     UniquePtr<PersistenceManager> persistence_manager_{};
     UniquePtr<SessionManager> session_mgr_{};
+    UniquePtr<ClusterManager> cluster_manager_{};
+
     // For fulltext index
     ThreadPool inverting_thread_pool_{4};
     ThreadPool commiting_thread_pool_{2};
@@ -91,7 +86,7 @@ private:
     ThreadPool hnsw_build_thread_pool_{4};
 
     mutable std::mutex mutex_;
-    InfinityRole current_server_role_{InfinityRole::kUnInitialized};
+    NodeRole current_server_role_{NodeRole::kUnInitialized};
 };
 
 } // namespace infinity

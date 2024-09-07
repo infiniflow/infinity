@@ -54,6 +54,7 @@ private:
     static QueryResult ShowVariable(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult ListNodes(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult ShowNode(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ShowCurrentNode(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult SetRole(QueryContext* query_context, const AdminStatement* admin_statement);
 
     static Vector<SharedPtr<WalEntry>> GetAllCheckpointEntries(QueryContext* query_context, const AdminStatement* admin_statement);

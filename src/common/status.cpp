@@ -344,8 +344,8 @@ Status Status::InvalidConstantType() { return Status(ErrorCode::kInvalidConstant
 
 Status Status::InvalidParsedExprType() { return Status(ErrorCode::kInvalidParsedExprType, MakeUnique<String>("Invalid parsed expression type.")); }
 
-Status Status::InvalidIndexType(const String& message) {
-    if(message.empty()) {
+Status Status::InvalidIndexType(const String &message) {
+    if (message.empty()) {
         return Status(ErrorCode::kInvalidIndexType, MakeUnique<String>("No index type is given"));
     } else {
         return Status(ErrorCode::kInvalidIndexType, MakeUnique<String>(fmt::format("Invalid index type: ", message)));
@@ -424,16 +424,21 @@ Status Status::TransactionNotFound(TransactionID txn_id) {
 }
 
 Status Status::InvalidDatabaseIndex(u64 database_index, u64 capacity) {
-    return Status(ErrorCode::kInvalidDatabaseIndex, MakeUnique<String>(fmt::format("Invalid database index: {} (0-{})", database_index, capacity - 1)));
+    return Status(ErrorCode::kInvalidDatabaseIndex,
+                  MakeUnique<String>(fmt::format("Invalid database index: {} (0-{})", database_index, capacity - 1)));
 }
 
 Status Status::InvalidTableIndex(u64 table_index, u64 capacity) {
     return Status(ErrorCode::kInvalidTableIndex, MakeUnique<String>(fmt::format("Invalid table index: {} (0-{})", table_index, capacity - 1)));
 }
 
-Status Status::FunctionIsDisable(const String& function_name) {
+Status Status::FunctionIsDisable(const String &function_name) {
     return Status(ErrorCode::kFunctionIsDisable, MakeUnique<String>(fmt::format("Function: {} is disable", function_name)));
 }
+
+Status Status::NotFound(const String &detailed_info) { return Status(ErrorCode::kFunctionIsDisable, MakeUnique<String>(detailed_info)); }
+
+Status Status::ErrorInit(const String &detailed_info) { return Status(ErrorCode::kErrorInit, MakeUnique<String>(detailed_info)); }
 
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
@@ -542,9 +547,7 @@ Status Status::InvalidFileFlag(u8 flag) {
     return Status(ErrorCode::kInvalidFileFlag, MakeUnique<String>(fmt::format("Invalid open file flag: {}", flag)));
 }
 
-Status Status::FailToRunPython(const String& reason) {
-    return Status(ErrorCode::kFailToRunPython, MakeUnique<String>(reason));
-}
+Status Status::FailToRunPython(const String &reason) { return Status(ErrorCode::kFailToRunPython, MakeUnique<String>(reason)); }
 
 Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
@@ -567,8 +570,6 @@ Status Status::WrongCheckpointType(const String &expect_type, const String &actu
                   MakeUnique<String>(fmt::format("Expect checkpoint type: {}, actual checkpoint type: {}", expect_type, actual_type)));
 }
 
-Status Status::InvalidServerRole(const String& message) {
-    return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>(message));
-}
+Status Status::InvalidServerRole(const String &message) { return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>(message)); }
 
 } // namespace infinity

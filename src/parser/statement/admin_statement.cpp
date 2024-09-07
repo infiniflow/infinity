@@ -120,6 +120,10 @@ std::string AdminStatement::ToString() const {
             ss << "Admin show node";
             break;
         }
+        case AdminStmtType::kShowCurrentNode: {
+            ss << "Admin show current node";
+            break;
+        }
         case AdminStmtType::kSetRole: {
             ss << "Admin set role";
             break;
