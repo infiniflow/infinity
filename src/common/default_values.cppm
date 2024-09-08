@@ -205,6 +205,7 @@ export {
     constexpr std::string_view HTTP_PORT_OPTION_NAME = "http_port";
     constexpr std::string_view CLIENT_PORT_OPTION_NAME = "client_port";
     constexpr std::string_view CONNECTION_POOL_SIZE_OPTION_NAME = "connection_pool_size";
+    constexpr std::string_view PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME = "peer_server_connection_pool_size";
     constexpr std::string_view LOG_FILENAME_OPTION_NAME = "log_filename";
 
     constexpr std::string_view LOG_DIR_OPTION_NAME = "log_dir";

@@ -41,6 +41,7 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(HTTP_PORT_OPTION_NAME)] = GlobalOptionIndex::kHTTPPort;
     name2index_[String(CLIENT_PORT_OPTION_NAME)] = GlobalOptionIndex::kClientPort;
     name2index_[String(CONNECTION_POOL_SIZE_OPTION_NAME)] = GlobalOptionIndex::kConnectionPoolSize;
+    name2index_[String(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME)] = GlobalOptionIndex::kPeerServerConnectionPoolSize;
     name2index_[String(LOG_FILENAME_OPTION_NAME)] = GlobalOptionIndex::kLogFileName;
 
     name2index_[String(LOG_DIR_OPTION_NAME)] = GlobalOptionIndex::kLogDir;

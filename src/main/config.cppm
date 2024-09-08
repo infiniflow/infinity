@@ -65,6 +65,7 @@ public:
     i64 HTTPPort();
     i64 ClientPort();
     i64 ConnectionPoolSize();
+    i64 PeerServerConnectionPoolSize();
 
     // Log
     String LogFileName();

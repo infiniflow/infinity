@@ -150,7 +150,8 @@ export enum class GlobalOptionIndex {
     kServerMode = 34,
     kPeerServerIP = 35,
     kPeerServerPort = 36,
-    kInvalid = 37,
+    kPeerServerConnectionPoolSize = 37,
+    kInvalid = 38,
 };
 
 export struct GlobalOptions {

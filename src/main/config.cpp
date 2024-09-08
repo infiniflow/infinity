@@ -248,6 +248,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Peer server connection pool size
+        i64 peer_server_connection_pool_size = 64;
+        UniquePtr<IntegerOption> peer_server_connection_pool_size_option = MakeUnique<IntegerOption>(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME, peer_server_connection_pool_size, 65536, 1);
+        status = global_options_.AddOption(std::move(peer_server_connection_pool_size_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Log file name
         String log_filename = "infinity.log";
         UniquePtr<StringOption> log_file_name_option = MakeUnique<StringOption>(LOG_FILENAME_OPTION_NAME, log_filename);
@@ -855,6 +864,27 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kPeerServerConnectionPoolSize: {
+                            // Client pool size
+                            i64 peer_server_connection_pool_size = 64;
+                            if (elem.second.is_integer()) {
+                                peer_server_connection_pool_size = elem.second.value_or(peer_server_connection_pool_size);
+                            } else {
+                                return Status::InvalidConfig("'peer_server_connection_pool_size' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> peer_server_connection_pool_size_option =
+                                MakeUnique<IntegerOption>(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME, peer_server_connection_pool_size, 65536, 1);
+                            if (!peer_server_connection_pool_size_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid peer server connection pool size: {}", peer_server_connection_pool_size));
+                            }
+
+                            Status status = global_options_.AddOption(std::move(peer_server_connection_pool_size_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'network' field", var_name));
                         }
@@ -926,6 +956,16 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     i64 connection_pool_size = 256;
                     UniquePtr<IntegerOption> connection_pool_size_option = MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, connection_pool_size, 65536, 1);
                     Status status = global_options_.AddOption(std::move(connection_pool_size_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerServerConnectionPoolSize) == nullptr) {
+                    // peer server pool size
+                    i64 peer_server_connection_pool_size = 64;
+                    UniquePtr<IntegerOption> peer_server_connection_pool_size_option = MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, peer_server_connection_pool_size, 65536, 1);
+                    Status status = global_options_.AddOption(std::move(peer_server_connection_pool_size_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -1890,6 +1930,11 @@ i64 Config::ConnectionPoolSize() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kConnectionPoolSize);
 }
 
+i64 Config::PeerServerConnectionPoolSize() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerServerConnectionPoolSize);
+}
+
 // Log
 String Config::LogFileName() {
     std::lock_guard<std::mutex> guard(mutex_);
@@ -2145,6 +2190,7 @@ void Config::PrintAll() {
     fmt::print(" - http port: {}\n", HTTPPort());
     fmt::print(" - rpc client port: {}\n", ClientPort());
     fmt::print(" - connection pool size: {}\n", ConnectionPoolSize());
+    fmt::print(" - peer server connection pool size: {}\n", ConnectionPoolSize());
 
     // Log
     fmt::print(" - log_filename: {}\n", LogFileName());

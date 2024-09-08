@@ -21,6 +21,9 @@ export module peer_server_thrift_types;
 namespace infinity_peer_server {
 
 export using infinity_peer_server::PeerServiceIf;
+export using infinity_peer_server::PeerServiceClient;
+export using infinity_peer_server::PeerServiceIfFactory;
+export using infinity_peer_server::PeerServiceProcessorFactory;
 export using infinity_peer_server::NodeType;
 export using infinity_peer_server::NodeInfo;
 export using infinity_peer_server::RegisterRequest;
