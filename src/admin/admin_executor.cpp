@@ -53,6 +53,7 @@ import infinity_context;
 import options;
 import cluster_manager;
 import utility;
+import peer_task;
 
 namespace infinity {
 
@@ -3624,7 +3625,7 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    Vector<SharedPtr<ServerNode>> server_nodes = InfinityContext::instance().cluster_manager()->ListNodes();
+    Vector<SharedPtr<NodeInfo>> server_nodes = InfinityContext::instance().cluster_manager()->ListNodes();
     for (const auto &server_node : server_nodes) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -3713,7 +3714,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     output_block_ptr->Init(column_types);
 
     String node_name = admin_statement->node_name_.value();
-    SharedPtr<ServerNode> server_node = InfinityContext::instance().cluster_manager()->GetServerNodePtrByName(node_name);
+    SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->GetNodeInfoPtrByName(node_name);
     if(server_node == nullptr) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::NotFound(fmt::format("No node: {} isn't found", node_name));
@@ -3836,7 +3837,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    SharedPtr<ServerNode> server_node = InfinityContext::instance().cluster_manager()->ThisNode();
+    SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->ThisNode();
     {
         SizeT column_id = 0;
         {

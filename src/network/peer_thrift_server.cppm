@@ -19,8 +19,6 @@ export module peer_thrift_server;
 import stl;
 import thrift;
 
-using namespace std;
-
 namespace infinity {
 
 export class PoolPeerThriftServer {

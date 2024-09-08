@@ -20,6 +20,8 @@ import peer_server_thrift_types;
 import stl;
 import thrift;
 import status;
+import blocking_queue;
+import peer_task;
 
 namespace infinity {
 
@@ -28,22 +30,25 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace infinity_peer_server;
 
-class PeerClient {
+export class PeerClient {
 public:
-    /// TODO: comment
-    static PeerClient Connect(const String &ip_address, i64 port);
+    static SharedPtr<PeerClient> Connect(const String &ip_address, i64 port);
 
+    ~PeerClient();
     PeerClient(SharedPtr<TTransport> socket, SharedPtr<TTransport> transport, SharedPtr<TProtocol> protocol, UniquePtr<PeerServiceClient> client)
         : socket_(socket), transport_(transport), protocol_(protocol), client_(std::move(client)) {}
 
-    /// TODO: comment
-    Status Disconnect();
+    Status Init();
+    Status UnInit();
+    void Send(PeerTask* task);
 
 private:
     SharedPtr<TTransport> socket_;
     SharedPtr<TTransport> transport_;
     SharedPtr<TProtocol> protocol_;
     UniquePtr<PeerServiceClient> client_;
+    bool running_;
+    BlockingQueue<PeerTask*> task_queue_;
 };
 
 } // namespace infinity

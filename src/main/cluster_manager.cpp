@@ -18,42 +18,16 @@ module cluster_manager;
 
 import stl;
 import infinity_context;
-// import third_party;
-//
-// import infinity_exception;
-// import default_values;
-// import logger;
 
 namespace infinity {
 
-String ToString(NodeRole role) {
-    switch (role) {
-        case NodeRole::kUnInitialized:
-            return "uninitialized";
-        case NodeRole::kAdmin:
-            return "admin";
-        case NodeRole::kStandalone:
-            return "standalone";
-        case NodeRole::kLeader:
-            return "leader";
-        case NodeRole::kFollower:
-            return "follower";
-        case NodeRole::kLearner:
-            return "learner";
+ClusterManager::~ClusterManager() {
+    other_nodes_.clear();
+    this_node_.reset();
+    if(peer_client_.get() != nullptr) {
+        peer_client_->UnInit();
     }
-}
-
-String ToString(NodeStatus status) {
-    switch (status) {
-        case NodeStatus::kReady:
-            return "ready";
-        case NodeStatus::kConnected:
-            return "connected";
-        case NodeStatus::kTimeout:
-            return "timeout";
-        case NodeStatus::kInvalid:
-            return "kInvalid";
-    }
+    peer_client_.reset();
 }
 
 Status ClusterManager::InitAsLeader(const String& node_name) {
@@ -61,7 +35,7 @@ Status ClusterManager::InitAsLeader(const String& node_name) {
     if(this_node_.get()!= nullptr) {
         return Status::ErrorInit("Init node as leader error: already initialized.");
     }
-    this_node_ = MakeShared<ServerNode>();
+    this_node_ = MakeShared<NodeInfo>();
     this_node_->node_role_ = NodeRole::kLeader;
     this_node_->node_status_ = NodeStatus::kReady;
     this_node_->node_name_ = node_name;
@@ -80,7 +54,7 @@ Status ClusterManager::InitAsFollower(const String& node_name, const String& lea
     if(this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as follower error: already initialized.");
     }
-    this_node_ = MakeShared<ServerNode>();
+    this_node_ = MakeShared<NodeInfo>();
     this_node_->node_role_ = NodeRole::kFollower;
     this_node_->node_status_ = NodeStatus::kReady;
     this_node_->node_name_ = node_name;
@@ -91,6 +65,7 @@ Status ClusterManager::InitAsFollower(const String& node_name, const String& lea
     auto time_since_epoch = now.time_since_epoch();
     this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
 
+    peer_client_ = PeerClient::Connect(leader_ip, leader_port);
     return Status::OK();
 }
 Status ClusterManager::InitAsLearner(const String& node_name, const String& leader_ip, i64 leader_port) {
@@ -98,7 +73,7 @@ Status ClusterManager::InitAsLearner(const String& node_name, const String& lead
     if(this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as learner error: already initialized.");
     }
-    this_node_ = MakeShared<ServerNode>();
+    this_node_ = MakeShared<NodeInfo>();
     this_node_->node_role_ = NodeRole::kLearner;
     this_node_->node_status_ = NodeStatus::kReady;
     this_node_->node_name_ = node_name;
@@ -109,6 +84,7 @@ Status ClusterManager::InitAsLearner(const String& node_name, const String& lead
     auto time_since_epoch = now.time_since_epoch();
     this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
 
+    peer_client_ = PeerClient::Connect(leader_ip, leader_port);
     return Status::OK();
 }
 
@@ -118,7 +94,7 @@ Status ClusterManager::UnInit() {
     return Status::OK();
 }
 
-Status ClusterManager::Register(SharedPtr<ServerNode> server_node) {
+Status ClusterManager::Register(SharedPtr<NodeInfo> server_node) {
     std::unique_lock<std::mutex> lock(mutex_);
     return Status::OK();
 }
@@ -127,32 +103,24 @@ Status ClusterManager::Unregister(const String &node_name) {
     return Status::OK();
 }
 
-Status ClusterManager::UpdateNodeInfo(const SharedPtr<ServerNode> &server_node) {
+Status ClusterManager::UpdateNodeInfo(const SharedPtr<NodeInfo> &server_node) {
     std::unique_lock<std::mutex> lock(mutex_);
     return Status::OK();
 }
-Status ClusterManager::UpdateNonLeaderNodeInfo(const Vector<SharedPtr<ServerNode>> &info_of_nodes) {
+Status ClusterManager::UpdateNonLeaderNodeInfo(const Vector<SharedPtr<NodeInfo>> &info_of_nodes) {
     std::unique_lock<std::mutex> lock(mutex_);
     return Status::OK();
 }
-Vector<SharedPtr<ServerNode>> ClusterManager::ListNodes() const {
+Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
     std::unique_lock<std::mutex> lock(mutex_);
     return {};
 }
-SharedPtr<ServerNode> ClusterManager::GetServerNodePtrByName(const String &node_name) const {
+SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);
     return nullptr;
 }
-SharedPtr<ServerNode> ClusterManager::ThisNode() const {
+SharedPtr<NodeInfo> ClusterManager::ThisNode() const {
     std::unique_lock<std::mutex> lock(mutex_);
-//    this->this_node_->node_role_ == NodeRole::k
-//
-//    NodeRole node_role_{NodeRole::kUnInitialized};
-//    NodeStatus node_status_{NodeStatus::kInvalid};
-//    String node_name_{};
-//    String ip_address_{};
-//    i16 port_{};
-//    u64 last_update_ts_{};
     return this->this_node_;
 }
 

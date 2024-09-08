@@ -148,7 +148,7 @@ public:
         file_handler.Read(&bytes, sizeof(bytes));
         auto buffer = MakeUnique<char[]>(bytes);
         file_handler.Read(buffer.get(), bytes);
-        char *buffer_ptr = buffer.get();
+        const char *buffer_ptr = buffer.get();
         return ReadAdv(buffer_ptr);
     }
 

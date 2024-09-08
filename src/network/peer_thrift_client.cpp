@@ -25,18 +25,25 @@ import thrift;
 
 namespace infinity {
 
-PeerClient PeerClient::Connect(const String &ip_address, i64 port) {
+PeerClient::~PeerClient() {
+    if(running_) {
+        UnInit();
+    }
+}
+
+SharedPtr<PeerClient> PeerClient::Connect(const String &ip_address, i64 port) {
     SharedPtr<TSocket> socket = MakeShared<TSocket>(ip_address, port);
     SharedPtr<TBufferedTransport> transport = MakeShared<TBufferedTransport>(socket);
     SharedPtr<TBinaryProtocol> protocol = MakeShared<TBinaryProtocol>(transport);
     UniquePtr<PeerServiceClient> client = MakeUnique<PeerServiceClient>(protocol);
     transport->open();
-    return {socket, transport, protocol, std::move(client)};
+    return MakeShared<PeerClient>(socket, transport, protocol, std::move(client));
 }
 
 /// TODO: comment
-Status PeerClient::Disconnect() {
+Status PeerClient::UnInit() {
     transport_->close();
+    running_ = false;
     return Status::OK();
 }
 

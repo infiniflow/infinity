@@ -28,6 +28,7 @@ import third_party;
 import global_resource_usage;
 import status;
 import cluster_manager;
+import peer_task;
 
 namespace infinity {
 
