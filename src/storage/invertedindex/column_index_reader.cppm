@@ -73,12 +73,18 @@ export struct IndexReader {
 
 export class TableIndexReaderCache {
 public:
+    inline explicit TableIndexReaderCache(TableEntry *table_entry_ptr) : table_entry_ptr_(table_entry_ptr) {}
+
     void UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts);
 
-    IndexReader GetIndexReader(Txn *txn, TableEntry *table_entry_ptr);
+    IndexReader GetIndexReader(Txn *txn);
+
+    // User shall call this function only once when all transactions using `GetIndexReader()` have finished.
+    void Invalidate();
 
 private:
     std::mutex mutex_;
+    TableEntry *table_entry_ptr_ = nullptr;
     TxnTimeStamp first_known_update_ts_ = 0;
     TxnTimeStamp last_known_update_ts_ = 0;
     TxnTimeStamp cache_ts_ = 0;

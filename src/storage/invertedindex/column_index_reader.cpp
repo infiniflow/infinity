@@ -117,7 +117,7 @@ void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mut
     last_known_update_ts_ = std::max(last_known_update_ts_, ts);
 }
 
-IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn, TableEntry *self_table_entry_ptr) {
+IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     TransactionID txn_id = txn->TxnID();
     IndexReader result;
@@ -132,7 +132,7 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn, TableEntry *self_tab
         FlatHashMap<u64, TxnTimeStamp, detail::Hash<u64>> cache_column_ts;
         result.column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<ColumnIndexReader>, detail::Hash<u64>>>();
         result.column2analyzer_ = MakeShared<Map<String, String>>();
-        for (auto map_guard = self_table_entry_ptr->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
+        for (auto map_guard = table_entry_ptr_->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
                 // already dropped
@@ -146,7 +146,7 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn, TableEntry *self_tab
                 continue;
             }
             String column_name = index_base->column_name();
-            auto column_id = self_table_entry_ptr->GetColumnIdByName(column_name);
+            auto column_id = table_entry_ptr_->GetColumnIdByName(column_name);
             assert(table_index_entry->GetFulltexSegmentUpdateTs() <= last_known_update_ts_);
             if (auto &target_ts = cache_column_ts[column_id]; target_ts < begin_ts) {
                 // need update result
@@ -163,7 +163,7 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn, TableEntry *self_tab
                     optionflag_t flag = index_full_text->flag_;
                     String index_dir = *(table_index_entry->index_dir());
                     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment =
-                        table_index_entry->GetIndexBySegmentSnapshot(self_table_entry_ptr, txn);
+                        table_index_entry->GetIndexBySegmentSnapshot(table_entry_ptr_, txn);
                     column_index_reader->Open(flag, std::move(index_dir), std::move(index_by_segment));
                     (*result.column_index_readers_)[column_id] = std::move(column_index_reader);
                 }
@@ -180,6 +180,16 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn, TableEntry *self_tab
         }
     }
     return result;
+}
+
+void TableIndexReaderCache::Invalidate() {
+    std::scoped_lock lock(mutex_);
+    first_known_update_ts_ = 0;
+    last_known_update_ts_ = 0;
+    cache_ts_ = 0;
+    cache_column_ts_.clear();
+    cache_column_readers_.reset();
+    column2analyzer_.reset();
 }
 
 } // namespace infinity
