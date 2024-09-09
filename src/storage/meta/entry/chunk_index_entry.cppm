@@ -30,13 +30,13 @@ import buffer_handle;
 import default_values;
 import column_def;
 import txn;
+import buffer_obj;
 
 namespace infinity {
 
 class SegmentIndexEntry;
 struct BlockEntry;
 class BufferManager;
-class BufferObj;
 struct SegmentEntry;
 
 // ChunkIndexEntry is an immutable chunk of SegmentIndexEntry. MemIndexer(for fulltext) is the mutable chunk of SegmentIndexEntry.
@@ -124,7 +124,7 @@ public:
 
     void LoadPartsReader(BufferManager *buffer_mgr);
 
-    BufferObj *GetBufferObj() { return buffer_obj_; }
+    BufferObj *GetBufferObj() { return buffer_obj_.get(); }
 
     void DeprecateChunk(TxnTimeStamp commit_ts);
 
@@ -151,8 +151,8 @@ public:
     Atomic<TxnTimeStamp> deprecate_ts_{UNCOMMIT_TS};
 
 private:
-    BufferObj *buffer_obj_{};
-    Vector<BufferObj *> part_buffer_objs_;
+    BufferPtr buffer_obj_{};
+    Vector<BufferPtr> part_buffer_objs_;
     Atomic<bool> optimizing_{false};
 };
 

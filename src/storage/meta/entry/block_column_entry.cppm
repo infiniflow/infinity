@@ -64,7 +64,7 @@ public:
     // Getter
     inline const BlockEntry *GetBlockEntry() const { return block_entry_; }
     inline const SharedPtr<DataType> &column_type() const { return column_type_; }
-    inline BufferObj *buffer() const { return buffer_; }
+    inline BufferObj *buffer() const { return buffer_.get(); }
     inline u64 column_id() const { return column_id_; }
     inline const SharedPtr<String> &filename() const { return file_name_; }
     inline const BlockEntry *block_entry() const { return block_entry_; }
@@ -108,12 +108,12 @@ private:
     const BlockEntry *block_entry_{nullptr};
     ColumnID column_id_{};
     SharedPtr<DataType> column_type_{};
-    BufferObj *buffer_{};
+    BufferPtr buffer_{};
 
     SharedPtr<String> file_name_{};
 
     mutable std::shared_mutex mutex_{};
-    Vector<BufferObj *> outline_buffers_;
+    Vector<BufferPtr> outline_buffers_;
     u64 last_chunk_offset_{};
 };
 

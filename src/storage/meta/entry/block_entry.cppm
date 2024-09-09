@@ -188,7 +188,7 @@ protected:
     u16 block_row_count_{};
     u16 row_capacity_{};
 
-    BufferObj *version_buffer_object_{};
+    BufferPtr version_buffer_object_{};
 
     // check if a value must not exist in the block
     FastRoughFilter fast_rough_filter_;

@@ -306,7 +306,7 @@ u64 ChunkIndexEntry::GetColumnLengthSum() const {
     assert(segment_index_entry_->table_index_entry()->index_base()->index_type_ == IndexType::kFullText);
     // Read the length from buffer object and sum up
     u64 column_length_sum = 0UL;
-    BufferHandle buffer_handle = buffer_obj_->Load();
+    BufferHandle buffer_handle = buffer_obj_.get()->Load();
     const u32 *column_lengths = (const u32 *)buffer_handle.GetData();
     for (SizeT i = 0; i < row_count_; i++) {
         column_length_sum += column_lengths[i];
@@ -314,7 +314,7 @@ u64 ChunkIndexEntry::GetColumnLengthSum() const {
     return column_length_sum;
 }
 
-BufferHandle ChunkIndexEntry::GetIndex() { return buffer_obj_->Load(); }
+BufferHandle ChunkIndexEntry::GetIndex() { return buffer_obj_.get()->Load(); }
 
 nlohmann::json ChunkIndexEntry::Serialize() {
     nlohmann::json index_entry_json;
@@ -342,11 +342,11 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
 }
 
 void ChunkIndexEntry::Cleanup() {
-    if (buffer_obj_) {
-        buffer_obj_->PickForCleanup();
+    if (buffer_obj_.get() != nullptr) {
+        buffer_obj_.get()->PickForCleanup();
     }
-    for (BufferObj *part_buffer_obj : part_buffer_objs_) {
-        part_buffer_obj->PickForCleanup();
+    for (auto &part_buffer_obj : part_buffer_objs_) {
+        part_buffer_obj.get()->PickForCleanup();
     }
     TableIndexEntry *table_index_entry = segment_index_entry_->table_index_entry();
     const auto &index_dir = segment_index_entry_->index_dir();
@@ -391,12 +391,12 @@ void ChunkIndexEntry::Cleanup() {
 }
 
 void ChunkIndexEntry::SaveIndexFile() {
-    if (buffer_obj_ == nullptr) {
+    if (buffer_obj_.get() == nullptr) {
         return;
     }
-    buffer_obj_->Save();
-    for (BufferObj *part_buffer_obj : part_buffer_objs_) {
-        part_buffer_obj->Save();
+    buffer_obj_.get()->Save();
+    for (auto &part_buffer_obj : part_buffer_objs_) {
+        part_buffer_obj.get()->Save();
     }
 }
 
@@ -431,7 +431,7 @@ void ChunkIndexEntry::DeprecateChunk(TxnTimeStamp commit_ts) {
     ResetOptimizing();
 }
 
-BufferHandle ChunkIndexEntry::GetIndexPartAt(u32 i) { return part_buffer_objs_.at(i)->Load(); }
+BufferHandle ChunkIndexEntry::GetIndexPartAt(u32 i) { return part_buffer_objs_.at(i).get()->Load(); }
 
 bool ChunkIndexEntry::CheckVisible(Txn *txn) const {
     if (txn == nullptr) {
@@ -442,8 +442,8 @@ bool ChunkIndexEntry::CheckVisible(Txn *txn) const {
 }
 
 void ChunkIndexEntry::Save() {
-    if (buffer_obj_) {
-        buffer_obj_->Save();
+    if (buffer_obj_.get()) {
+        buffer_obj_.get()->Save();
     }
 }
 
