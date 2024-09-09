@@ -94,6 +94,9 @@ class TestInfinity:
             - select c2 from test_select where ((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))
                 - -7
                 - 1
+            - select c2 from test_select where (not(c2 < -8 or -4 < c1) or not(c1 < 0 or 5 <= c2)) and not((c2 <= 0 or c1 > 1) and (c1 <= -8 or c2 >= -6))
+                - -7
+                - 1
         4. drop tables
             - 'test_select'
         expect: all operations successfully
@@ -166,6 +169,11 @@ class TestInfinity:
 
         res = table_obj.output(["c2"]).filter(
             "((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
+                                      .astype({'c2': dtype('int32')}))
+
+        res = table_obj.output(["c2"]).filter(
+            "(not(c2 < -8 or -4 < c1) or not(c1 < 0 or 5 <= c2)) and not((c2 <= 0 or c1 > 1) and (c1 <= -8 or c2 >= -6))").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
                                       .astype({'c2': dtype('int32')}))
 
