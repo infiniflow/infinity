@@ -2319,44 +2319,42 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         }
     }
 
-    for (u32 layer_n = 0; layer_n < 2; ++layer_n) {
-        SizeT outline_count = column_block_entry->OutlineBufferCount(layer_n);
+    SizeT outline_count = column_block_entry->OutlineBufferCount();
+    {
+        SizeT column_id = 0;
         {
-            SizeT column_id = 0;
-            {
-                Value value = Value::MakeVarchar(fmt::format("extra_file_group_{}_count", layer_n));
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-
-            ++column_id;
-            {
-                Value value = Value::MakeVarchar(std::to_string(outline_count));
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
+            Value value = Value::MakeVarchar("extra_file_count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
+        ++column_id;
         {
-            SizeT column_id = 0;
-            {
-                Value value = Value::MakeVarchar(fmt::format("extra_file_group_{}_name", layer_n));
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            Value value = Value::MakeVarchar(std::to_string(outline_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("extra_file_name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            String outline_storage;
+            for (SizeT idx = 0; idx < outline_count; ++idx) {
+                outline_storage += *(column_block_entry->OutlineFilename(idx));
+                outline_storage += ";";
             }
 
-            ++column_id;
-            {
-                String outline_storage;
-                for (SizeT idx = 0; idx < outline_count; ++idx) {
-                    outline_storage += *(column_block_entry->OutlineFilename(layer_n, idx));
-                    outline_storage += ";";
-                }
-
-                Value value = Value::MakeVarchar(outline_storage);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
+            Value value = Value::MakeVarchar(outline_storage);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
 

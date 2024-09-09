@@ -1867,8 +1867,7 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
         MakeShared<ColumnDef>(3, bigint_type, "commit_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(4, varchar_type, "file_name", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(5, varchar_type, "encode", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(6, bigint_type, "l1_outline_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(7, bigint_type, "l2_outline_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(6, bigint_type, "outline_count", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
@@ -1881,7 +1880,6 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
         bigint_type,
         varchar_type,
         varchar_type,
-        bigint_type,
         bigint_type,
     };
 
@@ -2028,17 +2026,10 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
         }
 
         {
-            // l1 outline buffer count
-            Value value = Value::MakeBigInt(block_column_entry->OutlineBufferCount(0));
+            // outline buffer count
+            Value value = Value::MakeBigInt(block_column_entry->OutlineBufferCount());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
-        }
-
-        {
-            // l2 outline buffer count
-            Value value = Value::MakeBigInt(block_column_entry->OutlineBufferCount(1));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
         }
 
         ++row_count;
