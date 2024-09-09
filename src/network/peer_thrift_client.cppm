@@ -65,7 +65,7 @@ private:
     SharedPtr<TTransport> transport_{};
     SharedPtr<TProtocol> protocol_{};
     UniquePtr<PeerServiceClient> client_{};
-    bool running_{false};
+    Atomic<bool> running_{false};
     BlockingQueue<SharedPtr<PeerTask>> peer_task_queue_{};
 
     SharedPtr<Thread> processor_thread_{};

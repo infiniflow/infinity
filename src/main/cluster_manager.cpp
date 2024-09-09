@@ -73,9 +73,8 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     leader_node_->port_ = leader_port;
 
     peer_client_ = MakeShared<PeerClient>(leader_ip, leader_port);
-    peer_client_->Init();
     Status client_status = peer_client_->Init();
-    if(!client_status.ok()) {
+    if (!client_status.ok()) {
         return client_status;
     }
 
@@ -100,8 +99,15 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     leader_node_->node_name_ = register_peer_task->leader_name_;
     //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
+    if(register_peer_task->heartbeat_interval_ == 0) {
+        leader_node_->heartbeat_interval_ = 1000; // 1000 ms by default
+    } else {
+        leader_node_->heartbeat_interval_ = register_peer_task->heartbeat_interval_;
+    }
+
     hb_periodic_thread_ = MakeShared<Thread>([&] {
-        auto hb_interval = std::chrono::milliseconds(register_peer_task->heartbeat_interval_);
+        auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval_);
+        this->hb_running_ = true;
         while (true) {
             std::unique_lock lock(this->hb_mutex_);
             this->hb_cv_.wait_for(lock, hb_interval, [&] { return !this->hb_running_; });
@@ -163,7 +169,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
 
     peer_client_ = MakeShared<PeerClient>(leader_ip, leader_port);
     Status client_status = peer_client_->Init();
-    if(!client_status.ok()) {
+    if (!client_status.ok()) {
         return client_status;
     }
 
@@ -188,8 +194,15 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     leader_node_->node_name_ = register_peer_task->leader_name_;
     //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
+
+    if(register_peer_task->heartbeat_interval_ == 0) {
+        leader_node_->heartbeat_interval_ = 1000; // 1000 ms by default
+    } else {
+        leader_node_->heartbeat_interval_ = register_peer_task->heartbeat_interval_;
+    }
     hb_periodic_thread_ = MakeShared<Thread>([&] {
-        auto hb_interval = std::chrono::milliseconds(register_peer_task->heartbeat_interval_);
+        auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval_);
+        this->hb_running_ = true;
         while (true) {
             std::unique_lock lock(this->hb_mutex_);
             this->hb_cv_.wait_for(lock, hb_interval, [&] { return !this->hb_running_; });
@@ -224,15 +237,17 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
             }
         }
     });
-    hb_periodic_thread_->detach();
     return status;
 }
 
 Status ClusterManager::UnInit() {
-    {
+    if(hb_periodic_thread_.get() != nullptr) {
         std::lock_guard lock(hb_mutex_);
         hb_running_ = false;
         hb_cv_.notify_all();
+
+        hb_periodic_thread_->join();
+        hb_periodic_thread_.reset();
     }
 
     std::unique_lock<std::mutex> lock(mutex_);

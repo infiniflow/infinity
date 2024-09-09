@@ -36,6 +36,7 @@ export enum class PeerTaskType {
     kTerminate,
     kRegister,
     kUnregister,
+    kHeartBeat,
     kLogSync,
     kChangeRole,
     kNewLeader,
@@ -53,6 +54,7 @@ export struct NodeInfo {
     i64 port_{};
     i64 last_update_ts_{};
     i64 leader_term_{};
+    i64 heartbeat_interval_{}; // provide by leader and used by follower and learner;
     // u64 update_interval_{}; // seconds
     // String from_{}; // Which node the information comes from.
 };
@@ -66,6 +68,7 @@ public:
         if (async_) {
             return;
         }
+        complete_ = false;
         std::unique_lock<std::mutex> locker(mutex_);
         cv_.wait(locker, [this] { return complete_; });
     }
@@ -82,6 +85,8 @@ public:
     [[nodiscard]] PeerTaskType Type() const {
         return type_;
     }
+
+    virtual String ToString() const = 0;
 protected:
     PeerTaskType type_{PeerTaskType::kInvalid};
     mutable std::mutex mutex_{};
@@ -93,6 +98,8 @@ protected:
 export class TerminatePeerTask final : public PeerTask {
 public:
     TerminatePeerTask() : PeerTask(PeerTaskType::kTerminate) {}
+
+    String ToString() const final;
 };
 
 export class RegisterPeerTask final : public PeerTask {
@@ -100,6 +107,8 @@ public:
     RegisterPeerTask(String node_name, NodeRole node_role, String node_ip, i64 node_port, i64 txn_ts, i64 message_time)
         : PeerTask(PeerTaskType::kRegister), node_name_(std::move(node_name)), node_role_(node_role), node_ip_(std::move(node_ip)),
           node_port_(node_port), txn_ts_(txn_ts), message_time_(message_time) {}
+
+    String ToString() const final;
 
     String node_name_{};
     NodeRole node_role_{};
@@ -122,6 +131,8 @@ public:
     UnregisterPeerTask(String node_name, i64 message_time)
         : PeerTask(PeerTaskType::kUnregister), node_name_(std::move(node_name)), message_time_(message_time) {}
 
+    String ToString() const final;
+
     String node_name_{};
     i64 message_time_{};
 
@@ -133,7 +144,9 @@ public:
 export class HeartBeatPeerTask final : public PeerTask {
 public:
     HeartBeatPeerTask(String node_name, i64 txn_ts, i64 message_time)
-        : PeerTask(PeerTaskType::kRegister), node_name_(std::move(node_name)), txn_ts_(txn_ts), message_time_(message_time) {}
+        : PeerTask(PeerTaskType::kHeartBeat), node_name_(std::move(node_name)), txn_ts_(txn_ts), message_time_(message_time) {}
+
+    String ToString() const final;
 
     String node_name_{};
     i64 txn_ts_{};

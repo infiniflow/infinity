@@ -45,7 +45,9 @@ Status PeerClient::Init() {
         protocol_ = MakeShared<TBinaryProtocol>(transport_);
         client_ = MakeUnique<PeerServiceClient>(protocol_);
         transport_->open();
-        processor_thread_ = MakeShared<Thread>([this] { Process(); });
+//        processor_thread_ = MakeShared<Thread>([this] { LOG_INFO(fmt::format("ip: {}", this->node_info_.ip_address_)); });
+        processor_thread_ = MakeShared<Thread>([this] { this->Process(); });
+//        processor_thread_->detach();
     } catch (const std::exception& e) {
         status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
     }
@@ -73,6 +75,7 @@ void PeerClient::Send(SharedPtr<PeerTask> peer_task) {
 
 void PeerClient::Process() {
     Deque<SharedPtr<PeerTask>> peer_tasks;
+    running_ = true;
     while (running_) {
         peer_task_queue_.DequeueBulk(peer_tasks);
         for (const auto &peer_task : peer_tasks) {
@@ -80,6 +83,18 @@ void PeerClient::Process() {
                 case PeerTaskType::kTerminate: {
                     LOG_INFO("Stop the background processor");
                     running_ = false;
+                }
+                case PeerTaskType::kRegister: {
+                    LOG_INFO(peer_task->ToString());
+                    break;
+                }
+                case PeerTaskType::kUnregister: {
+                    LOG_INFO(peer_task->ToString());
+                    break;
+                }
+                case PeerTaskType::kHeartBeat: {
+                    LOG_INFO(peer_task->ToString());
+                    break;
                 }
                 default: {
                     String error_message = fmt::format("Invalid peer task type");
