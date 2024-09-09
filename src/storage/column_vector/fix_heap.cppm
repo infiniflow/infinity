@@ -34,9 +34,9 @@ export struct FixHeapManager {
     static constexpr u64 INVALID_CHUNK_OFFSET = std::numeric_limits<u64>::max();
 
 public:
-    explicit FixHeapManager(u32 heap_id, u64 chunk_size, bool allow_cross_chunk);
+    explicit FixHeapManager(u64 chunk_size, bool allow_cross_chunk);
 
-    FixHeapManager(u32 heap_id, BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size, bool allow_cross_chunk);
+    FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size, bool allow_cross_chunk);
 
     ~FixHeapManager();
 
@@ -93,7 +93,6 @@ private:
     VectorHeapChunk &ReadChunk(ChunkId chunk_id);
 
 private:
-    u32 heap_id_ = 0;
     bool allow_storage_across_chunks_{true};
     HashMap<ChunkId, VectorHeapChunk> chunks_{};
     u64 current_chunk_size_{DEFAULT_FIXLEN_CHUNK_SIZE};
