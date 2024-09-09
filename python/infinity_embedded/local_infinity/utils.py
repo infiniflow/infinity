@@ -46,7 +46,21 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.function_expr = function_expr
 
         return parsed_expr
-
+    elif isinstance(cons, exp.Not):
+        parsed_expr = WrapParsedExpr()
+        function_expr = WrapFunctionExpr()
+        function_expr.func_name = "not"
+        arguments = []
+        for value in cons.hashable_args:
+            if fn:
+                expr = fn(value)
+            else:
+                expr = traverse_conditions(value)
+            arguments.append(expr)
+        function_expr.arguments = arguments
+        parsed_expr.type = ParsedExprType.kFunction
+        parsed_expr.function_expr = function_expr
+        return parsed_expr
     elif isinstance(cons, exp.Column):
         parsed_expr = WrapParsedExpr()
         column_expr = WrapColumnExpr()
