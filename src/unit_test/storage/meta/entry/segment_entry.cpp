@@ -12,7 +12,7 @@ import third_party;
 import logger;
 import table_def;
 import value;
-import bitmask;
+import roaring_bitmap;
 
 import data_block;
 import default_values;
@@ -257,7 +257,7 @@ TEST_P(SegmentEntryTest, check_rows_visible_test) {
         auto segment_entry = table_entry->GetSegmentEntry(0);
         Vector<u32> segment_offsets = {0};
         segment_entry->CheckRowsVisible(segment_offsets, txn1->BeginTS());
-        SharedPtr<Bitmask> offsets = Bitmask::Make(4);
+        SharedPtr<Bitmask> offsets = Bitmask::MakeSharedAllTrue(4);
         segment_entry->CheckRowsVisible(*offsets, txn1->BeginTS());
     }
 
