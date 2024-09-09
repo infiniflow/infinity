@@ -27,6 +27,8 @@ public:
     CommonLanguageAnalyzer(const CommonLanguageAnalyzer &) = delete;
     virtual ~CommonLanguageAnalyzer();
 
+    void InitStemmer(Language language);
+
     void SetCaseSensitive(bool case_sensitive = true, bool contain_lower = true) {
         case_sensitive_ = case_sensitive;
         contain_lower_ = contain_lower;

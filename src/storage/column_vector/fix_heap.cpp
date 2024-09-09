@@ -32,7 +32,7 @@ import infinity_context;
 
 namespace infinity {
 
-FixHeapManager::FixHeapManager(const u32 heap_id, const u64 chunk_size, bool allow_cross_chunk) : heap_id_(heap_id), current_chunk_size_(chunk_size) {
+FixHeapManager::FixHeapManager(const u64 chunk_size, bool allow_cross_chunk) : current_chunk_size_(chunk_size) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("FixHeapManager");
 #endif
@@ -40,17 +40,16 @@ FixHeapManager::FixHeapManager(const u32 heap_id, const u64 chunk_size, bool all
     allow_storage_across_chunks_ = allow_cross_chunk;
 }
 
-FixHeapManager::FixHeapManager(const u32 heap_id,
-                               BufferManager *buffer_mgr,
+FixHeapManager::FixHeapManager(BufferManager *buffer_mgr,
                                BlockColumnEntry *block_column_entry,
                                const u64 chunk_size,
                                bool allow_cross_chunk)
-    : heap_id_(heap_id), current_chunk_size_(chunk_size), current_chunk_offset_(block_column_entry->LastChunkOff(heap_id)), buffer_mgr_(buffer_mgr),
+    : current_chunk_size_(chunk_size), current_chunk_offset_(block_column_entry->LastChunkOff()), buffer_mgr_(buffer_mgr),
       block_column_entry_(block_column_entry) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("FixHeapManager");
 #endif
-    const int cnt = block_column_entry->OutlineBufferCount(heap_id);
+    const int cnt = block_column_entry->OutlineBufferCount();
     if (cnt == 0) {
         current_chunk_idx_ = INVALID_CHUNK_ID;
     } else {
@@ -74,10 +73,10 @@ VectorHeapChunk FixHeapManager::AllocateChunk() {
         auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                       block_column_entry_->FileDir(),
-                                                      block_column_entry_->OutlineFilename(heap_id_, current_chunk_idx_),
+                                                      block_column_entry_->OutlineFilename(current_chunk_idx_),
                                                       current_chunk_size_);
         auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
-        block_column_entry_->AppendOutlineBuffer(heap_id_, buffer_obj);
+        block_column_entry_->AppendOutlineBuffer(buffer_obj);
         return VectorHeapChunk(buffer_obj);
     }
 }
@@ -136,13 +135,13 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
     if (auto iter = chunks_.find(chunk_id); iter != chunks_.end()) {
         return iter->second;
     }
-    if (buffer_mgr_ == nullptr || chunk_id >= (ChunkId)block_column_entry_->OutlineBufferCount(heap_id_)) {
+    if (buffer_mgr_ == nullptr || chunk_id >= (ChunkId)block_column_entry_->OutlineBufferCount()) {
         String error_message = "No such chunk in heap";
         UnrecoverableError(error_message);
     }
-    auto *outline_buffer = block_column_entry_->GetOutlineBuffer(heap_id_, chunk_id);
+    auto *outline_buffer = block_column_entry_->GetOutlineBuffer(chunk_id);
     if (outline_buffer == nullptr) {
-        auto filename = block_column_entry_->OutlineFilename(heap_id_, chunk_id);
+        auto filename = block_column_entry_->OutlineFilename(chunk_id);
         auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                       block_column_entry_->FileDir(),
@@ -183,7 +182,7 @@ Pair<ChunkId, u64> FixHeapManager::AppendToHeap(const char *data_ptr, SizeT nbyt
         }
     }
     if (buffer_mgr_ != nullptr) {
-        block_column_entry_->SetLastChunkOff(heap_id_, current_chunk_offset_);
+        block_column_entry_->SetLastChunkOff(current_chunk_offset_);
     }
 
     return {start_chunk_id, start_chunk_offset};
@@ -217,7 +216,7 @@ Pair<ChunkID, u64> FixHeapManager::AppendToHeap(const Vector<Pair<const char *, 
         }
     }
     if (buffer_mgr_ != nullptr) {
-        block_column_entry_->SetLastChunkOff(heap_id_, current_chunk_offset_);
+        block_column_entry_->SetLastChunkOff(current_chunk_offset_);
     }
 
     return {start_chunk_id, start_chunk_offset};
@@ -266,7 +265,7 @@ Pair<ChunkId, u64> FixHeapManager::AppendToHeap(FixHeapManager *src_heap_mgr, Ch
         }
     }
     if (buffer_mgr_ != nullptr) {
-        block_column_entry_->SetLastChunkOff(heap_id_, current_chunk_offset_);
+        block_column_entry_->SetLastChunkOff(current_chunk_offset_);
     }
 
     return {start_chunk_id, start_chunk_offset};

@@ -275,6 +275,7 @@ export namespace std {
     using std::get;
     using std::visit;
 
+    using std::invocable;
     using std::unsigned_integral;
     using std::is_integral_v;
     using std::is_floating_point_v;
@@ -282,6 +283,7 @@ export namespace std {
     using std::underlying_type_t;
     using std::conditional_t;
     using std::remove_pointer_t;
+    using std::remove_reference_t;
 
     using std::function;
     using std::monostate;

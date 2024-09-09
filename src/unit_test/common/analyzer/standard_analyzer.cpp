@@ -17,6 +17,7 @@ import base_test;
 
 import stl;
 import term;
+import stemmer;
 import standard_analyzer;
 using namespace infinity;
 
@@ -28,6 +29,7 @@ TEST_F(StandardAnalyzerTest, test1) {
     StandardAnalyzer analyzer;
     TermList term_list;
     String input("Boost unit tests.");
+    analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.SetExtractEngStem(false);
     analyzer.Analyze(input, term_list);
 
@@ -46,6 +48,7 @@ TEST_F(StandardAnalyzerTest, test2) {
     StandardAnalyzer analyzer;
     TermList term_list;
     String input("Boost unit tests.");
+    analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.SetExtractEngStem(false);
     analyzer.SetCaseSensitive(true, false);
     analyzer.Analyze(input, term_list);
@@ -65,6 +68,7 @@ TEST_F(StandardAnalyzerTest, test3) {
     StandardAnalyzer analyzer;
     TermList term_list;
     String input("Boost unit tests.");
+    analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.Analyze(input, term_list);
 
     ASSERT_EQ(term_list.size(), 4U);
@@ -84,6 +88,7 @@ TEST_F(StandardAnalyzerTest, test4) {
     StandardAnalyzer analyzer;
     TermList term_list;
     String input("Boost unit tests.");
+    analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.SetExtractEngStem(false);
     analyzer.SetCaseSensitive(true, true);
     analyzer.Analyze(input, term_list);
@@ -104,6 +109,7 @@ TEST_F(StandardAnalyzerTest, test4) {
 TEST_F(StandardAnalyzerTest, test5) {
     StandardAnalyzer analyzer;
     TermList term_list;
+    analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.SetExtractEngStem(false);
     String input("BoostBoostboostBoostboost unit tests.");
     analyzer.Analyze(input, term_list);
@@ -121,6 +127,7 @@ TEST_F(StandardAnalyzerTest, test5) {
 
 TEST_F(StandardAnalyzerTest, test6) {
     StandardAnalyzer analyzer;
+    analyzer.InitStemmer(STEM_LANG_ENGLISH);
     TermList term_list;
     Vector<String> queries = {
         R"#({{Redirect|Anarchist|the fictional character|Anarchist (comics)}} {{Redirect|Anarchists}} {{Anarchism sidebar}} {{Libertarianism sidebar}}  '''Anarchism''' is generally defined as the [[political philosophy]] which holds the [[state (polity)|state]] to be undesirable, unnecessary, and harmful,<ref name="definition"> {{Cite journal|last=Malatesta|first=Errico|title=Towards Anarchism|journal=MAN!|publisher=International Group of San Francisco|location=Los Angeles|oclc=3930443|url=http://www.marxists.org/archive/malatesta/1930s/xx/toanarchy.htm|authorlink=Errico Malatesta}} {{Cite journal|url=http://www.theglobeandmail.com/servlet/story/RTGAM.20070514.wxlanarchist14/BNStory/lifeWork/home/ |title=Working for The Man |journal=[[The Globe and Mail]] |accessdate=2008-04-14 |last=Agrell |first=Siri |date=2007-05-14}} {{cite web|url=http://www.britannica.com/eb/article-9117285|title=Anarchism|year=2006|work=Encyclopædia Britannica|publisher=Encyclopædia Britannica Premium Service|accessdate=2006-08-29| archiveurl=)#",

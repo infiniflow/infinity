@@ -30,6 +30,8 @@ public:
 
     ~StandardAnalyzer() {}
 
+    void InitStemmer(Language language) { CommonLanguageAnalyzer::InitStemmer(language); }
+
 protected:
     inline void Parse(const String &input) override {
         tokenizer_.Tokenize(input);

@@ -335,7 +335,7 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
                         ASSERT_EQ(block_entry->columns().size(), 2ul);
                         {
                             auto &col2 = block_entry->columns()[1];
-                            EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
+                            EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
                         }
                     }
                 }
@@ -416,7 +416,7 @@ TEST_P(CatalogDeltaReplayTest, replay_append) {
                     ASSERT_EQ(block_entry->columns().size(), 2ul);
                     {
                         auto &col2 = block_entry->columns()[1];
-                        EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
+                        EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
                     }
                 }
             }
@@ -655,7 +655,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
                         ASSERT_EQ(block_entry->columns().size(), 2ul);
                         {
                             auto &col2 = block_entry->columns()[1];
-                            EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
+                            EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
                         }
                     }
                 }
