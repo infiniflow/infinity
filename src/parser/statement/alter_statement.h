@@ -23,8 +23,8 @@ namespace infinity {
 enum class AlterStatementType : uint8_t {
     kInvalid,
     kRenameTable,
-    kAddColumn,
-    kDropColumn,
+    kAddColumns,
+    kDropColumns,
     kAlterColumn,
     kRenameColumn,
 };
@@ -62,7 +62,7 @@ public:
 
 class AddColumnStatement final : public AlterStatement {
 public:
-    AddColumnStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kAddColumn) {}
+    AddColumnStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kAddColumns) {}
 
     ~AddColumnStatement() {
         if (column_def_ != nullptr) {
@@ -78,7 +78,7 @@ public:
 
 class DropColumnStatement final : public AlterStatement {
 public:
-    DropColumnStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kDropColumn) {}
+    DropColumnStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kDropColumns) {}
 
     ~DropColumnStatement() = default;
 

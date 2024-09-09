@@ -29,6 +29,8 @@ import data_type;
 import logger;
 import table_entry;
 import alter_statement;
+import column_def;
+import constant_expr;
 
 namespace infinity {
 
@@ -55,7 +57,7 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-private:
+protected:
     AlterStatementType type_;
     TableEntry *table_entry_{};
     SharedPtr<Vector<String>> output_names_{};
@@ -77,8 +79,46 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-public:
+private:
     String new_table_name_;
+};
+
+export class PhysicalAddColumns final : public PhysicalAlter {
+public:
+    PhysicalAddColumns(TableEntry *table_entry,
+                       const Vector<SharedPtr<ColumnDef>> &column_defs,
+                       SharedPtr<Vector<String>> output_names,
+                       SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                       u64 id,
+                       SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalAlter(table_entry, AlterStatementType::kAddColumns, std::move(output_names), std::move(output_types), id, load_metas),
+          column_defs_(column_defs) {}
+
+    void Init() override;
+
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
+
+private:
+    const Vector<SharedPtr<ColumnDef>> &column_defs_;
+};
+
+export class PhysicalRemoveColumns final : public PhysicalAlter {
+public:
+    PhysicalRemoveColumns(TableEntry *table_entry,
+                          const Vector<String> &column_names,
+                          SharedPtr<Vector<String>> output_names,
+                          SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                          u64 id,
+                          SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalAlter(table_entry, AlterStatementType::kDropColumns, std::move(output_names), std::move(output_types), id, load_metas),
+          column_names_(column_names) {}
+
+    void Init() override;
+
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
+
+private:
+    const Vector<String> &column_names_;
 };
 
 } // namespace infinity

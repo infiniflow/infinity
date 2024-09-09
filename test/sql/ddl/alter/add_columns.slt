@@ -1,0 +1,30 @@
+statement ok
+DROP TABLE IF EXISTS table1;
+
+statement ok
+CREATE TABLE table1 (column1 INT, column2 INT);
+
+statement ok
+INSERT INTO table1 VALUES (1, 2);
+
+query I
+SELECT * FROM table1;
+----
+1 2
+
+statement error
+ALTER TABLE table1 ADD COLUMN column2 varchar DEFAULT 'default';
+
+statement error
+ALTER TABLE table1 ADD COLUMN column3 varchar;
+
+statement ok
+ALTER TABLE table1 ADD COLUMN column3 varchar DEFAULT 'default';
+
+query II
+SELECT * FROM table1;
+----
+1 2 'default'
+
+statement ok
+DROP TABLE table2;

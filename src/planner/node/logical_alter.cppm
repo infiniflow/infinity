@@ -24,6 +24,7 @@ import table_entry;
 import internal_types;
 import data_type;
 import alter_statement;
+import column_def;
 
 namespace infinity {
 
@@ -45,7 +46,7 @@ public:
 
 export class LogicalRenameTable : public LogicalAlter {
 public:
-    LogicalRenameTable(u64 node_id, TableEntry *table_entry, String &&new_table_name)
+    LogicalRenameTable(u64 node_id, TableEntry *table_entry, String new_table_name)
         : LogicalAlter(node_id, table_entry, AlterStatementType::kRenameTable), new_table_name_(std::move(new_table_name)) {}
 
     String ToString(i64 &space) const final;
@@ -54,6 +55,21 @@ public:
 
 public:
     String new_table_name_;
+};
+
+export class LogicalAddColumns : public LogicalAlter {
+public:
+    LogicalAddColumns(u64 node_id, TableEntry *table_entry, ColumnDef *column_defs)
+        : LogicalAlter(node_id, table_entry, AlterStatementType::kAddColumns) {
+        column_defs_.push_back(MakeShared<ColumnDef>(*column_defs));
+    }
+
+    String ToString(i64 &space) const final;
+
+    String name() final { return "LogicalAddColumns"; }
+
+public:
+    Vector<SharedPtr<ColumnDef>> column_defs_;
 };
 
 } // namespace infinity

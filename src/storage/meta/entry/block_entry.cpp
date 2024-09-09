@@ -389,6 +389,27 @@ ColumnVector BlockEntry::GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offs
     return column_vector;
 }
 
+void BlockEntry::AddColumns(const Vector<Pair<ColumnID, const ConstantExpr *>> &columns, TxnTableStore *table_store) {
+    Txn *txn = table_store->GetTxn();
+    BufferManager *buffer_mgr = txn->buffer_mgr();
+    for (const auto [column_id, default_value] : columns) {
+        auto column_entry = BlockColumnEntry::NewBlockColumnEntry(this, column_id, txn);
+        column_entry->FillWithDefaultValue(block_row_count_, default_value, buffer_mgr);
+        columns_.emplace_back(std::move(column_entry));
+        table_store->AddBlockColumnStore(const_cast<SegmentEntry *>(segment_entry_), this, column_entry.get());
+    }
+}
+
+void BlockEntry::DropColumns(const Vector<ColumnID> &column_ids, Txn *txn) {
+    // Vector<UniquePtr<BlockColumnEntry>> new_columns;
+    // for (auto &column : columns_) {
+    //     if (std::find(column_ids.begin(), column_ids.end(), column->column_id()) == column_ids.end()) {
+    //         new_columns.emplace_back(std::move(column));
+    //     }
+    // }
+    // columns_ = std::move(new_columns);
+}
+
 void BlockEntry::FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count) {
     SizeT column_count = this->columns_.size();
     SizeT column_idx = 0;

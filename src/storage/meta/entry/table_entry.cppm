@@ -43,6 +43,7 @@ import random;
 import meta_info;
 import block_entry;
 import column_index_reader;
+import constant_expr;
 
 namespace infinity {
 
@@ -244,6 +245,8 @@ public:
 public:
     u64 GetColumnIdByName(const String &column_name) const;
 
+    i64 GetColumnID(const String &column_name) const;
+
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
     SegmentEntry *GetSegmentEntry(SegmentID seg_id) const {
@@ -334,6 +337,11 @@ private:
     bool locked_ = false;
     bool wait_lock_ = false;
     SizeT write_txn_num_ = 0;
+
+public:
+    void AddColumns(const Vector<SharedPtr<ColumnDef>> &columns, const Vector<const ConstantExpr *> &default_values, TxnTableStore *txn_store);
+
+    void DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store);
 };
 
 } // namespace infinity

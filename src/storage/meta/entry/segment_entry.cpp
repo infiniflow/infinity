@@ -665,4 +665,18 @@ String SegmentEntry::ToString() const {
     return fmt::format("Segment path: {}, id: {}, row_count: {}, block_count: {}, status: {}", *segment_dir_, segment_id_, row_count_, block_entries_.size(), SegmentStatusToString(status_));
 }
 
+void SegmentEntry::SetTableEntry(TableEntry *table_entry) {
+    table_entry_ = table_entry;
+}
+
+void SegmentEntry::AddColumns(const Vector<Pair<ColumnID, const ConstantExpr *>> &columns, TxnTableStore *table_store) {
+    for (auto &block : block_entries_) {
+        block->AddColumns(columns, table_store);
+    }
+}
+
+void SegmentEntry::DropColumns(const Vector<ColumnID> &column_ids, Txn *txn) {
+    //
+}
+
 } // namespace infinity

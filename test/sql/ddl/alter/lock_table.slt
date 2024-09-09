@@ -2,7 +2,7 @@ statement ok
 DROP TABLE IF EXISTS products;
 
 statement ok
-CREATE TABLE products (product_no integer, price integer, description varchar);
+CREATE TABLE products (product_no INT, price INT, description VARCHAR);
 
 statement ok
 INSERT INTO products VALUES (1, 2, 'abcdef');

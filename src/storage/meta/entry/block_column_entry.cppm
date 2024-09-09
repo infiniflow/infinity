@@ -27,6 +27,8 @@ import vector_buffer;
 import txn;
 import internal_types;
 import base_entry;
+import column_def;
+import constant_expr;
 
 namespace infinity {
 
@@ -105,6 +107,8 @@ public:
     static void Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count);
 
     void Cleanup();
+
+    void FillWithDefaultValue(SizeT row_count, const ConstantExpr *default_value, BufferManager *buffer_mgr);
 
 private:
     const BlockEntry *block_entry_{nullptr};

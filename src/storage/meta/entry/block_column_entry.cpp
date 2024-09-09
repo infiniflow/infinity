@@ -366,4 +366,12 @@ void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts
     this->Commit(commit_ts);
 }
 
+void BlockColumnEntry::FillWithDefaultValue(SizeT row_count, const ConstantExpr *default_value, BufferManager *buffer_mgr) {
+    ColumnVector column_vector = this->GetColumnVector(buffer_mgr);
+
+    for (SizeT i = 0; i < row_count; ++i) {
+        column_vector.AppendByConstantExpr(default_value);
+    }
+}
+
 } // namespace infinity

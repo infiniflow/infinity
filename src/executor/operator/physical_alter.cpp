@@ -14,18 +14,61 @@
 
 module;
 
+#include <vector>
+
 module physical_alter;
 
 import query_context;
 import operator_state;
+import third_party;
+import txn;
+import status;
+import infinity_exception;
 
 namespace infinity {
 
 void PhysicalRenameTable::Init() {}
 
 bool PhysicalRenameTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    LOG_INFO("PhysicalRenameTable::Execute");
+    Txn *txn = query_context->GetTxn();
+    LOG_INFO(fmt::format("Locking table {} for rename", *table_entry_->GetTableName()));
+    table_entry_->SetLocked();
+    LOG_INFO(fmt::format("Table {} is locked", *table_entry_->GetTableName()));
+    {
+        auto status = txn->RenameTable(table_entry_, new_table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+    }
+    LOG_INFO(fmt::format("Table {} unlocked.", *table_entry_->GetTableName()));
     operator_state->SetComplete();
+    return true;
+}
+
+void PhysicalAddColumns::Init() {}
+
+bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    Txn *txn = query_context->GetTxn();
+
+    Vector<const ConstantExpr *> default_values;
+    for (const auto &column_def : column_defs_) {
+        if (!column_def->has_default_value()) {
+            UnrecoverableError(fmt::format("Column {} has no default value", column_def->name()));
+        }
+        default_values.push_back(column_def->default_value());
+    }
+    auto status = txn->AddColumns(table_entry_, column_defs_, default_values);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    operator_state->SetComplete();
+    return true;
+}
+
+void PhysicalRemoveColumns::Init() {}
+
+bool PhysicalRemoveColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    //
     return true;
 }
 

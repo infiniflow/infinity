@@ -1129,10 +1129,6 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
 }
 
 Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    if (statement->type_ != AlterStatementType::kRenameTable) {
-        Status status = Status::NotSupport("Alter statement isn't supported.");
-        RecoverableError(status);
-    }
     if (statement->schema_name_.empty()) {
         statement->schema_name_ = query_context_ptr_->schema_name();
     }
@@ -1148,6 +1144,21 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
             this->logical_plan_ = MakeShared<LogicalRenameTable>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                  table_entry,
                                                                  std::move(rename_table_statement->new_table_name_));
+            break;
+        }
+        case AlterStatementType::kAddColumns: {
+            auto *add_columns_statement = static_cast<AddColumnStatement *>(statement);
+            ColumnDef *column_def = add_columns_statement->column_def_;
+            if (!column_def->has_default_value()) {
+                RecoverableError(Status::NotSupport("Add column without default value isn't supported."));
+            }
+            i64 column_id = table_entry->GetColumnID(column_def->name());
+            if (column_id != -1) {
+                RecoverableError(Status::DuplicateColumnName(column_def->name()));
+            }
+            this->logical_plan_ = MakeShared<LogicalAddColumns>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                table_entry,
+                                                                column_def);
             break;
         }
         default: {

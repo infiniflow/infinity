@@ -1180,6 +1180,14 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     return table_entry;
 }
 
+i64 TableEntry::GetColumnID(const String &column_name) const {
+    auto it = column_name2column_id_.find(column_name);
+    if (it == column_name2column_id_.end()) {
+        return -1;
+    }
+    return it->second;
+}
+
 u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     auto it = column_name2column_id_.find(column_name);
     if (it == column_name2column_id_.end()) {
@@ -1339,6 +1347,40 @@ void TableEntry::SetUnlock() {
         return;
     }
     locked_ = false;
+}
+
+void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs,
+                            const Vector<const ConstantExpr *> &default_values,
+                            TxnTableStore *txn_table_store) {
+    SizeT column_num = columns_.size();
+    columns_.insert(columns_.end(), column_defs.begin(), column_defs.end());
+
+    for (const auto &column_def : column_defs) {
+        column_name2column_id_[column_def->name()] = column_def->id();
+    }
+    Vector<Pair<ColumnID, const ConstantExpr *>> columns;
+    for (SizeT idx = 0; idx < column_defs.size(); ++idx) {
+        columns.emplace_back(column_num + idx, default_values[idx]);
+    }
+    for (auto &[segment_id, segment_entry] : segment_map_) {
+        segment_entry->SetTableEntry(this);
+        segment_entry->AddColumns(columns, txn_table_store);
+    }
+}
+
+void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store) {
+    // Vector<SharedPtr<ColumnDef>> new_columns;
+    // Vector<ColumnID> new_column_ids;
+    // for (const auto &column : columns_) {
+    //     if (std::find(column_names.begin(), column_names.end(), column->name()) == column_names.end()) {
+    //         new_columns.push_back(column);
+    //         new_column_ids.push_back(column->id());
+    //     }
+    // }
+    // columns_ = std::move(new_columns);
+    // for (auto &[segment_id, segment_entry] : segment_map_) {
+    //     segment_entry->DropColumns(new_column_ids, txn);
+    // }
 }
 
 } // namespace infinity

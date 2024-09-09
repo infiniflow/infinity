@@ -55,6 +55,7 @@ import default_values;
 import defer_op;
 import index_base;
 import base_table_ref;
+import constant_expr;
 
 module wal_manager;
 
@@ -1110,7 +1111,21 @@ void WalManager::WalCmdRenameTableReplay(WalCmdRenameTable &cmd, TransactionID t
 }
 
 void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    //
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
+    if (!table_status.ok()) {
+        String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
+        UnrecoverableError(error_message);
+    }
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
+    Vector<const ConstantExpr *> default_values;
+    for (const auto &column_def : cmd.column_defs_) {
+        if (!column_def->has_default_value()) {
+            UnrecoverableError(fmt::format("Wal Replay: Add column {} without default value", column_def->name()));
+        }
+        default_values.push_back(column_def->default_value());
+    }
+    table_entry->AddColumns(cmd.column_defs_, default_values, txn_store);
 }
 
 void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

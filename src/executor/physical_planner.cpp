@@ -580,11 +580,20 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
         case AlterStatementType::kRenameTable: {
             auto *logical_rename_table = static_cast<LogicalRenameTable *>(logical_alter);
             return MakeUnique<PhysicalRenameTable>(logical_rename_table->table_entry_,
-                                            std::move(logical_rename_table->new_table_name_),
-                                            logical_operator->GetOutputNames(),
-                                            logical_operator->GetOutputTypes(),
-                                            logical_operator->node_id(),
-                                            logical_operator->load_metas());
+                                                   std::move(logical_rename_table->new_table_name_),
+                                                   logical_operator->GetOutputNames(),
+                                                   logical_operator->GetOutputTypes(),
+                                                   logical_operator->node_id(),
+                                                   logical_operator->load_metas());
+        }
+        case AlterStatementType::kAddColumns: {
+            auto *logical_add_columns = static_cast<LogicalAddColumns *>(logical_alter);
+            return MakeUnique<PhysicalAddColumns>(logical_add_columns->table_entry_,
+                                                  logical_add_columns->column_defs_,
+                                                  logical_operator->GetOutputNames(),
+                                                  logical_operator->GetOutputTypes(),
+                                                  logical_operator->node_id(),
+                                                  logical_operator->load_metas());
         }
         default: {
             RecoverableError(Status::NotSupport("Alter statement isn't supported."));

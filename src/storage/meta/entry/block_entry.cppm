@@ -34,6 +34,9 @@ import value;
 import buffer_obj;
 import bitmask;
 import wal_entry;
+import column_def;
+import constant_expr;
+import txn_store;
 
 namespace infinity {
 
@@ -170,6 +173,10 @@ public:
     ColumnVector GetCreateTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
 
     ColumnVector GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
+
+    void AddColumns(const Vector<Pair<ColumnID, const ConstantExpr *>> &columns, TxnTableStore *table_store);
+
+    void DropColumns(const Vector<ColumnID> &column_ids, Txn *txn);
 
 public:
     // Setter, Used in import, segment append block, and block append block in compact

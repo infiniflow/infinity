@@ -39,4 +39,9 @@ String LogicalRenameTable::ToString(i64 &space) const {
     return "";
 }
 
+String LogicalAddColumns::ToString(i64 &space) const {
+    //
+    return "";
+}
+
 } // namespace infinity

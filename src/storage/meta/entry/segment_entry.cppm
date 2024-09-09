@@ -33,6 +33,8 @@ import cleanup_scanner;
 import logger;
 import bitmask;
 import wal_entry;
+import column_def;
+import constant_expr;
 
 namespace infinity {
 
@@ -156,6 +158,7 @@ public:
     String ToString() const;
 public:
     // Const getter
+    void SetTableEntry(TableEntry *table_entry);
     const TableEntry *GetTableEntry() const { return table_entry_; }
     // Relative to the `data_dir` config item
     const SharedPtr<String> &segment_dir() const { return segment_dir_; }
@@ -269,6 +272,10 @@ public:
     void Cleanup() override;
 
     void PickCleanup(CleanupScanner *scanner) override;
+
+    void AddColumns(const Vector<Pair<ColumnID, const ConstantExpr *>> &columns, TxnTableStore *table_store);
+
+    void DropColumns(const Vector<ColumnID> &column_ids, Txn *txn);
 };
 
 } // namespace infinity
