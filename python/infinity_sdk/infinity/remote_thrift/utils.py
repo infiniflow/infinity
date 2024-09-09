@@ -48,7 +48,22 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
         parsed_expr.type = parser_expr_type
 
         return parsed_expr
-
+    elif isinstance(cons, exp.Not):
+        parsed_expr = ttypes.ParsedExpr()
+        function_expr = ttypes.FunctionExpr()
+        function_expr.function_name = "not"
+        arguments = []
+        for value in cons.hashable_args:
+            if fn:
+                expr = fn(value)
+            else:
+                expr = traverse_conditions(value)
+            arguments.append(expr)
+        function_expr.arguments = arguments
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.function_expr = function_expr
+        parsed_expr.type = parser_expr_type
+        return parsed_expr
     elif isinstance(cons, exp.Column):
 
         match cons.alias_or_name:
