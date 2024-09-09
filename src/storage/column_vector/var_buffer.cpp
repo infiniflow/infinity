@@ -105,7 +105,7 @@ SizeT VarBufferManager::Append(UniquePtr<char[]> data, SizeT size, bool *free_su
     auto *buffer = GetInnerMut();
     SizeT offset = buffer->Append(std::move(data), size, free_success);
     if (type_ == BufferType::kBufferObj) {
-        block_column_entry_->SetLastChunkOff(0, buffer->TotalSize());
+        block_column_entry_->SetLastChunkOff(buffer->TotalSize());
     }
     return offset;
 }
@@ -126,15 +126,15 @@ void VarBufferManager::InitBuffer() {
         }
     } else {
         if (!buffer_handle_.has_value()) {
-            if (auto *block_obj = block_column_entry_->GetOutlineBuffer(0, 0); block_obj == nullptr) {
+            if (auto *block_obj = block_column_entry_->GetOutlineBuffer(0); block_obj == nullptr) {
                 auto file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                              block_column_entry_->block_entry()->block_dir(),
-                                                             block_column_entry_->OutlineFilename(0, 0),
+                                                             block_column_entry_->OutlineFilename(0),
                                                              0
                                                              /*buffer_size*/);
                 auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
-                block_column_entry_->AppendOutlineBuffer(0, buffer_obj);
+                block_column_entry_->AppendOutlineBuffer(buffer_obj);
                 buffer_handle_ = buffer_obj->Load();
             } else {
                 buffer_handle_ = block_obj->Load();

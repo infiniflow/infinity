@@ -14,6 +14,7 @@
 
 module;
 
+#include <sstream>
 #include <vector>
 
 module admin_executor;
@@ -998,7 +999,7 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
             // encode
             Value value = Value::MakeVarchar(db_entry->encode());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
         }
 
         ++row_count;
@@ -1106,7 +1107,7 @@ QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminSt
             // db_entry dir
             Value value = Value::MakeVarchar(*table_meta_ptr->db_entry_dir());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
 
         ++row_count;
@@ -1278,42 +1279,42 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
             // encode
             Value value = Value::MakeVarchar(table_entry->encode());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
         }
 
         {
             // column count
             Value value = Value::MakeBigInt(table_entry->ColumnCount());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[9]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
         }
 
         {
             // row count
             Value value = Value::MakeBigInt(table_entry->row_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[10]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[9]);
         }
 
         {
             // segment count
             Value value = Value::MakeBigInt(table_entry->segment_map().size());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[11]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[10]);
         }
 
         {
             // unsealed_segment
             Value value = Value::MakeBigInt(table_entry->unsealed_id());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[12]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[11]);
         }
 
         {
             // next segment id
             Value value = Value::MakeBigInt(table_entry->next_segment_id());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[13]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[12]);
         }
 
         ++row_count;
@@ -1507,84 +1508,84 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
             // encode
             Value value = Value::MakeVarchar(segment_entry->encode());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
         }
 
         {
             // row count
             Value value = Value::MakeBigInt(segment_entry->row_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
         }
 
         {
             // row capacity
             Value value = Value::MakeBigInt(segment_entry->row_capacity());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[9]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
         }
 
         {
             // column count
             Value value = Value::MakeBigInt(segment_entry->column_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[10]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[9]);
         }
 
         {
             // actual_row_count
             Value value = Value::MakeBigInt(segment_entry->actual_row_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[11]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[10]);
         }
 
         {
             // checkpoint_row_count
             Value value = Value::MakeBigInt(segment_entry->checkpoint_row_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[12]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[11]);
         }
 
         {
             // min_row_ts
             Value value = Value::MakeBigInt(segment_entry->min_row_ts());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[13]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[12]);
         }
 
         {
             // max_row_ts
             Value value = Value::MakeBigInt(segment_entry->max_row_ts());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[14]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[13]);
         }
 
         {
             // first_delete_ts
             Value value = Value::MakeBigInt(segment_entry->first_delete_ts());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[15]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[14]);
         }
 
         {
             // deprecate_ts
             Value value = Value::MakeBigInt(segment_entry->deprecate_ts());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[16]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[15]);
         }
 
         {
             // block_count
             Value value = Value::MakeBigInt(segment_entry->block_entries().size());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[17]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[16]);
         }
 
         {
             // status
             Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_entry->status()));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[18]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[17]);
         }
 
         ++row_count;
@@ -1788,49 +1789,49 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
             // encode
             Value value = Value::MakeVarchar(block_entry->encode());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
         }
 
         {
             // row count
             Value value = Value::MakeBigInt(block_entry->row_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
         }
 
         {
             // row capacity
             Value value = Value::MakeBigInt(block_entry->row_capacity());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[9]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
         }
 
         {
             // checkpoint_row_count
             Value value = Value::MakeBigInt(block_entry->checkpoint_row_count());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[10]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[9]);
         }
 
         {
             // min_row_ts
             Value value = Value::MakeBigInt(block_entry->min_row_ts());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[11]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[10]);
         }
 
         {
             // max_row_ts
             Value value = Value::MakeBigInt(block_entry->max_row_ts());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[12]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[11]);
         }
 
         {
             // checkpoint_ts
             Value value = Value::MakeBigInt(block_entry->checkpoint_ts());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[13]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[12]);
         }
 
         ++row_count;
@@ -1867,8 +1868,7 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
         MakeShared<ColumnDef>(3, bigint_type, "commit_ts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(4, varchar_type, "file_name", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(5, varchar_type, "encode", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(6, bigint_type, "l1_outline_count", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(7, bigint_type, "l2_outline_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(6, bigint_type, "outline_count", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
@@ -1881,7 +1881,6 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
         bigint_type,
         varchar_type,
         varchar_type,
-        bigint_type,
         bigint_type,
     };
 
@@ -2017,28 +2016,21 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
             // filename
             Value value = Value::MakeVarchar(*block_column_entry->filename());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
 
         {
             // encode
             Value value = Value::MakeVarchar(block_column_entry->encode());
             ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+        }
+
+        {
+            // outline buffer count
+            Value value = Value::MakeBigInt(block_column_entry->OutlineBufferCount());
+            ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
-        }
-
-        {
-            // l1 outline buffer count
-            Value value = Value::MakeBigInt(block_column_entry->OutlineBufferCount(0));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
-        }
-
-        {
-            // l2 outline buffer count
-            Value value = Value::MakeBigInt(block_column_entry->OutlineBufferCount(1));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
         }
 
         ++row_count;
@@ -2184,7 +2176,7 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
                 ss << " " << ConstrainTypeToString(constraint);
             }
 
-            Value value = Value::MakeVarchar(ss.str());
+            Value value = Value::MakeVarchar(std::move(ss).str());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
         }
@@ -2322,7 +2314,7 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
             // index entry count
             Value value = Value::MakeBigInt(table_index_meta->EntryCount());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
 
         ++row_count;
@@ -2515,28 +2507,28 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
             // encode
             Value value = Value::MakeVarchar(table_index_entry->encode());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
         }
 
         {
             // segment update timestamp
             Value value = Value::MakeBigInt(table_index_entry->GetFulltexSegmentUpdateTs());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
         }
 
         {
             // index info
             Value value = Value::MakeVarchar(table_index_entry->index_base()->ToString());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[9]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
         }
 
         {
             // segment count
             Value value = Value::MakeBigInt(table_index_entry->index_by_segment().size());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[10]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[9]);
         }
 
         ++row_count;
@@ -2733,14 +2725,14 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
             // encode
             Value value = Value::MakeVarchar(segment_index_ptr->encode());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
         }
 
         {
             // next chunk id
             Value value = Value::MakeBigInt(segment_index_ptr->next_chunk_id());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
         }
 
         {
@@ -2748,7 +2740,7 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
             auto [chunk_index_entries, memory_indexer] = segment_index_ptr->GetFullTextIndexSnapshot();
             Value value = Value::MakeBigInt(chunk_index_entries.size());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[9]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
         }
 
         ++row_count;
