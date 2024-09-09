@@ -259,11 +259,11 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 
-    ptr = buf_beg;
-    SharedPtr<WalEntry> entry2 = WalEntry::ReadAdv(ptr, exp_size);
+    const char *ptr_r = buf_beg;
+    SharedPtr<WalEntry> entry2 = WalEntry::ReadAdv(ptr_r, exp_size);
     EXPECT_NE(entry2, nullptr);
     EXPECT_EQ(*entry == *entry2, true);
-    EXPECT_EQ(ptr - buf_beg, exp_size);
+    EXPECT_EQ(ptr_r - buf_beg, exp_size);
 }
 
 TEST_F(WalEntryTest, ReadWriteVFS) {
@@ -290,7 +290,7 @@ TEST_F(WalEntryTest, ReadWriteVFS) {
     ASSERT_EQ(write_size, size);
 
     AddrSerializer addr_serializer1;
-    char *ptr1 = buffer.get();
+    const char *ptr1 = buffer.get();
     Vector<String> paths1 = addr_serializer1.ReadBufAdv(ptr1);
     SizeT read_size = ptr1 - buffer.get();
     ASSERT_EQ(read_size, size);

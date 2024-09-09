@@ -123,7 +123,7 @@ public:
 
     void WriteAdv(char *&ptr, const DataType *data_type) const;
 
-    void ReadAdv(char *&ptr, const DataType *data_type);
+    void ReadAdv(const char *&ptr, const DataType *data_type);
 
     const char *GetVarchar(SizeT offset, SizeT len) const;
 

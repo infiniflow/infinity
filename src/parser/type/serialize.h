@@ -33,58 +33,19 @@ inline int32_t GetSizeInBytes(const T &) {
     return sizeof(T);
 }
 
-// >>>>>>>>>>>>>>> deprecated
-template <>
-inline int32_t GetSizeInBytes(const std::string &value) {
-    return sizeof(int32_t) + value.length();
-}
-
 template <typename T>
-inline T ReadBuf(char *const buf) {
+inline T ReadBuf(const char *buf) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
-    T *ptr = (T *)buf;
-    T value = *ptr;
-    return value;
-}
-
-template <typename T>
-inline T ReadBufAdv(char *&buf) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
-    T *ptr = (T *)buf;
-    T value = *ptr;
-    buf += sizeof(T);
-    return value;
-}
-
-template <>
-inline std::string ReadBuf<std::string>(char *const buf) {
-    int32_t size = ReadBuf<int32_t>(buf);
-    std::string str(buf + sizeof(int32_t), size);
-    return str;
-}
-
-template <>
-inline std::string ReadBufAdv<std::string>(char *&buf) {
-    int32_t size = ReadBufAdv<int32_t>(buf);
-    std::string str(buf, size);
-    buf += size;
-    return str;
-}
-// <<<<<<<<<<<<<< deprecated
-
-template <typename T>
-inline T ReadBuf(const char * buf) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
-    T *ptr = (T *)buf;
-    T value = *ptr;
+    T value;
+    std::memcpy(&value, buf, sizeof(T));
     return value;
 }
 
 template <typename T>
 inline T ReadBufAdv(const char *&buf) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
-    T *ptr = (T *)buf;
-    T value = *ptr;
+    T value;
+    std::memcpy(&value, buf, sizeof(T));
     buf += sizeof(T);
     return value;
 }
@@ -107,15 +68,13 @@ inline std::string ReadBufAdv<std::string>(const char *&buf) {
 template <typename T>
 inline void WriteBuf(char *const buf, const T &value) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
-    T *ptr = (T *)buf;
-    *ptr = value;
+    std::memcpy(buf, &value, sizeof(T));
 }
 
 template <typename T>
 inline void WriteBufAdv(char *&buf, const T &value) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
-    T *ptr = (T *)buf;
-    *ptr = value;
+    std::memcpy(buf, &value, sizeof(T));
     buf += sizeof(T);
 }
 
@@ -123,7 +82,7 @@ template <>
 inline void WriteBuf<std::string>(char *const buf, const std::string &value) {
     int32_t len = value.length();
     WriteBuf(buf, len);
-    memcpy(buf + len, value.c_str(), len);
+    memcpy(buf + sizeof(len), value.c_str(), len);
 }
 
 template <>

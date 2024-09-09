@@ -48,7 +48,7 @@ public:
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<TableDef> ReadAdv(char *&ptr, i32 maxbytes);
+    static SharedPtr<TableDef> ReadAdv(const char *&ptr, i32 maxbytes);
 
     [[nodiscard]] inline const Vector<SharedPtr<ColumnDef>> &columns() const { return columns_; }
 

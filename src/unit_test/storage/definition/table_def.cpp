@@ -90,10 +90,10 @@ TEST_F(TableDefTest, ReadWrite) {
     table_def.WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 
-    ptr = buf_beg;
+    const char *ptr_r = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<TableDef> table_def2 = table_def.ReadAdv(ptr, maxbytes);
-    EXPECT_EQ(ptr - buf_beg, exp_size);
+    SharedPtr<TableDef> table_def2 = table_def.ReadAdv(ptr_r, maxbytes);
+    EXPECT_EQ(ptr_r - buf_beg, exp_size);
     EXPECT_NE(table_def2, nullptr);
     EXPECT_EQ(*table_def2, table_def);
 }

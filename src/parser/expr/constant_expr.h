@@ -58,7 +58,7 @@ public:
 
     void WriteAdv(char *&ptr) const;
 
-    static std::shared_ptr<ParsedExpr> ReadAdv(char *&ptr, int32_t maxbytes);
+    static std::shared_ptr<ParsedExpr> ReadAdv(const char *&ptr, int32_t maxbytes);
 
     nlohmann::json Serialize() const;
 

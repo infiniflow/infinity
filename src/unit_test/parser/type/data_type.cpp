@@ -173,10 +173,10 @@ TEST_F(DataTypeTest, ReadWrite) {
         data_type->WriteAdv(ptr);
         EXPECT_EQ(ptr - buf_beg, exp_size);
 
-        ptr = buf_beg;
-        SharedPtr<DataType> data_type2 = DataType::ReadAdv(ptr, exp_size);
+        const char *ptr_r = buf_beg;
+        SharedPtr<DataType> data_type2 = DataType::ReadAdv(ptr_r, exp_size);
         EXPECT_NE(data_type2, nullptr);
         EXPECT_EQ(*data_type2, *data_type);
-        EXPECT_EQ(ptr - buf_beg, exp_size);
+        EXPECT_EQ(ptr_r - buf_beg, exp_size);
     }
 }

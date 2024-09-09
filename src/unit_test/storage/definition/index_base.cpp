@@ -48,11 +48,11 @@ TEST_F(IndexBaseTest, ivfflat_readwrite) {
     index_base->WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 
-    ptr = buf_beg;
+    const char* ptr_r = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr, maxbytes);
+    SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr_r, maxbytes);
 //    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
-    EXPECT_EQ(ptr - buf_beg, exp_size);
+    EXPECT_EQ(ptr_r - buf_beg, exp_size);
     EXPECT_NE(index_base.get(), nullptr);
     EXPECT_EQ(*index_base, *index_base1);
 }
@@ -81,11 +81,11 @@ TEST_F(IndexBaseTest, hnsw_readwrite) {
     index_base->WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 
-    ptr = buf_beg;
+    const char *ptr_r = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr, maxbytes);
+    SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr_r, maxbytes);
 //    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
-    EXPECT_EQ(ptr - buf_beg, exp_size);
+    EXPECT_EQ(ptr_r - buf_beg, exp_size);
     EXPECT_NE(index_base.get(), nullptr);
     EXPECT_EQ(*index_base, *index_base1);
 }
@@ -109,11 +109,11 @@ TEST_F(IndexBaseTest, full_text_readwrite) {
     index_base->WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 
-    ptr = buf_beg;
+    const char *ptr_r = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr, maxbytes);
+    SharedPtr<IndexBase> index_base1 = IndexBase::ReadAdv(ptr_r, maxbytes);
 //    std::cout << "index_base1: " << index_base1->ToString() << std::endl;
-    EXPECT_EQ(ptr - buf_beg, exp_size);
+    EXPECT_EQ(ptr_r - buf_beg, exp_size);
     EXPECT_NE(index_base.get(), nullptr);
     EXPECT_EQ(*index_base, *index_base1);
 }

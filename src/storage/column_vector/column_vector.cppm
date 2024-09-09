@@ -251,7 +251,7 @@ public:
     void WriteAdv(char *&ptr) const;
 
     // Read from a serialized version
-    static SharedPtr<ColumnVector> ReadAdv(char *&ptr, i32 maxbytes);
+    static SharedPtr<ColumnVector> ReadAdv(const char *&ptr, i32 maxbytes);
 
 public:
     static void SetMultiVector(MultiVectorT &dest_multi_vec, VectorBuffer *dest_buffer, Span<const char> data, const EmbeddingInfo *embedding_info);
