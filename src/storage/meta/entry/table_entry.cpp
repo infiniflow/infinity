@@ -96,7 +96,7 @@ TableEntry::TableEntry(bool is_delete,
                        SegmentID next_segment_id)
     : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
       table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type),
-      unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
+      unsealed_id_(unsealed_id), next_segment_id_(next_segment_id), fulltext_column_index_cache_(this) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
@@ -1251,6 +1251,7 @@ void TableEntry::Cleanup() {
     if (this->deleted_) {
         return;
     }
+    fulltext_column_index_cache_.Invalidate();
     for (auto &[segment_id, segment] : segment_map_) {
         segment->Cleanup();
     }
@@ -1262,7 +1263,7 @@ void TableEntry::Cleanup() {
     LOG_DEBUG(fmt::format("Cleaned dir: {}", full_table_dir));
 }
 
-IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn, this); }
+IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn); }
 
 Tuple<Vector<String>, Vector<TableIndexMeta *>, std::shared_lock<std::shared_mutex>> TableEntry::GetAllIndexMapGuard() const {
     return index_meta_map_.GetAllMetaGuard();

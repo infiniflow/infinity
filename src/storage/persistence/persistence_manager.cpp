@@ -155,6 +155,27 @@ PersistenceManager::~PersistenceManager() {
 ObjAddr PersistenceManager::Persist(const String &file_path) {
     std::error_code ec;
     fs::path src_fp = file_path;
+
+    String local_path = RemovePrefix(file_path);
+    if (local_path.empty()) {
+        String error_message = fmt::format("Failed to find local path of {}", local_path);
+        UnrecoverableError(error_message);
+    }
+    {
+        // Cleanup the file if it already exists in the local_path_obj_
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = local_path_obj_.find(local_path);
+        if (it != local_path_obj_.end()) {
+            CleanupNoLock(it->second);
+            LOG_TRACE(fmt::format("Persist deleted mapping from local path {} to ObjAddr({}, {}, {})",
+                                  local_path,
+                                  it->second.obj_key_,
+                                  it->second.part_offset_,
+                                  it->second.part_size_));
+            local_path_obj_.erase(it);
+        }
+    }
+
     SizeT src_size = fs::file_size(src_fp, ec);
     if (ec) {
         String error_message = fmt::format("Failed to get file size of {}.", file_path);
@@ -178,11 +199,6 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
         objects_.emplace(obj_key, ObjStat(src_size, 1, 0));
         LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
-        String local_path = RemovePrefix(file_path);
-        if (local_path.empty()) {
-            String error_message = fmt::format("Failed to find local path of {}", local_path);
-            UnrecoverableError(error_message);
-        }
         local_path_obj_[local_path] = obj_addr;
         LOG_TRACE(fmt::format("Persist local path {} to dedicated ObjAddr ({}, {}, {})",
                               local_path,
@@ -198,11 +214,6 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
         ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
         CurrentObjAppendNoLock(file_path, src_size);
 
-        String local_path = RemovePrefix(file_path);
-        if (local_path.empty()) {
-            String error_message = fmt::format("Failed to find local path of {}", local_path);
-            UnrecoverableError(error_message);
-        }
         local_path_obj_[local_path] = obj_addr;
         LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
                               local_path,
