@@ -18,6 +18,7 @@ module cluster_manager;
 
 import stl;
 import infinity_context;
+import logger;
 
 namespace infinity {
 
@@ -64,8 +65,19 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     auto now = std::chrono::high_resolution_clock::now();
     auto duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
     this_node_->last_update_ts_ = duration_in_seconds.count();
+
+    leader_node_ = MakeShared<NodeInfo>();
+    leader_node_->node_role_ = NodeRole::kLeader;
+    leader_node_->node_status_ = NodeStatus::kInvalid;
+    leader_node_->ip_address_ = leader_ip;
+    leader_node_->port_ = leader_port;
+
     peer_client_ = MakeShared<PeerClient>(leader_ip, leader_port);
     peer_client_->Init();
+    Status client_status = peer_client_->Init();
+    if(!client_status.ok()) {
+        return client_status;
+    }
 
     // Register to leader;
     SharedPtr<RegisterPeerTask> register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
@@ -77,16 +89,54 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     peer_client_->Send(register_peer_task);
     register_peer_task->Wait();
 
-
     Status status = Status::OK();
-    if(register_peer_task->error_code_ != 0) {
+    if (register_peer_task->error_code_ != 0) {
         status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
         status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
         return status;
     }
 
-    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
+    leader_node_->last_update_ts_ = register_peer_task->update_time_;
+    leader_node_->node_name_ = register_peer_task->leader_name_;
+    //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
+    hb_periodic_thread_ = MakeShared<Thread>([&] {
+        auto hb_interval = std::chrono::milliseconds(register_peer_task->heartbeat_interval_);
+        while (true) {
+            std::unique_lock lock(this->hb_mutex_);
+            this->hb_cv_.wait_for(lock, hb_interval, [&] { return !this->hb_running_; });
+
+            auto hb_now = std::chrono::high_resolution_clock::now();
+            auto hb_duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(hb_now.time_since_epoch());
+            this_node_->last_update_ts_ = hb_duration_in_seconds.count();
+
+            // Send heartbeat
+            SharedPtr<HeartBeatPeerTask> hb_task =
+                MakeShared<HeartBeatPeerTask>(this_node_->node_name_, txn_manager_->CurrentTS(), this_node_->last_update_ts_);
+            peer_client_->Send(hb_task);
+            hb_task->Wait();
+
+            if (hb_task->error_code_ != 0) {
+                LOG_ERROR(fmt::format("Can't connect to leader: {} ,{}:{}, error: {}",
+                                      leader_node_->node_name_,
+                                      leader_node_->ip_address_,
+                                      leader_node_->port_,
+                                      hb_task->error_message_));
+                leader_node_->node_status_ = NodeStatus::kTimeout;
+                continue;
+            }
+
+            // Update leader info
+            leader_node_->node_status_ = NodeStatus::kConnected;
+            leader_node_->last_update_ts_ = hb_task->update_time_;
+            leader_node_->leader_term_ = hb_task->leader_term_;
+
+            if (!hb_running_) {
+                break;
+            }
+        }
+    });
+    hb_periodic_thread_->detach();
     return status;
 }
 Status ClusterManager::InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port) {
@@ -105,8 +155,17 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     auto duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
     this_node_->last_update_ts_ = duration_in_seconds.count();
 
+    leader_node_ = MakeShared<NodeInfo>();
+    leader_node_->node_role_ = NodeRole::kLeader;
+    leader_node_->node_status_ = NodeStatus::kInvalid;
+    leader_node_->ip_address_ = leader_ip;
+    leader_node_->port_ = leader_port;
+
     peer_client_ = MakeShared<PeerClient>(leader_ip, leader_port);
-    peer_client_->Init();
+    Status client_status = peer_client_->Init();
+    if(!client_status.ok()) {
+        return client_status;
+    }
 
     // Register to leader;
     SharedPtr<RegisterPeerTask> register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
@@ -119,19 +178,47 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     register_peer_task->Wait();
 
     Status status = Status::OK();
-    if(register_peer_task->error_code_ != 0) {
+    if (register_peer_task->error_code_ != 0) {
         status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
         status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
         return status;
     }
 
-    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
+    leader_node_->last_update_ts_ = register_peer_task->update_time_;
+    leader_node_->node_name_ = register_peer_task->leader_name_;
+    //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
     hb_periodic_thread_ = MakeShared<Thread>([&] {
         auto hb_interval = std::chrono::milliseconds(register_peer_task->heartbeat_interval_);
         while (true) {
             std::unique_lock lock(this->hb_mutex_);
             this->hb_cv_.wait_for(lock, hb_interval, [&] { return !this->hb_running_; });
+
+            auto hb_now = std::chrono::high_resolution_clock::now();
+            auto hb_duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(hb_now.time_since_epoch());
+            this_node_->last_update_ts_ = hb_duration_in_seconds.count();
+
+            // Send heartbeat
+            SharedPtr<HeartBeatPeerTask> hb_task =
+                MakeShared<HeartBeatPeerTask>(this_node_->node_name_, txn_manager_->CurrentTS(), this_node_->last_update_ts_);
+            peer_client_->Send(hb_task);
+            hb_task->Wait();
+
+            if (hb_task->error_code_ != 0) {
+                LOG_ERROR(fmt::format("Can't connect to leader: {} ,{}:{}, error: {}",
+                                      leader_node_->node_name_,
+                                      leader_node_->ip_address_,
+                                      leader_node_->port_,
+                                      hb_task->error_message_));
+                leader_node_->node_status_ = NodeStatus::kTimeout;
+                continue;
+            }
+
+            // Update leader info
+            leader_node_->node_status_ = NodeStatus::kConnected;
+            leader_node_->last_update_ts_ = hb_task->update_time_;
+            leader_node_->leader_term_ = hb_task->leader_term_;
+
             if (!hb_running_) {
                 break;
             }
@@ -149,7 +236,13 @@ Status ClusterManager::UnInit() {
     }
 
     std::unique_lock<std::mutex> lock(mutex_);
-    peer_client_->UnInit();
+    other_nodes_.clear();
+    this_node_.reset();
+    if (peer_client_.get() != nullptr) {
+        peer_client_->UnInit();
+    }
+    peer_client_.reset();
+
     return Status::OK();
 }
 

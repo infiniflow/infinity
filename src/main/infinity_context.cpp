@@ -141,6 +141,8 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
                     Status init_status = cluster_manager_->InitAsFollower(node_name, node_ip, node_port);
                     if(!init_status.ok()) {
+                        cluster_manager_->UnInit();
+                        cluster_manager_.reset();
                         return init_status;
                     }
                     break;
@@ -155,6 +157,8 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
                     Status init_status = cluster_manager_->InitAsLearner(node_name, node_ip, node_port);
                     if(!init_status.ok()) {
+                        cluster_manager_->UnInit();
+                        cluster_manager_.reset();
                         return init_status;
                     }
                     break;
@@ -264,6 +268,8 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
                     Status init_status = cluster_manager_->InitAsLeader(node_name);
                     if(!init_status.ok()) {
+                        cluster_manager_->UnInit();
+                        cluster_manager_.reset();
                         return init_status;
                     }
                     break;

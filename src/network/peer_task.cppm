@@ -52,6 +52,7 @@ export struct NodeInfo {
     String ip_address_{};
     i64 port_{};
     i64 last_update_ts_{};
+    i64 leader_term_{};
     // u64 update_interval_{}; // seconds
     // String from_{}; // Which node the information comes from.
 };
@@ -142,6 +143,7 @@ public:
     i64 error_code_{};
     String error_message_{};
     i64 leader_term_{};
+    i64 update_time_{};
     Vector<NodeInfo> other_nodes_{};
 };
 

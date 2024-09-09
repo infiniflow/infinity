@@ -48,8 +48,11 @@ public:
 private:
     TxnManager* txn_manager_{};
     mutable std::mutex mutex_;
+
+    SharedPtr<NodeInfo> leader_node_; // Used by follower / learner
     Vector<SharedPtr<NodeInfo>> other_nodes_; // Used by leader and follower/learner
     SharedPtr<NodeInfo> this_node_; // Used by leader and follower/learner
+
     SharedPtr<PeerClient> peer_client_{}; // Used by follower and learner;
 
     Map<String, SharedPtr<PeerClient>> follower_clients_{}; // Used by leader;

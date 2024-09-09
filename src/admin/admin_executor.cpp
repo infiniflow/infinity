@@ -3803,13 +3803,6 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
 
 QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const AdminStatement *admin_statement) {
 
-    QueryResult query_result;
-    if (!InfinityContext::instance().IsClusterRole()) {
-        query_result.result_table_ = nullptr;
-        query_result.status_ = Status::NotSupport("SHOW NODE only works in cluster mode");
-        return query_result;
-    }
-
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
@@ -3819,6 +3812,8 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_current_node"), column_defs);
+
+    QueryResult query_result;
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -3829,86 +3824,104 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->ThisNode();
-    {
-        SizeT column_id = 0;
+    if (InfinityContext::instance().IsClusterRole()) {
+        SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->ThisNode();
         {
-            Value value = Value::MakeVarchar("name");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("name");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(server_node->node_name_);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
         }
 
-        ++column_id;
         {
-            Value value = Value::MakeVarchar(server_node->node_name_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("role");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
 
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("role");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            Value value = Value::MakeVarchar(ToString(server_node->node_role_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("status");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(ToString(server_node->node_role_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
         }
 
-        ++column_id;
         {
-            Value value = Value::MakeVarchar(ToString(server_node->node_status_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("status");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
 
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("address");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->ip_address_, server_node->port_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("update_time");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(ToString(server_node->node_status_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
         }
 
-        ++column_id;
         {
-            //            const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node->last_update_ts_);
-            const std::time_t t_c = server_node->last_update_ts_;
-            Value value = Value::MakeVarchar(std::ctime(&t_c));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("address");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->ip_address_, server_node->port_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("update_time");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                //            const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node->last_update_ts_);
+                const std::time_t t_c = server_node->last_update_ts_;
+                Value value = Value::MakeVarchar(std::ctime(&t_c));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+    } else {
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("role");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(ToString(InfinityContext::instance().GetServerRole()));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
         }
     }
 

@@ -38,11 +38,14 @@ Status PeerClient::Init() {
     Status status = Status::OK();
     try {
         socket_ = MakeShared<TSocket>(node_info_.ip_address_, node_info_.port_);
+
+        TSocket* socket = static_cast<TSocket*>(socket_.get());
+        socket->setConnTimeout(2000); // 2s to timeout
         transport_ = MakeShared<TBufferedTransport>(socket_);
         protocol_ = MakeShared<TBinaryProtocol>(transport_);
         client_ = MakeUnique<PeerServiceClient>(protocol_);
         transport_->open();
-        processor_thread_ = Thread([this] { Process(); });
+        processor_thread_ = MakeShared<Thread>([this] { Process(); });
     } catch (const std::exception& e) {
         status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
     }
@@ -53,10 +56,12 @@ Status PeerClient::Init() {
 /// TODO: comment
 Status PeerClient::UnInit() {
     LOG_INFO(fmt::format("Peer client: {} is stopping.", node_info_.node_name_));
-    SharedPtr<TerminatePeerTask> terminate_task = MakeShared<TerminatePeerTask>();
-    peer_task_queue_.Enqueue(terminate_task);
-    terminate_task->Wait();
-    processor_thread_.join();
+    if(processor_thread_.get() != nullptr) {
+        SharedPtr<TerminatePeerTask> terminate_task = MakeShared<TerminatePeerTask>();
+        peer_task_queue_.Enqueue(terminate_task);
+        terminate_task->Wait();
+        processor_thread_->join();
+    }
     LOG_INFO(fmt::format("Peer client: {} is stopped.", node_info_.node_name_));
     return Status::OK();
 }

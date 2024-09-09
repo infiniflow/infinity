@@ -39,16 +39,16 @@ public:
     }
     ~PeerClient();
 
-    void SetPeerNode(NodeRole role, const String& node_name, i64 update_ts) {
-        node_info_.node_name_ = node_name;
-        node_info_.last_update_ts_ = update_ts;
-        node_info_.node_status_ = NodeStatus::kConnected;
-        node_info_.node_role_ = role;
-    }
-
-    String PeerNodeName() const {
-        return node_info_.node_name_;
-    }
+//    void SetPeerNode(NodeRole role, const String& node_name, i64 update_ts) {
+//        node_info_.node_name_ = node_name;
+//        node_info_.last_update_ts_ = update_ts;
+//        node_info_.node_status_ = NodeStatus::kConnected;
+//        node_info_.node_role_ = role;
+//    }
+//
+//    String PeerNodeName() const {
+//        return node_info_.node_name_;
+//    }
 
     Status Init();
     Status UnInit();
@@ -68,7 +68,7 @@ private:
     bool running_{false};
     BlockingQueue<SharedPtr<PeerTask>> peer_task_queue_{};
 
-    Thread processor_thread_{};
+    SharedPtr<Thread> processor_thread_{};
     Atomic<u64> peer_task_count_{};
 };
 
