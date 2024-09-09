@@ -62,6 +62,24 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnT
     : BaseEntry(EntryType::kBlock, false, BlockEntry::EncodeIndex(block_id, segment_entry)), segment_entry_(segment_entry), block_id_(block_id),
       block_row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE), checkpoint_ts_(checkpoint_ts) {}
 
+BlockEntry::BlockEntry(const BlockEntry &other)
+    : BaseEntry(other), segment_entry_(other.segment_entry_), block_id_(other.block_id_), block_dir_(other.block_dir_),
+      row_capacity_(other.row_capacity_), version_buffer_object_(other.version_buffer_object_) {
+    {
+        std::shared_lock lock(other.rw_locker_);
+        block_row_count_ = other.block_row_count_;
+        fast_rough_filter_ = other.fast_rough_filter_;
+        min_row_ts_ = other.min_row_ts_;
+        max_row_ts_ = other.max_row_ts_;
+        checkpoint_ts_ = other.checkpoint_ts_;
+        using_txn_id_ = other.using_txn_id_;
+        checkpoint_row_count_ = other.checkpoint_row_count_;
+    }
+    for (auto &column : other.columns_) {
+        columns_.emplace_back(MakeUnique<BlockColumnEntry>(*column));
+    }
+}
+
 UniquePtr<BlockEntry>
 BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, checkpoint_ts);
@@ -428,7 +446,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
 
 void BlockEntry::FlushForImport() { FlushDataNoLock(0, this->block_row_count_); }
 
-void BlockEntry::LoadFilterBinaryData(const String &block_filter_data) { fast_rough_filter_.DeserializeFromString(block_filter_data); }
+void BlockEntry::LoadFilterBinaryData(const String &block_filter_data) { fast_rough_filter_->DeserializeFromString(block_filter_data); }
 
 void BlockEntry::Cleanup() {
     for (auto &block_column_entry : columns_) {

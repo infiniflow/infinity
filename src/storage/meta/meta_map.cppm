@@ -39,7 +39,7 @@ class TableIndexMeta;
 export template <MetaConcept Meta>
 class MetaMap {
 public:
-    using Map = HashMap<String, UniquePtr<Meta>>;
+    using Map = HashMap<String, SharedPtr<Meta>>;
 
     struct MapGuard {
         Map &operator*() { return meta_map_; }
@@ -47,6 +47,21 @@ public:
         Map &meta_map_;
         std::shared_lock<std::shared_mutex> r_lock_;
     };
+
+    MetaMap() = default;
+
+    MetaMap(const MetaMap &other) {
+        std::shared_lock r_lock(rw_locker_);
+        this->meta_map_ = other.meta_map_;
+    }
+
+    MetaMap &operator=(const MetaMap &other) {
+        if (this != &other) {
+            std::shared_lock r_lock(rw_locker_);
+            this->meta_map_ = other.meta_map_;
+        }
+        return *this;
+    }
 
 public:
     void AddNewMetaNoLock(const String& meta_name, UniquePtr<Meta> meta);

@@ -59,6 +59,14 @@ BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID colum
     : BaseEntry(EntryType::kBlockColumn, false, BlockColumnEntry::EncodeIndex(column_id, block_entry)), block_entry_(block_entry),
       column_id_(column_id) {}
 
+BlockColumnEntry::BlockColumnEntry(const BlockColumnEntry &other)
+    : BaseEntry(other), block_entry_(other.block_entry_), column_id_(other.column_id_), column_type_(other.column_type_), buffer_(other.buffer_),
+      file_name_(other.file_name_) {
+    std::shared_lock lock(other.mutex_);
+    outline_buffers_ = other.outline_buffers_;
+    last_chunk_offset_ = other.last_chunk_offset_;
+}
+
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id);
 

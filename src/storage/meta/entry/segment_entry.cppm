@@ -83,6 +83,8 @@ public:
                           SizeT column_count,
                           SegmentStatus status);
 
+    SegmentEntry(const SegmentEntry &other);
+
     static SharedPtr<SegmentEntry> NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
     static SharedPtr<SegmentEntry> NewReplaySegmentEntry(TableEntry *table_entry,
@@ -144,9 +146,9 @@ public:
     // `this` called in wal thread, and `block_entry_` is also accessed in flush, so lock is needed
     void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
 
-    FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
+    FastRoughFilter *GetFastRoughFilter() { return fast_rough_filter_.get(); }
 
-    const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
+    const FastRoughFilter *GetFastRoughFilter() const { return fast_rough_filter_.get(); }
 
     void LoadFilterBinaryData(const String &segment_filter_data);
     static String SegmentStatusToString(const SegmentStatus &type);
@@ -256,7 +258,7 @@ private:
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
     // check if a value must not exist in the segment
-    FastRoughFilter fast_rough_filter_;
+    SharedPtr<FastRoughFilter> fast_rough_filter_;
 
     CompactStateData *compact_state_data_{};
     SegmentStatus status_;

@@ -77,6 +77,8 @@ public:
                         SegmentID unsealed_id,
                         SegmentID next_segment_id);
 
+    TableEntry(const TableEntry &other);
+
     static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
                                                const SharedPtr<String> &db_entry_dir,
                                                SharedPtr<String> table_collection_name,
@@ -258,7 +260,7 @@ public:
     IndexReader GetFullTextIndexReader(Txn *txn);
 
     void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
-        return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
+        return fulltext_column_index_cache_->UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
 
 private:
@@ -270,9 +272,9 @@ private:
 
     const SharedPtr<String> table_entry_dir_{};
 
-    const SharedPtr<String> table_name_{};
+    SharedPtr<String> table_name_{};
 
-    const Vector<SharedPtr<ColumnDef>> columns_{};
+    Vector<SharedPtr<ColumnDef>> columns_{};
 
     const TableEntryType table_entry_type_{TableEntryType::kTableEntry};
 
@@ -286,7 +288,7 @@ private:
     Atomic<SegmentID> next_segment_id_{};
 
     // for full text search cache
-    TableIndexReaderCache fulltext_column_index_cache_;
+    SharedPtr<TableIndexReaderCache> fulltext_column_index_cache_;
 
 public:
     // set nullptr to close auto compaction

@@ -45,6 +45,8 @@ public:
 public:
     explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id);
 
+    BlockColumnEntry(const BlockColumnEntry &other);
+
     static UniquePtr<BlockColumnEntry> NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn);
 
     static UniquePtr<BlockColumnEntry> NewReplayBlockColumnEntry(const BlockEntry *block_entry,

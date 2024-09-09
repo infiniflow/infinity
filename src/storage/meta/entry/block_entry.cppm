@@ -58,6 +58,8 @@ public:
     // for iterator unit test
     explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
 
+    BlockEntry(const BlockEntry &other);
+
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);
 
@@ -138,9 +140,9 @@ public:
 
     BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
 
-    FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
+    FastRoughFilter *GetFastRoughFilter() { return fast_rough_filter_.get(); }
 
-    const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
+    const FastRoughFilter *GetFastRoughFilter() const { return fast_rough_filter_.get(); }
 
     SizeT row_count(TxnTimeStamp check_ts) const;
 
@@ -191,7 +193,7 @@ protected:
     BufferPtr version_buffer_object_{};
 
     // check if a value must not exist in the block
-    FastRoughFilter fast_rough_filter_;
+    SharedPtr<FastRoughFilter> fast_rough_filter_;
 
     TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this BlockEntry
     TxnTimeStamp max_row_ts_{0};           // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
