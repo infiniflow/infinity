@@ -170,6 +170,7 @@ export enum class ErrorCode : long {
     kInvalidFileFlag = 7015,
     kInvalidServerAddress = 7016,
     kFailToRunPython = 7017,
+    kCantConnectServer = 7018,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -327,6 +328,7 @@ public:
     static Status InvalidFileFlag(u8 flag);
     static Status InvalidServerAddress(const String &error_address);
     static Status FailToRunPython(const String &reason);
+    static Status CantConnectServer(const String& ip, i64 port, const String& reason);
 
     // meta
     static Status InvalidEntry();

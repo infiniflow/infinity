@@ -32,23 +32,44 @@ using namespace infinity_peer_server;
 
 export class PeerClient {
 public:
-    static SharedPtr<PeerClient> Connect(const String &ip_address, i64 port);
-
+    PeerClient(const String& ip_addr, i64 port, const String& node_name = {}) {
+        node_info_.ip_address_ = ip_addr;
+        node_info_.port_ = port;
+        node_info_.node_name_ = node_name;
+    }
     ~PeerClient();
-    PeerClient(SharedPtr<TTransport> socket, SharedPtr<TTransport> transport, SharedPtr<TProtocol> protocol, UniquePtr<PeerServiceClient> client)
-        : socket_(socket), transport_(transport), protocol_(protocol), client_(std::move(client)) {}
+
+    void SetPeerNode(NodeRole role, const String& node_name, i64 update_ts) {
+        node_info_.node_name_ = node_name;
+        node_info_.last_update_ts_ = update_ts;
+        node_info_.node_status_ = NodeStatus::kConnected;
+        node_info_.node_role_ = role;
+    }
+
+    String PeerNodeName() const {
+        return node_info_.node_name_;
+    }
 
     Status Init();
     Status UnInit();
-    void Send(PeerTask* task);
+    void Send(SharedPtr<PeerTask> task);
 
 private:
-    SharedPtr<TTransport> socket_;
-    SharedPtr<TTransport> transport_;
-    SharedPtr<TProtocol> protocol_;
-    UniquePtr<PeerServiceClient> client_;
-    bool running_;
-    BlockingQueue<PeerTask*> task_queue_;
+    void Process();
+
+private:
+    NodeInfo node_info_;
+
+    // For message transportation
+    SharedPtr<TTransport> socket_{};
+    SharedPtr<TTransport> transport_{};
+    SharedPtr<TProtocol> protocol_{};
+    UniquePtr<PeerServiceClient> client_{};
+    bool running_{false};
+    BlockingQueue<SharedPtr<PeerTask>> peer_task_queue_{};
+
+    Thread processor_thread_{};
+    Atomic<u64> peer_task_count_{};
 };
 
 } // namespace infinity

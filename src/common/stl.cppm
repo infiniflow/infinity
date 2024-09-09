@@ -202,6 +202,8 @@ export namespace std {
         using std::chrono::year_month_day;
         using std::chrono::sys_days;
         using std::chrono::system_clock;
+
+        using std::chrono::high_resolution_clock;
     } // namespace chrono
 
     using std::format;

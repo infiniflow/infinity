@@ -22,6 +22,8 @@ import logger;
 import peer_server_thrift_types;
 import status;
 import thrift;
+import infinity_exception;
+import peer_task;
 
 namespace infinity {
 
@@ -31,20 +33,60 @@ PeerClient::~PeerClient() {
     }
 }
 
-SharedPtr<PeerClient> PeerClient::Connect(const String &ip_address, i64 port) {
-    SharedPtr<TSocket> socket = MakeShared<TSocket>(ip_address, port);
-    SharedPtr<TBufferedTransport> transport = MakeShared<TBufferedTransport>(socket);
-    SharedPtr<TBinaryProtocol> protocol = MakeShared<TBinaryProtocol>(transport);
-    UniquePtr<PeerServiceClient> client = MakeUnique<PeerServiceClient>(protocol);
-    transport->open();
-    return MakeShared<PeerClient>(socket, transport, protocol, std::move(client));
+Status PeerClient::Init() {
+
+    Status status = Status::OK();
+    try {
+        socket_ = MakeShared<TSocket>(node_info_.ip_address_, node_info_.port_);
+        transport_ = MakeShared<TBufferedTransport>(socket_);
+        protocol_ = MakeShared<TBinaryProtocol>(transport_);
+        client_ = MakeUnique<PeerServiceClient>(protocol_);
+        transport_->open();
+        processor_thread_ = Thread([this] { Process(); });
+    } catch (const std::exception& e) {
+        status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
+    }
+
+    return status;
 }
 
 /// TODO: comment
 Status PeerClient::UnInit() {
-    transport_->close();
-    running_ = false;
+    LOG_INFO(fmt::format("Peer client: {} is stopping.", node_info_.node_name_));
+    SharedPtr<TerminatePeerTask> terminate_task = MakeShared<TerminatePeerTask>();
+    peer_task_queue_.Enqueue(terminate_task);
+    terminate_task->Wait();
+    processor_thread_.join();
+    LOG_INFO(fmt::format("Peer client: {} is stopped.", node_info_.node_name_));
     return Status::OK();
+}
+
+void PeerClient::Send(SharedPtr<PeerTask> peer_task) {
+    ++peer_task_count_;
+    peer_task_queue_.Enqueue(std::move(peer_task));
+}
+
+void PeerClient::Process() {
+    Deque<SharedPtr<PeerTask>> peer_tasks;
+    while (running_) {
+        peer_task_queue_.DequeueBulk(peer_tasks);
+        for (const auto &peer_task : peer_tasks) {
+            switch (peer_task->Type()) {
+                case PeerTaskType::kTerminate: {
+                    LOG_INFO("Stop the background processor");
+                    running_ = false;
+                }
+                default: {
+                    String error_message = fmt::format("Invalid peer task type");
+                    UnrecoverableError(error_message);
+                    break;
+                }
+            }
+            peer_task->Complete();
+        }
+        peer_task_count_ -= peer_tasks.size();
+        peer_tasks.clear();
+    }
 }
 
 } // namespace infinity

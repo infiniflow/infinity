@@ -124,7 +124,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     if(cluster_manager_ != nullptr) {
                         UnrecoverableError("cluster manager was initialized before.");
                     }
-                    cluster_manager_ = MakeUnique<ClusterManager>();
+                    cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
                     Status init_status = cluster_manager_->InitAsLeader(node_name);
                     if(!init_status.ok()) {
                         return init_status;
@@ -138,7 +138,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     }
 
                     // TODO: connect to leader;
-                    cluster_manager_ = MakeUnique<ClusterManager>();
+                    cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
                     Status init_status = cluster_manager_->InitAsFollower(node_name, node_ip, node_port);
                     if(!init_status.ok()) {
                         return init_status;
@@ -152,7 +152,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     }
 
                     // TODO: connect to leader;
-                    cluster_manager_ = MakeUnique<ClusterManager>();
+                    cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
                     Status init_status = cluster_manager_->InitAsLearner(node_name, node_ip, node_port);
                     if(!init_status.ok()) {
                         return init_status;
@@ -261,7 +261,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     if(cluster_manager_ != nullptr) {
                         UnrecoverableError("cluster manager was initialized before.");
                     }
-                    cluster_manager_ = MakeUnique<ClusterManager>();
+                    cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
                     Status init_status = cluster_manager_->InitAsLeader(node_name);
                     if(!init_status.ok()) {
                         return init_status;

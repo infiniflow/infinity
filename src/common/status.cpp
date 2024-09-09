@@ -557,6 +557,10 @@ Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
 }
 
+Status Status::CantConnectServer(const String& ip, i64 port, const String& reason) {
+    return Status(ErrorCode::kCantConnectServer, MakeUnique<String>(fmt::format("Can't connect server: {}:{}, {}", ip, port, reason)));
+}
+
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 
 Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUnique<String>("Not found entry")); }

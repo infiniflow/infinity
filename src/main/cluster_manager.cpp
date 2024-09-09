@@ -24,15 +24,15 @@ namespace infinity {
 ClusterManager::~ClusterManager() {
     other_nodes_.clear();
     this_node_.reset();
-    if(peer_client_.get() != nullptr) {
+    if (peer_client_.get() != nullptr) {
         peer_client_->UnInit();
     }
     peer_client_.reset();
 }
 
-Status ClusterManager::InitAsLeader(const String& node_name) {
+Status ClusterManager::InitAsLeader(const String &node_name) {
     std::unique_lock<std::mutex> lock(mutex_);
-    if(this_node_.get()!= nullptr) {
+    if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as leader error: already initialized.");
     }
     this_node_ = MakeShared<NodeInfo>();
@@ -49,9 +49,9 @@ Status ClusterManager::InitAsLeader(const String& node_name) {
     return Status::OK();
 }
 
-Status ClusterManager::InitAsFollower(const String& node_name, const String& leader_ip, i64 leader_port) {
+Status ClusterManager::InitAsFollower(const String &node_name, const String &leader_ip, i64 leader_port) {
     std::unique_lock<std::mutex> lock(mutex_);
-    if(this_node_.get() != nullptr) {
+    if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as follower error: already initialized.");
     }
     this_node_ = MakeShared<NodeInfo>();
@@ -61,16 +61,37 @@ Status ClusterManager::InitAsFollower(const String& node_name, const String& lea
     this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
     this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
 
-    auto now = std::chrono::system_clock::now();
-    auto time_since_epoch = now.time_since_epoch();
-    this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
+    this_node_->last_update_ts_ = duration_in_seconds.count();
+    peer_client_ = MakeShared<PeerClient>(leader_ip, leader_port);
+    peer_client_->Init();
 
-    peer_client_ = PeerClient::Connect(leader_ip, leader_port);
-    return Status::OK();
+    // Register to leader;
+    SharedPtr<RegisterPeerTask> register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
+                                                                                  this_node_->node_role_,
+                                                                                  this_node_->ip_address_,
+                                                                                  this_node_->port_,
+                                                                                  txn_manager_->CurrentTS(),
+                                                                                  this_node_->last_update_ts_);
+    peer_client_->Send(register_peer_task);
+    register_peer_task->Wait();
+
+
+    Status status = Status::OK();
+    if(register_peer_task->error_code_ != 0) {
+        status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
+        status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
+        return status;
+    }
+
+    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
+    // Start HB thread.
+    return status;
 }
-Status ClusterManager::InitAsLearner(const String& node_name, const String& leader_ip, i64 leader_port) {
+Status ClusterManager::InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port) {
     std::unique_lock<std::mutex> lock(mutex_);
-    if(this_node_.get() != nullptr) {
+    if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as learner error: already initialized.");
     }
     this_node_ = MakeShared<NodeInfo>();
@@ -80,28 +101,66 @@ Status ClusterManager::InitAsLearner(const String& node_name, const String& lead
     this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
     this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
 
-    auto now = std::chrono::system_clock::now();
-    auto time_since_epoch = now.time_since_epoch();
-    this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
+    this_node_->last_update_ts_ = duration_in_seconds.count();
 
-    peer_client_ = PeerClient::Connect(leader_ip, leader_port);
-    return Status::OK();
+    peer_client_ = MakeShared<PeerClient>(leader_ip, leader_port);
+    peer_client_->Init();
+
+    // Register to leader;
+    SharedPtr<RegisterPeerTask> register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
+                                                                                  this_node_->node_role_,
+                                                                                  this_node_->ip_address_,
+                                                                                  this_node_->port_,
+                                                                                  txn_manager_->CurrentTS(),
+                                                                                  this_node_->last_update_ts_);
+    peer_client_->Send(register_peer_task);
+    register_peer_task->Wait();
+
+    Status status = Status::OK();
+    if(register_peer_task->error_code_ != 0) {
+        status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
+        status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
+        return status;
+    }
+
+    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
+    // Start HB thread.
+    hb_periodic_thread_ = MakeShared<Thread>([&] {
+        auto hb_interval = std::chrono::milliseconds(register_peer_task->heartbeat_interval_);
+        while (true) {
+            std::unique_lock lock(this->hb_mutex_);
+            this->hb_cv_.wait_for(lock, hb_interval, [&] { return !this->hb_running_; });
+            if (!hb_running_) {
+                break;
+            }
+        }
+    });
+    hb_periodic_thread_->detach();
+    return status;
 }
 
 Status ClusterManager::UnInit() {
-    std::unique_lock<std::mutex> lock(mutex_);
+    {
+        std::lock_guard lock(hb_mutex_);
+        hb_running_ = false;
+        hb_cv_.notify_all();
+    }
 
+    std::unique_lock<std::mutex> lock(mutex_);
+    peer_client_->UnInit();
     return Status::OK();
 }
 
-Status ClusterManager::Register(SharedPtr<NodeInfo> server_node) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return Status::OK();
-}
-Status ClusterManager::Unregister(const String &node_name) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return Status::OK();
-}
+// Status ClusterManager::Register(SharedPtr<NodeInfo> server_node) {
+//     std::unique_lock<std::mutex> lock(mutex_);
+//     return Status::OK();
+// }
+// Status ClusterManager::Unregister(const String &node_name) {
+//     std::unique_lock<std::mutex> lock(mutex_);
+//     return Status::OK();
+// }
 
 Status ClusterManager::UpdateNodeInfo(const SharedPtr<NodeInfo> &server_node) {
     std::unique_lock<std::mutex> lock(mutex_);

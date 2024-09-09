@@ -22,12 +22,14 @@ import third_party;
 import status;
 import peer_thrift_client;
 import peer_task;
+import txn_manager;
 
 namespace infinity {
 
 export class ClusterManager {
 public:
-    ClusterManager() = default;
+    explicit
+    ClusterManager(TxnManager* txn_manager): txn_manager_(txn_manager) {}
     ~ClusterManager();
 
     Status InitAsLeader(const String& node_name);
@@ -35,8 +37,8 @@ public:
     Status InitAsLearner(const String& node_name, const String& leader_ip, i64 leader_port);
     Status UnInit();
 
-    Status Register(SharedPtr<NodeInfo> server_node);
-    Status Unregister(const String& node_name); // Used by manual or disconnect from follower/learner
+//    Status Register(SharedPtr<NodeInfo> server_node);
+//    Status Unregister(const String& node_name); // Used by manual or disconnect from follower/learner
 
     Status UpdateNodeInfo(const SharedPtr<NodeInfo>& server_node); // Used by leader;
     Status UpdateNonLeaderNodeInfo(const Vector<SharedPtr<NodeInfo>>& info_of_nodes); // Use by follower / learner to update all node info.
@@ -44,12 +46,18 @@ public:
     SharedPtr<NodeInfo> GetNodeInfoPtrByName(const String& node_name) const;
     SharedPtr<NodeInfo> ThisNode() const;
 private:
+    TxnManager* txn_manager_{};
     mutable std::mutex mutex_;
     Vector<SharedPtr<NodeInfo>> other_nodes_; // Used by leader and follower/learner
     SharedPtr<NodeInfo> this_node_; // Used by leader and follower/learner
     SharedPtr<PeerClient> peer_client_{}; // Used by follower and learner;
 
     Map<String, SharedPtr<PeerClient>> follower_clients_{}; // Used by leader;
+
+    SharedPtr<Thread> hb_periodic_thread_{};
+    std::mutex hb_mutex_;
+    std::condition_variable hb_cv_;
+    bool hb_running_{false};
 };
 
 }

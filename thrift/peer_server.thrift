@@ -31,6 +31,7 @@ struct RegisterResponse {
 3: string leader_name,
 4: i64 leader_term,
 5: i64 heart_beat_interval, // microseconds
+6: i64 message_time,
 }
 
 struct UnRegisterRequest {

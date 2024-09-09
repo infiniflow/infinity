@@ -31,8 +31,9 @@ export enum class NodeRole {
 
 export String ToString(NodeRole);
 
-enum class PeerTaskType {
+export enum class PeerTaskType {
     kInvalid,
+    kTerminate,
     kRegister,
     kUnregister,
     kLogSync,
@@ -40,12 +41,7 @@ enum class PeerTaskType {
     kNewLeader,
 };
 
-export enum class NodeStatus {
-    kReady,
-    kConnected,
-    kTimeout,
-    kInvalid
-};
+export enum class NodeStatus { kReady, kConnected, kTimeout, kInvalid };
 
 export String ToString(NodeStatus);
 
@@ -55,24 +51,47 @@ export struct NodeInfo {
     String node_name_{};
     String ip_address_{};
     i64 port_{};
-    u64 last_update_ts_{};
+    i64 last_update_ts_{};
     // u64 update_interval_{}; // seconds
     // String from_{}; // Which node the information comes from.
 };
 
 export class PeerTask {
 public:
-    PeerTask(PeerTaskType type) : type_(type) {}
+    explicit PeerTask(PeerTaskType type, bool async = false) : type_(type), async_(async) {}
     virtual ~PeerTask() = default;
 
-    void Wait();
-    void Notify();
+    void Wait() {
+        if (async_) {
+            return;
+        }
+        std::unique_lock<std::mutex> locker(mutex_);
+        cv_.wait(locker, [this] { return complete_; });
+    }
 
+    void Complete() {
+        if (async_) {
+            return;
+        }
+        std::unique_lock<std::mutex> locker(mutex_);
+        complete_ = true;
+        cv_.notify_one();
+    }
+
+    [[nodiscard]] PeerTaskType Type() const {
+        return type_;
+    }
 protected:
     PeerTaskType type_{PeerTaskType::kInvalid};
-    std::mutex task_mutex{};
-    std::condition_variable task_cv{};
-    bool finished_{false};
+    mutable std::mutex mutex_{};
+    std::condition_variable cv_{};
+    bool complete_{false};
+    bool async_{false};
+};
+
+export class TerminatePeerTask final : public PeerTask {
+public:
+    TerminatePeerTask() : PeerTask(PeerTaskType::kTerminate) {}
 };
 
 export class RegisterPeerTask final : public PeerTask {
@@ -94,6 +113,7 @@ public:
     String leader_name_{};
     i64 leader_term_{};
     i64 heartbeat_interval_{}; // microseconds
+    i64 update_time_{};
 };
 
 export class UnregisterPeerTask final : public PeerTask {
