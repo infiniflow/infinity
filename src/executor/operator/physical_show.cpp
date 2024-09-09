@@ -509,16 +509,18 @@ void PhysicalShow::Init() {
             break;
         }
         case ShowType::kShowPersistenceObjects: {
-            output_names_->reserve(4);
-            output_types_->reserve(4);
+            output_names_->reserve(5);
+            output_types_->reserve(5);
             output_names_->emplace_back("name");
             output_names_->emplace_back("reference_count");
             output_names_->emplace_back("size");
-            output_names_->emplace_back("deleted_size");
+            output_names_->emplace_back("parts");
+            output_names_->emplace_back("deleted_ranges");
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
             break;
         }
         case ShowType::kShowPersistenceObject: {
@@ -5348,8 +5350,8 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(1, bigint_type, "reference_count", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(2, bigint_type, "size", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(2, bigint_type, "parts", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(3, varchar_type, "deleted_ranges", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, bigint_type, "parts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "deleted_ranges", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_persistence_objects"), column_defs);
@@ -5408,9 +5410,10 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
             // deleted ranges
             OStringStream oss;
             for (const auto &range : object_pair.second.deleted_ranges_) {
-                oss << "[" << range.start_ << ", " << range.end_ << ") ";
+                oss << fmt::format("[{}, {}) ", range.start_, range.end_);
             }
-            Value value = Value::MakeVarchar(oss.str());
+            String deleted_ranges = oss.str();
+            Value value = Value::MakeVarchar(deleted_ranges);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
