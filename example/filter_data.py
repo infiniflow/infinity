@@ -94,6 +94,12 @@ try:
 
     result = table_instance.output(["num", "name", "score"]).filter("(score > 80.0) and (score <= 90.0)").to_pl()
     print(result)
+
+    # result = table_instance.output(["num", "name", "score"]).filter("not (score > 80.0)").to_pl()
+    # print(result)
+
+    result = table_instance.output(["num", "name", "score"]).filter("num <> 9").to_pl()
+    print(result)
     infinity_instance.disconnect()
 
     print('test done')

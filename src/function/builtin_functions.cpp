@@ -97,7 +97,8 @@ void BuiltinFunctions::RegisterScalarFunction() {
 
     // register comparison operator
     RegisterEqualsFunction(catalog_ptr_);
-    RegisterInEqualsFunction(catalog_ptr_);
+    RegisterInEqualFunction(catalog_ptr_);
+    RegisterInEqualAliasFunction(catalog_ptr_);
     RegisterLessFunction(catalog_ptr_);
     RegisterLessEqualsFunction(catalog_ptr_);
     RegisterGreaterFunction(catalog_ptr_);

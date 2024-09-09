@@ -964,7 +964,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                 if(global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerServerConnectionPoolSize) == nullptr) {
                     // peer server pool size
                     i64 peer_server_connection_pool_size = 64;
-                    UniquePtr<IntegerOption> peer_server_connection_pool_size_option = MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, peer_server_connection_pool_size, 65536, 1);
+                    UniquePtr<IntegerOption> peer_server_connection_pool_size_option = MakeUnique<IntegerOption>(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME, peer_server_connection_pool_size, 65536, 1);
                     Status status = global_options_.AddOption(std::move(peer_server_connection_pool_size_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());

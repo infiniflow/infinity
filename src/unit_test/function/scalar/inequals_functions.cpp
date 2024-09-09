@@ -49,7 +49,7 @@ TEST_P(InEqualsFunctionsTest, inequals_func) {
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
-    RegisterInEqualsFunction(catalog_ptr);
+    RegisterInEqualFunction(catalog_ptr);
 
     String op = "<>";
     SharedPtr<FunctionSet> function_set = Catalog::GetFunctionSetByName(catalog_ptr.get(), op);
