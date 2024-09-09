@@ -51,7 +51,7 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
     for (SizeT i = 0; i < block_entry->columns_.size(); i++) {
         auto &col_i_outline_info = outline_infos_[i];
         auto *column = block_entry->columns_[i].get();
-        col_i_outline_info = {column->OutlineBufferCount(0), column->LastChunkOff(0)};
+        col_i_outline_info = {column->OutlineBufferCount(), column->LastChunkOff()};
         Vector<String> paths = column->FilePaths();
         paths_.insert(paths_.end(), paths.begin(), paths.end());
     }

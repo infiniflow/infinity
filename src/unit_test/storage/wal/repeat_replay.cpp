@@ -119,7 +119,7 @@ TEST_P(RepeatReplayTest, append) {
                 ASSERT_EQ(block_entry->columns().size(), 2ul);
                 {
                     auto &col2 = block_entry->columns()[1];
-                    EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
+                    EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
                 }
             }
         }
