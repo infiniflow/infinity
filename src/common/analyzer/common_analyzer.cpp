@@ -30,7 +30,6 @@ constexpr int MAX_TUPLE_LENGTH = 1024;
 CommonLanguageAnalyzer::CommonLanguageAnalyzer()
     : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(MakeUnique<Stemmer>()), case_sensitive_(false), contain_lower_(false),
       extract_eng_stem_(true), extract_synonym_(false), cjk_(false), remove_stopwords_(false) {
-    stemmer_->Init(STEM_LANG_ENGLISH);
     TokenizeConfig token_config;
     String divide_str("@#$");
     String unite_str("/");
@@ -40,6 +39,8 @@ CommonLanguageAnalyzer::CommonLanguageAnalyzer()
 }
 
 CommonLanguageAnalyzer::~CommonLanguageAnalyzer() {}
+
+void CommonLanguageAnalyzer::InitStemmer(Language language) { stemmer_->Init(language); }
 
 int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     Parse(input.text_);
