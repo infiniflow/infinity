@@ -466,6 +466,36 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
                                               std::move(old_chunk_ids));
             break;
         }
+        case WalCommandType::RENAME_TABLE: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String new_table_name = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdRenameTable>(std::move(db_name), std::move(table_name), std::move(new_table_name));
+            break;
+        }
+        case WalCommandType::ADD_COLUMNS: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            i32 column_n = ReadBufAdv<i32>(ptr);
+            Vector<SharedPtr<ColumnDef>> columns;
+            for (i32 i = 0; i < column_n; i++) {
+                auto cd = ColumnDef::ReadAdv(ptr, max_bytes);
+                columns.push_back(cd);
+            }
+            cmd = MakeShared<WalCmdAddColumns>(std::move(db_name), std::move(table_name), std::move(columns));
+            break;
+        }
+        case WalCommandType::DROP_COLUMNS: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            i32 column_n = ReadBufAdv<i32>(ptr);
+            Vector<String> column_names;
+            for (i32 i = 0; i < column_n; i++) {
+                column_names.push_back(ReadBufAdv<String>(ptr));
+            }
+            cmd = MakeShared<WalCmdDropColumns>(std::move(db_name), std::move(table_name), std::move(column_names));
+            break;
+        }
         default: {
             String error_message = fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type));
             UnrecoverableError(error_message);
@@ -583,6 +613,33 @@ bool WalCmdDumpIndex::operator==(const WalCmd &other) const {
            deprecate_ids_ == other_cmd->deprecate_ids_;
 }
 
+bool WalCmdRenameTable::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdRenameTable *>(&other);
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
+           IsEqual(new_table_name_, other_cmd->new_table_name_);
+}
+
+bool WalCmdAddColumns::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdAddColumns *>(&other);
+    bool res = other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
+               column_defs_.size() == other_cmd->column_defs_.size();
+    if (!res) {
+        return false;
+    }
+    for (SizeT i = 0; i < column_defs_.size(); i++) {
+        if (*(column_defs_[i]) != *(other_cmd->column_defs_[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool WalCmdDropColumns::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdDropColumns *>(&other);
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
+           column_names_ == other_cmd->column_names_;
+}
+
 i32 WalCmdCreateDatabase::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size();
 }
@@ -671,6 +728,27 @@ i32 WalCmdDumpIndex::GetSizeInBytes() const {
     }
     size += sizeof(i32) + sizeof(ChunkID) * this->deprecate_ids_.size();
     return size;
+}
+
+i32 WalCmdRenameTable::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+           this->new_table_name_.size();
+}
+
+i32 WalCmdAddColumns::GetSizeInBytes() const {
+    SizeT res = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32);
+    for (const auto &column_def : column_defs_) {
+        res += column_def->GetSizeInBytes();
+    }
+    return res;
+}
+
+i32 WalCmdDropColumns::GetSizeInBytes() const {
+    SizeT res = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32);
+    for (const auto &column_name : column_names_) {
+        res += sizeof(i32) + column_name.size();
+    }
+    return res;
 }
 
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
@@ -819,6 +897,33 @@ void WalCmdDumpIndex::WriteAdv(char *&buf) const {
     }
 }
 
+void WalCmdRenameTable::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::RENAME_TABLE);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->new_table_name_);
+}
+
+void WalCmdAddColumns::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::ADD_COLUMNS);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, static_cast<i32>(this->column_defs_.size()));
+    for (const auto &column_def : column_defs_) {
+        column_def->WriteAdv(buf);
+    }
+}
+
+void WalCmdDropColumns::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::DROP_COLUMNS);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, static_cast<i32>(this->column_names_.size()));
+    for (const auto &column_name : column_names_) {
+        WriteBufAdv(buf, column_name);
+    }
+}
+
 String WalCmdCreateDatabase::ToString() const {
     std::stringstream ss;
     ss << "db name: " << db_name_ << std::endl;
@@ -960,6 +1065,36 @@ String WalCmdDumpIndex::ToString() const {
     return ss.str();
 }
 
+String WalCmdRenameTable::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "new table name: " << new_table_name_ << std::endl;
+    return ss.str();
+}
+
+String WalCmdAddColumns::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "columns: ";
+    for (auto &column_def : column_defs_) {
+        ss << column_def->ToString() << " | ";
+    }
+    return ss.str();
+}
+
+String WalCmdDropColumns::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "columns: ";
+    for (auto &column_name : column_names_) {
+        ss << column_name << " | ";
+    }
+    return ss.str();
+}
+
 String WalCmdCreateDatabase::CompactInfo() const {
     return fmt::format("{}: database: {}, dir: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, db_dir_tail_);
 }
@@ -1073,6 +1208,30 @@ String WalCmdDumpIndex::CompactInfo() const {
                        ss.str());
 
     return ss.str();
+}
+
+String WalCmdRenameTable::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, new table: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       new_table_name_);
+}
+
+String WalCmdAddColumns::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, columns: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       column_defs_.size());
+}
+
+String WalCmdDropColumns::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, columns: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       column_names_.size());
 }
 
 bool WalEntry::operator==(const WalEntry &other) const {

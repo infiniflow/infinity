@@ -810,6 +810,18 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
                 WalCmdDumpIndexReplay(*static_cast<WalCmdDumpIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             }
+            case WalCommandType::RENAME_TABLE: {
+                WalCmdRenameTableReplay(*static_cast<WalCmdRenameTable *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                break;
+            }
+            case WalCommandType::ADD_COLUMNS: {
+                WalCmdAddColumnsReplay(*static_cast<WalCmdAddColumns *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                break;
+            }
+            case WalCommandType::DROP_COLUMNS: {
+                WalCmdDropColumnsReplay(*static_cast<WalCmdDropColumns *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                break;
+            }
             default: {
                 String error_message = "WalManager::ReplayWalEntry unknown wal command type";
                 UnrecoverableError(error_message);
@@ -1091,6 +1103,18 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
             old_chunk->DeprecateChunk(commit_ts);
         }
     }
+}
+
+void WalManager::WalCmdRenameTableReplay(WalCmdRenameTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    //
+}
+
+void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    //
+}
+
+void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    //
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
