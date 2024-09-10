@@ -311,8 +311,8 @@ target_sources(infinity
 
 add_dependencies(infinity oatpp)
 
-include(/home/weilongma/Desktop/vcpkg/scripts/buildsystems/vcpkg.cmake)
-find_package(miniocpp REQUIRED)
+#include(/home/weilongma/Desktop/vcpkg/scripts/buildsystems/vcpkg.cmake)
+#find_package(miniocpp REQUIRED)
 target_link_libraries(infinity
         infinity_core
         sql_parser
@@ -330,7 +330,7 @@ target_link_libraries(infinity
         event.a
         c++.a
         c++abi.a
-        miniocpp::miniocpp
+        #miniocpp::miniocpp
         #        profiler
         oatpp.a
         parquet.a
@@ -392,7 +392,7 @@ if (SKBUILD)
             thrift.a
             thriftnb.a
             snappy.a
-            miniocpp::miniocpp
+            #miniocpp::miniocpp
     )
 
     # WARN: python modules shall not link to static libstdc++!!!
@@ -528,7 +528,7 @@ target_link_libraries(unit_test
         thriftnb.a
         snappy.a
         ${JEMALLOC_STATIC_LIB}
-        miniocpp::miniocpp
+        #miniocpp::miniocpp
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
