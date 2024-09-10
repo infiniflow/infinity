@@ -200,12 +200,17 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     } else {
         leader_node_->heartbeat_interval_ = register_peer_task->heartbeat_interval_;
     }
-    hb_periodic_thread_ = MakeShared<Thread>([&] {
+
+    this->hb_running_ = true;
+    hb_periodic_thread_ = MakeShared<Thread>([this] {
         auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval_);
-        this->hb_running_ = true;
+
         while (true) {
             std::unique_lock lock(this->hb_mutex_);
             this->hb_cv_.wait_for(lock, hb_interval, [&] { return !this->hb_running_; });
+            if (!hb_running_) {
+                break;
+            }
 
             auto hb_now = std::chrono::high_resolution_clock::now();
             auto hb_duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(hb_now.time_since_epoch());
@@ -231,10 +236,6 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
             leader_node_->node_status_ = NodeStatus::kConnected;
             leader_node_->last_update_ts_ = hb_task->update_time_;
             leader_node_->leader_term_ = hb_task->leader_term_;
-
-            if (!hb_running_) {
-                break;
-            }
         }
     });
     return status;
@@ -242,10 +243,11 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
 
 Status ClusterManager::UnInit() {
     if(hb_periodic_thread_.get() != nullptr) {
-        std::lock_guard lock(hb_mutex_);
-        hb_running_ = false;
-        hb_cv_.notify_all();
-
+        {
+            std::lock_guard lock(hb_mutex_);
+            hb_running_ = false;
+            hb_cv_.notify_all();
+        }
         hb_periodic_thread_->join();
         hb_periodic_thread_.reset();
     }

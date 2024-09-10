@@ -60,7 +60,7 @@ private:
     SharedPtr<Thread> hb_periodic_thread_{};
     std::mutex hb_mutex_;
     std::condition_variable hb_cv_;
-    bool hb_running_{false};
+    Atomic<bool> hb_running_{false};
 };
 
 }
