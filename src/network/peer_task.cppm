@@ -52,6 +52,7 @@ export struct NodeInfo {
     String node_name_{};
     String ip_address_{};
     i64 port_{};
+    i64 txn_timestamp_{};
     i64 last_update_ts_{};
     i64 leader_term_{};
     i64 heartbeat_interval_{}; // provide by leader and used by follower and learner;

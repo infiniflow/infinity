@@ -561,6 +561,13 @@ Status Status::CantConnectServer(const String& ip, i64 port, const String& reaso
     return Status(ErrorCode::kCantConnectServer, MakeUnique<String>(fmt::format("Can't connect server: {}:{}, {}", ip, port, reason)));
 }
 
+Status Status::NotExistNode(const String& node_info) {
+    return Status(ErrorCode::kNotExistNode, MakeUnique<String>(fmt::format("Node doesn't exist: {}", node_info)));
+}
+Status Status::DuplicateNode(const String& node_info) {
+    return Status(ErrorCode::kDuplicateNode, MakeUnique<String>(fmt::format("Duplicate node: {}", node_info)));
+}
+
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 
 Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUnique<String>("Not found entry")); }
@@ -578,6 +585,6 @@ Status Status::WrongCheckpointType(const String &expect_type, const String &actu
                   MakeUnique<String>(fmt::format("Expect checkpoint type: {}, actual checkpoint type: {}", expect_type, actual_type)));
 }
 
-Status Status::InvalidServerRole(const String &message) { return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>(message)); }
+Status Status::InvalidServerRole(const String &message) { return Status(ErrorCode::kInvalidServerRole, MakeUnique<String>(message)); }
 
 } // namespace infinity

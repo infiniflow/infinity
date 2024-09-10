@@ -14,11 +14,14 @@
 
 module;
 
+#include <vector>
+
 module cluster_manager;
 
 import stl;
 import infinity_context;
 import logger;
+import infinity_exception;
 
 namespace infinity {
 
@@ -99,7 +102,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     leader_node_->node_name_ = register_peer_task->leader_name_;
     //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
-    if(register_peer_task->heartbeat_interval_ == 0) {
+    if (register_peer_task->heartbeat_interval_ == 0) {
         leader_node_->heartbeat_interval_ = 1000; // 1000 ms by default
     } else {
         leader_node_->heartbeat_interval_ = register_peer_task->heartbeat_interval_;
@@ -195,7 +198,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
 
-    if(register_peer_task->heartbeat_interval_ == 0) {
+    if (register_peer_task->heartbeat_interval_ == 0) {
         leader_node_->heartbeat_interval_ = 1000; // 1000 ms by default
     } else {
         leader_node_->heartbeat_interval_ = register_peer_task->heartbeat_interval_;
@@ -242,7 +245,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
 }
 
 Status ClusterManager::UnInit() {
-    if(hb_periodic_thread_.get() != nullptr) {
+    if (hb_periodic_thread_.get() != nullptr) {
         {
             std::lock_guard lock(hb_mutex_);
             hb_running_ = false;
@@ -272,8 +275,65 @@ Status ClusterManager::UnInit() {
 //     return Status::OK();
 // }
 
-Status ClusterManager::UpdateNodeInfo(const SharedPtr<NodeInfo> &server_node) {
+Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     std::unique_lock<std::mutex> lock(mutex_);
+    if (this_node_->node_role_ == NodeRole::kLeader) {
+        // Add by register
+        bool found = false;
+        for (const SharedPtr<NodeInfo> &other_node : other_nodes_) {
+            if (other_node->node_name_ == node_info->node_name_) {
+                // Found the node, just update the info
+                found = true;
+                break;
+            }
+        }
+        if (found) {
+            return Status::DuplicateNode(node_info->node_name_);
+        }
+    } else {
+        String error_message = "Invalid node role.";
+        UnrecoverableError(error_message);
+    }
+    return Status::OK();
+}
+
+Status ClusterManager::UpdateNodeInfo(const SharedPtr<NodeInfo> &node_info) {
+    std::unique_lock<std::mutex> lock(mutex_);
+
+    bool found = false;
+    for (SharedPtr<NodeInfo> &other_node : other_nodes_) {
+        if (other_node->node_name_ == node_info->node_name_) {
+            // Found the node, just update the info
+            found = true;
+            *other_node = *node_info;
+            break;
+        }
+    }
+
+    switch (this_node_->node_role_) {
+        case NodeRole::kLeader: {
+            // Update and heartbeat
+            if (found == false) {
+                return Status::NotExistNode(fmt::format("node: {}, {}, address: {}:{}",
+                                                        node_info->node_name_,
+                                                        ToString(node_info->node_role_),
+                                                        node_info->ip_address_,
+                                                        node_info->port_));
+            }
+            break;
+        }
+        case NodeRole::kFollower:
+        case NodeRole::kLearner: {
+            if (found == false) {
+                other_nodes_.emplace_back(leader_node_);
+            }
+            break;
+        }
+        default: {
+            String error_message = "Invalid node role.";
+            UnrecoverableError(error_message);
+        }
+    }
     return Status::OK();
 }
 Status ClusterManager::UpdateNonLeaderNodeInfo(const Vector<SharedPtr<NodeInfo>> &info_of_nodes) {
@@ -282,7 +342,13 @@ Status ClusterManager::UpdateNonLeaderNodeInfo(const Vector<SharedPtr<NodeInfo>>
 }
 Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
     std::unique_lock<std::mutex> lock(mutex_);
-    return {};
+    Vector<SharedPtr<NodeInfo>> result = other_nodes_;
+    result.emplace_back(this_node_);
+    if (this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
+        result.emplace_back(leader_node_);
+    }
+
+    return result;
 }
 SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);

@@ -20,11 +20,49 @@ import stl;
 import third_party;
 import logger;
 import peer_server_thrift_types;
+import infinity_context;
+import peer_task;
+import status;
 
 namespace infinity {
 
 void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &response, const infinity_peer_server::RegisterRequest &request) {
-    LOG_INFO("Get Register request");
+
+    LOG_TRACE("Get Register request");
+    // This must be a leader node.
+    NodeInfo* leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
+    if(leader_node->node_role_ == NodeRole::kLeader) {
+        SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
+        non_leader_node_info->node_name_ = request.node_name;
+        switch(request.node_type) {
+            case infinity_peer_server::NodeType::kLeader: {
+                non_leader_node_info->node_role_ = NodeRole::kLeader;
+                break;
+            }
+            case infinity_peer_server::NodeType::kFollower: {
+                non_leader_node_info->node_role_ = NodeRole::kFollower;
+                break;
+            }
+            case infinity_peer_server::NodeType::kLearner: {
+                non_leader_node_info->node_role_ = NodeRole::kLearner;
+                break;
+            }
+        }
+        non_leader_node_info->ip_address_ = request.node_ip;
+        non_leader_node_info->port_ = request.node_port;
+        non_leader_node_info->txn_timestamp_ = request.txn_timestamp;
+        non_leader_node_info->last_update_ts_ = request.message_time;
+        InfinityContext::instance().cluster_manager()->AddNodeInfo(non_leader_node_info);
+
+        response.leader_name = leader_node->node_name_;
+        response.leader_term = leader_node->leader_term_;
+        response.heart_beat_interval = leader_node->heartbeat_interval_;
+        response.message_time = leader_node->last_update_ts_;
+    } else {
+        response.error_code = static_cast<i64>(ErrorCode::kInvalidServerRole);
+        response.error_msg = fmt::format("Attempt to register a non-leader node: {}", ToString(leader_node->node_role_));
+    }
+
     return ;
 }
 

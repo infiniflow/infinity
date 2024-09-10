@@ -171,6 +171,8 @@ export enum class ErrorCode : long {
     kInvalidServerAddress = 7016,
     kFailToRunPython = 7017,
     kCantConnectServer = 7018,
+    kNotExistNode = 7019,
+    kDuplicateNode = 7020,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -179,7 +181,7 @@ export enum class ErrorCode : long {
     kEmptyEntryList = 8004,
     kNoWALEntryFound = 8005,
     kWrongCheckpointType = 8006,
-    kInvalidServerStatus = 8007
+    kInvalidServerRole = 8007
 };
 
 export class Status {
@@ -329,6 +331,8 @@ public:
     static Status InvalidServerAddress(const String &error_address);
     static Status FailToRunPython(const String &reason);
     static Status CantConnectServer(const String& ip, i64 port, const String& reason);
+    static Status NotExistNode(const String& node_info);
+    static Status DuplicateNode(const String& node_info);
 
     // meta
     static Status InvalidEntry();
