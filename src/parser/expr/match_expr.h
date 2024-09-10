@@ -32,6 +32,7 @@ public:
     std::string fields_;
     std::string matching_text_;
     std::string options_text_;
+    std::unique_ptr<ParsedExpr> filter_expr_;
 };
 
 } // namespace infinity

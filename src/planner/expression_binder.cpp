@@ -135,9 +135,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildExpression(const ParsedExpr &ex
         case ParsedExprType::kIn: {
             return BuildInExpr((const InExpr &)expr, bind_context_ptr, depth, root);
         }
-        case ParsedExprType::kKnn: {
-            return BuildKnnExpr((const KnnExpr &)expr, bind_context_ptr, depth, root);
-        }
         case ParsedExprType::kSearch: {
             return BuildSearchExpr((const SearchExpr &)expr, bind_context_ptr, depth, root);
         }
