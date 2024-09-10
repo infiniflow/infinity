@@ -161,7 +161,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
 
 void BufferObj::PickForCleanup() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (ptr_rc_ > 1) {
+    if (*ptr_rc_ > 1) {
         return;
     }
     switch (status_) {
