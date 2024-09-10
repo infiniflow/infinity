@@ -44,6 +44,7 @@ import emvb_index_file_worker;
 import bmp_index_file_worker;
 import column_def;
 import infinity_context;
+import persistence_manager;
 
 namespace infinity {
 
@@ -352,23 +353,15 @@ void ChunkIndexEntry::Cleanup() {
     const auto &index_dir = segment_index_entry_->index_dir();
     const IndexBase *index_base = table_index_entry->index_base();
     if (index_base->index_type_ == IndexType::kFullText) {
-        if (InfinityContext::instance().persistence_manager() != nullptr) {
-            // TODO cleanup fulltext file obj,
+        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        if (pm != nullptr) {
             Path path = Path(*index_dir) / base_name_;
             String index_prefix = path.string();
             String posting_file = index_prefix + POSTING_SUFFIX;
             String dict_file = index_prefix + DICT_SUFFIX;
-
-            String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
-            String absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
-
-            LocalFileSystem fs;
-            fs.DeleteFile(absolute_posting_file);
-            fs.DeleteFile(absolute_dict_file);
-            LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}",
-                                  index_prefix,
-                                  absolute_posting_file,
-                                  absolute_dict_file));
+            pm->Cleanup(posting_file);
+            pm->Cleanup(dict_file);
+            LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}", index_prefix, posting_file, dict_file));
         } else {
             Path path = Path(*index_dir) / base_name_;
             String index_prefix = path.string();

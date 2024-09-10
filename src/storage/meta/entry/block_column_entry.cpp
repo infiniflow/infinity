@@ -125,7 +125,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
         auto outline_buffer_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                     MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                     block_entry->block_dir(),
-                                                                    column_entry->OutlineFilename(0, 0),
+                                                                    column_entry->OutlineFilename(0),
                                                                     buffer_size);
         auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker), true /*restart*/);
         column_entry->outline_buffers_.push_back(buffer_obj);
@@ -161,76 +161,13 @@ ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, c
     return column_vector;
 }
 
-SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, const SizeT file_idx) const {
-    if (buffer_group_id == 0) {
-        return MakeShared<String>(fmt::format("col_{}_out_{}", column_id_, file_idx));
-    } else if (buffer_group_id == 1) {
-        return MakeShared<String>(fmt::format("col_{}_out1_{}", column_id_, file_idx));
-    } else {
-        String error_message = "Invalid buffer group id";
-        UnrecoverableError(error_message);
-        return nullptr;
-    }
-}
-
 Vector<String> BlockColumnEntry::FilePaths() const {
     Vector<String> res = {LocalFileSystem::ConcatenateFilePath(*FileDir(), *file_name_)};
     for (SizeT file_idx = 0; file_idx < outline_buffers_.size(); ++file_idx) {
-        String outline_file_path = *OutlineFilename(0, file_idx);
+        String outline_file_path = *OutlineFilename(file_idx);
         res.push_back(LocalFileSystem::ConcatenateFilePath(*FileDir(), outline_file_path));
     }
     return res;
-}
-
-void BlockColumnEntry::AppendOutlineBuffer(const u32 buffer_group_id, BufferObj *buffer) {
-    std::unique_lock lock(mutex_);
-    if (buffer_group_id == 0) {
-        outline_buffers_.push_back(buffer);
-    } else {
-        String error_message = "Invalid buffer group id";
-        UnrecoverableError(error_message);
-    }
-}
-
-BufferObj *BlockColumnEntry::GetOutlineBuffer(const u32 buffer_group_id, const SizeT idx) const {
-    std::shared_lock lock(mutex_);
-    if (buffer_group_id == 0) {
-        return outline_buffers_.empty() ? nullptr : outline_buffers_[idx].get();
-    } else {
-        String error_message = "Invalid buffer group id";
-        UnrecoverableError(error_message);
-        return nullptr;
-    }
-}
-
-SizeT BlockColumnEntry::OutlineBufferCount(const u32 buffer_group_id) const {
-    std::shared_lock lock(mutex_);
-    if (buffer_group_id == 0) {
-        return outline_buffers_.size();
-    } else {
-        String error_message = "Invalid buffer group id";
-        UnrecoverableError(error_message);
-        return 0;
-    }
-}
-
-u64 BlockColumnEntry::LastChunkOff(const u32 buffer_group_id) const {
-    if (buffer_group_id == 0) {
-        return last_chunk_offset_;
-    } else {
-        String error_message = "Invalid buffer group id";
-        UnrecoverableError(error_message);
-        return 0;
-    }
-}
-
-void BlockColumnEntry::SetLastChunkOff(const u32 buffer_group_id, const u64 offset) {
-    if (buffer_group_id == 0) {
-        last_chunk_offset_ = offset;
-    } else {
-        String error_message = "Invalid buffer group id";
-        UnrecoverableError(error_message);
-    }
 }
 
 void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input_column_vector_offset, SizeT append_rows, BufferManager *buffer_mgr) {
@@ -334,7 +271,7 @@ nlohmann::json BlockColumnEntry::Serialize() {
     {
         std::shared_lock lock(mutex_);
         json_res["next_outline_idx"] = outline_buffers_.size();
-        json_res["last_chunk_offset"] = this->LastChunkOff(0);
+        json_res["last_chunk_offset"] = this->LastChunkOff();
     }
 
     json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);

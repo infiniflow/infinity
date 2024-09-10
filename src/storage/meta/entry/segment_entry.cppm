@@ -158,7 +158,6 @@ public:
     String ToString() const;
 public:
     // Const getter
-    void SetTableEntry(TableEntry *table_entry);
     const TableEntry *GetTableEntry() const { return table_entry_; }
     // Relative to the `data_dir` config item
     const SharedPtr<String> &segment_dir() const { return segment_dir_; }

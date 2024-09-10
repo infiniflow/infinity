@@ -145,6 +145,9 @@ bool DateTypeStd::Add(DateTypeStd input, IntervalType interval, DateTypeStd &out
     switch (interval.unit) {
         case kYear: {
             ymd += std::chrono::years{interval.value};
+            if(!ymd.ok()) {
+                ymd = ymd.year()/ymd.month()/std::chrono::last;
+            }
             output.value = std::chrono::sys_days{ymd}.time_since_epoch().count();
             return true;
         }
