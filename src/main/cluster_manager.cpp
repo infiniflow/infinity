@@ -192,6 +192,8 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
         status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
         return status;
     }
+    // Update this node info
+    this_node_->node_status_ = NodeStatus::kConnected;
 
     leader_node_->last_update_ts_ = register_peer_task->leader_update_time_;
     leader_node_->node_name_ = register_peer_task->leader_name_;
@@ -282,7 +284,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
         bool found = false;
         for (const SharedPtr<NodeInfo> &other_node : other_nodes_) {
             if (other_node->node_name_ == node_info->node_name_) {
-                // Found the node, just update the info
+                // Found the node, duplicate node
                 found = true;
                 break;
             }
@@ -290,6 +292,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
         if (found) {
             return Status::DuplicateNode(node_info->node_name_);
         }
+        other_nodes_.emplace_back(node_info);
     } else {
         String error_message = "Invalid node role.";
         UnrecoverableError(error_message);

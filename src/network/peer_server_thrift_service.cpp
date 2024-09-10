@@ -50,6 +50,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         }
         non_leader_node_info->ip_address_ = request.node_ip;
         non_leader_node_info->port_ = request.node_port;
+        non_leader_node_info->node_status_ = NodeStatus::kReady;
         non_leader_node_info->txn_timestamp_ = request.txn_timestamp;
         non_leader_node_info->last_update_ts_ = request.message_time;
         InfinityContext::instance().cluster_manager()->AddNodeInfo(non_leader_node_info);
