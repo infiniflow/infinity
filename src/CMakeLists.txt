@@ -271,8 +271,9 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/arrow/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/minio-cpp/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp_x64-linux/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann/nlohmann-json_x64-linux/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 
 if (NOT SUPPORT_FMA EQUAL 0)
     message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -344,8 +345,9 @@ target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/minio-cpp/include")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp_x64-linux/include")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann/nlohmann-json_x64-linux/include")
+target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp/include")
+target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
+target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 
 if (SKBUILD)
     add_library(embedded_infinity_ext MODULE
