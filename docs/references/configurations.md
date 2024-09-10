@@ -25,7 +25,7 @@ The loading methods listed above have increasing priority, so a higher-priority 
 ```toml
 [general]
 # version of Infinity Server, defaults to version in source code
-version                  = "0.3.0"
+version                  = "0.4.0"
 # timezone
 time_zone                = "utc-8"
 # number of worker threads, defaults to concurrent threads supported by compiler implementation
