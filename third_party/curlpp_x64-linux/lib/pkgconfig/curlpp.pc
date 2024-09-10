@@ -1,0 +1,14 @@
+prefix=${pcfiledir}/../..
+# This is a comment
+exec_prefix=${prefix}
+includedir=include
+
+Name: curlpp
+Description: cURLpp is a libcurl C++ wrapper
+Version:                            
+# libcurl is required as non-private because CurlHandle.inl uses curl_easy_setopt.
+ 
+
+Libs: -Llib -lcurlpp
+Requires: libcurl
+Cflags: -Iinclude 
