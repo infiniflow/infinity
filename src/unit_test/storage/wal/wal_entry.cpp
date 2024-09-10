@@ -36,6 +36,7 @@ import column_def;
 import statement_common;
 import data_type;
 import persistence_manager;
+import embedding_info;
 
 using namespace infinity;
 
@@ -250,6 +251,28 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<WalChunkIndexInfo> chunk_infos{info};
         Vector<ChunkID> deprecate_ids{0, 1};
         entry->cmds_.push_back(MakeShared<WalCmdDumpIndex>("db1", "tbl1", "idx1", 0 /*segment_id*/, chunk_infos, deprecate_ids));
+    }
+    {
+        entry->cmds_.push_back(MakeShared<WalCmdRenameTable>("db1", "tbl1", "tbl2"));
+    }
+    {
+        Vector<SharedPtr<ColumnDef>> column_defs;
+        std::set<ConstraintType> constraints;
+
+        auto column_def3 = MakeShared<ColumnDef>(3 /*column_id*/, MakeShared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
+        auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
+        auto column_def4 =
+            MakeShared<ColumnDef>(4 /*column id*/, MakeShared<DataType>(LogicalType::kEmbedding, embedding_info), "embedding_col", constraints);
+
+        column_defs.push_back(column_def3);
+        column_defs.push_back(column_def4);
+        entry->cmds_.push_back(MakeShared<WalCmdAddColumns>("db1", "tbl1", std::move(column_defs)));
+    }
+    {
+        Vector<String> column_names;
+        column_names.push_back("boolean_col");
+        column_names.push_back("embedding_col");
+        entry->cmds_.push_back(MakeShared<WalCmdDropColumns>("db1", "tbl1", std::move(column_names)));
     }
 
     i32 exp_size = entry->GetSizeInBytes();

@@ -110,7 +110,7 @@ public:
     Status BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Alter operator
-    Status BuildAlter(const AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildAlter(AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Show operator
     Status BuildShow(ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

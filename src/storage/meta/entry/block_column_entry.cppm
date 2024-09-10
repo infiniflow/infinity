@@ -27,6 +27,8 @@ import vector_buffer;
 import txn;
 import internal_types;
 import base_entry;
+import column_def;
+import value;
 
 namespace infinity {
 
@@ -44,6 +46,12 @@ public:
 
 public:
     explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id);
+
+private:
+    BlockColumnEntry(const BlockColumnEntry &other);
+
+public:
+    UniquePtr<BlockColumnEntry> Clone(BlockEntry *block_entry) const;
 
     static UniquePtr<BlockColumnEntry> NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn);
 
@@ -64,7 +72,7 @@ public:
     // Getter
     inline const BlockEntry *GetBlockEntry() const { return block_entry_; }
     inline const SharedPtr<DataType> &column_type() const { return column_type_; }
-    inline BufferObj *buffer() const { return buffer_; }
+    inline BufferObj *buffer() const { return buffer_.get(); }
     inline u64 column_id() const { return column_id_; }
     inline const SharedPtr<String> &filename() const { return file_name_; }
     inline const BlockEntry *block_entry() const { return block_entry_; }
@@ -94,7 +102,7 @@ public:
 
     BufferObj *GetOutlineBuffer(SizeT idx) const {
         std::shared_lock lock(mutex_);
-        return outline_buffers_.empty() ? nullptr : outline_buffers_[idx];
+        return outline_buffers_.empty() ? nullptr : outline_buffers_[idx].get();
     }
 
     SizeT OutlineBufferCount() const {
@@ -113,16 +121,18 @@ public:
 
     void Cleanup();
 
+    void FillWithDefaultValue(SizeT row_count, const Value *default_value, BufferManager *buffer_mgr);
+
 private:
     const BlockEntry *block_entry_{nullptr};
     ColumnID column_id_{};
     SharedPtr<DataType> column_type_{};
-    BufferObj *buffer_{};
+    BufferPtr buffer_{};
 
     SharedPtr<String> file_name_{};
 
     mutable std::shared_mutex mutex_{};
-    Vector<BufferObj *> outline_buffers_;
+    Vector<BufferPtr> outline_buffers_;
     u64 last_chunk_offset_{};
 };
 

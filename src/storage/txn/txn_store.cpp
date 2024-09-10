@@ -76,6 +76,10 @@ void TxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState
             local_delta_ops->AddOperation(MakeUnique<AddColumnEntryOp>(column_entry.get(), commit_ts));
         }
     }
+
+    for (auto *block_column_entry : block_column_entries_) {
+        local_delta_ops->AddOperation(MakeUnique<AddColumnEntryOp>(block_column_entry, commit_ts));
+    }
 }
 
 ///-----------------------------------------------------------------------------
@@ -467,6 +471,15 @@ void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block
         iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore(segment_entry)).first;
     }
     iter->second.block_entries_.emplace(block_entry->block_id(), block_entry);
+    has_update_ = true;
+}
+
+void TxnTableStore::AddBlockColumnStore(SegmentEntry *segment_entry, BlockEntry *block_entry, BlockColumnEntry *block_column_entry) {
+    auto iter = txn_segments_store_.find(segment_entry->segment_id());
+    if (iter == txn_segments_store_.end()) {
+        iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore(segment_entry)).first;
+    }
+    iter->second.block_column_entries_.emplace_back(block_column_entry);
     has_update_ = true;
 }
 

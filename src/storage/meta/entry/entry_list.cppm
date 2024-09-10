@@ -47,15 +47,40 @@ enum class FindResult : u8 {
 
 export template <EntryConcept Entry>
 class EntryList {
-
 public:
+    EntryList() = default;
+
+    EntryList(const EntryList &&other) {
+        std::unique_lock lock(rw_locker_);
+        entry_list_ = std::move(other.entry_list_);
+    }
+
+    EntryList &operator=(EntryList &&other) {
+        if (this != &other) {
+            std::unique_lock lock(rw_locker_);
+            entry_list_ = std::move(other.entry_list_);
+        }
+        return *this;
+    }
+
+    template<typename T>
+    EntryList Clone(T *parent) const {
+        EntryList new_entry_list;
+        std::shared_lock r_lock(rw_locker_);
+        for (const auto &entry : entry_list_) {
+            new_entry_list.entry_list_.push_back(entry->Clone(parent));
+        }
+        return new_entry_list;
+    }
+
     // op
     Tuple<Entry *, Status> AddEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                     std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func,
                                     TransactionID txn_id,
                                     TxnTimeStamp begin_ts,
                                     TxnManager *txn_mgr,
-                                    ConflictType conflict_type);
+                                    ConflictType conflict_type,
+                                    bool add_if_found = false);
 
     Tuple<SharedPtr<Entry>, Status> DropEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                               std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func,
@@ -231,10 +256,14 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
                                                   TransactionID txn_id,
                                                   TxnTimeStamp begin_ts,
                                                   TxnManager *txn_mgr,
-                                                  ConflictType conflict_type) {
+                                                  ConflictType conflict_type,
+                                                  bool add_if_found) {
     std::unique_lock lock(rw_locker_);
     parent_r_lock.unlock();
     FindResult find_res = this->FindEntryNoLock(txn_id, begin_ts, txn_mgr);
+    if (add_if_found && find_res == FindResult::kFound) {
+        find_res = FindResult::kNotFound;
+    }
     switch (find_res) {
         case FindResult::kUncommittedDelete:
         case FindResult::kNotFound: {
