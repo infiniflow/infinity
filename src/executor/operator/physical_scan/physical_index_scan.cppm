@@ -37,7 +37,7 @@ import table_index_entry;
 import segment_index_entry;
 import fast_rough_filter;
 import global_block_id;
-import bitmask;
+import roaring_bitmap;
 
 namespace infinity {
 
@@ -112,11 +112,10 @@ private:
     mutable Vector<SizeT> column_ids_{};
 };
 
-export std::variant<Vector<u32>, Bitmask> SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_execute_command,
-                                                                    const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
-                                                                    SegmentID segment_id,
-                                                                    u32 segment_row_count,
-                                                                    u32 segment_row_actual_count,
-                                                                    Txn *txn);
+export Bitmask SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_execute_command,
+                                         const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
+                                         SegmentID segment_id,
+                                         u32 segment_row_count,
+                                         Txn *txn);
 
 } // namespace infinity

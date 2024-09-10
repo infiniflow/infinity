@@ -18,7 +18,7 @@ export module knn_flat_ip_reservoir;
 
 import stl;
 import knn_result_handler;
-import bitmask;
+import roaring_bitmap;
 import knn_distance;
 import logger;
 

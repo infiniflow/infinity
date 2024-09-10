@@ -16,7 +16,7 @@
 import base_test;
 
 import stl;
-import bitmask;
+import roaring_bitmap;
 import data_store;
 import vec_store_type;
 import dist_func_l2;
@@ -103,7 +103,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
         EXPECT_NEAR(result[3].second, 3, error);
     }
 
-    auto p_bitmask = Bitmask::Make(64);
+    auto p_bitmask = Bitmask::MakeSharedAllTrue(base_embedding_count);
     p_bitmask->SetFalse(1);
     --top_k;
     {

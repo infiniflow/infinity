@@ -51,7 +51,7 @@ import status;
 import logger;
 import physical_index_scan;
 import filter_value_type_classification;
-import bitmask;
+import roaring_bitmap;
 import segment_entry;
 import segment_index_entry;
 import chunk_index_entry;
@@ -256,12 +256,14 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         auto *index_entry = index_entries_[task_job_index];
         const auto segment_id = index_entry->segment_id();
         SegmentEntry *segment_entry = nullptr;
+        SegmentOffset segment_row_count = 0;
         const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
             String error_message = fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id);
             UnrecoverableError(error_message);
         } else {
             segment_entry = iter->second.segment_entry_;
+            segment_row_count = iter->second.segment_offset_;
         }
 
         bool has_some_result = false;
@@ -270,21 +272,12 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             has_some_result = true;
             segment_bitmask.SetAllTrue();
         } else {
-            auto it = common_query_filter_->filter_result_.find(segment_id);
-            if (it != common_query_filter_->filter_result_.end()) {
+            if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
                 LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, index_entries_.size()));
-
-                auto segment_row_count = segment_entry->row_count();
-                const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
-                if (std::holds_alternative<Vector<u32>>(filter_result)) {
-                    const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                    segment_bitmask.Initialize(std::bit_ceil(segment_row_count));
-                    segment_bitmask.SetAllFalse();
-                    for (u32 row_id : filter_result_vector) {
-                        segment_bitmask.SetTrue(row_id);
-                    }
-                } else {
-                    segment_bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+                segment_bitmask = it->second;
+                if (segment_row_count != segment_bitmask.count()) {
+                    UnrecoverableError(
+                        fmt::format("Segment row count {} not match with bitmask size {}", segment_row_count, segment_bitmask.count()));
                 }
                 has_some_result = true;
             }

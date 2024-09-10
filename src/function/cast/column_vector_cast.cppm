@@ -19,7 +19,7 @@ export module column_vector_cast;
 import column_vector;
 import stl;
 
-import bitmask;
+import roaring_bitmap;
 import bound_cast_func;
 import unary_operator;
 import embedding_unary_operator;

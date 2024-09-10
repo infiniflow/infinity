@@ -31,7 +31,7 @@ import mlas_matrix_multiply;
 import emvb_product_quantization;
 import emvb_shared_vec;
 import infinity_exception;
-import bitmask;
+import roaring_bitmap;
 import segment_entry;
 import block_index;
 import knn_filter;

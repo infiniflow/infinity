@@ -16,16 +16,13 @@
 This example is to connect local infinity instance, create table, insert data, search the data
 '''
 
-import infinity
-from infinity.common import SparseVector
+import infinity_embedded as infinity
+#import infinity
 import sys
 
 try:
-    # open a local directory to store the data
-    infinity_instance = infinity.connect("/var/infinity")
-
-    # connect to server with 127.0.0.1
-    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+    # open a local directory(default = "/var/infinity") or connect to server(default = NetworkAddress("127.0.0.1", 23817)) to store the data
+    infinity_instance = infinity.connect()
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -46,22 +43,22 @@ try:
             {
                 "num": 1,
                 "body": r"unnecessary and harmful",
-                "vec":  SparseVector([10, 20, 30], [1.1, 2.2, 3.3])
+                "vec":  infinity.common.SparseVector([10, 20, 30], [1.1, 2.2, 3.3])
             },
             {
                 "num": 2,
                 "body": r"Office for Harmful Blooms",
-                "vec": SparseVector([40, 50, 60], [4.4, 5.5, 6.6])
+                "vec": infinity.common.SparseVector([40, 50, 60], [4.4, 5.5, 6.6])
             },
             {
                 "num": 3,
                 "body": r"A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
-                "vec":  SparseVector([70, 80, 90], [7.7, 8.8, 9.9])
+                "vec":  infinity.common.SparseVector([70, 80, 90], [7.7, 8.8, 9.9])
             },
         ]
     )
 
-    result = table_instance.output(["num", "vec", "_similarity"]).match_sparse("vec", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3).to_pl()
+    result = table_instance.output(["num", "vec", "_similarity"]).match_sparse("vec", infinity.common.SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3).to_pl()
     print(result)
     infinity_instance.disconnect()
 

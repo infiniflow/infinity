@@ -23,7 +23,7 @@ export module column_vector;
 import stl;
 import global_resource_usage;
 import vector_buffer;
-import bitmask;
+import roaring_bitmap;
 import selection;
 import default_values;
 import value;
@@ -79,6 +79,9 @@ public:
     SharedPtr<VectorBuffer> buffer_{nullptr};
 
     // A bitmap to indicate the null information
+    // true: row is not null
+    // false: row is null
+    // initial state: all true
     SharedPtr<Bitmask> nulls_ptr_{nullptr};
 
     bool initialized{false};

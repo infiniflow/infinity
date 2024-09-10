@@ -32,7 +32,7 @@ import data_type;
 import segment_entry;
 import version_file_worker;
 import column_vector;
-import bitmask;
+import roaring_bitmap;
 import block_version;
 import cleanup_scanner;
 import buffer_manager;

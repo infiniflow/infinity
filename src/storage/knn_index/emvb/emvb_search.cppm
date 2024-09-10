@@ -19,12 +19,12 @@ import stl;
 import emvb_shared_vec;
 import simd_init;
 import simd_functions;
+import roaring_bitmap;
 
 namespace infinity {
 
 extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
-struct Bitmask;
 struct BlockIndex;
 struct SegmentEntry;
 

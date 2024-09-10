@@ -12,7 +12,6 @@ import third_party;
 import logger;
 import table_def;
 import value;
-import bitmask;
 
 import data_block;
 import default_values;

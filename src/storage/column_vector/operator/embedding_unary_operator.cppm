@@ -17,11 +17,9 @@ module;
 export module embedding_unary_operator;
 
 import stl;
-import bitmask;
+import roaring_bitmap;
 import column_vector;
 import infinity_exception;
-
-import bitmask_buffer;
 import embedding_info;
 import logger;
 
@@ -115,55 +113,19 @@ private:
                                            SizeT dim,
                                            SizeT count,
                                            void *state_ptr) {
-        if (input_null->IsAllTrue()) {
-            // Initialized all true to output null bitmask.
-            result_null->SetAllTrue();
-
-            for (SizeT i = 0; i < count; ++i) {
-                Operator::template Execute<InputElemType, ResultElemType>(input_ptr + dim * i,
-                                                                          result_ptr + dim * i,
-                                                                          dim,
-                                                                          result_null.get(),
-                                                                          i,
-                                                                          state_ptr);
+        *result_null = *input_null;
+        result_null->RoaringBitmapApplyFunc([&](u32 row_index) {
+            if (row_index >= count) {
+                return false;
             }
-        } else {
-            result_null->DeepCopy(*input_null);
-
-            const u64 *input_null_data = input_null->GetData();
-            SizeT unit_count = BitmaskBuffer::UnitCount(count);
-            for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-                if (input_null_data[i] == BitmaskBuffer::UNIT_MAX) {
-                    // all data of 64 rows are not null
-                    while (start_index < end_index) {
-                        Operator::template Execute<InputElemType, ResultElemType>(input_ptr + dim * start_index,
-                                                                                  result_ptr + dim * start_index,
-                                                                                  dim,
-                                                                                  result_null.get(),
-                                                                                  start_index,
-                                                                                  state_ptr);
-                        ++start_index;
-                    }
-                } else if (input_null_data[i] == BitmaskBuffer::UNIT_MIN) {
-                    // all data of 64 rows are null
-                    ;
-                } else {
-                    SizeT original_start = start_index;
-                    while (start_index < end_index) {
-                        if (input_null->IsTrue(start_index - original_start)) {
-                            // This row isn't null
-                            Operator::template Execute<InputElemType, ResultElemType>(input_ptr + dim * start_index,
-                                                                                      result_ptr + dim * start_index,
-                                                                                      dim,
-                                                                                      result_null.get(),
-                                                                                      start_index,
-                                                                                      state_ptr);
-                            ++start_index;
-                        }
-                    }
-                }
-            }
-        }
+            Operator::template Execute<InputElemType, ResultElemType>(input_ptr + dim * row_index,
+                                                                      result_ptr + dim * row_index,
+                                                                      dim,
+                                                                      result_null.get(),
+                                                                      row_index,
+                                                                      state_ptr);
+            return row_index + 1 < count;
+        });
     }
 };
 
