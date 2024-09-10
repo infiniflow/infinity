@@ -28,7 +28,7 @@ import txn;
 import internal_types;
 import base_entry;
 import column_def;
-import constant_expr;
+import value;
 
 namespace infinity {
 
@@ -121,7 +121,7 @@ public:
 
     void Cleanup();
 
-    void FillWithDefaultValue(SizeT row_count, const ConstantExpr *default_value, BufferManager *buffer_mgr);
+    void FillWithDefaultValue(SizeT row_count, const Value *default_value, BufferManager *buffer_mgr);
 
 private:
     const BlockEntry *block_entry_{nullptr};

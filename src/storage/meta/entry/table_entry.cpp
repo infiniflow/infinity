@@ -1360,20 +1360,22 @@ void TableEntry::SetUnlock() {
 }
 
 void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs,
-                            const Vector<const ConstantExpr *> &default_values,
+                            const Vector<Value> &default_values,
                             TxnTableStore *txn_table_store) {
-    SizeT column_num = columns_.size();
-    columns_.insert(columns_.end(), column_defs.begin(), column_defs.end());
+    for (auto &column_def : column_defs) {
+        column_def->id_ = columns_.size();
+        columns_.push_back(column_def);
+    }
 
     for (const auto &column_def : column_defs) {
         column_name2column_id_[column_def->name()] = column_def->id();
     }
-    Vector<Pair<ColumnID, const ConstantExpr *>> columns;
+    Vector<Pair<ColumnID, const Value *>> columns_info;
     for (SizeT idx = 0; idx < column_defs.size(); ++idx) {
-        columns.emplace_back(column_num + idx, default_values[idx]);
+        columns_info.emplace_back(column_defs[idx]->id(), &default_values[idx]);
     }
     for (auto &[segment_id, segment_entry] : segment_map_) {
-        segment_entry->AddColumns(columns, txn_table_store);
+        segment_entry->AddColumns(columns_info, txn_table_store);
     }
 }
 

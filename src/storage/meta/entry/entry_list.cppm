@@ -79,7 +79,8 @@ public:
                                     TransactionID txn_id,
                                     TxnTimeStamp begin_ts,
                                     TxnManager *txn_mgr,
-                                    ConflictType conflict_type);
+                                    ConflictType conflict_type,
+                                    bool add_if_found = false);
 
     Tuple<SharedPtr<Entry>, Status> DropEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                               std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func,
@@ -255,10 +256,14 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
                                                   TransactionID txn_id,
                                                   TxnTimeStamp begin_ts,
                                                   TxnManager *txn_mgr,
-                                                  ConflictType conflict_type) {
+                                                  ConflictType conflict_type,
+                                                  bool add_if_found) {
     std::unique_lock lock(rw_locker_);
     parent_r_lock.unlock();
     FindResult find_res = this->FindEntryNoLock(txn_id, begin_ts, txn_mgr);
+    if (add_if_found && find_res == FindResult::kFound) {
+        find_res = FindResult::kNotFound;
+    }
     switch (find_res) {
         case FindResult::kUncommittedDelete:
         case FindResult::kNotFound: {

@@ -1432,6 +1432,15 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::DUMP_INDEX:
             command = "DUMP_INDEX";
             break;
+        case WalCommandType::RENAME_TABLE:
+            command = "RENAME_TABLE";
+            break;
+        case WalCommandType::ADD_COLUMNS:
+            command = "ADD_COLUMNS";
+            break;
+        case WalCommandType::DROP_COLUMNS:
+            command = "DROP_COLUMNS";
+            break;
         default: {
             String error_message = "Unknown command type";
             UnrecoverableError(error_message);

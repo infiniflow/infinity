@@ -502,6 +502,9 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
     for (const auto &[block_id, block_entry] : segment_store.block_entries_) {
         block_entry->CommitBlock(txn_id, commit_ts);
     }
+    for (auto *block_column_entry : segment_store.block_column_entries_) {
+        block_column_entry->CommitColumn(txn_id, commit_ts);   
+    }
 }
 
 void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const HashMap<BlockID, BlockEntry *> &block_entries) {
@@ -671,7 +674,7 @@ String SegmentEntry::ToString() const {
     return fmt::format("Segment path: {}, id: {}, row_count: {}, block_count: {}, status: {}", *segment_dir_, segment_id_, row_count_, block_entries_.size(), SegmentStatusToString(status_));
 }
 
-void SegmentEntry::AddColumns(const Vector<Pair<ColumnID, const ConstantExpr *>> &columns, TxnTableStore *table_store) {
+void SegmentEntry::AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store) {
     for (auto &block : block_entries_) {
         block->AddColumns(columns, table_store);
     }

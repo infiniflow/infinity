@@ -276,7 +276,7 @@ public:
 
     void PickCleanup(CleanupScanner *scanner) override;
 
-    void AddColumns(const Vector<Pair<ColumnID, const ConstantExpr *>> &columns, TxnTableStore *table_store);
+    void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
 
     void DropColumns(const Vector<ColumnID> &column_ids, Txn *txn);
 };

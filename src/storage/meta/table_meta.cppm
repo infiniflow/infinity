@@ -102,7 +102,8 @@ private:
                     SharedPtr<TableEntry> table_entry,
                     TransactionID txn_id,
                     TxnTimeStamp begin_ts,
-                    TxnManager *txn_mgr);
+                    TxnManager *txn_mgr,
+                    bool add_if_exist = false);
 
     void DeleteEntry(TransactionID txn_id);
 

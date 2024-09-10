@@ -108,9 +108,8 @@ public:
         return const_expr != nullptr && const_expr->literal_type_ != LiteralType::kNull;
     }
 
-    const ConstantExpr *default_value() const {
-        auto const_expr = std::dynamic_pointer_cast<ConstantExpr>(default_expr_);
-        return const_expr.get();
+    const std::shared_ptr<ConstantExpr> default_value() const {
+        return std::dynamic_pointer_cast<ConstantExpr>(default_expr_);
     }
 
 public:

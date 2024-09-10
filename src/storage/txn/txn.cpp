@@ -253,17 +253,17 @@ Status Txn::RenameTable(TableEntry *old_table_entry, const String &new_table_nam
     return Status::OK();
 }
 
-Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<const ConstantExpr *> &default_values) {
+Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_id_, begin_ts);
     if (!db_status.ok()) {
         return db_status;
     }
-    auto new_table_entry = MakeShared<TableEntry>(*table_entry);
+    UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
     TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
     new_table_entry->AddColumns(column_defs, default_values, txn_table_store);
-    auto add_status = db_entry->AddTable(new_table_entry, txn_id_, begin_ts, txn_mgr_);
+    auto add_status = db_entry->AddTable(std::move(new_table_entry), txn_id_, begin_ts, txn_mgr_, true/*add_if_found*/);
     if (!add_status.ok()) {
         return add_status;
     }

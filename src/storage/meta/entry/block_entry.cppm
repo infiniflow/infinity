@@ -35,7 +35,6 @@ import buffer_obj;
 import bitmask;
 import wal_entry;
 import column_def;
-import constant_expr;
 import txn_store;
 
 namespace infinity {
@@ -178,7 +177,7 @@ public:
 
     ColumnVector GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
 
-    void AddColumns(const Vector<Pair<ColumnID, const ConstantExpr *>> &columns, TxnTableStore *table_store);
+    void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
 
     void DropColumns(const Vector<ColumnID> &column_ids, Txn *txn);
 
@@ -204,7 +203,7 @@ protected:
     BufferPtr version_buffer_object_{};
 
     // check if a value must not exist in the block
-    SharedPtr<FastRoughFilter> fast_rough_filter_;
+    SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
 
     TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this BlockEntry
     TxnTimeStamp max_row_ts_{0};           // Indicate the max commit_ts which create/update/delete data inside this BlockEntry

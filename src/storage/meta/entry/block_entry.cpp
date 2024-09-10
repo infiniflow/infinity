@@ -393,14 +393,14 @@ ColumnVector BlockEntry::GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offs
     return column_vector;
 }
 
-void BlockEntry::AddColumns(const Vector<Pair<ColumnID, const ConstantExpr *>> &columns, TxnTableStore *table_store) {
+void BlockEntry::AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store) {
     Txn *txn = table_store->GetTxn();
     BufferManager *buffer_mgr = txn->buffer_mgr();
-    for (const auto [column_id, default_value] : columns) {
+    for (const auto &[column_id, default_value] : columns) {
         auto column_entry = BlockColumnEntry::NewBlockColumnEntry(this, column_id, txn);
         column_entry->FillWithDefaultValue(block_row_count_, default_value, buffer_mgr);
-        columns_.emplace_back(std::move(column_entry));
         table_store->AddBlockColumnStore(const_cast<SegmentEntry *>(segment_entry_), this, column_entry.get());
+        columns_.emplace_back(std::move(column_entry));
     }
 }
 

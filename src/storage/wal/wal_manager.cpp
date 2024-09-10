@@ -56,6 +56,10 @@ import defer_op;
 import index_base;
 import base_table_ref;
 import constant_expr;
+import bind_context;
+import value_expression;
+import expression_binder;
+import value;
 
 module wal_manager;
 
@@ -1118,12 +1122,18 @@ void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn
     }
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
-    Vector<const ConstantExpr *> default_values;
+    Vector<Value> default_values;
+    ExpressionBinder tmp_binder(nullptr);
     for (const auto &column_def : cmd.column_defs_) {
         if (!column_def->has_default_value()) {
             UnrecoverableError(fmt::format("Wal Replay: Add column {} without default value", column_def->name()));
         }
-        default_values.push_back(column_def->default_value());
+
+        auto default_expr = column_def->default_value();
+        auto expr = tmp_binder.BuildValueExpr(*default_expr, nullptr, 0, false);
+        auto value_expr = std::dynamic_pointer_cast<ValueExpression>(expr);
+
+        default_values.push_back(value_expr->GetValue());
     }
     table_entry->AddColumns(cmd.column_defs_, default_values, txn_store);
 }

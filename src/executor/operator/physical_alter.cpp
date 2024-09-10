@@ -24,6 +24,10 @@ import third_party;
 import txn;
 import status;
 import infinity_exception;
+import value;
+import bind_context;
+import value_expression;
+import expression_binder;
 
 namespace infinity {
 
@@ -50,14 +54,19 @@ void PhysicalAddColumns::Init() {}
 bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
     Txn *txn = query_context->GetTxn();
 
-    Vector<const ConstantExpr *> default_values;
+    ExpressionBinder tmp_binder(nullptr);
+    Vector<Value> values;
     for (const auto &column_def : column_defs_) {
         if (!column_def->has_default_value()) {
             UnrecoverableError(fmt::format("Column {} has no default value", column_def->name()));
         }
-        default_values.push_back(column_def->default_value());
+        SharedPtr<ConstantExpr> default_expr = column_def->default_value();
+        auto expr = tmp_binder.BuildValueExpr(*default_expr, nullptr, 0, false);
+        auto value_expr = std::dynamic_pointer_cast<ValueExpression>(expr);
+
+        values.push_back(value_expr->GetValue());
     }
-    auto status = txn->AddColumns(table_entry_, column_defs_, default_values);
+    auto status = txn->AddColumns(table_entry_, column_defs_, values);
     if (!status.ok()) {
         RecoverableError(status);
     }

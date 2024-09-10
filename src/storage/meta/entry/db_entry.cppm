@@ -97,7 +97,7 @@ public:
 
     void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);
 
-    Status AddTable(SharedPtr<TableEntry> table_entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Status AddTable(SharedPtr<TableEntry> table_entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, bool add_if_found = false);
 
     // replay
     void CreateTableReplay(const SharedPtr<String> &table_name,

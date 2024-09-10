@@ -113,7 +113,8 @@ Status TableMeta::AddEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                            SharedPtr<TableEntry> table_entry,
                            TransactionID txn_id,
                            TxnTimeStamp begin_ts,
-                           TxnManager *txn_mgr) {
+                           TxnManager *txn_mgr,
+                           bool add_if_found) {
     auto [table_entry_ptr, status] = table_entry_list_.AddEntry(
         std::move(r_lock),
         [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -124,7 +125,8 @@ Status TableMeta::AddEntry(std::shared_lock<std::shared_mutex> &&r_lock,
         txn_id,
         begin_ts,
         txn_mgr,
-        ConflictType::kError);
+        ConflictType::kError,
+        add_if_found);
     return status;
 }
 
