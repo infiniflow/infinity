@@ -163,7 +163,7 @@ public:
     BufferPtr() : buffer_obj_(nullptr) {}
 
     ~BufferPtr() {
-        if (*ptr_rc_ > 0) {
+        if (buffer_obj_ != nullptr && *ptr_rc_ > 0) {
             --*ptr_rc_;
         }
     }
