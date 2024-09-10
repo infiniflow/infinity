@@ -18,7 +18,7 @@ export module knn_filter;
 
 import stl;
 import hnsw_common;
-import bitmask;
+import roaring_bitmap;
 
 import segment_entry;
 

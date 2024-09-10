@@ -18,7 +18,7 @@ module;
 #include <vector>
 module common_query_filter;
 import stl;
-import bitmask;
+import roaring_bitmap;
 import base_expression;
 import base_table_ref;
 import block_index;
@@ -38,7 +38,6 @@ import internal_types;
 import column_vector;
 import segment_iter;
 import vector_buffer;
-import bitmask_buffer;
 import data_type;
 import logical_type;
 import expression_state;
@@ -68,55 +67,20 @@ void ReadDataBlock(DataBlock *output,
     output->Finalize();
 }
 
-void MergeIntoBitmask(const VectorBuffer *input_bool_column_buffer,
-                      const SharedPtr<Bitmask> &input_null_mask,
-                      const SizeT count,
-                      Bitmask &bitmask,
-                      bool nullable,
-                      SizeT bitmask_offset = 0) {
-    if ((!nullable) || (input_null_mask->IsAllTrue())) {
-        for (SizeT idx = 0; idx < count; ++idx) {
-            if (!(input_bool_column_buffer->GetCompactBit(idx))) {
-                bitmask.SetFalse(idx + bitmask_offset);
-            }
+void MergeFalseIntoBitmask(const VectorBuffer *input_bool_column_buffer,
+                           const SharedPtr<Bitmask> &input_null_mask,
+                           const SizeT count,
+                           Bitmask &bitmask,
+                           const SizeT bitmask_offset) {
+    input_null_mask->RoaringBitmapApplyFunc([&](const u32 row_offset) -> bool {
+        if (row_offset >= count) {
+            return false;
         }
-    } else {
-        const u64 *result_null_data = input_null_mask->GetData();
-        u64 *bitmask_data = bitmask.GetData();
-        SizeT unit_count = BitmaskBuffer::UnitCount(count);
-        bool bitmask_use_unit = (bitmask_offset % BitmaskBuffer::UNIT_BITS) == 0;
-        SizeT bitmask_unit_offset = bitmask_offset / BitmaskBuffer::UNIT_BITS;
-        for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count;
-             ++i, end_index = std::min(end_index + BitmaskBuffer::UNIT_BITS, count)) {
-            if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
-                // all data of 64 rows are not null
-                for (; start_index < end_index; ++start_index) {
-                    if (!(input_bool_column_buffer->GetCompactBit(start_index))) {
-                        bitmask.SetFalse(start_index + bitmask_offset);
-                    }
-                }
-            } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
-                // all data of 64 rows are null
-                if (bitmask_use_unit) {
-                    if (bitmask.GetData() == nullptr) {
-                        bitmask.SetFalse(start_index + bitmask_offset);
-                    }
-                    bitmask_data[i + bitmask_unit_offset] = BitmaskBuffer::UNIT_MIN;
-                    start_index = end_index;
-                } else {
-                    for (; start_index < end_index; ++start_index) {
-                        bitmask.SetFalse(start_index + bitmask_offset);
-                    }
-                }
-            } else {
-                for (; start_index < end_index; ++start_index) {
-                    if (!(input_null_mask->IsTrue(start_index)) || !(input_bool_column_buffer->GetCompactBit(start_index))) {
-                        bitmask.SetFalse(start_index + bitmask_offset);
-                    }
-                }
-            }
+        if (!(input_bool_column_buffer->GetCompactBit(row_offset))) {
+            bitmask.SetFalse(row_offset + bitmask_offset);
         }
-    }
+        return row_offset + 1 < count;
+    });
 }
 
 CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, TxnTimeStamp begin_ts)
@@ -146,22 +110,20 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
         // skip this segment
         return;
     }
-    const SizeT segment_row_count = segment_entry->row_count();
-    const SizeT segment_actual_row_count = segment_entry->actual_row_count();
-    auto result_elem = SolveSecondaryIndexFilter(filter_execute_command_,
-                                                 secondary_index_column_index_map_,
-                                                 segment_id,
-                                                 segment_row_count,
-                                                 segment_actual_row_count,
-                                                 txn);
-    if (std::visit(Overload{[](const Vector<u32> &v) -> bool { return v.empty(); }, [](const Bitmask &) -> bool { return false; }}, result_elem)) {
+    const SizeT segment_row_count = segment_index.at(segment_id).segment_offset_;
+    Bitmask result_elem = SolveSecondaryIndexFilter(filter_execute_command_, secondary_index_column_index_map_, segment_id, segment_row_count, txn);
+    if (result_elem.CountTrue() == 0) {
         // empty result
         return;
     }
+    if (result_elem.count() != segment_row_count) {
+        UnrecoverableError(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count: {}, result_elem.count(): {}",
+                                       segment_id,
+                                       segment_row_count,
+                                       result_elem.count()));
+    }
     if (filter_leftover_) {
-        Bitmask bitmask;
-        bitmask.Initialize(std::bit_ceil(segment_row_count));
-        SizeT segment_row_count_real = 0;
+        SizeT segment_row_count_read = 0;
         auto filter_state = ExpressionState::CreateState(filter_leftover_);
         auto db_for_filter_p = MakeUnique<DataBlock>();
         auto db_for_filter = db_for_filter_p.get();
@@ -170,9 +132,10 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
         // filter and build bitmask, if filter_expression_ != nullptr
         ExpressionEvaluator expr_evaluator;
         auto block_entry_iter = BlockEntryIter(segment_entry);
-        for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr and segment_row_count_real < segment_row_count;
+        for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr and segment_row_count_read < segment_row_count;
              block_entry = block_entry_iter.Next()) {
-            auto row_count = block_entry->row_count();
+            const auto block_row_count = block_entry->row_count();
+            const auto row_count = std::min<SizeT>(segment_row_count - segment_row_count_read, block_row_count);
             db_for_filter->Reset(row_count);
             ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
             bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
@@ -180,48 +143,21 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
             expr_evaluator.Execute(filter_leftover_, filter_state, bool_column);
             const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
             SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
-            MergeIntoBitmask(bool_column_buffer, null_mask, row_count, bitmask, true, segment_row_count_real);
-            segment_row_count_real += row_count;
+            MergeFalseIntoBitmask(bool_column_buffer, null_mask, row_count, result_elem, segment_row_count_read);
+            segment_row_count_read += row_count;
             bool_column->Reset();
         }
-        if (segment_row_count_real < segment_row_count) {
-            String error_message = fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
-                                               segment_id,
-                                               segment_row_count_real,
-                                               segment_row_count);
-            UnrecoverableError(error_message);
+        if (segment_row_count_read < segment_row_count) {
+            UnrecoverableError(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_read: {}, segment_row_count: {}",
+                                           segment_id,
+                                           segment_row_count_read,
+                                           segment_row_count));
         }
-        // merge
-        std::visit(Overload{[&bitmask](Vector<u32> &v) {
-                                Vector<u32> new_v;
-                                new_v.reserve(v.size());
-                                for (auto &elem : v) {
-                                    if (bitmask.IsTrue(elem)) {
-                                        new_v.push_back(elem);
-                                    }
-                                }
-                                v = std::move(new_v);
-                            },
-                            [&bitmask](Bitmask &m) { m.Merge(bitmask); }},
-                   result_elem);
     }
-
     // Remove deleted rows from the result
-    std::visit(Overload{[segment_entry, begin_ts](Vector<u32> &v) { segment_entry->CheckRowsVisible(v, begin_ts); },
-                        [segment_entry, begin_ts](Bitmask &b) { segment_entry->CheckRowsVisible(b, begin_ts); }},
-               result_elem);
-
-    if (const SizeT result_count = std::visit(Overload{[](const Vector<u32> &v) -> SizeT { return v.size(); },
-                                                       [segment_row_count](const Bitmask &m) -> SizeT {
-                                                           if (m.GetData() == nullptr) {
-                                                               return segment_row_count;
-                                                           }
-                                                           assert(m.count() >= segment_row_count);
-                                                           assert(m.CountTrue() >= m.count() - segment_row_count);
-                                                           return m.CountTrue() - (m.count() - segment_row_count);
-                                                       }},
-                                              result_elem);
-        result_count) {
+    segment_entry->CheckRowsVisible(result_elem, begin_ts);
+    result_elem.RunOptimize();
+    if (const auto result_count = result_elem.CountTrue(); result_count) {
         std::lock_guard lock(result_mutex_);
         filter_result_count_ += result_count;
         filter_result_.emplace(segment_id, std::move(result_elem));
@@ -256,20 +192,6 @@ void CommonQueryFilter::TryApplySecondaryIndexFilterOptimizer(QueryContext *quer
     filter_execute_command_ = std::move(filter_execute_command);
 }
 
-template <typename VariantType, typename T, std::size_t index = 0>
-consteval auto variant_index() {
-    static_assert(std::variant_size_v<VariantType> > index, "Type not found in variant");
-    if constexpr (std::is_same_v<std::variant_alternative_t<index, VariantType>, T>) {
-        return index;
-    } else {
-        return variant_index<VariantType, T, index + 1>();
-    }
-}
-
-using FilterResultType = std::variant<Vector<u32>, Bitmask>;
-static_assert(variant_index<FilterResultType, Vector<u32>>() == 0);
-static_assert(variant_index<FilterResultType, Bitmask>() == 1);
-
 bool CommonQueryFilter::PassFilter(RowID doc_id) {
     if (always_true_) [[unlikely]]
         return true;
@@ -284,44 +206,9 @@ bool CommonQueryFilter::PassFilter(RowID doc_id) {
             return false;
         }
         current_segment_id_ = doc_id.segment_id_;
-        const FilterResultType &doc_id_list_or_bitmask = it->second;
-        decode_status_ = doc_id_list_or_bitmask.index();
-        doc_id_list_ = nullptr;
-        doc_id_bitmask_ = nullptr;
-        switch (decode_status_) {
-            case variant_index<FilterResultType, Vector<u32>>(): {
-                doc_id_list_ = &std::get<Vector<u32>>(doc_id_list_or_bitmask);
-                doc_id_bitmask_ = nullptr;
-                doc_id_list_size_ = doc_id_list_->size();
-                pos_ = 0;
-                break;
-            }
-            case variant_index<FilterResultType, Bitmask>(): {
-                doc_id_list_ = nullptr;
-                doc_id_bitmask_ = &std::get<Bitmask>(doc_id_list_or_bitmask);
-                break;
-            }
-            default: {
-                String error_message = "Error variant status!";
-                UnrecoverableError(error_message);
-                break;
-            }
-        }
+        doc_id_bitmask_ = &(it->second);
     }
-    switch (decode_status_) {
-        case variant_index<FilterResultType, Vector<u32>>(): {
-            while (pos_ < doc_id_list_size_ && (*doc_id_list_)[pos_] < doc_id.segment_offset_)
-                pos_++;
-            bool found = pos_ < doc_id_list_size_ && (*doc_id_list_)[pos_] == doc_id.segment_offset_;
-            return found;
-        }
-        case variant_index<FilterResultType, Bitmask>(): {
-            bool found = doc_id_bitmask_->IsTrue(doc_id.segment_offset_);
-            return found;
-        }
-        default:
-            return false;
-    }
+    return doc_id_bitmask_->IsTrue(doc_id.segment_offset_);
 }
 
 } // namespace infinity

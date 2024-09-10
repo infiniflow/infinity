@@ -53,7 +53,7 @@ import ann_ivf_flat;
 import annivfflat_index_data;
 import buffer_handle;
 import data_block;
-import bitmask;
+import roaring_bitmap;
 import column_vector;
 import index_hnsw;
 import status;
@@ -540,13 +540,12 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         SegmentIndexEntry *segment_index_entry = knn_scan_shared_data->index_entries_->at(index_idx);
 
         auto segment_id = segment_index_entry->segment_id();
-        SegmentEntry *segment_entry = nullptr;
+        SegmentOffset segment_row_count = 0;
         const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
-            String error_message = fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
         } else {
-            segment_entry = iter->second.segment_entry_;
+            segment_row_count = iter->second.segment_offset_;
         }
 
         bool has_some_result = false;
@@ -554,25 +553,15 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         bool use_bitmask = false;
         if (common_query_filter_->AlwaysTrue()) {
             has_some_result = true;
-            bitmask.SetAllTrue();
         } else {
-            auto it = common_query_filter_->filter_result_.find(segment_id);
-            if (it != common_query_filter_->filter_result_.end()) {
+            if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
                 LOG_TRACE(fmt::format("KnnScan: {} index {}/{} not skipped after common_query_filter",
                                       knn_scan_function_data->task_id_,
                                       index_idx + 1,
                                       index_task_n));
-                auto segment_row_count = segment_entry->row_count();
-                const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
-                if (std::holds_alternative<Vector<u32>>(filter_result)) {
-                    const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                    bitmask.Initialize(std::bit_ceil(segment_row_count));
-                    bitmask.SetAllFalse();
-                    for (u32 row_id : filter_result_vector) {
-                        bitmask.SetTrue(row_id);
-                    }
-                } else {
-                    bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+                bitmask = it->second;
+                if (segment_row_count != bitmask.count()) {
+                    UnrecoverableError(fmt::format("Segment row count mismatch with filter result: {} vs {}", segment_row_count, bitmask.count()));
                 }
                 has_some_result = true;
                 use_bitmask = !bitmask.IsAllTrue();
