@@ -109,6 +109,7 @@ export function Logo() {
 }
 
 export function VercelLogo(props: React.SVGProps<SVGSVGElement>) {
+  return <img src="/logo.svg" alt="" />;
   return (
     <svg
       {...props}

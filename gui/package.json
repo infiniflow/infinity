@@ -45,6 +45,7 @@
     "trailingComma": "none"
   },
   "devDependencies": {
+    "@svgr/webpack": "^8.1.0",
     "code-inspector-plugin": "^0.16.1"
   }
 }
