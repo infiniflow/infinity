@@ -10,9 +10,7 @@ import TabItem from '@theme/TabItem';
 Infinity can only be compiled natively on Linux. If your operating system is not Linux, build it using Docker.
 
 - [Build from source on Linux using Docker](#build-from-source-on-linux-using-docker)
-- [Build from source on Ubuntu 22.04](#build-from-source-on-ubuntu-2204)
-- [Build from source on Ubuntu 23.10](#build-from-source-on-ubuntu-2310)
-- [Build from source on Ubuntu 24.04](#build-from-source-on-ubuntu-2404)
+- [Build from source on Ubuntu](#build-from-source-on-ubuntu)
 - []()
 
 ## Prerequisites
@@ -77,11 +75,20 @@ ulimit -n 500000
 ./cmake-build-debug/src/infinity
 ```
 
-## Build from source on Ubuntu 22.04
+## Build from source on Ubuntu
 
-This section provides instructions on building Infinity from source on Ubuntu 22.04.
+This section provides instructions on building Infinity from source on Ubuntu.
 
 ### 1. Install necessary dependencies
+
+<Tabs
+  defaultValue="linux_mac"
+  values={[
+    {label: 'Ubuntu 22.04', value: 'ubuntu2204'},
+    {label: 'Ubuntu 23.10', value: 'ubuntu2310'},
+    {label: 'Ubuntu 24.04', value: 'ubuntu2404'},
+  ]}>
+   <TabItem value="ubuntu2204">
 
 ```shell
 sudo apt update && sudo apt install git wget unzip software-properties-common
@@ -143,58 +150,8 @@ sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
-### 2. Download the source code
-
-```shell
-git clone https://github.com/infiniflow/infinity.git
-```
-
-### 3. Build the source code
-
-you need first install `simde` if on arm, note we need `v0.7.4+` version for simde
-
-```shell
-sudo apt install libsimde-dev
-```
-
-If the installed version is under v0.7.4, you can download the include files directly from github and replace it.
-
-```shell
-git config --global --add safe.directory infinity
-```
-
-```shell
-cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
-```
-
-```shell
-export CC=/usr/bin/clang-18
-```
-
-```shell
-export CXX=/usr/bin/clang++-18
-```
-
-```shell
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
-
-```shell
-cmake --build . -t infinity
-```
-
-### 4. Start up the Infinity server
-
-```shell
-sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-ulimit -n 500000
-./cmake-build-debug/src/infinity
-```
-
-## Build from source on Ubuntu 23.10
-
-This section provides instructions on building Infinity from source on Ubuntu 23.10.
-
-### 1. Install dependencies
+  </TabItem>
+  <TabItem value="ubuntu2310">
 
 ```shell
 sudo apt update && sudo apt install -y git wget
@@ -239,89 +196,134 @@ sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
-### 2. Download Source Code
-
-```shell
-git clone https://github.com/infiniflow/infinity.git
-```
-
-### 3. Build source code
-
-```shell
-git config --global --add safe.directory infinity
-cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
-export CC=/usr/bin/clang-18
-export CXX=/usr/bin/clang++-18
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
-cmake --build . -t infinity
-```
-
-### 4. Start up Infinity server
-
-```shell
-sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-ulimit -n 500000
-./cmake-build-debug/src/infinity
-```
-
-## Build from source on Ubuntu 24.04
-
-This section provides instructions on building Infinity from source on Ubuntu 24.04.
-
-### 1. Install dependencies
+  </TabItem>
+  <TabItem value="ubuntu2404">
 
 ```shell
 sudo apt update && sudo apt install -y git wget lsb-release software-properties-common
+```
+
+```shell
 wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
+```
+
+```shell
 tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
+```
+
+```shell
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
+```
+
+```shell
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
+```
+
+```shell
 sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.83-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+```
+
+```shell
 sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
+```
+
+```shell
 sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
+```
+
+```shell
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
+```
+
+```shell
 sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
+```
+
+```shell
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
-### 2. Download Source Code
+  </TabItem>
+</Tabs>
+
+### 2. Download the source code
 
 ```shell
 git clone https://github.com/infiniflow/infinity.git
 ```
 
-### 3. Build source code
+### 3. Build the source code
+
+:::tip NOTE
+You must *also* install `simde` v0.7.4+ if using Ubuntu 22.04 on ARM architecture.
+
+```shell
+sudo apt install libsimde-dev
+```
+
+If your installed version is below v0.7.4, download the include files directly from github and replace them.
+:::
 
 ```shell
 git config --global --add safe.directory infinity
+```
+
+```shell
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
+```
+
+```shell
 export CC=/usr/bin/clang-18
+```
+
+```shell
 export CXX=/usr/bin/clang++-18
+```
+
+```shell
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+
+```shell
 cmake --build . -t infinity
 ```
 
-### 4. Start up Infinity server
+### 4. Start up the Infinity server
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+```
+
+```shell
 ulimit -n 500000
+```
+
+```shell
 ./cmake-build-debug/src/infinity
 ```
 
-# Build and run unit test
+## Build and run unit test
 
 ## Build and run unit test on Linux using Docker
 
 ```shell
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  test_main"
+```
+
+```shell
 ./cmake-build-debug/src/test_main
 ```
 
 ## Build and run unit test on Ubuntu
+
 ```shell
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+```
+
+```shell
 cmake --build . -t test_main
+```
+
+```shell
 ./cmake-build-debug/src/test_main
 ```
 
@@ -332,17 +334,22 @@ cmake --build . -t test_main
 pip install gcovr
 ```
 
-###  2. Build and run unit test with code coverage option on 
+### 2. Build and run unit test with code coverage option on 
+
 ```shell
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
 cmake --build . -t test_main
 find . -name "*.gcda"  | xargs rm -f
 ./cmake-build-debug/src/test_main
 ```
 
 ### 3. Use Gcovr to generate summarized code coverage results
+
 ```shell
 cd ./cmake-build-debug/src/CMakeFiles/unit_test.dir
+```
+
+```shell
 gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html unit_test_html.html
 ```
 
@@ -357,7 +364,7 @@ python3 tools/run_pytest_parallel.py
 
 ## Build and run function test on Ubuntu
 ```shell
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
 cmake --build . -t infinity
 ./cmake-build-debug/src/infinity
 python3 tools/run_pytest_parallel.py
@@ -367,7 +374,7 @@ python3 tools/run_pytest_parallel.py
 
 ### 1. Build and start up Infinity server with code coverage option on
 ```shell
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
 cmake --build . -t infinity
 find . -name "*.gcda"  | xargs rm -f
 ./cmake-build-debug/src/infinity
