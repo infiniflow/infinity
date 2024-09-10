@@ -25,7 +25,7 @@ from infinity_embedded.infinity import InfinityConnection
 from infinity_embedded.local_infinity.infinity import LocalInfinityConnection
 from infinity_embedded.errors import ErrorCode
 
-def connect(uri) -> InfinityConnection:
+def connect(uri = LOCAL_INFINITY_PATH) -> InfinityConnection:
     if isinstance(uri, str) and len(uri) != 0:
         return LocalInfinityConnection(uri)
     else:
