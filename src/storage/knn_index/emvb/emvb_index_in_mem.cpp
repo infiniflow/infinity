@@ -22,7 +22,7 @@ import stl;
 import logical_type;
 import internal_types;
 import column_def;
-import bitmask;
+import roaring_bitmap;
 import default_values;
 import buffer_manager;
 import block_column_entry;
@@ -44,7 +44,6 @@ import embedding_info;
 import emvb_product_quantization;
 import column_vector;
 import block_index;
-import bitmask;
 
 namespace infinity {
 

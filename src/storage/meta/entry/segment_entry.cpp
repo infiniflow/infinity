@@ -44,6 +44,7 @@ import cleanup_scanner;
 import background_process;
 import wal_entry;
 import infinity_context;
+import roaring_bitmap;
 
 namespace infinity {
 

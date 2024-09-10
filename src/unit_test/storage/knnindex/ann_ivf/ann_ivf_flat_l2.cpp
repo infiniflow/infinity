@@ -19,7 +19,7 @@ import infinity_exception;
 import stl;
 import knn_filter;
 import ann_ivf_flat;
-import bitmask;
+import roaring_bitmap;
 import knn_expr;
 import internal_types;
 import infinity_context;
@@ -105,7 +105,7 @@ TEST_P(AnnIVFFlatL2Test, test1) {
 
     {
         AnnIVFFlatL2<f32> ann_distance_m(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
-        auto p_bitmask = Bitmask::Make(64);
+        auto p_bitmask = Bitmask::MakeSharedAllTrue(base_embedding_count);
         BitmaskFilter<SegmentOffset> filter(*p_bitmask);
         p_bitmask->SetFalse(1);
         {

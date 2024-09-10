@@ -14,7 +14,7 @@
 
 module;
 
-module bitmask_buffer;
+module deprecated_bitmask_buffer;
 
 import stl;
 import global_resource_usage;

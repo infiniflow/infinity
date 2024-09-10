@@ -26,7 +26,7 @@ import knn_result_handler;
 import infinity_exception;
 import default_values;
 import vector_distance;
-import bitmask;
+import roaring_bitmap;
 import knn_expr;
 import internal_types;
 

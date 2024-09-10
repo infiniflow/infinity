@@ -18,8 +18,8 @@ import base_test;
 import infinity_exception;
 
 import logger;
-import bitmask_buffer;
-import bitmask;
+import deprecated_bitmask_buffer;
+import deprecated_bitmask;
 import third_party;
 import stl;
 

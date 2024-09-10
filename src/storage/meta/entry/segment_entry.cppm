@@ -31,7 +31,7 @@ import value;
 import meta_entry_interface;
 import cleanup_scanner;
 import logger;
-import bitmask;
+import roaring_bitmap;
 import wal_entry;
 import column_def;
 import constant_expr;

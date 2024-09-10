@@ -17,6 +17,7 @@ module;
 export module emvb_index_in_mem;
 import stl;
 import internal_types;
+import roaring_bitmap;
 
 namespace infinity {
 
@@ -28,7 +29,6 @@ class SegmentIndexEntry;
 struct SegmentEntry;
 class IndexBase;
 class EMVBIndex;
-struct Bitmask;
 struct BlockIndex;
 
 using EMVBInMemQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;
