@@ -374,7 +374,7 @@ struct SQL_LTYPE {
 
 /* SQL keywords */
 
-%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT LOCK UNLOCK
+%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT LOCK UNLOCK ADD RENAME
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
@@ -410,6 +410,7 @@ struct SQL_LTYPE {
 %type <command_stmt>      command_statement
 %type <compact_stmt>      compact_statement
 %type <admin_stmt>        admin_statement
+%type <alter_stmt>        alter_statement
 
 %type <stmt_array>        statement_list
 
@@ -522,6 +523,7 @@ statement : create_statement { $$ = $1; }
 | command_statement { $$ = $1; }
 | compact_statement { $$ = $1; }
 | admin_statement { $$ = $1; }
+| alter_statement { $$ = $1; }
 
 explainable_statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
@@ -2361,6 +2363,37 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->node_name_ = $7;
      free($3);
      free($7);
+}
+
+alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
+    auto *ret = new infinity::RenameTableStatement($3);
+    $$ = ret;
+    ret->new_table_name_ = $6;
+    free($6);
+}
+| ALTER TABLE table_name ADD COLUMN table_column {
+    auto *ret = new infinity::AddColumnStatement($3);
+    $$ = ret;
+    ret->column_def_ = $6;
+}
+| ALTER TABLE table_name DROP COLUMN IDENTIFIER {
+    auto *ret = new infinity::DropColumnStatement($3);
+    $$ = ret;
+    ret->column_name_ = $6;
+    free($6);
+}
+| ALTER TABLE table_name ALTER COLUMN table_column {
+    auto *ret = new infinity::AlterColumnStatement($3);
+    $$ = ret;
+    ret->column_def_ = $6;
+}
+| ALTER TABLE table_name RENAME COLUMN IDENTIFIER TO IDENTIFIER {
+    auto *ret = new infinity::RenameColumnStatement($3);
+    $$ = ret;
+    ret->column_name_ = $6;
+    free($6);
+    ret->new_column_name_ = $8;
+    free($8);
 }
 
 /*

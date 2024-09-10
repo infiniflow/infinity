@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import {
   Home,
   LineChart,
@@ -9,6 +8,7 @@ import {
   ShoppingCart,
   Users2
 } from 'lucide-react';
+import Link from 'next/link';
 
 import {
   Breadcrumb,
@@ -26,11 +26,12 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 import { Analytics } from '@vercel/analytics/react';
-import { User } from './user';
-import Providers from './providers';
 import { NavItem } from './nav-item';
+import Providers from './providers';
 import { SearchInput } from './search';
-import Logo from '/logo.svg';
+import { User } from './user';
+import DatabaseIcon from '/public/database.svg';
+import Logo from '/public/logo.svg';
 
 export default function DashboardLayout({
   children
@@ -74,8 +75,8 @@ function DesktopNav() {
           <Home className="h-5 w-5" />
         </NavItem>
 
-        <NavItem href="#" label="Orders">
-          <ShoppingCart className="h-5 w-5" />
+        <NavItem href="/database" label="Database">
+          <DatabaseIcon className="h-5 w-5"></DatabaseIcon>
         </NavItem>
 
         <NavItem href="/" label="Products">

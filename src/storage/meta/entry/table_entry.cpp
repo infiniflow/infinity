@@ -96,7 +96,7 @@ TableEntry::TableEntry(bool is_delete,
                        SegmentID next_segment_id)
     : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
       table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type),
-      unsealed_id_(unsealed_id), next_segment_id_(next_segment_id), fulltext_column_index_cache_(this) {
+      unsealed_id_(unsealed_id), next_segment_id_(next_segment_id), fulltext_column_index_cache_(MakeShared<TableIndexReaderCache>(this)) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
@@ -110,6 +110,30 @@ TableEntry::TableEntry(bool is_delete,
         this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY, this));
         compaction_alg_->Enable({});
     }
+}
+
+TableEntry::TableEntry(const TableEntry &other)
+    : BaseEntry(other), table_meta_(other.table_meta_), column_name2column_id_(other.column_name2column_id_),
+      table_entry_dir_(other.table_entry_dir_), table_name_(other.table_name_), columns_(other.columns_), table_entry_type_(other.table_entry_type_) {
+    row_count_ = other.row_count_.load();
+    unsealed_id_ = other.unsealed_id_;
+    next_segment_id_ = other.next_segment_id_.load();
+    fulltext_column_index_cache_ = other.fulltext_column_index_cache_;
+}
+
+UniquePtr<TableEntry> TableEntry::Clone(TableMeta *meta) const {
+    auto ret = UniquePtr<TableEntry>(new TableEntry(*this));
+    std::shared_lock lock(rw_locker_);
+    if (meta != nullptr) {
+        ret->table_meta_ = meta;
+    }
+    for (const auto &[segment_id, segment_entry] : segment_map_) {
+        ret->segment_map_[segment_id] = segment_entry->Clone(ret.get());
+    }
+    if (unsealed_segment_.get() != nullptr) {
+        ret->unsealed_segment_ = ret->segment_map_[ret->unsealed_id_];
+    }
+    return ret;
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
@@ -1165,6 +1189,14 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     return table_entry;
 }
 
+i64 TableEntry::GetColumnID(const String &column_name) const {
+    auto it = column_name2column_id_.find(column_name);
+    if (it == column_name2column_id_.end()) {
+        return -1;
+    }
+    return it->second;
+}
+
 u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     auto it = column_name2column_id_.find(column_name);
     if (it == column_name2column_id_.end()) {
@@ -1251,7 +1283,7 @@ void TableEntry::Cleanup() {
     if (this->deleted_) {
         return;
     }
-    fulltext_column_index_cache_.Invalidate();
+    fulltext_column_index_cache_->Invalidate();
     for (auto &[segment_id, segment] : segment_map_) {
         segment->Cleanup();
     }
@@ -1263,7 +1295,7 @@ void TableEntry::Cleanup() {
     LOG_DEBUG(fmt::format("Cleaned dir: {}", full_table_dir));
 }
 
-IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn); }
+IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_->GetIndexReader(txn); }
 
 Tuple<Vector<String>, Vector<TableIndexMeta *>, std::shared_lock<std::shared_mutex>> TableEntry::GetAllIndexMapGuard() const {
     return index_meta_map_.GetAllMetaGuard();
@@ -1325,6 +1357,41 @@ void TableEntry::SetUnlock() {
         return;
     }
     locked_ = false;
+}
+
+void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs,
+                            const Vector<Value> &default_values,
+                            TxnTableStore *txn_table_store) {
+    for (auto &column_def : column_defs) {
+        column_def->id_ = columns_.size();
+        columns_.push_back(column_def);
+    }
+
+    for (const auto &column_def : column_defs) {
+        column_name2column_id_[column_def->name()] = column_def->id();
+    }
+    Vector<Pair<ColumnID, const Value *>> columns_info;
+    for (SizeT idx = 0; idx < column_defs.size(); ++idx) {
+        columns_info.emplace_back(column_defs[idx]->id(), &default_values[idx]);
+    }
+    for (auto &[segment_id, segment_entry] : segment_map_) {
+        segment_entry->AddColumns(columns_info, txn_table_store);
+    }
+}
+
+void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store) {
+    // Vector<SharedPtr<ColumnDef>> new_columns;
+    // Vector<ColumnID> new_column_ids;
+    // for (const auto &column : columns_) {
+    //     if (std::find(column_names.begin(), column_names.end(), column->name()) == column_names.end()) {
+    //         new_columns.push_back(column);
+    //         new_column_ids.push_back(column->id());
+    //     }
+    // }
+    // columns_ = std::move(new_columns);
+    // for (auto &[segment_id, segment_entry] : segment_map_) {
+    //     segment_entry->DropColumns(new_column_ids, txn);
+    // }
 }
 
 } // namespace infinity
