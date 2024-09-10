@@ -4,6 +4,8 @@ slug: /build_from_source
 ---
 
 # Build from Source
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 Infinity can only be compiled natively on Linux. If your operating system is not Linux, build it using Docker.
 
@@ -11,7 +13,7 @@ Infinity can only be compiled natively on Linux. If your operating system is not
 - [Build from source on Ubuntu 22.04](#build-from-source-on-ubuntu-2204)
 - [Build from source on Ubuntu 23.10](#build-from-source-on-ubuntu-2310)
 - [Build from source on Ubuntu 24.04](#build-from-source-on-ubuntu-2404)
-
+- []()
 
 ## Prerequisites
 
@@ -37,26 +39,41 @@ Following procedures use `Debug`. Change it as you need.
 
 This section provides instructions on building Infinity from source on Linux using Docker.
 
-### Step1 Download the source code
+### 1. Download the source code
 
 ```shell
 git clone https://github.com/infiniflow/infinity.git
 ```
 
-### Step2 Build the source code using Docker
+### 2. Build the source code using Docker
 
 ```shell
 cd infinity && mkdir cmake-build-debug
+```
+
+```shell
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
+```
+
+```shell
 docker run -d --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang18
+```
+
+```shell
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  infinity"
 ```
 
-### Step3 Start up the Infinity server
+### 3. Start up the Infinity server
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+```
+
+```shell
 ulimit -n 500000
+```
+
+```shell
 ./cmake-build-debug/src/infinity
 ```
 
@@ -64,52 +81,108 @@ ulimit -n 500000
 
 This section provides instructions on building Infinity from source on Ubuntu 22.04.
 
-### Step1 Install necessary dependencies
+### 1. Install necessary dependencies
 
 ```shell
 sudo apt update && sudo apt install git wget unzip software-properties-common
+```
+
+```shell
 wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
+```
+
+```shell
 tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
+```
+
+```shell
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
+```
+
+```shell
 wget https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
+```
+
+```shell
 unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja
+```
+
+```shell
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
+```
+
+```shell
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
+```
+
+```shell
 sudo add-apt-repository -P ppa:mhier/libboost-latest
+```
+
+```shell
 sudo apt update && sudo apt install libc++-18-dev clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+```
+
+```shell
 sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
+```
+
+```shell
 sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
+```
+
+```shell
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
+```
+
+```shell
 sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
+```
+
+```shell
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
-### Step2 Download the source code
+### 2. Download the source code
 
 ```shell
 git clone https://github.com/infiniflow/infinity.git
 ```
 
-### Step3 Build the source code
+### 3. Build the source code
 
 you need first install `simde` if on arm, note we need `v0.7.4+` version for simde
 
-```
+```shell
 sudo apt install libsimde-dev
 ```
-If the installed version is under v0.7.4, you can download the include files directly from github and replace it.
 
+If the installed version is under v0.7.4, you can download the include files directly from github and replace it.
 
 ```shell
 git config --global --add safe.directory infinity
+```
+
+```shell
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
+```
+
+```shell
 export CC=/usr/bin/clang-18
+```
+
+```shell
 export CXX=/usr/bin/clang++-18
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
+```
+
+```shell
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+
+```shell
 cmake --build . -t infinity
 ```
 
-### Step4 Start up the Infinity server
+### 4. Start up the Infinity server
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
@@ -117,34 +190,62 @@ ulimit -n 500000
 ./cmake-build-debug/src/infinity
 ```
 
-
 ## Build from source on Ubuntu 23.10
 
 This section provides instructions on building Infinity from source on Ubuntu 23.10.
 
-### Step1 Install dependencies
+### 1. Install dependencies
 
 ```shell
 sudo apt update && sudo apt install -y git wget
+```
+
+```shell
 wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
+```
+
+```shell
 tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
+```
+
+```shell
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
+```
+
+```shell
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
+```
+
+```shell
 sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+```
+
+```shell
 sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
+```
+
+```shell
 sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
+```
+
+```shell
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
+```
+
+```shell
 sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
+
+```shell
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
-### Step2 Download Source Code
+### 2. Download Source Code
 
 ```shell
 git clone https://github.com/infiniflow/infinity.git
 ```
 
-### Step3 Build source code
+### 3. Build source code
 
 ```shell
 git config --global --add safe.directory infinity
@@ -155,7 +256,7 @@ cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
 cmake --build . -t infinity
 ```
 
-### Step4 Start up Infinity server
+### 4. Start up Infinity server
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
@@ -167,7 +268,7 @@ ulimit -n 500000
 
 This section provides instructions on building Infinity from source on Ubuntu 24.04.
 
-### Step1 Install dependencies
+### 1. Install dependencies
 
 ```shell
 sudo apt update && sudo apt install -y git wget lsb-release software-properties-common
@@ -183,24 +284,24 @@ sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
-### Step2 Download Source Code
+### 2. Download Source Code
 
 ```shell
 git clone https://github.com/infiniflow/infinity.git
 ```
 
-### Step3 Build source code
+### 3. Build source code
 
 ```shell
 git config --global --add safe.directory infinity
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-18
 export CXX=/usr/bin/clang++-18
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
 cmake --build . -t infinity
 ```
 
-### Step4 Start up Infinity server
+### 4. Start up Infinity server
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
@@ -211,6 +312,7 @@ ulimit -n 500000
 # Build and run unit test
 
 ## Build and run unit test on Linux using Docker
+
 ```shell
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  test_main"
 ./cmake-build-debug/src/test_main
@@ -224,12 +326,13 @@ cmake --build . -t test_main
 ```
 
 ## Build and run unit test with code coverage
-### Step 1 Install dependency
+
+### 1. Install dependency
 ```shell
 pip install gcovr
 ```
 
-###  Step 2 Build and run unit test with code coverage option on 
+###  2. Build and run unit test with code coverage option on 
 ```shell
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
 cmake --build . -t test_main
@@ -237,7 +340,7 @@ find . -name "*.gcda"  | xargs rm -f
 ./cmake-build-debug/src/test_main
 ```
 
-### Step 3 Use Gcovr to generate summarized code coverage results
+### 3. Use Gcovr to generate summarized code coverage results
 ```shell
 cd ./cmake-build-debug/src/CMakeFiles/unit_test.dir
 gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html unit_test_html.html
@@ -261,7 +364,8 @@ python3 tools/run_pytest_parallel.py
 ```
 
 ## Build and run function test with code coverage
-### Step 1 Build and start up Infinity server with code coverage option on
+
+### 1. Build and start up Infinity server with code coverage option on
 ```shell
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
 cmake --build . -t infinity
@@ -269,17 +373,17 @@ find . -name "*.gcda"  | xargs rm -f
 ./cmake-build-debug/src/infinity
 ```
 
-### Step 2 Run function test
+### 2. Run function test
 ```shell
 python3 tools/run_pytest_parallel.py
 ```
 
-### Step 4 Shut down Infinity server
+### 3. Shut down Infinity server
 ```shell
 kill -15 `pidof infinity`
 ```
 
-### Step 5 Use Gcovr to generate summarized code coverage results
+### 4. Use Gcovr to generate summarized code coverage results
 ```shell
 cd ./cmake-build-debug/src/CMakeFiles
 gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html function_test_html.html
