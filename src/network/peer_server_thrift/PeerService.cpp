@@ -383,11 +383,11 @@ uint32_t PeerService_UnRegister_presult::read(::apache::thrift::protocol::TProto
 }
 
 
-PeerService_SendHeartBeat_args::~PeerService_SendHeartBeat_args() noexcept {
+PeerService_HeartBeat_args::~PeerService_HeartBeat_args() noexcept {
 }
 
 
-uint32_t PeerService_SendHeartBeat_args::read(::apache::thrift::protocol::TProtocol* iprot) {
+uint32_t PeerService_HeartBeat_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
   ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
   uint32_t xfer = 0;
@@ -428,10 +428,10 @@ uint32_t PeerService_SendHeartBeat_args::read(::apache::thrift::protocol::TProto
   return xfer;
 }
 
-uint32_t PeerService_SendHeartBeat_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+uint32_t PeerService_HeartBeat_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
   uint32_t xfer = 0;
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-  xfer += oprot->writeStructBegin("PeerService_SendHeartBeat_args");
+  xfer += oprot->writeStructBegin("PeerService_HeartBeat_args");
 
   xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
   xfer += this->request.write(oprot);
@@ -443,14 +443,14 @@ uint32_t PeerService_SendHeartBeat_args::write(::apache::thrift::protocol::TProt
 }
 
 
-PeerService_SendHeartBeat_pargs::~PeerService_SendHeartBeat_pargs() noexcept {
+PeerService_HeartBeat_pargs::~PeerService_HeartBeat_pargs() noexcept {
 }
 
 
-uint32_t PeerService_SendHeartBeat_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+uint32_t PeerService_HeartBeat_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
   uint32_t xfer = 0;
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-  xfer += oprot->writeStructBegin("PeerService_SendHeartBeat_pargs");
+  xfer += oprot->writeStructBegin("PeerService_HeartBeat_pargs");
 
   xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
   xfer += (*(this->request)).write(oprot);
@@ -462,11 +462,11 @@ uint32_t PeerService_SendHeartBeat_pargs::write(::apache::thrift::protocol::TPro
 }
 
 
-PeerService_SendHeartBeat_result::~PeerService_SendHeartBeat_result() noexcept {
+PeerService_HeartBeat_result::~PeerService_HeartBeat_result() noexcept {
 }
 
 
-uint32_t PeerService_SendHeartBeat_result::read(::apache::thrift::protocol::TProtocol* iprot) {
+uint32_t PeerService_HeartBeat_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
   ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
   uint32_t xfer = 0;
@@ -507,11 +507,11 @@ uint32_t PeerService_SendHeartBeat_result::read(::apache::thrift::protocol::TPro
   return xfer;
 }
 
-uint32_t PeerService_SendHeartBeat_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
+uint32_t PeerService_HeartBeat_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
   uint32_t xfer = 0;
 
-  xfer += oprot->writeStructBegin("PeerService_SendHeartBeat_result");
+  xfer += oprot->writeStructBegin("PeerService_HeartBeat_result");
 
   if (this->__isset.success) {
     xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
@@ -524,11 +524,11 @@ uint32_t PeerService_SendHeartBeat_result::write(::apache::thrift::protocol::TPr
 }
 
 
-PeerService_SendHeartBeat_presult::~PeerService_SendHeartBeat_presult() noexcept {
+PeerService_HeartBeat_presult::~PeerService_HeartBeat_presult() noexcept {
 }
 
 
-uint32_t PeerService_SendHeartBeat_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
+uint32_t PeerService_HeartBeat_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
   ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
   uint32_t xfer = 0;
@@ -1246,18 +1246,18 @@ void PeerServiceClient::recv_UnRegister(UnRegisterResponse& _return)
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "UnRegister failed: unknown result");
 }
 
-void PeerServiceClient::SendHeartBeat(HeartBeatResponse& _return, const HeartBeatRequest& request)
+void PeerServiceClient::HeartBeat(HeartBeatResponse& _return, const HeartBeatRequest& request)
 {
-  send_SendHeartBeat(request);
-  recv_SendHeartBeat(_return);
+  send_HeartBeat(request);
+  recv_HeartBeat(_return);
 }
 
-void PeerServiceClient::send_SendHeartBeat(const HeartBeatRequest& request)
+void PeerServiceClient::send_HeartBeat(const HeartBeatRequest& request)
 {
   int32_t cseqid = 0;
-  oprot_->writeMessageBegin("SendHeartBeat", ::apache::thrift::protocol::T_CALL, cseqid);
+  oprot_->writeMessageBegin("HeartBeat", ::apache::thrift::protocol::T_CALL, cseqid);
 
-  PeerService_SendHeartBeat_pargs args;
+  PeerService_HeartBeat_pargs args;
   args.request = &request;
   args.write(oprot_);
 
@@ -1266,7 +1266,7 @@ void PeerServiceClient::send_SendHeartBeat(const HeartBeatRequest& request)
   oprot_->getTransport()->flush();
 }
 
-void PeerServiceClient::recv_SendHeartBeat(HeartBeatResponse& _return)
+void PeerServiceClient::recv_HeartBeat(HeartBeatResponse& _return)
 {
 
   int32_t rseqid = 0;
@@ -1286,12 +1286,12 @@ void PeerServiceClient::recv_SendHeartBeat(HeartBeatResponse& _return)
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
   }
-  if (fname.compare("SendHeartBeat") != 0) {
+  if (fname.compare("HeartBeat") != 0) {
     iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
   }
-  PeerService_SendHeartBeat_presult result;
+  PeerService_HeartBeat_presult result;
   result.success = &_return;
   result.read(iprot_);
   iprot_->readMessageEnd();
@@ -1301,7 +1301,7 @@ void PeerServiceClient::recv_SendHeartBeat(HeartBeatResponse& _return)
     // _return pointer has now been filled
     return;
   }
-  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "SendHeartBeat failed: unknown result");
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "HeartBeat failed: unknown result");
 }
 
 void PeerServiceClient::SyncLog(SyncLogResponse& _return, const SyncLogRequest& request)
@@ -1605,38 +1605,38 @@ void PeerServiceProcessor::process_UnRegister(int32_t seqid, ::apache::thrift::p
   }
 }
 
-void PeerServiceProcessor::process_SendHeartBeat(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+void PeerServiceProcessor::process_HeartBeat(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
 {
   void* ctx = nullptr;
   if (this->eventHandler_.get() != nullptr) {
-    ctx = this->eventHandler_->getContext("PeerService.SendHeartBeat", callContext);
+    ctx = this->eventHandler_->getContext("PeerService.HeartBeat", callContext);
   }
-  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "PeerService.SendHeartBeat");
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "PeerService.HeartBeat");
 
   if (this->eventHandler_.get() != nullptr) {
-    this->eventHandler_->preRead(ctx, "PeerService.SendHeartBeat");
+    this->eventHandler_->preRead(ctx, "PeerService.HeartBeat");
   }
 
-  PeerService_SendHeartBeat_args args;
+  PeerService_HeartBeat_args args;
   args.read(iprot);
   iprot->readMessageEnd();
   uint32_t bytes = iprot->getTransport()->readEnd();
 
   if (this->eventHandler_.get() != nullptr) {
-    this->eventHandler_->postRead(ctx, "PeerService.SendHeartBeat", bytes);
+    this->eventHandler_->postRead(ctx, "PeerService.HeartBeat", bytes);
   }
 
-  PeerService_SendHeartBeat_result result;
+  PeerService_HeartBeat_result result;
   try {
-    iface_->SendHeartBeat(result.success, args.request);
+    iface_->HeartBeat(result.success, args.request);
     result.__isset.success = true;
   } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-      this->eventHandler_->handlerError(ctx, "PeerService.SendHeartBeat");
+      this->eventHandler_->handlerError(ctx, "PeerService.HeartBeat");
     }
 
     ::apache::thrift::TApplicationException x(e.what());
-    oprot->writeMessageBegin("SendHeartBeat", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    oprot->writeMessageBegin("HeartBeat", ::apache::thrift::protocol::T_EXCEPTION, seqid);
     x.write(oprot);
     oprot->writeMessageEnd();
     oprot->getTransport()->writeEnd();
@@ -1645,17 +1645,17 @@ void PeerServiceProcessor::process_SendHeartBeat(int32_t seqid, ::apache::thrift
   }
 
   if (this->eventHandler_.get() != nullptr) {
-    this->eventHandler_->preWrite(ctx, "PeerService.SendHeartBeat");
+    this->eventHandler_->preWrite(ctx, "PeerService.HeartBeat");
   }
 
-  oprot->writeMessageBegin("SendHeartBeat", ::apache::thrift::protocol::T_REPLY, seqid);
+  oprot->writeMessageBegin("HeartBeat", ::apache::thrift::protocol::T_REPLY, seqid);
   result.write(oprot);
   oprot->writeMessageEnd();
   bytes = oprot->getTransport()->writeEnd();
   oprot->getTransport()->flush();
 
   if (this->eventHandler_.get() != nullptr) {
-    this->eventHandler_->postWrite(ctx, "PeerService.SendHeartBeat", bytes);
+    this->eventHandler_->postWrite(ctx, "PeerService.HeartBeat", bytes);
   }
 }
 
@@ -1996,19 +1996,19 @@ void PeerServiceConcurrentClient::recv_UnRegister(UnRegisterResponse& _return, c
   } // end while(true)
 }
 
-void PeerServiceConcurrentClient::SendHeartBeat(HeartBeatResponse& _return, const HeartBeatRequest& request)
+void PeerServiceConcurrentClient::HeartBeat(HeartBeatResponse& _return, const HeartBeatRequest& request)
 {
-  int32_t seqid = send_SendHeartBeat(request);
-  recv_SendHeartBeat(_return, seqid);
+  int32_t seqid = send_HeartBeat(request);
+  recv_HeartBeat(_return, seqid);
 }
 
-int32_t PeerServiceConcurrentClient::send_SendHeartBeat(const HeartBeatRequest& request)
+int32_t PeerServiceConcurrentClient::send_HeartBeat(const HeartBeatRequest& request)
 {
   int32_t cseqid = this->sync_->generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-  oprot_->writeMessageBegin("SendHeartBeat", ::apache::thrift::protocol::T_CALL, cseqid);
+  oprot_->writeMessageBegin("HeartBeat", ::apache::thrift::protocol::T_CALL, cseqid);
 
-  PeerService_SendHeartBeat_pargs args;
+  PeerService_HeartBeat_pargs args;
   args.request = &request;
   args.write(oprot_);
 
@@ -2020,7 +2020,7 @@ int32_t PeerServiceConcurrentClient::send_SendHeartBeat(const HeartBeatRequest& 
   return cseqid;
 }
 
-void PeerServiceConcurrentClient::recv_SendHeartBeat(HeartBeatResponse& _return, const int32_t seqid)
+void PeerServiceConcurrentClient::recv_HeartBeat(HeartBeatResponse& _return, const int32_t seqid)
 {
 
   int32_t rseqid = 0;
@@ -2049,7 +2049,7 @@ void PeerServiceConcurrentClient::recv_SendHeartBeat(HeartBeatResponse& _return,
         iprot_->readMessageEnd();
         iprot_->getTransport()->readEnd();
       }
-      if (fname.compare("SendHeartBeat") != 0) {
+      if (fname.compare("HeartBeat") != 0) {
         iprot_->skip(::apache::thrift::protocol::T_STRUCT);
         iprot_->readMessageEnd();
         iprot_->getTransport()->readEnd();
@@ -2058,7 +2058,7 @@ void PeerServiceConcurrentClient::recv_SendHeartBeat(HeartBeatResponse& _return,
         using ::apache::thrift::protocol::TProtocolException;
         throw TProtocolException(TProtocolException::INVALID_DATA);
       }
-      PeerService_SendHeartBeat_presult result;
+      PeerService_HeartBeat_presult result;
       result.success = &_return;
       result.read(iprot_);
       iprot_->readMessageEnd();
@@ -2070,7 +2070,7 @@ void PeerServiceConcurrentClient::recv_SendHeartBeat(HeartBeatResponse& _return,
         return;
       }
       // in a bad state, don't commit
-      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "SendHeartBeat failed: unknown result");
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "HeartBeat failed: unknown result");
     }
     // seqid != rseqid
     this->sync_->updatePending(fname, mtype, rseqid);

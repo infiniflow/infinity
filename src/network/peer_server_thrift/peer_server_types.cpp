@@ -436,6 +436,10 @@ void RegisterResponse::__set_leader_term(const int64_t val) {
 void RegisterResponse::__set_heart_beat_interval(const int64_t val) {
   this->heart_beat_interval = val;
 }
+
+void RegisterResponse::__set_message_time(const int64_t val) {
+  this->message_time = val;
+}
 std::ostream& operator<<(std::ostream& out, const RegisterResponse& obj)
 {
   obj.printTo(out);
@@ -504,6 +508,14 @@ uint32_t RegisterResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->message_time);
+          this->__isset.message_time = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -541,6 +553,10 @@ uint32_t RegisterResponse::write(::apache::thrift::protocol::TProtocol* oprot) c
   xfer += oprot->writeI64(this->heart_beat_interval);
   xfer += oprot->writeFieldEnd();
 
+  xfer += oprot->writeFieldBegin("message_time", ::apache::thrift::protocol::T_I64, 6);
+  xfer += oprot->writeI64(this->message_time);
+  xfer += oprot->writeFieldEnd();
+
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -553,6 +569,7 @@ void swap(RegisterResponse &a, RegisterResponse &b) {
   swap(a.leader_name, b.leader_name);
   swap(a.leader_term, b.leader_term);
   swap(a.heart_beat_interval, b.heart_beat_interval);
+  swap(a.message_time, b.message_time);
   swap(a.__isset, b.__isset);
 }
 
@@ -562,6 +579,7 @@ RegisterResponse::RegisterResponse(const RegisterResponse& other6) {
   leader_name = other6.leader_name;
   leader_term = other6.leader_term;
   heart_beat_interval = other6.heart_beat_interval;
+  message_time = other6.message_time;
   __isset = other6.__isset;
 }
 RegisterResponse& RegisterResponse::operator=(const RegisterResponse& other7) {
@@ -570,6 +588,7 @@ RegisterResponse& RegisterResponse::operator=(const RegisterResponse& other7) {
   leader_name = other7.leader_name;
   leader_term = other7.leader_term;
   heart_beat_interval = other7.heart_beat_interval;
+  message_time = other7.message_time;
   __isset = other7.__isset;
   return *this;
 }
@@ -581,6 +600,7 @@ void RegisterResponse::printTo(std::ostream& out) const {
   out << ", " << "leader_name=" << to_string(leader_name);
   out << ", " << "leader_term=" << to_string(leader_term);
   out << ", " << "heart_beat_interval=" << to_string(heart_beat_interval);
+  out << ", " << "message_time=" << to_string(message_time);
   out << ")";
 }
 

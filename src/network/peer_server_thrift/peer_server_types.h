@@ -219,12 +219,13 @@ void swap(RegisterRequest &a, RegisterRequest &b);
 std::ostream& operator<<(std::ostream& out, const RegisterRequest& obj);
 
 typedef struct _RegisterResponse__isset {
-  _RegisterResponse__isset() : error_code(false), error_msg(false), leader_name(false), leader_term(false), heart_beat_interval(false) {}
+  _RegisterResponse__isset() : error_code(false), error_msg(false), leader_name(false), leader_term(false), heart_beat_interval(false), message_time(false) {}
   bool error_code :1;
   bool error_msg :1;
   bool leader_name :1;
   bool leader_term :1;
   bool heart_beat_interval :1;
+  bool message_time :1;
 } _RegisterResponse__isset;
 
 class RegisterResponse : public virtual ::apache::thrift::TBase {
@@ -237,7 +238,8 @@ class RegisterResponse : public virtual ::apache::thrift::TBase {
                      error_msg(),
                      leader_name(),
                      leader_term(0),
-                     heart_beat_interval(0) {
+                     heart_beat_interval(0),
+                     message_time(0) {
   }
 
   virtual ~RegisterResponse() noexcept;
@@ -246,6 +248,7 @@ class RegisterResponse : public virtual ::apache::thrift::TBase {
   std::string leader_name;
   int64_t leader_term;
   int64_t heart_beat_interval;
+  int64_t message_time;
 
   _RegisterResponse__isset __isset;
 
@@ -259,6 +262,8 @@ class RegisterResponse : public virtual ::apache::thrift::TBase {
 
   void __set_heart_beat_interval(const int64_t val);
 
+  void __set_message_time(const int64_t val);
+
   bool operator == (const RegisterResponse & rhs) const
   {
     if (!(error_code == rhs.error_code))
@@ -270,6 +275,8 @@ class RegisterResponse : public virtual ::apache::thrift::TBase {
     if (!(leader_term == rhs.leader_term))
       return false;
     if (!(heart_beat_interval == rhs.heart_beat_interval))
+      return false;
+    if (!(message_time == rhs.message_time))
       return false;
     return true;
   }

@@ -95,7 +95,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
         return status;
     }
 
-    leader_node_->last_update_ts_ = register_peer_task->update_time_;
+    leader_node_->last_update_ts_ = register_peer_task->leader_update_time_;
     leader_node_->node_name_ = register_peer_task->leader_name_;
     //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
@@ -134,7 +134,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
 
             // Update leader info
             leader_node_->node_status_ = NodeStatus::kConnected;
-            leader_node_->last_update_ts_ = hb_task->update_time_;
+            leader_node_->last_update_ts_ = hb_task->leader_update_time_;
             leader_node_->leader_term_ = hb_task->leader_term_;
 
             if (!hb_running_) {
@@ -190,7 +190,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
         return status;
     }
 
-    leader_node_->last_update_ts_ = register_peer_task->update_time_;
+    leader_node_->last_update_ts_ = register_peer_task->leader_update_time_;
     leader_node_->node_name_ = register_peer_task->leader_name_;
     //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
@@ -234,7 +234,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
 
             // Update leader info
             leader_node_->node_status_ = NodeStatus::kConnected;
-            leader_node_->last_update_ts_ = hb_task->update_time_;
+            leader_node_->last_update_ts_ = hb_task->leader_update_time_;
             leader_node_->leader_term_ = hb_task->leader_term_;
         }
     });

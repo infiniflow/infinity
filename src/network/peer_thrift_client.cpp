@@ -85,7 +85,9 @@ void PeerClient::Process() {
                     running_ = false;
                 }
                 case PeerTaskType::kRegister: {
-                    LOG_INFO(peer_task->ToString());
+                    LOG_DEBUG(peer_task->ToString());
+                    RegisterPeerTask* register_peer_task = static_cast<RegisterPeerTask*>(peer_task.get());
+                    Register(register_peer_task);
                     break;
                 }
                 case PeerTaskType::kUnregister: {
@@ -106,6 +108,43 @@ void PeerClient::Process() {
         }
         peer_task_count_ -= peer_tasks.size();
         peer_tasks.clear();
+    }
+}
+
+void PeerClient::Register(RegisterPeerTask* peer_task) {
+
+    RegisterRequest request;
+    request.node_name = peer_task->node_name_;
+    switch(peer_task->node_role_) {
+        case NodeRole::kFollower: {
+            request.node_type = NodeType::type::kFollower;
+            break;
+        }
+        case NodeRole::kLearner: {
+            request.node_type = NodeType::type::kLearner;
+            break;
+        }
+        default: {
+            String error_message = fmt::format("Only follower and learner can send register message to leader");
+            UnrecoverableError(error_message);
+        }
+    }
+    request.node_ip = peer_task->node_ip_;
+    request.node_port = peer_task->node_port_;
+    request.txn_timestamp = peer_task->txn_ts_;
+    request.message_time = peer_task->message_time_;
+
+    RegisterResponse response;
+    client_->Register(response, request);
+    if(response.error_code != 0) {
+        // Error
+        peer_task->error_code_ = response.error_code;
+        peer_task->error_message_ = response.error_msg;
+    } else {
+        peer_task->leader_name_ = response.leader_name;
+        peer_task->leader_term_ = response.leader_term;
+        peer_task->heartbeat_interval_ = response.heart_beat_interval;
+        peer_task->leader_update_time_ = response.message_time;
     }
 }
 

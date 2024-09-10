@@ -2199,7 +2199,7 @@ void Config::PrintAll() {
     fmt::print(" - log_to_stdout: {}\n", LogToStdout());
     fmt::print(" - log_file_max_size: {}\n", Utility::FormatByteSize(LogFileMaxSize()));
     fmt::print(" - log_file_rotate_count: {}\n", LogFileRotateCount());
-    fmt::print(" - log_level: {}\n", LogLevel2Str(LogLevel()));
+    fmt::print(" - log_level: {}\n", LogLevel2Str(GetLogLevel()));
 
     // Storage
     fmt::print(" - persistence_dir: {}\n", PersistenceDir());

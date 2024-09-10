@@ -123,7 +123,7 @@ public:
     String leader_name_{};
     i64 leader_term_{};
     i64 heartbeat_interval_{}; // microseconds
-    i64 update_time_{};
+    i64 leader_update_time_{};
 };
 
 export class UnregisterPeerTask final : public PeerTask {
@@ -156,7 +156,7 @@ public:
     i64 error_code_{};
     String error_message_{};
     i64 leader_term_{};
-    i64 update_time_{};
+    i64 leader_update_time_{};
     Vector<NodeInfo> other_nodes_{};
 };
 

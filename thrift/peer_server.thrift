@@ -99,7 +99,7 @@ RegisterResponse Register(1:RegisterRequest request),
 UnRegisterResponse UnRegister(1:UnRegisterRequest request),
 
 // From follower/learner to leader
-HeartBeatResponse SendHeartBeat(1:HeartBeatRequest request),
+HeartBeatResponse HeartBeat(1:HeartBeatRequest request),
 
 // From leader to follower/learner
 SyncLogResponse SyncLog(1:SyncLogRequest request),
