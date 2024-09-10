@@ -54,21 +54,18 @@ class InfinityHelperForColBERT:
         schema[self.inner_col_txt] = {"type": "varchar"}
         schema[self.inner_col_float] = {"type": "tensorarray,128,float"}
         schema[self.inner_col_bit] = {"type": "tensorarray,128,bit"}
-        import infinity
-        from infinity import NetworkAddress
-        import infinity.index as index
-        from infinity.common import ConflictType
         # NOTICE: the following statement is for local infinity
-        self.infinity_obj = infinity.connect("/var/infinity")
+        import infinity_embedded as infinity
         # enable the following statement to use remote infinity
-        # self.infinity_obj = infinity.connect(LOCAL_HOST)
-        self.infinity_obj.drop_database(self.test_db_name, ConflictType.Ignore)
+        #import infinity
+        self.infinity_obj = infinity.connect()
+        self.infinity_obj.drop_database(self.test_db_name, infinity.common.ConflictType.Ignore)
         self.colbert_test_db = self.infinity_obj.create_database(self.test_db_name)
-        self.colbert_test_table = self.colbert_test_db.create_table(self.test_table_name, schema, ConflictType.Error)
+        self.colbert_test_table = self.colbert_test_db.create_table(self.test_table_name, schema, infinity.common.ConflictType.Error)
         # NOTICE: the following statement is for english text
         self.colbert_test_table.create_index("test_ft_index",
-                                             index.IndexInfo(self.inner_col_txt, index.IndexType.FullText),
-                                             ConflictType.Error)
+                                             infinity.index.IndexInfo(self.inner_col_txt, infinity.index.IndexType.FullText),
+                                             infinity.common.ConflictType.Error)
         # please enable the following statement to use chinese text
         # self.colbert_test_table.create_index("test_ft_index",
         #                                      index.IndexInfo(self.inner_col_txt, index.IndexType.FullText,

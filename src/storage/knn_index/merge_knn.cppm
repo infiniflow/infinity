@@ -21,7 +21,7 @@ import stl;
 import knn_result_handler;
 
 import infinity_exception;
-import bitmask;
+import roaring_bitmap;
 import default_values;
 import internal_types;
 

@@ -19,6 +19,8 @@ import stl;
 import croaring;
 import infinity_exception;
 import serialize;
+import logger;
+import third_party;
 
 namespace infinity {
 
@@ -63,8 +65,9 @@ struct RoaringBitmap {
     }
 
     [[nodiscard]] inline bool IsTrue(const u32 row_index) const {
-        if (row_index >= count_) {
-            UnrecoverableError("RoaringBitmap::IsTrue: row_index >= count_");
+        if (row_index >= count_) [[unlikely]] {
+            LOG_WARN(fmt::format("RoaringBitmap::IsTrue: access row_index out of bound, row_index: {}, bitmap range: {}", row_index, count_));
+            return false;
         }
         if constexpr (init_all_true) {
             if (all_true_flag_.value) {

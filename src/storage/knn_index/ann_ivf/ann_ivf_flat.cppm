@@ -27,7 +27,7 @@ import vector_distance;
 import search_top_1;
 import search_top_k;
 import knn_result_handler;
-import bitmask;
+import roaring_bitmap;
 import knn_expr;
 import internal_types;
 import logger;

@@ -16,9 +16,9 @@ module;
 
 #include <sstream>
 
-module bitmask;
+module deprecated_bitmask;
 
-import bitmask_buffer;
+import deprecated_bitmask_buffer;
 import global_resource_usage;
 
 import infinity_exception;

@@ -24,7 +24,7 @@ import logger;
 
 import knn_flat_ip;
 import infinity_context;
-import bitmask;
+import roaring_bitmap;
 import knn_expr;
 import internal_types;
 
@@ -102,7 +102,7 @@ TEST_F(KnnFlatIpTest, test1) {
 
     {
         KnnFlatIP <f32> knn_distance_m(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
-        auto p_bitmask = Bitmask::Make(64);
+        auto p_bitmask = Bitmask::MakeSharedAllTrue(base_embedding_count);
         p_bitmask->SetFalse(1);
         {
             knn_distance_m.Begin();

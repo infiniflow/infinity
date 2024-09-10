@@ -25,7 +25,7 @@ from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 from infinity.errors import ErrorCode
 
-def connect(uri) -> InfinityConnection:
+def connect(uri = LOCAL_HOST) -> InfinityConnection:
     if isinstance(uri, NetworkAddress):
         return RemoteThriftInfinityConnection(uri)
     else:
