@@ -78,7 +78,11 @@ public:
                         SegmentID unsealed_id,
                         SegmentID next_segment_id);
 
+private:
     TableEntry(const TableEntry &other);
+
+public:
+    UniquePtr<TableEntry> Clone(TableMeta *meta = nullptr) const;
 
     static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
                                                const SharedPtr<String> &db_entry_dir,
@@ -267,7 +271,7 @@ public:
     }
 
 private:
-    TableMeta *const table_meta_{};
+    TableMeta *table_meta_{};
 
     MetaMap<TableIndexMeta> index_meta_map_{};
 

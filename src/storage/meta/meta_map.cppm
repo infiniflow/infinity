@@ -50,19 +50,14 @@ public:
 
     MetaMap() = default;
 
-    MetaMap(const MetaMap &other) {
+    template<typename T>
+    MetaMap Clone(T *parent) const {
+        MetaMap new_meta_map;
         std::shared_lock r_lock(rw_locker_);
-        this->meta_map_ = other.meta_map_;
-    }
-
-    MetaMap &operator=(const MetaMap &other) {
-        if (this != &other) {
-            std::shared_lock r_lock(rw_locker_);
-            for (const auto &[name, meta] : other.meta_map_) {
-                this->meta_map_[name] = MakeUnique<Meta>(*meta);
-            }
+        for (const auto &[name, meta] : meta_map_) {
+            new_meta_map.meta_map_[name] = meta->Clone(parent);
         }
-        return *this;
+        return new_meta_map;
     }
 
 public:

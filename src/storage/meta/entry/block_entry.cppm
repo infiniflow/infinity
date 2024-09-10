@@ -61,7 +61,11 @@ public:
     // for iterator unit test
     explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
 
+private:
     BlockEntry(const BlockEntry &other);
+
+public:
+    UniquePtr<BlockEntry> Clone(SegmentEntry *segment_entry) const;
 
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);

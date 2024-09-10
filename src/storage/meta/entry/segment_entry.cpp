@@ -87,14 +87,20 @@ SegmentEntry::SegmentEntry(const SegmentEntry &other)
         first_delete_ts_ = other.first_delete_ts_;
         deprecate_ts_ = other.deprecate_ts_;
 
-        for (auto &block : other.block_entries_) {
-            block_entries_.emplace_back(MakeShared<BlockEntry>(*block));
-        }
         fast_rough_filter_ = other.fast_rough_filter_;
         compact_state_data_ = nullptr;
         status_ = other.status_;
         delete_txns_ = other.delete_txns_;
     }
+}
+
+UniquePtr<SegmentEntry> SegmentEntry::Clone(TableEntry *table_entry) const {
+    auto ret = UniquePtr<SegmentEntry>(new SegmentEntry(*this));
+    ret->table_entry_ = table_entry;
+    for (auto &block : block_entries_) {
+        ret->block_entries_.emplace_back(block->Clone(ret.get()));
+    }
+    return ret;
 }
 
 SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {

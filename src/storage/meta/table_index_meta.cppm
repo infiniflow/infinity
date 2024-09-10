@@ -43,7 +43,11 @@ public:
 
     explicit TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
 
+private:
     TableIndexMeta(const TableIndexMeta &meta);
+
+public:
+    UniquePtr<TableIndexMeta> Clone(TableEntry *table_entry) const;
 
     static UniquePtr<TableIndexMeta> NewTableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
 

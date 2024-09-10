@@ -75,6 +75,12 @@ ChunkIndexEntry::ChunkIndexEntry(const ChunkIndexEntry &other)
       base_rowid_(other.base_rowid_), row_count_(other.row_count_), deprecate_ts_(other.deprecate_ts_.load()), buffer_obj_(other.buffer_obj_),
       part_buffer_objs_(other.part_buffer_objs_) {}
 
+UniquePtr<ChunkIndexEntry> ChunkIndexEntry::Clone(SegmentIndexEntry *segment_index_entry) const {
+    auto ret = UniquePtr<ChunkIndexEntry>(new ChunkIndexEntry(*this));
+    ret->segment_index_entry_ = segment_index_entry;
+    return ret;
+}
+
 String ChunkIndexEntry::IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
 
 SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewHnswIndexChunkIndexEntry(ChunkID chunk_id,

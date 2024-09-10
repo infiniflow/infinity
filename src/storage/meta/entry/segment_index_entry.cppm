@@ -262,8 +262,10 @@ public:
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer);
 
-public:
     SegmentIndexEntry(const SegmentIndexEntry &other);
+
+public:
+    UniquePtr<SegmentIndexEntry> Clone(TableIndexEntry *table_index_entry) const;
 
 private:
     // Load from disk. Is called by SegmentIndexEntry::Deserialize.

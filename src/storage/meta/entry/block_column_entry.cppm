@@ -47,7 +47,11 @@ public:
 public:
     explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id);
 
+private:
     BlockColumnEntry(const BlockColumnEntry &other);
+
+public:
+    UniquePtr<BlockColumnEntry> Clone(BlockEntry *block_entry) const;
 
     static UniquePtr<BlockColumnEntry> NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn);
 

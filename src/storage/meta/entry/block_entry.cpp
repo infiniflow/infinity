@@ -65,19 +65,23 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnT
 BlockEntry::BlockEntry(const BlockEntry &other)
     : BaseEntry(other), segment_entry_(other.segment_entry_), block_id_(other.block_id_), block_dir_(other.block_dir_),
       row_capacity_(other.row_capacity_), version_buffer_object_(other.version_buffer_object_) {
-    {
-        std::shared_lock lock(other.rw_locker_);
-        block_row_count_ = other.block_row_count_;
-        fast_rough_filter_ = other.fast_rough_filter_;
-        min_row_ts_ = other.min_row_ts_;
-        max_row_ts_ = other.max_row_ts_;
-        checkpoint_ts_ = other.checkpoint_ts_;
-        using_txn_id_ = other.using_txn_id_;
-        checkpoint_row_count_ = other.checkpoint_row_count_;
+    std::shared_lock lock(other.rw_locker_);
+    block_row_count_ = other.block_row_count_;
+    fast_rough_filter_ = other.fast_rough_filter_;
+    min_row_ts_ = other.min_row_ts_;
+    max_row_ts_ = other.max_row_ts_;
+    checkpoint_ts_ = other.checkpoint_ts_;
+    using_txn_id_ = other.using_txn_id_;
+    checkpoint_row_count_ = other.checkpoint_row_count_;
+}
+
+UniquePtr<BlockEntry> BlockEntry::Clone(SegmentEntry *segment_entry) const {
+    auto ret = UniquePtr<BlockEntry>(new BlockEntry(*this));
+    ret->segment_entry_ = segment_entry;
+    for (auto &column : columns_) {
+        ret->columns_.emplace_back(column->Clone(ret.get()));
     }
-    for (auto &column : other.columns_) {
-        columns_.emplace_back(MakeUnique<BlockColumnEntry>(*column));
-    }
+    return ret;
 }
 
 UniquePtr<BlockEntry>

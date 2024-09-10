@@ -115,16 +115,25 @@ TableEntry::TableEntry(bool is_delete,
 TableEntry::TableEntry(const TableEntry &other)
     : BaseEntry(other), table_meta_(other.table_meta_), column_name2column_id_(other.column_name2column_id_),
       table_entry_dir_(other.table_entry_dir_), table_name_(other.table_name_), columns_(other.columns_), table_entry_type_(other.table_entry_type_) {
-    std::shared_lock lock(other.rw_locker_);
-    index_meta_map_ = other.index_meta_map_;
     row_count_ = other.row_count_.load();
-    for (const auto &[segment_id, segment_entry] : other.segment_map_) {
-        segment_map_[segment_id] = MakeShared<SegmentEntry>(*segment_entry);
-    }
-    unsealed_segment_ = segment_map_[other.unsealed_id_];
     unsealed_id_ = other.unsealed_id_;
     next_segment_id_ = other.next_segment_id_.load();
     fulltext_column_index_cache_ = other.fulltext_column_index_cache_;
+}
+
+UniquePtr<TableEntry> TableEntry::Clone(TableMeta *meta) const {
+    auto ret = UniquePtr<TableEntry>(new TableEntry(*this));
+    std::shared_lock lock(rw_locker_);
+    if (meta != nullptr) {
+        ret->table_meta_ = meta;
+    }
+    for (const auto &[segment_id, segment_entry] : segment_map_) {
+        ret->segment_map_[segment_id] = segment_entry->Clone(ret.get());
+    }
+    if (unsealed_segment_.get() != nullptr) {
+        ret->unsealed_segment_ = ret->segment_map_[ret->unsealed_id_];
+    }
+    return ret;
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,

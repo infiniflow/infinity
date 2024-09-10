@@ -101,15 +101,12 @@ SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, Segment
 SegmentIndexEntry::SegmentIndexEntry(const SegmentIndexEntry &other)
     : BaseEntry(other), buffer_manager_(other.buffer_manager_), table_index_entry_(other.table_index_entry_), index_dir_(other.index_dir_),
       segment_id_(other.segment_id_) {
-    std::shared_lock lock(other.rw_locker_);
     vector_buffer_ = other.vector_buffer_;
     min_ts_ = other.min_ts_;
     max_ts_ = other.max_ts_;
     checkpoint_ts_ = other.checkpoint_ts_;
     next_chunk_id_ = other.next_chunk_id_;
-    for (const auto &chunk_index_entry : other.chunk_index_entries_) {
-        chunk_index_entries_.emplace_back(MakeShared<ChunkIndexEntry>(*chunk_index_entry));
-    }
+
     memory_hnsw_index_ = other.memory_hnsw_index_;
     memory_indexer_ = other.memory_indexer_;
     memory_secondary_index_ = other.memory_secondary_index_;
@@ -117,6 +114,15 @@ SegmentIndexEntry::SegmentIndexEntry(const SegmentIndexEntry &other)
     memory_bmp_index_ = other.memory_bmp_index_;
     ft_column_len_sum_ = other.ft_column_len_sum_;
     ft_column_len_cnt_ = other.ft_column_len_cnt_;
+}
+
+UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Clone(TableIndexEntry *table_index_entry) const {
+    auto ret = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(*this));
+    std::shared_lock lock(rw_locker_);
+    for (const auto &chunk_index_entry : chunk_index_entries_) {
+        ret->chunk_index_entries_.emplace_back(chunk_index_entry->Clone(ret.get()));
+    }
+    return ret;
 }
 
 SharedPtr<SegmentIndexEntry> SegmentIndexEntry::CreateFakeEntry(const String &index_dir) {

@@ -50,11 +50,27 @@ class EntryList {
 public:
     EntryList() = default;
 
-    EntryList(const EntryList &other) {
-        std::shared_lock lock(other.rw_locker_);
-        for (const auto &entry : other.entry_list_) {
-            entry_list_.push_back(MakeShared<Entry>(*entry));
+    EntryList(const EntryList &&other) {
+        std::unique_lock lock(rw_locker_);
+        entry_list_ = std::move(other.entry_list_);
+    }
+
+    EntryList &operator=(EntryList &&other) {
+        if (this != &other) {
+            std::unique_lock lock(rw_locker_);
+            entry_list_ = std::move(other.entry_list_);
         }
+        return *this;
+    }
+
+    template<typename T>
+    EntryList Clone(T *parent) const {
+        EntryList new_entry_list;
+        std::shared_lock r_lock(rw_locker_);
+        for (const auto &entry : entry_list_) {
+            new_entry_list.entry_list_.push_back(entry->Clone(parent));
+        }
+        return new_entry_list;
     }
 
     // op

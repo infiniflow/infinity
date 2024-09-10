@@ -85,7 +85,11 @@ public:
                           SizeT column_count,
                           SegmentStatus status);
 
+private:
     SegmentEntry(const SegmentEntry &other);
+
+public:
+    UniquePtr<SegmentEntry> Clone(TableEntry *table_entry) const;
 
     static SharedPtr<SegmentEntry> NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
@@ -260,7 +264,7 @@ private:
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
     // check if a value must not exist in the segment
-    SharedPtr<FastRoughFilter> fast_rough_filter_;
+    SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
 
     CompactStateData *compact_state_data_{};
     SegmentStatus status_;

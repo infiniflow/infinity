@@ -43,7 +43,14 @@ TableIndexMeta::TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_
     : index_name_(std::move(index_name)), table_entry_(table_entry) {}
 
 TableIndexMeta::TableIndexMeta(const TableIndexMeta &meta)
-    : index_name_(meta.index_name_), table_entry_(meta.table_entry_), index_entry_list_(meta.index_entry_list_) {}
+    : index_name_(meta.index_name_), table_entry_(meta.table_entry_) {}
+
+UniquePtr<TableIndexMeta> TableIndexMeta::Clone(TableEntry *table_entry) const {
+    auto ret = UniquePtr<TableIndexMeta>(new TableIndexMeta(*this));
+    ret->table_entry_ = table_entry;
+    ret->index_entry_list_ = index_entry_list_.Clone(ret.get());
+    return ret;
+}
 
 UniquePtr<TableIndexMeta> TableIndexMeta::NewTableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name) {
     auto table_index_meta = MakeUnique<TableIndexMeta>(table_entry, index_name);
