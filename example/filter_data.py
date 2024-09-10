@@ -13,13 +13,16 @@
 # limitations under the License.
 
 
-import infinity_embedded as infinity
-#import infinity
+# import infinity_embedded as infinity
+import infinity
 import sys
 
 try:
-    # open a local directory(default = "/var/infinity") or connect to server(default = NetworkAddress("127.0.0.1", 23817)) to store the data
-    infinity_instance = infinity.connect()
+    # Use infinity_embedded module to open a local directory
+    # infinity_instance = infinity.connect("/var/infinity")
+
+    #  Use infinity module to connect a remote server
+    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
