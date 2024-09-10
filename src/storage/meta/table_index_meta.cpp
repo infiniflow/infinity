@@ -42,6 +42,9 @@ struct SegmentEntry;
 TableIndexMeta::TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name)
     : index_name_(std::move(index_name)), table_entry_(table_entry) {}
 
+TableIndexMeta::TableIndexMeta(const TableIndexMeta &meta)
+    : index_name_(meta.index_name_), table_entry_(meta.table_entry_), index_entry_list_(meta.index_entry_list_) {}
+
 UniquePtr<TableIndexMeta> TableIndexMeta::NewTableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name) {
     auto table_index_meta = MakeUnique<TableIndexMeta>(table_entry, index_name);
     return table_index_meta;

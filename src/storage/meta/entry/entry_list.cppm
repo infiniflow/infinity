@@ -47,8 +47,16 @@ enum class FindResult : u8 {
 
 export template <EntryConcept Entry>
 class EntryList {
-
 public:
+    EntryList() = default;
+
+    EntryList(const EntryList &other) {
+        std::shared_lock lock(other.rw_locker_);
+        for (const auto &entry : other.entry_list_) {
+            entry_list_.push_back(MakeShared<Entry>(*entry));
+        }
+    }
+
     // op
     Tuple<Entry *, Status> AddEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                     std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func,

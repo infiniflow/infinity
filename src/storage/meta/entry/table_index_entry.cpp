@@ -86,6 +86,16 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
     txn_id_ = txn_id;
 }
 
+TableIndexEntry::TableIndexEntry(const TableIndexEntry &other)
+    : BaseEntry(other), table_index_meta_(other.table_index_meta_), index_base_(other.index_base_), index_dir_(other.index_dir_),
+      column_def_(other.column_def_) {
+    std::shared_lock lock(other.rw_locker_);
+    for (const auto &[segment_id, segment_index_entry] : other.index_by_segment_) {
+        index_by_segment_.emplace(segment_id, MakeShared<SegmentIndexEntry>(*segment_index_entry));
+    }
+    last_segment_ = index_by_segment_[other.last_segment_->segment_id()];
+}
+
 SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                                                bool is_delete,
                                                                const SharedPtr<String> &table_entry_dir,

@@ -43,6 +43,8 @@ public:
 
     explicit TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
 
+    TableIndexMeta(const TableIndexMeta &meta);
+
     static UniquePtr<TableIndexMeta> NewTableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
 
 public:

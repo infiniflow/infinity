@@ -71,6 +71,8 @@ public:
                     TransactionID txn_id,
                     TxnTimeStamp begin_ts);
 
+    TableIndexEntry(const TableIndexEntry &other);
+
     static SharedPtr<TableIndexEntry> NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                                          bool is_delete,
                                                          const SharedPtr<String> &table_entry_dir,
@@ -152,7 +154,7 @@ private:
     std::shared_mutex segment_update_ts_mutex_{};
     TxnTimeStamp segment_update_ts_{0};
 
-    std::shared_mutex rw_locker_{};
+    mutable std::shared_mutex rw_locker_{};
     TableIndexMeta *const table_index_meta_{};
     const SharedPtr<IndexBase> index_base_{};
     const SharedPtr<String> index_dir_{};

@@ -90,10 +90,34 @@ String SegmentIndexEntry::EncodeIndex(const SegmentID segment_id, const TableInd
 
 SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
     : BaseEntry(EntryType::kSegmentIndex, false, SegmentIndexEntry::EncodeIndex(segment_id, table_index_entry)),
-      table_index_entry_(table_index_entry), segment_id_(segment_id), vector_buffer_(std::move(vector_buffer)) {
+      table_index_entry_(table_index_entry), segment_id_(segment_id) {
+    for (auto *buffer : vector_buffer) {
+        vector_buffer_.push_back(buffer);
+    }
     if (table_index_entry != nullptr)
         index_dir_ = table_index_entry->index_dir();
 };
+
+SegmentIndexEntry::SegmentIndexEntry(const SegmentIndexEntry &other)
+    : BaseEntry(other), buffer_manager_(other.buffer_manager_), table_index_entry_(other.table_index_entry_), index_dir_(other.index_dir_),
+      segment_id_(other.segment_id_) {
+    std::shared_lock lock(other.rw_locker_);
+    vector_buffer_ = other.vector_buffer_;
+    min_ts_ = other.min_ts_;
+    max_ts_ = other.max_ts_;
+    checkpoint_ts_ = other.checkpoint_ts_;
+    next_chunk_id_ = other.next_chunk_id_;
+    for (const auto &chunk_index_entry : other.chunk_index_entries_) {
+        chunk_index_entries_.emplace_back(MakeShared<ChunkIndexEntry>(*chunk_index_entry));
+    }
+    memory_hnsw_index_ = other.memory_hnsw_index_;
+    memory_indexer_ = other.memory_indexer_;
+    memory_secondary_index_ = other.memory_secondary_index_;
+    memory_emvb_index_ = other.memory_emvb_index_;
+    memory_bmp_index_ = other.memory_bmp_index_;
+    ft_column_len_sum_ = other.ft_column_len_sum_;
+    ft_column_len_cnt_ = other.ft_column_len_cnt_;
+}
 
 SharedPtr<SegmentIndexEntry> SegmentIndexEntry::CreateFakeEntry(const String &index_dir) {
     SharedPtr<SegmentIndexEntry> fake_entry;
@@ -240,9 +264,9 @@ SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segmen
     return res;
 }
 
-BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
+BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0].get()->Load(); }
 
-BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1]->Load(); }
+BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1].get()->Load(); }
 
 void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                        u32 row_offset,
@@ -843,12 +867,12 @@ bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
 }
 
 void SegmentIndexEntry::Cleanup() {
-    for (auto *buffer_obj : vector_buffer_) {
-        if (buffer_obj == nullptr) {
+    for (auto &buffer_ptr : vector_buffer_) {
+        if (buffer_ptr.get() == nullptr) {
             String error_message = "vector_buffer should not has nullptr.";
             UnrecoverableError(error_message);
         }
-        buffer_obj->PickForCleanup();
+        buffer_ptr.get()->PickForCleanup();
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->Cleanup();
@@ -1018,7 +1042,7 @@ void SegmentIndexEntry::SaveIndexFile() {
     u64 segment_id = this->segment_id_;
     LOG_TRACE(fmt::format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
     for (auto &buffer_ptr : vector_buffer_) {
-        buffer_ptr->Save();
+        buffer_ptr.get()->Save();
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->SaveIndexFile();
@@ -1056,7 +1080,8 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String 
     std::shared_lock lock(rw_locker_);
     ChunkID chunk_id = this->GetNextChunkID();
     // row range of chunk_index_entries_ may overlop and misorder due to deprecated ones.
-    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, chunk_id, base_name, base_rowid, row_count, buffer_manager_);
+    SharedPtr<ChunkIndexEntry> chunk_index_entry =
+        ChunkIndexEntry::NewFtChunkIndexEntry(this, chunk_id, base_name, base_rowid, row_count, buffer_manager_);
     chunk_index_entries_.push_back(chunk_index_entry);
     return chunk_index_entry;
 }

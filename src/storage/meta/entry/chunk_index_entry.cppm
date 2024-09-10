@@ -48,6 +48,8 @@ public:
 
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
 
+    ChunkIndexEntry(const ChunkIndexEntry &other);
+
 public:
     static String IndexFileName(SegmentID segment_id, ChunkID chunk_id);
 
