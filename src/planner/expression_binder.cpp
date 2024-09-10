@@ -548,10 +548,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
     }
 
     InType in_type{InType::kIn};
-    if (expr.not_in_) {
-        in_type = InType::kNotIn;
-    } else {
+    if (expr.in_) {
         in_type = InType::kIn;
+    } else {
+        in_type = InType::kNotIn;
     }
     SharedPtr<InExpression> in_expression_ptr = MakeShared<InExpression>(in_type, bound_left_expr, arguments);
     return in_expression_ptr;
@@ -705,7 +705,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     // Create query embedding
     EmbeddingT query_embedding((ptr_t)parsed_knn_expr.embedding_data_ptr_, false);
 
-    if(parsed_knn_expr.ignore_index_ && !parsed_knn_expr.index_name_.empty()) {
+    if (parsed_knn_expr.ignore_index_ && !parsed_knn_expr.index_name_.empty()) {
         Status status = Status::SyntaxError(fmt::format("Force to use index {} conflicts with Ignore index flag.", parsed_knn_expr.index_name_));
         RecoverableError(std::move(status));
     }
