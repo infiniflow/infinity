@@ -1,5 +1,5 @@
 [general]
-version                  = "0.3.0"
+version                  = "0.4.0"
 time_zone                = "utc-23"  # Changed to "utc-23"
 
 [network]
