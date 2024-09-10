@@ -24,7 +24,7 @@ ALTER TABLE table1 ADD COLUMN column3 varchar DEFAULT 'default';
 query II
 SELECT * FROM table1;
 ----
-1 2 'default'
+1 2 default
 
 statement ok
-DROP TABLE table2;
+DROP TABLE table1;
