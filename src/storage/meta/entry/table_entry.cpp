@@ -1015,6 +1015,27 @@ SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID seg_id, Txn *txn) c
     return segment;
 }
 
+const ColumnDef *TableEntry::GetColumnDefByID(ColumnID column_id) const {
+    auto iter = std::find_if(columns_.begin(), columns_.end(), [column_id](const SharedPtr<ColumnDef> &column_def) {
+        return static_cast<ColumnID>(column_def->id()) == column_id;
+    });
+    if (iter == columns_.end()) {
+        return nullptr;
+    }
+    return iter->get();
+}
+
+SharedPtr<ColumnDef> TableEntry::GetColumnDefByName(const String &column_name) const {
+    ColumnID column_id = GetColumnIdByName(column_name);
+    auto iter = std::find_if(columns_.begin(), columns_.end(), [column_id](const SharedPtr<ColumnDef> &column_def) {
+        return static_cast<ColumnID>(column_def->id()) == column_id;
+    });
+    if (iter == columns_.end()) {
+        return nullptr;
+    }
+    return *iter;
+}
+
 Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     auto iter = this->segment_map_.find(seg_id);
     if (iter != this->segment_map_.end()) {

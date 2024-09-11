@@ -318,7 +318,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                     continue;
                 }
 
-                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                auto column_def = table_entry->GetColumnDefByIdx(column_idx);
                 if (column_def->has_default_value()) {
                     SharedPtr<BaseExpression> value_expr =
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
@@ -351,7 +351,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         } else {
             SizeT table_column_count = table_entry->ColumnCount();
             for (SizeT column_idx = value_list.size(); column_idx < table_column_count; ++column_idx) {
-                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                auto column_def = table_entry->GetColumnDefByIdx(column_idx);
                 if (column_def->has_default_value()) {
                     SharedPtr<BaseExpression> value_expr =
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
@@ -370,7 +370,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
             for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
-                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByID(column_idx)->column_type_;
+                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByIdx(column_idx)->column_type_;
                 DataType value_type = value_list[column_idx]->Type();
                 if (*table_column_type == value_type) {
                     rewrite_value_list[column_idx] = value_list[column_idx];
@@ -1068,7 +1068,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                 RecoverableError(status);
             }
 
-            const ColumnDef *column_def = table_entry->GetColumnDefByID(column_idx_array[0]);
+            const ColumnDef *column_def = table_entry->GetColumnDefByIdx(column_idx_array[0]);
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 Status status = Status::NotSupport(
                     fmt::format("Attempt to export column: {} with type: {} as FVECS file", column_def->name(), column_def->type()->ToString()));

@@ -311,7 +311,7 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
     const BlockIndex *block_index = base_table_ref_->block_index_.get();
     const TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     const ColumnID column_id = fusion_expr_->match_tensor_expr_->column_expr_->binding().column_idx;
-    const ColumnDef *column_def = table_entry->GetColumnDefByID(column_id);
+    const ColumnDef *column_def = table_entry->GetColumnDefByIdx(column_id);
     const DataType *column_data_type = column_def->type().get();
     switch (column_data_type->type()) {
         case LogicalType::kTensor:

@@ -215,9 +215,16 @@ public:
 
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, Txn *txn) const;
 
-    inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
+    const ColumnDef *GetColumnDefByIdx(SizeT idx) const {
+        if (idx >= columns_.size()) {
+            return nullptr;
+        }
+        return columns_[idx].get();
+    }
 
-    inline SharedPtr<ColumnDef> GetColumnDefByName(const String &column_name) const { return columns_[GetColumnIdByName(column_name)]; }
+    const ColumnDef *GetColumnDefByID(ColumnID column_id) const;
+
+    SharedPtr<ColumnDef> GetColumnDefByName(const String &column_name) const;
 
     inline SizeT ColumnCount() const { return columns_.size(); }
 
