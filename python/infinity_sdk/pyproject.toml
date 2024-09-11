@@ -16,7 +16,7 @@ dependencies = [
     "requests~=2.32.0"
 ]
 description = "infinity"
-#readme = "README.md"
+readme = "README.md"
 
 [build-system]
 requires = ["setuptools", "wheel"]
