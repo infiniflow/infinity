@@ -383,6 +383,7 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         thrift.a
         thriftnb.a
         snappy.a
+        ${JEMALLOC_STATIC_LIB}
 )
 
 # WARN: python modules shall not link to static libstdc++!!!

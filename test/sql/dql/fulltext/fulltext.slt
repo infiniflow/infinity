@@ -6,7 +6,7 @@ statement ok
 DROP TABLE IF EXISTS sqllogic_test_enwiki;
 
 statement ok
-CREATE TABLE sqllogic_test_enwiki(doctitle varchar, docdate varchar, body varchar);
+CREATE TABLE sqllogic_test_enwiki(doctitle varchar DEFAULT '', docdate varchar DEFAULT '', body varchar DEFAULT '');
 
 # copy data from csv file
 query I
