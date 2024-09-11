@@ -45,9 +45,7 @@ Status PeerClient::Init() {
         protocol_ = MakeShared<TBinaryProtocol>(transport_);
         client_ = MakeUnique<PeerServiceClient>(protocol_);
         transport_->open();
-//        processor_thread_ = MakeShared<Thread>([this] { LOG_INFO(fmt::format("ip: {}", this->node_info_.ip_address_)); });
         processor_thread_ = MakeShared<Thread>([this] { this->Process(); });
-//        processor_thread_->detach();
     } catch (const std::exception& e) {
         status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
     }
@@ -93,6 +91,8 @@ void PeerClient::Process() {
                 }
                 case PeerTaskType::kUnregister: {
                     LOG_INFO(peer_task->ToString());
+                    UnregisterPeerTask* unregister_peer_task = static_cast<UnregisterPeerTask*>(peer_task.get());
+                    Unregister(unregister_peer_task);
                     break;
                 }
                 case PeerTaskType::kHeartBeat: {
@@ -139,11 +139,24 @@ void PeerClient::Register(RegisterPeerTask* peer_task) {
     if(response.error_code != 0) {
         // Error
         peer_task->error_code_ = response.error_code;
-        peer_task->error_message_ = response.error_msg;
+        peer_task->error_message_ = response.error_message;
     } else {
         peer_task->leader_name_ = response.leader_name;
         peer_task->leader_term_ = response.leader_term;
         peer_task->heartbeat_interval_ = response.heart_beat_interval;
+    }
+}
+
+void PeerClient::Unregister(UnregisterPeerTask* peer_task) {
+    UnregisterRequest request;
+    UnregisterResponse response;
+    request.node_name = peer_task->node_name_;
+
+    client_->Unregister(response, request);
+    if(response.error_code != 0) {
+        // Error
+        peer_task->error_code_ = response.error_code;
+        peer_task->error_message_ = response.error_message;
     }
 }
 

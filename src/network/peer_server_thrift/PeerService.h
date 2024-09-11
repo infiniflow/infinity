@@ -23,7 +23,7 @@ class PeerServiceIf {
  public:
   virtual ~PeerServiceIf() {}
   virtual void Register(RegisterResponse& _return, const RegisterRequest& request) = 0;
-  virtual void UnRegister(UnRegisterResponse& _return, const UnRegisterRequest& request) = 0;
+  virtual void Unregister(UnregisterResponse& _return, const UnregisterRequest& request) = 0;
   virtual void HeartBeat(HeartBeatResponse& _return, const HeartBeatRequest& request) = 0;
   virtual void SyncLog(SyncLogResponse& _return, const SyncLogRequest& request) = 0;
   virtual void ChangeRole(ChangeRoleResponse& _return, const ChangeRoleRequest& request) = 0;
@@ -60,7 +60,7 @@ class PeerServiceNull : virtual public PeerServiceIf {
   void Register(RegisterResponse& /* _return */, const RegisterRequest& /* request */) override {
     return;
   }
-  void UnRegister(UnRegisterResponse& /* _return */, const UnRegisterRequest& /* request */) override {
+  void Unregister(UnregisterResponse& /* _return */, const UnregisterRequest& /* request */) override {
     return;
   }
   void HeartBeat(HeartBeatResponse& /* _return */, const HeartBeatRequest& /* request */) override {
@@ -181,37 +181,37 @@ class PeerService_Register_presult {
 
 };
 
-typedef struct _PeerService_UnRegister_args__isset {
-  _PeerService_UnRegister_args__isset() : request(false) {}
+typedef struct _PeerService_Unregister_args__isset {
+  _PeerService_Unregister_args__isset() : request(false) {}
   bool request :1;
-} _PeerService_UnRegister_args__isset;
+} _PeerService_Unregister_args__isset;
 
-class PeerService_UnRegister_args {
+class PeerService_Unregister_args {
  public:
 
-  PeerService_UnRegister_args(const PeerService_UnRegister_args&);
-  PeerService_UnRegister_args& operator=(const PeerService_UnRegister_args&);
-  PeerService_UnRegister_args() noexcept {
+  PeerService_Unregister_args(const PeerService_Unregister_args&);
+  PeerService_Unregister_args& operator=(const PeerService_Unregister_args&);
+  PeerService_Unregister_args() noexcept {
   }
 
-  virtual ~PeerService_UnRegister_args() noexcept;
-  UnRegisterRequest request;
+  virtual ~PeerService_Unregister_args() noexcept;
+  UnregisterRequest request;
 
-  _PeerService_UnRegister_args__isset __isset;
+  _PeerService_Unregister_args__isset __isset;
 
-  void __set_request(const UnRegisterRequest& val);
+  void __set_request(const UnregisterRequest& val);
 
-  bool operator == (const PeerService_UnRegister_args & rhs) const
+  bool operator == (const PeerService_Unregister_args & rhs) const
   {
     if (!(request == rhs.request))
       return false;
     return true;
   }
-  bool operator != (const PeerService_UnRegister_args &rhs) const {
+  bool operator != (const PeerService_Unregister_args &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const PeerService_UnRegister_args & ) const;
+  bool operator < (const PeerService_Unregister_args & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
@@ -219,67 +219,67 @@ class PeerService_UnRegister_args {
 };
 
 
-class PeerService_UnRegister_pargs {
+class PeerService_Unregister_pargs {
  public:
 
 
-  virtual ~PeerService_UnRegister_pargs() noexcept;
-  const UnRegisterRequest* request;
+  virtual ~PeerService_Unregister_pargs() noexcept;
+  const UnregisterRequest* request;
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-typedef struct _PeerService_UnRegister_result__isset {
-  _PeerService_UnRegister_result__isset() : success(false) {}
+typedef struct _PeerService_Unregister_result__isset {
+  _PeerService_Unregister_result__isset() : success(false) {}
   bool success :1;
-} _PeerService_UnRegister_result__isset;
+} _PeerService_Unregister_result__isset;
 
-class PeerService_UnRegister_result {
+class PeerService_Unregister_result {
  public:
 
-  PeerService_UnRegister_result(const PeerService_UnRegister_result&);
-  PeerService_UnRegister_result& operator=(const PeerService_UnRegister_result&);
-  PeerService_UnRegister_result() noexcept {
+  PeerService_Unregister_result(const PeerService_Unregister_result&);
+  PeerService_Unregister_result& operator=(const PeerService_Unregister_result&);
+  PeerService_Unregister_result() noexcept {
   }
 
-  virtual ~PeerService_UnRegister_result() noexcept;
-  UnRegisterResponse success;
+  virtual ~PeerService_Unregister_result() noexcept;
+  UnregisterResponse success;
 
-  _PeerService_UnRegister_result__isset __isset;
+  _PeerService_Unregister_result__isset __isset;
 
-  void __set_success(const UnRegisterResponse& val);
+  void __set_success(const UnregisterResponse& val);
 
-  bool operator == (const PeerService_UnRegister_result & rhs) const
+  bool operator == (const PeerService_Unregister_result & rhs) const
   {
     if (!(success == rhs.success))
       return false;
     return true;
   }
-  bool operator != (const PeerService_UnRegister_result &rhs) const {
+  bool operator != (const PeerService_Unregister_result &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const PeerService_UnRegister_result & ) const;
+  bool operator < (const PeerService_Unregister_result & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-typedef struct _PeerService_UnRegister_presult__isset {
-  _PeerService_UnRegister_presult__isset() : success(false) {}
+typedef struct _PeerService_Unregister_presult__isset {
+  _PeerService_Unregister_presult__isset() : success(false) {}
   bool success :1;
-} _PeerService_UnRegister_presult__isset;
+} _PeerService_Unregister_presult__isset;
 
-class PeerService_UnRegister_presult {
+class PeerService_Unregister_presult {
  public:
 
 
-  virtual ~PeerService_UnRegister_presult() noexcept;
-  UnRegisterResponse* success;
+  virtual ~PeerService_Unregister_presult() noexcept;
+  UnregisterResponse* success;
 
-  _PeerService_UnRegister_presult__isset __isset;
+  _PeerService_Unregister_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -729,9 +729,9 @@ class PeerServiceClient : virtual public PeerServiceIf {
   void Register(RegisterResponse& _return, const RegisterRequest& request) override;
   void send_Register(const RegisterRequest& request);
   void recv_Register(RegisterResponse& _return);
-  void UnRegister(UnRegisterResponse& _return, const UnRegisterRequest& request) override;
-  void send_UnRegister(const UnRegisterRequest& request);
-  void recv_UnRegister(UnRegisterResponse& _return);
+  void Unregister(UnregisterResponse& _return, const UnregisterRequest& request) override;
+  void send_Unregister(const UnregisterRequest& request);
+  void recv_Unregister(UnregisterResponse& _return);
   void HeartBeat(HeartBeatResponse& _return, const HeartBeatRequest& request) override;
   void send_HeartBeat(const HeartBeatRequest& request);
   void recv_HeartBeat(HeartBeatResponse& _return);
@@ -760,7 +760,7 @@ class PeerServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   typedef std::map<std::string, ProcessFunction> ProcessMap;
   ProcessMap processMap_;
   void process_Register(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_UnRegister(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_Unregister(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_HeartBeat(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_SyncLog(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ChangeRole(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -769,7 +769,7 @@ class PeerServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   PeerServiceProcessor(::std::shared_ptr<PeerServiceIf> iface) :
     iface_(iface) {
     processMap_["Register"] = &PeerServiceProcessor::process_Register;
-    processMap_["UnRegister"] = &PeerServiceProcessor::process_UnRegister;
+    processMap_["Unregister"] = &PeerServiceProcessor::process_Unregister;
     processMap_["HeartBeat"] = &PeerServiceProcessor::process_HeartBeat;
     processMap_["SyncLog"] = &PeerServiceProcessor::process_SyncLog;
     processMap_["ChangeRole"] = &PeerServiceProcessor::process_ChangeRole;
@@ -812,13 +812,13 @@ class PeerServiceMultiface : virtual public PeerServiceIf {
     return;
   }
 
-  void UnRegister(UnRegisterResponse& _return, const UnRegisterRequest& request) override {
+  void Unregister(UnregisterResponse& _return, const UnregisterRequest& request) override {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->UnRegister(_return, request);
+      ifaces_[i]->Unregister(_return, request);
     }
-    ifaces_[i]->UnRegister(_return, request);
+    ifaces_[i]->Unregister(_return, request);
     return;
   }
 
@@ -897,9 +897,9 @@ class PeerServiceConcurrentClient : virtual public PeerServiceIf {
   void Register(RegisterResponse& _return, const RegisterRequest& request) override;
   int32_t send_Register(const RegisterRequest& request);
   void recv_Register(RegisterResponse& _return, const int32_t seqid);
-  void UnRegister(UnRegisterResponse& _return, const UnRegisterRequest& request) override;
-  int32_t send_UnRegister(const UnRegisterRequest& request);
-  void recv_UnRegister(UnRegisterResponse& _return, const int32_t seqid);
+  void Unregister(UnregisterResponse& _return, const UnregisterRequest& request) override;
+  int32_t send_Unregister(const UnregisterRequest& request);
+  void recv_Unregister(UnregisterResponse& _return, const int32_t seqid);
   void HeartBeat(HeartBeatResponse& _return, const HeartBeatRequest& request) override;
   int32_t send_HeartBeat(const HeartBeatRequest& request);
   void recv_HeartBeat(HeartBeatResponse& _return, const int32_t seqid);

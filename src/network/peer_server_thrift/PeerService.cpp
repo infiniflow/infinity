@@ -196,11 +196,11 @@ uint32_t PeerService_Register_presult::read(::apache::thrift::protocol::TProtoco
 }
 
 
-PeerService_UnRegister_args::~PeerService_UnRegister_args() noexcept {
+PeerService_Unregister_args::~PeerService_Unregister_args() noexcept {
 }
 
 
-uint32_t PeerService_UnRegister_args::read(::apache::thrift::protocol::TProtocol* iprot) {
+uint32_t PeerService_Unregister_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
   ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
   uint32_t xfer = 0;
@@ -241,10 +241,10 @@ uint32_t PeerService_UnRegister_args::read(::apache::thrift::protocol::TProtocol
   return xfer;
 }
 
-uint32_t PeerService_UnRegister_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+uint32_t PeerService_Unregister_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
   uint32_t xfer = 0;
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-  xfer += oprot->writeStructBegin("PeerService_UnRegister_args");
+  xfer += oprot->writeStructBegin("PeerService_Unregister_args");
 
   xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
   xfer += this->request.write(oprot);
@@ -256,14 +256,14 @@ uint32_t PeerService_UnRegister_args::write(::apache::thrift::protocol::TProtoco
 }
 
 
-PeerService_UnRegister_pargs::~PeerService_UnRegister_pargs() noexcept {
+PeerService_Unregister_pargs::~PeerService_Unregister_pargs() noexcept {
 }
 
 
-uint32_t PeerService_UnRegister_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+uint32_t PeerService_Unregister_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
   uint32_t xfer = 0;
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-  xfer += oprot->writeStructBegin("PeerService_UnRegister_pargs");
+  xfer += oprot->writeStructBegin("PeerService_Unregister_pargs");
 
   xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
   xfer += (*(this->request)).write(oprot);
@@ -275,11 +275,11 @@ uint32_t PeerService_UnRegister_pargs::write(::apache::thrift::protocol::TProtoc
 }
 
 
-PeerService_UnRegister_result::~PeerService_UnRegister_result() noexcept {
+PeerService_Unregister_result::~PeerService_Unregister_result() noexcept {
 }
 
 
-uint32_t PeerService_UnRegister_result::read(::apache::thrift::protocol::TProtocol* iprot) {
+uint32_t PeerService_Unregister_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
   ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
   uint32_t xfer = 0;
@@ -320,11 +320,11 @@ uint32_t PeerService_UnRegister_result::read(::apache::thrift::protocol::TProtoc
   return xfer;
 }
 
-uint32_t PeerService_UnRegister_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
+uint32_t PeerService_Unregister_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
   uint32_t xfer = 0;
 
-  xfer += oprot->writeStructBegin("PeerService_UnRegister_result");
+  xfer += oprot->writeStructBegin("PeerService_Unregister_result");
 
   if (this->__isset.success) {
     xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
@@ -337,11 +337,11 @@ uint32_t PeerService_UnRegister_result::write(::apache::thrift::protocol::TProto
 }
 
 
-PeerService_UnRegister_presult::~PeerService_UnRegister_presult() noexcept {
+PeerService_Unregister_presult::~PeerService_Unregister_presult() noexcept {
 }
 
 
-uint32_t PeerService_UnRegister_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
+uint32_t PeerService_Unregister_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
   ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
   uint32_t xfer = 0;
@@ -1188,18 +1188,18 @@ void PeerServiceClient::recv_Register(RegisterResponse& _return)
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Register failed: unknown result");
 }
 
-void PeerServiceClient::UnRegister(UnRegisterResponse& _return, const UnRegisterRequest& request)
+void PeerServiceClient::Unregister(UnregisterResponse& _return, const UnregisterRequest& request)
 {
-  send_UnRegister(request);
-  recv_UnRegister(_return);
+  send_Unregister(request);
+  recv_Unregister(_return);
 }
 
-void PeerServiceClient::send_UnRegister(const UnRegisterRequest& request)
+void PeerServiceClient::send_Unregister(const UnregisterRequest& request)
 {
   int32_t cseqid = 0;
-  oprot_->writeMessageBegin("UnRegister", ::apache::thrift::protocol::T_CALL, cseqid);
+  oprot_->writeMessageBegin("Unregister", ::apache::thrift::protocol::T_CALL, cseqid);
 
-  PeerService_UnRegister_pargs args;
+  PeerService_Unregister_pargs args;
   args.request = &request;
   args.write(oprot_);
 
@@ -1208,7 +1208,7 @@ void PeerServiceClient::send_UnRegister(const UnRegisterRequest& request)
   oprot_->getTransport()->flush();
 }
 
-void PeerServiceClient::recv_UnRegister(UnRegisterResponse& _return)
+void PeerServiceClient::recv_Unregister(UnregisterResponse& _return)
 {
 
   int32_t rseqid = 0;
@@ -1228,12 +1228,12 @@ void PeerServiceClient::recv_UnRegister(UnRegisterResponse& _return)
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
   }
-  if (fname.compare("UnRegister") != 0) {
+  if (fname.compare("Unregister") != 0) {
     iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
   }
-  PeerService_UnRegister_presult result;
+  PeerService_Unregister_presult result;
   result.success = &_return;
   result.read(iprot_);
   iprot_->readMessageEnd();
@@ -1243,7 +1243,7 @@ void PeerServiceClient::recv_UnRegister(UnRegisterResponse& _return)
     // _return pointer has now been filled
     return;
   }
-  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "UnRegister failed: unknown result");
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Unregister failed: unknown result");
 }
 
 void PeerServiceClient::HeartBeat(HeartBeatResponse& _return, const HeartBeatRequest& request)
@@ -1551,38 +1551,38 @@ void PeerServiceProcessor::process_Register(int32_t seqid, ::apache::thrift::pro
   }
 }
 
-void PeerServiceProcessor::process_UnRegister(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+void PeerServiceProcessor::process_Unregister(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
 {
   void* ctx = nullptr;
   if (this->eventHandler_.get() != nullptr) {
-    ctx = this->eventHandler_->getContext("PeerService.UnRegister", callContext);
+    ctx = this->eventHandler_->getContext("PeerService.Unregister", callContext);
   }
-  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "PeerService.UnRegister");
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "PeerService.Unregister");
 
   if (this->eventHandler_.get() != nullptr) {
-    this->eventHandler_->preRead(ctx, "PeerService.UnRegister");
+    this->eventHandler_->preRead(ctx, "PeerService.Unregister");
   }
 
-  PeerService_UnRegister_args args;
+  PeerService_Unregister_args args;
   args.read(iprot);
   iprot->readMessageEnd();
   uint32_t bytes = iprot->getTransport()->readEnd();
 
   if (this->eventHandler_.get() != nullptr) {
-    this->eventHandler_->postRead(ctx, "PeerService.UnRegister", bytes);
+    this->eventHandler_->postRead(ctx, "PeerService.Unregister", bytes);
   }
 
-  PeerService_UnRegister_result result;
+  PeerService_Unregister_result result;
   try {
-    iface_->UnRegister(result.success, args.request);
+    iface_->Unregister(result.success, args.request);
     result.__isset.success = true;
   } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-      this->eventHandler_->handlerError(ctx, "PeerService.UnRegister");
+      this->eventHandler_->handlerError(ctx, "PeerService.Unregister");
     }
 
     ::apache::thrift::TApplicationException x(e.what());
-    oprot->writeMessageBegin("UnRegister", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    oprot->writeMessageBegin("Unregister", ::apache::thrift::protocol::T_EXCEPTION, seqid);
     x.write(oprot);
     oprot->writeMessageEnd();
     oprot->getTransport()->writeEnd();
@@ -1591,17 +1591,17 @@ void PeerServiceProcessor::process_UnRegister(int32_t seqid, ::apache::thrift::p
   }
 
   if (this->eventHandler_.get() != nullptr) {
-    this->eventHandler_->preWrite(ctx, "PeerService.UnRegister");
+    this->eventHandler_->preWrite(ctx, "PeerService.Unregister");
   }
 
-  oprot->writeMessageBegin("UnRegister", ::apache::thrift::protocol::T_REPLY, seqid);
+  oprot->writeMessageBegin("Unregister", ::apache::thrift::protocol::T_REPLY, seqid);
   result.write(oprot);
   oprot->writeMessageEnd();
   bytes = oprot->getTransport()->writeEnd();
   oprot->getTransport()->flush();
 
   if (this->eventHandler_.get() != nullptr) {
-    this->eventHandler_->postWrite(ctx, "PeerService.UnRegister", bytes);
+    this->eventHandler_->postWrite(ctx, "PeerService.Unregister", bytes);
   }
 }
 
@@ -1912,19 +1912,19 @@ void PeerServiceConcurrentClient::recv_Register(RegisterResponse& _return, const
   } // end while(true)
 }
 
-void PeerServiceConcurrentClient::UnRegister(UnRegisterResponse& _return, const UnRegisterRequest& request)
+void PeerServiceConcurrentClient::Unregister(UnregisterResponse& _return, const UnregisterRequest& request)
 {
-  int32_t seqid = send_UnRegister(request);
-  recv_UnRegister(_return, seqid);
+  int32_t seqid = send_Unregister(request);
+  recv_Unregister(_return, seqid);
 }
 
-int32_t PeerServiceConcurrentClient::send_UnRegister(const UnRegisterRequest& request)
+int32_t PeerServiceConcurrentClient::send_Unregister(const UnregisterRequest& request)
 {
   int32_t cseqid = this->sync_->generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-  oprot_->writeMessageBegin("UnRegister", ::apache::thrift::protocol::T_CALL, cseqid);
+  oprot_->writeMessageBegin("Unregister", ::apache::thrift::protocol::T_CALL, cseqid);
 
-  PeerService_UnRegister_pargs args;
+  PeerService_Unregister_pargs args;
   args.request = &request;
   args.write(oprot_);
 
@@ -1936,7 +1936,7 @@ int32_t PeerServiceConcurrentClient::send_UnRegister(const UnRegisterRequest& re
   return cseqid;
 }
 
-void PeerServiceConcurrentClient::recv_UnRegister(UnRegisterResponse& _return, const int32_t seqid)
+void PeerServiceConcurrentClient::recv_Unregister(UnregisterResponse& _return, const int32_t seqid)
 {
 
   int32_t rseqid = 0;
@@ -1965,7 +1965,7 @@ void PeerServiceConcurrentClient::recv_UnRegister(UnRegisterResponse& _return, c
         iprot_->readMessageEnd();
         iprot_->getTransport()->readEnd();
       }
-      if (fname.compare("UnRegister") != 0) {
+      if (fname.compare("Unregister") != 0) {
         iprot_->skip(::apache::thrift::protocol::T_STRUCT);
         iprot_->readMessageEnd();
         iprot_->getTransport()->readEnd();
@@ -1974,7 +1974,7 @@ void PeerServiceConcurrentClient::recv_UnRegister(UnRegisterResponse& _return, c
         using ::apache::thrift::protocol::TProtocolException;
         throw TProtocolException(TProtocolException::INVALID_DATA);
       }
-      PeerService_UnRegister_presult result;
+      PeerService_Unregister_presult result;
       result.success = &_return;
       result.read(iprot_);
       iprot_->readMessageEnd();
@@ -1986,7 +1986,7 @@ void PeerServiceConcurrentClient::recv_UnRegister(UnRegisterResponse& _return, c
         return;
       }
       // in a bad state, don't commit
-      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "UnRegister failed: unknown result");
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Unregister failed: unknown result");
     }
     // seqid != rseqid
     this->sync_->updatePending(fname, mtype, rseqid);

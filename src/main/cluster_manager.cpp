@@ -180,6 +180,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
 }
 
 Status ClusterManager::UnInit() {
+
     if (hb_periodic_thread_.get() != nullptr) {
         {
             std::lock_guard lock(hb_mutex_);
@@ -191,6 +192,18 @@ Status ClusterManager::UnInit() {
     }
 
     std::unique_lock<std::mutex> lock(mutex_);
+    if(this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
+        if(leader_node_->node_status_ == NodeStatus::kAlive) {
+            // Leader is alive, need to unregister
+            SharedPtr<UnregisterPeerTask> unregister_task = MakeShared<UnregisterPeerTask>(this_node_->node_name_);
+            peer_client_->Send(unregister_task);
+            unregister_task->Wait();
+            if(unregister_task->error_code_ != 0) {
+                LOG_ERROR(fmt::format("Fail to unregister from leader: {}", unregister_task->error_message_));
+            }
+        }
+    }
+
     other_nodes_.clear();
     this_node_.reset();
     if (peer_client_.get() != nullptr) {
@@ -270,6 +283,30 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
         String error_message = "Invalid node role.";
         UnrecoverableError(error_message);
     }
+    return Status::OK();
+}
+
+Status ClusterManager::RemoveNode(const String& node_name) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    u64 found_count = 0;
+    std::erase_if(other_nodes_, [&](const SharedPtr<NodeInfo>& node) {
+        if(node_name == node->node_name_) {
+            ++ found_count;
+            return true;
+        }
+        return false;
+    });
+
+    if(found_count == 0) {
+        return Status::NotExistNode(fmt::format("Attempt to remove non-exist node: {}", node_name));
+    } else if(found_count == 1) {
+        return Status::OK();
+    } else {
+        String error_message = fmt::format("Attemtp to remove multiple({}) node with name: {}", found_count, node_name);
+        LOG_ERROR(error_message);
+        return Status::DuplicateNode(error_message);
+    }
+
     return Status::OK();
 }
 

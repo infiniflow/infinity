@@ -44,6 +44,8 @@ public:
 
 public:
     Status AddNodeInfo(const SharedPtr<NodeInfo>& new_node);
+    Status RemoveNode(const String& node_name);
+
     Status UpdateNodeInfo(const SharedPtr<NodeInfo>& server_node); // Used by leader;
     Status UpdateNonLeaderNodeInfo(const Vector<SharedPtr<NodeInfo>>& info_of_nodes); // Use by follower / learner to update all node info.
     Vector<SharedPtr<NodeInfo>> ListNodes() const;

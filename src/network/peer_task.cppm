@@ -127,7 +127,7 @@ public:
 
 export class UnregisterPeerTask final : public PeerTask {
 public:
-    UnregisterPeerTask(String node_name, i64 message_time)
+    UnregisterPeerTask(String node_name)
         : PeerTask(PeerTaskType::kUnregister), node_name_(std::move(node_name)) {}
 
     String ToString() const final;

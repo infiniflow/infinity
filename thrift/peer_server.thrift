@@ -26,19 +26,19 @@ struct RegisterRequest {
 
 struct RegisterResponse {
 1: i64 error_code,
-2: string error_msg,
+2: string error_message,
 3: string leader_name,
 4: i64 leader_term,
 5: i64 heart_beat_interval, // microseconds
 }
 
-struct UnRegisterRequest {
+struct UnregisterRequest {
 1: string node_name,
 }
 
-struct UnRegisterResponse {
+struct UnregisterResponse {
 1: i64 error_code,
-2: string error_msg,
+2: string error_message,
 }
 
 struct HeartBeatRequest {
@@ -48,7 +48,7 @@ struct HeartBeatRequest {
 
 struct HeartBeatResponse {
 1: i64 error_code,
-2: string error_msg,
+2: string error_message,
 3: i64 leader_term,
 4: list<NodeInfo> other_nodes,
 }
@@ -60,7 +60,7 @@ struct SyncLogRequest {
 
 struct SyncLogResponse {
 1: i64 error_code,
-2: string error_msg,
+2: string error_message,
 3: i64 txn_timestamp,
 }
 
@@ -90,7 +90,7 @@ service PeerService {
 
 // From follower/learner to leader.
 RegisterResponse Register(1:RegisterRequest request),
-UnRegisterResponse UnRegister(1:UnRegisterRequest request),
+UnregisterResponse Unregister(1:UnregisterRequest request),
 
 // From follower/learner to leader
 HeartBeatResponse HeartBeat(1:HeartBeatRequest request),

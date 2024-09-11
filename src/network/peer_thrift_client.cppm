@@ -57,6 +57,7 @@ public:
 private:
     void Process();
     void Register(RegisterPeerTask* peer_task);
+    void Unregister(UnregisterPeerTask* peer_task);
 
 private:
     NodeInfo node_info_;
