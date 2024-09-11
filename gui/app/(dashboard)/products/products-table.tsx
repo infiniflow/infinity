@@ -1,13 +1,6 @@
 'use client';
 
 import {
-  TableHead,
-  TableRow,
-  TableHeader,
-  TableBody,
-  Table
-} from '@/components/ui/table';
-import {
   Card,
   CardContent,
   CardDescription,
@@ -15,11 +8,18 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
 import { Product } from './product';
 // import { SelectProduct } from '@/lib/db';
-import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export function ProductsTable({
   products,
