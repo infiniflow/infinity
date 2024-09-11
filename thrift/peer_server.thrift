@@ -22,6 +22,7 @@ struct NodeInfo {
 4: i64 node_port,
 5: i64 txn_timestamp,
 6: NodeStatus node_status,
+7: i64 hb_count,
 }
 
 struct RegisterRequest {

@@ -105,6 +105,10 @@ void NodeInfo::__set_txn_timestamp(const int64_t val) {
 void NodeInfo::__set_node_status(const NodeStatus::type val) {
   this->node_status = val;
 }
+
+void NodeInfo::__set_hb_count(const int64_t val) {
+  this->hb_count = val;
+}
 std::ostream& operator<<(std::ostream& out, const NodeInfo& obj)
 {
   obj.printTo(out);
@@ -185,6 +189,14 @@ uint32_t NodeInfo::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 7:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->hb_count);
+          this->__isset.hb_count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -226,6 +238,10 @@ uint32_t NodeInfo::write(::apache::thrift::protocol::TProtocol* oprot) const {
   xfer += oprot->writeI32(static_cast<int32_t>(this->node_status));
   xfer += oprot->writeFieldEnd();
 
+  xfer += oprot->writeFieldBegin("hb_count", ::apache::thrift::protocol::T_I64, 7);
+  xfer += oprot->writeI64(this->hb_count);
+  xfer += oprot->writeFieldEnd();
+
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -239,6 +255,7 @@ void swap(NodeInfo &a, NodeInfo &b) {
   swap(a.node_port, b.node_port);
   swap(a.txn_timestamp, b.txn_timestamp);
   swap(a.node_status, b.node_status);
+  swap(a.hb_count, b.hb_count);
   swap(a.__isset, b.__isset);
 }
 
@@ -249,6 +266,7 @@ NodeInfo::NodeInfo(const NodeInfo& other2) {
   node_port = other2.node_port;
   txn_timestamp = other2.txn_timestamp;
   node_status = other2.node_status;
+  hb_count = other2.hb_count;
   __isset = other2.__isset;
 }
 NodeInfo& NodeInfo::operator=(const NodeInfo& other3) {
@@ -258,6 +276,7 @@ NodeInfo& NodeInfo::operator=(const NodeInfo& other3) {
   node_port = other3.node_port;
   txn_timestamp = other3.txn_timestamp;
   node_status = other3.node_status;
+  hb_count = other3.hb_count;
   __isset = other3.__isset;
   return *this;
 }
@@ -270,6 +289,7 @@ void NodeInfo::printTo(std::ostream& out) const {
   out << ", " << "node_port=" << to_string(node_port);
   out << ", " << "txn_timestamp=" << to_string(txn_timestamp);
   out << ", " << "node_status=" << to_string(node_status);
+  out << ", " << "hb_count=" << to_string(hb_count);
   out << ")";
 }
 

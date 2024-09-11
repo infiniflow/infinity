@@ -77,13 +77,14 @@ class NewLeaderRequest;
 class NewLeaderResponse;
 
 typedef struct _NodeInfo__isset {
-  _NodeInfo__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false), node_status(false) {}
+  _NodeInfo__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false), node_status(false), hb_count(false) {}
   bool node_name :1;
   bool node_type :1;
   bool node_ip :1;
   bool node_port :1;
   bool txn_timestamp :1;
   bool node_status :1;
+  bool hb_count :1;
 } _NodeInfo__isset;
 
 class NodeInfo : public virtual ::apache::thrift::TBase {
@@ -97,7 +98,8 @@ class NodeInfo : public virtual ::apache::thrift::TBase {
              node_ip(),
              node_port(0),
              txn_timestamp(0),
-             node_status(static_cast<NodeStatus::type>(0)) {
+             node_status(static_cast<NodeStatus::type>(0)),
+             hb_count(0) {
   }
 
   virtual ~NodeInfo() noexcept;
@@ -115,6 +117,7 @@ class NodeInfo : public virtual ::apache::thrift::TBase {
    * @see NodeStatus
    */
   NodeStatus::type node_status;
+  int64_t hb_count;
 
   _NodeInfo__isset __isset;
 
@@ -130,6 +133,8 @@ class NodeInfo : public virtual ::apache::thrift::TBase {
 
   void __set_node_status(const NodeStatus::type val);
 
+  void __set_hb_count(const int64_t val);
+
   bool operator == (const NodeInfo & rhs) const
   {
     if (!(node_name == rhs.node_name))
@@ -143,6 +148,8 @@ class NodeInfo : public virtual ::apache::thrift::TBase {
     if (!(txn_timestamp == rhs.txn_timestamp))
       return false;
     if (!(node_status == rhs.node_status))
+      return false;
+    if (!(hb_count == rhs.hb_count))
       return false;
     return true;
   }

@@ -3600,6 +3600,7 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
         MakeShared<ColumnDef>(2, varchar_type, "status", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(3, varchar_type, "address", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(4, varchar_type, "last_update", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(5, bigint_type, "heartbeat", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_nodes"), column_defs);
@@ -3611,6 +3612,7 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
         varchar_type,
         varchar_type,
         varchar_type,
+        bigint_type
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -3663,6 +3665,14 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
+
+        {
+            // heartbeat
+            Value value = Value::MakeBigInt(server_node->heartbeat_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+        }
+
 
         ++row_count;
         if (row_count % output_block_ptr->capacity() == 0) {

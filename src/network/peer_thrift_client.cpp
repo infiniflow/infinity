@@ -84,19 +84,19 @@ void PeerClient::Process() {
                     break;
                 }
                 case PeerTaskType::kRegister: {
-                    LOG_DEBUG(peer_task->ToString());
+                    LOG_TRACE(peer_task->ToString());
                     RegisterPeerTask* register_peer_task = static_cast<RegisterPeerTask*>(peer_task.get());
                     Register(register_peer_task);
                     break;
                 }
                 case PeerTaskType::kUnregister: {
-                    LOG_INFO(peer_task->ToString());
+                    LOG_TRACE(peer_task->ToString());
                     UnregisterPeerTask* unregister_peer_task = static_cast<UnregisterPeerTask*>(peer_task.get());
                     Unregister(unregister_peer_task);
                     break;
                 }
                 case PeerTaskType::kHeartBeat: {
-                    LOG_DEBUG(peer_task->ToString());
+                    LOG_TRACE(peer_task->ToString());
                     HeartBeatPeerTask* heartbeat_peer_task = static_cast<HeartBeatPeerTask*>(peer_task.get());
                     HeartBeat(heartbeat_peer_task);
                     break;
@@ -187,6 +187,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask* peer_task) {
             node_info->ip_address_ = other_node.node_ip;
             node_info->port_ = other_node.node_port;
             node_info->txn_timestamp_ = other_node.txn_timestamp;
+            node_info->heartbeat_count_ = other_node.hb_count;
             switch(other_node.node_type) {
                 case infinity_peer_server::NodeType::type::kLeader: {
                     node_info->node_role_ = NodeRole::kLeader;

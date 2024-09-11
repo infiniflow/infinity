@@ -111,6 +111,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
         leader_node_->heartbeat_interval_ = register_peer_task->heartbeat_interval_;
     }
 
+    this->hb_running_ = true;
     hb_periodic_thread_ = MakeShared<Thread>([this] { this->HeartBeatToLeader(); });
     return status;
 }
@@ -336,6 +337,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const String& node_name, i64 tx
                 thrift_node_info.node_ip = other_node->ip_address_;
                 thrift_node_info.node_port = other_node->port_;
                 thrift_node_info.txn_timestamp = other_node->txn_timestamp_;
+                thrift_node_info.hb_count = other_node->heartbeat_count_;
                 switch(other_node->node_role_) {
                     case NodeRole::kLeader: {
                         thrift_node_info.node_type = infinity_peer_server::NodeType::kLeader;
