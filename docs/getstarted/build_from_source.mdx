@@ -14,8 +14,7 @@ Infinity can be natively compiled on Linux only. For non-Linux operating systems
 :::
 
 - [Prerequisites](#prerequisites)
-- [Build from source on Linux using Docker](#build-from-source-on-linux-using-docker)
-- [Build from source on Ubuntu](#build-from-source-on-ubuntu)
+- [Build from source](#build-from-source)
 - [Build and run unit tests](#build-and-run-unit-tests)
 - [Build and run functional tests](#build-and-run-functional-tests)
 
@@ -56,7 +55,15 @@ The `cmake` build type (`CMAKE_BUILD_TYPE`) can be one of the following:
 The following procedures set `CMAKE_BUILD_TYPE` to `Debug`. Change it as you see necessary.
 :::
 
-## Build from source on Linux using Docker
+## Build from Source
+
+<Tabs
+  defaultValue="linuxdocker"
+  values={[
+    {label: 'On Linux using Docker', value: 'linuxdocker'},
+    {label: 'On Ubuntu', value: 'ubuntu'},
+  ]}>
+   <TabItem value="linuxdocker">
 
 This section provides instructions for building Infinity from source on Linux using Docker.
 
@@ -83,7 +90,8 @@ ulimit -n 500000
 ./cmake-build-debug/src/infinity
 ```
 
-## Build from source on Ubuntu
+  </TabItem>
+  <TabItem value="ubuntu">
 
 This section provides instructions for building Infinity from source on Ubuntu.
 
@@ -175,6 +183,9 @@ sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 ulimit -n 500000
 ./cmake-build-debug/src/infinity
 ```
+
+  </TabItem>
+</Tabs>
 
 ## Build and run unit tests
 
