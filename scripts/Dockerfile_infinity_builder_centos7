@@ -128,7 +128,7 @@ RUN --mount=type=bind,source=v1.1.0.tar.gz,target=/root/v1.1.0.tar.gz  \
 # Refers to https://github.com/jemalloc/jemalloc/issues/2454
 RUN --mount=type=bind,source=jemalloc-5.3.0.tar.bz2,target=/root/jemalloc-5.3.0.tar.bz2  \
     cd /root && tar xjf jemalloc-5.3.0.tar.bz2 \
-    && cd jemalloc-5.3.0 && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind && make -j install \
+    && cd jemalloc-5.3.0 && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && make -j install \
     && ldconfig && cd /root && rm -rf jemalloc-5.3.0
 
 # Install gperftools-2.15
