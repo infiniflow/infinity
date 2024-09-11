@@ -7,15 +7,22 @@ slug: /build_from_source
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Infinity can only be compiled natively on Linux. If your operating system is not Linux, build it using Docker.
+This document provides instructions for building Infinity from source, as well as building and running unit and functional tests. 
 
+:::tip NOTE
+Infinity can be natively compiled on Linux only. For non-Linux operating systems, build it using Docker.
+:::
+
+- [Prerequisites](#prerequisites)
 - [Build from source on Linux using Docker](#build-from-source-on-linux-using-docker)
 - [Build from source on Ubuntu](#build-from-source-on-ubuntu)
 - []()
 
 ## Prerequisites
 
-Build the whole project, especially the link stage, requires much RAM. The host may become unresponsive due to the very slow kernel oom killer. To lessen the chances of it happening, it is recommended to install [earlyoom](https://github.com/rfjakob/earlyoom). Furthermore, you need to tell cmake to limit the concurrent link process:
+Building the whole project, especially during the link stage, requires much RAM. The host may become unresponsive due to the very slow kernel oom killer. 
+To lessen the chances of it happening, it is recommended to install [earlyoom](https://github.com/rfjakob/earlyoom). 
+Furthermore, you need to tell cmake to limit the concurrent link process:
 
 `-DCMAKE_JOB_POOLS:STRING='link=4'`
 
@@ -31,11 +38,12 @@ The `CMAKE_BUILD_TYPE` (cmake build type) can be one of:
 - `RelWithDebInfo`: optimize with `-O2`, with symbol info. This aims performance analysis.
 - `Release`: optimize with `-O3`, without symbol info. The executables built out are much smaller than `RelWithDebInfo`. This aims [project releases](https://github.com/infiniflow/infinity/releases).
 
-Following procedures use `Debug`. Change it as you need.
+The following procedures use `Debug`. Change it as you need.
+
 
 ## Build from source on Linux using Docker
 
-This section provides instructions on building Infinity from source on Linux using Docker.
+This section provides instructions for building Infinity from source on Linux using Docker.
 
 ### 1. Download the source code
 
@@ -77,7 +85,7 @@ ulimit -n 500000
 
 ## Build from source on Ubuntu
 
-This section provides instructions on building Infinity from source on Ubuntu.
+This section provides instructions for building Infinity from source on Ubuntu.
 
 ### 1. Install necessary dependencies
 
@@ -191,6 +199,7 @@ sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
 
 ```shell
 sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
+```
 
 ```shell
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
@@ -255,7 +264,7 @@ git clone https://github.com/infiniflow/infinity.git
 ### 3. Build the source code
 
 :::tip NOTE
-You must *also* install `simde` v0.7.4+ if using Ubuntu 22.04 on ARM architecture.
+You must *also* install `simde` v0.7.4+ if using Ubuntu 22.04 on an ARM architecture.
 
 ```shell
 sudo apt install libsimde-dev
@@ -301,9 +310,16 @@ ulimit -n 500000
 ./cmake-build-debug/src/infinity
 ```
 
-## Build and run unit test
+## Build and run unit tests
 
-## Build and run unit test on Linux using Docker
+<Tabs
+  defaultValue="linux_mac"
+  values={[
+    {label: 'Using Docker on Linux', value: 'dockerlinux'},
+    {label: 'on Ubuntu', value: 'ubuntu'},
+    {label: 'With code coverage enabled', value: 'codecoverage'},
+  ]}>
+   <TabItem value="dockerlinux">
 
 ```shell
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  test_main"
@@ -313,7 +329,8 @@ docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G N
 ./cmake-build-debug/src/test_main
 ```
 
-## Build and run unit test on Ubuntu
+  </TabItem>
+  <TabItem value="ubuntu">
 
 ```shell
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
@@ -327,71 +344,138 @@ cmake --build . -t test_main
 ./cmake-build-debug/src/test_main
 ```
 
-## Build and run unit test with code coverage
+  </TabItem>
+  <TabItem value="codecoverage">
 
-### 1. Install dependency
-```shell
-pip install gcovr
-```
+1. Install the `Gcovr` dependency:
 
-### 2. Build and run unit test with code coverage option on 
+   ```shell
+   pip install gcovr
+   ```
 
-```shell
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
-cmake --build . -t test_main
-find . -name "*.gcda"  | xargs rm -f
-./cmake-build-debug/src/test_main
-```
+2. Build and run the unit tests with code coverage enabled:
 
-### 3. Use Gcovr to generate summarized code coverage results
+   ```shell
+   cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
+   ```
 
-```shell
-cd ./cmake-build-debug/src/CMakeFiles/unit_test.dir
-```
+   ```shell
+   cmake --build . -t test_main
+   ```
 
-```shell
-gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html unit_test_html.html
-```
+   ```shell
+   find . -name "*.gcda"  | xargs rm -f
+   ```
 
-# Build and run function test
+   ```shell
+   ./cmake-build-debug/src/test_main
+   ```
 
-## Build and run function test on Linux using Docker
-```shell
-docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  infinity"
-./cmake-build-debug/src/infinity
-python3 tools/run_pytest_parallel.py
-```
+3. Use Gcovr to generate summarized code coverage results:
 
-## Build and run function test on Ubuntu
-```shell
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
-cmake --build . -t infinity
-./cmake-build-debug/src/infinity
-python3 tools/run_pytest_parallel.py
-```
+   ```shell
+   cd ./cmake-build-debug/src/CMakeFiles/unit_test.dir
+   ```
 
-## Build and run function test with code coverage
+   ```shell
+   gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html unit_test_html.html
+   ```
 
-### 1. Build and start up Infinity server with code coverage option on
-```shell
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
-cmake --build . -t infinity
-find . -name "*.gcda"  | xargs rm -f
-./cmake-build-debug/src/infinity
-```
+  </TabItem>
+</Tabs>
 
-### 2. Run function test
-```shell
-python3 tools/run_pytest_parallel.py
-```
+## Build and run functional tests
 
-### 3. Shut down Infinity server
-```shell
-kill -15 `pidof infinity`
-```
+<Tabs
+  defaultValue="linux_mac"
+  values={[
+    {label: 'Using Docker on Linux', value: 'dockerlinux'},
+    {label: 'on Ubuntu', value: 'ubuntu'},
+    {label: 'With code coverage enabled', value: 'codecoverage'},
+  ]}>
+   <TabItem value="dockerlinux">
 
-### 4. Use Gcovr to generate summarized code coverage results
-```shell
-cd ./cmake-build-debug/src/CMakeFiles
-gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html function_test_html.html
-```
+1. Build and start up the Infinity server:
+
+   ```shell
+   docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  infinity"
+   ```
+
+   ```shell
+   ./cmake-build-debug/src/infinity
+   ```
+
+2. Run the functional tests:
+
+   ```shell
+   python3 tools/run_pytest_parallel.py
+   ```
+
+  </TabItem>
+  <TabItem value="ubuntu">
+
+1. Build and start up the Infinity server with code coverage enabled:
+
+   ```shell
+   cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+   ```
+
+   ```shell
+   cmake --build . -t infinity
+   ```
+
+   ```shell
+   ./cmake-build-debug/src/infinity
+   ```
+
+2. Run the functional tests: 
+
+   ```shell
+   python3 tools/run_pytest_parallel.py
+   ```
+
+  </TabItem>
+  <TabItem value="codecoverage">
+
+1. Build and start up the Infinity server with code coverage enabled:
+
+   ```shell
+   cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
+   ```
+
+   ```shell
+   cmake --build . -t infinity
+   ```
+
+   ```shell
+   find . -name "*.gcda"  | xargs rm -f
+   ```
+
+   ```shell
+   ./cmake-build-debug/src/infinity
+   ```
+
+2. Run the functional tests: 
+
+   ```shell
+   python3 tools/run_pytest_parallel.py
+   ```
+
+3. Shut down the Infinity server
+
+   ```shell
+   kill -15 `pidof infinity`
+   ```
+
+4. Use Gcovr to generate summarized code coverage results:
+
+   ```shell
+   cd ./cmake-build-debug/src/CMakeFiles
+   ```
+
+   ```shell
+   gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html function_test_html.html
+   ```
+
+  </TabItem>
+</Tabs>
