@@ -436,7 +436,7 @@ struct SQL_LTYPE {
 %type <expr_t>                  expr expr_alias column_expr function_expr subquery_expr match_vector_expr match_tensor_expr match_sparse_expr sub_search
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
 %type <expr_t>                  conjunction_expr cast_expr case_expr
-%type <expr_t>                  match_text_expr query_expr fusion_expr search_clause
+%type <expr_t>                  match_text_expr query_expr fusion_expr search_clause optional_search_filter_expr
 %type <const_expr_t>            constant_expr interval_expr default_expr
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <const_expr_t>            common_array_expr subarray_array_expr unclosed_subarray_array_expr
@@ -456,7 +456,7 @@ struct SQL_LTYPE {
 %type <copy_option_array> copy_option_list
 %type <copy_option_t>     copy_option
 
-%type <str_value>         file_path extra_match_tensor_option
+%type <str_value>         file_path
 
 %type <bool_value>        if_not_exists if_exists distinct
 
@@ -1385,7 +1385,12 @@ select_clause_with_modifier: select_clause_without_modifier order_by_clause limi
     }
     if($1->search_expr_ != nullptr and ($2 != nullptr or $3 != nullptr or $4 != nullptr)) {
         delete $1;
-        delete $2;
+        if ($2) {
+            for (auto ptr : *($2)) {
+                delete ptr;
+            }
+            delete $2;
+        }
         delete $3;
         delete $4;
         yyerror(&yyloc, scanner, result, "Result modifier(ORDER BY, LIMIT, OFFSET) is conflict with SEARCH expression.");
@@ -1485,6 +1490,13 @@ search_clause: SEARCH sub_search_array {
     $$ = search_expr;
 }
 | /* no search clause */ {
+    $$ = nullptr;
+}
+
+optional_search_filter_expr: ',' WHERE expr {
+    $$ = $3;
+}
+| /* no where clause */ {
     $$ = nullptr;
 }
 
@@ -2485,16 +2497,9 @@ operand: '(' expr ')' {
 | query_expr
 | fusion_expr
 
-extra_match_tensor_option : ',' STRING {
-    $$ = $2;
-}
-| {
-    $$ = nullptr;
-}
-
-//                                       4                   6               8          10              11
-//                  MATCH TENSOR  (  column_name,     search_tensor, tensor_data_type, search_method, extra_match_tensor_option(including topn))
-match_tensor_expr : MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRING ',' STRING extra_match_tensor_option ')' {
+//                                       4                 6                 8          10         12                                          13
+//                  MATCH TENSOR  (  column_name, search_tensor, tensor_data_type, search_method, extra_match_tensor_option(including topn) optional_filter)
+match_tensor_expr : MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRING ',' STRING ',' STRING optional_search_filter_expr ')' {
     auto match_tensor_expr = std::make_unique<infinity::MatchTensorExpr>();
     // search column
     match_tensor_expr->SetSearchColumn($4);
@@ -2505,15 +2510,14 @@ match_tensor_expr : MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRIN
     ParserHelper::ToLower($10);
     match_tensor_expr->SetSearchMethod($10);
     // search options
-    if ($11) {
-        match_tensor_expr->SetExtraOptions($11);
-    }
+    match_tensor_expr->SetExtraOptions($12);
+    match_tensor_expr->SetOptionalFilter($13);
     $$ = match_tensor_expr.release();
 }
 
-//                  MATCH VECTOR (column_name, query_vec, data_type, metric_type, topn        ) USING INDEX ( index_name )  extra options
-//                   1      2         4         6              8          10           12                           17             19
-match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' USING INDEX '(' IDENTIFIER ')' with_index_param_list {
+//                  MATCH VECTOR (column_name, query_vec, data_type, metric_type, topn             optional_filter          ) USING INDEX ( index_name )  extra options
+//                   1      2         4         6              8          10           12                13                                        18             20
+match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' USING INDEX '(' IDENTIFIER ')' with_index_param_list {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     $$ = match_vector_expr;
 
@@ -2537,19 +2541,20 @@ match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING '
     free($10);
     delete $6;
 
-    match_vector_expr->index_name_ = $17;
-    free($17);
+    match_vector_expr->index_name_ = $18;
+    free($18);
     match_vector_expr->topn_ = $12;
-    match_vector_expr->opt_params_ = $19;
+    match_vector_expr->filter_expr_.reset($13);
+    match_vector_expr->opt_params_ = $20;
     goto Return1;
 Error1:
-    for (auto* param_ptr: *$19) {
+    for (auto* param_ptr: *$20) {
         delete param_ptr;
     }
-    delete $19;
+    delete $20;
     free($8);
     free($10);
-    free($17);
+    free($18);
     delete $6;
     delete $$;
     yyerror(&yyloc, scanner, result, "Invalid vector search distance type");
@@ -2558,7 +2563,7 @@ Return1:
     ;
 }
 |
-MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' IGNORE INDEX {
+MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' IGNORE INDEX {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     $$ = match_vector_expr;
 
@@ -2583,6 +2588,7 @@ MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' IG
     delete $6;
 
     match_vector_expr->topn_ = $12;
+    match_vector_expr->filter_expr_.reset($13);
     match_vector_expr->ignore_index_ = true;
     goto Return2;
 Error2:
@@ -2596,7 +2602,7 @@ Return2:
     ;
 }
 |
-MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' with_index_param_list {
+MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' with_index_param_list {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     $$ = match_vector_expr;
 
@@ -2621,13 +2627,14 @@ MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' wi
     delete $6;
 
     match_vector_expr->topn_ = $12;
-    match_vector_expr->opt_params_ = $14;
+    match_vector_expr->filter_expr_.reset($13);
+    match_vector_expr->opt_params_ = $15;
     goto Return3;
 Error3:
-    for (auto* param_ptr: *$14) {
+    for (auto* param_ptr: *$15) {
         delete param_ptr;
     }
-    delete $14;
+    delete $15;
     free($8);
     free($10);
     delete $6;
@@ -2638,7 +2645,7 @@ Return3:
     ;
 }
 |
-MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ')' with_index_param_list {
+MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING optional_search_filter_expr ')' with_index_param_list {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     $$ = match_vector_expr;
 
@@ -2663,14 +2670,15 @@ MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ')' with_index_param_
     delete $6;
 
     match_vector_expr->topn_ = infinity::DEFAULT_MATCH_VECTOR_TOP_N;
-    match_vector_expr->opt_params_ = $12;
+    match_vector_expr->filter_expr_.reset($11);
+    match_vector_expr->opt_params_ = $13;
     goto Return4;
 
 Error4:
-    for (auto* param_ptr: *$12) {
+    for (auto* param_ptr: *$13) {
         delete param_ptr;
     }
-    delete $12;
+    delete $13;
     free($8);
     free($10);
     delete $6;
@@ -2682,9 +2690,9 @@ Return4:
 }
 
 
-//                 MATCH SPARSE (column_name,       query_sparse,      metric_type,     topn)                                         extra options
-//                   1      2         4                  6                   8           10                             15                  17
-match_sparse_expr: MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE ')' USING INDEX '(' IDENTIFIER ')' with_index_param_list {
+//                 MATCH SPARSE (column_name,       query_sparse,      metric_type,     topn,         optional_filter)                                             extra options
+//                   1      2         4                  6                   8           10                  11                                     16                  18
+match_sparse_expr: MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' USING INDEX '(' IDENTIFIER ')' with_index_param_list {
     auto match_sparse_expr = new infinity::MatchSparseExpr();
     $$ = match_sparse_expr;
 
@@ -2699,13 +2707,16 @@ match_sparse_expr: MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING
     match_sparse_expr->SetMetricType($8);
 
     // topn and options
-    match_sparse_expr->SetOptParams($10, $17);
+    match_sparse_expr->SetOptParams($10, $18);
 
-    match_sparse_expr->index_name_ = $15;
-    free($15);
+    // optional filter
+    match_sparse_expr->SetOptionalFilter($11);
+
+    match_sparse_expr->index_name_ = $16;
+    free($16);
 }
 |
-MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE ')' IGNORE INDEX {
+MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' IGNORE INDEX {
     auto match_sparse_expr = new infinity::MatchSparseExpr();
     $$ = match_sparse_expr;
 
@@ -2722,10 +2733,13 @@ MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE ')'
     // topn and options
     match_sparse_expr->topn_ = $10;
 
+    // optional filter
+    match_sparse_expr->SetOptionalFilter($11);
+
     match_sparse_expr->ignore_index_ = true;
 }
 |
-MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE ')' with_index_param_list {
+MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' with_index_param_list {
     auto match_sparse_expr = new infinity::MatchSparseExpr();
     $$ = match_sparse_expr;
 
@@ -2739,11 +2753,14 @@ MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE ')'
     ParserHelper::ToLower($8);
     match_sparse_expr->SetMetricType($8);
 
+    // optional filter
+    match_sparse_expr->SetOptionalFilter($11);
+
     // topn and options
-    match_sparse_expr->SetOptParams($10, $12);
+    match_sparse_expr->SetOptParams($10, $13);
 }
 |
-MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ')' with_index_param_list {
+MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING optional_search_filter_expr ')' with_index_param_list {
     auto match_sparse_expr = new infinity::MatchSparseExpr();
     $$ = match_sparse_expr;
 
@@ -2757,39 +2774,46 @@ MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ')' with_index_par
     ParserHelper::ToLower($8);
     match_sparse_expr->SetMetricType($8);
 
+    // optional filter
+    match_sparse_expr->SetOptionalFilter($9);
+
     // topn and options
-    match_sparse_expr->SetOptParams(infinity::DEFAULT_MATCH_SPARSE_TOP_N, $10);
+    match_sparse_expr->SetOptParams(infinity::DEFAULT_MATCH_SPARSE_TOP_N, $11);
 }
 
-match_text_expr : MATCH TEXT '(' STRING ',' STRING ')' {
+match_text_expr : MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr ')' {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->fields_ = std::string($4);
     match_text_expr->matching_text_ = std::string($6);
+    match_text_expr->filter_expr_.reset($7);
     free($4);
     free($6);
     $$ = match_text_expr;
 }
-| MATCH TEXT '(' STRING ',' STRING ',' STRING ')' {
+| MATCH TEXT '(' STRING ',' STRING ',' STRING optional_search_filter_expr ')' {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->fields_ = std::string($4);
     match_text_expr->matching_text_ = std::string($6);
     match_text_expr->options_text_ = std::string($8);
+    match_text_expr->filter_expr_.reset($9);
     free($4);
     free($6);
     free($8);
     $$ = match_text_expr;
 }
 
-query_expr : QUERY '(' STRING ')' {
+query_expr : QUERY '(' STRING optional_search_filter_expr ')' {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->matching_text_ = std::string($3);
+    match_text_expr->filter_expr_.reset($4);
     free($3);
     $$ = match_text_expr;
 }
-| QUERY '(' STRING ',' STRING ')' {
+| QUERY '(' STRING ',' STRING optional_search_filter_expr ')' {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->matching_text_ = std::string($3);
     match_text_expr->options_text_ = std::string($5);
+    match_text_expr->filter_expr_.reset($6);
     free($3);
     free($5);
     $$ = match_text_expr;

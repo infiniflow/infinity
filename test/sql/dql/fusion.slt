@@ -125,6 +125,19 @@ SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical'
 9893
 2123
 
+# cannot have both where clause and subsearch filter
+statement error
+SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3, WHERE 33 + 5 < num), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') WHERE 100 > num;
+
+# subsearch filter
+query I
+SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=2', WHERE num != 6989), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 2, WHERE num != 0), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 2, WHERE num != 0), FUSION('rrf');
+----
+1
+2
+9893
+2123
+
 # Clean up
 statement ok
 DROP TABLE enwiki_embedding;

@@ -41,6 +41,7 @@ import logical_index_scan;
 import logical_match;
 import logical_match_tensor_scan;
 import logical_match_scan_base;
+import logical_fusion;
 import aggregate_expression;
 import between_expression;
 import case_expression;
@@ -62,6 +63,11 @@ void LogicalNodeVisitor::VisitNodeChildren(LogicalNode &op) {
     }
     if (op.right_node()) {
         VisitNode(*op.right_node());
+    }
+    if (op.operator_type() == LogicalNodeType::kFusion) {
+        for (const auto &fusion = static_cast<const LogicalFusion &>(op); auto &child : fusion.other_children_) {
+            VisitNode(*child);
+        }
     }
 }
 

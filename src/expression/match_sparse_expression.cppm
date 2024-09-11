@@ -37,7 +37,8 @@ public:
                           SparseMetricType metric_type,
                           SizeT query_n,
                           SizeT topn,
-                          const Vector<UniquePtr<InitParameter>> &opt_params);
+                          const Vector<UniquePtr<InitParameter>> &opt_params,
+                          SharedPtr<BaseExpression> optional_filter);
 
     DataType Type() const override;
 
@@ -55,6 +56,8 @@ public:
     SizeT topn_;
 
     const Vector<UniquePtr<InitParameter>> &opt_params_;
+
+    SharedPtr<BaseExpression> optional_filter_;
 };
 
 } // namespace infinity

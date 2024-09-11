@@ -36,10 +36,11 @@ MatchTensorExpression::MatchTensorExpression(Vector<SharedPtr<BaseExpression>> s
                                              const u32 dimension,
                                              EmbeddingT query_embedding,
                                              const u32 tensor_basic_embedding_dimension,
-                                             const String &options_text)
+                                             const String &options_text,
+                                             SharedPtr<BaseExpression> optional_filter)
     : BaseExpression(ExpressionType::kMatchTensor, std::move(search_column)), search_method_(search_method),
       embedding_data_type_(embedding_data_type), dimension_(dimension), query_embedding_(std::move(query_embedding)),
-      tensor_basic_embedding_dimension_(tensor_basic_embedding_dimension), options_text_(options_text) {
+      tensor_basic_embedding_dimension_(tensor_basic_embedding_dimension), options_text_(options_text), optional_filter_(std::move(optional_filter)) {
     column_expr_ = static_cast<ColumnExpression *>(arguments_[0].get());
 }
 
@@ -53,10 +54,9 @@ String MatchTensorExpression::ToString() const {
     }
     auto tensor_str =
         TensorT::Tensor2String(query_embedding_.ptr, embedding_data_type_, tensor_basic_embedding_dimension_, num_of_embedding_in_query_tensor_);
-    if (options_text_.empty()) {
-        return fmt::format("MATCH TENSOR ({}, {}, {})", column_expr_->Name(), tensor_str, MethodToString(search_method_));
-    }
-    return fmt::format("MATCH TENSOR ({}, {}, {}, '{}')", column_expr_->Name(), tensor_str, MethodToString(search_method_), options_text_);
+    const auto options_str = options_text_.empty() ? "" : fmt::format(", '{}'", options_text_);
+    const auto filter_str = optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "";
+    return fmt::format("MATCH TENSOR ({}, {}, {}{}{})", column_expr_->Name(), tensor_str, MethodToString(search_method_), options_str, filter_str);
 }
 
 } // namespace infinity
