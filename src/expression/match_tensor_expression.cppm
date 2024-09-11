@@ -35,7 +35,8 @@ public:
                           u32 dimension,
                           EmbeddingT query_embedding,
                           u32 tensor_basic_embedding_dimension,
-                          const String &options_text);
+                          const String &options_text,
+                          SharedPtr<BaseExpression> optional_filter);
 
     DataType Type() const override;
 
@@ -51,6 +52,7 @@ public:
     const u32 tensor_basic_embedding_dimension_; // dimension of single embedding in the tensor column
     const u32 num_of_embedding_in_query_tensor_ = dimension_ / tensor_basic_embedding_dimension_;
     const String options_text_;
+    SharedPtr<BaseExpression> optional_filter_;
 };
 
 } // namespace infinity

@@ -1132,7 +1132,8 @@ AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpres
                                                                 src_match_tensor_expr.dimension_,
                                                                 EmbeddingT(static_cast<char *>(aligned_ptr), false),
                                                                 src_match_tensor_expr.tensor_basic_embedding_dimension_,
-                                                                src_match_tensor_expr.options_text_);
+                                                                src_match_tensor_expr.options_text_,
+                                                                src_match_tensor_expr.optional_filter_);
     }
     return result;
 }

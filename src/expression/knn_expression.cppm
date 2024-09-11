@@ -38,6 +38,7 @@ public:
                   Vector<SharedPtr<BaseExpression>> arguments,
                   i64 topn,
                   Vector<InitParameter *> *opt_params,
+                  SharedPtr<BaseExpression> optional_filter,
                   String using_index,
                   bool ignore_index);
 
@@ -68,6 +69,7 @@ public:
     Vector<InitParameter> opt_params_;
     const String using_index_;
     bool ignore_index_;
+    SharedPtr<BaseExpression> optional_filter_;
 };
 
 } // namespace infinity
