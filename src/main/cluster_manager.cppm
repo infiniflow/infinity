@@ -48,7 +48,7 @@ public:
     Status RemoveNode(const String& node_name);
 
     Status UpdateNodeInfoByHeartBeat(const String& node_name, i64 txn_timestamp, Vector<infinity_peer_server::NodeInfo>& other_nodes, i64& leader_term); // Used by leader;
-    Status UpdateNonLeaderNodeInfo(const Vector<SharedPtr<NodeInfo>>& info_of_nodes); // Use by follower / learner to update all node info.
+    Status UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>>& info_of_nodes); // Use by follower / learner to update all node info.
     Vector<SharedPtr<NodeInfo>> ListNodes() const;
     SharedPtr<NodeInfo> GetNodeInfoPtrByName(const String& node_name) const;
     SharedPtr<NodeInfo> ThisNode() const;

@@ -219,8 +219,8 @@ void ClusterManager::HeartBeatToLeader() {
     auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval_);
 
     while (true) {
-        std::unique_lock lock(this->hb_mutex_);
-        this->hb_cv_.wait_for(lock, hb_interval, [&] { return !this->hb_running_; });
+        std::unique_lock hb_lock(this->hb_mutex_);
+        this->hb_cv_.wait_for(hb_lock, hb_interval, [&] { return !this->hb_running_; });
         if (!hb_running_) {
             break;
         }
@@ -244,14 +244,18 @@ void ClusterManager::HeartBeatToLeader() {
             continue;
         }
 
+        hb_now = std::chrono::system_clock::now();
+        hb_time_since_epoch = hb_now.time_since_epoch();
+        std::unique_lock<std::mutex> cluster_manager_lock(mutex_);
         // Update leader info
         leader_node_->node_status_ = NodeStatus::kAlive;
 
-        hb_now = std::chrono::system_clock::now();
-        hb_time_since_epoch = hb_now.time_since_epoch();
         leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
         leader_node_->leader_term_ = hb_task->leader_term_;
         ++ this_node_->heartbeat_count_;
+
+        // Update the non-leader node info from leader
+        UpdateNodeInfoNoLock(hb_task->other_nodes_);
     }
     return ;
 }
@@ -364,6 +368,8 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const String& node_name, i64 tx
                         return Status::InvalidNodeStatus(error_message);
                     }
                 }
+
+                other_nodes.emplace_back(thrift_node_info);
             }
         }
     } else {
@@ -373,48 +379,23 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const String& node_name, i64 tx
     return Status::OK();
 }
 
-//Status ClusterManager::UpdateNodeInfo(const SharedPtr<NodeInfo> &node_info) {
-//    std::unique_lock<std::mutex> lock(mutex_);
-//
-//    bool found = false;
-//    for (SharedPtr<NodeInfo> &other_node : other_nodes_) {
-//        if (other_node->node_name_ == node_info->node_name_) {
-//            // Found the node, just update the info
-//            found = true;
-//            *other_node = *node_info;
-//            break;
-//        }
-//    }
-//
-//    switch (this_node_->node_role_) {
-//        case NodeRole::kLeader: {
-//            // Update and heartbeat
-//            if (found == false) {
-//                return Status::NotExistNode(fmt::format("node: {}, {}, address: {}:{}",
-//                                                        node_info->node_name_,
-//                                                        ToString(node_info->node_role_),
-//                                                        node_info->ip_address_,
-//                                                        node_info->port_));
-//            }
-//            break;
-//        }
-//        case NodeRole::kFollower:
-//        case NodeRole::kLearner: {
-//            if (found == false) {
-//                other_nodes_.emplace_back(leader_node_);
-//            }
-//            break;
-//        }
-//        default: {
-//            String error_message = "Invalid node role.";
-//            UnrecoverableError(error_message);
-//        }
-//    }
-//    return Status::OK();
-//}
-
-Status ClusterManager::UpdateNonLeaderNodeInfo(const Vector<SharedPtr<NodeInfo>> &info_of_nodes) {
-    std::unique_lock<std::mutex> lock(mutex_);
+Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &info_of_nodes) {
+    for(const SharedPtr<NodeInfo>& node_info: info_of_nodes) {
+        bool found = false;
+        for(const SharedPtr<NodeInfo>& other_node_ptr: other_nodes_) {
+            if(node_info->node_name_ == other_node_ptr->node_name_) {
+                found = true;
+                other_node_ptr->txn_timestamp_ = node_info->txn_timestamp_;
+                other_node_ptr->ip_address_ = node_info->ip_address_;
+                other_node_ptr->port_ = node_info->port_;
+                other_node_ptr->node_role_ = node_info->node_role_;
+                other_node_ptr->node_status_ = node_info->node_status_;
+            }
+        }
+        if(!found) {
+            other_nodes_.emplace_back(node_info);
+        }
+    }
     return Status::OK();
 }
 Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {

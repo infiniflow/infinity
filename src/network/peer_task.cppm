@@ -154,7 +154,7 @@ public:
     i64 error_code_{};
     String error_message_{};
     i64 leader_term_{};
-    Vector<NodeInfo> other_nodes_{};
+    Vector<SharedPtr<NodeInfo>> other_nodes_{};
 };
 
 } // namespace infinity

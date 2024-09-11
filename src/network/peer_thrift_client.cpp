@@ -178,30 +178,45 @@ void PeerClient::HeartBeat(HeartBeatPeerTask* peer_task) {
         SizeT node_count = response.other_nodes.size();
         peer_task->other_nodes_.reserve(node_count);
         for(SizeT idx = 0; idx < node_count; ++ idx) {
-            NodeInfo node_info;
+            SharedPtr<NodeInfo> node_info = MakeShared<NodeInfo>();
             auto& other_node = response.other_nodes[idx];
             if(this_node_name_ == other_node.node_name) {
                 continue;
             }
-            node_info.node_name_ = other_node.node_name;
-            node_info.ip_address_ = other_node.node_ip;
-            node_info.port_ = other_node.node_port;
-            node_info.txn_timestamp_ = other_node.txn_timestamp;
+            node_info->node_name_ = other_node.node_name;
+            node_info->ip_address_ = other_node.node_ip;
+            node_info->port_ = other_node.node_port;
+            node_info->txn_timestamp_ = other_node.txn_timestamp;
             switch(other_node.node_type) {
-                case NodeType::type::kLeader: {
-                    node_info.node_role_ = NodeRole::kLeader;
+                case infinity_peer_server::NodeType::type::kLeader: {
+                    node_info->node_role_ = NodeRole::kLeader;
                     break;
                 }
-                case NodeType::type::kFollower: {
-                    node_info.node_role_ = NodeRole::kFollower;
+                case infinity_peer_server::NodeType::type::kFollower: {
+                    node_info->node_role_ = NodeRole::kFollower;
                     break;
                 }
-                case NodeType::type::kLearner: {
-                    node_info.node_role_ = NodeRole::kLearner;
+                case infinity_peer_server::NodeType::type::kLearner: {
+                    node_info->node_role_ = NodeRole::kLearner;
                     break;
                 }
                 default: {
                     String error_message = "Invalid role type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                }
+            }
+            switch(other_node.node_status) {
+                case infinity_peer_server::NodeStatus::type::kAlive: {
+                    node_info->node_status_ = NodeStatus::kAlive;
+                    break;
+                }
+                case infinity_peer_server::NodeStatus::type::kTimeout: {
+                    node_info->node_status_ = NodeStatus::kTimeout;
+                    break;
+                }
+                default: {
+                    String error_message = "Invalid node status";
                     LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
