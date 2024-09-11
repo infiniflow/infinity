@@ -100,6 +100,34 @@ std::string AdminStatement::ToString() const {
             ss << "Admin show index segment";
             break;
         }
+        case AdminStmtType::kListConfigs: {
+            ss << "Admin list configs";
+            break;
+        }
+        case AdminStmtType::kListVariables: {
+            ss << "Admin list variables";
+            break;
+        }
+        case AdminStmtType::kShowVariable: {
+            ss << "Admin show variable";
+            break;
+        }
+        case AdminStmtType::kListNodes: {
+            ss << "Admin list nodes";
+            break;
+        }
+        case AdminStmtType::kShowNode: {
+            ss << "Admin show node";
+            break;
+        }
+        case AdminStmtType::kShowCurrentNode: {
+            ss << "Admin show current node";
+            break;
+        }
+        case AdminStmtType::kSetRole: {
+            ss << "Admin set role";
+            break;
+        }
         case AdminStmtType::kInvalid: {
             ss << "Invalid admin statement";
             break;

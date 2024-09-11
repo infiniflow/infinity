@@ -132,6 +132,8 @@ export enum class ErrorCode : long {
     kInvalidDatabaseIndex = 3085,
     kInvalidTableIndex = 3086,
     kFunctionIsDisable = 3087,
+    kNotFound = 3088,
+    kErrorInit = 3089,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -168,6 +170,9 @@ export enum class ErrorCode : long {
     kInvalidFileFlag = 7015,
     kInvalidServerAddress = 7016,
     kFailToRunPython = 7017,
+    kCantConnectServer = 7018,
+    kNotExistNode = 7019,
+    kDuplicateNode = 7020,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -176,6 +181,8 @@ export enum class ErrorCode : long {
     kEmptyEntryList = 8004,
     kNoWALEntryFound = 8005,
     kWrongCheckpointType = 8006,
+    kInvalidNodeRole = 8007,
+    kInvalidNodeStatus = 8008
 };
 
 export class Status {
@@ -198,7 +205,7 @@ public:
     static Status WrongPasswd(const String &user_name);
     static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
     static Status UnsupportedVersionIndex(i64 given_index);
-    static Status ClientVersionMismatch(const char* expected_version, const char* given_version);
+    static Status ClientVersionMismatch(const char *expected_version, const char *given_version);
     static Status AdminOnlySupportInMaintenanceMode();
     static Status NotSupportInMaintenanceMode();
 
@@ -259,33 +266,35 @@ public:
     static Status UnknownFTSFault();
     static Status InvalidConstraintType();
     static Status InvalidKnnDistanceType();
-    static Status InvalidEmbeddingDataType(const String& type_str);
+    static Status InvalidEmbeddingDataType(const String &type_str);
     static Status InvalidConstantType();
     static Status InvalidParsedExprType();
-    static Status InvalidIndexType(const String& message);
+    static Status InvalidIndexType(const String &message);
     static Status InvalidIndexParam(const String &param_name);
     static Status LackIndexParam();
     static Status InvalidFilterExpression(const String &expr);
     static Status MultipleFunctionMatched(const String &function, const String &matched_functions);
     static Status InsertWithoutValues();
     static Status InvalidConflictType();
-    static Status InvalidJsonFormat(const String& invalid_json);
-    static Status DuplicateColumnName(const String& column_name);
-    static Status InvalidExpression(const String& expr_str);
+    static Status InvalidJsonFormat(const String &invalid_json);
+    static Status DuplicateColumnName(const String &column_name);
+    static Status InvalidExpression(const String &expr_str);
     static Status SegmentNotExist(SegmentID segment_id);
     static Status BlockNotExist(BlockID block_id);
     static Status AggregateFunctionWithEmptyArgs();
-    static Status InvalidCommand(const String& detailed_error);
-    static Status AnalyzerNotFound(const String& name);
-    static Status NotSupportedAnalyzer(const String& name);
-    static Status InvalidAnalyzerName(const String& name);
-    static Status InvalidAnalyzerFile(const String& detailed_info);
+    static Status InvalidCommand(const String &detailed_error);
+    static Status AnalyzerNotFound(const String &name);
+    static Status NotSupportedAnalyzer(const String &name);
+    static Status InvalidAnalyzerName(const String &name);
+    static Status InvalidAnalyzerFile(const String &detailed_info);
     static Status ChunkNotExist(ChunkID chunk_id);
-    static Status NameMismatched(const String& name_left, const String& name_right);
+    static Status NameMismatched(const String &name_left, const String &name_right);
     static Status TransactionNotFound(TransactionID txn_id);
     static Status InvalidDatabaseIndex(u64 database_index, u64 capacity);
     static Status InvalidTableIndex(u64 table_index, u64 capacity);
-    static Status FunctionIsDisable(const String& function_name);
+    static Status FunctionIsDisable(const String &function_name);
+    static Status NotFound(const String &detailed_info);
+    static Status ErrorInit(const String &detailed_info);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");
@@ -308,7 +317,7 @@ public:
     static Status IOError(const String &detailed_info);
     static Status DuplicatedFile(const String &filename);
     static Status ConfigFileError(const String &path, const String &detailed_info);
-    static Status LockFileError(const String &path, const String& error_msg);
+    static Status LockFileError(const String &path, const String &error_msg);
     static Status CatalogCorrupted(const String &path);
     static Status DataCorrupted(const String &path);
     static Status IndexCorrupted(const String &path);
@@ -320,15 +329,21 @@ public:
     static Status MmapFileError(const String &detailed_info);
     static Status MunmapFileError(const String &detailed_info);
     static Status InvalidFileFlag(u8 flag);
-    static Status FailToRunPython(const String& reason);
+    static Status InvalidServerAddress(const String &error_address);
+    static Status FailToRunPython(const String &reason);
+    static Status CantConnectServer(const String& ip, i64 port, const String& reason);
+    static Status NotExistNode(const String& node_info);
+    static Status DuplicateNode(const String& node_info);
 
     // meta
     static Status InvalidEntry();
     static Status NotFoundEntry();
     static Status DuplicateEntry();
     static Status EmptyEntryList();
-    static Status NoWALEntryFound(const String& file_name, i64 index);
-    static Status WrongCheckpointType(const String& expect_type, const String& actual_type);
+    static Status NoWALEntryFound(const String &file_name, i64 index);
+    static Status WrongCheckpointType(const String &expect_type, const String &actual_type);
+    static Status InvalidNodeRole(const String &message);
+    static Status InvalidNodeStatus(const String &message);
 
 public:
     Status() = default;

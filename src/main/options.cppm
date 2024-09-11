@@ -148,7 +148,10 @@ export enum class GlobalOptionIndex {
     kPersistenceObjectSizeLimit = 32,
     kMemIndexMemoryQuota = 33,
     kServerMode = 34,
-    kInvalid = 35,
+    kPeerServerIP = 35,
+    kPeerServerPort = 36,
+    kPeerServerConnectionPoolSize = 37,
+    kInvalid = 38,
 };
 
 export struct GlobalOptions {

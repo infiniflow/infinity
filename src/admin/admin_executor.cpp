@@ -48,6 +48,13 @@ import block_entry;
 import table_index_meta;
 import table_index_entry;
 import segment_index_entry;
+import config;
+import default_values;
+import infinity_context;
+import options;
+import cluster_manager;
+import utility;
+import peer_task;
 
 namespace infinity {
 
@@ -114,6 +121,27 @@ QueryResult AdminExecutor::Execute(QueryContext *query_context, const AdminState
         }
         case AdminStmtType::kShowIndexSegment: {
             return ShowIndexSegment(query_context, admin_statement);
+        }
+        case AdminStmtType::kListConfigs: {
+            return ListConfigs(query_context, admin_statement);
+        }
+        case AdminStmtType::kListVariables: {
+            return ListVariables(query_context, admin_statement);
+        }
+        case AdminStmtType::kShowVariable: {
+            return ShowVariable(query_context, admin_statement);
+        }
+        case AdminStmtType::kListNodes: {
+            return ListNodes(query_context, admin_statement);
+        }
+        case AdminStmtType::kShowNode: {
+            return ShowNode(query_context, admin_statement);
+        }
+        case AdminStmtType::kShowCurrentNode: {
+            return ShowCurrentNode(query_context, admin_statement);
+        }
+        case AdminStmtType::kSetRole: {
+            return SetRole(query_context, admin_statement);
         }
         case AdminStmtType::kInvalid: {
             QueryResult query_result;
@@ -780,12 +808,14 @@ QueryResult AdminExecutor::ShowCatalog(QueryContext *query_context, const AdminS
     return query_result;
 }
 
-Tuple<UniquePtr<Catalog>, Status> AdminExecutor::LoadCatalogFiles(QueryContext* query_context, const AdminStatement* admin_statement, Vector<SharedPtr<WalEntry>>& ckp_entries) {
+Tuple<UniquePtr<Catalog>, Status>
+AdminExecutor::LoadCatalogFiles(QueryContext *query_context, const AdminStatement *admin_statement, Vector<SharedPtr<WalEntry>> &ckp_entries) {
 
     i64 catalog_file_start_index = admin_statement->catalog_file_start_index_.value();
     i64 catalog_file_end_index = admin_statement->catalog_file_end_index_.value();
     if (catalog_file_end_index < catalog_file_start_index) {
-        return {nullptr, Status::InvalidCommand(fmt::format("start_index {} is larger than end_index {}", catalog_file_start_index, catalog_file_end_index))};
+        return {nullptr,
+                Status::InvalidCommand(fmt::format("start_index {} is larger than end_index {}", catalog_file_start_index, catalog_file_end_index))};
     }
 
     WalCmdCheckpoint *full_ckp_cmd = static_cast<WalCmdCheckpoint *>(ckp_entries[catalog_file_start_index]->cmds_[0].get());
@@ -848,15 +878,15 @@ QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const Admi
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.status_ = status;
         return query_result;
     }
 
     SizeT row_count = 0;
     auto [_, meta_ptrs, meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
-    for(auto& meta_ptr: meta_ptrs) {
-        DBMeta* db_meta = static_cast<DBMeta*>(meta_ptr);
+    for (auto &meta_ptr : meta_ptrs) {
+        DBMeta *db_meta = static_cast<DBMeta *>(meta_ptr);
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -922,7 +952,7 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = status;
         return query_result;
@@ -932,14 +962,14 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
     auto [_, meta_ptrs, meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
 
     u64 database_meta_index = admin_statement->database_meta_index_.value();
-    if(database_meta_index >= meta_ptrs.size()) {
+    if (database_meta_index >= meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, meta_ptrs.size());
         return query_result;
     }
-    DBMeta* db_meta = meta_ptrs[database_meta_index];
+    DBMeta *db_meta = meta_ptrs[database_meta_index];
     List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
-    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
+    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -1010,7 +1040,6 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
         }
     }
 
-
     output_block_ptr->Finalize();
     query_result.result_table_->Append(std::move(output_block_ptr));
     return query_result;
@@ -1047,43 +1076,42 @@ QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminSt
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = status;
         return query_result;
     }
 
-
     auto [_, db_meta_ptrs, db_meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
 
     u64 database_meta_index = admin_statement->database_meta_index_.value();
-    if(database_meta_index >= db_meta_ptrs.size()) {
+    if (database_meta_index >= db_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, db_meta_ptrs.size());
         return query_result;
     }
-    DBMeta* db_meta = db_meta_ptrs[database_meta_index];
+    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
     List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
 
     u64 database_entry_index = admin_statement->database_entry_index_.value();
-    if(database_entry_index >= entry_list.size()) {
+    if (database_entry_index >= entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_entry_index, entry_list.size());
         return query_result;
     }
 
     SizeT row_count = 0;
-    DBEntry* current_db_entry = nullptr;
-    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
-        if(row_count == database_entry_index) {
+    DBEntry *current_db_entry = nullptr;
+    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+        if (row_count == database_entry_index) {
             current_db_entry = db_entry.get();
         }
-        ++ row_count;
+        ++row_count;
     }
 
     row_count = 0;
     auto [table_names, table_meta_ptrs, table_meta_lock] = current_db_entry->GetAllTableMetas();
-    for(auto& table_meta_ptr: table_meta_ptrs) {
+    for (auto &table_meta_ptr : table_meta_ptrs) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -1174,7 +1202,7 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = status;
         return query_result;
@@ -1183,43 +1211,43 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
     auto [_, db_meta_ptrs, db_meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
 
     u64 database_meta_index = admin_statement->database_meta_index_.value();
-    if(database_meta_index >= db_meta_ptrs.size()) {
+    if (database_meta_index >= db_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, db_meta_ptrs.size());
         return query_result;
     }
-    DBMeta* db_meta = db_meta_ptrs[database_meta_index];
+    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
     List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
 
     u64 database_entry_index = admin_statement->database_entry_index_.value();
-    if(database_entry_index >= entry_list.size()) {
+    if (database_entry_index >= entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_entry_index, entry_list.size());
         return query_result;
     }
 
     SizeT row_count = 0;
-    DBEntry* current_db_entry = nullptr;
-    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
-        if(row_count == database_entry_index) {
+    DBEntry *current_db_entry = nullptr;
+    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+        if (row_count == database_entry_index) {
             current_db_entry = db_entry.get();
         }
-        ++ row_count;
+        ++row_count;
     }
 
     row_count = 0;
     auto [table_names, table_meta_ptrs, table_meta_lock] = current_db_entry->GetAllTableMetas();
 
     u64 table_meta_index = admin_statement->table_meta_index_.value();
-    if(table_meta_index >= table_meta_ptrs.size()) {
+    if (table_meta_index >= table_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_meta_index, table_meta_ptrs.size());
         return query_result;
     }
 
-    TableMeta* table_meta = table_meta_ptrs[table_meta_index];
+    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
     List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
-    for(const SharedPtr<TableEntry>& table_entry: table_entry_list) {
+    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -1391,7 +1419,7 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = status;
         return query_result;
@@ -1400,53 +1428,52 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     auto [_, db_meta_ptrs, db_meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
 
     u64 database_meta_index = admin_statement->database_meta_index_.value();
-    if(database_meta_index >= db_meta_ptrs.size()) {
+    if (database_meta_index >= db_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, db_meta_ptrs.size());
         return query_result;
     }
-    DBMeta* db_meta = db_meta_ptrs[database_meta_index];
+    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
     List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
 
     u64 database_entry_index = admin_statement->database_entry_index_.value();
-    if(database_entry_index >= entry_list.size()) {
+    if (database_entry_index >= entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_entry_index, entry_list.size());
         return query_result;
     }
 
     SizeT row_count = 0;
-    DBEntry* current_db_entry = nullptr;
-    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
-        if(row_count == database_entry_index) {
+    DBEntry *current_db_entry = nullptr;
+    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+        if (row_count == database_entry_index) {
             current_db_entry = db_entry.get();
         }
-        ++ row_count;
+        ++row_count;
     }
-
 
     auto [table_names, table_meta_ptrs, table_meta_lock] = current_db_entry->GetAllTableMetas();
 
     u64 table_meta_index = admin_statement->table_meta_index_.value();
-    if(table_meta_index >= table_meta_ptrs.size()) {
+    if (table_meta_index >= table_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_meta_index, table_meta_ptrs.size());
         return query_result;
     }
 
-    TableMeta* table_meta = table_meta_ptrs[table_meta_index];
+    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
     List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
 
     u64 table_entry_index = admin_statement->table_entry_index_.value();
-    if(table_entry_index >= table_entry_list.size()) {
+    if (table_entry_index >= table_entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_entry_index, table_entry_list.size());
         return query_result;
     }
 
     row_count = 0;
-    TableEntry* current_table_entry = nullptr;
-    for(const SharedPtr<TableEntry>& table_entry: table_entry_list) {
+    TableEntry *current_table_entry = nullptr;
+    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
         if (row_count == table_entry_index) {
             current_table_entry = table_entry.get();
         }
@@ -1454,8 +1481,8 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     }
 
     row_count = 0;
-    Map<SegmentID, SharedPtr<SegmentEntry>>& segment_map = current_table_entry->segment_map();
-    for(auto& [segment_id, segment_entry] : segment_map) {
+    Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map = current_table_entry->segment_map();
+    for (auto &[segment_id, segment_entry] : segment_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -1659,7 +1686,7 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = status;
         return query_result;
@@ -1668,75 +1695,73 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
     auto [_, db_meta_ptrs, db_meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
 
     u64 database_meta_index = admin_statement->database_meta_index_.value();
-    if(database_meta_index >= db_meta_ptrs.size()) {
+    if (database_meta_index >= db_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, db_meta_ptrs.size());
         return query_result;
     }
-    DBMeta* db_meta = db_meta_ptrs[database_meta_index];
+    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
     List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
 
     u64 database_entry_index = admin_statement->database_entry_index_.value();
-    if(database_entry_index >= entry_list.size()) {
+    if (database_entry_index >= entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_entry_index, entry_list.size());
         return query_result;
     }
 
     SizeT row_count = 0;
-    DBEntry* current_db_entry = nullptr;
-    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
-        if(row_count == database_entry_index) {
+    DBEntry *current_db_entry = nullptr;
+    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+        if (row_count == database_entry_index) {
             current_db_entry = db_entry.get();
         }
-        ++ row_count;
+        ++row_count;
     }
-
 
     auto [table_names, table_meta_ptrs, table_meta_lock] = current_db_entry->GetAllTableMetas();
 
     u64 table_meta_index = admin_statement->table_meta_index_.value();
-    if(table_meta_index >= table_meta_ptrs.size()) {
+    if (table_meta_index >= table_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_meta_index, table_meta_ptrs.size());
         return query_result;
     }
 
-    TableMeta* table_meta = table_meta_ptrs[table_meta_index];
+    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
     List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
 
     u64 table_entry_index = admin_statement->table_entry_index_.value();
-    if(table_entry_index >= table_entry_list.size()) {
+    if (table_entry_index >= table_entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_entry_index, table_entry_list.size());
         return query_result;
     }
 
     row_count = 0;
-    TableEntry* current_table_entry = nullptr;
-    for(const SharedPtr<TableEntry>& table_entry: table_entry_list) {
+    TableEntry *current_table_entry = nullptr;
+    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
         if (row_count == table_entry_index) {
             current_table_entry = table_entry.get();
         }
         ++row_count;
     }
 
-
-    Map<SegmentID, SharedPtr<SegmentEntry>>& segment_map = current_table_entry->segment_map();
+    Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map = current_table_entry->segment_map();
 
     SegmentID segment_id = admin_statement->segment_index_.value();
     auto segment_it = segment_map.find(segment_id);
-    if(segment_it == segment_map.end()) {
+    if (segment_it == segment_map.end()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::SegmentNotExist(segment_id);
         return query_result;
     }
 
-    SegmentEntry* segment_entry = segment_it->second.get();
-    Vector<SharedPtr<BlockEntry>>& block_entries = segment_entry->block_entries();
+    SegmentEntry *segment_entry = segment_it->second.get();
+    Vector<SharedPtr<BlockEntry>> &block_entries = segment_entry->block_entries();
 
     row_count = 0;
-    for(const auto& block_entry: block_entries) {
+    for (const auto &block_entry : block_entries) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -1893,7 +1918,7 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = status;
         return query_result;
@@ -1902,83 +1927,83 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
     auto [_, db_meta_ptrs, db_meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
 
     u64 database_meta_index = admin_statement->database_meta_index_.value();
-    if(database_meta_index >= db_meta_ptrs.size()) {
+    if (database_meta_index >= db_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, db_meta_ptrs.size());
         return query_result;
     }
-    DBMeta* db_meta = db_meta_ptrs[database_meta_index];
+    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
     List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
 
     u64 database_entry_index = admin_statement->database_entry_index_.value();
-    if(database_entry_index >= entry_list.size()) {
+    if (database_entry_index >= entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_entry_index, entry_list.size());
         return query_result;
     }
 
     SizeT row_count = 0;
-    DBEntry* current_db_entry = nullptr;
-    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
-        if(row_count == database_entry_index) {
+    DBEntry *current_db_entry = nullptr;
+    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+        if (row_count == database_entry_index) {
             current_db_entry = db_entry.get();
         }
-        ++ row_count;
+        ++row_count;
     }
 
     auto [table_names, table_meta_ptrs, table_meta_lock] = current_db_entry->GetAllTableMetas();
 
     u64 table_meta_index = admin_statement->table_meta_index_.value();
-    if(table_meta_index >= table_meta_ptrs.size()) {
+    if (table_meta_index >= table_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_meta_index, table_meta_ptrs.size());
         return query_result;
     }
 
-    TableMeta* table_meta = table_meta_ptrs[table_meta_index];
+    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
     List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
 
     u64 table_entry_index = admin_statement->table_entry_index_.value();
-    if(table_entry_index >= table_entry_list.size()) {
+    if (table_entry_index >= table_entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_entry_index, table_entry_list.size());
         return query_result;
     }
 
     row_count = 0;
-    TableEntry* current_table_entry = nullptr;
-    for(const SharedPtr<TableEntry>& table_entry: table_entry_list) {
+    TableEntry *current_table_entry = nullptr;
+    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
         if (row_count == table_entry_index) {
             current_table_entry = table_entry.get();
         }
         ++row_count;
     }
 
-    Map<SegmentID, SharedPtr<SegmentEntry>>& segment_map = current_table_entry->segment_map();
+    Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map = current_table_entry->segment_map();
 
     SegmentID segment_id = admin_statement->segment_index_.value();
     auto segment_it = segment_map.find(segment_id);
-    if(segment_it == segment_map.end()) {
+    if (segment_it == segment_map.end()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::SegmentNotExist(segment_id);
         return query_result;
     }
 
-    SegmentEntry* segment_entry = segment_it->second.get();
-    Vector<SharedPtr<BlockEntry>>& block_entries = segment_entry->block_entries();
+    SegmentEntry *segment_entry = segment_it->second.get();
+    Vector<SharedPtr<BlockEntry>> &block_entries = segment_entry->block_entries();
 
     BlockID block_id = admin_statement->block_index_.value();
     row_count = 0;
-    BlockEntry* current_block_entry = nullptr;
-    for(const auto& block_entry: block_entries) {
+    BlockEntry *current_block_entry = nullptr;
+    for (const auto &block_entry : block_entries) {
         if (row_count == block_id) {
             current_block_entry = block_entry.get();
         }
-        ++ row_count;
+        ++row_count;
     }
 
     row_count = 0;
-    for(const auto& block_column_entry: current_block_entry->columns()) {
+    for (const auto &block_column_entry : current_block_entry->columns()) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -2063,7 +2088,7 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
         bigint_type,
         varchar_type,
         varchar_type,
@@ -2079,7 +2104,7 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = status;
         return query_result;
@@ -2088,52 +2113,52 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
     auto [_, db_meta_ptrs, db_meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
 
     u64 database_meta_index = admin_statement->database_meta_index_.value();
-    if(database_meta_index >= db_meta_ptrs.size()) {
+    if (database_meta_index >= db_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, db_meta_ptrs.size());
         return query_result;
     }
-    DBMeta* db_meta = db_meta_ptrs[database_meta_index];
+    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
     List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
 
     u64 database_entry_index = admin_statement->database_entry_index_.value();
-    if(database_entry_index >= entry_list.size()) {
+    if (database_entry_index >= entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_entry_index, entry_list.size());
         return query_result;
     }
 
     SizeT row_count = 0;
-    DBEntry* current_db_entry = nullptr;
-    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
-        if(row_count == database_entry_index) {
+    DBEntry *current_db_entry = nullptr;
+    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+        if (row_count == database_entry_index) {
             current_db_entry = db_entry.get();
         }
-        ++ row_count;
+        ++row_count;
     }
 
     auto [table_names, table_meta_ptrs, table_meta_lock] = current_db_entry->GetAllTableMetas();
 
     u64 table_meta_index = admin_statement->table_meta_index_.value();
-    if(table_meta_index >= table_meta_ptrs.size()) {
+    if (table_meta_index >= table_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_meta_index, table_meta_ptrs.size());
         return query_result;
     }
 
-    TableMeta* table_meta = table_meta_ptrs[table_meta_index];
+    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
     List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
 
     u64 table_entry_index = admin_statement->table_entry_index_.value();
-    if(table_entry_index >= table_entry_list.size()) {
+    if (table_entry_index >= table_entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_entry_index, table_entry_list.size());
         return query_result;
     }
 
     row_count = 0;
-    TableEntry* current_table_entry = nullptr;
-    for(const SharedPtr<TableEntry>& table_entry: table_entry_list) {
+    TableEntry *current_table_entry = nullptr;
+    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
         if (row_count == table_entry_index) {
             current_table_entry = table_entry.get();
         }
@@ -2142,7 +2167,7 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
 
     row_count = 0;
     const Vector<SharedPtr<ColumnDef>> &table_column_defs = current_table_entry->column_defs();
-    for(const SharedPtr<ColumnDef>& column_def: table_column_defs) {
+    for (const SharedPtr<ColumnDef> &column_def : table_column_defs) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -2210,7 +2235,7 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
         bigint_type,
         varchar_type,
         bigint_type,
@@ -2225,7 +2250,7 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = status;
         return query_result;
@@ -2234,52 +2259,52 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
     auto [_, db_meta_ptrs, db_meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
 
     u64 database_meta_index = admin_statement->database_meta_index_.value();
-    if(database_meta_index >= db_meta_ptrs.size()) {
+    if (database_meta_index >= db_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, db_meta_ptrs.size());
         return query_result;
     }
-    DBMeta* db_meta = db_meta_ptrs[database_meta_index];
+    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
     List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
 
     u64 database_entry_index = admin_statement->database_entry_index_.value();
-    if(database_entry_index >= entry_list.size()) {
+    if (database_entry_index >= entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_entry_index, entry_list.size());
         return query_result;
     }
 
     SizeT row_count = 0;
-    DBEntry* current_db_entry = nullptr;
-    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
-        if(row_count == database_entry_index) {
+    DBEntry *current_db_entry = nullptr;
+    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+        if (row_count == database_entry_index) {
             current_db_entry = db_entry.get();
         }
-        ++ row_count;
+        ++row_count;
     }
 
     auto [table_names, table_meta_ptrs, table_meta_lock] = current_db_entry->GetAllTableMetas();
 
     u64 table_meta_index = admin_statement->table_meta_index_.value();
-    if(table_meta_index >= table_meta_ptrs.size()) {
+    if (table_meta_index >= table_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_meta_index, table_meta_ptrs.size());
         return query_result;
     }
 
-    TableMeta* table_meta = table_meta_ptrs[table_meta_index];
+    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
     List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
 
     u64 table_entry_index = admin_statement->table_entry_index_.value();
-    if(table_entry_index >= table_entry_list.size()) {
+    if (table_entry_index >= table_entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_entry_index, table_entry_list.size());
         return query_result;
     }
 
     row_count = 0;
-    TableEntry* current_table_entry = nullptr;
-    for(const SharedPtr<TableEntry>& table_entry: table_entry_list) {
+    TableEntry *current_table_entry = nullptr;
+    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
         if (row_count == table_entry_index) {
             current_table_entry = table_entry.get();
         }
@@ -2288,8 +2313,8 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
 
     auto [meta_map, locker] = current_table_entry->IndexMetaMap();
     row_count = 0;
-    for(const auto& table_index_pair: meta_map) {
-        TableIndexMeta* table_index_meta = table_index_pair.second.get();
+    for (const auto &table_index_pair : meta_map) {
+        TableIndexMeta *table_index_meta = table_index_pair.second.get();
 
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -2375,7 +2400,7 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = status;
         return query_result;
@@ -2384,52 +2409,52 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
     auto [_, db_meta_ptrs, db_meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
 
     u64 database_meta_index = admin_statement->database_meta_index_.value();
-    if(database_meta_index >= db_meta_ptrs.size()) {
+    if (database_meta_index >= db_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, db_meta_ptrs.size());
         return query_result;
     }
-    DBMeta* db_meta = db_meta_ptrs[database_meta_index];
+    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
     List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
 
     u64 database_entry_index = admin_statement->database_entry_index_.value();
-    if(database_entry_index >= entry_list.size()) {
+    if (database_entry_index >= entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_entry_index, entry_list.size());
         return query_result;
     }
 
     SizeT row_count = 0;
-    DBEntry* current_db_entry = nullptr;
-    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
-        if(row_count == database_entry_index) {
+    DBEntry *current_db_entry = nullptr;
+    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+        if (row_count == database_entry_index) {
             current_db_entry = db_entry.get();
         }
-        ++ row_count;
+        ++row_count;
     }
 
     auto [table_names, table_meta_ptrs, table_meta_lock] = current_db_entry->GetAllTableMetas();
 
     u64 table_meta_index = admin_statement->table_meta_index_.value();
-    if(table_meta_index >= table_meta_ptrs.size()) {
+    if (table_meta_index >= table_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_meta_index, table_meta_ptrs.size());
         return query_result;
     }
 
-    TableMeta* table_meta = table_meta_ptrs[table_meta_index];
+    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
     List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
 
     u64 table_entry_index = admin_statement->table_entry_index_.value();
-    if(table_entry_index >= table_entry_list.size()) {
+    if (table_entry_index >= table_entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_entry_index, table_entry_list.size());
         return query_result;
     }
 
     row_count = 0;
-    TableEntry* current_table_entry = nullptr;
-    for(const SharedPtr<TableEntry>& table_entry: table_entry_list) {
+    TableEntry *current_table_entry = nullptr;
+    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
         if (row_count == table_entry_index) {
             current_table_entry = table_entry.get();
         }
@@ -2438,15 +2463,15 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
 
     u64 table_index_meta_index = admin_statement->index_meta_index_.value();
     auto [index_meta_map, locker] = current_table_entry->IndexMetaMap();
-    if(table_index_meta_index >= index_meta_map.size()) {
+    if (table_index_meta_index >= index_meta_map.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_index_meta_index, index_meta_map.size());
         return query_result;
     }
 
     row_count = 0;
-    TableIndexMeta* table_index_meta = nullptr;
-    for(const auto& table_index_pair: index_meta_map) {
+    TableIndexMeta *table_index_meta = nullptr;
+    for (const auto &table_index_pair : index_meta_map) {
         if (row_count == table_index_meta_index) {
             table_index_meta = table_index_pair.second.get();
         }
@@ -2455,7 +2480,7 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
 
     row_count = 0;
     List<SharedPtr<TableIndexEntry>> table_index_entry_list = table_index_meta->GetAllEntries();
-    for(const SharedPtr<TableIndexEntry>& table_index_entry: table_index_entry_list) {
+    for (const SharedPtr<TableIndexEntry> &table_index_entry : table_index_entry_list) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -2585,7 +2610,7 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     }
 
     auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = status;
         return query_result;
@@ -2594,52 +2619,52 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     auto [_, db_meta_ptrs, db_meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
 
     u64 database_meta_index = admin_statement->database_meta_index_.value();
-    if(database_meta_index >= db_meta_ptrs.size()) {
+    if (database_meta_index >= db_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, db_meta_ptrs.size());
         return query_result;
     }
-    DBMeta* db_meta = db_meta_ptrs[database_meta_index];
+    DBMeta *db_meta = db_meta_ptrs[database_meta_index];
     List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
 
     u64 database_entry_index = admin_statement->database_entry_index_.value();
-    if(database_entry_index >= entry_list.size()) {
+    if (database_entry_index >= entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidDatabaseIndex(database_entry_index, entry_list.size());
         return query_result;
     }
 
     SizeT row_count = 0;
-    DBEntry* current_db_entry = nullptr;
-    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
-        if(row_count == database_entry_index) {
+    DBEntry *current_db_entry = nullptr;
+    for (const SharedPtr<DBEntry> &db_entry : entry_list) {
+        if (row_count == database_entry_index) {
             current_db_entry = db_entry.get();
         }
-        ++ row_count;
+        ++row_count;
     }
 
     auto [table_names, table_meta_ptrs, table_meta_lock] = current_db_entry->GetAllTableMetas();
 
     u64 table_meta_index = admin_statement->table_meta_index_.value();
-    if(table_meta_index >= table_meta_ptrs.size()) {
+    if (table_meta_index >= table_meta_ptrs.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_meta_index, table_meta_ptrs.size());
         return query_result;
     }
 
-    TableMeta* table_meta = table_meta_ptrs[table_meta_index];
+    TableMeta *table_meta = table_meta_ptrs[table_meta_index];
     List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
 
     u64 table_entry_index = admin_statement->table_entry_index_.value();
-    if(table_entry_index >= table_entry_list.size()) {
+    if (table_entry_index >= table_entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_entry_index, table_entry_list.size());
         return query_result;
     }
 
     row_count = 0;
-    TableEntry* current_table_entry = nullptr;
-    for(const SharedPtr<TableEntry>& table_entry: table_entry_list) {
+    TableEntry *current_table_entry = nullptr;
+    for (const SharedPtr<TableEntry> &table_entry : table_entry_list) {
         if (row_count == table_entry_index) {
             current_table_entry = table_entry.get();
         }
@@ -2648,15 +2673,15 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
 
     u64 table_index_meta_index = admin_statement->index_meta_index_.value();
     auto [index_meta_map, locker] = current_table_entry->IndexMetaMap();
-    if(table_index_meta_index >= index_meta_map.size()) {
+    if (table_index_meta_index >= index_meta_map.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_index_meta_index, index_meta_map.size());
         return query_result;
     }
 
     row_count = 0;
-    TableIndexMeta* table_index_meta = nullptr;
-    for(const auto& table_index_pair: index_meta_map) {
+    TableIndexMeta *table_index_meta = nullptr;
+    for (const auto &table_index_pair : index_meta_map) {
         if (row_count == table_index_meta_index) {
             table_index_meta = table_index_pair.second.get();
         }
@@ -2665,27 +2690,27 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
 
     u64 table_index_entry_index = admin_statement->index_entry_index_.value();
     List<SharedPtr<TableIndexEntry>> table_index_entry_list = table_index_meta->GetAllEntries();
-    if(table_index_entry_index >= table_index_entry_list.size()) {
+    if (table_index_entry_index >= table_index_entry_list.size()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::InvalidTableIndex(table_index_meta_index, index_meta_map.size());
         return query_result;
     }
     row_count = 0;
-    TableIndexEntry* table_index_entry = nullptr;
-    for(const SharedPtr<TableIndexEntry>& table_index_entry_elem: table_index_entry_list) {
+    TableIndexEntry *table_index_entry = nullptr;
+    for (const SharedPtr<TableIndexEntry> &table_index_entry_elem : table_index_entry_list) {
         if (row_count == table_index_entry_index) {
             table_index_entry = table_index_entry_elem.get();
         }
         ++row_count;
     }
 
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>>& segment_indexes = table_index_entry->index_by_segment();
-    for(auto& segment_index_pair: segment_indexes) {
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> &segment_indexes = table_index_entry->index_by_segment();
+    for (auto &segment_index_pair : segment_indexes) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
         }
-        SegmentIndexEntry* segment_index_ptr = segment_index_pair.second.get();
+        SegmentIndexEntry *segment_index_ptr = segment_index_pair.second.get();
         {
             // segment_id
             Value value = Value::MakeBigInt(segment_index_pair.first);
@@ -2760,6 +2785,1280 @@ QueryResult AdminExecutor::ShowIndexSegment(QueryContext *query_context, const A
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
+    return query_result;
+}
+
+QueryResult AdminExecutor::ListConfigs(QueryContext *query_context, const AdminStatement *admin_statement) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "config_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "description", std::set<ConstraintType>()),
+    };
+
+    Config *global_config = query_context->global_config();
+    QueryResult query_result;
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_configs"), column_defs);
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+
+    // create data block for output state
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(column_types);
+
+    // Config
+    {
+        {
+            Value value = Value::MakeVarchar(VERSION_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // option value
+            Value value = Value::MakeVarchar(global_config->Version());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option description
+            Value value = Value::MakeVarchar("Infinity version.");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        { // option name
+            Value value = Value::MakeVarchar(TIME_ZONE_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            i64 time_zone_bias = global_config->TimeZoneBias();
+            if (time_zone_bias >= 0) {
+                Value value = Value::MakeVarchar(fmt::format("{}+{}", global_config->TimeZone(), time_zone_bias));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            } else {
+                Value value = Value::MakeVarchar(fmt::format("{}{}", global_config->TimeZone(), time_zone_bias));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Time zone information.");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(CPU_LIMIT_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->CPULimit()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("CPU number used by infinity executor.");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(RECORD_RUNNING_QUERY_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = global_config->RecordRunningQuery() ? Value::MakeVarchar("true") : Value::MakeVarchar("false");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("To record running query");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(SERVER_ADDRESS_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(global_config->ServerAddress());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Infinity server listen ip address");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(POSTGRES_PORT_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->PostgresPort()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Postgres port");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(HTTP_PORT_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->HTTPPort()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("HTTP port");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(CLIENT_PORT_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->ClientPort()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Thrift RPC port");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(CONNECTION_POOL_SIZE_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->ConnectionPoolSize()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Connection pool capacity.");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->PeerServerConnectionPoolSize()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Peer server connection pool capacity.");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(LOG_FILENAME_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(global_config->LogFileName());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Log file name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(LOG_DIR_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(global_config->LogDir());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Log directory");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(LOG_TO_STDOUT_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = global_config->LogToStdout() ? Value::MakeVarchar("true") : Value::MakeVarchar("false");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("If log is also output to standard output");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(LOG_FILE_MAX_SIZE_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->LogFileMaxSize()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Max log file size");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(LOG_FILE_ROTATE_COUNT_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->LogFileRotateCount()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Log files rotation limitation");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(LOG_LEVEL_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(LogLevel2Str(global_config->GetLogLevel()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Log level");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    if (InfinityContext::instance().persistence_manager() != nullptr) {
+        {
+            {
+                // option name
+                Value value = Value::MakeVarchar(PERSISTENCE_DIR_OPTION_NAME);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar(global_config->PersistenceDir());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar("Virtual filesystem directory");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            }
+        }
+
+        {
+            {
+                // option name
+                Value value = Value::MakeVarchar(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar(std::to_string(global_config->PersistenceObjectSizeLimit()));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar("Virtual file limitation");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            }
+        }
+    } else {
+        {
+            {
+                // option name
+                Value value = Value::MakeVarchar(DATA_DIR_OPTION_NAME);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar(global_config->DataDir());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar("Data directory");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            }
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(CLEANUP_INTERVAL_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->CleanupInterval()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Cleanup period interval");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(COMPACT_INTERVAL_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->CompactInterval()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Compact period interval");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(OPTIMIZE_INTERVAL_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->OptimizeIndexInterval()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Optimize memory index period interval");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(MEM_INDEX_CAPACITY_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->MemIndexCapacity()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Real-time index building row capacity");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(BUFFER_MANAGER_SIZE_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->BufferManagerSize()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Buffer manager memory size");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(TEMP_DIR_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(global_config->TempDir());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Temporary data directory");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(WAL_DIR_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(global_config->WALDir());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Write ahead log data directory");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(WAL_COMPACT_THRESHOLD_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->WALCompactThreshold()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Write ahead log compact triggering threshold");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(FULL_CHECKPOINT_INTERVAL_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->FullCheckpointInterval()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Full checkpoint period interval");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->DeltaCheckpointInterval()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Delta checkpoint period interval");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->DeltaCheckpointThreshold()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Delta checkpoint triggering threshold");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(WAL_FLUSH_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(FlushOptionTypeToString(global_config->FlushMethodAtCommit()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Write ahead log flush method");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(RESOURCE_DIR_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(global_config->ResourcePath());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Infinity resource directory");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
+    return query_result;
+}
+
+QueryResult AdminExecutor::ListVariables(QueryContext *query_context, const AdminStatement *admin_statement) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "description", std::set<ConstraintType>()),
+    };
+
+    QueryResult query_result;
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_configs"), column_defs);
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+
+    // create data block for output state
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(column_types);
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar("role");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option value
+            Value value = Value::MakeVarchar(ToString(InfinityContext::instance().GetServerRole()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option description
+            Value value = Value::MakeVarchar("Current infinity server role");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
+    return query_result;
+}
+
+QueryResult AdminExecutor::ShowVariable(QueryContext *query_context, const AdminStatement *admin_statement) {
+    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    //    SharedPtr<DataType> integer_type = MakeShared<DataType>(LogicalType::kBigInt);
+    //    SharedPtr<DataType> double_type = MakeShared<DataType>(LogicalType::kDouble);
+    //    SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+
+    Vector<SharedPtr<ColumnDef>> output_column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
+
+    QueryResult query_result;
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+    Vector<SharedPtr<DataType>> output_column_types{
+        varchar_type,
+    };
+
+    String variable_name = admin_statement->variable_name_.value();
+    ToLower(variable_name);
+
+    if (variable_name == "server_role") {
+        output_block_ptr->Init(output_column_types);
+        Value value = Value::MakeVarchar(ToString(InfinityContext::instance().GetServerRole()));
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+    }
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
+
+    return query_result;
+}
+
+QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminStatement *admin_statement) {
+
+    QueryResult query_result;
+    if (!InfinityContext::instance().IsClusterRole()) {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::NotSupport("LIST NODES only works in cluster mode");
+        return query_result;
+    }
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "role", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "status", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "address", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "last_update", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(5, bigint_type, "heartbeat", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_nodes"), column_defs);
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        bigint_type
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    Vector<SharedPtr<NodeInfo>> server_nodes = InfinityContext::instance().cluster_manager()->ListNodes();
+    for (const auto &server_node : server_nodes) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // name
+            Value value = Value::MakeVarchar(server_node->node_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // role
+            Value value = Value::MakeVarchar(ToString(server_node->node_role_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // status
+            Value value = Value::MakeVarchar(ToString(server_node->node_status_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // address
+            Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->ip_address_, server_node->port_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // last_update
+            std::chrono::system_clock::duration time_duration = std::chrono::seconds(server_node->last_update_ts_);
+            std::chrono::time_point<std::chrono::system_clock> time_since_epoch = std::chrono::time_point<std::chrono::system_clock>(time_duration);
+            std::time_t t_c = std::chrono::system_clock::to_time_t(time_since_epoch);
+            //            std::stringstream ss;
+            //            ss << std::put_time(std::localtime(&t_c), "%F %T"));
+            Value value = Value::MakeVarchar(std::ctime(&t_c));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        {
+            // heartbeat
+            Value value = Value::MakeBigInt(server_node->heartbeat_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+        }
+
+
+        ++row_count;
+        if (row_count % output_block_ptr->capacity() == 0) {
+            output_block_ptr->Finalize();
+            query_result.result_table_->Append(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
+    return query_result;
+}
+
+QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStatement *admin_statement) {
+
+    QueryResult query_result;
+    if (!InfinityContext::instance().IsClusterRole()) {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::NotSupport("SHOW NODE only works in cluster mode");
+        return query_result;
+    }
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_node"), column_defs);
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    String node_name = admin_statement->node_name_.value();
+    SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->GetNodeInfoPtrByName(node_name);
+    if(server_node == nullptr) {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::NotFound(fmt::format("No node: {} isn't found", node_name));
+        return query_result;
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(server_node->node_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("role");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(ToString(server_node->node_role_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("status");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(ToString(server_node->node_status_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("address");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->ip_address_, server_node->port_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("entry_count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            //            const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node->last_update_ts_);
+            const std::time_t t_c = server_node->last_update_ts_;
+            Value value = Value::MakeVarchar(std::ctime(&t_c));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
+    return query_result;
+}
+
+
+QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const AdminStatement *admin_statement) {
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_current_node"), column_defs);
+
+    QueryResult query_result;
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    if (InfinityContext::instance().IsClusterRole()) {
+        SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->ThisNode();
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("name");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(server_node->node_name_);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("role");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(ToString(server_node->node_role_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("status");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(ToString(server_node->node_status_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("address");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->ip_address_, server_node->port_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("update_time");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                //            const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node->last_update_ts_);
+                const std::time_t t_c = server_node->last_update_ts_;
+                Value value = Value::MakeVarchar(std::ctime(&t_c));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+    } else {
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("role");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(ToString(InfinityContext::instance().GetServerRole()));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+    }
+
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
+    return query_result;
+}
+
+
+QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminStatement *admin_statement) {
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+
+    AdminNodeRole admin_server_role = admin_statement->admin_node_role_.value();
+    Status status;
+    QueryResult query_result;
+    switch (admin_server_role) {
+        case AdminNodeRole::kAdmin: {
+            status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+            break;
+        }
+        case AdminNodeRole::kStandalone: {
+            status = InfinityContext::instance().ChangeRole(NodeRole::kStandalone);
+            break;
+        }
+        case AdminNodeRole::kLeader: {
+            String node_name = admin_statement->node_name_.value();
+            switch (IdentifierValidation(node_name)) {
+                case IdentifierValidationStatus::kOk:
+                    break;
+                case IdentifierValidationStatus::kEmpty: {
+                    status = Status::EmptyColumnName();
+                    break;
+                }
+                case IdentifierValidationStatus::kExceedLimit: {
+                    status = Status::ExceedColumnNameLength(node_name.length());
+                    break;
+                }
+                case IdentifierValidationStatus::kInvalidName: {
+                    status = Status::InvalidColumnName(node_name);
+                    break;
+                }
+            }
+            if(!status.ok()) {
+                query_result.status_ = status;
+                return query_result;
+            }
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, node_name);
+            break;
+        }
+        case AdminNodeRole::kFollower: {
+            String node_name = admin_statement->node_name_.value();
+            switch (IdentifierValidation(node_name)) {
+                case IdentifierValidationStatus::kOk:
+                    break;
+                case IdentifierValidationStatus::kEmpty: {
+                    status = Status::EmptyColumnName();
+                    break;
+                }
+                case IdentifierValidationStatus::kExceedLimit: {
+                    status = Status::ExceedColumnNameLength(node_name.length());
+                    break;
+                }
+                case IdentifierValidationStatus::kInvalidName: {
+                    status = Status::InvalidColumnName(node_name);
+                    break;
+                }
+            }
+            if(!status.ok()) {
+                query_result.status_ = status;
+                return query_result;
+            }
+
+            String leader_address = admin_statement->leader_address_.value();
+            String leader_ip;
+            i64 leader_port;
+            if(!ParseIPPort(leader_address, leader_ip, leader_port)) {
+                query_result.status_ = Status::InvalidServerAddress(leader_address);
+                return query_result;
+            }
+
+            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, node_name, leader_ip, leader_port);
+            break;
+        }
+        case AdminNodeRole::kLearner: {
+            String node_name = admin_statement->node_name_.value();
+            switch (IdentifierValidation(node_name)) {
+                case IdentifierValidationStatus::kOk:
+                    break;
+                case IdentifierValidationStatus::kEmpty: {
+                    status = Status::EmptyColumnName();
+                    break;
+                }
+                case IdentifierValidationStatus::kExceedLimit: {
+                    status = Status::ExceedColumnNameLength(node_name.length());
+                    break;
+                }
+                case IdentifierValidationStatus::kInvalidName: {
+                    status = Status::InvalidColumnName(node_name);
+                    break;
+                }
+            }
+            if(!status.ok()) {
+                query_result.status_ = status;
+                return query_result;
+            }
+
+            String leader_address = admin_statement->leader_address_.value();
+            String leader_ip;
+            i64 leader_port;
+            if(!ParseIPPort(leader_address, leader_ip, leader_port)) {
+                query_result.status_ = Status::InvalidServerAddress(leader_address);
+                return query_result;
+            }
+
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, node_name, leader_ip, leader_port);
+            break;
+        }
+    }
+
+    if (status.ok()) {
+        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), column_defs);
+        query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+    } else {
+        query_result.status_ = status;
+    }
+
     return query_result;
 }
 
