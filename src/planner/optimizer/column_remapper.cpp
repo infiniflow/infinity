@@ -24,6 +24,7 @@ import special_function;
 import default_values;
 import third_party;
 import logger;
+import infinity_exception;
 
 module column_remapper;
 
@@ -119,10 +120,10 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
             return ReferenceExpression::Make(expression->Type(), expression->table_name(), expression->column_name(), expression->alias_, idx);
         }
     }
-    LOG_ERROR(fmt::format("Can't bind column expression: {} [{}.{}]",
-                          expression->table_name(),
-                          expression->binding().table_idx,
-                          expression->binding().column_idx));
+    UnrecoverableError(fmt::format("Can't bind column expression: {} [{}.{}]",
+                                   expression->table_name(),
+                                   expression->binding().table_idx,
+                                   expression->binding().column_idx));
     return nullptr;
 }
 
