@@ -6,6 +6,13 @@ enum NodeType {
 kLeader,
 kFollower,
 kLearner,
+kInvalid,
+}
+
+enum NodeStatus {
+kInvalid,
+kAlive,
+kTimeout
 }
 
 struct NodeInfo {
@@ -14,6 +21,7 @@ struct NodeInfo {
 3: string node_ip,
 4: i64 node_port,
 5: i64 txn_timestamp,
+6: NodeStatus node_status,
 }
 
 struct RegisterRequest {

@@ -56,6 +56,7 @@ export struct NodeInfo {
     u64 last_update_ts_{};
     i64 leader_term_{};
     i64 heartbeat_interval_{}; // provide by leader and used by follower and learner;
+    u64 heartbeat_count_{}; // given by leader to calculate how many heartbeat received on this node.
     // u64 update_interval_{}; // seconds
     // String from_{}; // Which node the information comes from.
 };

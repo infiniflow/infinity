@@ -100,13 +100,13 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
 Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name, String node_ip, i16 node_port) {
     NodeRole current_role = GetServerRole();
     if (current_role == target_role) {
-        return Status::InvalidServerRole(fmt::format("Infinity is already the role of {}", ToString(current_role)));
+        return Status::InvalidNodeRole(fmt::format("Infinity is already the role of {}", ToString(current_role)));
     }
 
     switch (current_role) {
         case NodeRole::kUnInitialized: {
             if (target_role != NodeRole::kAdmin) {
-                Status status = Status::InvalidServerRole("Un-init role can only be switch to Admin role");
+                Status status = Status::InvalidNodeRole("Un-init role can only be switch to Admin role");
                 return status;
             }
             storage_ = MakeUnique<Storage>(config_.get());
@@ -170,7 +170,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     return Status::OK();
                 }
                 case NodeRole::kAdmin: {
-                    Status status = Status::InvalidServerRole("Can't switch admin role to admin");
+                    Status status = Status::InvalidNodeRole("Can't switch admin role to admin");
                     return status;
                 }
             }
@@ -191,11 +191,11 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     break;
                 }
                 case NodeRole::kUnInitialized: {
-                    Status status = Status::InvalidServerRole("Can't switch standalone role to un-init");
+                    Status status = Status::InvalidNodeRole("Can't switch standalone role to un-init");
                     return status;
                 }
                 default: {
-                    Status status = Status::InvalidServerRole("Can't switch Infinity to cluster mode");
+                    Status status = Status::InvalidNodeRole("Can't switch Infinity to cluster mode");
                     return status;
                 }
             }
@@ -218,7 +218,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     break;
                 }
                 default: {
-                    Status status = Status::InvalidServerRole("Can't switch infinity role");
+                    Status status = Status::InvalidNodeRole("Can't switch infinity role");
                     return status;
                 }
             }
@@ -243,12 +243,12 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
                     break;
                 }
                 case NodeRole::kStandalone: {
-                    Status status = Status::InvalidServerRole("Can't switch follower role to standalone");
+                    Status status = Status::InvalidNodeRole("Can't switch follower role to standalone");
                     RecoverableError(status);
                     break;
                 }
                 case NodeRole::kUnInitialized: {
-                    Status status = Status::InvalidServerRole("Can't switch follower role to un-init");
+                    Status status = Status::InvalidNodeRole("Can't switch follower role to un-init");
                     RecoverableError(status);
                     break;
                 }

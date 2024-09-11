@@ -181,7 +181,8 @@ export enum class ErrorCode : long {
     kEmptyEntryList = 8004,
     kNoWALEntryFound = 8005,
     kWrongCheckpointType = 8006,
-    kInvalidServerRole = 8007
+    kInvalidNodeRole = 8007,
+    kInvalidNodeStatus = 8008
 };
 
 export class Status {
@@ -341,7 +342,8 @@ public:
     static Status EmptyEntryList();
     static Status NoWALEntryFound(const String &file_name, i64 index);
     static Status WrongCheckpointType(const String &expect_type, const String &actual_type);
-    static Status InvalidServerRole(const String &message);
+    static Status InvalidNodeRole(const String &message);
+    static Status InvalidNodeStatus(const String &message);
 
 public:
     Status() = default;

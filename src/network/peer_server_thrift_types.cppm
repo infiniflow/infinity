@@ -24,6 +24,7 @@ export using infinity_peer_server::PeerServiceIf;
 export using infinity_peer_server::PeerServiceClient;
 export using infinity_peer_server::PeerServiceIfFactory;
 export using infinity_peer_server::PeerServiceProcessorFactory;
+export using infinity_peer_server::NodeStatus;
 export using infinity_peer_server::NodeType;
 export using infinity_peer_server::NodeInfo;
 export using infinity_peer_server::RegisterRequest;
@@ -38,5 +39,4 @@ export using infinity_peer_server::ChangeRoleRequest;
 export using infinity_peer_server::ChangeRoleResponse;
 export using infinity_peer_server::NewLeaderRequest;
 export using infinity_peer_server::NewLeaderResponse;
-
 }

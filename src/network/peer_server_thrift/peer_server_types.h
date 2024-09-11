@@ -25,7 +25,8 @@ struct NodeType {
   enum type {
     kLeader = 0,
     kFollower = 1,
-    kLearner = 2
+    kLearner = 2,
+    kInvalid = 3
   };
 };
 
@@ -34,6 +35,20 @@ extern const std::map<int, const char*> _NodeType_VALUES_TO_NAMES;
 std::ostream& operator<<(std::ostream& out, const NodeType::type& val);
 
 std::string to_string(const NodeType::type& val);
+
+struct NodeStatus {
+  enum type {
+    kInvalid = 0,
+    kAlive = 1,
+    kTimeout = 2
+  };
+};
+
+extern const std::map<int, const char*> _NodeStatus_VALUES_TO_NAMES;
+
+std::ostream& operator<<(std::ostream& out, const NodeStatus::type& val);
+
+std::string to_string(const NodeStatus::type& val);
 
 class NodeInfo;
 
@@ -62,12 +77,13 @@ class NewLeaderRequest;
 class NewLeaderResponse;
 
 typedef struct _NodeInfo__isset {
-  _NodeInfo__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false) {}
+  _NodeInfo__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false), node_status(false) {}
   bool node_name :1;
   bool node_type :1;
   bool node_ip :1;
   bool node_port :1;
   bool txn_timestamp :1;
+  bool node_status :1;
 } _NodeInfo__isset;
 
 class NodeInfo : public virtual ::apache::thrift::TBase {
@@ -80,7 +96,8 @@ class NodeInfo : public virtual ::apache::thrift::TBase {
              node_type(static_cast<NodeType::type>(0)),
              node_ip(),
              node_port(0),
-             txn_timestamp(0) {
+             txn_timestamp(0),
+             node_status(static_cast<NodeStatus::type>(0)) {
   }
 
   virtual ~NodeInfo() noexcept;
@@ -93,6 +110,11 @@ class NodeInfo : public virtual ::apache::thrift::TBase {
   std::string node_ip;
   int64_t node_port;
   int64_t txn_timestamp;
+  /**
+   * 
+   * @see NodeStatus
+   */
+  NodeStatus::type node_status;
 
   _NodeInfo__isset __isset;
 
@@ -106,6 +128,8 @@ class NodeInfo : public virtual ::apache::thrift::TBase {
 
   void __set_txn_timestamp(const int64_t val);
 
+  void __set_node_status(const NodeStatus::type val);
+
   bool operator == (const NodeInfo & rhs) const
   {
     if (!(node_name == rhs.node_name))
@@ -117,6 +141,8 @@ class NodeInfo : public virtual ::apache::thrift::TBase {
     if (!(node_port == rhs.node_port))
       return false;
     if (!(txn_timestamp == rhs.txn_timestamp))
+      return false;
+    if (!(node_status == rhs.node_status))
       return false;
     return true;
   }

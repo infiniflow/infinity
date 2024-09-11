@@ -585,6 +585,8 @@ Status Status::WrongCheckpointType(const String &expect_type, const String &actu
                   MakeUnique<String>(fmt::format("Expect checkpoint type: {}, actual checkpoint type: {}", expect_type, actual_type)));
 }
 
-Status Status::InvalidServerRole(const String &message) { return Status(ErrorCode::kInvalidServerRole, MakeUnique<String>(message)); }
+Status Status::InvalidNodeRole(const String &message) { return Status(ErrorCode::kInvalidNodeRole, MakeUnique<String>(message)); }
+
+Status Status::InvalidNodeStatus(const String &message) { return Status(ErrorCode::kInvalidNodeStatus, MakeUnique<String>(message)); }
 
 } // namespace infinity

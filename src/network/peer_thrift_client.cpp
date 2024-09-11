@@ -55,14 +55,14 @@ Status PeerClient::Init() {
 
 /// TODO: comment
 Status PeerClient::UnInit() {
-    LOG_INFO(fmt::format("Peer client: {} is stopping.", node_info_.node_name_));
+    LOG_INFO(fmt::format("Peer client: {} is stopping.", this_node_name_));
     if(processor_thread_.get() != nullptr) {
         SharedPtr<TerminatePeerTask> terminate_task = MakeShared<TerminatePeerTask>();
         peer_task_queue_.Enqueue(terminate_task);
         terminate_task->Wait();
         processor_thread_->join();
     }
-    LOG_INFO(fmt::format("Peer client: {} is stopped.", node_info_.node_name_));
+    LOG_INFO(fmt::format("Peer client: {} is stopped.", this_node_name_));
     return Status::OK();
 }
 
@@ -96,7 +96,9 @@ void PeerClient::Process() {
                     break;
                 }
                 case PeerTaskType::kHeartBeat: {
-                    LOG_INFO(peer_task->ToString());
+                    LOG_DEBUG(peer_task->ToString());
+                    HeartBeatPeerTask* heartbeat_peer_task = static_cast<HeartBeatPeerTask*>(peer_task.get());
+                    HeartBeat(heartbeat_peer_task);
                     break;
                 }
                 default: {
@@ -157,6 +159,55 @@ void PeerClient::Unregister(UnregisterPeerTask* peer_task) {
         // Error
         peer_task->error_code_ = response.error_code;
         peer_task->error_message_ = response.error_message;
+    }
+}
+
+void PeerClient::HeartBeat(HeartBeatPeerTask* peer_task) {
+    HeartBeatRequest request;
+    HeartBeatResponse response;
+    request.node_name = peer_task->node_name_;
+    request.txn_timestamp = peer_task->txn_ts_;
+
+    client_->HeartBeat(response, request);
+    if(response.error_code != 0) {
+        // Error
+        peer_task->error_code_ = response.error_code;
+        peer_task->error_message_ = response.error_message;
+    } else {
+        peer_task->leader_term_ = response.leader_term;
+        SizeT node_count = response.other_nodes.size();
+        peer_task->other_nodes_.reserve(node_count);
+        for(SizeT idx = 0; idx < node_count; ++ idx) {
+            NodeInfo node_info;
+            auto& other_node = response.other_nodes[idx];
+            if(this_node_name_ == other_node.node_name) {
+                continue;
+            }
+            node_info.node_name_ = other_node.node_name;
+            node_info.ip_address_ = other_node.node_ip;
+            node_info.port_ = other_node.node_port;
+            node_info.txn_timestamp_ = other_node.txn_timestamp;
+            switch(other_node.node_type) {
+                case NodeType::type::kLeader: {
+                    node_info.node_role_ = NodeRole::kLeader;
+                    break;
+                }
+                case NodeType::type::kFollower: {
+                    node_info.node_role_ = NodeRole::kFollower;
+                    break;
+                }
+                case NodeType::type::kLearner: {
+                    node_info.node_role_ = NodeRole::kLearner;
+                    break;
+                }
+                default: {
+                    String error_message = "Invalid role type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                }
+            }
+            peer_task->other_nodes_.emplace_back(node_info);
+        }
     }
 }
 

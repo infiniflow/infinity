@@ -21,6 +21,7 @@ import stl;
 import third_party;
 import status;
 import peer_thrift_client;
+import peer_server_thrift_types;
 import peer_task;
 import txn_manager;
 
@@ -46,7 +47,7 @@ public:
     Status AddNodeInfo(const SharedPtr<NodeInfo>& new_node);
     Status RemoveNode(const String& node_name);
 
-    Status UpdateNodeInfo(const SharedPtr<NodeInfo>& server_node); // Used by leader;
+    Status UpdateNodeInfoByHeartBeat(const String& node_name, i64 txn_timestamp, Vector<infinity_peer_server::NodeInfo>& other_nodes, i64& leader_term); // Used by leader;
     Status UpdateNonLeaderNodeInfo(const Vector<SharedPtr<NodeInfo>>& info_of_nodes); // Use by follower / learner to update all node info.
     Vector<SharedPtr<NodeInfo>> ListNodes() const;
     SharedPtr<NodeInfo> GetNodeInfoPtrByName(const String& node_name) const;
