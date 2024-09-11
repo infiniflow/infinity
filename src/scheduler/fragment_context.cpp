@@ -477,6 +477,9 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         case PhysicalOperatorType::kFusion: {
             return MakeTaskStateTemplate<FusionOperatorState>(physical_ops[operator_id]);
         }
+        case PhysicalOperatorType::kAlter: {
+            return MakeTaskStateTemplate<AlterOperatorState>(physical_ops[operator_id]);
+        }
         default: {
             String error_message = fmt::format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type()));
             UnrecoverableError(error_message);
@@ -1213,7 +1216,6 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kJoinMerge:
         case PhysicalOperatorType::kJoinIndex:
         case PhysicalOperatorType::kCrossProduct:
-        case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kPreparedPlan: {
             String error_message = fmt::format("Not support {} now", PhysicalOperatorToString(last_operator->operator_type()));
             UnrecoverableError(error_message);
@@ -1261,6 +1263,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCommand:
         case PhysicalOperatorType::kCreateTable:
         case PhysicalOperatorType::kCreateIndexFinish:

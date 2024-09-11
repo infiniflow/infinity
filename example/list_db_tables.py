@@ -16,15 +16,16 @@
 This example is about connecting to the local infinity instance, creating table, inserting data, and searching data
 '''
 
+# import infinity_embedded as infinity
 import infinity
 import sys
 
 try:
-    # open a local directory to store the data
-    infinity_instance = infinity.connect("/var/infinity")
+    # Use infinity_embedded module to open a local directory
+    # infinity_instance = infinity.connect("/var/infinity")
 
-    # connect to server with 127.0.0.1
-    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+    #  Use infinity module to connect a remote server
+    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
 
     infinity_instance.create_database("db1", infinity.common.ConflictType.Ignore)
     infinity_instance.create_database("db2", infinity.common.ConflictType.Ignore)

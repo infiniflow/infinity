@@ -21,9 +21,8 @@ import data_block;
 import base_expression;
 import expression_state;
 import selection;
-import bitmask;
+import roaring_bitmap;
 import logical_type;
-import bitmask_buffer;
 import column_vector;
 import expression_evaluator;
 import internal_types;
@@ -90,34 +89,20 @@ void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
 
 void ExpressionSelector::Select(const SharedPtr<ColumnVector> &bool_column, SizeT count, SharedPtr<Selection> &output_true_select, bool nullable) {
     if (bool_column->vector_type() != ColumnVectorType::kCompactBit || bool_column->data_type()->type() != LogicalType::kBoolean) {
-        String error_message = "Attempting to select non-boolean expression";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Attempting to select non-boolean expression");
     }
     const auto &boolean_buffer = *(bool_column->buffer_);
     const auto &null_mask = bool_column->nulls_ptr_;
-    if (nullable && !(null_mask->IsAllTrue())) {
-        const u64 *result_null_data = null_mask->GetData();
-        SizeT unit_count = BitmaskBuffer::UnitCount(count);
-        for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-            end_index = std::min(end_index, count);
-            if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
-                // all data of 64 rows are not null
-                for (; start_index < end_index; ++start_index) {
-                    if (boolean_buffer.GetCompactBit(start_index)) {
-                        output_true_select->Append(start_index);
-                    }
-                }
-            } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
-                // all data of 64 rows are null
-                start_index = end_index;
-            } else {
-                for (; start_index < end_index; ++start_index) {
-                    if ((null_mask->IsTrue(start_index)) && boolean_buffer.GetCompactBit(start_index)) {
-                        output_true_select->Append(start_index);
-                    }
-                }
+    if (nullable) {
+        null_mask->RoaringBitmapApplyFunc([&](const u32 idx) -> bool {
+            if (idx >= count) [[unlikely]] {
+                return false;
             }
-        }
+            if (boolean_buffer.GetCompactBit(idx)) {
+                output_true_select->Append(idx);
+            }
+            return idx + 1 < count;
+        });
     } else {
         for (SizeT idx = 0; idx < count; ++idx) {
             if (boolean_buffer.GetCompactBit(idx)) {

@@ -374,7 +374,7 @@ struct SQL_LTYPE {
 
 /* SQL keywords */
 
-%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT LOCK UNLOCK
+%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT LOCK UNLOCK ADD RENAME
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
@@ -387,7 +387,7 @@ struct SQL_LTYPE {
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
 %token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
-%token ADMIN
+%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
 
 %token NUMBER
@@ -410,6 +410,7 @@ struct SQL_LTYPE {
 %type <command_stmt>      command_statement
 %type <compact_stmt>      compact_statement
 %type <admin_stmt>        admin_statement
+%type <alter_stmt>        alter_statement
 
 %type <stmt_array>        statement_list
 
@@ -522,6 +523,7 @@ statement : create_statement { $$ = $1; }
 | command_statement { $$ = $1; }
 | compact_statement { $$ = $1; }
 | admin_statement { $$ = $1; }
+| alter_statement { $$ = $1; }
 
 explainable_statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
@@ -2298,6 +2300,100 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->admin_type_ = infinity::AdminStmtType::kShowLogIndex;
      $$->log_file_index_ = $4;
      $$->log_index_in_file_ = $6;
+}
+| ADMIN SHOW CONFIGS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListConfigs;
+}
+| ADMIN SHOW VARIABLES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListVariables;
+}
+| ADMIN SHOW VARIABLE IDENTIFIER {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowVariable;
+     $$->variable_name_ = $4;
+     free($4);
+}
+| ADMIN SHOW NODES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListNodes;
+}
+| ADMIN SHOW NODE IDENTIFIER {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowNode;
+     $$->node_name_ = $4;
+     free($4);
+}
+| ADMIN SHOW NODE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowCurrentNode;
+}
+| ADMIN SET ADMIN {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kSetRole;
+     $$->admin_node_role_ = infinity::AdminNodeRole::kAdmin;
+}
+| ADMIN SET STANDALONE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kSetRole;
+     $$->admin_node_role_ = infinity::AdminNodeRole::kStandalone;
+}
+| ADMIN SET LEADER USING STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kSetRole;
+     $$->admin_node_role_ = infinity::AdminNodeRole::kLeader;
+     $$->node_name_ = $5;
+     free($5);
+}
+| ADMIN CONNECT STRING AS FOLLOWER USING STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kSetRole;
+     $$->admin_node_role_ = infinity::AdminNodeRole::kFollower;
+     $$->leader_address_ = $3;
+     $$->node_name_ = $7;
+     free($3);
+     free($7);
+}
+| ADMIN CONNECT STRING AS LEARNER USING STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kSetRole;
+     $$->admin_node_role_ = infinity::AdminNodeRole::kLearner;
+     $$->leader_address_ = $3;
+     $$->node_name_ = $7;
+     free($3);
+     free($7);
+}
+
+alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
+    auto *ret = new infinity::RenameTableStatement($3);
+    $$ = ret;
+    ret->new_table_name_ = $6;
+    free($6);
+}
+| ALTER TABLE table_name ADD COLUMN table_column {
+    auto *ret = new infinity::AddColumnStatement($3);
+    $$ = ret;
+    ret->column_def_ = $6;
+}
+| ALTER TABLE table_name DROP COLUMN IDENTIFIER {
+    auto *ret = new infinity::DropColumnStatement($3);
+    $$ = ret;
+    ret->column_name_ = $6;
+    free($6);
+}
+| ALTER TABLE table_name ALTER COLUMN table_column {
+    auto *ret = new infinity::AlterColumnStatement($3);
+    $$ = ret;
+    ret->column_def_ = $6;
+}
+| ALTER TABLE table_name RENAME COLUMN IDENTIFIER TO IDENTIFIER {
+    auto *ret = new infinity::RenameColumnStatement($3);
+    $$ = ret;
+    ret->column_name_ = $6;
+    free($6);
+    ret->new_column_name_ = $8;
+    free($8);
 }
 
 /*

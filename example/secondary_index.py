@@ -16,18 +16,17 @@
 This example is about connecting to the local infinity instance, creating table, inserting data, and searching data
 '''
 
+# import infinity_embedded as infinity
 import infinity
-import time
 import sys
-
-from infinity import index
+import time
 
 try:
-    # open a local directory to store the data
-    infinity_instance = infinity.connect("/var/infinity")
+    # Use infinity_embedded module to open a local directory
+    # infinity_instance = infinity.connect("/var/infinity")
 
-    # connect to server with 127.0.0.1
-    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+    #  Use infinity module to connect a remote server
+    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -55,7 +54,7 @@ try:
                 }]
         )
 
-    table_instance.create_index("index1", index.IndexInfo("id", index.IndexType.Secondary))
+    table_instance.create_index("index1", infinity.index.IndexInfo("id", infinity.index.IndexType.Secondary))
     res = table_instance.filter("id='ID_1'").output(["*"]).to_pl()
     print(res)
 

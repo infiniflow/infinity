@@ -2,7 +2,7 @@ statement ok
 DROP TABLE IF EXISTS products;
 
 statement ok
-CREATE TABLE products (product_no integer, price integer, description varchar);
+CREATE TABLE products (product_no INT, price INT, description VARCHAR);
 
 statement ok
 INSERT INTO products VALUES (1, 2, 'abcdef');
@@ -27,6 +27,9 @@ DELETE FROM products WHERE product_no=1;
 
 statement error
 COMPACT TABLE products;
+
+statement error
+CREATE INDEX idx_c1 ON products (product_no);
 
 query
 SELECT * FROM products;

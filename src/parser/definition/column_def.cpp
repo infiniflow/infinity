@@ -16,6 +16,7 @@
 #include "expr/constant_expr.h"
 #include "expr/parsed_expr.h"
 #include "type/data_type.h"
+#include "type/serialize.h"
 
 namespace infinity {
 
@@ -88,6 +89,46 @@ bool ColumnDef::operator==(const ColumnDef &other) const {
         }
     }
     return true;
+}
+
+int32_t ColumnDef::GetSizeInBytes() const {
+    int32_t size = 0;
+    size += sizeof(int64_t); // id_
+    size += column_type_->GetSizeInBytes();
+    size += sizeof(int32_t) + name_.size();
+    size += sizeof(int32_t) + constraints_.size() * sizeof(ConstraintType);
+    size += (dynamic_cast<ConstantExpr *>(default_expr_.get()))->GetSizeInBytes();
+    size += sizeof(uint8_t); // build_bloom_filter_
+    return size;
+}
+
+void ColumnDef::WriteAdv(char *&ptr) const {
+    WriteBufAdv(ptr, id_);
+    column_type_->WriteAdv(ptr);
+    WriteBufAdv(ptr, name_);
+    WriteBufAdv(ptr, (int32_t)constraints_.size());
+    for (const auto &cons : constraints_) {
+        WriteBufAdv(ptr, cons);
+    }
+    (dynamic_cast<ConstantExpr *>(default_expr_.get()))->WriteAdv(ptr);
+    uint8_t bf = build_bloom_filter_ ? 1 : 0;
+    WriteBufAdv(ptr, bf);
+}
+
+std::shared_ptr<ColumnDef> ColumnDef::ReadAdv(const char *&ptr, int32_t maxbytes) {
+    int64_t id = ReadBufAdv<int64_t>(ptr);
+    std::shared_ptr<DataType> column_type = DataType::ReadAdv(ptr, maxbytes);
+    std::string name = ReadBufAdv<std::string>(ptr);
+    int32_t constraint_size = ReadBufAdv<int32_t>(ptr);
+    std::set<ConstraintType> constraints;
+    for (int32_t i = 0; i < constraint_size; i++) {
+        constraints.insert(ReadBufAdv<ConstraintType>(ptr));
+    }
+    std::shared_ptr<ParsedExpr> default_expr = ConstantExpr::ReadAdv(ptr, maxbytes);
+    auto column_def = std::make_shared<ColumnDef>(id, column_type, name, constraints, default_expr);
+    uint8_t bf = ReadBufAdv<uint8_t>(ptr);
+    column_def->build_bloom_filter_ = bf == 1;
+    return column_def;
 }
 
 std::string ColumnDef::ToString() const {

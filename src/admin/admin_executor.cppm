@@ -49,6 +49,13 @@ private:
     static QueryResult ShowIndex(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult ListIndexSegments(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult ShowIndexSegment(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ListConfigs(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ListVariables(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ShowVariable(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ListNodes(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ShowNode(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ShowCurrentNode(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult SetRole(QueryContext* query_context, const AdminStatement* admin_statement);
 
     static Vector<SharedPtr<WalEntry>> GetAllCheckpointEntries(QueryContext* query_context, const AdminStatement* admin_statement);
     static Tuple<UniquePtr<Catalog>, Status> LoadCatalogFiles(QueryContext* query_context, const AdminStatement* admin_statement, Vector<SharedPtr<WalEntry>>& ckp_entries);
