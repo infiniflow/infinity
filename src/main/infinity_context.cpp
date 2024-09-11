@@ -335,6 +335,9 @@ void InfinityContext::UnInit() {
 }
 
 void InfinityContext::SetIndexThreadPool(SizeT thread_num) {
+    thread_num = thread_num / 2;
+    if (thread_num < 2)
+        thread_num = 2;
     inverting_thread_pool_.resize(thread_num);
     commiting_thread_pool_.resize(thread_num);
     hnsw_build_thread_pool_.resize(thread_num);
