@@ -93,7 +93,6 @@ This section provides instructions for building Infinity from source on Ubuntu.
   defaultValue="linux_mac"
   values={[
     {label: 'Ubuntu 22.04', value: 'ubuntu2204'},
-    {label: 'Ubuntu 23.10', value: 'ubuntu2310'},
     {label: 'Ubuntu 24.04', value: 'ubuntu2404'},
   ]}>
    <TabItem value="ubuntu2204">
@@ -109,26 +108,6 @@ wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
 sudo add-apt-repository -P ppa:mhier/libboost-latest
 sudo apt update && sudo apt install libc++-18-dev clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf
-wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
-tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
-sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
-sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
-sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
-sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
-sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
-sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
-```
-
-  </TabItem>
-  <TabItem value="ubuntu2310">
-
-```shell
-sudo apt update && sudo apt install -y git wget
-wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
-tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
-sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
-wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
-sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf
 wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
 tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
 sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
