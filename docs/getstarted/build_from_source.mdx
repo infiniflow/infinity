@@ -70,17 +70,8 @@ git clone https://github.com/infiniflow/infinity.git
 
 ```shell
 cd infinity && mkdir cmake-build-debug
-```
-
-```shell
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-```
-
-```shell
 docker run -d --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang18
-```
-
-```shell
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  infinity"
 ```
 
@@ -88,13 +79,7 @@ docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G N
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-```
-
-```shell
 ulimit -n 500000
-```
-
-```shell
 ./cmake-build-debug/src/infinity
 ```
 
@@ -115,74 +100,22 @@ This section provides instructions for building Infinity from source on Ubuntu.
 
 ```shell
 sudo apt update && sudo apt install git wget unzip software-properties-common
-```
-
-```shell
 wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
-```
-
-```shell
 tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
-```
-
-```shell
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
-```
-
-```shell
 wget https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
-```
-
-```shell
 unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja
-```
-
-```shell
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
-```
-
-```shell
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
-```
-
-```shell
 sudo add-apt-repository -P ppa:mhier/libboost-latest
-```
-
-```shell
 sudo apt update && sudo apt install libc++-18-dev clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf
-```
-
-```shell
-# Install jemalloc from source
 wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
-```
-
-```shell
 tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
-```
-
-```shell
 sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
-```
-
-```shell
 sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
-```
-
-```shell
 sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
-```
-
-```shell
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
-```
-
-```shell
 sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
-```
-
-```shell
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
@@ -191,58 +124,18 @@ sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /us
 
 ```shell
 sudo apt update && sudo apt install -y git wget
-```
-
-```shell
 wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
-```
-
-```shell
 tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
-```
-
-```shell
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
-```
-
-```shell
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
-```
-
-```shell
 sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf
-```
-
-```shell
-# Install jemalloc from source
 wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
-```
-
-```shell
 tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
-```
-
-```shell
 sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
-```
-
-```shell
 sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
-```
-
-```shell
 sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
-```
-
-```shell
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
-```
-
-```shell
 sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
-```
-
-```shell
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
@@ -251,58 +144,18 @@ sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /us
 
 ```shell
 sudo apt update && sudo apt install -y git wget lsb-release software-properties-common
-```
-
-```shell
 wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
-```
-
-```shell
 tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
-```
-
-```shell
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
-```
-
-```shell
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
-```
-
-```shell
 sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.83-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf
-```
-
-```shell
-# Install jemalloc from source
 wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
-```
-
-```shell
 tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
-```
-
-```shell
 sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
-```
-
-```shell
 sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
-```
-
-```shell
 sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
-```
-
-```shell
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
-```
-
-```shell
 sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
-```
-
-```shell
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
@@ -329,24 +182,10 @@ If your installed version is below v0.7.4, download the include files directly f
 
 ```shell
 git config --global --add safe.directory infinity
-```
-
-```shell
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
-```
-
-```shell
 export CC=/usr/bin/clang-18
-```
-
-```shell
 export CXX=/usr/bin/clang++-18
-```
-
-```shell
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
-
-```shell
 cmake --build . -t infinity
 ```
 
@@ -354,13 +193,7 @@ cmake --build . -t infinity
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-```
-
-```shell
 ulimit -n 500000
-```
-
-```shell
 ./cmake-build-debug/src/infinity
 ```
 
@@ -377,9 +210,6 @@ ulimit -n 500000
 
 ```shell
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  test_main"
-```
-
-```shell
 ./cmake-build-debug/src/test_main
 ```
 
@@ -388,13 +218,7 @@ docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G N
 
 ```shell
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
-```
-
-```shell
 cmake --build . -t test_main
-```
-
-```shell
 ./cmake-build-debug/src/test_main
 ```
 
@@ -411,17 +235,8 @@ cmake --build . -t test_main
 
    ```shell
    cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
-   ```
-
-   ```shell
    cmake --build . -t test_main
-   ```
-
-   ```shell
    find . -name "*.gcda"  | xargs rm -f
-   ```
-
-   ```shell
    ./cmake-build-debug/src/test_main
    ```
 
@@ -429,9 +244,6 @@ cmake --build . -t test_main
 
    ```shell
    cd ./cmake-build-debug/src/CMakeFiles/unit_test.dir
-   ```
-
-   ```shell
    gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html unit_test_html.html
    ```
 
@@ -453,9 +265,6 @@ cmake --build . -t test_main
 
    ```shell
    docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  infinity"
-   ```
-
-   ```shell
    ./cmake-build-debug/src/infinity
    ```
 
@@ -472,13 +281,7 @@ cmake --build . -t test_main
 
    ```shell
    cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
-   ```
-
-   ```shell
    cmake --build . -t infinity
-   ```
-
-   ```shell
    ./cmake-build-debug/src/infinity
    ```
 
@@ -495,17 +298,8 @@ cmake --build . -t test_main
 
    ```shell
    cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCODE_COVERAGE=ON ..
-   ```
-
-   ```shell
    cmake --build . -t infinity
-   ```
-
-   ```shell
    find . -name "*.gcda"  | xargs rm -f
-   ```
-
-   ```shell
    ./cmake-build-debug/src/infinity
    ```
 
@@ -525,9 +319,6 @@ cmake --build . -t test_main
 
    ```shell
    cd ./cmake-build-debug/src/CMakeFiles
-   ```
-
-   ```shell
    gcovr --gcov-executable "llvm-cov gcov" -r "YOUR_ABSOLUTE_PATH_OF_THE_PROJECT/infinity/src" --gcov-exclude-directories ${PWD}'/unit_test' . --html function_test_html.html
    ```
 
