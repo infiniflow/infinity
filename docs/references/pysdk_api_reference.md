@@ -721,6 +721,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"chinese"`: Simplified Chinese
       - `"tradition"`: Traditional Chinese
       - `"japanese"`: Japanese
+      - `"korea"`: Korea
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
   - Parameter settings for a secondary index:  
     No parameters are required. For now, use an empty list `[]`.
