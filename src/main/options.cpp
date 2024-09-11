@@ -34,11 +34,14 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(TIME_ZONE_BIAS_OPTION_NAME)] = GlobalOptionIndex::kTimeZoneBias;
     name2index_[String(CPU_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kWorkerCPULimit;
     name2index_[String(SERVER_ADDRESS_OPTION_NAME)] = GlobalOptionIndex::kServerAddress;
+    name2index_[String(PEER_SERVER_IP_OPTION_NAME)] = GlobalOptionIndex::kPeerServerIP;
+    name2index_[String(PEER_SERVER_PORT_OPTION_NAME)] = GlobalOptionIndex::kPeerServerPort;
 
     name2index_[String(POSTGRES_PORT_OPTION_NAME)] = GlobalOptionIndex::kPostgresPort;
     name2index_[String(HTTP_PORT_OPTION_NAME)] = GlobalOptionIndex::kHTTPPort;
     name2index_[String(CLIENT_PORT_OPTION_NAME)] = GlobalOptionIndex::kClientPort;
     name2index_[String(CONNECTION_POOL_SIZE_OPTION_NAME)] = GlobalOptionIndex::kConnectionPoolSize;
+    name2index_[String(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME)] = GlobalOptionIndex::kPeerServerConnectionPoolSize;
     name2index_[String(LOG_FILENAME_OPTION_NAME)] = GlobalOptionIndex::kLogFileName;
 
     name2index_[String(LOG_DIR_OPTION_NAME)] = GlobalOptionIndex::kLogDir;
@@ -85,7 +88,7 @@ Status GlobalOptions::AddOption(UniquePtr<BaseOption> option) {
     }
 
     if(options_[option_index].get() != nullptr) {
-        return Status::InvalidConfig(fmt::format("Attempt to exists option", option->name_));
+        return Status::InvalidConfig(fmt::format("Attempt to add an existed option", option->name_));
     }
 
     options_[option_index] = std::move(option);

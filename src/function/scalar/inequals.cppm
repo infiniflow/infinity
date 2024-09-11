@@ -22,6 +22,8 @@ namespace infinity {
 
 class Catalog;
 
-export void RegisterInEqualsFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterInEqualFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterInEqualAliasFunction(const UniquePtr<Catalog> &catalog_ptr);
+
 
 }
