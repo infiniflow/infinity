@@ -1385,7 +1385,12 @@ select_clause_with_modifier: select_clause_without_modifier order_by_clause limi
     }
     if($1->search_expr_ != nullptr and ($2 != nullptr or $3 != nullptr or $4 != nullptr)) {
         delete $1;
-        delete $2;
+        if ($2) {
+            for (auto ptr : *($2)) {
+                delete ptr;
+            }
+            delete $2;
+        }
         delete $3;
         delete $4;
         yyerror(&yyloc, scanner, result, "Result modifier(ORDER BY, LIMIT, OFFSET) is conflict with SEARCH expression.");
