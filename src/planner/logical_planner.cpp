@@ -1152,8 +1152,16 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
             if (!column_def->has_default_value()) {
                 RecoverableError(Status::NotSupport("Add column without default value isn't supported."));
             }
-            i64 column_id = table_entry->GetColumnID(column_def->name());
-            if (column_id != -1) {
+            bool found = true;
+            try {
+                [[maybe_unused]] i64 column_id = table_entry->GetColumnIdByName(column_def->name());
+            } catch (const RecoverableException &e) {
+                if (e.ErrorCode() != ErrorCode::kColumnNotExist) {
+                    throw;
+                }
+                found = false;
+            }
+            if (found) {
                 RecoverableError(Status::DuplicateColumnName(column_def->name()));
             }
             this->logical_plan_ = MakeShared<LogicalAddColumns>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -1164,10 +1172,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
         case AlterStatementType::kDropColumns: {
             auto *drop_columns_statement = static_cast<DropColumnStatement *>(statement);
             const String &column_name = drop_columns_statement->column_name_;
-            i64 column_id = table_entry->GetColumnID(column_name);
-            if (column_id == -1) {
-                RecoverableError(Status::ColumnNotExist(column_name));
-            }
+            i64 column_id = table_entry->GetColumnIdByName(column_name);
             if (table_entry->CheckIfIndexColumn(column_id, txn->TxnID(), txn->BeginTS())) {
                 RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
             }

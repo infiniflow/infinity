@@ -226,6 +226,8 @@ public:
 
     SharedPtr<ColumnDef> GetColumnDefByName(const String &column_name) const;
 
+    SizeT GetColumnIdxByID(ColumnID column_id) const;
+
     inline SizeT ColumnCount() const { return columns_.size(); }
 
     const SharedPtr<String> &TableEntryDir() const { return table_entry_dir_; }
@@ -260,8 +262,6 @@ public:
 public:
     u64 GetColumnIdByName(const String &column_name) const;
 
-    i64 GetColumnID(const String &column_name) const;
-
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
     SegmentEntry *GetSegmentEntry(SegmentID seg_id) const {
@@ -285,8 +285,6 @@ private:
     TableMeta *table_meta_{};
 
     MetaMap<TableIndexMeta> index_meta_map_{};
-
-    HashMap<String, ColumnID> column_name2column_id_;
 
     const SharedPtr<String> table_entry_dir_{};
 

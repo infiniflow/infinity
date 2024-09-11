@@ -103,11 +103,6 @@ TableEntry::TableEntry(bool is_delete,
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
-    SizeT column_count = columns.size();
-    for (SizeT idx = 0; idx < column_count; ++idx) {
-        column_name2column_id_[columns[idx]->name()] = idx;
-    }
-
     // this->SetCompactionAlg(nullptr);
     if (!is_delete) {
         this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY, this));
@@ -116,9 +111,8 @@ TableEntry::TableEntry(bool is_delete,
 }
 
 TableEntry::TableEntry(const TableEntry &other)
-    : BaseEntry(other), table_meta_(other.table_meta_), column_name2column_id_(other.column_name2column_id_),
-      table_entry_dir_(other.table_entry_dir_), table_name_(other.table_name_), columns_(other.columns_), next_column_id_(other.next_column_id_),
-      table_entry_type_(other.table_entry_type_) {
+    : BaseEntry(other), table_meta_(other.table_meta_), table_entry_dir_(other.table_entry_dir_), table_name_(other.table_name_),
+      columns_(other.columns_), next_column_id_(other.next_column_id_), table_entry_type_(other.table_entry_type_) {
     row_count_ = other.row_count_.load();
     unsealed_id_ = other.unsealed_id_;
     next_segment_id_ = other.next_segment_id_.load();
@@ -1036,6 +1030,16 @@ SharedPtr<ColumnDef> TableEntry::GetColumnDefByName(const String &column_name) c
     return *iter;
 }
 
+SizeT TableEntry::GetColumnIdxByID(ColumnID column_id) const {
+    auto iter = std::find_if(columns_.begin(), columns_.end(), [column_id](const SharedPtr<ColumnDef> &column_def) {
+        return static_cast<ColumnID>(column_def->id()) == column_id;
+    });
+    if (iter == columns_.end()) {
+        return -1;
+    }
+    return std::distance(columns_.begin(), iter);
+}
+
 Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     auto iter = this->segment_map_.find(seg_id);
     if (iter != this->segment_map_.end()) {
@@ -1239,21 +1243,15 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     return table_entry;
 }
 
-i64 TableEntry::GetColumnID(const String &column_name) const {
-    auto it = column_name2column_id_.find(column_name);
-    if (it == column_name2column_id_.end()) {
-        return -1;
-    }
-    return it->second;
-}
-
 u64 TableEntry::GetColumnIdByName(const String &column_name) const {
-    auto it = column_name2column_id_.find(column_name);
-    if (it == column_name2column_id_.end()) {
+    auto iter = std::find_if(columns_.begin(), columns_.end(), [column_name](const SharedPtr<ColumnDef> &column_def) {
+        return column_def->name() == column_name;
+    });
+    if (iter == columns_.end()) {
         Status status = Status::ColumnNotExist(column_name);
         RecoverableError(status);
     }
-    return it->second;
+    return (*iter)->id();
 }
 
 bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id) {
@@ -1415,7 +1413,6 @@ void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs, con
         const auto &column_def = column_defs[idx];
         column_def->id_ = next_column_id_++;
         columns_.push_back(column_def);
-        column_name2column_id_[column_def->name()] = column_def->id();
         columns_info.emplace_back(column_defs[idx]->id(), &default_values[idx]);
     }
     for (auto &[segment_id, segment_entry] : segment_map_) {
@@ -1429,7 +1426,6 @@ void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *
         ColumnID column_id = GetColumnIdByName(column_name);
         column_ids.push_back(column_id);
         std::erase_if(columns_, [&](const SharedPtr<ColumnDef> &column_def) { return static_cast<ColumnID>(column_def->id()) == column_id; });
-        column_name2column_id_.erase(column_name);
     }
     for (auto &[segment_id, segment_entry] : segment_map_) {
         segment_entry->DropColumns(column_ids, txn_table_store);

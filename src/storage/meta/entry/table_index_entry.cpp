@@ -81,6 +81,9 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
         assert(index_base.get() != nullptr);
         const String &column_name = index_base->column_name();
         column_def_ = table_index_meta->GetTableEntry()->GetColumnDefByName(column_name);
+        if (column_def_.get() == nullptr) {
+            UnrecoverableError(fmt::format("Column {} not found in table {}.", column_name, *table_index_meta->GetTableEntry()->GetTableName()));
+        }
     }
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
