@@ -313,11 +313,11 @@ private:
     // the compaction algorithm, mutable because all its interface are protected by lock
     mutable UniquePtr<CompactionAlg> compaction_alg_{};
 
-private: // TODO: remove it
+private:
     void MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *txn, SegmentID seg_id, Vector<AppendRange> &append_ranges);
 
-public: // TODO: remove it?
-//    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
+public:
+    bool CheckIfIndexColumn(ColumnID column_id, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     bool CheckAnyDelete(TxnTimeStamp check_ts) const;
 

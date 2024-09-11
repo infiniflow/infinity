@@ -770,6 +770,16 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
     }
 }
 
+bool TableEntry::CheckIfIndexColumn(ColumnID column_id, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (const auto &[_, table_index_meta] : *index_meta_map_guard) {
+        if (table_index_meta->CheckIfIndexColumn(column_id, txn_id, begin_ts)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // void TableEntry::MemIndexDump(Txn *txn, bool spill) {
 //     TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
 //     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
@@ -1359,19 +1369,14 @@ void TableEntry::SetUnlock() {
     locked_ = false;
 }
 
-void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs,
-                            const Vector<Value> &default_values,
-                            TxnTableStore *txn_table_store) {
-    for (auto &column_def : column_defs) {
-        column_def->id_ = columns_.size();
-        columns_.push_back(column_def);
-    }
-
-    for (const auto &column_def : column_defs) {
-        column_name2column_id_[column_def->name()] = column_def->id();
-    }
+void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values, TxnTableStore *txn_table_store) {
     Vector<Pair<ColumnID, const Value *>> columns_info;
+    ColumnID next_column_id = columns_.size();
     for (SizeT idx = 0; idx < column_defs.size(); ++idx) {
+        const auto &column_def = column_defs[idx];
+        column_def->id_ = next_column_id++;
+        columns_.push_back(column_def);
+        column_name2column_id_[column_def->name()] = column_def->id();
         columns_info.emplace_back(column_defs[idx]->id(), &default_values[idx]);
     }
     for (auto &[segment_id, segment_entry] : segment_map_) {
@@ -1379,19 +1384,20 @@ void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs,
     }
 }
 
-void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store) {
-    // Vector<SharedPtr<ColumnDef>> new_columns;
-    // Vector<ColumnID> new_column_ids;
-    // for (const auto &column : columns_) {
-    //     if (std::find(column_names.begin(), column_names.end(), column->name()) == column_names.end()) {
-    //         new_columns.push_back(column);
-    //         new_column_ids.push_back(column->id());
-    //     }
+void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *txn_table_store) {
+    Vector<ColumnID> column_ids;
+    // for (const String &column_name : column_names) {
+    //     ColumnID column_id = GetColumnIdByName(column_name);
+    //     column_ids.push_back(column_id);
+    //     column_name2column_id_.erase(column_name);
+    //     columns_.erase(std::remove_if(columns_.begin(),
+    //                                   columns_.end(),
+    //                                   [&](const SharedPtr<ColumnDef> &column_def) { return static_cast<ColumnID>(column_def->id()) == column_id; }),
+    //                    columns_.end());
     // }
-    // columns_ = std::move(new_columns);
-    // for (auto &[segment_id, segment_entry] : segment_map_) {
-    //     segment_entry->DropColumns(new_column_ids, txn);
-    // }
+    for (auto &[segment_id, segment_entry] : segment_map_) {
+        segment_entry->DropColumns(column_ids, txn_table_store);
+    }
 }
 
 } // namespace infinity

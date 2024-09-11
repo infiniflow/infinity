@@ -681,8 +681,10 @@ void SegmentEntry::AddColumns(const Vector<Pair<ColumnID, const Value *>> &colum
     }
 }
 
-void SegmentEntry::DropColumns(const Vector<ColumnID> &column_ids, Txn *txn) {
-    //
+void SegmentEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store) {
+    for (auto &block : block_entries_) {
+        block->DropColumns(column_ids, table_store);
+    }
 }
 
 } // namespace infinity

@@ -278,7 +278,7 @@ public:
 
     void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
 
-    void DropColumns(const Vector<ColumnID> &column_ids, Txn *txn);
+    void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
 };
 
 } // namespace infinity

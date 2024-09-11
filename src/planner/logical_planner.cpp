@@ -1161,6 +1161,21 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                                                                 column_def);
             break;
         }
+        case AlterStatementType::kDropColumns: {
+            auto *drop_columns_statement = static_cast<DropColumnStatement *>(statement);
+            const String &column_name = drop_columns_statement->column_name_;
+            i64 column_id = table_entry->GetColumnID(column_name);
+            if (column_id == -1) {
+                RecoverableError(Status::ColumnNotExist(column_name));
+            }
+            if (table_entry->CheckIfIndexColumn(column_id, txn->TxnID(), txn->BeginTS())) {
+                RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+            }
+            this->logical_plan_ = MakeShared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                 table_entry,
+                                                                 column_name);
+            break;
+        }
         default: {
             RecoverableError(Status::NotSupport("Alter statement isn't supported."));
         }

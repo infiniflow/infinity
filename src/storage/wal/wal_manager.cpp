@@ -1139,7 +1139,14 @@ void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn
 }
 
 void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    //
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
+    if (!table_status.ok()) {
+        String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
+        UnrecoverableError(error_message);
+    }
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
+    table_entry->DropColumns(cmd.column_names_, txn_store);
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

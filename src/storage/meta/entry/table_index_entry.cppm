@@ -150,6 +150,8 @@ public:
 
     void OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
+    bool CheckIfIndexColumn(ColumnID column_id) const;
+
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
 

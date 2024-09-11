@@ -72,4 +72,19 @@ public:
     Vector<SharedPtr<ColumnDef>> column_defs_;
 };
 
+export class LogicalDropColumns : public LogicalAlter {
+public:
+    LogicalDropColumns(u64 node_id, TableEntry *table_entry, String column_name)
+        : LogicalAlter(node_id, table_entry, AlterStatementType::kDropColumns) {
+        column_names_.push_back(std::move(column_name));
+    }
+
+    String ToString(i64 &space) const final;
+
+    String name() final { return "LogicalDropColumns"; }
+
+public:
+    Vector<String> column_names_;
+};
+
 } // namespace infinity

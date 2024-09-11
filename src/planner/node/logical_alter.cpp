@@ -44,4 +44,9 @@ String LogicalAddColumns::ToString(i64 &space) const {
     return "";
 }
 
+String LogicalDropColumns::ToString(i64 &space) const {
+    //
+    return "";
+}
+
 } // namespace infinity

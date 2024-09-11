@@ -96,6 +96,8 @@ public:
 
     TableIndexEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    bool CheckIfIndexColumn(ColumnID column_id, TransactionID txn_id, TxnTimeStamp begin_ts);
+
     List<SharedPtr<TableIndexEntry>> GetAllEntries() const {
         return index_entry_list_.GetAllEntries();
     }

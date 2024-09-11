@@ -102,14 +102,14 @@ private:
     const Vector<SharedPtr<ColumnDef>> &column_defs_;
 };
 
-export class PhysicalRemoveColumns final : public PhysicalAlter {
+export class PhysicalDropColumns final : public PhysicalAlter {
 public:
-    PhysicalRemoveColumns(TableEntry *table_entry,
-                          const Vector<String> &column_names,
-                          SharedPtr<Vector<String>> output_names,
-                          SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                          u64 id,
-                          SharedPtr<Vector<LoadMeta>> load_metas)
+    PhysicalDropColumns(TableEntry *table_entry,
+                        const Vector<String> &column_names,
+                        SharedPtr<Vector<String>> output_names,
+                        SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                        u64 id,
+                        SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalAlter(table_entry, AlterStatementType::kDropColumns, std::move(output_names), std::move(output_types), id, load_metas),
           column_names_(column_names) {}
 

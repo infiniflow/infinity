@@ -125,7 +125,7 @@ public:
 
     Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values);
 
-    Status DropColumns(const Vector<String> &column_names);
+    Status DropColumns(TableEntry *table_entry, const Vector<String> &column_names);
 
     Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 
