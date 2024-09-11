@@ -177,6 +177,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
             task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 
             i64 cpu_limit = config_->CPULimit();
+            cpu_limit = std::max(cpu_limit / 2, i64(1));
             SetIndexThreadPool(cpu_limit);
             break;
         }
