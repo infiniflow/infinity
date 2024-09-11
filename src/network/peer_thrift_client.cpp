@@ -83,6 +83,7 @@ void PeerClient::Process() {
                 case PeerTaskType::kTerminate: {
                     LOG_INFO("Stop the background processor");
                     running_ = false;
+                    break;
                 }
                 case PeerTaskType::kRegister: {
                     LOG_DEBUG(peer_task->ToString());
