@@ -103,7 +103,8 @@ try:
         .fusion(
             method="match_tensor", topn=2,
             fusion_params={"field": "tensor", "data_type": "float",
-                           "data": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}
+                           "data": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]},
+            params={"filter": "year < 2024"}
         )
         .to_pl()
     )

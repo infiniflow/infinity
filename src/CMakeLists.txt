@@ -223,7 +223,8 @@ add_library(infinity_core
         ${metrics_cpp}
         ${common_cpp}
         ${admin_cpp}
-        storage/buffer/file_worker/file_worker_type.cppm)
+        ${network_cpp}
+)
 
 target_sources(infinity_core
         PUBLIC
@@ -240,6 +241,7 @@ target_sources(infinity_core
         ${executor_cppm}
         ${metrics_cppm}
         ${admin_cppm}
+        ${network_cppm}
 )
 
 add_dependencies(infinity_core thrift thriftnb parquet_static snappy)
@@ -270,6 +272,8 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/arrow/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
+target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 
 if (NOT SUPPORT_FMA EQUAL 0)
     message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -291,20 +295,20 @@ endif ()
 
 add_executable(infinity
         ${main_cpp}
-        ${network_cpp}
-        network/http_server.cppm
-        network/http_server.cpp
-        network/http/http_search.cppm
-        network/http/http_search.cpp
-        network/infinity_thrift_service.cpp
-        network/infinity_thrift_service.cppm
+
+#        network/http_server.cppm
+#        network/http_server.cpp
+#        network/http/http_search.cppm
+#        network/http/http_search.cpp
+#        network/infinity_thrift_service.cpp
+#        network/infinity_thrift_service.cppm
 )
 
-target_sources(infinity
-        PUBLIC
-        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-        ${network_cppm}
-)
+#target_sources(infinity
+#        PUBLIC
+#        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+#        ${network_cppm}
+#)
 
 add_dependencies(infinity oatpp)
 
@@ -493,6 +497,7 @@ add_executable(unit_test
         ${common_cpp}
         ${executor_cpp}
         ${admin_cpp}
+        ${network_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
@@ -515,21 +520,23 @@ target_link_libraries(unit_test
         c++abi.a
         parquet.a
         arrow.a
+        snappy.a
+        oatpp.a
+        ${JEMALLOC_STATIC_LIB}
         thrift.a
         thriftnb.a
-        snappy.a
-        ${JEMALLOC_STATIC_LIB}
+        event.a
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 
 target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${ut_dependent_cppm}
-        ${network_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

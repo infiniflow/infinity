@@ -30,6 +30,13 @@ export module storage;
 
 namespace infinity {
 
+export enum class StorageMode {
+    kUnInitialized,
+    kAdmin,
+    kReadable,
+    kWritable,
+};
+
 export class Storage {
 public:
     explicit Storage(Config *config_ptr);
@@ -50,11 +57,9 @@ public:
 
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
 
-    void AdminModeInit();
-    void WorkingModeInit();
 
-    void AdminModeUnInit();
-    void WorkingModeUnInit();
+    StorageMode GetStorageMode() const;
+    void SetStorageMode(StorageMode mode);
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
 
@@ -72,6 +77,9 @@ private:
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
+
+    mutable std::mutex mutex_;
+    StorageMode current_storage_mode_{StorageMode::kUnInitialized};
 };
 
 } // namespace infinity
