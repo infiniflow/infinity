@@ -22,7 +22,6 @@ struct RegisterRequest {
 3: string node_ip,
 4: i64 node_port,
 5: i64 txn_timestamp,
-6: i64 message_time,
 }
 
 struct RegisterResponse {
@@ -31,12 +30,10 @@ struct RegisterResponse {
 3: string leader_name,
 4: i64 leader_term,
 5: i64 heart_beat_interval, // microseconds
-6: i64 message_time,
 }
 
 struct UnRegisterRequest {
 1: string node_name,
-2: i64 message_time,
 }
 
 struct UnRegisterResponse {
@@ -47,7 +44,6 @@ struct UnRegisterResponse {
 struct HeartBeatRequest {
 1: string node_name,
 2: i64 txn_timestamp,
-3: i64 message_time,
 }
 
 struct HeartBeatResponse {
@@ -75,7 +71,6 @@ struct ChangeRoleRequest {
 
 struct ChangeRoleResponse {
 1: string node_name,
-2: i64 message_time,
 }
 
 struct NewLeaderRequest {
@@ -88,7 +83,6 @@ struct NewLeaderRequest {
 
 struct NewLeaderResponse {
 1: string node_name,
-2: i64 message_time,
 }
 
 // Service

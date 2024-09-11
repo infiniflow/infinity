@@ -42,7 +42,7 @@ public:
 //    void SetPeerNode(NodeRole role, const String& node_name, i64 update_ts) {
 //        node_info_.node_name_ = node_name;
 //        node_info_.last_update_ts_ = update_ts;
-//        node_info_.node_status_ = NodeStatus::kConnected;
+//        node_info_.node_status_ = NodeStatus::kAlive;
 //        node_info_.node_role_ = role;
 //    }
 //

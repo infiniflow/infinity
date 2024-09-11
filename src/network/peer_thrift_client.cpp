@@ -132,7 +132,6 @@ void PeerClient::Register(RegisterPeerTask* peer_task) {
     request.node_ip = peer_task->node_ip_;
     request.node_port = peer_task->node_port_;
     request.txn_timestamp = peer_task->txn_ts_;
-    request.message_time = peer_task->message_time_;
 
     RegisterResponse response;
     client_->Register(response, request);
@@ -144,7 +143,6 @@ void PeerClient::Register(RegisterPeerTask* peer_task) {
         peer_task->leader_name_ = response.leader_name;
         peer_task->leader_term_ = response.leader_term;
         peer_task->heartbeat_interval_ = response.heart_beat_interval;
-        peer_task->leader_update_time_ = response.message_time;
     }
 }
 

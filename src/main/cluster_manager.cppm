@@ -40,6 +40,7 @@ public:
 //    Status Register(SharedPtr<NodeInfo> server_node);
 //    Status Unregister(const String& node_name); // Used by manual or disconnect from follower/learner
 
+    Status RegisterToLeader();
     Status AddNodeInfo(const SharedPtr<NodeInfo>& new_node);
     Status UpdateNodeInfo(const SharedPtr<NodeInfo>& server_node); // Used by leader;
     Status UpdateNonLeaderNodeInfo(const Vector<SharedPtr<NodeInfo>>& info_of_nodes); // Use by follower / learner to update all node info.

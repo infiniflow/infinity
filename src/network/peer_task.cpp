@@ -40,10 +40,8 @@ String ToString(NodeRole role) {
 
 String ToString(NodeStatus status) {
     switch (status) {
-        case NodeStatus::kReady:
-            return "ready";
-        case NodeStatus::kConnected:
-            return "connected";
+        case NodeStatus::kAlive:
+            return "alive";
         case NodeStatus::kTimeout:
             return "timeout";
         case NodeStatus::kInvalid:

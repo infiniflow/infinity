@@ -41,7 +41,7 @@ Status ClusterManager::InitAsLeader(const String &node_name) {
     }
     this_node_ = MakeShared<NodeInfo>();
     this_node_->node_role_ = NodeRole::kLeader;
-    this_node_->node_status_ = NodeStatus::kReady;
+    this_node_->node_status_ = NodeStatus::kAlive;
     this_node_->node_name_ = node_name;
     this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
     this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
@@ -60,14 +60,14 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     }
     this_node_ = MakeShared<NodeInfo>();
     this_node_->node_role_ = NodeRole::kFollower;
-    this_node_->node_status_ = NodeStatus::kReady;
+    this_node_->node_status_ = NodeStatus::kAlive;
     this_node_->node_name_ = node_name;
     this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
     this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
 
-    auto now = std::chrono::high_resolution_clock::now();
-    auto duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
-    this_node_->last_update_ts_ = duration_in_seconds.count();
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+    this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
 
     leader_node_ = MakeShared<NodeInfo>();
     leader_node_->node_role_ = NodeRole::kLeader;
@@ -86,8 +86,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
                                                                                   this_node_->node_role_,
                                                                                   this_node_->ip_address_,
                                                                                   this_node_->port_,
-                                                                                  txn_manager_->CurrentTS(),
-                                                                                  this_node_->last_update_ts_);
+                                                                                  txn_manager_->CurrentTS());
     peer_client_->Send(register_peer_task);
     register_peer_task->Wait();
 
@@ -98,7 +97,9 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
         return status;
     }
 
-    leader_node_->last_update_ts_ = register_peer_task->leader_update_time_;
+    now = std::chrono::system_clock::now();
+    time_since_epoch = now.time_since_epoch();
+    leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
     leader_node_->node_name_ = register_peer_task->leader_name_;
     //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
@@ -115,13 +116,12 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
             std::unique_lock lock(this->hb_mutex_);
             this->hb_cv_.wait_for(lock, hb_interval, [&] { return !this->hb_running_; });
 
-            auto hb_now = std::chrono::high_resolution_clock::now();
-            auto hb_duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(hb_now.time_since_epoch());
-            this_node_->last_update_ts_ = hb_duration_in_seconds.count();
+            auto hb_now = std::chrono::system_clock::now();
+            auto hb_time_since_epoch = hb_now.time_since_epoch();
+            this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
 
             // Send heartbeat
-            SharedPtr<HeartBeatPeerTask> hb_task =
-                MakeShared<HeartBeatPeerTask>(this_node_->node_name_, txn_manager_->CurrentTS(), this_node_->last_update_ts_);
+            SharedPtr<HeartBeatPeerTask> hb_task = MakeShared<HeartBeatPeerTask>(this_node_->node_name_, txn_manager_->CurrentTS());
             peer_client_->Send(hb_task);
             hb_task->Wait();
 
@@ -136,8 +136,11 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
             }
 
             // Update leader info
-            leader_node_->node_status_ = NodeStatus::kConnected;
-            leader_node_->last_update_ts_ = hb_task->leader_update_time_;
+            leader_node_->node_status_ = NodeStatus::kAlive;
+
+            hb_now = std::chrono::system_clock::now();
+            hb_time_since_epoch = hb_now.time_since_epoch();
+            leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
             leader_node_->leader_term_ = hb_task->leader_term_;
 
             if (!hb_running_) {
@@ -155,14 +158,14 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     }
     this_node_ = MakeShared<NodeInfo>();
     this_node_->node_role_ = NodeRole::kLearner;
-    this_node_->node_status_ = NodeStatus::kReady;
+    this_node_->node_status_ = NodeStatus::kAlive;
     this_node_->node_name_ = node_name;
     this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
     this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
 
-    auto now = std::chrono::high_resolution_clock::now();
-    auto duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
-    this_node_->last_update_ts_ = duration_in_seconds.count();
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+    this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
 
     leader_node_ = MakeShared<NodeInfo>();
     leader_node_->node_role_ = NodeRole::kLeader;
@@ -181,8 +184,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
                                                                                   this_node_->node_role_,
                                                                                   this_node_->ip_address_,
                                                                                   this_node_->port_,
-                                                                                  txn_manager_->CurrentTS(),
-                                                                                  this_node_->last_update_ts_);
+                                                                                  txn_manager_->CurrentTS());
     peer_client_->Send(register_peer_task);
     register_peer_task->Wait();
 
@@ -193,9 +195,11 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
         return status;
     }
     // Update this node info
-    this_node_->node_status_ = NodeStatus::kConnected;
+    this_node_->node_status_ = NodeStatus::kAlive;
 
-    leader_node_->last_update_ts_ = register_peer_task->leader_update_time_;
+    now = std::chrono::system_clock::now();
+    time_since_epoch = now.time_since_epoch();
+    leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
     leader_node_->node_name_ = register_peer_task->leader_name_;
     //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
@@ -217,13 +221,12 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
                 break;
             }
 
-            auto hb_now = std::chrono::high_resolution_clock::now();
-            auto hb_duration_in_seconds = std::chrono::duration_cast<std::chrono::seconds>(hb_now.time_since_epoch());
-            this_node_->last_update_ts_ = hb_duration_in_seconds.count();
+            auto hb_now = std::chrono::system_clock::now();
+            auto hb_time_since_epoch = hb_now.time_since_epoch();
+            this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
 
             // Send heartbeat
-            SharedPtr<HeartBeatPeerTask> hb_task =
-                MakeShared<HeartBeatPeerTask>(this_node_->node_name_, txn_manager_->CurrentTS(), this_node_->last_update_ts_);
+            SharedPtr<HeartBeatPeerTask> hb_task = MakeShared<HeartBeatPeerTask>(this_node_->node_name_, txn_manager_->CurrentTS());
             peer_client_->Send(hb_task);
             hb_task->Wait();
 
@@ -238,8 +241,11 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
             }
 
             // Update leader info
-            leader_node_->node_status_ = NodeStatus::kConnected;
-            leader_node_->last_update_ts_ = hb_task->leader_update_time_;
+            leader_node_->node_status_ = NodeStatus::kAlive;
+
+            hb_now = std::chrono::system_clock::now();
+            hb_time_since_epoch = hb_now.time_since_epoch();
+            leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
             leader_node_->leader_term_ = hb_task->leader_term_;
         }
     });

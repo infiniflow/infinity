@@ -137,13 +137,12 @@ void swap(NodeInfo &a, NodeInfo &b);
 std::ostream& operator<<(std::ostream& out, const NodeInfo& obj);
 
 typedef struct _RegisterRequest__isset {
-  _RegisterRequest__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false), message_time(false) {}
+  _RegisterRequest__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false) {}
   bool node_name :1;
   bool node_type :1;
   bool node_ip :1;
   bool node_port :1;
   bool txn_timestamp :1;
-  bool message_time :1;
 } _RegisterRequest__isset;
 
 class RegisterRequest : public virtual ::apache::thrift::TBase {
@@ -156,8 +155,7 @@ class RegisterRequest : public virtual ::apache::thrift::TBase {
                     node_type(static_cast<NodeType::type>(0)),
                     node_ip(),
                     node_port(0),
-                    txn_timestamp(0),
-                    message_time(0) {
+                    txn_timestamp(0) {
   }
 
   virtual ~RegisterRequest() noexcept;
@@ -170,7 +168,6 @@ class RegisterRequest : public virtual ::apache::thrift::TBase {
   std::string node_ip;
   int64_t node_port;
   int64_t txn_timestamp;
-  int64_t message_time;
 
   _RegisterRequest__isset __isset;
 
@@ -184,8 +181,6 @@ class RegisterRequest : public virtual ::apache::thrift::TBase {
 
   void __set_txn_timestamp(const int64_t val);
 
-  void __set_message_time(const int64_t val);
-
   bool operator == (const RegisterRequest & rhs) const
   {
     if (!(node_name == rhs.node_name))
@@ -197,8 +192,6 @@ class RegisterRequest : public virtual ::apache::thrift::TBase {
     if (!(node_port == rhs.node_port))
       return false;
     if (!(txn_timestamp == rhs.txn_timestamp))
-      return false;
-    if (!(message_time == rhs.message_time))
       return false;
     return true;
   }
@@ -219,13 +212,12 @@ void swap(RegisterRequest &a, RegisterRequest &b);
 std::ostream& operator<<(std::ostream& out, const RegisterRequest& obj);
 
 typedef struct _RegisterResponse__isset {
-  _RegisterResponse__isset() : error_code(false), error_msg(false), leader_name(false), leader_term(false), heart_beat_interval(false), message_time(false) {}
+  _RegisterResponse__isset() : error_code(false), error_msg(false), leader_name(false), leader_term(false), heart_beat_interval(false) {}
   bool error_code :1;
   bool error_msg :1;
   bool leader_name :1;
   bool leader_term :1;
   bool heart_beat_interval :1;
-  bool message_time :1;
 } _RegisterResponse__isset;
 
 class RegisterResponse : public virtual ::apache::thrift::TBase {
@@ -238,8 +230,7 @@ class RegisterResponse : public virtual ::apache::thrift::TBase {
                      error_msg(),
                      leader_name(),
                      leader_term(0),
-                     heart_beat_interval(0),
-                     message_time(0) {
+                     heart_beat_interval(0) {
   }
 
   virtual ~RegisterResponse() noexcept;
@@ -248,7 +239,6 @@ class RegisterResponse : public virtual ::apache::thrift::TBase {
   std::string leader_name;
   int64_t leader_term;
   int64_t heart_beat_interval;
-  int64_t message_time;
 
   _RegisterResponse__isset __isset;
 
@@ -262,8 +252,6 @@ class RegisterResponse : public virtual ::apache::thrift::TBase {
 
   void __set_heart_beat_interval(const int64_t val);
 
-  void __set_message_time(const int64_t val);
-
   bool operator == (const RegisterResponse & rhs) const
   {
     if (!(error_code == rhs.error_code))
@@ -275,8 +263,6 @@ class RegisterResponse : public virtual ::apache::thrift::TBase {
     if (!(leader_term == rhs.leader_term))
       return false;
     if (!(heart_beat_interval == rhs.heart_beat_interval))
-      return false;
-    if (!(message_time == rhs.message_time))
       return false;
     return true;
   }
@@ -297,9 +283,8 @@ void swap(RegisterResponse &a, RegisterResponse &b);
 std::ostream& operator<<(std::ostream& out, const RegisterResponse& obj);
 
 typedef struct _UnRegisterRequest__isset {
-  _UnRegisterRequest__isset() : node_name(false), message_time(false) {}
+  _UnRegisterRequest__isset() : node_name(false) {}
   bool node_name :1;
-  bool message_time :1;
 } _UnRegisterRequest__isset;
 
 class UnRegisterRequest : public virtual ::apache::thrift::TBase {
@@ -308,25 +293,19 @@ class UnRegisterRequest : public virtual ::apache::thrift::TBase {
   UnRegisterRequest(const UnRegisterRequest&);
   UnRegisterRequest& operator=(const UnRegisterRequest&);
   UnRegisterRequest() noexcept
-                    : node_name(),
-                      message_time(0) {
+                    : node_name() {
   }
 
   virtual ~UnRegisterRequest() noexcept;
   std::string node_name;
-  int64_t message_time;
 
   _UnRegisterRequest__isset __isset;
 
   void __set_node_name(const std::string& val);
 
-  void __set_message_time(const int64_t val);
-
   bool operator == (const UnRegisterRequest & rhs) const
   {
     if (!(node_name == rhs.node_name))
-      return false;
-    if (!(message_time == rhs.message_time))
       return false;
     return true;
   }
@@ -397,10 +376,9 @@ void swap(UnRegisterResponse &a, UnRegisterResponse &b);
 std::ostream& operator<<(std::ostream& out, const UnRegisterResponse& obj);
 
 typedef struct _HeartBeatRequest__isset {
-  _HeartBeatRequest__isset() : node_name(false), txn_timestamp(false), message_time(false) {}
+  _HeartBeatRequest__isset() : node_name(false), txn_timestamp(false) {}
   bool node_name :1;
   bool txn_timestamp :1;
-  bool message_time :1;
 } _HeartBeatRequest__isset;
 
 class HeartBeatRequest : public virtual ::apache::thrift::TBase {
@@ -410,14 +388,12 @@ class HeartBeatRequest : public virtual ::apache::thrift::TBase {
   HeartBeatRequest& operator=(const HeartBeatRequest&);
   HeartBeatRequest() noexcept
                    : node_name(),
-                     txn_timestamp(0),
-                     message_time(0) {
+                     txn_timestamp(0) {
   }
 
   virtual ~HeartBeatRequest() noexcept;
   std::string node_name;
   int64_t txn_timestamp;
-  int64_t message_time;
 
   _HeartBeatRequest__isset __isset;
 
@@ -425,15 +401,11 @@ class HeartBeatRequest : public virtual ::apache::thrift::TBase {
 
   void __set_txn_timestamp(const int64_t val);
 
-  void __set_message_time(const int64_t val);
-
   bool operator == (const HeartBeatRequest & rhs) const
   {
     if (!(node_name == rhs.node_name))
       return false;
     if (!(txn_timestamp == rhs.txn_timestamp))
-      return false;
-    if (!(message_time == rhs.message_time))
       return false;
     return true;
   }
@@ -677,9 +649,8 @@ void swap(ChangeRoleRequest &a, ChangeRoleRequest &b);
 std::ostream& operator<<(std::ostream& out, const ChangeRoleRequest& obj);
 
 typedef struct _ChangeRoleResponse__isset {
-  _ChangeRoleResponse__isset() : node_name(false), message_time(false) {}
+  _ChangeRoleResponse__isset() : node_name(false) {}
   bool node_name :1;
-  bool message_time :1;
 } _ChangeRoleResponse__isset;
 
 class ChangeRoleResponse : public virtual ::apache::thrift::TBase {
@@ -688,25 +659,19 @@ class ChangeRoleResponse : public virtual ::apache::thrift::TBase {
   ChangeRoleResponse(const ChangeRoleResponse&);
   ChangeRoleResponse& operator=(const ChangeRoleResponse&);
   ChangeRoleResponse() noexcept
-                     : node_name(),
-                       message_time(0) {
+                     : node_name() {
   }
 
   virtual ~ChangeRoleResponse() noexcept;
   std::string node_name;
-  int64_t message_time;
 
   _ChangeRoleResponse__isset __isset;
 
   void __set_node_name(const std::string& val);
 
-  void __set_message_time(const int64_t val);
-
   bool operator == (const ChangeRoleResponse & rhs) const
   {
     if (!(node_name == rhs.node_name))
-      return false;
-    if (!(message_time == rhs.message_time))
       return false;
     return true;
   }
@@ -802,9 +767,8 @@ void swap(NewLeaderRequest &a, NewLeaderRequest &b);
 std::ostream& operator<<(std::ostream& out, const NewLeaderRequest& obj);
 
 typedef struct _NewLeaderResponse__isset {
-  _NewLeaderResponse__isset() : node_name(false), message_time(false) {}
+  _NewLeaderResponse__isset() : node_name(false) {}
   bool node_name :1;
-  bool message_time :1;
 } _NewLeaderResponse__isset;
 
 class NewLeaderResponse : public virtual ::apache::thrift::TBase {
@@ -813,25 +777,19 @@ class NewLeaderResponse : public virtual ::apache::thrift::TBase {
   NewLeaderResponse(const NewLeaderResponse&);
   NewLeaderResponse& operator=(const NewLeaderResponse&);
   NewLeaderResponse() noexcept
-                    : node_name(),
-                      message_time(0) {
+                    : node_name() {
   }
 
   virtual ~NewLeaderResponse() noexcept;
   std::string node_name;
-  int64_t message_time;
 
   _NewLeaderResponse__isset __isset;
 
   void __set_node_name(const std::string& val);
 
-  void __set_message_time(const int64_t val);
-
   bool operator == (const NewLeaderResponse & rhs) const
   {
     if (!(node_name == rhs.node_name))
-      return false;
-    if (!(message_time == rhs.message_time))
       return false;
     return true;
   }

@@ -242,10 +242,6 @@ void RegisterRequest::__set_node_port(const int64_t val) {
 void RegisterRequest::__set_txn_timestamp(const int64_t val) {
   this->txn_timestamp = val;
 }
-
-void RegisterRequest::__set_message_time(const int64_t val) {
-  this->message_time = val;
-}
 std::ostream& operator<<(std::ostream& out, const RegisterRequest& obj)
 {
   obj.printTo(out);
@@ -316,14 +312,6 @@ uint32_t RegisterRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 6:
-        if (ftype == ::apache::thrift::protocol::T_I64) {
-          xfer += iprot->readI64(this->message_time);
-          this->__isset.message_time = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -361,10 +349,6 @@ uint32_t RegisterRequest::write(::apache::thrift::protocol::TProtocol* oprot) co
   xfer += oprot->writeI64(this->txn_timestamp);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("message_time", ::apache::thrift::protocol::T_I64, 6);
-  xfer += oprot->writeI64(this->message_time);
-  xfer += oprot->writeFieldEnd();
-
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -377,7 +361,6 @@ void swap(RegisterRequest &a, RegisterRequest &b) {
   swap(a.node_ip, b.node_ip);
   swap(a.node_port, b.node_port);
   swap(a.txn_timestamp, b.txn_timestamp);
-  swap(a.message_time, b.message_time);
   swap(a.__isset, b.__isset);
 }
 
@@ -387,7 +370,6 @@ RegisterRequest::RegisterRequest(const RegisterRequest& other4) {
   node_ip = other4.node_ip;
   node_port = other4.node_port;
   txn_timestamp = other4.txn_timestamp;
-  message_time = other4.message_time;
   __isset = other4.__isset;
 }
 RegisterRequest& RegisterRequest::operator=(const RegisterRequest& other5) {
@@ -396,7 +378,6 @@ RegisterRequest& RegisterRequest::operator=(const RegisterRequest& other5) {
   node_ip = other5.node_ip;
   node_port = other5.node_port;
   txn_timestamp = other5.txn_timestamp;
-  message_time = other5.message_time;
   __isset = other5.__isset;
   return *this;
 }
@@ -408,7 +389,6 @@ void RegisterRequest::printTo(std::ostream& out) const {
   out << ", " << "node_ip=" << to_string(node_ip);
   out << ", " << "node_port=" << to_string(node_port);
   out << ", " << "txn_timestamp=" << to_string(txn_timestamp);
-  out << ", " << "message_time=" << to_string(message_time);
   out << ")";
 }
 
@@ -435,10 +415,6 @@ void RegisterResponse::__set_leader_term(const int64_t val) {
 
 void RegisterResponse::__set_heart_beat_interval(const int64_t val) {
   this->heart_beat_interval = val;
-}
-
-void RegisterResponse::__set_message_time(const int64_t val) {
-  this->message_time = val;
 }
 std::ostream& operator<<(std::ostream& out, const RegisterResponse& obj)
 {
@@ -508,14 +484,6 @@ uint32_t RegisterResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 6:
-        if (ftype == ::apache::thrift::protocol::T_I64) {
-          xfer += iprot->readI64(this->message_time);
-          this->__isset.message_time = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -553,10 +521,6 @@ uint32_t RegisterResponse::write(::apache::thrift::protocol::TProtocol* oprot) c
   xfer += oprot->writeI64(this->heart_beat_interval);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("message_time", ::apache::thrift::protocol::T_I64, 6);
-  xfer += oprot->writeI64(this->message_time);
-  xfer += oprot->writeFieldEnd();
-
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -569,7 +533,6 @@ void swap(RegisterResponse &a, RegisterResponse &b) {
   swap(a.leader_name, b.leader_name);
   swap(a.leader_term, b.leader_term);
   swap(a.heart_beat_interval, b.heart_beat_interval);
-  swap(a.message_time, b.message_time);
   swap(a.__isset, b.__isset);
 }
 
@@ -579,7 +542,6 @@ RegisterResponse::RegisterResponse(const RegisterResponse& other6) {
   leader_name = other6.leader_name;
   leader_term = other6.leader_term;
   heart_beat_interval = other6.heart_beat_interval;
-  message_time = other6.message_time;
   __isset = other6.__isset;
 }
 RegisterResponse& RegisterResponse::operator=(const RegisterResponse& other7) {
@@ -588,7 +550,6 @@ RegisterResponse& RegisterResponse::operator=(const RegisterResponse& other7) {
   leader_name = other7.leader_name;
   leader_term = other7.leader_term;
   heart_beat_interval = other7.heart_beat_interval;
-  message_time = other7.message_time;
   __isset = other7.__isset;
   return *this;
 }
@@ -600,7 +561,6 @@ void RegisterResponse::printTo(std::ostream& out) const {
   out << ", " << "leader_name=" << to_string(leader_name);
   out << ", " << "leader_term=" << to_string(leader_term);
   out << ", " << "heart_beat_interval=" << to_string(heart_beat_interval);
-  out << ", " << "message_time=" << to_string(message_time);
   out << ")";
 }
 
@@ -611,10 +571,6 @@ UnRegisterRequest::~UnRegisterRequest() noexcept {
 
 void UnRegisterRequest::__set_node_name(const std::string& val) {
   this->node_name = val;
-}
-
-void UnRegisterRequest::__set_message_time(const int64_t val) {
-  this->message_time = val;
 }
 std::ostream& operator<<(std::ostream& out, const UnRegisterRequest& obj)
 {
@@ -652,14 +608,6 @@ uint32_t UnRegisterRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 2:
-        if (ftype == ::apache::thrift::protocol::T_I64) {
-          xfer += iprot->readI64(this->message_time);
-          this->__isset.message_time = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -681,10 +629,6 @@ uint32_t UnRegisterRequest::write(::apache::thrift::protocol::TProtocol* oprot) 
   xfer += oprot->writeString(this->node_name);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("message_time", ::apache::thrift::protocol::T_I64, 2);
-  xfer += oprot->writeI64(this->message_time);
-  xfer += oprot->writeFieldEnd();
-
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -693,18 +637,15 @@ uint32_t UnRegisterRequest::write(::apache::thrift::protocol::TProtocol* oprot) 
 void swap(UnRegisterRequest &a, UnRegisterRequest &b) {
   using ::std::swap;
   swap(a.node_name, b.node_name);
-  swap(a.message_time, b.message_time);
   swap(a.__isset, b.__isset);
 }
 
 UnRegisterRequest::UnRegisterRequest(const UnRegisterRequest& other8) {
   node_name = other8.node_name;
-  message_time = other8.message_time;
   __isset = other8.__isset;
 }
 UnRegisterRequest& UnRegisterRequest::operator=(const UnRegisterRequest& other9) {
   node_name = other9.node_name;
-  message_time = other9.message_time;
   __isset = other9.__isset;
   return *this;
 }
@@ -712,7 +653,6 @@ void UnRegisterRequest::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "UnRegisterRequest(";
   out << "node_name=" << to_string(node_name);
-  out << ", " << "message_time=" << to_string(message_time);
   out << ")";
 }
 
@@ -840,10 +780,6 @@ void HeartBeatRequest::__set_node_name(const std::string& val) {
 void HeartBeatRequest::__set_txn_timestamp(const int64_t val) {
   this->txn_timestamp = val;
 }
-
-void HeartBeatRequest::__set_message_time(const int64_t val) {
-  this->message_time = val;
-}
 std::ostream& operator<<(std::ostream& out, const HeartBeatRequest& obj)
 {
   obj.printTo(out);
@@ -888,14 +824,6 @@ uint32_t HeartBeatRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 3:
-        if (ftype == ::apache::thrift::protocol::T_I64) {
-          xfer += iprot->readI64(this->message_time);
-          this->__isset.message_time = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -921,10 +849,6 @@ uint32_t HeartBeatRequest::write(::apache::thrift::protocol::TProtocol* oprot) c
   xfer += oprot->writeI64(this->txn_timestamp);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("message_time", ::apache::thrift::protocol::T_I64, 3);
-  xfer += oprot->writeI64(this->message_time);
-  xfer += oprot->writeFieldEnd();
-
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -934,20 +858,17 @@ void swap(HeartBeatRequest &a, HeartBeatRequest &b) {
   using ::std::swap;
   swap(a.node_name, b.node_name);
   swap(a.txn_timestamp, b.txn_timestamp);
-  swap(a.message_time, b.message_time);
   swap(a.__isset, b.__isset);
 }
 
 HeartBeatRequest::HeartBeatRequest(const HeartBeatRequest& other12) {
   node_name = other12.node_name;
   txn_timestamp = other12.txn_timestamp;
-  message_time = other12.message_time;
   __isset = other12.__isset;
 }
 HeartBeatRequest& HeartBeatRequest::operator=(const HeartBeatRequest& other13) {
   node_name = other13.node_name;
   txn_timestamp = other13.txn_timestamp;
-  message_time = other13.message_time;
   __isset = other13.__isset;
   return *this;
 }
@@ -956,7 +877,6 @@ void HeartBeatRequest::printTo(std::ostream& out) const {
   out << "HeartBeatRequest(";
   out << "node_name=" << to_string(node_name);
   out << ", " << "txn_timestamp=" << to_string(txn_timestamp);
-  out << ", " << "message_time=" << to_string(message_time);
   out << ")";
 }
 
@@ -1518,10 +1438,6 @@ ChangeRoleResponse::~ChangeRoleResponse() noexcept {
 void ChangeRoleResponse::__set_node_name(const std::string& val) {
   this->node_name = val;
 }
-
-void ChangeRoleResponse::__set_message_time(const int64_t val) {
-  this->message_time = val;
-}
 std::ostream& operator<<(std::ostream& out, const ChangeRoleResponse& obj)
 {
   obj.printTo(out);
@@ -1558,14 +1474,6 @@ uint32_t ChangeRoleResponse::read(::apache::thrift::protocol::TProtocol* iprot) 
           xfer += iprot->skip(ftype);
         }
         break;
-      case 2:
-        if (ftype == ::apache::thrift::protocol::T_I64) {
-          xfer += iprot->readI64(this->message_time);
-          this->__isset.message_time = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -1587,10 +1495,6 @@ uint32_t ChangeRoleResponse::write(::apache::thrift::protocol::TProtocol* oprot)
   xfer += oprot->writeString(this->node_name);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("message_time", ::apache::thrift::protocol::T_I64, 2);
-  xfer += oprot->writeI64(this->message_time);
-  xfer += oprot->writeFieldEnd();
-
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -1599,18 +1503,15 @@ uint32_t ChangeRoleResponse::write(::apache::thrift::protocol::TProtocol* oprot)
 void swap(ChangeRoleResponse &a, ChangeRoleResponse &b) {
   using ::std::swap;
   swap(a.node_name, b.node_name);
-  swap(a.message_time, b.message_time);
   swap(a.__isset, b.__isset);
 }
 
 ChangeRoleResponse::ChangeRoleResponse(const ChangeRoleResponse& other35) {
   node_name = other35.node_name;
-  message_time = other35.message_time;
   __isset = other35.__isset;
 }
 ChangeRoleResponse& ChangeRoleResponse::operator=(const ChangeRoleResponse& other36) {
   node_name = other36.node_name;
-  message_time = other36.message_time;
   __isset = other36.__isset;
   return *this;
 }
@@ -1618,7 +1519,6 @@ void ChangeRoleResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "ChangeRoleResponse(";
   out << "node_name=" << to_string(node_name);
-  out << ", " << "message_time=" << to_string(message_time);
   out << ")";
 }
 
@@ -1804,10 +1704,6 @@ NewLeaderResponse::~NewLeaderResponse() noexcept {
 void NewLeaderResponse::__set_node_name(const std::string& val) {
   this->node_name = val;
 }
-
-void NewLeaderResponse::__set_message_time(const int64_t val) {
-  this->message_time = val;
-}
 std::ostream& operator<<(std::ostream& out, const NewLeaderResponse& obj)
 {
   obj.printTo(out);
@@ -1844,14 +1740,6 @@ uint32_t NewLeaderResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 2:
-        if (ftype == ::apache::thrift::protocol::T_I64) {
-          xfer += iprot->readI64(this->message_time);
-          this->__isset.message_time = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -1873,10 +1761,6 @@ uint32_t NewLeaderResponse::write(::apache::thrift::protocol::TProtocol* oprot) 
   xfer += oprot->writeString(this->node_name);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("message_time", ::apache::thrift::protocol::T_I64, 2);
-  xfer += oprot->writeI64(this->message_time);
-  xfer += oprot->writeFieldEnd();
-
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -1885,18 +1769,15 @@ uint32_t NewLeaderResponse::write(::apache::thrift::protocol::TProtocol* oprot) 
 void swap(NewLeaderResponse &a, NewLeaderResponse &b) {
   using ::std::swap;
   swap(a.node_name, b.node_name);
-  swap(a.message_time, b.message_time);
   swap(a.__isset, b.__isset);
 }
 
 NewLeaderResponse::NewLeaderResponse(const NewLeaderResponse& other40) {
   node_name = other40.node_name;
-  message_time = other40.message_time;
   __isset = other40.__isset;
 }
 NewLeaderResponse& NewLeaderResponse::operator=(const NewLeaderResponse& other41) {
   node_name = other41.node_name;
-  message_time = other41.message_time;
   __isset = other41.__isset;
   return *this;
 }
@@ -1904,7 +1785,6 @@ void NewLeaderResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "NewLeaderResponse(";
   out << "node_name=" << to_string(node_name);
-  out << ", " << "message_time=" << to_string(message_time);
   out << ")";
 }
 

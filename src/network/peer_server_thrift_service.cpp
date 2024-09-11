@@ -50,15 +50,17 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         }
         non_leader_node_info->ip_address_ = request.node_ip;
         non_leader_node_info->port_ = request.node_port;
-        non_leader_node_info->node_status_ = NodeStatus::kReady;
+        non_leader_node_info->node_status_ = NodeStatus::kAlive;
         non_leader_node_info->txn_timestamp_ = request.txn_timestamp;
-        non_leader_node_info->last_update_ts_ = request.message_time;
+
+        auto now = std::chrono::system_clock::now();
+        auto time_since_epoch = now.time_since_epoch();
+        non_leader_node_info->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
         InfinityContext::instance().cluster_manager()->AddNodeInfo(non_leader_node_info);
 
         response.leader_name = leader_node->node_name_;
         response.leader_term = leader_node->leader_term_;
         response.heart_beat_interval = leader_node->heartbeat_interval_;
-        response.message_time = leader_node->last_update_ts_;
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidServerRole);
         response.error_msg = fmt::format("Attempt to register a non-leader node: {}", ToString(leader_node->node_role_));
