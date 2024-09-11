@@ -72,6 +72,7 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool m_flag, De
     task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 
     i64 cpu_limit = config_->CPULimit();
+    cpu_limit = std::max(cpu_limit / 2, i64(1));
     inverting_thread_pool_.resize(cpu_limit);
     commiting_thread_pool_.resize(cpu_limit);
     hnsw_build_thread_pool_.resize(cpu_limit);
