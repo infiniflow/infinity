@@ -167,6 +167,7 @@ public:
     SizeT row_count_{0};
     SegmentID unsealed_id_{};
     SegmentID next_segment_id_{0};
+    ColumnID next_column_id_{};
 };
 
 /// class AddSegmentEntryOp

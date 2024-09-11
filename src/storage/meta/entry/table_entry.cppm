@@ -76,7 +76,8 @@ public:
                         TransactionID txn_id,
                         TxnTimeStamp begin_ts,
                         SegmentID unsealed_id,
-                        SegmentID next_segment_id);
+                        SegmentID next_segment_id,
+                        ColumnID next_column_id);
 
 private:
     TableEntry(const TableEntry &other);
@@ -104,7 +105,8 @@ public:
                                                   TxnTimeStamp commit_ts,
                                                   SizeT row_count,
                                                   SegmentID unsealed_id,
-                                                  SegmentID next_segment_id) noexcept;
+                                                  SegmentID next_segment_id,
+                                                  ColumnID next_column_id) noexcept;
 
 public:
     Tuple<TableIndexEntry *, Status>
@@ -183,6 +185,8 @@ public:
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
 
     SegmentID next_segment_id() const { return next_segment_id_; }
+
+    ColumnID next_column_id() const { return next_column_id_; }
 
     static SharedPtr<String> DetermineTableDir(const String &parent_dir, const String &table_name);
 
@@ -282,6 +286,7 @@ private:
     SharedPtr<String> table_name_{};
 
     Vector<SharedPtr<ColumnDef>> columns_{};
+    ColumnID next_column_id_{};
 
     const TableEntryType table_entry_type_{TableEntryType::kTableEntry};
 

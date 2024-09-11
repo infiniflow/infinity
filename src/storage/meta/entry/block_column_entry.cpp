@@ -260,6 +260,16 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
     }
 }
 
+void BlockColumnEntry::DropColumn() {
+    if (buffer_.get() != nullptr) {
+        buffer_.reset();
+    }
+    for (auto &outline_buffer : outline_buffers_) {
+        outline_buffer.reset();
+    }
+    deleted_ = true;
+}
+
 void BlockColumnEntry::Cleanup() {
     if (buffer_.get() != nullptr) {
         buffer_.get()->PickForCleanup();
@@ -302,8 +312,7 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
 
 void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts) {
     if (this->Committed()) {
-        String error_message = "Column already committed";
-        UnrecoverableError(error_message);
+        return;
     }
     this->txn_id_ = txn_id;
     this->Commit(commit_ts);

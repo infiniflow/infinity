@@ -121,6 +121,8 @@ public:
 
     void Cleanup();
 
+    void DropColumn();
+
     void FillWithDefaultValue(SizeT row_count, const Value *default_value, BufferManager *buffer_mgr);
 
 private:

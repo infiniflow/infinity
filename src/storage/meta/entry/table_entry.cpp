@@ -17,6 +17,7 @@ module;
 #include <cassert>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 module table_entry;
 
@@ -93,10 +94,12 @@ TableEntry::TableEntry(bool is_delete,
                        TransactionID txn_id,
                        TxnTimeStamp begin_ts,
                        SegmentID unsealed_id,
-                       SegmentID next_segment_id)
+                       SegmentID next_segment_id,
+                       ColumnID next_column_id)
     : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
-      table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type),
-      unsealed_id_(unsealed_id), next_segment_id_(next_segment_id), fulltext_column_index_cache_(MakeShared<TableIndexReaderCache>(this)) {
+      table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns), next_column_id_(next_column_id),
+      table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id),
+      fulltext_column_index_cache_(MakeShared<TableIndexReaderCache>(this)) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
@@ -114,7 +117,8 @@ TableEntry::TableEntry(bool is_delete,
 
 TableEntry::TableEntry(const TableEntry &other)
     : BaseEntry(other), table_meta_(other.table_meta_), column_name2column_id_(other.column_name2column_id_),
-      table_entry_dir_(other.table_entry_dir_), table_name_(other.table_name_), columns_(other.columns_), table_entry_type_(other.table_entry_type_) {
+      table_entry_dir_(other.table_entry_dir_), table_name_(other.table_name_), columns_(other.columns_), next_column_id_(other.next_column_id_),
+      table_entry_type_(other.table_entry_type_) {
     row_count_ = other.row_count_.load();
     unsealed_id_ = other.unsealed_id_;
     next_segment_id_ = other.next_segment_id_.load();
@@ -150,6 +154,7 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
     } else {
         table_entry_dir = TableEntry::DetermineTableDir(*db_entry_dir, *table_name);
     }
+    ColumnID next_column_id = columns.size();
     return MakeShared<TableEntry>(is_delete,
                                   std::move(table_entry_dir),
                                   std::move(table_name),
@@ -159,7 +164,8 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                   txn_id,
                                   begin_ts,
                                   INVALID_SEGMENT_ID,
-                                  0 /*next_segment_id*/);
+                                  0 /*next_segment_id*/,
+                                  next_column_id);
 }
 
 SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
@@ -173,7 +179,8 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
                                                    TxnTimeStamp commit_ts,
                                                    SizeT row_count,
                                                    SegmentID unsealed_id,
-                                                   SegmentID next_segment_id) noexcept {
+                                                   SegmentID next_segment_id,
+                                                   ColumnID next_column_id) noexcept {
     auto table_entry = MakeShared<TableEntry>(is_delete,
                                               std::move(table_entry_dir),
                                               std::move(table_name),
@@ -183,7 +190,8 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
                                               txn_id,
                                               begin_ts,
                                               unsealed_id,
-                                              next_segment_id);
+                                              next_segment_id,
+                                              next_column_id);
     // TODO need to check if commit_ts influence replay catalog delta entry
     table_entry->commit_ts_.store(commit_ts);
     table_entry->row_count_.store(row_count);
@@ -1089,6 +1097,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
         }
         u32 next_segment_id = this->next_segment_id_;
         json_res["next_segment_id"] = next_segment_id;
+        json_res["next_column_id"] = next_column_id_;
 
         segment_candidates.reserve(this->segment_map_.size());
         for (const auto &[segment_id, segment_entry] : this->segment_map_) {
@@ -1162,9 +1171,19 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
     SegmentID unsealed_id = table_entry_json["unsealed_id"];
     SegmentID next_segment_id = table_entry_json["next_segment_id"];
+    ColumnID next_column_id = table_entry_json["next_column_id"];
 
-    UniquePtr<TableEntry> table_entry = MakeUnique<
-        TableEntry>(deleted, table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts, unsealed_id, next_segment_id);
+    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted,
+                                                               table_entry_dir,
+                                                               table_name,
+                                                               columns,
+                                                               table_entry_type,
+                                                               table_meta,
+                                                               txn_id,
+                                                               begin_ts,
+                                                               unsealed_id,
+                                                               next_segment_id,
+                                                               next_column_id);
     table_entry->row_count_ = row_count;
 
     if (table_entry_json.contains("segments")) {
@@ -1371,10 +1390,9 @@ void TableEntry::SetUnlock() {
 
 void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values, TxnTableStore *txn_table_store) {
     Vector<Pair<ColumnID, const Value *>> columns_info;
-    ColumnID next_column_id = columns_.size();
     for (SizeT idx = 0; idx < column_defs.size(); ++idx) {
         const auto &column_def = column_defs[idx];
-        column_def->id_ = next_column_id++;
+        column_def->id_ = next_column_id_++;
         columns_.push_back(column_def);
         column_name2column_id_[column_def->name()] = column_def->id();
         columns_info.emplace_back(column_defs[idx]->id(), &default_values[idx]);
@@ -1386,15 +1404,12 @@ void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs, con
 
 void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *txn_table_store) {
     Vector<ColumnID> column_ids;
-    // for (const String &column_name : column_names) {
-    //     ColumnID column_id = GetColumnIdByName(column_name);
-    //     column_ids.push_back(column_id);
-    //     column_name2column_id_.erase(column_name);
-    //     columns_.erase(std::remove_if(columns_.begin(),
-    //                                   columns_.end(),
-    //                                   [&](const SharedPtr<ColumnDef> &column_def) { return static_cast<ColumnID>(column_def->id()) == column_id; }),
-    //                    columns_.end());
-    // }
+    for (const String &column_name : column_names) {
+        ColumnID column_id = GetColumnIdByName(column_name);
+        column_ids.push_back(column_id);
+        std::erase_if(columns_, [&](const SharedPtr<ColumnDef> &column_def) { return static_cast<ColumnID>(column_def->id()) == column_id; });
+        column_name2column_id_.erase(column_name);
+    }
     for (auto &[segment_id, segment_entry] : segment_map_) {
         segment_entry->DropColumns(column_ids, txn_table_store);
     }

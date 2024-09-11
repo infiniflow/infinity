@@ -853,6 +853,7 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
     db_entry->CreateTableReplay(
         table_name,
         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            ColumnID next_column_id = cmd.table_def_->columns().size();
             return TableEntry::ReplayTableEntry(false,
                                                 table_meta,
                                                 table_dir,
@@ -864,7 +865,8 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
                                                 commit_ts,
                                                 0 /*row_count*/,
                                                 INVALID_SEGMENT_ID /*unsealed_id*/,
-                                                0 /*next_segment_id*/);
+                                                0 /*next_segment_id*/,
+                                                next_column_id);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -897,7 +899,8 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID
                                                 commit_ts,
                                                 0 /*row_count*/,
                                                 INVALID_SEGMENT_ID /*unsealed_id*/,
-                                                0 /*next_segment_id*/);
+                                                0 /*next_segment_id*/,
+                                                0 /*next_column_id*/);
         },
         txn_id,
         0 /*begin_ts*/);

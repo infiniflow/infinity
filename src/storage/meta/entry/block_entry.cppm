@@ -215,5 +215,6 @@ protected:
 
     // Column data
     Vector<UniquePtr<BlockColumnEntry>> columns_{};
+    Vector<UniquePtr<BlockColumnEntry>> dropped_columns_{};
 };
 } // namespace infinity

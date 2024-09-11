@@ -405,16 +405,14 @@ void BlockEntry::AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns
 }
 
 void BlockEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store) {
-    // for (ColumnID column_id : column_ids) {
-    //     auto iter = std::find_if(columns_.begin(), columns_.end(), [&](const auto &column) { return column->column_id() == column_id; });
-    //     if (iter != columns_.end()) {
-    //         columns_.erase(iter);
-    //     }
-    //     BlockColumnEntry *column_entry = iter->get();
-    //     column_entry->deleted_ = true;
-    //     column_entry->commit_ts_ = UNCOMMIT_TS;
-    //     table_store->AddBlockColumnStore(const_cast<SegmentEntry *>(segment_entry_), this, column_entry);
-    // }
+    for (ColumnID dropped_id : column_ids) {
+        auto iter = std::find_if(columns_.begin(), columns_.end(), [&](const auto &column) { return column->column_id() == dropped_id; });
+        UniquePtr<BlockColumnEntry> dropped_column = std::move(*iter);
+        columns_.erase(iter);
+        dropped_column->DropColumn();
+        table_store->AddBlockColumnStore(const_cast<SegmentEntry *>(segment_entry_), this, dropped_column.get());
+        dropped_columns_.emplace_back(std::move(dropped_column));
+    }
 }
 
 void BlockEntry::FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count) {
@@ -477,6 +475,7 @@ void BlockEntry::FlushForImport() { FlushDataNoLock(0, this->block_row_count_); 
 void BlockEntry::LoadFilterBinaryData(const String &block_filter_data) { fast_rough_filter_->DeserializeFromString(block_filter_data); }
 
 void BlockEntry::Cleanup() {
+    dropped_columns_.clear();
     for (auto &block_column_entry : columns_) {
         block_column_entry->Cleanup();
     }
