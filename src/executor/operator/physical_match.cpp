@@ -63,7 +63,7 @@ import column_index_reader;
 import filter_value_type_classification;
 import common_analyzer;
 import analyzer_pool;
-import bitmask;
+import roaring_bitmap;
 import segment_entry;
 import knn_filter;
 
@@ -127,7 +127,7 @@ struct FilterQueryNode final : public QueryNode {
     // filter info
     CommonQueryFilter *common_query_filter_;
     const SizeT filter_result_count_ = common_query_filter_->filter_result_count_;
-    const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr_ = &common_query_filter_->filter_result_;
+    const Map<SegmentID, Bitmask> *filter_result_ptr_ = &common_query_filter_->filter_result_;
     const BaseExpression *secondary_index_filter_ = common_query_filter_->secondary_index_filter_qualified_.get();
 
     explicit FilterQueryNode(CommonQueryFilter *common_query_filter, UniquePtr<QueryNode> &&query_tree)

@@ -24,7 +24,7 @@ import internal_types;
 import infinity_exception;
 import data_type;
 import data_block;
-import bitmask;
+import roaring_bitmap;
 import unary_operator;
 import binary_operator;
 import ternary_operator;

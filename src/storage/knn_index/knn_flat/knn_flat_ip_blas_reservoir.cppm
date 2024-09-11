@@ -20,7 +20,7 @@ import stl;
 import knn_result_handler;
 import knn_distance;
 import mlas_matrix_multiply;
-import bitmask;
+import roaring_bitmap;
 import logger;
 
 import infinity_exception;

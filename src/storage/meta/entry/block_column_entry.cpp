@@ -59,6 +59,20 @@ BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID colum
     : BaseEntry(EntryType::kBlockColumn, false, BlockColumnEntry::EncodeIndex(column_id, block_entry)), block_entry_(block_entry),
       column_id_(column_id) {}
 
+BlockColumnEntry::BlockColumnEntry(const BlockColumnEntry &other)
+    : BaseEntry(other), block_entry_(other.block_entry_), column_id_(other.column_id_), column_type_(other.column_type_), buffer_(other.buffer_),
+      file_name_(other.file_name_) {
+    std::shared_lock lock(other.mutex_);
+    outline_buffers_ = other.outline_buffers_;
+    last_chunk_offset_ = other.last_chunk_offset_;
+}
+
+UniquePtr<BlockColumnEntry> BlockColumnEntry::Clone(BlockEntry *block_entry) const {
+    auto ret = UniquePtr<BlockColumnEntry>(new BlockColumnEntry(*this));
+    ret->block_entry_ = block_entry;
+    return ret;
+}
+
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id);
 
@@ -138,7 +152,7 @@ ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr) {
 }
 
 ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe) {
-    if (this->buffer_ == nullptr) {
+    if (this->buffer_.get() == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
@@ -163,7 +177,7 @@ Vector<String> BlockColumnEntry::FilePaths() const {
 }
 
 void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input_column_vector_offset, SizeT append_rows, BufferManager *buffer_mgr) {
-    if (buffer_ == nullptr) {
+    if (buffer_.get() == nullptr) {
         String error_message = "Not initialize buffer handle";
         UnrecoverableError(error_message);
     }
@@ -201,9 +215,8 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
         case LogicalType::kEmbedding:
         case LogicalType::kRowID: {
             //            SizeT buffer_size = row_count * column_type->Size();
-            i64 address = (i64)(block_column_entry->buffer_);
-            LOG_TRACE(fmt::format("Saving {} {}", block_column_entry->column_id(), address));
-            block_column_entry->buffer_->Save();
+            LOG_TRACE(fmt::format("Saving {}", block_column_entry->column_id()));
+            block_column_entry->buffer_.get()->Save();
             LOG_TRACE(fmt::format("Saved {}", block_column_entry->column_id()));
 
             break;
@@ -215,13 +228,13 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
         case LogicalType::kVarchar: {
             //            SizeT buffer_size = row_count * column_type->Size();
             LOG_TRACE(fmt::format("Saving column {}", block_column_entry->column_id()));
-            block_column_entry->buffer_->Save();
+            block_column_entry->buffer_.get()->Save();
             LOG_TRACE(fmt::format("Saved column {}", block_column_entry->column_id()));
 
             std::shared_lock lock(block_column_entry->mutex_);
-            for (auto *outline_buffer : block_column_entry->outline_buffers_) {
-                if (outline_buffer != nullptr) {
-                    outline_buffer->Save();
+            for (auto &outline_buffer : block_column_entry->outline_buffers_) {
+                if (outline_buffer.get() != nullptr) {
+                    outline_buffer.get()->Save();
                 }
             }
             break;
@@ -248,12 +261,12 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
 }
 
 void BlockColumnEntry::Cleanup() {
-    if (buffer_ != nullptr) {
-        buffer_->PickForCleanup();
+    if (buffer_.get() != nullptr) {
+        buffer_.get()->PickForCleanup();
     }
-    for (auto *outline_buffer : outline_buffers_) {
-        if (outline_buffer) {
-            outline_buffer->PickForCleanup();
+    for (auto &outline_buffer : outline_buffers_) {
+        if (outline_buffer.get() != nullptr) {
+            outline_buffer.get()->PickForCleanup();
         }
     }
 }
@@ -294,6 +307,14 @@ void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts
     }
     this->txn_id_ = txn_id;
     this->Commit(commit_ts);
+}
+
+void BlockColumnEntry::FillWithDefaultValue(SizeT row_count, const Value *default_value, BufferManager *buffer_mgr) {
+    ColumnVector column_vector = this->GetColumnVector(buffer_mgr);
+
+    for (SizeT i = 0; i < row_count; ++i) {
+        column_vector.SetValue(i, *default_value);
+    }
 }
 
 } // namespace infinity

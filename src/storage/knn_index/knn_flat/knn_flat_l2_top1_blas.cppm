@@ -25,7 +25,7 @@ import infinity_exception;
 import default_values;
 import vector_distance;
 import mlas_matrix_multiply;
-import bitmask;
+import roaring_bitmap;
 import knn_expr;
 import internal_types;
 

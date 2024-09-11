@@ -210,6 +210,16 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
             UnrecoverableError(error_message);
             break;
         }
+        case PhysicalOperatorType::kAlter: {
+            auto *output_state = static_cast<AlterOperatorState *>(task_operator_state);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
+            } else {
+                result_sink_state->result_def_ = {
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+            }
+            break;
+        }
         case PhysicalOperatorType::kCreateTable: {
             auto *output_state = static_cast<CreateTableOperatorState *>(task_operator_state);
             if (!output_state->Ok()) {

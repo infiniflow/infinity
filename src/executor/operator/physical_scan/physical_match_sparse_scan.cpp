@@ -51,7 +51,7 @@ import merge_knn;
 import match_sparse_scan_function_data;
 import fix_heap;
 import global_block_id;
-import bitmask;
+import roaring_bitmap;
 import txn;
 import bmp_index_file_worker;
 import segment_index_entry;
@@ -435,7 +435,6 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         bool use_bitmask = false;
         if (common_query_filter_->AlwaysTrue()) {
             has_some_result = true;
-            bitmask.SetAllTrue();
         } else {
             auto it = common_query_filter_->filter_result_.find(segment_id);
             if (it != common_query_filter_->filter_result_.end()) {
@@ -447,16 +446,9 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                     }
                     segment_row_count = segment_it->second.segment_offset_;
                 }
-                const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
-                if (std::holds_alternative<Vector<u32>>(filter_result)) {
-                    const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                    bitmask.Initialize(std::bit_ceil(segment_row_count));
-                    bitmask.SetAllFalse();
-                    for (u32 row_id : filter_result_vector) {
-                        bitmask.SetTrue(row_id);
-                    }
-                } else {
-                    bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+                bitmask = it->second;
+                if (bitmask.count() != segment_row_count) {
+                    UnrecoverableError(fmt::format("Invalid segment row count: {} vs {}", bitmask.count(), segment_row_count));
                 }
                 has_some_result = true;
                 use_bitmask = !bitmask.IsAllTrue();

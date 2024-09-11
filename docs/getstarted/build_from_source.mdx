@@ -150,7 +150,20 @@ sudo add-apt-repository -P ppa:mhier/libboost-latest
 ```
 
 ```shell
-sudo apt update && sudo apt install libc++-18-dev clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+sudo apt update && sudo apt install libc++-18-dev clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf
+```
+
+```shell
+# Install jemalloc from source
+wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
+```
+
+```shell
+tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
+```
+
+```shell
+sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
 ```
 
 ```shell
@@ -197,7 +210,20 @@ wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm
 ```
 
 ```shell
-sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf
+```
+
+```shell
+# Install jemalloc from source
+wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
+```
+
+```shell
+tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
+```
+
+```shell
+sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
 ```
 
 ```shell
@@ -244,7 +270,20 @@ wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm
 ```
 
 ```shell
-sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.83-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.83-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf
+```
+
+```shell
+# Install jemalloc from source
+wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
+```
+
+```shell
+tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
+```
+
+```shell
+sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
 ```
 
 ```shell

@@ -28,6 +28,7 @@ static thread_local std::stringstream string_buffer;
 
 [ \t\n]+        /* ignore \t\n and space */;
 
+ADD             { return ADD; }
 ADMIN           { return ADMIN; }
 ALL             { return ALL; }
 ALLOCATION      { return ALLOCATION; }
@@ -166,6 +167,7 @@ QUERIES         { return QUERIES; }
 QUERY           { return QUERY; }
 RAW             { return RAW; }
 REAL            { return REAL; }
+RENAME          { return RENAME; }
 RIGHT           { return RIGHT; }
 ROWLIMIT        { return ROWLIMIT; }
 SEARCH          { return SEARCH; }

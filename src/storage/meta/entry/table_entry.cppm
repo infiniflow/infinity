@@ -43,6 +43,7 @@ import random;
 import meta_info;
 import block_entry;
 import column_index_reader;
+import value;
 
 namespace infinity {
 
@@ -76,6 +77,12 @@ public:
                         TxnTimeStamp begin_ts,
                         SegmentID unsealed_id,
                         SegmentID next_segment_id);
+
+private:
+    TableEntry(const TableEntry &other);
+
+public:
+    UniquePtr<TableEntry> Clone(TableMeta *meta = nullptr) const;
 
     static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
                                                const SharedPtr<String> &db_entry_dir,
@@ -242,6 +249,8 @@ public:
 public:
     u64 GetColumnIdByName(const String &column_name) const;
 
+    i64 GetColumnID(const String &column_name) const;
+
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
     SegmentEntry *GetSegmentEntry(SegmentID seg_id) const {
@@ -258,11 +267,11 @@ public:
     IndexReader GetFullTextIndexReader(Txn *txn);
 
     void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
-        return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
+        return fulltext_column_index_cache_->UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
 
 private:
-    TableMeta *const table_meta_{};
+    TableMeta *table_meta_{};
 
     MetaMap<TableIndexMeta> index_meta_map_{};
 
@@ -270,9 +279,9 @@ private:
 
     const SharedPtr<String> table_entry_dir_{};
 
-    const SharedPtr<String> table_name_{};
+    SharedPtr<String> table_name_{};
 
-    const Vector<SharedPtr<ColumnDef>> columns_{};
+    Vector<SharedPtr<ColumnDef>> columns_{};
 
     const TableEntryType table_entry_type_{TableEntryType::kTableEntry};
 
@@ -286,7 +295,7 @@ private:
     Atomic<SegmentID> next_segment_id_{};
 
     // for full text search cache
-    TableIndexReaderCache fulltext_column_index_cache_;
+    SharedPtr<TableIndexReaderCache> fulltext_column_index_cache_;
 
 public:
     // set nullptr to close auto compaction
@@ -332,6 +341,11 @@ private:
     bool locked_ = false;
     bool wait_lock_ = false;
     SizeT write_txn_num_ = 0;
+
+public:
+    void AddColumns(const Vector<SharedPtr<ColumnDef>> &columns, const Vector<Value> &default_values, TxnTableStore *txn_store);
+
+    void DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store);
 };
 
 } // namespace infinity

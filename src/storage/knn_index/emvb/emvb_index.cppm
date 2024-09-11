@@ -17,6 +17,7 @@ module;
 export module emvb_index;
 import stl;
 import emvb_shared_vec;
+import roaring_bitmap;
 
 namespace infinity {
 
@@ -27,7 +28,6 @@ struct RowID;
 struct SegmentEntry;
 class ColumnDef;
 class BufferManager;
-struct Bitmask;
 struct BlockIndex;
 
 using EMVBQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;

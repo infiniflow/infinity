@@ -34,6 +34,7 @@ struct TableIndexEntry;
 struct TableEntry;
 struct SegmentEntry;
 struct BlockEntry;
+struct BlockColumnEntry;
 class DataBlock;
 class SegmentIndexEntry;
 class ChunkIndexEntry;
@@ -56,6 +57,7 @@ public:
 public:
     SegmentEntry *const segment_entry_ = nullptr;
     HashMap<BlockID, BlockEntry *> block_entries_;
+    Vector<BlockColumnEntry *> block_column_entries_;
 };
 
 export struct TxnIndexStore {
@@ -112,6 +114,8 @@ public:
     void AddSegmentStore(SegmentEntry *segment_entry);
 
     void AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block_entry);
+
+    void AddBlockColumnStore(SegmentEntry *segment_entry, BlockEntry *block_entry, BlockColumnEntry *block_column_entry);
 
     void AddSealedSegment(SegmentEntry *segment_entry);
 
