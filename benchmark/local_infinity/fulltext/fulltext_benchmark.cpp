@@ -133,7 +133,17 @@ void BenchmarkImport(SharedPtr<Infinity> infinity,
 
     profiler.Begin();
     ImportOptions import_options;
-    import_options.copy_file_type_ = CopyFileType::kJSONL;
+    String extension = Path(import_from).filename().extension().string();
+    if (extension == ".jsonl") {
+        import_options.copy_file_type_ = CopyFileType::kJSONL;
+    } else if (extension == ".json") {
+        import_options.copy_file_type_ = CopyFileType::kJSON;
+    } else if (extension == ".csv") {
+        import_options.copy_file_type_ = CopyFileType::kCSV;
+    } else {
+        LOG_ERROR(fmt::format("Unsupported file extension: {}", extension));
+        return;
+    }
     infinity->Import(db_name, table_name, import_from, std::move(import_options));
     LOG_INFO(fmt::format("Import data cost: {}", profiler.ElapsedToString()));
     profiler.End();
@@ -328,11 +338,10 @@ int main(int argc, char *argv[]) {
     String index_name = "ft_dbpedia_index";
     String srcfile = test_data_path();
     srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
+    // srcfile += "/benchmark/enwiki.33332620.csv";
 
-//#define DEL_LOCAL_DATA
-#ifdef DEL_LOCAL_DATA
-    system("rm -rf /var/infinity/data /var/infinity/wal /var/infinity/log /var/infinity/tmp");
-#endif
+    printf("Cleanup /var/infinity\n");
+    system("rm -rf /var/infinity/data /var/infinity/log /var/infinity/persistence /var/infinity/tmp /var/infinity/wal");
 
     SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
 
