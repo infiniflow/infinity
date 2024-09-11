@@ -102,5 +102,18 @@ SELECT c1 FROM test_knn_l2_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2],
 2
 2
 
+query I
+SELECT c1 FROM test_knn_l2_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 13, WHERE c1 < 7);
+----
+6
+6
+6
+4
+4
+4
+2
+2
+2
+
 statement ok
 DROP TABLE test_knn_l2_filter;
