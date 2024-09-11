@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,10 +7,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
+import { MoreHorizontal } from 'lucide-react';
 // import { SelectProduct } from '@/lib/db';
-import { deleteProduct } from './actions';
+import { deleteProduct } from '../actions';
 
 export function Product({ product }: { product: any }) {
   return (

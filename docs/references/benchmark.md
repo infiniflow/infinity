@@ -168,7 +168,7 @@ Infinity provides a Python script for benchmarking the SIFT1M and GIST1M dataset
 You have two options for building Infinity. Choose the option that best fits your needs:
 
 - [Build Infinity using Docker](https://github.com/infiniflow/infinity/blob/main/README.md)
-- [Build from source](../getstarted/build_from_source.md)
+- [Build from source](../getstarted/build_from_source.mdx)
 
 ### Download the Benchmark datasets
 
