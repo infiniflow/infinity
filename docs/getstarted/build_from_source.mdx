@@ -44,7 +44,7 @@ The `cmake` build type (`CMAKE_BUILD_TYPE`) can be one of the following:
 
 - `Debug`: Suitable for daily development.  
   No inline; with symbol info; with address sanitizer.  
-  Normally ~10x slower than `RelWithDebInfo` or `Release`.  
+  Typically ~10x slower than `RelWithDebInfo` or `Release`.  
 - `RelWithDebInfo`: Suitable for performance analysis.  
   Optimizes with `-O2`; with symbol information.  
 - `Release`: Suitable for [project releases](https://github.com/infiniflow/infinity/releases).
@@ -67,13 +67,13 @@ The following procedures set `CMAKE_BUILD_TYPE` to `Debug`. Change it as you see
 
 This section provides instructions for building Infinity from source on Linux using Docker.
 
-### 1. Download the source code
+1. Download the source code:
 
 ```shell
 git clone https://github.com/infiniflow/infinity.git
 ```
 
-### 2. Build the source code using Docker
+2. Build the source code using Docker:
 
 ```shell
 cd infinity && mkdir cmake-build-debug
@@ -82,7 +82,7 @@ docker run -d --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot i
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build . -t  infinity"
 ```
 
-### 3. Start up the Infinity server
+3. Start up the Infinity server:
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
@@ -95,7 +95,7 @@ ulimit -n 500000
 
 This section provides instructions for building Infinity from source on Ubuntu.
 
-### 1. Install necessary dependencies
+1. Install necessary dependencies:
 
 <Tabs
   defaultValue="ubuntu2204"
@@ -149,13 +149,13 @@ sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /us
   </TabItem>
 </Tabs>
 
-### 2. Download the source code
+2. Download the source code:
 
 ```shell
 git clone https://github.com/infiniflow/infinity.git
 ```
 
-### 3. Build the source code
+3. Build the source code:
 
 :::tip NOTE
 You must *also* install `simde` v0.7.4+ if using Ubuntu 22.04 on an ARM architecture.
@@ -176,7 +176,7 @@ cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
 cmake --build . -t infinity
 ```
 
-### 4. Start up the Infinity server
+4. Start up the Infinity server:
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
