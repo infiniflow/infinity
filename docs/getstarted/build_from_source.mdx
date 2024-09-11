@@ -90,7 +90,7 @@ This section provides instructions for building Infinity from source on Ubuntu.
 ### 1. Install necessary dependencies
 
 <Tabs
-  defaultValue="linux_mac"
+  defaultValue="ubuntu2204"
   values={[
     {label: 'Ubuntu 22.04', value: 'ubuntu2204'},
     {label: 'Ubuntu 24.04', value: 'ubuntu2404'},
@@ -179,7 +179,7 @@ ulimit -n 500000
 ## Build and run unit tests
 
 <Tabs
-  defaultValue="linux_mac"
+  defaultValue="dockerlinux"
   values={[
     {label: 'Using Docker on Linux', value: 'dockerlinux'},
     {label: 'on Ubuntu', value: 'ubuntu'},
@@ -232,7 +232,7 @@ cmake --build . -t test_main
 ## Build and run functional tests
 
 <Tabs
-  defaultValue="linux_mac"
+  defaultValue="dockerlinux"
   values={[
     {label: 'Using Docker on Linux', value: 'dockerlinux'},
     {label: 'on Ubuntu', value: 'ubuntu'},
