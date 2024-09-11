@@ -33,7 +33,7 @@ PROJECT (5)
      - output columns: [title, num, __score, __rowid]
 
 query I
-EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
+EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '') WHERE 10 > num;
 ----
 PROJECT (3)
  - table index: #4
@@ -58,7 +58,7 @@ PROJECT (3)
 #----
 
 #query I
-#EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH VECTOR (vec, [0.0, -10.0, 0.0, 0.7], 'float', 'l2', 3), MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim'), FUSION('rrf') WHERE 10 > num;
+#EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH VECTOR (vec, [0.0, -10.0, 0.0, 0.7], 'float', 'l2', 3), MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', ''), FUSION('rrf') WHERE 10 > num;
 #----
 
 # Cleanup

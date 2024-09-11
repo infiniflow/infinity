@@ -21,7 +21,7 @@ test66 16 [[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3],[0.3,0.2,0.1
 test77 18 [[0.4,-0.3,0.2,0.1],[-0.4,0.3,0.2,0.1]] off
 
 query I
-EXPLAIN SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
+EXPLAIN SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '') WHERE 10 > num;
 ----
 PROJECT (3)
  - table index: #4
@@ -37,7 +37,7 @@ PROJECT (3)
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
 test22 636.870056
 test55 27.369999
@@ -50,7 +50,7 @@ test11 -9.660001
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '');
 ----
 test22 636.870056
 test55 27.369999
@@ -77,7 +77,7 @@ test55 27.369999
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '') WHERE 10 > num;
 ----
 test22 636.870056
 test33 3.620001
@@ -86,7 +86,7 @@ test11 -9.660001
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '') WHERE 10 > num;
 ----
 test22 636.870056
 test33 3.620001
@@ -95,7 +95,7 @@ test11 -9.660001
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'double', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'double', 'maxsim', '') WHERE 10 > num;
 ----
 test22 636.870056
 test33 3.620001
@@ -104,7 +104,7 @@ test11 -9.660001
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'float16', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'float16', 'maxsim', '') WHERE 10 > num;
 ----
 test22 639.399963
 test33 3.700001
@@ -116,7 +116,7 @@ statement ok
 COPY sqllogic_tensor_maxsim FROM '/var/infinity/test_data/tensor_maxsim.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 query I
-EXPLAIN SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
+EXPLAIN SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '') WHERE 10 > num;
 ----
 PROJECT (3)
  - table index: #4
@@ -138,7 +138,7 @@ PROJECT (3)
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
 test22 636.870056
 test22 636.870056
@@ -153,7 +153,7 @@ test77 2.260000
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '');
 ----
 test22 636.870056
 test22 636.870056
@@ -194,7 +194,7 @@ COPY sqllogic_tensor_maxsim FROM '/var/infinity/test_data/tensor_maxsim.csv' WIT
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
 test22 636.954102
 test55 27.370213
@@ -207,7 +207,7 @@ test11 -9.664453
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float16', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float16', 'maxsim', '');
 ----
 test22 637.092651
 test55 27.372774
@@ -234,7 +234,7 @@ test55 27.370213
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '') WHERE 10 > num;
 ----
 test22 636.954102
 test33 3.623462
@@ -243,7 +243,7 @@ test11 -9.664453
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '') WHERE 10 > num;
 ----
 test22 636.954102
 test33 3.623462
@@ -252,7 +252,7 @@ test11 -9.664453
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'double', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'double', 'maxsim', '') WHERE 10 > num;
 ----
 test22 636.954102
 test33 3.623462
@@ -261,7 +261,7 @@ test11 -9.664453
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'float16', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'float16', 'maxsim', '') WHERE 10 > num;
 ----
 test22 639.484375
 test33 3.703491
@@ -274,7 +274,7 @@ COPY sqllogic_tensor_maxsim FROM '/var/infinity/test_data/tensor_maxsim.csv' WIT
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
 test22 636.954102
 test22 636.954102
@@ -289,7 +289,7 @@ test77 2.266235
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '');
 ----
 test22 636.954102
 test22 636.954102
@@ -330,7 +330,7 @@ COPY sqllogic_tensor_maxsim FROM '/var/infinity/test_data/tensor_maxsim.csv' WIT
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
 test22 634.709167
 test55 27.263084
@@ -343,7 +343,7 @@ test11 -9.622266
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float16', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float16', 'maxsim', '');
 ----
 test22 634.847168
 test55 27.265635
@@ -370,7 +370,7 @@ test55 27.263084
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '') WHERE 10 > num;
 ----
 test22 634.709167
 test33 3.605859
@@ -379,7 +379,7 @@ test11 -9.622266
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '') WHERE 10 > num;
 ----
 test22 634.709167
 test33 3.605859
@@ -388,7 +388,7 @@ test11 -9.622266
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'double', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'double', 'maxsim', '') WHERE 10 > num;
 ----
 test22 634.709167
 test33 3.605859
@@ -397,7 +397,7 @@ test11 -9.622266
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'float16', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'float16', 'maxsim', '') WHERE 10 > num;
 ----
 test22 637.230469
 test33 3.685547
@@ -410,7 +410,7 @@ COPY sqllogic_tensor_maxsim FROM '/var/infinity/test_data/tensor_maxsim.csv' WIT
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '');
 ----
 test22 634.709167
 test22 634.709167
@@ -425,7 +425,7 @@ test77 2.251172
 
 # default top 10
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '');
 ----
 test22 634.709167
 test22 634.709167
