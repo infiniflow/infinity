@@ -185,6 +185,13 @@ public:
 
     BufferObj *get() const { return buffer_obj_; }
 
+    void reset() {
+        if (buffer_obj_ != nullptr) {
+            --*ptr_rc_;
+            buffer_obj_ = nullptr;
+        }
+    }
+
 private:
     BufferObj *buffer_obj_;
     SharedPtr<u32> ptr_rc_;

@@ -427,7 +427,7 @@ void BuildFastRoughFilterTask::ExecuteInner(SegmentEntry *segment_entry, BufferM
     const auto *table_entry = segment_entry->GetTableEntry();
     for (u32 column_id = 0; column_id < column_count; ++column_id) {
         // step 2.1. check data type
-        auto *column_def = table_entry->GetColumnDefByID(column_id);
+        auto *column_def = table_entry->GetColumnDefByIdx(column_id);
         auto &data_type_ptr = column_def->type();
         bool can_build_min_max_data_filter = data_type_ptr->SupportMinMaxFilter();
         bool can_build_probabilistic_data_filter = data_type_ptr->SupportBloomFilter();

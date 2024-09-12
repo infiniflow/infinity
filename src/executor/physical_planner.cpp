@@ -595,6 +595,15 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
                                                   logical_operator->node_id(),
                                                   logical_operator->load_metas());
         }
+        case AlterStatementType::kDropColumns: {
+            auto *logical_drop_columns = static_cast<LogicalDropColumns *>(logical_alter);
+            return MakeUnique<PhysicalDropColumns>(logical_drop_columns->table_entry_,
+                                                   logical_drop_columns->column_names_,
+                                                   logical_operator->GetOutputNames(),
+                                                   logical_operator->GetOutputTypes(),
+                                                   logical_operator->node_id(),
+                                                   logical_operator->load_metas());
+        }
         default: {
             RecoverableError(Status::NotSupport("Alter statement isn't supported."));
         }

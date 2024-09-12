@@ -124,7 +124,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         Status status = Status::ImportFileFormatError("FVECS file must have only one column.");
         RecoverableError(status);
     }
-    auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
+    auto &column_type = table_entry_->GetColumnDefByIdx(0)->column_type_;
     if (column_type->type() != LogicalType::kEmbedding) {
         Status status = Status::ImportFileFormatError("FVECS file must have only one embedding column.");
         RecoverableError(status);
@@ -226,7 +226,7 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         Status status = Status::ImportFileFormatError("BVECS file must have only one column.");
         RecoverableError(status);
     }
-    auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
+    auto &column_type = table_entry_->GetColumnDefByIdx(0)->column_type_;
     if (column_type->type() != LogicalType::kEmbedding) {
         Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column.");
         RecoverableError(status);
@@ -372,7 +372,7 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         Status status = Status::ImportFileFormatError("CSR file must have only one column.");
         RecoverableError(status);
     }
-    auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
+    auto &column_type = table_entry_->GetColumnDefByIdx(0)->column_type_;
     if (column_type->type() != LogicalType::kSparse) {
         Status status = Status::ImportFileFormatError("CSR file must have only one sparse column.");
         RecoverableError(status);
@@ -730,7 +730,7 @@ void PhysicalImport::CSVHeaderHandler(void *context) {
     // Not check the header column name
     for (SizeT idx = 0; idx < csv_column_count; ++idx) {
         auto *csv_col_name = reinterpret_cast<const char *>(parser.GetCellStr(idx));
-        const char *table_col_name = parser_context->table_entry_->GetColumnDefByID(idx)->name().c_str();
+        const char *table_col_name = parser_context->table_entry_->GetColumnDefByIdx(idx)->name().c_str();
         if (!strcmp(csv_col_name, table_col_name)) {
             parser_context->err_msg_ = MakeShared<String>(fmt::format("Unmatched column name({} != {})", csv_col_name, table_col_name));
 
@@ -774,7 +774,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
         ZsvCell cell = parser_context->parser_.GetCell(column_idx);
         std::string_view str_view{};
-        auto column_def = table_entry->GetColumnDefByID(column_idx);
+        auto column_def = table_entry->GetColumnDefByIdx(column_idx);
         if (cell.len) {
             str_view = std::string_view((char *)cell.str, cell.len);
             auto &column_vector = parser_context->column_vectors_[column_idx];
@@ -791,7 +791,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         }
     }
     for (SizeT column_idx = column_count; column_idx < table_entry->ColumnCount(); ++column_idx) {
-        auto column_def = table_entry->GetColumnDefByID(column_idx);
+        auto column_def = table_entry->GetColumnDefByIdx(column_idx);
         auto &column_vector = parser_context->column_vectors_[column_idx];
         if (column_def->has_default_value()) {
             auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
@@ -1004,7 +1004,7 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
 
 void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors) {
     for (SizeT i = 0; auto &column_vector : column_vectors) {
-        const ColumnDef *column_def = table_entry_->GetColumnDefByID(i++);
+        const ColumnDef *column_def = table_entry_->GetColumnDefByIdx(i++);
 
         if (line_json.contains(column_def->name_)) {
             switch (column_vector.data_type()->type()) {

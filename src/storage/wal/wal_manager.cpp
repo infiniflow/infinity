@@ -853,6 +853,7 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
     db_entry->CreateTableReplay(
         table_name,
         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            ColumnID next_column_id = cmd.table_def_->columns().size();
             return TableEntry::ReplayTableEntry(false,
                                                 table_meta,
                                                 table_dir,
@@ -864,7 +865,8 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
                                                 commit_ts,
                                                 0 /*row_count*/,
                                                 INVALID_SEGMENT_ID /*unsealed_id*/,
-                                                0 /*next_segment_id*/);
+                                                0 /*next_segment_id*/,
+                                                next_column_id);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -897,7 +899,8 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID
                                                 commit_ts,
                                                 0 /*row_count*/,
                                                 INVALID_SEGMENT_ID /*unsealed_id*/,
-                                                0 /*next_segment_id*/);
+                                                0 /*next_segment_id*/,
+                                                0 /*next_column_id*/);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -1139,7 +1142,14 @@ void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn
 }
 
 void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    //
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
+    if (!table_status.ok()) {
+        String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
+        UnrecoverableError(error_message);
+    }
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
+    table_entry->DropColumns(cmd.column_names_, txn_store);
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

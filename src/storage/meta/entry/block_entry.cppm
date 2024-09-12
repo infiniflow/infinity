@@ -178,7 +178,7 @@ public:
 
     void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
 
-    void DropColumns(const Vector<ColumnID> &column_ids, Txn *txn);
+    void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
 
 public:
     // Setter, Used in import, segment append block, and block append block in compact
@@ -215,5 +215,6 @@ protected:
 
     // Column data
     Vector<UniquePtr<BlockColumnEntry>> columns_{};
+    Vector<UniquePtr<BlockColumnEntry>> dropped_columns_{};
 };
 } // namespace infinity

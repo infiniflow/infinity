@@ -646,6 +646,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto row_count = add_table_entry_op->row_count_;
                 SegmentID unsealed_id = add_table_entry_op->unsealed_id_;
                 SegmentID next_segment_id = add_table_entry_op->next_segment_id_;
+                ColumnID next_column_id = add_table_entry_op->next_column_id_;
 
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
@@ -664,7 +665,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                 commit_ts,
                                                                 row_count,
                                                                 unsealed_id,
-                                                                next_segment_id);
+                                                                next_segment_id,
+                                                                next_column_id);
                         },
                         txn_id,
                         begin_ts);
@@ -681,7 +683,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                         commit_ts,
                                                         row_count,
                                                         unsealed_id,
-                                                        next_segment_id);
+                                                        next_segment_id,
+                                                        next_column_id);
                 };
                 if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
                     db_entry->CreateTableReplay(table_name, init_table_entry, txn_id, begin_ts);
@@ -1029,9 +1032,10 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 
     delta_catalog_path = *catalog_dir_;
     delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
-    String full_path = fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
+    String full_path =
+        fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
 
-    if(flush_delta_entry->commit_ts() != max_commit_ts) {
+    if (flush_delta_entry->commit_ts() != max_commit_ts) {
         String error_message = "Expect flush_delta_entry->commit_ts() == max_commit_ts";
         UnrecoverableError(error_message);
     }

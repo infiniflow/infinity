@@ -114,7 +114,7 @@ public:
     TransactionID txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     atomic_u64 commit_ts_{UNCOMMIT_TS};
-    const bool deleted_;
+    bool deleted_;
 
     const EntryType entry_type_;
 

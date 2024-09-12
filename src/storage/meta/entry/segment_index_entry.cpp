@@ -286,6 +286,9 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
     const SharedPtr<ColumnDef> &column_def = table_index_entry_->column_def();
     ColumnID column_id = column_def->id();
 
+    auto *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
+    SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
+
     switch (index_base->index_type_) {
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
@@ -308,7 +311,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                     memory_indexer_->InsertGap(begin_row_id - exp_begin_row_id);
                 }
             }
-            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
             SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetConstColumnVector(buffer_manager));
             memory_indexer_->Insert(column_vector, row_offset, row_count, false);
             break;
@@ -319,7 +322,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_hnsw_index_ = HnswIndexInMem::Make(begin_row_id, index_base.get(), column_def.get(), this, true /*trace*/);
             }
-            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
             memory_hnsw_index_->InsertVecs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
@@ -329,7 +332,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, begin_row_id);
             }
             auto block_id = block_entry->block_id();
-            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
             memory_secondary_index_->Insert(block_id, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
@@ -345,7 +348,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 memory_emvb_index_ = EMVBIndexInMem::NewEMVBIndexInMem(index_base, column_def, begin_row_id);
             }
             auto block_id = block_entry->block_id();
-            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
             memory_emvb_index_->Insert(block_id, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
@@ -354,7 +357,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_bmp_index_ = MakeShared<BMPIndexInMem>(begin_row_id, index_base.get(), column_def.get());
             }
-            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
             memory_bmp_index_->AddDocs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
@@ -516,6 +519,8 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
 
     u32 seg_id = segment_entry->segment_id();
     RowID base_row_id(seg_id, 0);
+    auto *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
+
     switch (index_base->index_type_) {
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
@@ -523,9 +528,10 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
             memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
             u64 column_id = column_def->id();
+            SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
                 RowID begin_row_id = block_entry->base_row_id();
                 RowID exp_begin_row_id = memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount();
                 assert(begin_row_id >= exp_begin_row_id);
@@ -565,10 +571,11 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
         case IndexType::kSecondary: {
             memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id);
             u64 column_id = column_def->id();
+            SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 const auto block_id = block_entry->block_id();
-                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
                 memory_secondary_index_->Insert(block_id, block_column_entry, buffer_mgr, 0, block_entry->row_count());
             }
             dumped_memindex_entry = MemIndexDump();

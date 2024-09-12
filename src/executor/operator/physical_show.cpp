@@ -1807,7 +1807,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             output_block_ptr->Init(column_types);
         }
 
-        const ColumnDef *column = table_entry->GetColumnDefByID(input_column_id);
+        const ColumnDef *column = table_entry->GetColumnDefByIdx(input_column_id);
 
         SizeT output_column_idx = 0;
         {

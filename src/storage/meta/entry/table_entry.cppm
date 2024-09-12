@@ -76,7 +76,8 @@ public:
                         TransactionID txn_id,
                         TxnTimeStamp begin_ts,
                         SegmentID unsealed_id,
-                        SegmentID next_segment_id);
+                        SegmentID next_segment_id,
+                        ColumnID next_column_id);
 
 private:
     TableEntry(const TableEntry &other);
@@ -104,7 +105,8 @@ public:
                                                   TxnTimeStamp commit_ts,
                                                   SizeT row_count,
                                                   SegmentID unsealed_id,
-                                                  SegmentID next_segment_id) noexcept;
+                                                  SegmentID next_segment_id,
+                                                  ColumnID next_column_id) noexcept;
 
 public:
     Tuple<TableIndexEntry *, Status>
@@ -184,6 +186,8 @@ public:
 
     SegmentID next_segment_id() const { return next_segment_id_; }
 
+    ColumnID next_column_id() const { return next_column_id_; }
+
     static SharedPtr<String> DetermineTableDir(const String &parent_dir, const String &table_name);
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
@@ -211,9 +215,18 @@ public:
 
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, Txn *txn) const;
 
-    inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
+    const ColumnDef *GetColumnDefByIdx(SizeT idx) const {
+        if (idx >= columns_.size()) {
+            return nullptr;
+        }
+        return columns_[idx].get();
+    }
 
-    inline SharedPtr<ColumnDef> GetColumnDefByName(const String &column_name) const { return columns_[GetColumnIdByName(column_name)]; }
+    const ColumnDef *GetColumnDefByID(ColumnID column_id) const;
+
+    SharedPtr<ColumnDef> GetColumnDefByName(const String &column_name) const;
+
+    SizeT GetColumnIdxByID(ColumnID column_id) const;
 
     inline SizeT ColumnCount() const { return columns_.size(); }
 
@@ -249,8 +262,6 @@ public:
 public:
     u64 GetColumnIdByName(const String &column_name) const;
 
-    i64 GetColumnID(const String &column_name) const;
-
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
     SegmentEntry *GetSegmentEntry(SegmentID seg_id) const {
@@ -275,13 +286,12 @@ private:
 
     MetaMap<TableIndexMeta> index_meta_map_{};
 
-    HashMap<String, ColumnID> column_name2column_id_;
-
     const SharedPtr<String> table_entry_dir_{};
 
     SharedPtr<String> table_name_{};
 
     Vector<SharedPtr<ColumnDef>> columns_{};
+    ColumnID next_column_id_{};
 
     const TableEntryType table_entry_type_{TableEntryType::kTableEntry};
 
@@ -313,11 +323,11 @@ private:
     // the compaction algorithm, mutable because all its interface are protected by lock
     mutable UniquePtr<CompactionAlg> compaction_alg_{};
 
-private: // TODO: remove it
+private:
     void MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *txn, SegmentID seg_id, Vector<AppendRange> &append_ranges);
 
-public: // TODO: remove it?
-//    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
+public:
+    bool CheckIfIndexColumn(ColumnID column_id, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     bool CheckAnyDelete(TxnTimeStamp check_ts) const;
 

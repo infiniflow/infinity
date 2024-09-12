@@ -93,7 +93,8 @@ TEST_P(TableEntryTest, test1) {
                                                                0 /*txn_id*/,
                                                                0 /*begin_ts*/,
                                                                INVALID_SEGMENT_ID /*unsealed_id*/,
-                                                               0 /*next_segment_id*/);
+                                                               0 /*next_segment_id*/,
+                                                               0 /*next_column_id*/);
 }
 
 TEST_P(TableEntryTest, test2) {

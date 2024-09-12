@@ -404,14 +404,15 @@ void BlockEntry::AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns
     }
 }
 
-void BlockEntry::DropColumns(const Vector<ColumnID> &column_ids, Txn *txn) {
-    // Vector<UniquePtr<BlockColumnEntry>> new_columns;
-    // for (auto &column : columns_) {
-    //     if (std::find(column_ids.begin(), column_ids.end(), column->column_id()) == column_ids.end()) {
-    //         new_columns.emplace_back(std::move(column));
-    //     }
-    // }
-    // columns_ = std::move(new_columns);
+void BlockEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store) {
+    for (ColumnID dropped_id : column_ids) {
+        auto iter = std::find_if(columns_.begin(), columns_.end(), [&](const auto &column) { return column->column_id() == dropped_id; });
+        UniquePtr<BlockColumnEntry> dropped_column = std::move(*iter);
+        columns_.erase(iter);
+        dropped_column->DropColumn();
+        table_store->AddBlockColumnStore(const_cast<SegmentEntry *>(segment_entry_), this, dropped_column.get());
+        dropped_columns_.emplace_back(std::move(dropped_column));
+    }
 }
 
 void BlockEntry::FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count) {
@@ -474,6 +475,7 @@ void BlockEntry::FlushForImport() { FlushDataNoLock(0, this->block_row_count_); 
 void BlockEntry::LoadFilterBinaryData(const String &block_filter_data) { fast_rough_filter_->DeserializeFromString(block_filter_data); }
 
 void BlockEntry::Cleanup() {
+    dropped_columns_.clear();
     for (auto &block_column_entry : columns_) {
         block_column_entry->Cleanup();
     }
@@ -569,10 +571,12 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
 }
 
 void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id) {
-    if (column_id >= columns_.size()) {
-        columns_.resize(column_id + 1);
+    auto iter = std::find_if(columns_.begin(), columns_.end(), [&](const auto &column) { return column->column_id() == column_id; });
+    if (iter == columns_.end()) {
+        columns_.emplace_back(std::move(column_entry));
+    } else {
+        *iter = std::move(column_entry);
     }
-    columns_[column_id] = std::move(column_entry);
 }
 
 void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {

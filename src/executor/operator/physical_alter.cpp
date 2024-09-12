@@ -28,23 +28,14 @@ import value;
 import bind_context;
 import value_expression;
 import expression_binder;
+import defer_op;
 
 namespace infinity {
 
 void PhysicalRenameTable::Init() {}
 
 bool PhysicalRenameTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    Txn *txn = query_context->GetTxn();
-    LOG_INFO(fmt::format("Locking table {} for rename", *table_entry_->GetTableName()));
-    table_entry_->SetLocked();
-    LOG_INFO(fmt::format("Table {} is locked", *table_entry_->GetTableName()));
-    {
-        auto status = txn->RenameTable(table_entry_, new_table_name_);
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-    }
-    LOG_INFO(fmt::format("Table {} unlocked.", *table_entry_->GetTableName()));
+    RecoverableError(Status::NotSupport("Rename table is not supported."));
     operator_state->SetComplete();
     return true;
 }
@@ -52,6 +43,15 @@ bool PhysicalRenameTable::Execute(QueryContext *query_context, OperatorState *op
 void PhysicalAddColumns::Init() {}
 
 bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    LOG_INFO(fmt::format("Locking table {} for add columns", *table_entry_->GetTableName()));
+    table_entry_->SetLocked();
+    LOG_INFO(fmt::format("Table {} is locked", *table_entry_->GetTableName()));
+
+    DeferFn defer_fn([&]() {
+        LOG_INFO(fmt::format("Table {} unlocked.", *table_entry_->GetTableName()));
+        table_entry_->SetUnlock();
+    });
+
     Txn *txn = query_context->GetTxn();
 
     ExpressionBinder tmp_binder(nullptr);
@@ -74,10 +74,25 @@ bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *ope
     return true;
 }
 
-void PhysicalRemoveColumns::Init() {}
+void PhysicalDropColumns::Init() {}
 
-bool PhysicalRemoveColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    //
+bool PhysicalDropColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    LOG_INFO(fmt::format("Locking table {} for add columns", *table_entry_->GetTableName()));
+    table_entry_->SetLocked();
+    LOG_INFO(fmt::format("Table {} is locked", *table_entry_->GetTableName()));
+
+    DeferFn defer_fn([&]() {
+        LOG_INFO(fmt::format("Table {} unlocked.", *table_entry_->GetTableName()));
+        table_entry_->SetUnlock();
+    });
+
+    Txn *txn = query_context->GetTxn();
+    auto status = txn->DropColumns(table_entry_, column_names_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    operator_state->SetComplete();
     return true;
 }
 

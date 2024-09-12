@@ -127,6 +127,14 @@ TableIndexEntry *TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeSta
     return entry;
 }
 
+bool TableIndexMeta::CheckIfIndexColumn(ColumnID column_id, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [index_entry, status] = index_entry_list_.GetEntryNolock(txn_id, begin_ts);
+    if (!status.ok()) {
+        return false;
+    }
+    return index_entry->CheckIfIndexColumn(column_id);
+}
+
 Tuple<SharedPtr<TableIndexInfo>, Status>
 TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [table_index_entry, status] = index_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);

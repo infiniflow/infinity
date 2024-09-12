@@ -283,7 +283,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                     continue;
                 }
 
-                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                auto column_def = table_entry->GetColumnDefByIdx(column_idx);
                 if (column_def->has_default_value()) {
                     SharedPtr<BaseExpression> value_expr =
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
@@ -316,7 +316,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         } else {
             SizeT table_column_count = table_entry->ColumnCount();
             for (SizeT column_idx = value_list.size(); column_idx < table_column_count; ++column_idx) {
-                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                auto column_def = table_entry->GetColumnDefByIdx(column_idx);
                 if (column_def->has_default_value()) {
                     SharedPtr<BaseExpression> value_expr =
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
@@ -335,7 +335,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
             for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
-                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByID(column_idx)->column_type_;
+                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByIdx(column_idx)->column_type_;
                 DataType value_type = value_list[column_idx]->Type();
                 if (*table_column_type == value_type) {
                     rewrite_value_list[column_idx] = value_list[column_idx];
@@ -1033,7 +1033,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                 RecoverableError(status);
             }
 
-            const ColumnDef *column_def = table_entry->GetColumnDefByID(column_idx_array[0]);
+            const ColumnDef *column_def = table_entry->GetColumnDefByIdx(column_idx_array[0]);
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 Status status = Status::NotSupport(
                     fmt::format("Attempt to export column: {} with type: {} as FVECS file", column_def->name(), column_def->type()->ToString()));
@@ -1117,13 +1117,33 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
             if (!column_def->has_default_value()) {
                 RecoverableError(Status::NotSupport("Add column without default value isn't supported."));
             }
-            i64 column_id = table_entry->GetColumnID(column_def->name());
-            if (column_id != -1) {
+            bool found = true;
+            try {
+                [[maybe_unused]] i64 column_id = table_entry->GetColumnIdByName(column_def->name());
+            } catch (const RecoverableException &e) {
+                if (e.ErrorCode() != ErrorCode::kColumnNotExist) {
+                    throw;
+                }
+                found = false;
+            }
+            if (found) {
                 RecoverableError(Status::DuplicateColumnName(column_def->name()));
             }
             this->logical_plan_ = MakeShared<LogicalAddColumns>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                 table_entry,
                                                                 column_def);
+            break;
+        }
+        case AlterStatementType::kDropColumns: {
+            auto *drop_columns_statement = static_cast<DropColumnStatement *>(statement);
+            const String &column_name = drop_columns_statement->column_name_;
+            i64 column_id = table_entry->GetColumnIdByName(column_name);
+            if (table_entry->CheckIfIndexColumn(column_id, txn->TxnID(), txn->BeginTS())) {
+                RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+            }
+            this->logical_plan_ = MakeShared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                 table_entry,
+                                                                 column_name);
             break;
         }
         default: {
