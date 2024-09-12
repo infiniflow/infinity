@@ -26,6 +26,7 @@ import function_expression;
 import reference_expression;
 import value_expression;
 import in_expression;
+import filter_fulltext_expression;
 import data_block;
 import column_vector;
 import expression_state;
@@ -53,6 +54,8 @@ public:
     void Execute(const SharedPtr<ReferenceExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
 
     void Execute(const SharedPtr<InExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
+
+    void Execute(const SharedPtr<FilterFulltextExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector);
 
 private:
     const DataBlock *input_data_block_{};
