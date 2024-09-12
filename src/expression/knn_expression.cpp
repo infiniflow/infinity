@@ -56,14 +56,13 @@ KnnExpression::KnnExpression(EmbeddingDataType embedding_data_type,
                              Vector<SharedPtr<BaseExpression>> arguments,
                              i64 topn,
                              Vector<InitParameter *> *opt_params,
+                             SharedPtr<BaseExpression> optional_filter,
                              String using_index,
                              bool ignore_index)
     : BaseExpression(ExpressionType::kKnn, std::move(arguments)), dimension_(dimension), embedding_data_type_(embedding_data_type),
       distance_type_(knn_distance_type), query_embedding_(std::move(query_embedding)),
       topn_(topn), // Should call move constructor, otherwise there will be memory leak.
-      using_index_(std::move(using_index)),
-      ignore_index_(ignore_index)
-{
+      using_index_(std::move(using_index)), ignore_index_(ignore_index), optional_filter_(std::move(optional_filter)) {
     if (opt_params) {
         for (auto &param : *opt_params) {
             opt_params_.emplace_back(*param);
@@ -76,12 +75,13 @@ String KnnExpression::ToString() const {
         return alias_;
     }
 
-    String expr_str = fmt::format("MATCH VECTOR ({}, {}, {}, {}, {})",
+    String expr_str = fmt::format("MATCH VECTOR ({}, {}, {}, {}, {}{})",
                                   arguments_.at(0)->Name(),
                                   EmbeddingT::Embedding2String(query_embedding_, embedding_data_type_, dimension_),
                                   EmbeddingT::EmbeddingDataType2String(embedding_data_type_),
                                   KnnDistanceType2Str(distance_type_),
-                                  topn_);
+                                  topn_,
+                                  optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "");
 
     return expr_str;
 }

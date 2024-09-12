@@ -30,6 +30,7 @@ import function_expr;
 import case_expr;
 import in_expr;
 import knn_expr;
+import match_expr;
 import match_tensor_expr;
 import match_sparse_expr;
 import search_expr;
@@ -74,6 +75,8 @@ public:
     virtual SharedPtr<BaseExpression> BuildInExpr(const InExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     virtual SharedPtr<BaseExpression> BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+
+    virtual SharedPtr<BaseExpression> BuildMatchTextExpr(const MatchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     virtual SharedPtr<BaseExpression> BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 

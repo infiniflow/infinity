@@ -29,9 +29,12 @@ import logical_knn_scan;
 import logical_match;
 import logical_match_tensor_scan;
 import logical_match_scan_base;
+import logical_fusion;
 import base_table_ref;
 import load_meta;
 import special_function;
+import infinity_exception;
+import third_party;
 
 namespace infinity {
 
@@ -175,18 +178,100 @@ void CleanScan::VisitNode(LogicalNode &op) {
             CleanScanVisitBaseTableRefNode<LogicalMatch>(op, last_op_load_metas_, scan_table_indexes_);
             break;
         }
-        case LogicalNodeType::kLimit:
-        case LogicalNodeType::kFusion: {
+        case LogicalNodeType::kLimit: {
             // Skip
             VisitNodeChildren(op);
             VisitNodeExpression(op);
             break;
         }
+        case LogicalNodeType::kFusion: {
+            last_op_load_metas_ = op.load_metas();
+            last_op_node_id_ = op.node_id();
+            const auto &fusion = static_cast<const LogicalFusion &>(op);
+            if (!op.left_node()) {
+                UnrecoverableError("Internal error: Fusion has no left node.");
+            }
+            if (op.left_node()->operator_type() == LogicalNodeType::kFusion) {
+                // check fusion child
+                if (op.right_node() || !fusion.other_children_.empty()) {
+                    UnrecoverableError("Internal error: Fusion with fusion child has right node or other children.");
+                }
+                // Skip
+                VisitNodeChildren(op);
+                VisitNodeExpression(op);
+                break;
+            }
+            // now fusion has only search node children
+            auto apply_to_fusion_children = [&fusion](auto &&apply_func) {
+                if (fusion.left_node()) {
+                    apply_func(*fusion.left_node());
+                }
+                if (fusion.right_node()) {
+                    apply_func(*fusion.right_node());
+                }
+                for (auto &child : fusion.other_children_) {
+                    apply_func(*child);
+                }
+            };
+            // make sure that children can only be search nodes
+            apply_to_fusion_children([](const LogicalNode &node) {
+                switch (node.operator_type()) {
+                    case LogicalNodeType::kMatch:
+                    case LogicalNodeType::kKnnScan:
+                    case LogicalNodeType::kMatchSparseScan:
+                    case LogicalNodeType::kMatchTensorScan: {
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError("Internal error: Fusion children are not search nodes.");
+                    }
+                }
+            });
+            // make sure that children share same base_table_ref_
+            BaseTableRef *common_base_table_ref = nullptr;
+            apply_to_fusion_children([&common_base_table_ref](LogicalNode &node) {
+                if (const auto base_table_ref = GetScanTableRef(node); base_table_ref.has_value()) {
+                    if (common_base_table_ref == nullptr) {
+                        common_base_table_ref = base_table_ref.value();
+                    } else if (common_base_table_ref != base_table_ref.value()) {
+                        UnrecoverableError("Internal error: Fusion children have different base_table_ref_.");
+                    }
+                } else {
+                    UnrecoverableError(fmt::format("Internal error: Fusion child {} has no base_table_ref_.", node.name()));
+                }
+            });
+            // get all children's load_metas
+            if (op.load_metas() && !op.load_metas()->empty()) {
+                UnrecoverableError("Internal error: Fusion has load_metas");
+            }
+            Vector<LoadMeta> children_columns;
+            apply_to_fusion_children([&children_columns](LogicalNode &node) {
+                auto &node_load_metas = *node.load_metas();
+                children_columns.insert(children_columns.end(),
+                                        std::make_move_iterator(node_load_metas.begin()),
+                                        std::make_move_iterator(node_load_metas.end()));
+                node_load_metas.clear();
+            });
+            // sort and unique children_columns
+            std::sort(children_columns.begin(), children_columns.end(), [](const LoadMeta &a, const LoadMeta &b) { return a.binding_ < b.binding_; });
+            children_columns.erase(std::unique(children_columns.begin(),
+                                               children_columns.end(),
+                                               [](const LoadMeta &a, const LoadMeta &b) { return a.binding_ == b.binding_; }),
+                                   children_columns.end());
+            // edit children's base_table_ref_
+            scan_table_indexes_.push_back(common_base_table_ref->table_index_);
+            common_base_table_ref->RetainColumnByIndices(LoadedColumn(&children_columns, common_base_table_ref));
+            break;
+        }
         default: {
             last_op_load_metas_ = op.load_metas();
+            last_op_node_id_ = op.node_id();
             VisitNodeChildren(op);
             VisitNodeExpression(op);
-
+            if (last_op_node_id_ != op.node_id()) {
+                // last_op_load_metas_ is not used
+                break;
+            }
             auto load_metas = op.load_metas();
             if (!scan_table_indexes_.empty()) {
                 Vector<LoadMeta> filtered_metas;

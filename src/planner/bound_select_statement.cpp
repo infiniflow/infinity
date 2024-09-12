@@ -169,18 +169,27 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         }
         auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
         // FIXME: need check if there is subquery inside the where conditions
-        auto filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);
-        auto common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
+        auto default_filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);
+        if (default_filter_expr && search_expr_->have_filter_in_subsearch_) {
+            RecoverableError(Status::SyntaxError("Cannot have filter in subsearch and where clause at the same time."));
+        }
+        auto default_common_query_filter = MakeShared<CommonQueryFilter>(default_filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
         match_knn_nodes.reserve(num_children);
         for (auto &match_expr : search_expr_->match_exprs_) {
+            auto filter_expr = default_filter_expr;
+            auto common_query_filter = default_common_query_filter;
             switch (match_expr->type()) {
                 case ExpressionType::kMatch: {
-                    SharedPtr<LogicalMatch> match_node = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(),
-                                                                                  base_table_ref,
-                                                                                  std::dynamic_pointer_cast<MatchExpression>(match_expr));
-                    match_node->filter_expression_ = filter_expr;
-                    match_node->common_query_filter_ = common_query_filter;
+                    auto match_text_expr = std::dynamic_pointer_cast<MatchExpression>(match_expr);
+                    if (match_text_expr->optional_filter_) {
+                        filter_expr = match_text_expr->optional_filter_;
+                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
+                    }
+                    SharedPtr<LogicalMatch> match_node =
+                        MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, std::move(match_text_expr));
+                    match_node->filter_expression_ = std::move(filter_expr);
+                    match_node->common_query_filter_ = std::move(common_query_filter);
                     match_node->index_reader_ = base_table_ref->table_entry_ptr_->GetFullTextIndexReader(query_context->GetTxn());
 
                     const Map<String, String> &column2analyzer = match_node->index_reader_.GetColumn2Analyzer();
@@ -251,35 +260,49 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     break;
                 }
                 case ExpressionType::kKnn: {
-                    SharedPtr<LogicalKnnScan> knn_scan =
-                        BuildInitialKnnScan(table_ref_ptr_, std::dynamic_pointer_cast<KnnExpression>(match_expr), query_context, bind_context);
-                    knn_scan->filter_expression_ = filter_expr;
-                    knn_scan->common_query_filter_ = common_query_filter;
+                    auto match_dense_expr = std::dynamic_pointer_cast<KnnExpression>(match_expr);
+                    if (match_dense_expr->optional_filter_) {
+                        filter_expr = match_dense_expr->optional_filter_;
+                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
+                    }
+                    auto knn_scan = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(),
+                                                               base_table_ref,
+                                                               std::move(match_dense_expr),
+                                                               bind_context->knn_table_index_);
+                    knn_scan->filter_expression_ = std::move(filter_expr);
+                    knn_scan->common_query_filter_ = std::move(common_query_filter);
                     match_knn_nodes.push_back(std::move(knn_scan));
                     break;
                 }
                 case ExpressionType::kMatchTensor: {
-                    auto match_tensor_node = MakeShared<LogicalMatchTensorScan>(bind_context->GetNewLogicalNodeId(),
-                                                                                base_table_ref,
-                                                                                std::dynamic_pointer_cast<MatchTensorExpression>(match_expr));
-                    match_tensor_node->filter_expression_ = filter_expr;
-                    match_tensor_node->common_query_filter_ = common_query_filter;
+                    auto match_tensor_expr = std::dynamic_pointer_cast<MatchTensorExpression>(match_expr);
+                    if (match_tensor_expr->optional_filter_) {
+                        filter_expr = match_tensor_expr->optional_filter_;
+                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
+                    }
+                    auto match_tensor_node =
+                        MakeShared<LogicalMatchTensorScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, std::move(match_tensor_expr));
+                    match_tensor_node->filter_expression_ = std::move(filter_expr);
+                    match_tensor_node->common_query_filter_ = std::move(common_query_filter);
                     match_tensor_node->InitExtraOptions();
                     match_knn_nodes.push_back(std::move(match_tensor_node));
                     break;
                 }
                 case ExpressionType::kMatchSparse: {
-                    auto match_sparse_node = MakeShared<LogicalMatchSparseScan>(bind_context->GetNewLogicalNodeId(),
-                                                                                base_table_ref,
-                                                                                std::dynamic_pointer_cast<MatchSparseExpression>(match_expr));
-                    match_sparse_node->filter_expression_ = filter_expr;
-                    match_sparse_node->common_query_filter_ = common_query_filter;
+                    auto match_sparse_expr = std::dynamic_pointer_cast<MatchSparseExpression>(match_expr);
+                    if (match_sparse_expr->optional_filter_) {
+                        filter_expr = match_sparse_expr->optional_filter_;
+                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
+                    }
+                    auto match_sparse_node =
+                        MakeShared<LogicalMatchSparseScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, std::move(match_sparse_expr));
+                    match_sparse_node->filter_expression_ = std::move(filter_expr);
+                    match_sparse_node->common_query_filter_ = std::move(common_query_filter);
                     match_knn_nodes.push_back(std::move(match_sparse_node));
                     break;
                 }
                 default: {
-                    String error_message = "Unsupported match expression type";
-                    UnrecoverableError(error_message);
+                    UnrecoverableError(fmt::format("Unsupported match expression: {}.", match_expr->ToString()));
                 }
             }
         }
@@ -333,11 +356,12 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
             UnrecoverableError(error_message);
         }
         case TableRefType::kTable: {
-            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
-
+            auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
             // Change function table to knn table scan function
-            SharedPtr<LogicalKnnScan> knn_scan_node =
-                MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, knn_expr, bind_context->knn_table_index_);
+            SharedPtr<LogicalKnnScan> knn_scan_node = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(),
+                                                                                 std::move(base_table_ref),
+                                                                                 std::move(knn_expr),
+                                                                                 bind_context->knn_table_index_);
             return knn_scan_node;
         }
         case TableRefType::kSubquery: {

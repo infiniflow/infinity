@@ -27,6 +27,7 @@ import stemmer;
 import chinese_analyzer;
 import traditional_chinese_analyzer;
 import japanese_analyzer;
+import korea_analyzer;
 import standard_analyzer;
 import ngram_analyzer;
 import logger;
@@ -149,6 +150,27 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 cache_[JAPANESE] = std::move(analyzer);
             }
             return {MakeUnique<JapaneseAnalyzer>(*reinterpret_cast<JapaneseAnalyzer *>(prototype)), Status::OK()};
+        }
+        case Str2Int(KOREA.data()): {
+            Analyzer *prototype = cache_[KOREA].get();
+            if (prototype == nullptr) {
+                String path;
+                Config *config = InfinityContext::instance().config();
+                if (config == nullptr) {
+                    // InfinityContext has not been initialized.
+                    path = "/var/infinity/resource";
+                } else {
+                    path = config->ResourcePath();
+                }
+                UniquePtr<KoreaAnalyzer> analyzer = MakeUnique<KoreaAnalyzer>(std::move(path));
+                Status load_status = analyzer->Load();
+                if (!load_status.ok()) {
+                    return {nullptr, load_status};
+                }
+                prototype = analyzer.get();
+                cache_[KOREA] = std::move(analyzer);
+            }
+            return {MakeUnique<KoreaAnalyzer>(*reinterpret_cast<KoreaAnalyzer *>(prototype)), Status::OK()};
         }
         case Str2Int(STANDARD.data()): {
             UniquePtr<StandardAnalyzer> analyzer = MakeUnique<StandardAnalyzer>();

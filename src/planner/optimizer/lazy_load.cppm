@@ -54,6 +54,7 @@ private:
     SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) final;
 
     SharedPtr<Vector<LoadMeta>> last_op_load_metas_{};
+    u64 last_op_node_id_{};
     Vector<SizeT> scan_table_indexes_{};
 };
 

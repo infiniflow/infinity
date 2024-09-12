@@ -39,6 +39,8 @@ public:
 
     void SetOptParams(size_t topn, std::vector<InitParameter *> *&opt_params);
 
+    void SetOptionalFilter(ParsedExpr *&filter_expr);
+
     static std::string MetricTypeToString(SparseMetricType metric);
 
     [[nodiscard]] std::string ToString() const override;
@@ -61,6 +63,8 @@ public:
 
     bool ignore_index_{false};
     std::string index_name_;
+
+    std::unique_ptr<ParsedExpr> filter_expr_;
 };
 
 } // namespace infinity
