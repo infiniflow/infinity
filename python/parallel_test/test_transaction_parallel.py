@@ -1,8 +1,9 @@
 import threading
 import time
 import pytest
-from infinity.connection_pool import ConnectionPool
-from infinity.table import Table
+from infinity_sdk.infinity.connection_pool import ConnectionPool
+from infinity_embedded.local_infinity.table import Table
+
 
 #Setting the number of concurrent transactions and test duration
 NUM_TRANSACTIONS = 10
