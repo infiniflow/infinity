@@ -27,7 +27,7 @@ import local_file_system;
 import third_party;
 import catalog;
 import table_entry_type;
-
+import infinity_context;
 import txn_store;
 import data_access_state;
 import status;
@@ -55,6 +55,11 @@ import default_values;
 import defer_op;
 import index_base;
 import base_table_ref;
+import constant_expr;
+import bind_context;
+import value_expression;
+import expression_binder;
+import value;
 
 module wal_manager;
 
@@ -188,7 +193,7 @@ void WalManager::Flush() {
             entry->WriteAdv(ptr);
             i32 act_size = ptr - buf.data();
             if (exp_size != act_size) {
-                String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}", exp_size, act_size);
+                String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}", exp_size, act_size, entry->ToString());
                 UnrecoverableError(error_message);
             }
             ofs_.write(buf.data(), ptr - buf.data());
@@ -270,7 +275,7 @@ void WalManager::Checkpoint(bool is_full_checkpoint) {
     TxnManager *txn_mgr = storage_->txn_manager();
     Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), true /*is_checkpoint*/);
 
-    if(is_full_checkpoint) {
+    if (is_full_checkpoint) {
         FullCheckpointInner(txn);
     } else {
         DeltaCheckpointInner(txn);
@@ -282,7 +287,7 @@ void WalManager::Checkpoint(bool is_full_checkpoint) {
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
     bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
 
-    if(is_full_checkpoint) {
+    if (is_full_checkpoint) {
         FullCheckpointInner(ckp_task->txn_);
     } else {
         DeltaCheckpointInner(ckp_task->txn_);
@@ -312,10 +317,7 @@ void WalManager::FullCheckpointInner(Txn *txn) {
     }
 
     try {
-        LOG_DEBUG(fmt::format("Full Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
-                              txn->TxnID(),
-                              txn->BeginTS(),
-                              max_commit_ts));
+        LOG_DEBUG(fmt::format("Full Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}", txn->TxnID(), txn->BeginTS(), max_commit_ts));
         txn->FullCheckpoint(max_commit_ts);
         SetLastCkpWalSize(wal_size);
 
@@ -351,10 +353,7 @@ void WalManager::DeltaCheckpointInner(Txn *txn) {
     }
 
     try {
-        LOG_DEBUG(fmt::format("Delta Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
-                              txn->TxnID(),
-                              txn->BeginTS(),
-                              max_commit_ts));
+        LOG_DEBUG(fmt::format("Delta Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}", txn->TxnID(), txn->BeginTS(), max_commit_ts));
         TxnTimeStamp new_max_commit_ts = 0;
         if (!txn->DeltaCheckpoint(last_ckp_ts, new_max_commit_ts)) {
             return;
@@ -522,10 +521,10 @@ i64 WalManager::ReplayWalFile() {
                 String error_message = "Found unexpected bad wal entry";
                 UnrecoverableError(error_message);
             }
-            LOG_TRACE(wal_entry->ToString());
+            // LOG_TRACE(wal_entry->ToString());
 
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
-            if (wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
+            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
                 catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
@@ -569,7 +568,7 @@ i64 WalManager::ReplayWalFile() {
         UnrecoverableError(error_message);
     }
     auto &[full_catalog_fileinfo, delta_catalog_fileinfo_array] = catalog_fileinfo.value();
-    storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfo_array, data_path_);
+    storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfo_array);
 
     // phase 3: replay the entries
     LOG_INFO(fmt::format("Replay phase 3: replay {} entries", replay_entries.size()));
@@ -586,7 +585,7 @@ i64 WalManager::ReplayWalFile() {
         last_commit_ts = replay_entries[replay_count]->commit_ts_;
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
-        LOG_TRACE(replay_entries[replay_count]->ToString());
+        LOG_DEBUG(replay_entries[replay_count]->ToString());
         ReplayWalEntry(*replay_entries[replay_count]);
     }
 
@@ -642,8 +641,8 @@ Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::Ge
             }
             LOG_TRACE(wal_entry->ToString());
 
-            WalCmdCheckpoint *checkpoint_cmd = wal_entry->GetCheckPoint();
-            if (checkpoint_cmd != nullptr) {
+            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
                 catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
@@ -711,7 +710,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
 
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
             wal_entries.push_back(wal_entry);
-            if (wal_entry->IsCheckPoint(wal_entries, checkpoint_cmd)) {
+            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 system_start_ts = wal_entry->commit_ts_;
                 break;
@@ -816,6 +815,18 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
                 WalCmdDumpIndexReplay(*static_cast<WalCmdDumpIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             }
+            case WalCommandType::RENAME_TABLE: {
+                WalCmdRenameTableReplay(*static_cast<WalCmdRenameTable *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                break;
+            }
+            case WalCommandType::ADD_COLUMNS: {
+                WalCmdAddColumnsReplay(*static_cast<WalCmdAddColumns *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                break;
+            }
+            case WalCommandType::DROP_COLUMNS: {
+                WalCmdDropColumnsReplay(*static_cast<WalCmdDropColumns *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                break;
+            }
             default: {
                 String error_message = "WalManager::ReplayWalEntry unknown wal command type";
                 UnrecoverableError(error_message);
@@ -830,7 +841,7 @@ void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, Tra
     catalog->CreateDatabaseReplay(
         MakeShared<String>(cmd.db_name_),
         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return DBEntry::ReplayDBEntry(db_meta, false, catalog->DataDir(), db_dir, db_name, txn_id, begin_ts, commit_ts);
+            return DBEntry::ReplayDBEntry(db_meta, false, db_dir, db_name, txn_id, begin_ts, commit_ts);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -844,7 +855,6 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
             return TableEntry::ReplayTableEntry(false,
                                                 table_meta,
-                                                table_meta->base_dir(),
                                                 table_dir,
                                                 table_name,
                                                 cmd.table_def_->columns(),
@@ -865,7 +875,7 @@ void WalManager::WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, Transac
     storage_->catalog()->DropDatabaseReplay(
         cmd.db_name_,
         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return DBEntry::ReplayDBEntry(db_meta, true, data_path_ptr, db_meta->data_dir(), db_name, txn_id, begin_ts, commit_ts);
+            return DBEntry::ReplayDBEntry(db_meta, true, data_path_ptr, db_name, txn_id, begin_ts, commit_ts);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -878,7 +888,6 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID
         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
             return TableEntry::ReplayTableEntry(true,
                                                 table_meta,
-                                                table_meta->base_dir(),
                                                 nullptr,
                                                 table_name,
                                                 Vector<SharedPtr<ColumnDef>>{},
@@ -957,8 +966,10 @@ WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment
                                                              UNCOMMIT_TS /*deprecate_ts*/,
                                                              0 /*begin_ts*/, // FIXME
                                                              txn_id);
+    auto *pm = InfinityContext::instance().persistence_manager();
     for (BlockID block_id = 0; block_id < (BlockID)segment_info.block_infos_.size(); ++block_id) {
         auto &block_info = segment_info.block_infos_[block_id];
+        block_info.addr_serializer_.AddToPersistenceManager(pm);
         auto block_entry = BlockEntry::NewReplayBlockEntry(segment_entry.get(),
                                                            block_id,
                                                            block_info.row_count_,
@@ -971,16 +982,8 @@ WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment
                                                            buffer_mgr,
                                                            txn_id);
         for (ColumnID column_id = 0; column_id < (ColumnID)block_info.outline_infos_.size(); ++column_id) {
-            const auto [next_idx_0, last_off_0] = block_info.outline_infos_[column_id][0];
-            const auto [next_idx_1, last_off_1] = block_info.outline_infos_[column_id][1];
-            auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(),
-                                                                            column_id,
-                                                                            buffer_mgr,
-                                                                            next_idx_0,
-                                                                            next_idx_1,
-                                                                            last_off_0,
-                                                                            last_off_1,
-                                                                            commit_ts);
+            const auto [next_idx, last_off] = block_info.outline_infos_[column_id];
+            auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_idx, last_off, commit_ts);
             block_entry->AddColumnReplay(std::move(column_entry), column_id); // reuse function from delta catalog.
         }
         segment_entry->AddBlockReplay(std::move(block_entry)); // reuse function from delta catalog.
@@ -1087,8 +1090,9 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
             segment_index_entry = segment_index_entry_ptr.get();
         }
     }
-
+    auto *pm = InfinityContext::instance().persistence_manager();
     for (const auto &chunk_info : cmd.chunk_infos_) {
+        chunk_info.addr_serializer_.AddToPersistenceManager(pm);
         segment_index_entry->AddChunkIndexEntryReplayWal(chunk_info.chunk_id_,
                                                          table_entry,
                                                          chunk_info.base_name_,
@@ -1104,6 +1108,38 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
             old_chunk->DeprecateChunk(commit_ts);
         }
     }
+}
+
+void WalManager::WalCmdRenameTableReplay(WalCmdRenameTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    //
+}
+
+void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
+    if (!table_status.ok()) {
+        String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
+        UnrecoverableError(error_message);
+    }
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
+    Vector<Value> default_values;
+    ExpressionBinder tmp_binder(nullptr);
+    for (const auto &column_def : cmd.column_defs_) {
+        if (!column_def->has_default_value()) {
+            UnrecoverableError(fmt::format("Wal Replay: Add column {} without default value", column_def->name()));
+        }
+
+        auto default_expr = column_def->default_value();
+        auto expr = tmp_binder.BuildValueExpr(*default_expr, nullptr, 0, false);
+        auto value_expr = std::dynamic_pointer_cast<ValueExpression>(expr);
+
+        default_values.push_back(value_expr->GetValue());
+    }
+    table_entry->AddColumns(cmd.column_defs_, default_values, txn_store);
+}
+
+void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    //
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

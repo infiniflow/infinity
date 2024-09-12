@@ -1,0 +1,17 @@
+[general]
+version = "0.4.0"
+time_zone = "utc-8"
+
+[network]
+[log]
+log_to_stdout = true
+log_level               = "trace"
+
+[storage]
+mem_index_capacity       = 8192
+
+[buffer]
+[wal]
+delta_checkpoint_interval = "10s"
+
+[resource]

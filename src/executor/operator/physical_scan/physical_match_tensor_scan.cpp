@@ -51,7 +51,7 @@ import status;
 import logger;
 import physical_index_scan;
 import filter_value_type_classification;
-import bitmask;
+import roaring_bitmap;
 import segment_entry;
 import segment_index_entry;
 import chunk_index_entry;
@@ -74,6 +74,7 @@ import filter_value_type_classification;
 import logical_match_tensor_scan;
 import simd_functions;
 import knn_expression;
+import search_options;
 
 namespace infinity {
 
@@ -200,6 +201,12 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
             }
         }
     }
+    if (!block_column_entries_.empty()) {
+        // check unused option text
+        if (const SearchOptions options(src_match_tensor_expr_->options_text_); options.size() != options.options_.count("topn")) {
+            RecoverableError(Status::SyntaxError(fmt::format(R"(Input option text "{}" has unused part.)", src_match_tensor_expr_->options_text_)));
+        }
+    }
     LOG_TRACE(fmt::format("MatchTensorScan: brute force task: {}, index task: {}", block_column_entries_.size(), index_entries_.size()));
 }
 
@@ -249,12 +256,14 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         auto *index_entry = index_entries_[task_job_index];
         const auto segment_id = index_entry->segment_id();
         SegmentEntry *segment_entry = nullptr;
+        SegmentOffset segment_row_count = 0;
         const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
             String error_message = fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id);
             UnrecoverableError(error_message);
         } else {
             segment_entry = iter->second.segment_entry_;
+            segment_row_count = iter->second.segment_offset_;
         }
 
         bool has_some_result = false;
@@ -263,21 +272,12 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             has_some_result = true;
             segment_bitmask.SetAllTrue();
         } else {
-            auto it = common_query_filter_->filter_result_.find(segment_id);
-            if (it != common_query_filter_->filter_result_.end()) {
+            if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
                 LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, index_entries_.size()));
-
-                auto segment_row_count = segment_entry->row_count();
-                const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
-                if (std::holds_alternative<Vector<u32>>(filter_result)) {
-                    const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                    segment_bitmask.Initialize(std::ceil(segment_row_count));
-                    segment_bitmask.SetAllFalse();
-                    for (u32 row_id : filter_result_vector) {
-                        segment_bitmask.SetTrue(row_id);
-                    }
-                } else {
-                    segment_bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+                segment_bitmask = it->second;
+                if (segment_row_count != segment_bitmask.count()) {
+                    UnrecoverableError(
+                        fmt::format("Segment row count {} not match with bitmask size {}", segment_row_count, segment_bitmask.count()));
                 }
                 has_some_result = true;
             }
@@ -707,11 +707,8 @@ struct CalcutateScoreOfTensorRow {
                          const char *query_tensor_ptr,
                          const u32 query_embedding_num,
                          const u32 basic_embedding_dimension) {
-        auto tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
-        FixHeapManager *tensor_heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
-        const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[block_offset];
-        const char *tensor_data_ptr = tensor_heap_mgr->GetRawPtrFromChunk(chunk_id, chunk_offset);
-        return Op::Score(query_tensor_ptr, tensor_data_ptr, query_embedding_num, embedding_num, basic_embedding_dimension);
+        const auto [raw_data, embedding_num] = column_vector.GetTensorRaw(block_offset);
+        return Op::Score(query_tensor_ptr, raw_data.data(), query_embedding_num, embedding_num, basic_embedding_dimension);
     }
 };
 
@@ -722,19 +719,10 @@ struct CalcutateScoreOfTensorArrayRow {
                          const char *query_tensor_ptr,
                          const u32 query_embedding_num,
                          const u32 basic_embedding_dimension) {
-        auto tensor_array_ptr = reinterpret_cast<const TensorArrayT *>(column_vector.data());
-        FixHeapManager *tensor_array_heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
-        FixHeapManager *tensor_heap_mgr = column_vector.buffer_->fix_heap_mgr_1_.get();
-        const auto [tensor_num, tensor_array_chunk_id, tensor_array_chunk_offset] = tensor_array_ptr[block_offset];
-        Vector<TensorT> tensors(tensor_num);
-        tensor_array_heap_mgr->ReadFromHeap(reinterpret_cast<char *>(tensors.data()),
-                                            tensor_array_chunk_id,
-                                            tensor_array_chunk_offset,
-                                            tensor_num * sizeof(TensorT));
         float maxsim_score = std::numeric_limits<float>::lowest();
-        for (const auto [embedding_num, tensor_chunk_id, tensor_chunk_offset] : tensors) {
-            const char *tensor_data_ptr = tensor_heap_mgr->GetRawPtrFromChunk(tensor_chunk_id, tensor_chunk_offset);
-            const float tensor_score = Op::Score(query_tensor_ptr, tensor_data_ptr, query_embedding_num, embedding_num, basic_embedding_dimension);
+        Vector<Pair<Span<const char>, SizeT>> tensor_array = column_vector.GetTensorArrayRaw(block_offset);
+        for (const auto &[raw_data, embedding_num] : tensor_array) {
+            const float tensor_score = Op::Score(query_tensor_ptr, raw_data.data(), query_embedding_num, embedding_num, basic_embedding_dimension);
             maxsim_score = std::max(maxsim_score, tensor_score);
         }
         return maxsim_score;
@@ -1144,7 +1132,8 @@ AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpres
                                                                 src_match_tensor_expr.dimension_,
                                                                 EmbeddingT(static_cast<char *>(aligned_ptr), false),
                                                                 src_match_tensor_expr.tensor_basic_embedding_dimension_,
-                                                                src_match_tensor_expr.options_text_);
+                                                                src_match_tensor_expr.options_text_,
+                                                                src_match_tensor_expr.optional_filter_);
     }
     return result;
 }

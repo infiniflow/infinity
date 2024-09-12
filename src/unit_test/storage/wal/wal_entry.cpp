@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-
-#include <filesystem>
-
+#include "gtest/gtest.h"
+import base_test;
 import infinity_context;
 import infinity_exception;
 
@@ -37,10 +35,12 @@ import internal_types;
 import column_def;
 import statement_common;
 import data_type;
-
-class WalEntryTest : public BaseTest {};
+import persistence_manager;
+import embedding_info;
 
 using namespace infinity;
+
+class WalEntryTest : public BaseTest {};
 
 SharedPtr<TableDef> MockTableDesc2() {
     // Define columns
@@ -85,12 +85,9 @@ WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT co
         block_info.block_id_ = 0;
         block_info.row_count_ = row_count;
         block_info.row_capacity_ = row_count;
-        Vector<Vector<Pair<u32, u64>>> outline_infos;
-        outline_infos.resize(column_count);
-        for (SizeT i = 0; i < column_count; ++i) {
-            outline_infos[i].resize(2);
-        }
-        block_info.outline_infos_ = std::move(outline_infos);
+        Vector<Pair<u32, u64>> outline_info;
+        outline_info.resize(column_count);
+        block_info.outline_infos_ = std::move(outline_info);
     }
     segment_info.block_infos_ = std::move(block_infos_);
     return segment_info;
@@ -239,10 +236,43 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<RowID> row_ids = {RowID(1, 3)};
         entry->cmds_.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, String(GetFullDataDir()) + "/catalog", String("META_123.full.json")));
+    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "catalog", String("META_123.full.json")));
     {
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
+    }
+    {
+        WalChunkIndexInfo info;
+        info.chunk_id_ = 2;
+        info.base_name_ = "base_name";
+        info.base_rowid_ = RowID(0, 0);
+        info.row_count_ = 4;
+        info.deprecate_ts_ = 0;
+        Vector<WalChunkIndexInfo> chunk_infos{info};
+        Vector<ChunkID> deprecate_ids{0, 1};
+        entry->cmds_.push_back(MakeShared<WalCmdDumpIndex>("db1", "tbl1", "idx1", 0 /*segment_id*/, chunk_infos, deprecate_ids));
+    }
+    {
+        entry->cmds_.push_back(MakeShared<WalCmdRenameTable>("db1", "tbl1", "tbl2"));
+    }
+    {
+        Vector<SharedPtr<ColumnDef>> column_defs;
+        std::set<ConstraintType> constraints;
+
+        auto column_def3 = MakeShared<ColumnDef>(3 /*column_id*/, MakeShared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
+        auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
+        auto column_def4 =
+            MakeShared<ColumnDef>(4 /*column id*/, MakeShared<DataType>(LogicalType::kEmbedding, embedding_info), "embedding_col", constraints);
+
+        column_defs.push_back(column_def3);
+        column_defs.push_back(column_def4);
+        entry->cmds_.push_back(MakeShared<WalCmdAddColumns>("db1", "tbl1", std::move(column_defs)));
+    }
+    {
+        Vector<String> column_names;
+        column_names.push_back("boolean_col");
+        column_names.push_back("embedding_col");
+        entry->cmds_.push_back(MakeShared<WalCmdDropColumns>("db1", "tbl1", std::move(column_names)));
     }
 
     i32 exp_size = entry->GetSizeInBytes();
@@ -252,11 +282,42 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 
-    ptr = buf_beg;
-    SharedPtr<WalEntry> entry2 = WalEntry::ReadAdv(ptr, exp_size);
+    const char *ptr_r = buf_beg;
+    SharedPtr<WalEntry> entry2 = WalEntry::ReadAdv(ptr_r, exp_size);
     EXPECT_NE(entry2, nullptr);
     EXPECT_EQ(*entry == *entry2, true);
-    EXPECT_EQ(ptr - buf_beg, exp_size);
+    EXPECT_EQ(ptr_r - buf_beg, exp_size);
+}
+
+TEST_F(WalEntryTest, ReadWriteVFS) {
+    RemoveDbDirs();
+    SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
+
+    Vector<String> paths = {"path1", "path2"};
+    String workspace = GetFullPersistDir();
+    String data_dir = GetFullDataDir();
+    SizeT object_size_limit = 100;
+    PersistenceManager pm(workspace, data_dir, object_size_limit);
+    ObjAddr obj_addr0{.obj_key_ = "key1", .part_offset_ = 0, .part_size_ = 10};
+    ObjAddr obj_addr1{.obj_key_ = "key1", .part_offset_ = 10, .part_size_ = 20};
+    pm.SaveLocalPath(paths[0], obj_addr0);
+    pm.SaveLocalPath(paths[1], obj_addr1);
+
+    AddrSerializer addr_serializer;
+    addr_serializer.Initialize(&pm, paths);
+    SizeT size = addr_serializer.GetSizeInBytes();
+    auto buffer = MakeUnique<char[]>(size);
+    char *ptr = buffer.get();
+    addr_serializer.WriteBufAdv(ptr);
+    SizeT write_size = ptr - buffer.get();
+    ASSERT_EQ(write_size, size);
+
+    AddrSerializer addr_serializer1;
+    const char *ptr1 = buffer.get();
+    Vector<String> paths1 = addr_serializer1.ReadBufAdv(ptr1);
+    SizeT read_size = ptr1 - buffer.get();
+    ASSERT_EQ(read_size, size);
+    ASSERT_EQ(paths1, paths);
 }
 
 void Println(const String &message1, const String &message2) { std::cout << message1 << message2 << std::endl; }
@@ -266,7 +327,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     RemoveDbDirs();
     std::filesystem::create_directories(GetFullWalDir());
     String wal_file_path = String(GetFullWalDir()) + "/wal.log";
-    String ckp_file_path = String(GetFullDataDir()) + "/catalog";
+    String ckp_file_path = "catalog";
     String ckp_file_name = String("META_123.full.json");
     MockWalFile(wal_file_path, ckp_file_path, ckp_file_name);
     {
@@ -277,10 +338,10 @@ TEST_F(WalEntryTest, WalEntryIterator) {
             if (wal_entry == nullptr) {
                 break;
             }
-            Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
-            for (const auto &cmd : wal_entry->cmds_) {
-                Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-            }
+//            Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
+//            for (const auto &cmd : wal_entry->cmds_) {
+//                Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+//            }
         }
     }
 
@@ -297,14 +358,14 @@ TEST_F(WalEntryTest, WalEntryIterator) {
                 break;
             }
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
-            if (!wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
+            if (!wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 replay_entries.push_back(wal_entry);
             } else {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 catalog_path = checkpoint_cmd->catalog_path_;
 
-                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
-                Println("Catalog Path: {}", catalog_path);
+//                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
+//                Println("Catalog Path: {}", catalog_path);
                 break;
             }
         }
@@ -322,15 +383,15 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     }
 
     // phase 3: replay the entries
-    Println("Start to replay the entries", "");
-    for (const auto &entry : replay_entries) {
-        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
-        for (const auto &cmd : entry->cmds_) {
-            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-        }
-    }
+//    Println("Start to replay the entries", "");
+//    for (const auto &entry : replay_entries) {
+//        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
+//        for (const auto &cmd : entry->cmds_) {
+//            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+//        }
+//    }
     EXPECT_EQ(max_commit_ts, 123ul);
-    EXPECT_EQ(catalog_path, String(GetFullDataDir()) + "/catalog");
+    EXPECT_EQ(catalog_path, String("catalog"));
     EXPECT_EQ(replay_entries.size(), 1u);
 }
 
@@ -340,7 +401,7 @@ TEST_F(WalEntryTest, WalListIterator) {
     std::filesystem::create_directories(GetFullWalDir());
     String wal_file_path1 = String(GetFullWalDir()) + "/wal.log";
     String wal_file_path2 = String(GetFullWalDir()) + "/wal2.log";
-    String ckp_file_path = String(GetFullDataDir()) + "/catalog";
+    String ckp_file_path = "catalog";
     String ckp_file_name = String("META_123.full.json");
     MockWalFile(wal_file_path1, ckp_file_path, ckp_file_name);
     MockWalFile(wal_file_path2, ckp_file_path, ckp_file_name);
@@ -352,10 +413,10 @@ TEST_F(WalEntryTest, WalListIterator) {
         if (wal_entry.get() == nullptr) {
             break;
         }
-        Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
-        for (const auto &cmd : wal_entry->cmds_) {
-            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-        }
+//        Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
+//        for (const auto &cmd : wal_entry->cmds_) {
+//            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+//        }
     }
 
     Vector<SharedPtr<WalEntry>> replay_entries;
@@ -371,14 +432,14 @@ TEST_F(WalEntryTest, WalListIterator) {
                 break;
             }
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
-            if (!wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
+            if (!wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 replay_entries.push_back(wal_entry);
             } else {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 catalog_path = checkpoint_cmd->catalog_path_;
 
-                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
-                Println("Catalog Path: {}", catalog_path);
+//                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
+//                Println("Catalog Path: {}", catalog_path);
                 break;
             }
         }
@@ -396,13 +457,13 @@ TEST_F(WalEntryTest, WalListIterator) {
     }
 
     // phase 3: replay the entries
-    Println("Start to replay the entries", "");
-    for (const auto &entry : replay_entries) {
-        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
-        for (const auto &cmd : entry->cmds_) {
-            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-        }
-    }
+//    Println("Start to replay the entries", "");
+//    for (const auto &entry : replay_entries) {
+//        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
+//        for (const auto &cmd : entry->cmds_) {
+//            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+//        }
+//    }
     EXPECT_EQ(max_commit_ts, 123ul);
     EXPECT_EQ(catalog_path, ckp_file_path);
     EXPECT_EQ(replay_entries.size(), 1u);

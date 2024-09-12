@@ -6,7 +6,6 @@ from threading import Thread
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
-from infinity.table import Table
 from infinity.db import Database
 
 kRunningTime = 30
@@ -56,7 +55,6 @@ def create_index(db_obj: Database):
                                index.IndexInfo("c1", index.IndexType.Hnsw,{
                                    "M": "16",
                                    "ef_construction": "50",
-                                   "ef": "50",
                                    "metric": "l2"
                                }), ConflictType.Error)
     except Exception as e:

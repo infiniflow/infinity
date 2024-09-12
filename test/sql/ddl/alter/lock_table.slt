@@ -1,0 +1,52 @@
+statement ok
+DROP TABLE IF EXISTS products;
+
+statement ok
+CREATE TABLE products (product_no INT, price INT, description VARCHAR);
+
+statement ok
+INSERT INTO products VALUES (1, 2, 'abcdef');
+
+statement error
+INSERT INTO products VALUES (1, 2);
+
+statement ok
+LOCK TABLE products;
+
+statement error
+INSERT INTO products VALUES (2, 2, 'abcdef');
+
+statement error
+UPDATE products SET price=1 WHERE product_no=1;
+
+statement error
+COPY products FROM '/var/infinity/test_data/basic.csv' WITH (FORMAT CSV);
+
+statement error
+DELETE FROM products WHERE product_no=1;
+
+statement error
+COMPACT TABLE products;
+
+statement error
+CREATE INDEX idx_c1 ON products (product_no);
+
+query
+SELECT * FROM products;
+----
+1 2 abcdef
+
+statement ok
+UNLOCK TABLE products;
+
+statement ok
+INSERT INTO products VALUES (2, 2, 'abcdef');
+
+query
+SELECT * FROM products;
+----
+1 2 abcdef
+2 2 abcdef
+
+statement ok
+DROP TABLE products;

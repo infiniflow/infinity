@@ -271,71 +271,57 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                                 ((BigIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
-                        case kHugeInt: {
+                        case LogicalType::kHugeInt: {
                             String error_message = "Not implement: HugeInt data shuffle";
                             UnrecoverableError(error_message);
                             break;
                         }
-                        case kFloat: {
+                        case LogicalType::kFloat: {
                             ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
                                 ((FloatT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
-                        case kDouble: {
+                        case LogicalType::kDouble: {
                             ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
                                 ((DoubleT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
-                        case kDecimal: {
+                        case LogicalType::kDecimal: {
                             String error_message = "Not implement: data shuffle.";
                             UnrecoverableError(error_message);
                             break;
                         }
-                        case kVarchar: {
+                        case LogicalType::kVarchar: {
                             String error_message = "Not implement: data shuffle.";
                             UnrecoverableError(error_message);
-                            //                            VarcharT &dst_ref = ((VarcharT
-                            //                            *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]; VarcharT &src_ref
-                            //                            = ((VarcharT
-                            //                            *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
-                            //                            (src_ref.IsInlined()) {
-                            //                                std::memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
-                            //                            } else {
-                            //                                dst_ref.length = src_ref.length;
-                            //                                std::memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
-                            //
-                            //                                dst_ref.ptr =
-                            //                                output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
-                            //                                std::memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
-                            //                            }
                             break;
                         }
-                        case kDate: {
+                        case LogicalType::kDate: {
                             ((DateT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
                                 ((DateT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
-                        case kTime: {
+                        case LogicalType::kTime: {
                             String error_message = "Not implement: data shuffle.";
                             UnrecoverableError(error_message);
                             break;
                         }
-                        case kDateTime: {
+                        case LogicalType::kDateTime: {
                             String error_message = "Not implement: data shuffle.";
                             UnrecoverableError(error_message);
                             break;
                         }
-                        case kTimestamp: {
+                        case LogicalType::kTimestamp: {
                             String error_message = "Not implement: data shuffle.";
                             UnrecoverableError(error_message);
                             break;
                         }
-                        case kInterval: {
+                        case LogicalType::kInterval: {
                             String error_message = "Not implement: data shuffle.";
                             UnrecoverableError(error_message);
                             break;
                         }
-                        case kMixed: {
+                        case LogicalType::kMixed: {
                             String error_message = "Not implement: data shuffle.";
                             UnrecoverableError(error_message);
                             break;
@@ -423,70 +409,57 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                         ((BigIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
-                case kHugeInt: {
+                case LogicalType::kHugeInt: {
                     String error_message = "Not implement: data shuffle.";
                     UnrecoverableError(error_message);
                     break;
                 }
-                case kFloat: {
+                case LogicalType::kFloat: {
                     ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
                         ((FloatT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
-                case kDouble: {
+                case LogicalType::kDouble: {
                     ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
                         ((DoubleT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
-                case kDecimal: {
+                case LogicalType::kDecimal: {
                     String error_message = "Not implement: data shuffle.";
                     UnrecoverableError(error_message);
                     break;
                 }
-                case kVarchar: {
+                case LogicalType::kVarchar: {
                     String error_message = "Not implement: data shuffle.";
                     UnrecoverableError(error_message);
                     break;
-                    //                    VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
-                    //                    VarcharT &src_ref = ((VarcharT
-                    //                    *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
-                    //                    (src_ref.IsInlined()) {
-                    //                        std::memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
-                    //                    } else {
-                    //                        dst_ref.length = src_ref.length;
-                    //                        std::memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
-                    //
-                    //                        dst_ref.ptr =
-                    //                        output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
-                    //                        std::memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
-                    //                    }
                 }
-                case kDate: {
+                case LogicalType::kDate: {
                     ((DateT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
                         ((DateT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
-                case kTime: {
+                case LogicalType::kTime: {
                     String error_message = "Not implement: data shuffle.";
                     UnrecoverableError(error_message);
                     break;
                 }
-                case kDateTime: {
+                case LogicalType::kDateTime: {
                     String error_message = "Not implement: data shuffle.";
                     UnrecoverableError(error_message);
                     break;
                 }
-                case kTimestamp: {
+                case LogicalType::kTimestamp: {
                     String error_message = "Not implement: data shuffle.";
                     UnrecoverableError(error_message);
                     break;
                 }
-                case kInterval: {
+                case LogicalType::kInterval: {
                     String error_message = "Not implement: data shuffle.";
                     UnrecoverableError(error_message);
                     break;
                 }
-                case kMixed: {
+                case LogicalType::kMixed: {
                     String error_message = "Not implement: data shuffle.";
                     UnrecoverableError(error_message);
                     break;
@@ -552,44 +525,44 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                         ((BigIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
-                case kHugeInt: {
+                case LogicalType::kHugeInt: {
                     NotImplementError("HugeInt data shuffle isn't implemented.")
                 }
-                case kFloat: {
+                case LogicalType::kFloat: {
                     ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
                         ((FloatT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
-                case kDouble: {
+                case LogicalType::kDouble: {
                     ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
                         ((DoubleT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
-                case kDecimal: {
+                case LogicalType::kDecimal: {
                     NotImplementError("Decimal data shuffle isn't implemented.")
                 }
-                case kVarchar: {
+                case LogicalType::kVarchar: {
                     NotImplementError("Varchar data shuffle isn't implemented.")
                 }
-                case kDate: {
+                case LogicalType::kDate: {
                     NotImplementError("Date data shuffle isn't implemented.")
                 }
-                case kTime: {
+                case LogicalType::kTime: {
                     NotImplementError("Time data shuffle isn't implemented.")
                 }
-                case kDateTime: {
+                case LogicalType::kDateTime: {
                     NotImplementError("Datetime data shuffle isn't implemented.")
                 }
-                case kTimestamp: {
+                case LogicalType::kTimestamp: {
                     NotImplementError("Timestamp data shuffle isn't implemented.")
                 }
-                case kTimestampTZ: {
+                case LogicalType::kTimestampTZ: {
                     NotImplementError("TimestampTZ data shuffle isn't implemented.")
                 }
-                case kInterval: {
+                case LogicalType::kInterval: {
                     NotImplementError("Interval data shuffle isn't implemented.")
                 }
-                case kMixed: {
+                case LogicalType::kMixed: {
                     NotImplementError("Heterogeneous data shuffle isn't implemented.")
                 }
                 default: {

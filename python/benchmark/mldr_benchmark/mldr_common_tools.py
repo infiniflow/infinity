@@ -5,6 +5,7 @@ from tqdm import tqdm
 import datasets
 from dataclasses import dataclass, field
 from pyserini.output_writer import get_output_writer, OutputFormat
+from infinity.common import SparseVector
 
 
 @dataclass
@@ -265,20 +266,20 @@ query_yields = {'bm25': bm25_query_yield, 'dense': dense_query_yield, 'sparse': 
 
 
 def apply_bm25(table, query_str: str, max_hits: int):
-    return table.match('fulltext_col', query_str, f'topn={max_hits}')
+    return table.match_text('fulltext_col', query_str, max_hits)
 
 
 def apply_dense(table, query_embedding, max_hits: int):
-    return table.knn("dense_col", query_embedding, "float", "ip", max_hits, {"ef": str(max_hits)})
+    return table.match_dense("dense_col", query_embedding, "float", "ip", max_hits, {"ef": str(max_hits)})
 
 
 def apply_sparse(table, query_embedding: dict, max_hits: int):
-    return table.match_sparse("sparse_col", query_embedding, "ip", max_hits, {"alpha": "0.9", "beta": "0.5"})
+    return table.match_sparse("sparse_col", SparseVector(**query_embedding), "ip", max_hits, {"alpha": "0.9", "beta": "0.5"})
 
 
 def apply_colbert(table, query_tensor: list[list], max_hits: int):
-    return table.match_tensor("colbert_col", query_tensor, 'float', 'maxsim',
-                              f'topn={max_hits};emvb_threshold_first=0.3;emvb_threshold_final=0.4')
+    return table.match_tensor(column_name="colbert_col", query_data=query_tensor, query_data_type='float',
+                              topn=max_hits, extra_option={"emvb_threshold_first": 0.3, "emvb_threshold_final": 0.4})
 
 
 apply_funcs = {'bm25': apply_bm25, 'dense': apply_dense, 'sparse': apply_sparse, 'colbert': apply_colbert}

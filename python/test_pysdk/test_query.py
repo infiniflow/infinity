@@ -1,12 +1,10 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import pytest
 from common import common_values
 import infinity
+import infinity_embedded
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
@@ -14,6 +12,10 @@ from infinity.remote_thrift.db import RemoteDatabase
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
 from infinity.common import ConflictType
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 
@@ -30,11 +32,14 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.index")
+        globals()["index"] = module
         uri = common_values.TEST_LOCAL_PATH
+        request.cls.infinity_obj = infinity_embedded.connect(uri)
     else:
         uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    request.cls.infinity_obj = infinity.connect(uri)
     if http:
         request.cls.infinity_obj = infinity_http()
     yield
@@ -76,9 +81,9 @@ class TestInfinity:
         # Create a query builder
         query_builder = InfinityThriftQueryBuilder(table)
         query_builder.output(["num", "body"])
-        query_builder.knn('vec', [3.0] * 5, 'float', 'ip', 2)
-        query_builder.match('body', 'harmful', 'topn=2')
-        query_builder.fusion('rrf')
+        query_builder.match_dense('vec', [3.0] * 5, 'float', 'ip', 2)
+        query_builder.match_text('body', 'harmful', 2, None)
+        query_builder.fusion(method='rrf', topn=10, fusion_params=None)
         res = query_builder.to_df()
         print(res)
         res = table.drop_index("my_index", ConflictType.Error)

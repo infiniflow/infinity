@@ -83,13 +83,7 @@ i32 TableDef::GetSizeInBytes() const {
     size += sizeof(i32);
     for (u32 i = 0; i < columns_.size(); i++) {
         const ColumnDef &cd = *columns_[i];
-        size += sizeof(i64); // id_
-        size += cd.column_type_->GetSizeInBytes();
-        size += sizeof(i32) + cd.name_.length();
-        size += sizeof(i32);
-        size += cd.constraints_.size() * sizeof(ConstraintType);
-        size += (dynamic_cast<ConstantExpr *>(cd.default_expr_.get()))->GetSizeInBytes();
-        size += sizeof(u8); // build_bloom_filter_
+        size += cd.GetSizeInBytes();
     }
     return size;
 }
@@ -101,22 +95,13 @@ void TableDef::WriteAdv(char *&ptr) const {
     SizeT column_count = columns_.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
         const ColumnDef &cd = *columns_[idx];
-        WriteBufAdv<i64>(ptr, cd.id_);
-        cd.column_type_->WriteAdv(ptr);
-        WriteBufAdv(ptr, cd.name_);
-        WriteBufAdv(ptr, (i32)cd.constraints_.size());
-        for (const auto &cons : cd.constraints_) {
-            WriteBufAdv(ptr, cons);
-        }
-        (dynamic_cast<ConstantExpr *>(cd.default_expr_.get()))->WriteAdv(ptr);
-        u8 bf = cd.build_bloom_filter_ ? 1 : 0;
-        WriteBufAdv(ptr, bf);
+        cd.WriteAdv(ptr);
     }
     return;
 }
 
-SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
+SharedPtr<TableDef> TableDef::ReadAdv(const char *&ptr, i32 maxbytes) {
+    const char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
         String error_message = "ptr goes out of range when reading TableDef";
         UnrecoverableError(error_message);
@@ -126,24 +111,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
     i32 columns_size = ReadBufAdv<i32>(ptr);
     Vector<SharedPtr<ColumnDef>> columns;
     for (i32 i = 0; i < columns_size; i++) {
-        i64 id = ReadBufAdv<i64>(ptr);
-        maxbytes = ptr_end - ptr;
-        if (maxbytes <= 0) {
-            String error_message = "ptr goes out of range when reading TableDef";
-        UnrecoverableError(error_message);
-        }
-        SharedPtr<DataType> column_type = DataType::ReadAdv(ptr, maxbytes);
-        String column_name = ReadBufAdv<String>(ptr);
-        i32 constraints_size = ReadBufAdv<i32>(ptr);
-        std::set<ConstraintType> constraints;
-        for (i32 j = 0; j < constraints_size; j++) {
-            ConstraintType ct = ReadBufAdv<ConstraintType>(ptr);
-            constraints.insert(ct);
-        }
-        SharedPtr<ParsedExpr> default_expr = ConstantExpr::ReadAdv(ptr, maxbytes);
-        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints, default_expr);
-        u8 bf = ReadBufAdv<u8>(ptr);
-        cd->build_bloom_filter_ = bf;
+        auto cd = ColumnDef::ReadAdv(ptr, maxbytes);
         columns.push_back(cd);
     }
     maxbytes = ptr_end - ptr;

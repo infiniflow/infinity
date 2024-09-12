@@ -13,8 +13,7 @@ class TestDrop:
         infinity_runner.clear()
 
         infinity_runner.init(config)
-        time.sleep(1)
-        infinity_obj = infinity.connect(uri)
+        infinity_obj = InfinityRunner.connect(uri)
 
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.create_table("test_drop", {"c1": {"type": "int"}})
@@ -36,11 +35,15 @@ class TestDrop:
 
         # replay nothing
         infinity_runner.init(config)
-        time.sleep(1)
-        infinity_obj = infinity.connect(uri)
+        infinity_obj = InfinityRunner.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         try:
             table_obj = db_obj.get_table("test_drop")
         except Exception as e:
             assert e.error_code == ErrorCode.TABLE_NOT_EXIST
         print(table_obj)
+
+        db_obj.drop_table("test_drop")
+
+        infinity_obj.disconnect()
+        infinity_runner.uninit()

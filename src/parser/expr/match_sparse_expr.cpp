@@ -23,7 +23,7 @@ void MatchSparseExpr::SetSearchColumn(ParsedExpr *&column_expr) {
     column_expr = nullptr;
 }
 
-void MatchSparseExpr::SetQuerySparse(ConstantExpr *raw_sparse_expr) {
+void MatchSparseExpr::SetQuerySparse(ConstantExpr *&raw_sparse_expr) {
     query_sparse_expr_.reset(raw_sparse_expr);
     query_sparse_expr_->TrySortSparseVec(nullptr);
     raw_sparse_expr = nullptr;
@@ -54,6 +54,11 @@ void MatchSparseExpr::SetOptParams(size_t topn, std::vector<InitParameter *> *&o
     opt_params = nullptr;
 }
 
+void MatchSparseExpr::SetOptionalFilter(ParsedExpr *&filter_expr) {
+    filter_expr_.reset(filter_expr);
+    filter_expr = nullptr;
+}
+
 std::string MatchSparseExpr::ToString() const {
     std::string column_str = column_expr_->ToString();
     std::string query_str = query_sparse_expr_->ToString();
@@ -67,9 +72,9 @@ std::string MatchSparseExpr::ToString() const {
             ss << ", ";
         }
     }
-    std::string opt_str = ss.str();
-
-    return fmt::format("MATCH SPARSE ({}, [{}], {}, {}) WITH ({})", column_str, query_str, method_str, topn_, opt_str);
+    std::string opt_str = std::move(ss).str();
+    const auto filter_str = filter_expr_ ? fmt::format(", WHERE {}", filter_expr_->ToString()) : "";
+    return fmt::format("MATCH SPARSE ({}, [{}], {}, {}{}) WITH ({})", column_str, query_str, method_str, topn_, filter_str, opt_str);
 }
 
 void MatchSparseExpr::SetMetricTypeInner(std::string_view metric_type) {

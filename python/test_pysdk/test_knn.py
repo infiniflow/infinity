@@ -1,21 +1,22 @@
+import importlib
 import sys
 import os
+import pytest
+from common import common_values
+from common import common_index
+import infinity
+import infinity_embedded
+from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
+import infinity.index as index
+from infinity.errors import ErrorCode
+from infinity.common import ConflictType, InfinityException, SparseVector
+from common.utils import copy_data, generate_commas_enwiki
+import pandas as pd
+from numpy import dtype
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
-import pytest
-from common import common_values
-import infinity
-from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
-import infinity.index as index
-from infinity.errors import ErrorCode
-from infinity.common import ConflictType, InfinityException, CommonMatchTensorExpr
-from infinity.remote_thrift.types import make_match_tensor_expr as remote_make_match_tensor_expr
-from infinity.local_infinity.types import make_match_tensor_expr as local_make_match_tensor_expr
-from common.utils import copy_data, generate_commas_enwiki
-import pandas as pd
-from numpy import dtype
 from infinity_http import infinity_http
 
 
@@ -32,11 +33,21 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.index")
+        globals()["index"] = module
+        module = importlib.import_module("infinity_embedded.common")
+        func = getattr(module, 'ConflictType')
+        globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
+        func = getattr(module, 'SparseVector')
+        globals()['SparseVector'] = func
         uri = common_values.TEST_LOCAL_PATH
+        request.cls.infinity_obj = infinity_embedded.connect(uri)
     else:
         uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    request.cls.infinity_obj = infinity.connect(uri)
     if http:
         request.cls.infinity_obj = infinity_http()
     yield
@@ -84,16 +95,16 @@ class TestInfinity:
         # res = table_obj.output(["variant_id"]).to_df()
 
         # true
-        # res = table_obj.output(["variant_id", "query_price"]).knn('gender_vector', [1.0] * 768, "float", "ip",
-        #                                                           10).to_pl()
+        # res = table_obj.output(["variant_id", "query_price"]).match_dense('gender_vector', [1.0] * 768, "float", "ip",
+        #                                                                   10).to_pl()
         # print(res)
 
         # true
-        res = table_obj.output(["variant_id", "_row_id"]).knn("gender_vector", [1.0] * 4, "float", "ip", 10).to_pl()
+        res = table_obj.output(["variant_id", "_row_id"]).match_dense("gender_vector", [1.0] * 4, "float", "ip", 10).to_pl()
         print(res)
 
         # FIXME
-        # res = table_obj.output(["variant_id", "query_is_recommend", "query_gender", "query_color", "query_price"]).knn(
+        # res = table_obj.output(["variant_id", "query_is_recommend", "query_gender", "query_color", "query_price"]).match_dense(
         #     "gender_vector", [1.0] * 4, "float", "ip", 3).to_pl()
 
         # print(res)
@@ -121,7 +132,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1, 5, 9, 11), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12], [127, 128, 255])}).astype(
             {'c1': dtype('int32')}))
-        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "uint8", "l2", 10).to_df()
+        res = table_obj.output(["c1", "_distance"]).match_dense('c2', [0, 0, 0], "uint8", "l2", 10).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
@@ -131,7 +142,6 @@ class TestInfinity:
                                                                   {
                                                                       "M": "16",
                                                                       "ef_construction": "50",
-                                                                      "ef": "50",
                                                                       "metric": "l2",
                                                                       "encode": "lvq"
                                                                   }),
@@ -139,17 +149,16 @@ class TestInfinity:
         res = table_obj.create_index("valid_lvq", index.IndexInfo("c2", index.IndexType.Hnsw, {
             "M": "16",
             "ef_construction": "50",
-            "ef": "50",
             "metric": "l2"
         }), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "uint8", "l2", 10).to_df()
+        res = table_obj.output(["c1", "_distance"]).match_dense('c2', [0, 0, 0], "uint8", "l2", 10).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
             {'c1': dtype('int32'), 'DISTANCE': dtype('float32')}))
         with pytest.raises(InfinityException):
-            table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "int8", "l2", 10).to_result()
+            table_obj.output(["c1", "_distance"]).match_dense('c2', [0, 0, 0], "int8", "l2", 10).to_result()
         res = db_obj.drop_table("test_knn_u8"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -175,7 +184,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1, 5, 9, 11), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12], [127, 128, 255])}).astype(
             {'c1': dtype('int32')}))
-        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], query_elem_type, "l2", 10).to_df()
+        res = table_obj.output(["c1", "_distance"]).match_dense('c2', [0, 0, 0], query_elem_type, "l2", 10).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
@@ -239,7 +248,7 @@ class TestInfinity:
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
-        res = table_obj.output(["variant_id", "_row_id", "_similarity"]).knn(
+        res = table_obj.output(["variant_id", "_row_id", "_similarity"]).match_dense(
             column_name, [1.0] * 4, "float", "ip", 2).to_pl()
         print(res)
 
@@ -276,7 +285,7 @@ class TestInfinity:
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
         with pytest.raises(InfinityException) as e:
-            table_obj.output(["variant_id", "_row_id"]).knn(column_name, [1.0] * 4, "float", "ip", 2).to_pl()
+            table_obj.output(["variant_id", "_row_id"]).match_dense(column_name, [1.0] * 4, "float", "ip", 2).to_pl()
 
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
@@ -311,7 +320,7 @@ class TestInfinity:
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
-        res = table_obj.output(["variant_id", "_row_id"]).knn(
+        res = table_obj.output(["variant_id", "_row_id"]).match_dense(
             "gender_vector", embedding_data, "float", "ip", 2).to_pl()
         print(res)
 
@@ -351,7 +360,7 @@ class TestInfinity:
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
         with pytest.raises(Exception):
-            res = table_obj.output(["variant_id", "_row_id"]).knn(
+            res = table_obj.output(["variant_id", "_row_id"]).match_dense(
                 "gender_vector", embedding_data, "float", "ip", 2).to_pl()
             print(res)
 
@@ -389,16 +398,16 @@ class TestInfinity:
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
         if embedding_data_type[1]:
-            res = table_obj.output(["variant_id", "_distance"]).knn("gender_vector", embedding_data,
-                                                                    embedding_data_type[0],
-                                                                    "l2",
-                                                                    2).to_pl()
+            res = table_obj.output(["variant_id", "_distance"]).match_dense("gender_vector", embedding_data,
+                                                                            embedding_data_type[0],
+                                                                            "l2",
+                                                                            2).to_pl()
             print(res)
         else:
-            res = table_obj.output(["variant_id", "_similarity"]).knn("gender_vector", embedding_data,
-                                                                      embedding_data_type[0],
-                                                                      "ip",
-                                                                      2).to_pl()
+            res = table_obj.output(["variant_id", "_similarity"]).match_dense("gender_vector", embedding_data,
+                                                                              embedding_data_type[0],
+                                                                              "ip",
+                                                                              2).to_pl()
 
         res = db_obj.drop_table(
             "test_valid_embedding_data_type"+suffix, ConflictType.Error)
@@ -438,14 +447,16 @@ class TestInfinity:
         table_obj.import_data(test_csv_dir, None)
         with pytest.raises(Exception):
             if embedding_data_type[1]:
-                res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
-                                                           "l2",
-                                                           2).to_pl()
+                res = table_obj.output(["variant_id"]).match_dense("gender_vector", embedding_data,
+                                                                   embedding_data_type[0],
+                                                                   "l2",
+                                                                   2).to_pl()
                 print(res)
             else:
-                res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
-                                                           "ip",
-                                                           2).to_pl()
+                res = table_obj.output(["variant_id"]).match_dense("gender_vector", embedding_data,
+                                                                   embedding_data_type[0],
+                                                                   "ip",
+                                                                   2).to_pl()
         res = db_obj.drop_table(
             "test_invalid_embedding_data_type"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -489,15 +500,15 @@ class TestInfinity:
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
         if distance_type[1] and embedding_data_type[1]:
-            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
-                                                       distance_type[0],
-                                                       2).to_pl()
+            res = table_obj.output(["variant_id"]).match_dense("gender_vector", embedding_data, embedding_data_type[0],
+                                                               distance_type[0],
+                                                               2).to_pl()
             print(res)
         else:
             with pytest.raises(InfinityException) as e:
-                table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
-                                                     distance_type[0],
-                                                     2).to_pl()
+                table_obj.output(["variant_id"]).match_dense("gender_vector", embedding_data, embedding_data_type[0],
+                                                             distance_type[0],
+                                                             2).to_pl()
 
             assert e.type == InfinityException
             assert e.value.args[0] == ErrorCode.NOT_SUPPORTED
@@ -540,12 +551,12 @@ class TestInfinity:
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
         if topn[1]:
-            res = table_obj.output(["variant_id"]).knn(
+            res = table_obj.output(["variant_id"]).match_dense(
                 "gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
             print(res)
         else:
             with pytest.raises(InfinityException) as e:
-                table_obj.output(["variant_id"]).knn(
+                table_obj.output(["variant_id"]).match_dense(
                     "gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
 
             assert e.type == InfinityException
@@ -594,13 +605,12 @@ class TestInfinity:
                                                      {
                                                          "M": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": index_distance_type
                                                      }), ConflictType.Error)
 
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["variant_id"]).knn(
+        res = table_obj.output(["variant_id"]).match_dense(
             knn_column_name, [1.0] * 4, "float", knn_distance_type, 5).to_pl()
         print(res)
 
@@ -645,7 +655,7 @@ class TestInfinity:
             copy_data("pysdk_test_knn.csv")
         test_csv_dir = "/var/infinity/test_data/pysdk_test_knn.csv"
         table_obj.import_data(test_csv_dir, None)
-        res = table_obj.output(["variant_id"]).knn(
+        res = table_obj.output(["variant_id"]).match_dense(
             knn_column_name, [1.0] * 4, "float", knn_distance_type, 5).to_pl()
         print(res)
         res = table_obj.create_index("my_index",
@@ -654,7 +664,6 @@ class TestInfinity:
                                                      {
                                                          "M": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": index_distance_type
                                                      }), ConflictType.Error)
 
@@ -670,8 +679,8 @@ class TestInfinity:
                              indirect=True)
     def test_fulltext_operator_option(self, check_data, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_fulltext_operator_option"+suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_fulltext_operator_option"+suffix,
+        db_obj.drop_table("test_fulltext_operator_option" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_fulltext_operator_option" + suffix,
                                         {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"},
                                          "body": {"type": "varchar"}})
         table_obj.create_index("my_index",
@@ -684,22 +693,22 @@ class TestInfinity:
         test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_99.csv"
         table_obj.import_data(test_csv_dir, import_options={"delimiter": "\t"})
         print('Test fulltext operator OR for query "TO BE OR NOT":')
-        print(table_obj.output(["*", "_row_id", "_score"]).match("doctitle,body^5", "TO BE OR NOT",
-                                                                 "topn=5;operator=or").to_pl())
+        print(table_obj.output(["*", "_row_id", "_score"]).match_text("body^5", "TO BE OR NOT", 5,
+                                                                      {"operator": "or"}).to_pl())
         print('Test fulltext operator AND for query "TO BE OR NOT":')
-        print(table_obj.output(["*", "_row_id", "_score"]).match("doctitle,body^5", "TO BE OR NOT",
-                                                                 "topn=5;operator=and").to_pl())
+        print(table_obj.output(["*", "_row_id", "_score"]).match_text("body^5", "TO BE OR NOT", 5,
+                                                                      {"operator": "and"}).to_pl())
         # expect throw
         print('No operator option for query "TO BE OR NOT", expect throw:')
         with pytest.raises(InfinityException) as e_info:
-            table_obj.output(["*", "_row_id", "_score"]).match("doctitle,body^5", "TO BE OR NOT", "topn=5").to_pl()
+            table_obj.output(["*", "_row_id", "_score"]).match_text("body^5", "TO BE OR NOT", 5).to_pl()
         print(e_info.value.error_message)
         res = table_obj.drop_index("my_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        res = db_obj.drop_table("test_fulltext_operator_option"+suffix, ConflictType.Error)
+        res = db_obj.drop_table("test_fulltext_operator_option" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("match_param_1", ["doctitle,num,body^5"])
+    @pytest.mark.parametrize("match_param_1", ["body^5"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_fulltext_match_with_valid_columns(self, check_data, match_param_1, suffix):
@@ -727,9 +736,9 @@ class TestInfinity:
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
         res = (table_obj
                .output(["*"])
-               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
-               .match(match_param_1, "black", "topn=1")
-               .fusion('rrf')
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match_text(match_param_1, "black", 1)
+               .fusion(method='rrf', topn=10)
                .to_pl())
         print(res)
 
@@ -774,9 +783,9 @@ class TestInfinity:
         with pytest.raises(Exception):
             res = (table_obj
                    .output(["*"])
-                   .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
-                   .match(match_param_1, "black", "topn=1")
-                   .fusion('rrf')
+                   .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+                   .match_text(match_param_1, "black", 1)
+                   .fusion(method='rrf', topn=10)
                    .to_pl())
             print(res)
 
@@ -816,9 +825,9 @@ class TestInfinity:
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
         res = (table_obj
                .output(["*"])
-               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
-               .match("doctitle,num,body^5", match_param_2, "topn=1")
-               .fusion('rrf')
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match_text("body^5", match_param_2, 1)
+               .fusion(method='rrf', topn=10)
                .to_pl())
         print(res)
 
@@ -864,9 +873,9 @@ class TestInfinity:
         with pytest.raises(Exception):
             res = (table_obj
                    .output(["*"])
-                   .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
-                   .match("doctitle,num,body^5", match_param_2, "topn=1")
-                   .fusion('rrf')
+                   .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+                   .match_text("doctitle,num,body^5", match_param_2, 1)
+                   .fusion(method='rrf', topn=10)
                    .to_pl())
             print(res)
 
@@ -875,96 +884,6 @@ class TestInfinity:
 
         res = db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_words"+suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.parametrize("match_param_3", [pytest.param("@#$!#@$SDa^sdf3!@#$"),
-                                               "topn=1",
-                                               "1"])
-    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_with_fulltext_match_with_options(self, check_data, match_param_3, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table(
-            "test_with_fulltext_match_with_options"+suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_with_fulltext_match_with_options"+suffix,
-                                        {"doctitle": {"type": "varchar"},
-                                         "docdate": {"type": "varchar"},
-                                         "body": {"type": "varchar"},
-                                         "num": {"type": "int"},
-                                         "vec": {"type": "vector, 4, float"}})
-        table_obj.create_index("my_index",
-                               index.IndexInfo("body",
-                                               index.IndexType.FullText,
-                                               {"ANALYZER": "standard"}),
-                               ConflictType.Error)
-
-        if not check_data:
-            generate_commas_enwiki(
-                "enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
-            copy_data("enwiki_embedding_99_commas.csv")
-
-        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
-        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
-        res = (table_obj
-               .output(["*"])
-               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
-               .match("doctitle,num,body^5", "word", match_param_3)
-               .fusion('rrf')
-               .to_pl())
-        print(res)
-
-        res = table_obj.drop_index("my_index", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-        res = db_obj.drop_table(
-            "test_with_fulltext_match_with_options"+suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.parametrize("match_param_3", [pytest.param(1),
-                                               pytest.param(1.1),
-                                               pytest.param([]),
-                                               pytest.param({}),
-                                               pytest.param(()), ])
-    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_with_fulltext_match_with_invalid_options(self, check_data, match_param_3, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table(
-            "test_with_fulltext_match_with_invalid_options"+suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_with_fulltext_match_with_invalid_options"+suffix,
-                                        {"doctitle": {"type": "varchar"},
-                                         "docdate": {"type": "varchar"},
-                                         "body": {"type": "varchar"},
-                                         "num": {"type": "int"},
-                                         "vec": {"type": "vector, 4, float"}})
-        table_obj.create_index("my_index",
-                               index.IndexInfo("body",
-                                               index.IndexType.FullText,
-                                               {"ANALYZER": "standard"}),
-                               ConflictType.Error)
-
-        if not check_data:
-            generate_commas_enwiki(
-                "enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
-            copy_data("enwiki_embedding_99_commas.csv")
-
-        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
-        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
-
-        with pytest.raises(Exception):
-            res = (table_obj
-                   .output(["*"])
-                   .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
-                   .match("doctitle,num,body^5", "word", match_param_3)
-                   .fusion('rrf')
-                   .to_pl())
-            print(res)
-
-        res = table_obj.drop_index("my_index", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-        res = db_obj.drop_table(
-            "test_with_fulltext_match_with_invalid_options"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
@@ -985,12 +904,17 @@ class TestInfinity:
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
         res = (table_obj
                .output(["*", "_row_id", "_score"])
-               .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], query_elem_t, 'maxsim', 'topn=3')
+               .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], query_elem_t, 3)
                .to_pl())
         print(res)
+        with pytest.raises(InfinityException) as e:
+            table_obj.output(["*", "_row_id", "_score"]).match_tensor('t',
+                                                                      [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],
+                                                                      query_elem_t, 3, {"some_option": 222}).to_df()
+        print(e)
         pd.testing.assert_frame_equal(
             table_obj.output(["title"]).match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],
-                                                     query_elem_t, 'maxsim', 'topn=3').to_df(),
+                                                     query_elem_t, 3).to_df(),
             pd.DataFrame({'title': ["test22", "test55", "test66"]}))
         res = db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -1008,14 +932,13 @@ class TestInfinity:
         test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
         res = (table_obj.output(["*", "_row_id", "_similarity"])
-               .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+               .match_sparse("c2", SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}), "ip", 3)
                .to_pl())
         print(res)
 
         res = db_obj.drop_table("test_sparse_scan"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_sparse_knn_with_index(self, check_data, suffix):
@@ -1037,7 +960,7 @@ class TestInfinity:
 
         res = (table_obj
                .output(["*", "_row_id", "_similarity"])
-               .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3,
+               .match_sparse("c2", SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}), "ip", 3,
                              {"alpha": "1.0", "beta": "1.0"})
                .to_pl())
         print(res)
@@ -1058,18 +981,23 @@ class TestInfinity:
                                          "num": {"type": "int"},
                                          "t": {"type": "tensor, 4, float"},
                                          "body": {"type": "varchar"}})
+        table_obj.create_index("ft_index",
+                               index.IndexInfo("body",
+                                               index.IndexType.FullText,
+                                               {"ANALYZER": "standard"}),
+                               ConflictType.Error)
         if not check_data:
             copy_data("tensor_maxsim.csv")
         test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
-        match_tensor_expr = CommonMatchTensorExpr('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float',
-                                                  'maxsim')
         res = (table_obj
                .output(["*", "_row_id", "_score"])
-               .match('body', 'off', 'topn=4')
-               .match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=2')
-               .fusion('rrf')
-               .fusion('match_tensor', 'topn=2', match_tensor_expr)
+               .match_text('body', 'off', 4)
+               .match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 2)
+               .fusion(method='rrf', topn=10)
+               .fusion(method='match_tensor', topn=2, fusion_params={'field': 't', 'data_type': 'float',
+                                                                     'data': [[0.0, -10.0, 0.0, 0.7],
+                                                                              [9.2, 45.6, -55.8, 3.5]]})
                .to_pl())
         print(res)
 
@@ -1082,7 +1010,7 @@ class TestInfinity:
     @pytest.mark.parametrize("knn_column_name", ["gender_vector"])
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip", "cosine", "cos"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip", "cosine", "cos"])
-    @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw, index.IndexType.IVFFlat]) # Remove index.IndexType.IVFFlat, after IVFFlat support cosine metric
+    @pytest.mark.parametrize("index_type", [common_index.IndexType.Hnsw]) # Remove index.IndexType.IVFFlat, after IVFFlat support cosine metric
     def test_with_various_index_knn_distance_combination(self, check_data, index_column_name, knn_column_name,
                                                          index_distance_type, knn_distance_type, index_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -1103,23 +1031,22 @@ class TestInfinity:
             copy_data("pysdk_test_knn.csv")
         test_csv_dir = "/var/infinity/test_data/pysdk_test_knn.csv"
         table_obj.import_data(test_csv_dir, None)
-        if index_type == index.IndexType.Hnsw:
+        if index_type == common_index.IndexType.Hnsw:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo(index_column_name,
                                                          index.IndexType.Hnsw,
                                                          {
                                                              "M": "16",
                                                              "ef_construction": "50",
-                                                             "ef": "50",
                                                              "metric": index_distance_type
                                                          }), ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-            res = table_obj.output(["variant_id"]).knn(
+            res = table_obj.output(["variant_id"]).match_dense(
                 knn_column_name, [1.0] * 4, "float", knn_distance_type, 5).to_pl()
             print(res)
             res = table_obj.drop_index("my_index", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-        elif index_type == index.IndexType.IVFFlat:
+        elif index_type == common_index.IndexType.IVFFlat:
             if index_distance_type == "cosine" or index_distance_type == "cos":
                 with pytest.raises(InfinityException) as e:
                     res = table_obj.create_index("my_index",
@@ -1137,7 +1064,7 @@ class TestInfinity:
                                              ConflictType.Error)
                 assert res.error_code == ErrorCode.OK
                 # for IVFFlat, index_distance_type has to match knn_distance_type?
-                res = table_obj.output(["variant_id"]).knn(
+                res = table_obj.output(["variant_id"]).match_dense(
                     knn_column_name, [1.0] * 4, "float", index_distance_type, 5).to_pl()
                 print(res)
                 res = table_obj.drop_index("my_index", ConflictType.Error)
@@ -1160,7 +1087,7 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.DATA_TYPE_MISMATCH
         with pytest.raises(InfinityException) as e:
-            res = table_obj.output(["_row_id"]).knn(
+            res = table_obj.output(["_row_id"]).match_dense(
                 "zero_vector", [0.0], "float", "l2", 5).to_pl()
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
@@ -1169,7 +1096,7 @@ class TestInfinity:
         with pytest.raises(Exception):
             table_obj.insert([{"zero_vector": []}])
         try:
-            res = table_obj.output(["_row_id"]).knn(
+            res = table_obj.output(["_row_id"]).match_dense(
                 "zero_vector", [], "float", "l2", 5).to_pl()
         except:
             print("Exception")
@@ -1190,7 +1117,7 @@ class TestInfinity:
                           {"big_vector": [3.0] * dim},
                           {"big_vector": [4.0] * dim},
                           {"big_vector": [5.0] * dim}])
-        res = table_obj.output(["_row_id"]).knn(
+        res = table_obj.output(["_row_id"]).match_dense(
             "big_vector", [0.0] * dim, "float", "l2", 5).to_pl()
         print(res)
 
@@ -1201,8 +1128,7 @@ class TestInfinity:
     # refer to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
     @pytest.mark.parametrize("fields_and_matching_text", [
         ["body", "black"],
-        ["doctitle,num,body", "black"],
-        ["doctitle,num,body^5", "black"],
+        ["body^5", "black"],
         ["", "body:black"],
         ["", "body:black^5"],
         ["", "'body':'(black)'"],
@@ -1212,12 +1138,12 @@ class TestInfinity:
         ["", "'body':'(black)^5 OR (white)'"],
         ["", "'body':'(black)^5 AND (white)'"],
         ["", "'body':'black - white'"],
-        ["", "body:black OR doctitle:black"],
-        ["", "body:black AND doctitle:black"],
-        ["", "(body:black OR doctitle:black) AND (body:white OR doctitle:white)"],
-        ["", "(body:black)^5 OR doctitle:black"],
-        ["", "(body:black)^5 AND doctitle:black"],
-        ["", "(body:black OR doctitle:black)^5 AND (body:white OR doctitle:white)"],
+        ["", "body:black OR body:black"],
+        ["", "body:black AND body:black"],
+        ["", "(body:black OR body:black) AND (body:white OR body:white)"],
+        ["", "(body:black)^5 OR body:black"],
+        ["", "(body:black)^5 AND body:black"],
+        ["", "(body:black OR body:black)^5 AND (body:white OR body:white)"],
         # ["", "doc\*:back"] not support
     ])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
@@ -1247,9 +1173,9 @@ class TestInfinity:
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
         res = (table_obj
                .output(["*"])
-               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
-               .match(fields_and_matching_text[0], fields_and_matching_text[1], "topn=1")
-               .fusion('rrf')
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match_text(fields_and_matching_text[0], fields_and_matching_text[1], 1)
+               .fusion(method='rrf', topn=10)
                .to_pl())
         print(res)
 
@@ -1285,38 +1211,7 @@ class TestInfinity:
         with pytest.raises(Exception):
             res = (table_obj
                    .output(["*", "_row_id", "_score"])
-                   .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], data_type, 'maxsim', 'topn=2')
-                   .to_pl())
-
-        res = db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.parametrize("method_type", ['invalid method type',
-                                             pytest.param(1),
-                                             pytest.param(1.1),
-                                             pytest.param([]),
-                                             pytest.param({}),
-                                             pytest.param(()),
-                                             pytest.param("@#$!#@$SDasdf3!@#$")
-                                             ])
-    @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_tensor_scan_with_invalid_method_type(self, check_data, method_type, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_tensor_scan"+suffix,
-                                        {"title": {"type": "varchar"},
-                                         "num": {"type": "int"},
-                                         "t": {"type": "tensor, 4, float"},
-                                         "body": {"type": "varchar"}})
-        if not check_data:
-            copy_data("tensor_maxsim.csv")
-        test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
-        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
-        with pytest.raises(Exception):
-            res = (table_obj
-                   .output(["*", "_row_id", "_score"])
-                   .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', method_type, 'topn=2')
+                   .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], data_type, 2)
                    .to_pl())
 
         res = db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Error)
@@ -1328,7 +1223,6 @@ class TestInfinity:
                                               pytest.param(1),
                                               pytest.param(1.1),
                                               pytest.param([]),
-                                              pytest.param({}),
                                               pytest.param(()),
                                               ])
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
@@ -1346,11 +1240,9 @@ class TestInfinity:
         test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
         with pytest.raises(Exception):
-            res = (table_obj
-                   .output(["*", "_row_id", "_score"])
-                   .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim',
-                                 extra_option)
-                   .to_pl())
+            table_obj.output(["*", "_row_id", "_score"]).match_tensor('t',
+                                                                      [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],
+                                                                      'float', 3, extra_option).to_pl()
 
         res = db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -1369,7 +1261,7 @@ class TestInfinity:
         with pytest.raises(Exception):
             res = (table_obj
                    .output(["*", "_row_id", "_score"])
-                   .match_tensor('t', [[], []], 'float', 'maxsim', 'topn=2')
+                   .match_tensor('t', [[], []], 'float', 2)
                    .to_pl())
 
         res = db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Error)
@@ -1390,7 +1282,7 @@ class TestInfinity:
 
         res = (table_obj
                .output(["*", "_row_id", "_score"])
-               .match_tensor('t', [[[0.0] * dim] * dim] * dim, 'float', 'maxsim', 'topn=5')
+               .match_tensor('t', [[[0.0] * dim] * dim] * dim, 'float', 5)
                .to_pl())
         print(res)
 
@@ -1427,7 +1319,7 @@ class TestInfinity:
 
             with pytest.raises(InfinityException) as e:
                 res = (table_obj.output(["*", "_row_id", "_similarity"])
-                       .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+                       .match_sparse("c2", SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}), "ip", 3)
                        .to_pl())
             assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
 
@@ -1440,7 +1332,7 @@ class TestInfinity:
 
             with pytest.raises(InfinityException) as e:
                 res = (table_obj.output(["*", "_row_id", "_similarity"])
-                       .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+                       .match_sparse("c2", SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}), "ip", 3)
                        .to_pl())
             assert e.value.args[0] == ErrorCode.DATA_TYPE_MISMATCH
 
@@ -1461,11 +1353,11 @@ class TestInfinity:
                                                 ConflictType.Error)
             assert e.value.args[0] == ErrorCode.INVALID_EMBEDDING_DATA_TYPE
 
-    @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat,
-                                            index.IndexType.Hnsw,
-                                            index.IndexType.EMVB,
-                                            index.IndexType.FullText,
-                                            index.IndexType.Secondary, ])
+    @pytest.mark.parametrize("index_type", [#common_index.IndexType.IVFFlat,
+                                            common_index.IndexType.Hnsw,
+                                            common_index.IndexType.EMVB,
+                                            common_index.IndexType.FullText,
+                                            common_index.IndexType.Secondary, ])
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_sparse_knn_with_invalid_index_type(self, check_data, index_type, suffix):
@@ -1480,35 +1372,34 @@ class TestInfinity:
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
 
         with pytest.raises(InfinityException) as e:
-            if index_type == index.IndexType.IVFFlat:
+            if index_type == common_index.IndexType.IVFFlat:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
                                                              index.IndexType.IVFFlat,
                                                              {"centroids_count": "128", "metric": "L2"}),
                                              ConflictType.Error)
-            elif index_type == index.IndexType.Hnsw:
+            elif index_type == common_index.IndexType.Hnsw:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
                                                              index.IndexType.Hnsw,
                                                              {
                                                                  "M": "16",
                                                                  "ef_construction": "50",
-                                                                 "ef": "50",
                                                                  "metric": "L2"
                                                              }), ConflictType.Error)
-            elif index_type == index.IndexType.EMVB:
+            elif index_type == common_index.IndexType.EMVB:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
                                                              index.IndexType.EMVB,
                                                              {"pq_subspace_num": "32", "pq_subspace_bits": "8"}),
                                              ConflictType.Error)
-            elif index_type == index.IndexType.FullText:
+            elif index_type == common_index.IndexType.FullText:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
                                                              index.IndexType.FullText,
                                                              {"ANALYZER": "STANDARD"}),
                                              ConflictType.Error)
-            elif index_type == index.IndexType.Secondary:
+            elif index_type == common_index.IndexType.Secondary:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
                                                              index.IndexType.Secondary),
@@ -1568,7 +1459,7 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             res = (table_obj
                    .output(["*", "_row_id", "_similarity"])
-                   .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3,
+                   .match_sparse("c2", SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}), "ip", 3,
                                  {"alpha": alpha, "beta": beta})
                    .to_pl())
 
@@ -1594,7 +1485,7 @@ class TestInfinity:
 
         res = (table_obj
                .output(["*", "_row_id", "_similarity"])
-               .match_sparse("c2", {"indices": [0, 20], "values": [1.0, 2.0, 3.0]}, "ip", 3,
+               .match_sparse("c2", SparseVector(**{"indices": [0, 20], "values": [1.0, 2.0, 3.0]}), "ip", 3,
                              {"alpha": "1.0", "beta": "1.0"})
                .to_pl())
         print(res)
@@ -1619,7 +1510,7 @@ class TestInfinity:
         with pytest.raises(Exception):
             res = (table_obj
                    .output(["*", "_row_id", "_similarity"])
-                   .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, distance_type, 3,
+                   .match_sparse("c2", SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}), distance_type, 3,
                                  {"alpha": "1.0", "beta": "1.0"})
                    .to_pl())
 
@@ -1654,7 +1545,6 @@ class TestInfinity:
                                                      {
                                                          "M": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), ConflictType.Error)
 
@@ -1666,17 +1556,16 @@ class TestInfinity:
                                                      {
                                                          "M": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "ip"
                                                      }), ConflictType.Error)
 
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["variant_id"]).knn(
+        res = table_obj.output(["variant_id"]).match_dense(
             "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"index_name":"my_index_l2"}).to_pl()
         print(res)
 
-        res = table_obj.output(["variant_id"]).knn(
+        res = table_obj.output(["variant_id"]).match_dense(
             "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"index_name": "my_index_ip"}).to_pl()
         print(res)
 
@@ -1717,13 +1606,12 @@ class TestInfinity:
                                                      {
                                                          "M": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), ConflictType.Error)
 
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["variant_id"]).knn(
+        res = table_obj.output(["variant_id"]).match_dense(
             "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"ignore_index":"true"}).to_pl()
         print(res)
 
@@ -1761,14 +1649,13 @@ class TestInfinity:
                                                      {
                                                          "M": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), ConflictType.Error)
 
         assert res.error_code == ErrorCode.OK
 
         with  pytest.raises(InfinityException) as e:
-            res = table_obj.output(["variant_id"]).knn(
+            res = table_obj.output(["variant_id"]).match_dense(
                 "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"index_name": "my_index_ip"}).to_pl()
         assert e.value.args[0] == ErrorCode.INDEX_NOT_EXIST
 
@@ -1806,18 +1693,17 @@ class TestInfinity:
                                                      {
                                                          "M": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), ConflictType.Error)
 
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["variant_id"]).knn(
+        res = table_obj.output(["variant_id"]).match_dense(
                 "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"index_name": "my_index_l2", "ignore_index":"false"}).to_pl()
         print(res)
 
         with  pytest.raises(InfinityException) as e:
-            res = table_obj.output(["variant_id"]).knn(
+            res = table_obj.output(["variant_id"]).match_dense(
                     "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"index_name": "my_index_l2", "ignore_index":"true"}).to_pl()
         assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
 

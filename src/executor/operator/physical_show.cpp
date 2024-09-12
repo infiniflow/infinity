@@ -75,6 +75,8 @@ import wal_entry;
 import catalog_delta_entry;
 import memindex_tracer;
 import persistence_manager;
+import global_resource_usage;
+import infinity_context;
 
 namespace infinity {
 
@@ -507,16 +509,18 @@ void PhysicalShow::Init() {
             break;
         }
         case ShowType::kShowPersistenceObjects: {
-            output_names_->reserve(4);
-            output_types_->reserve(4);
+            output_names_->reserve(5);
+            output_types_->reserve(5);
             output_names_->emplace_back("name");
             output_names_->emplace_back("reference_count");
             output_names_->emplace_back("size");
-            output_names_->emplace_back("deleted_size");
+            output_names_->emplace_back("parts");
+            output_names_->emplace_back("deleted_ranges");
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
             break;
         }
         case ShowType::kShowPersistenceObject: {
@@ -525,6 +529,33 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("start");
             output_names_->emplace_back("end");
             output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
+        case ShowType::kShowMemory: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowMemoryObjects: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("count");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
+        case ShowType::kShowMemoryAllocation: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("total_size");
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
             break;
         }
@@ -674,6 +705,18 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowPersistenceObject: {
             ExecuteShowPersistenceObject(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowMemory: {
+            ExecuteShowMemory(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowMemoryObjects: {
+            ExecuteShowMemoryObjects(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowMemoryAllocation: {
+            ExecuteShowMemoryAllocation(query_context, show_operator_state);
             break;
         }
         default: {
@@ -1039,8 +1082,8 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            const String *table_dir = table_index_info->index_entry_dir_.get();
-            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*table_dir));
+            const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
+            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(table_dir));
             Value value = Value::MakeVarchar(index_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1116,7 +1159,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         }
     }
 
-    String full_segment_index_dir = fmt::format("{}/{}", *segment_index_entry->base_dir(), *segment_index_entry->index_dir());
+    String full_segment_index_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_index_entry->index_dir();
     {
         SizeT column_id = 0;
         {
@@ -1862,7 +1905,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            String full_segment_dir = fmt::format("{}/{}", *segment_entry->base_dir(), *segment_entry->segment_dir());
+            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
             const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_segment_dir));
             Value value = Value::MakeVarchar(seg_size);
             ValueExpression value_expr(value);
@@ -1934,7 +1977,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            String full_segment_dir = fmt::format("{}/{}", *segment_entry->base_dir(), *segment_entry->segment_dir());
+            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
             const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_segment_dir));
             Value value = Value::MakeVarchar(seg_size);
             ValueExpression value_expr(value);
@@ -2037,7 +2080,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            String full_block_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
+            String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
             const auto &blk_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_block_dir));
             Value value = Value::MakeVarchar(blk_size);
             ValueExpression value_expr(value);
@@ -2104,7 +2147,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
     }
 
-    String full_block_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
+    String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
     ++column_id;
     {
         Value value = Value::MakeVarchar(full_block_dir);
@@ -2278,44 +2321,42 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         }
     }
 
-    for (u32 layer_n = 0; layer_n < 2; ++layer_n) {
-        SizeT outline_count = column_block_entry->OutlineBufferCount(layer_n);
+    SizeT outline_count = column_block_entry->OutlineBufferCount();
+    {
+        SizeT column_id = 0;
         {
-            SizeT column_id = 0;
-            {
-                Value value = Value::MakeVarchar(fmt::format("extra_file_group_{}_count", layer_n));
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-
-            ++column_id;
-            {
-                Value value = Value::MakeVarchar(std::to_string(outline_count));
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
+            Value value = Value::MakeVarchar("extra_file_count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
+        ++column_id;
         {
-            SizeT column_id = 0;
-            {
-                Value value = Value::MakeVarchar(fmt::format("extra_file_group_{}_name", layer_n));
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            Value value = Value::MakeVarchar(std::to_string(outline_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("extra_file_name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            String outline_storage;
+            for (SizeT idx = 0; idx < outline_count; ++idx) {
+                outline_storage += *(column_block_entry->OutlineFilename(idx));
+                outline_storage += ";";
             }
 
-            ++column_id;
-            {
-                String outline_storage;
-                for (SizeT idx = 0; idx < outline_count; ++idx) {
-                    outline_storage += *(column_block_entry->OutlineFilename(layer_n, idx));
-                    outline_storage += ";";
-                }
-
-                Value value = Value::MakeVarchar(outline_storage);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
+            Value value = Value::MakeVarchar(outline_storage);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
 
@@ -2453,7 +2494,49 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
         {
             // option name type
-            Value value = Value::MakeVarchar("Infinity server listen ip address");
+            Value value = Value::MakeVarchar("Infinity server ip");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(PEER_SERVER_IP_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(global_config->PeerServerIP());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Infinity peer server ip");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(PEER_SERVER_PORT_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->PeerServerPort()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Infinity peer server port");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
@@ -2532,6 +2615,27 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         {
             // option name type
             Value value = Value::MakeVarchar(std::to_string(global_config->ConnectionPoolSize()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Connection pool capacity.");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->PeerServerConnectionPoolSize()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
@@ -2669,24 +2773,68 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
     }
 
-    {
+    if (InfinityContext::instance().persistence_manager() != nullptr) {
         {
-            // option name
-            Value value = Value::MakeVarchar(DATA_DIR_OPTION_NAME);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            {
+                // option name
+                Value value = Value::MakeVarchar(PERSISTENCE_DIR_OPTION_NAME);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar(global_config->PersistenceDir());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar("Virtual filesystem directory");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            }
         }
+
         {
-            // option name type
-            Value value = Value::MakeVarchar(global_config->DataDir());
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            {
+                // option name
+                Value value = Value::MakeVarchar(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar(std::to_string(global_config->PersistenceObjectSizeLimit()));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar("Virtual file limitation");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            }
         }
+    } else {
         {
-            // option name type
-            Value value = Value::MakeVarchar("Data directory");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            {
+                // option name
+                Value value = Value::MakeVarchar(DATA_DIR_OPTION_NAME);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar(global_config->DataDir());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+            {
+                // option name type
+                Value value = Value::MakeVarchar("Data directory");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            }
         }
     }
 
@@ -3806,6 +3954,24 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
+        case GlobalVariable::kJeProf: {
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                varchar_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+#ifdef ENABLE_JEMALLOC
+            // option value
+            Value value = Value::MakeVarchar("off");
+#else
+            Value value = Value::MakeVarchar("on");
+#endif
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+            break;
+        }
         default: {
             operator_state->status_ = Status::NoSysVar(object_name_);
             RecoverableError(operator_state->status_);
@@ -4287,6 +4453,32 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 break;
             }
+            case GlobalVariable::kJeProf: {
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+#ifdef ENABLE_JEMALLOC
+                    // option value
+                    Value value = Value::MakeVarchar("off");
+#else
+                    Value value = Value::MakeVarchar("on");
+#endif
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("Use jemalloc to profile Infinity");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
             default: {
                 operator_state->status_ = Status::NoSysVar(var_name);
                 RecoverableError(operator_state->status_);
@@ -4521,7 +4713,8 @@ void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperator
     SizeT row_count = 0;
 
     BGMemIndexTracer *mem_index_tracer = query_context->storage()->memindex_tracer();
-    Vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo();
+    Txn *txn = query_context->GetTxn();
+    Vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo(txn);
     for (const auto &memindex_tracer_info : mem_index_tracer_info_array) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -5218,7 +5411,8 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(1, bigint_type, "reference_count", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(2, bigint_type, "size", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(3, bigint_type, "deleted_size", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, bigint_type, "parts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "deleted_ranges", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_persistence_objects"), column_defs);
@@ -5229,6 +5423,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         bigint_type,
         bigint_type,
         bigint_type,
+        varchar_type,
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -5267,10 +5462,21 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
         {
-            // delete size
-            Value value = Value::MakeBigInt(object_pair.second.deleted_size_);
+            // parts
+            Value value = Value::MakeBigInt(object_pair.second.parts_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+        {
+            // deleted ranges
+            OStringStream oss;
+            for (const auto &range : object_pair.second.deleted_ranges_) {
+                oss << fmt::format("[{}, {}) ", range.start_, range.end_);
+            }
+            String deleted_ranges = oss.str();
+            Value value = Value::MakeVarchar(deleted_ranges);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
 
         ++row_count;
@@ -5348,6 +5554,152 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
             row_count = 0;
         }
 
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteShowMemory(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(column_types);
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("memory_objects");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(GlobalResourceUsage::GetObjectCountInfo());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("memory_allocation");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(GlobalResourceUsage::GetRawMemoryInfo());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        bigint_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    std::unordered_map<String, i64> object_map = GlobalResourceUsage::GetObjectClones();
+    SizeT row_count = 0;
+
+    for(auto& object_pair: object_map) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+        {
+            // object_name
+            Value value = Value::MakeVarchar(object_pair.first);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // object_count
+            Value value = Value::MakeBigInt(object_pair.second);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        bigint_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    std::unordered_map<String, i64> raw_memory_map = GlobalResourceUsage::GetRawMemoryClone();
+    SizeT row_count = 0;
+
+    for(auto& raw_memory_pair: raw_memory_map) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // name
+            Value value = Value::MakeVarchar(raw_memory_pair.first);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // total_memory
+            Value value = Value::MakeBigInt(raw_memory_pair.second);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
     }
 
     output_block_ptr->Finalize();

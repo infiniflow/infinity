@@ -67,7 +67,7 @@ void Connection::Run() {
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
 
     SessionManager *session_manager = InfinityContext::instance().session_manager();
-    SharedPtr<RemoteSession> remote_session = session_manager->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
+    SharedPtr<RemoteSession> remote_session = session_manager->CreateRemoteSession();
     if(remote_session == nullptr) {
         HandleError("Infinity is running under maintenance mode, only one connection is allowed.");
         return ;
@@ -263,6 +263,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
             }
             case LogicalType::kTensor:
             case LogicalType::kTensorArray:
+            case LogicalType::kMultiVector:
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
                     String error_message = "Not embedding type";

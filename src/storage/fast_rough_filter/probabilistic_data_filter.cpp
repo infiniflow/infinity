@@ -18,6 +18,7 @@ module;
 #include <vector>
 module probabilistic_data_filter;
 import stl;
+import logical_type;
 import binary_fuse_filter;
 import file_system;
 import file_system_type;
@@ -159,45 +160,44 @@ u64 ConvertValueToU64T<VarcharT>(const Value &value) {
 
 u64 ConvertValueToU64(const Value &value) {
     switch (value.type_.type()) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             return ConvertValueToU64T<BooleanT>(value);
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             return ConvertValueToU64T<TinyIntT>(value);
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             return ConvertValueToU64T<SmallIntT>(value);
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             return ConvertValueToU64T<IntegerT>(value);
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             return ConvertValueToU64T<BigIntT>(value);
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             return ConvertValueToU64T<HugeIntT>(value);
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             return ConvertValueToU64T<DecimalT>(value);
         }
-        case kDate: {
+        case LogicalType::kDate: {
             return ConvertValueToU64T<DateT>(value);
         }
-        case kTime: {
+        case LogicalType::kTime: {
             return ConvertValueToU64T<TimeT>(value);
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             return ConvertValueToU64T<DateTimeT>(value);
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             return ConvertValueToU64T<TimestampT>(value);
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             return ConvertValueToU64T<VarcharT>(value);
         }
         default: {
-            String error_message = fmt::format("ConvertValueToU64() not implemented for type {}", value.type_.ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("ConvertValueToU64() not implemented for type {}", value.type_.ToString()));
             return 0;
         }
     }

@@ -23,7 +23,6 @@ import stl;
 import logical_type;
 import internal_types;
 import column_def;
-import bitmask;
 import default_values;
 import buffer_manager;
 import block_column_entry;
@@ -61,7 +60,7 @@ public:
         data_ptr->InsertData(&in_mem_secondary_index_, new_chunk_index_entry);
         return new_chunk_index_entry;
     }
-    Pair<u32, std::variant<Vector<u32>, Bitmask>> RangeQuery(const void *input) override {
+    Pair<u32, Bitmask> RangeQuery(const void *input) override {
         const auto &[segment_row_count, b, e] = *static_cast<const std::tuple<u32, KeyType, KeyType> *>(input);
         return RangeQueryInner(segment_row_count, b, e);
     }
@@ -77,14 +76,8 @@ private:
             const auto &[v_ptr, offset] = opt.value();
             if constexpr (std::is_same_v<RawValueType, VarcharT>) {
                 auto column_vector = iter.column_vector();
-                String str;
-                if (v_ptr->IsInlined()) {
-                    str = {v_ptr->short_.data_, v_ptr->length_};
-                } else {
-                    const char *data = column_vector->buffer_->GetVarchar(v_ptr->vector_.file_offset_, v_ptr->length_);
-                    str.resize(v_ptr->length_);
-                    std::memcpy(str.data(), data, v_ptr->length_);
-                }
+                Span<const char> data = column_vector->GetVarcharInner(*v_ptr);
+                String str{data.data(), data.size()};
                 const KeyType key = ConvertToOrderedKeyValue(str);
                 in_mem_secondary_index_.emplace(key, offset);
             } else {
@@ -94,29 +87,19 @@ private:
         }
     }
 
-    Pair<u32, std::variant<Vector<u32>, Bitmask>> RangeQueryInner(const u32 segment_row_count, const KeyType b, const KeyType e) {
+    Pair<u32, Bitmask> RangeQueryInner(const u32 segment_row_count, const KeyType b, const KeyType e) {
         std::shared_lock lock(map_mutex_);
         const auto begin = in_mem_secondary_index_.lower_bound(b);
         const auto end = in_mem_secondary_index_.upper_bound(e);
         const u32 result_size = std::distance(begin, end);
-        Pair<u32, std::variant<Vector<u32>, Bitmask>> result_var;
-        result_var.first = result_size;
-        // use array or bitmask for result
-        // use array when result_size <= 1024 or size of array (u32 type) <= size of bitmask
-        if (result_size <= 1024 or result_size <= std::bit_ceil(segment_row_count) / 32) {
-            auto &result = result_var.second.emplace<Vector<u32>>();
-            result.reserve(result_size);
-            for (auto it = begin; it != end; ++it) {
-                result.push_back(it->second);
-            }
-        } else {
-            auto &result = result_var.second.emplace<Bitmask>();
-            result.Initialize(segment_row_count);
-            result.SetAllFalse();
-            for (auto it = begin; it != end; ++it) {
-                result.SetTrue(it->second);
+        Pair<u32, Bitmask> result_var(result_size, Bitmask(segment_row_count));
+        result_var.second.SetAllFalse();
+        for (auto it = begin; it != end; ++it) {
+            if (const auto offset = it->second; offset < segment_row_count) {
+                result_var.second.SetTrue(offset);
             }
         }
+        result_var.second.RunOptimize();
         return result_var;
     }
 };

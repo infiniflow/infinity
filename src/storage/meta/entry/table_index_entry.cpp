@@ -41,8 +41,15 @@ import embedding_info;
 import block_entry;
 import segment_entry;
 import table_entry;
+import infinity_context;
 
 namespace infinity {
+
+SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, const String &index_name) {
+    auto abs_parent_dir = Path(InfinityContext::instance().config()->DataDir()) / parent_dir;
+    SharedPtr<String> temp_dir = DetermineRandomString(abs_parent_dir, fmt::format("index_{}", index_name));
+    return MakeShared<String>(Path(parent_dir) / *temp_dir);
+}
 
 Vector<std::string_view> TableIndexEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
@@ -68,10 +75,7 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                  const SharedPtr<String> &index_entry_dir,
                                  TransactionID txn_id,
                                  TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTableIndex,
-                is_delete,
-                table_index_meta->GetTableEntry()->base_dir_,
-                TableIndexEntry::EncodeIndex(*index_base->index_name_, table_index_meta)),
+    : BaseEntry(EntryType::kTableIndex, is_delete, TableIndexEntry::EncodeIndex(*index_base->index_name_, table_index_meta)),
       table_index_meta_(table_index_meta), index_base_(std::move(index_base)), index_dir_(index_entry_dir) {
     if (!is_delete) {
         assert(index_base.get() != nullptr);
@@ -80,6 +84,21 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
     }
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
+}
+
+TableIndexEntry::TableIndexEntry(const TableIndexEntry &other)
+    : BaseEntry(other), table_index_meta_(other.table_index_meta_), index_base_(other.index_base_), index_dir_(other.index_dir_),
+      column_def_(other.column_def_) {}
+
+UniquePtr<TableIndexEntry> TableIndexEntry::Clone(TableIndexMeta *table_index_meta) const {
+    auto ret = UniquePtr<TableIndexEntry>(new TableIndexEntry(*this));
+    ret->table_index_meta_ = table_index_meta;
+    std::shared_lock lock(rw_locker_);
+    for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+        ret->index_by_segment_.emplace(segment_id, segment_index_entry->Clone(ret.get()));
+    }
+    ret->last_segment_ = ret->index_by_segment_[last_segment_->segment_id()];
+    return ret;
 }
 
 SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
@@ -91,10 +110,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     if (is_delete) {
         return MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, nullptr, txn_id, begin_ts);
     }
-    SharedPtr<String> temp_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->base_dir_,
-                                                   *table_index_meta->GetTableEntry()->TableEntryDir(),
-                                                   *index_base->index_name_);
-    SharedPtr<String> index_dir = temp_dir;
+    SharedPtr<String> index_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
     auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_dir, txn_id, begin_ts);
 
     // Get column info
@@ -258,6 +274,13 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     return table_index_entry;
 }
 
+BaseMemIndex *TableIndexEntry::GetMemIndex() const {
+    if (last_segment_.get() == nullptr) {
+        return nullptr;
+    }
+    return last_segment_->GetMemIndex();
+}
+
 void TableIndexEntry::MemIndexCommit() {
     if (last_segment_.get() != nullptr) {
         last_segment_->MemIndexCommit();
@@ -357,13 +380,13 @@ void TableIndexEntry::Cleanup() {
 
     LOG_DEBUG(fmt::format("Cleaning up dir: {}", *index_dir_));
 
-    // FIXME(sys): delete full text index by whole directory tmply, should call CleanupScanner::CleanupDir
     LocalFileSystem fs;
-    if (!fs.Exists(*index_dir_)) {
+    String absolute_index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir_);
+    if (!fs.Exists(absolute_index_dir)) {
         return;
     }
-    fs.DeleteDirectory(*index_dir_);
-    LOG_DEBUG(fmt::format("Cleaned dir: {}", *index_dir_));
+    fs.DeleteDirectory(absolute_index_dir);
+    LOG_DEBUG(fmt::format("Cleaned dir: {}", absolute_index_dir));
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
@@ -428,6 +451,11 @@ void TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<Uniq
                     for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
                         segment_index_entry->OptIndex(static_cast<IndexBase *>(&old_index_hnsw), txn_table_store, opt_params, false /*replay*/);
                     }
+                }
+            }
+            if (params->lvq_avg) {
+                for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+                    segment_index_entry->OptIndex(hnsw_index, txn_table_store, opt_params, false /*replay*/);
                 }
             }
             break;

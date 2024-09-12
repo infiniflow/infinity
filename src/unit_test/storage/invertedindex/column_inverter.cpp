@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import analyzer;
@@ -50,10 +51,6 @@ public:
     };
 
 public:
-    void SetUp() override {}
-
-    void TearDown() override {}
-
     SharedPtr<PostingWriter> GetOrAddPosting(const String &term) {
         auto it = postings_.find(term);
         if (it != postings_.end()) {

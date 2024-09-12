@@ -4,15 +4,17 @@ import requests
 import logging
 import os
 from test_pysdk.common.common_data import *
-from infinity.common import ConflictType, InfinityException, CommonMatchTensorExpr
+from infinity.common import ConflictType, InfinityException, SparseVector
 from test_pysdk.common import common_values
 import infinity
+from typing import Optional, Any
 from infinity.errors import ErrorCode
+from infinity.utils import deprecated_api
 import numpy as np
 import pandas as pd
 import polars as pl
 import pyarrow as pa
-
+from infinity.table import ExplainType
 
 
 class infinity_http:
@@ -183,40 +185,13 @@ class infinity_http:
         try:
             fields = []
             for col in columns_definition:
-                tmp = {}
-                tmp["name"] = col
+                tmp = {"name": col}
                 for param_name in columns_definition[col]:
-                    if param_name.lower() != "constraints" and param_name.lower() != "default": # not constraint and default, should be type
-                        params = columns_definition[col][param_name].split(",")
-                        if params[0].strip().lower() == "vector" or params[0].strip().lower() == "tensor" or params[0].strip().lower() == "tensorarray":
-                            tmp["type"] = params[0].strip()
-                            tmp["dimension"] = int(params[1].strip())
-                            tmp["element_type"] = type_transfrom[params[2].strip()]
-                        elif params[0].strip().lower() == "sparse":
-                            tmp["type"] = params[0].strip()
-                            tmp["dimension"] = int(params[1].strip())
-                            tmp["data_type"] = type_transfrom[params[2].strip()]
-                            tmp["index_type"] = type_transfrom[params[3].strip()]
-                        else:
-                            tmp[param_name.lower()] = type_transfrom[columns_definition[col][param_name]]
-                    elif param_name.lower() == "default":
-                        default_field = {}
-                        if tmp["type"] == "vector":
-                            default_field["type"] = type_to_vector_literaltype[tmp["element_type"]]
-                        elif tmp["type"] == "tensor":
-                            pass
-                        elif tmp["type"] == "sparse":
-                            pass
-                        else:
-                            default_field["type"] = type_to_literaltype[tmp["type"]]
-                        default_field["value"] = columns_definition[col][param_name]
-                        tmp["default"] = default_field
-                    else:
-                        tmp[param_name] = columns_definition[col][param_name]
+                    tmp[param_name.lower()] = columns_definition[col][param_name]
                 fields.append(tmp)
         except:
             raise InfinityException(ErrorCode.SYNTAX_ERROR, "http adapter create table parse error")
-        #print(fields)
+        print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
         h = self.set_up_header(["accept", "content-type"])
@@ -332,7 +307,7 @@ class infinity_http:
         fields = []
         create_index_info = {}
         fields.append(index_info.column_name)
-        create_index_info["type"] = index_type_transfrom[index_info.index_type]
+        create_index_info["type"] = index_type_transfrom[index_info.index_type.value]
         if index_info.params is not None:
             for key, value in index_info.params.items():
                 if not isinstance(value, str):
@@ -392,6 +367,16 @@ class infinity_http:
         self.index_list = index_list
         return self
 
+    def optimize(self, index_name = "", optimize_options = {}):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
+        h = self.set_up_header(
+            ["accept", "content-type"],
+        )
+        opt_opt = {"optimize_options": optimize_options}
+        r = self.request(url, "put", h, opt_opt)
+        self.raise_exception(r)
+        return self
+
     def insert(self,values=[]):
         if isinstance(values, list):
             pass
@@ -407,6 +392,8 @@ class infinity_http:
                         for idx in range(len(value[key])):
                             if isinstance(value[key][idx], np.ndarray):
                                 value[key][idx] = value[key][idx].tolist()
+                    if isinstance(value[key], SparseVector):
+                        value[key] = value[key].to_dict()
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])
@@ -470,16 +457,8 @@ class infinity_http:
         tmp = {}
         if len(self._filter):
             tmp.update({"filter": self._filter})
-        if len(self._fusion):
-            tmp.update({"fusion": self._fusion})
-        if len(self._knn):
-            tmp.update({"knn": self._knn})
-        if len(self._match):
-            tmp.update({"match":self._match})
-        if len(self._match_tensor):
-            tmp.update({"match_tensor":self._match_tensor})
-        if len(self._match_sparse):
-            tmp.update({"match_sparse":self._match_sparse})
+        if len(self._search_exprs):
+            tmp.update({"search": self._search_exprs})
         if len(self._output):
             tmp.update({"output":self._output})
         #print(tmp)
@@ -493,6 +472,41 @@ class infinity_http:
             self.output_res = []
         return self
 
+    def explain(self, ExplainType = ExplainType.Physical):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/meta"
+        h = self.set_up_header(["accept", "content-type"])
+        tmp = {}
+        if len(self._filter):
+            tmp.update({"filter": self._filter})
+        if len(self._fusion):
+            tmp.update({"fusion": self._fusion})
+        if len(self._knn):
+            tmp.update({"knn": self._knn})
+        if len(self._match):
+            tmp.update({"match": self._match})
+        if len(self._match_tensor):
+            tmp.update({"match_tensor": self._match_tensor})
+        if len(self._match_sparse):
+            tmp.update({"match_sparse": self._match_sparse})
+        if len(self._output):
+            tmp.update({"output": self._output})
+        tmp.update({"explain_type":ExplainType_transfrom(ExplainType)})
+        # print(tmp)
+        d = self.set_up_data([], tmp)
+        r = self.request(url, "get", h, d)
+        self.raise_exception(r)
+        message = ""
+        sign = 0
+        for res in r.json()["output"]:
+            for k in res:
+                if sign == 0:
+                    message = message + k + "\n"
+                    message = message + res[k] + "\n"
+                    sign = 1
+                else:
+                    message = message + res[k] + "\n"
+        return message
+
     def output(
         self,
         output=[],
@@ -500,82 +514,70 @@ class infinity_http:
         self.output_res = []
         self._output = output
         self._filter = ""
-        self._fusion = []
-        self._knn = {}
-        self._match = {}
-        self._match_tensor = {}
-        self._match_sparse = {}
+        self._search_exprs = []
         return self
 
-    def match(self, fields, query, operator="top=10"):
-        self._match = {}
-        self._match["fields"] = fields
-        self._match["query"] = query
-        self._match["operator"] = operator
-        return self
-
-    def match_tensor(self, vector_column_name, tensor_data, tensor_data_type, method_type="maxsim",extra_option = "top=10"):
-        self._match_tensor = {}
-        self._match_tensor["search_method"] = method_type
-        if isinstance(vector_column_name, list):
-            pass
-        else:
-            vector_column_name = [vector_column_name]
-        self._match_tensor["fields"] = vector_column_name
-        self._match_tensor["query_tensor"] = tensor_data
-        self._match_tensor["options"] = extra_option
-        self._match_tensor["element_type"] = type_transfrom[tensor_data_type]
-        return self
-
-    def match_sparse(self, vector_column_name, sparse_data, distance_type="ip", topn=10, opt_params = {"alpha": "1.0", "beta": "1.0"}):
-        self._match_sparse = {}
-        if isinstance(vector_column_name, list):
-            pass
-        else:
-            vector_column_name = [vector_column_name]
-        self._match_sparse["fields"] = vector_column_name
-        self._match_sparse["query_sparse"] = sparse_data
-        self._match_sparse["metric_type"] = distance_type
-        self._match_sparse["topn"] = topn
-        self._match_sparse["opt_params"] = opt_params
-        return self
-
-    def filter(self, filter):
-        self._filter = filter
-        return self
-
-    def knn(self, fields, query_vector, element_type, metric_type, top_k, opt_params : {} = None):
-        self._knn = {}
-        self._knn["fields"] = [fields]
-        self._knn["query_vector"] = query_vector
-        self._knn["element_type"] = type_transfrom[element_type]
-        self._knn["metric_type"] = metric_type
-        self._knn["top_k"] = top_k
+    def match_text(self, fields: str, query: str, topn: int, opt_params: Optional[dict] = None):
+        tmp_match_expr = {"match_method": "text", "fields": fields, "matching_text": query, "topn": topn}
         if opt_params is not None:
-            for key in opt_params:
-                self._knn[key] = opt_params[key]
+            tmp_match_expr["params"] = opt_params
+        self._search_exprs.append(tmp_match_expr)
         return self
 
-    def fusion(self, method="", option="", optional_match_tensor: CommonMatchTensorExpr = None):
-        _fusion = {}
-        _fusion["method"] = method
-        if len(option) :
-            _fusion["option"] = option
-        if method == "match_tensor":
-            _fusion["optional_match_tensor"] = {}
-            vector_column_name = optional_match_tensor.vector_column_name
-            if isinstance(vector_column_name, list):
-                pass
-            else:
-                vector_column_name = [vector_column_name]
-            _fusion["optional_match_tensor"]["fields"] = vector_column_name
-            _fusion["optional_match_tensor"]["query_tensor"] = optional_match_tensor.embedding_data
-            if optional_match_tensor.extra_option:
-                _fusion["optional_match_tensor"]["options"] = optional_match_tensor.extra_option
-            _fusion["optional_match_tensor"]["element_type"] = type_transfrom[optional_match_tensor.embedding_data_type]
-            _fusion["optional_match_tensor"]["search_method"] = optional_match_tensor.method_type
+    def match(self, *args, **kwargs):
+        deprecated_api("match is deprecated, please use match_text instead")
+        return self.match_text(*args, **kwargs)
 
-        self._fusion.append(_fusion)
+    def match_tensor(self, column_name: str, query_data, query_data_type: str, topn: int,
+                     extra_option: Optional[dict] = None):
+        tmp_match_tensor = {"match_method": "tensor", "fields": column_name, "query_tensor": query_data,
+                            "element_type": query_data_type, "topn": topn}
+        if extra_option is not None:
+            tmp_match_tensor["params"] = extra_option
+        self._search_exprs.append(tmp_match_tensor)
+        return self
+
+    def match_sparse(self, vector_column_name: str, sparse_data: SparseVector | dict, distance_type: str, topn: int,
+                     opt_params: Optional[dict] = None):
+        tmp_match_sparse = {"match_method": "sparse", "fields": vector_column_name,
+                            "query_vector": sparse_data.to_dict(), "metric_type": distance_type, "topn": topn}
+        if opt_params is not None:
+            tmp_match_sparse["params"] = opt_params
+        self._search_exprs.append(tmp_match_sparse)
+        return self
+
+    def filter(self, filter_expr):
+        self._filter = filter_expr
+        return self
+
+    def match_dense(self, fields: str, query_vector: list, element_type: str, metric_type: str, top_k: int,
+                    opt_params: Optional[dict] = None):
+        tmp_match_dense = {"match_method": "dense", "fields": fields, "query_vector": query_vector,
+                           "element_type": element_type, "metric_type": metric_type, "topn": top_k}
+        if opt_params is not None:
+            tmp_match_dense["params"] = opt_params
+        self._search_exprs.append(tmp_match_dense)
+        return self
+
+    def knn(self, *args, **kwargs):
+        deprecated_api("knn is deprecated, please use match_dense instead")
+        return self.match_dense(*args, **kwargs)
+
+    def fusion(self, method: str, topn: int, fusion_params: Optional[dict] = None):
+        tmp_fusion_expr = {"fusion_method": method, "topn": topn}
+        if method == "match_tensor":
+            tmp_new_params = {"fields": fusion_params["field"], "query_tensor": fusion_params["data"],
+                              "element_type": fusion_params["data_type"]}
+            # handle left params
+            fusion_params.pop("field")
+            fusion_params.pop("data")
+            fusion_params.pop("data_type")
+            tmp_new_params.update(fusion_params)
+            tmp_fusion_expr["params"] = tmp_new_params
+        else:
+            if fusion_params is not None:
+                tmp_fusion_expr["params"] = fusion_params
+        self._search_exprs.append(tmp_fusion_expr)
         return self
 
     def to_result(self):
@@ -653,14 +655,10 @@ class infinity_http:
         self.raise_exception(r)
         return self
 
-    def update(self, filter="", update={},):
+    def update(self, filter_str: str, update: dict[str, Any]):
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])
-        if len(update) == 0:
-            update = {}
-        else:
-            update = update[0]
-        d = self.set_up_data([], {"update": update, "filter": filter})
+        d = self.set_up_data([], {"update": update, "filter": filter_str})
         r = self.request(url, "put", h, d)
         self.raise_exception(r)
         return self

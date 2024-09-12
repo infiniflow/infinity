@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -36,6 +37,7 @@ import column_def;
 import parser_result;
 import data_type;
 
+using namespace infinity;
 class SQLParserTest : public BaseTest {};
 
 TEST_F(SQLParserTest, good_test1) {
@@ -109,7 +111,7 @@ TEST_F(SQLParserTest, good_test1) {
 
     for (const String &input : inputs) {
         parser->Parse(input, result.get());
-        std::cout << result->ToString() << std::endl;
+//        std::cout << result->ToString() << std::endl;
         result->Reset();
     }
 }
@@ -421,7 +423,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "ac");
-                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemBit, 256);
+                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemBit, 256);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -430,7 +432,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "ad");
-                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemFloat, 512);
+                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 512);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -465,7 +467,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "af");
-                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemInt32, 32);
+                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(EmbeddingDataType::kElemInt32, 32);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0u);
@@ -570,8 +572,8 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
         EXPECT_EQ(index_info->column_name_, "a");
         EXPECT_TRUE(index_info->index_param_list_->empty());
-        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFLAT");
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
 
         result->Reset();
     }
@@ -597,8 +599,8 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
         EXPECT_EQ(index_info->column_name_, "a");
         EXPECT_TRUE(index_info->index_param_list_->empty());
-        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFLAT");
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
 
         result->Reset();
     }
@@ -624,8 +626,8 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
         EXPECT_EQ(index_info->column_name_, "a");
         EXPECT_TRUE(index_info->index_param_list_->empty());
-        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFLAT");
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
 
         result->Reset();
     }
@@ -654,8 +656,8 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ((*index_info->index_param_list_)[0]->param_name_, "metric");
         EXPECT_EQ((*index_info->index_param_list_)[0]->param_value_, "l2");
 
-        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFLAT");
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
 
         result->Reset();
     }

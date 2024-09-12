@@ -42,9 +42,10 @@ MatchSparseExpression::MatchSparseExpression(Vector<SharedPtr<BaseExpression>> s
                                              SparseMetricType metric_type,
                                              SizeT query_n,
                                              SizeT topn,
-                                             const Vector<UniquePtr<InitParameter>> &opt_params)
+                                             const Vector<UniquePtr<InitParameter>> &opt_params,
+                                             SharedPtr<BaseExpression> optional_filter)
     : BaseExpression(ExpressionType::kMatchSparse, std::move(search_column)), metric_type_(metric_type), query_n_(query_n), topn_(topn),
-      opt_params_(opt_params) {
+      opt_params_(opt_params), optional_filter_(std::move(optional_filter)) {
     column_expr_ = static_cast<const ColumnExpression *>(arguments_[0].get());
     this->MakeQuery(query_sparse_expr);
 }
@@ -53,18 +54,18 @@ DataType MatchSparseExpression::Type() const {
     const DataType &column_type = column_expr_->Type();
     const auto *sparse_info = static_cast<const SparseInfo *>(column_type.type_info().get());
     switch (sparse_info->DataType()) {
-        case kElemBit: {
+        case EmbeddingDataType::kElemBit: {
             switch (sparse_info->IndexType()) {
-                case kElemInt8: {
+                case EmbeddingDataType::kElemInt8: {
                     return DataType(LogicalType::kTinyInt);
                 }
-                case kElemInt16: {
+                case EmbeddingDataType::kElemInt16: {
                     return DataType(LogicalType::kSmallInt);
                 }
-                case kElemInt32: {
+                case EmbeddingDataType::kElemInt32: {
                     return DataType(LogicalType::kInteger);
                 }
-                case kElemInt64: {
+                case EmbeddingDataType::kElemInt64: {
                     return DataType(LogicalType::kBigInt);
                 }
                 default: {
@@ -72,17 +73,17 @@ DataType MatchSparseExpression::Type() const {
                 }
             }
         }
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             return DataType(LogicalType::kFloat);
         }
-        case kElemDouble: {
+        case EmbeddingDataType::kElemDouble: {
             return DataType(LogicalType::kDouble);
         }
-        case kElemUInt8:
-        case kElemInt8:
-        case kElemInt16:
-        case kElemInt32:
-        case kElemInt64: {
+        case EmbeddingDataType::kElemUInt8:
+        case EmbeddingDataType::kElemInt8:
+        case EmbeddingDataType::kElemInt16:
+        case EmbeddingDataType::kElemInt32:
+        case EmbeddingDataType::kElemInt64: {
             return DataType(LogicalType::kFloat);
         }
         default: {
@@ -111,11 +112,12 @@ String MatchSparseExpression::ToString() const {
     }
     String opt_str = ss.str();
 
-    return fmt::format("MATCH SPARSE ({}, [{}], {}, {}) WITH ({})",
+    return fmt::format("MATCH SPARSE ({}, [{}], {}, {}{}) WITH ({})",
                        column_expr_->Name(),
                        sparse_str,
                        MatchSparseExpr::MetricTypeToString(metric_type_),
                        topn_,
+                       optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "",
                        opt_str);
 }
 

@@ -13,15 +13,16 @@
 # limitations under the License.
 
 
+# import infinity_embedded as infinity
 import infinity
-from infinity.common import ConflictType, LOCAL_HOST
+import sys
 
 try:
-    # Open a local directory to store the data
-    infinity_instance = infinity.connect("/var/infinity")
+    # Use infinity_embedded module to open a local directory
+    # infinity_instance = infinity.connect("/var/infinity")
 
-    # connect to server with 127.0.0.1
-    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+    #  Use infinity module to connect a remote server
+    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -94,7 +95,16 @@ try:
 
     result = table_instance.output(["num", "name", "score"]).filter("(score > 80.0) and (score <= 90.0)").to_pl()
     print(result)
+
+    # result = table_instance.output(["num", "name", "score"]).filter("not (score > 80.0)").to_pl()
+    # print(result)
+
+    result = table_instance.output(["num", "name", "score"]).filter("num <> 9").to_pl()
+    print(result)
     infinity_instance.disconnect()
 
+    print('test done')
+    sys.exit(0)
 except Exception as e:
     print(str(e))
+    sys.exit(-1)

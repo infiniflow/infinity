@@ -16,18 +16,20 @@
 This example is about connecting local infinity instance, creating table, ing data, importing file into a table, and exporting table's data
 '''
 
-import infinity
 import os
-
 current_path = os.path.abspath(__file__)
 project_directory = os.path.dirname(current_path)
 
-try:
-    # open a local directory to store the data
-    infinity_instance = infinity.connect("/var/infinity")
+# import infinity_embedded as infinity
+import infinity
+import sys
 
-    # connect to server with 127.0.0.1
-    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+try:
+    # Use infinity_embedded module to open a local directory
+    # infinity_instance = infinity.connect("/var/infinity")
+
+    #  Use infinity module to connect a remote server
+    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -102,7 +104,7 @@ try:
             },
             {
                 "num": 10,
-                "name": "Steven",
+                "name": "Steve",
                 "age": 20,
                 "score": 86.0,
             },
@@ -115,6 +117,9 @@ try:
 
 
     infinity_instance.disconnect()
+    print('test done')
+    sys.exit(0)
 
 except Exception as e:
     print(str(e))
+    sys.exit(-1)

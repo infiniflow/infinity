@@ -1,4 +1,5 @@
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 
@@ -51,7 +52,7 @@ TEST_F(PostingByteSliceTest, test1) {
     PostingByteSliceReader reader;
     reader.Open(posting_byte_slice_.get());
 
-    size_t decode_len;
+    SizeT decode_len;
     reader.Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len);
     ASSERT_EQ((uint32_t)1, doc_id_buffer[0]);
     ASSERT_EQ((uint32_t)2, doc_id_buffer[1]);
@@ -103,7 +104,7 @@ TEST_F(PostingByteSliceTest, test3) {
 
     uint32_t buffer[count * 2];
     uint16_t doc_payload_buffer[count * 2];
-    size_t actual_decode_len;
+    SizeT actual_decode_len;
     reader.Decode(buffer, decode_len, actual_decode_len);
     reader.Decode(doc_payload_buffer, decode_len, actual_decode_len);
     reader.Decode(buffer + decode_len, decode_len, actual_decode_len);

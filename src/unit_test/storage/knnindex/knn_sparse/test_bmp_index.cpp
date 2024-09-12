@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
 #include <cassert>
 
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import bmp_alg;
 import bmp_util;
@@ -31,10 +32,6 @@ using namespace infinity;
 
 class BMPIndexTest : public BaseTest {
 protected:
-    void SetUp() override {}
-
-    void TearDown() override {}
-
     template <typename DataType, typename IdxType, BMPCompressType CompressType>
     void TestFunc(u32 block_size) {
         using BMPAlg = BMPAlg<DataType, IdxType, CompressType>;
@@ -59,6 +56,13 @@ protected:
         LocalFileSystem fs;
 
         auto test_query = [&](const BMPAlg &index) {
+            {
+                SparseMatrixIter iter(query_set);
+                SparseVecRef vec = iter.val();
+                auto [indices, scores] = index.SearchKnn(vec, 0/*topk*/, options);
+                EXPECT_EQ(indices.size(), 0);
+                EXPECT_EQ(scores.size(), 0);
+            }
             u32 hit_all = 0;
             u32 total_all = 0;
             for (SparseMatrixIter iter(query_set); iter.HasNext(); iter.Next()) {
@@ -77,7 +81,7 @@ protected:
                 // SparseTestUtil<DataType, IdxType>::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
                 // std::cout << fmt::format("accuracy: {}\n", (f32)hit / total);
             }
-            std::cout << fmt::format("hit: {}, total: {}\n", hit_all, total_all);
+//            std::cout << fmt::format("hit: {}, total: {}\n", hit_all, total_all);
             if (hit_all < total_all * accuracy_all) {
                 EXPECT_TRUE(false);
             }

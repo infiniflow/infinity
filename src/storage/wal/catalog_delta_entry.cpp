@@ -34,7 +34,7 @@ import create_index_info;
 import infinity_context;
 import index_defines;
 import persistence_manager;
-
+import defer_op;
 import third_party;
 import logger;
 
@@ -87,9 +87,18 @@ SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        size += pm->GetSizeInBytes(GetFilePaths());
+        pm_size_ = addr_serializer_.GetSizeInBytes();
+        size += pm_size_;
     }
     return size;
+}
+
+void CatalogDeltaOperation::InitializeAddrSerializer() {
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        addr_serializer_.Initialize(pm, GetFilePaths());
+    }
 }
 
 void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
@@ -102,11 +111,17 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->WriteBufAdv(buf, GetFilePaths());
+        char *start = buf;
+        addr_serializer_.WriteBufAdv(buf);
+        SizeT pm_size = buf - start;
+        if (pm_size != pm_size_) {
+            String error_message = fmt::format("Mismatched pm_size: {} != {}", pm_size, pm_size_);
+            UnrecoverableError(error_message);
+        }
     }
 }
 
-void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
+void CatalogDeltaOperation::ReadAdvBase(const char *&ptr) {
     begin_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     merge_flag_ = ReadBufAdv<MergeFlag>(ptr);
     txn_id_ = ReadBufAdv<TransactionID>(ptr);
@@ -116,7 +131,7 @@ void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ReadBufAdv(ptr);
+        addr_serializer_.ReadBufAdv(ptr); // discard return value
     }
 }
 
@@ -149,8 +164,8 @@ CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry 
     // LOG_TRACE(fmt::format("Create delta op: {} ", this->ToString()));
 }
 
-UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 max_bytes) {
-    char *const ptr_end = ptr + max_bytes;
+UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(const char *&ptr, i32 max_bytes) {
+    const char *const ptr_end = ptr + max_bytes;
     UniquePtr<CatalogDeltaOperation> operation{nullptr};
     auto operation_type = ReadBufAdv<CatalogDeltaOpType>(ptr);
     switch (operation_type) {
@@ -364,17 +379,15 @@ AddBlockEntryOp::AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts
       row_capacity_(block_entry->row_capacity()), row_count_(block_entry->row_count()), min_row_ts_(block_entry->min_row_ts()),
       max_row_ts_(block_entry->max_row_ts()), checkpoint_ts_(block_entry->checkpoint_ts()),
       checkpoint_row_count_(block_entry->checkpoint_row_count()), block_filter_binary_data_(std::move(block_filter_binary_data)) {
-    String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
-    String file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
+    String file_path = fmt::format("{}/{}", *block_entry->block_dir(), *BlockVersion::FileName());
     local_paths_.push_back(file_path);
 }
 
 AddColumnEntryOp::AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts) {
-    for (u32 layer = 0; layer < 2; ++layer) {
-        outline_infos_.emplace_back(column_entry->OutlineBufferCount(layer), column_entry->LastChunkOff(layer));
-    }
-    local_paths_.push_back(column_entry->FilePath());
+    outline_info_ = {column_entry->OutlineBufferCount(), column_entry->LastChunkOff()};
+    Vector<String> paths = column_entry->FilePaths();
+    local_paths_.insert(local_paths_.end(), paths.begin(), paths.end());
 }
 
 AddTableIndexEntryOp::AddTableIndexEntryOp(TableIndexEntry *table_index_entry, TxnTimeStamp commit_ts)
@@ -392,20 +405,20 @@ AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, T
     IndexType index_type = segment_index_entry->table_index_entry()->index_base()->index_type_;
     switch (index_type) {
         case IndexType::kFullText: {
-            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX);
-            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + DICT_SUFFIX);
-            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            Path rela_dir = *(segment_index_entry->index_dir());
+            local_paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + POSTING_SUFFIX));
+            local_paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + DICT_SUFFIX));
+            local_paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + LENGTH_SUFFIX));
             break;
         }
         case IndexType::kHnsw:
         case IndexType::kEMVB:
         case IndexType::kSecondary:
         case IndexType::kBMP: {
-            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
+            Path rela_dir = *(segment_index_entry->index_dir());
             String file_name = ChunkIndexEntry::IndexFileName(segment_index_entry->segment_id(), chunk_index_entry->chunk_id_);
-            String full_path = fmt::format("{}/{}", full_dir, file_name);
-            local_paths_.push_back(full_path);
+            String rela_path = rela_dir / file_name;
+            local_paths_.push_back(rela_path);
             break;
         }
         default: {
@@ -415,7 +428,7 @@ AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, T
     }
 }
 
-UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(const char *&ptr) {
     auto add_db_op = MakeUnique<AddDBEntryOp>();
     add_db_op->ReadAdvBase(ptr);
 
@@ -423,7 +436,7 @@ UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(char *&ptr) {
     return add_db_op;
 }
 
-UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
+UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(const char *&ptr, const char *ptr_end) {
     auto add_table_op = MakeUnique<AddTableEntryOp>();
     add_table_op->ReadAdvBase(ptr);
 
@@ -457,7 +470,7 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
     return add_table_op;
 }
 
-UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(const char *&ptr) {
     auto add_segment_op = MakeUnique<AddSegmentEntryOp>();
     add_segment_op->ReadAdvBase(ptr);
 
@@ -474,7 +487,7 @@ UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(char *&ptr) {
     return add_segment_op;
 }
 
-UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(const char *&ptr) {
     auto add_block_op = MakeUnique<AddBlockEntryOp>();
     add_block_op->ReadAdvBase(ptr);
 
@@ -488,19 +501,16 @@ UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(char *&ptr) {
     return add_block_op;
 }
 
-UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(const char *&ptr) {
     auto add_column_op = MakeUnique<AddColumnEntryOp>();
     add_column_op->ReadAdvBase(ptr);
-    const auto outline_infos_size = ReadBufAdv<u32>(ptr);
-    add_column_op->outline_infos_.resize(outline_infos_size);
-    for (auto &[outline_buffer_count, last_chunk_offset] : add_column_op->outline_infos_) {
-        outline_buffer_count = ReadBufAdv<u32>(ptr);
-        last_chunk_offset = ReadBufAdv<u64>(ptr);
-    }
+    auto &[outline_buffer_count, last_chunk_offset] = add_column_op->outline_info_;
+    outline_buffer_count = ReadBufAdv<u32>(ptr);
+    last_chunk_offset = ReadBufAdv<u64>(ptr);
     return add_column_op;
 }
 
-UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
+UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(const char *&ptr, const char *ptr_end) {
     auto add_table_index_op = MakeUnique<AddTableIndexEntryOp>();
     add_table_index_op->ReadAdvBase(ptr);
 
@@ -511,7 +521,7 @@ UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(char *&ptr, char *
     return add_table_index_op;
 }
 
-UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(const char *&ptr) {
     auto add_segment_index_op = MakeUnique<AddSegmentIndexEntryOp>();
     add_segment_index_op->ReadAdvBase(ptr);
 
@@ -521,7 +531,7 @@ UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(char *&ptr) {
     return add_segment_index_op;
 }
 
-UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(char *&ptr) {
+UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(const char *&ptr) {
     auto add_chunk_index_op = MakeUnique<AddChunkIndexEntryOp>();
     add_chunk_index_op->ReadAdvBase(ptr);
 
@@ -583,7 +593,7 @@ SizeT AddBlockEntryOp::GetSizeInBytes() const {
 
 SizeT AddColumnEntryOp::GetSizeInBytes() const {
     auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-    total_size += sizeof(u32) + outline_infos_.size() * (sizeof(u32) + sizeof(u64));
+    total_size += (sizeof(u32) + sizeof(u64));
     return total_size;
 }
 
@@ -671,12 +681,9 @@ void AddBlockEntryOp::WriteAdv(char *&buf) const {
 void AddColumnEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->type_);
     WriteAdvBase(buf);
-    const u32 outline_infos_size = outline_infos_.size();
-    WriteBufAdv(buf, outline_infos_size);
-    for (const auto &[outline_buffer_count, last_chunk_offset] : outline_infos_) {
-        WriteBufAdv(buf, outline_buffer_count);
-        WriteBufAdv(buf, last_chunk_offset);
-    }
+    const auto &[outline_buffer_count, last_chunk_offset] = outline_info_;
+    WriteBufAdv(buf, outline_buffer_count);
+    WriteBufAdv(buf, last_chunk_offset);
 }
 
 void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
@@ -757,13 +764,8 @@ const String AddBlockEntryOp::ToString() const {
 const String AddColumnEntryOp::ToString() const {
     std::ostringstream oss;
     oss << fmt::format("AddColumnEntryOp {} outline_infos: [", CatalogDeltaOperation::ToString());
-    for (u32 i = 0; i < outline_infos_.size(); ++i) {
-        const auto &[outline_buffer_count, last_chunk_offset] = outline_infos_[i];
-        oss << fmt::format("outline_buffer_group_{} : [outline_buffer_count: {}, last_chunk_offset: {}]", i, outline_buffer_count, last_chunk_offset);
-        if (i != outline_infos_.size() - 1) {
-            oss << ", ";
-        }
-    }
+    const auto &[outline_buffer_count, last_chunk_offset] = outline_info_;
+    oss << fmt::format("outline_buffer_count: {}, last_chunk_offset: {}", outline_buffer_count, last_chunk_offset);
     oss << "]";
     return std::move(oss).str();
 }
@@ -831,7 +833,7 @@ bool AddBlockEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
 
 bool AddColumnEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddColumnEntryOp *>(&rhs);
-    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && outline_infos_ == rhs_op->outline_infos_;
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && outline_info_ == rhs_op->outline_info_;
 }
 
 bool AddTableIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
@@ -947,7 +949,10 @@ void AddChunkIndexEntryOp::Merge(CatalogDeltaOperation &other) {
         String error_message = fmt::format("Merge failed, other type: {}", other.GetTypeStr());
         UnrecoverableError(error_message);
     }
-    *this = std::move(static_cast<AddChunkIndexEntryOp &>(other));
+    auto &add_chunk_index_op = static_cast<AddChunkIndexEntryOp &>(other);
+    MergeFlag flag = this->NextDeleteFlag(add_chunk_index_op.merge_flag_);
+    *this = std::move(add_chunk_index_op);
+    this->merge_flag_ = flag;
 }
 
 void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
@@ -972,9 +977,9 @@ i32 CatalogDeltaEntry::GetSizeInBytes() const {
     return size;
 }
 
-UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_bytes) {
-    char *const ptr_start = ptr;
-    char *const ptr_end = ptr + max_bytes;
+UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
+    const char *const ptr_start = ptr;
+    const char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
         String error_message = "ptr goes out of range when reading WalEntry";
         UnrecoverableError(error_message);
@@ -983,19 +988,16 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     header.size_ = ReadBufAdv<i32>(ptr);
     header.checksum_ = ReadBufAdv<u32>(ptr);
     auto entry = MakeUnique<CatalogDeltaEntry>();
-    i32 size2 = *(i32 *)(ptr_start + header.size_ - sizeof(i32));
-    if (header.size_ != size2) {
+    if (const i32 size2 = ReadBuf<i32>(ptr_start + header.size_ - sizeof(i32)); header.size_ != size2) {
         return nullptr;
     }
     {
-        ptr = ptr_start;
-        WriteBufAdv(ptr, header.size_);
-        u32 init_checksum = 0;
-        WriteBufAdv(ptr, init_checksum);
-        u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr_start), header.size_);
-        if (header.checksum_ != checksum2) {
-            String error_message = fmt::format("checksum failed, checksum: {}, checksum2: {}", header.checksum_, checksum2);
-            UnrecoverableError(error_message);
+        const auto ptr_start_mutable = const_cast<char *>(ptr_start);
+        WriteBuf<u32>(ptr_start_mutable + sizeof(header.size_), 0);
+        DeferFn defer([&] { WriteBuf<u32>(ptr_start_mutable + sizeof(header.size_), header.checksum_); });
+        if (const u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr_start), header.size_);
+            header.checksum_ != checksum2) {
+            UnrecoverableError(fmt::format("checksum failed, checksum: {}, checksum2: {}", header.checksum_, checksum2));
         }
     }
     entry->max_commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
@@ -1201,6 +1203,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(new_op.get());
             if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
                 add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
+                LOG_DEBUG(fmt::format("Delete chunk: {} at {}", *new_op->encode_, add_chunk_index_op->deprecate_ts_));
             }
         }
         const String &encode = *new_op->encode_;

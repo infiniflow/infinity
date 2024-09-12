@@ -71,7 +71,6 @@ class TestIndex(HttpTest):
                               "type": "HNSW",
                               "M": "16",
                               "ef_construction": "50",
-                              "ef": "50",
                               "metric": "l2"
                           })
         self.drop_index(db_name, table_name, idxname)
@@ -695,7 +694,6 @@ class TestIndex(HttpTest):
                 "type": "HNSW",
                 "M": "16",
                 "ef_construction": "50",
-                "ef": "50",
                 "metric": "l2"
             }, {"error_code": 0}, opt)
         self.drop_index(db_name, table_name, idxname)
@@ -725,7 +723,6 @@ class TestIndex(HttpTest):
                 "type": "HNSW",
                 "M": "16",
                 "ef_construction": "50",
-                "ef": "50",
                 "metric": "l2"
             }, {"status_code": 500}, str(opt))
             i += 1
@@ -754,7 +751,6 @@ class TestIndex(HttpTest):
                 "type": "HNSW",
                 "M": "16",
                 "ef_construction": "50",
-                "ef": "50",
                 "metric": "l2"
             })
         self.drop_index(db_name, table_name, idxname)
@@ -783,7 +779,6 @@ class TestIndex(HttpTest):
             "type": "HNSW",
             "M": "16",
             "ef_construction": "50",
-            "ef": "50",
             "metric": "l2"
         }, {
                               "error_code": 0
@@ -793,7 +788,6 @@ class TestIndex(HttpTest):
             "type": "HNSW",
             "M": "16",
             "ef_construction": "50",
-            "ef": "50",
             "metric": "l2"
         }, {
                               "status_code": 500,
@@ -825,7 +819,6 @@ class TestIndex(HttpTest):
                 "type": "HNSW",
                 "M": "16",
                 "ef_construction": "50",
-                "ef": "50",
                 "metric": "l2"
             })
             self.show_index(db_name, table_name, idxname + str(i), {
@@ -855,7 +848,6 @@ class TestIndex(HttpTest):
             "type": "HNSW",
             "M": "16",
             "ef_construction": "50",
-            "ef": "50",
             "metric": "l2"
         })
         self.show_index(db_name, table_name, idxname, {
@@ -888,7 +880,6 @@ class TestIndex(HttpTest):
             "type": "HNSW",
             "M": "16",
             "ef_construction": "50",
-            "ef": "50",
             "metric": "l2"
         })
         for name in idx_name_list:
@@ -923,7 +914,6 @@ class TestIndex(HttpTest):
                 "type": "HNSW",
                 "M": "16",
                 "ef_construction": "50",
-                "ef": "50",
                 "metric": "l2"
             })
         self.list_index(db_name, table_name, {
@@ -956,7 +946,6 @@ class TestIndex(HttpTest):
             "type": "HNSW",
             "M": "16",
             "ef_construction": "50",
-            "ef": "50",
             "metric": "l2"
         })
         self.drop_index(db_name, table_name, idxname, {
@@ -985,7 +974,6 @@ class TestIndex(HttpTest):
             "type": "HNSW",
             "M": "16",
             "ef_construction": "50",
-            "ef": "50",
             "metric": "l2"
         })
 
@@ -1022,14 +1010,12 @@ class TestIndex(HttpTest):
             "type": "HNSW",
             "M": "16",
             "ef_construction": "50",
-            "ef": "50",
             "metric": "l2"
         })
         self.create_index(db_name, table_name, idxname, ["c1"], {
             "type": "HNSW",
             "M": "16",
             "ef_construction": "50",
-            "ef": "50",
             "metric": "ip"
         })
         self.drop_index(db_name, table_name, idxname)
@@ -1061,7 +1047,6 @@ class TestIndex(HttpTest):
                 "type": "HNSW",
                 "M": "16",
                 "ef_construction": "50",
-                "ef": "50",
                 "metric": t
             }, {
                                   "status_code": 500,

@@ -50,18 +50,23 @@ SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_conte
         Status status = Status::SyntaxError("where_conditions_ shall not be empty");
         RecoverableError(status);
     }
-    SharedPtr<LogicalNode> from = BuildFrom(table_ref_ptr_, query_context, bind_context);
+    SharedPtr<LogicalNode> table_scan_node = BuildFrom(table_ref_ptr_, query_context, bind_context);
     if (!where_conditions_.empty()) {
-        current_node = BuildFilter(from, where_conditions_, query_context, bind_context);
-        current_node->set_left_node(from);
+        SharedPtr<LogicalNode> filter_node = BuildFilter(table_scan_node, where_conditions_, query_context, bind_context);
+        filter_node->set_left_node(table_scan_node);
+        current_node = filter_node;
     } else {
-        current_node = from;
+        current_node = table_scan_node;
     }
 
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
-    SharedPtr<LogicalNode> upd = MakeShared<LogicalUpdate>(bind_context->GetNewLogicalNodeId(), base_table_ref->table_entry_ptr_, update_columns_);
-    upd->set_left_node(current_node);
-    return upd;
+    auto update_node = MakeShared<LogicalUpdate>(bind_context->GetNewLogicalNodeId(),
+                                                 base_table_ref->table_entry_ptr_,
+                                                 update_columns_,
+                                                 all_columns_in_table_,
+                                                 final_result_columns_);
+    update_node->set_left_node(current_node);
+    return update_node;
 }
 
 SharedPtr<LogicalNode>

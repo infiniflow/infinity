@@ -22,8 +22,7 @@ import stl;
 import column_vector;
 import logger;
 import infinity_exception;
-import bitmask;
-import bitmask_buffer;
+import roaring_bitmap;
 import internal_types;
 
 namespace infinity {
@@ -133,48 +132,14 @@ private:
                                            SharedPtr<Bitmask> &result_null,
                                            SizeT count,
                                            void *state_ptr) {
-        if (input_null->IsAllTrue()) {
-            // Initialized all true to output null bitmask.
-            result_null->SetAllTrue();
-
-            for (SizeT i = 0; i < count; i++) {
-                Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
+        *result_null = *input_null;
+        result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
+            if (row_index >= count) {
+                return false;
             }
-        } else {
-            result_null->DeepCopy(*input_null);
-
-            const u64 *input_null_data = input_null->GetData();
-            SizeT unit_count = BitmaskBuffer::UnitCount(count);
-            for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-                if (input_null_data[i] == BitmaskBuffer::UNIT_MAX) {
-                    // all data of 64 rows are not null
-                    while (start_index < end_index) {
-                        Operator::template Execute<InputType, ResultType>(input_ptr[start_index],
-                                                                          result_ptr[start_index],
-                                                                          result_null.get(),
-                                                                          start_index,
-                                                                          state_ptr);
-                        ++start_index;
-                    }
-                } else if (input_null_data[i] == BitmaskBuffer::UNIT_MIN) {
-                    // all data of 64 rows are null
-                    ;
-                } else {
-                    SizeT original_start = start_index;
-                    while (start_index < end_index) {
-                        if (input_null->IsTrue(start_index - original_start)) {
-                            // This row isn't null
-                            Operator::template Execute<InputType, ResultType>(input_ptr[start_index],
-                                                                              result_ptr[start_index],
-                                                                              result_null.get(),
-                                                                              start_index,
-                                                                              state_ptr);
-                            ++start_index;
-                        }
-                    }
-                }
-            }
-        }
+            Operator::template Execute<InputType, ResultType>(input_ptr[row_index], result_ptr[row_index], result_null.get(), row_index, state_ptr);
+            return row_index + 1 < count;
+        });
     }
 
     template <typename InputType, typename ResultType, typename Operator>
@@ -210,42 +175,19 @@ private:
 
     template <typename Operator>
     static void inline ExecuteBooleanWithNull(const SharedPtr<ColumnVector> &input, SharedPtr<ColumnVector> &result, SizeT count, void *state_ptr) {
-        const SharedPtr<Bitmask> &input_null = input->nulls_ptr_;
-        SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
-        result_null->DeepCopy(*input_null);
-        const u64 *result_null_data = result_null->GetData();
-        SizeT unit_count = BitmaskBuffer::UnitCount(count);
-        auto input_u8 = reinterpret_cast<const u8 *>(input->data());
-        auto result_u8 = reinterpret_cast<u8 *>(result->data());
-        static_assert(BitmaskBuffer::UNIT_BITS % 8 == 0, "static_assert: BitmaskBuffer::UNIT_BITS % 8 == 0");
-        for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-            end_index = std::min(end_index, count);
-            if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
-                // all data of 64 rows are not null
-                const SizeT e = end_index / 8, tail = end_index % 8;
-                for (SizeT b = start_index / 8; b < e; ++b) {
-                    Operator::template Execute(input_u8[b], result_u8[b], result_null.get(), 0, state_ptr);
-                }
-                if (tail) {
-                    u8 tail_result;
-                    Operator::template Execute(input_u8[e], tail_result, result_null.get(), 0, state_ptr);
-                    const u8 mask_keep = u8(0xff) << tail;
-                    result_u8[e] = (result_u8[e] & mask_keep) | (tail_result & ~mask_keep);
-                }
-                start_index = end_index;
-            } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
-                // all data of 64 rows are null
-                start_index = end_index;
-            } else {
-                for (BooleanT answer; start_index < end_index; ++start_index) {
-                    if (result_null->IsTrue(start_index)) {
-                        // This row isn't null
-                        Operator::template Execute(input->buffer_->GetCompactBit(start_index), answer, result_null.get(), start_index, state_ptr);
-                        result->buffer_->SetCompactBit(start_index, answer);
-                    }
-                }
+        const auto &input_null = input->nulls_ptr_;
+        auto &result_null = result->nulls_ptr_;
+        *result_null = *input_null;
+        result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
+            if (row_index >= count) {
+                return false;
             }
-        }
+            // This row isn't null
+            BooleanT answer;
+            Operator::template Execute(input->buffer_->GetCompactBit(row_index), answer, result_null.get(), row_index, state_ptr);
+            result->buffer_->SetCompactBit(row_index, answer);
+            return row_index + 1 < count;
+        });
     }
 };
 

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -39,12 +40,12 @@ import logical_type;
 import data_type;
 import logical_type;
 
+using namespace infinity;
 class VarcharTest : public BaseTest {};
 
 using namespace infinity;
 
 void InitVarcharAsInline(VarcharT& varchar, const std::string_view sv) {
-    varchar.is_value_ = false;
     varchar.length_ = sv.size();
     if (sv.size() <= VARCHAR_INLINE_LEN) {
         std::memcpy(varchar.short_.data_, sv.data(), sv.size());

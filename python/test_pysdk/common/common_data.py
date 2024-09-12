@@ -14,6 +14,8 @@ import infinity.index as index
 from numpy import dtype
 import ast
 from enum import Enum
+from infinity.table import ExplainType
+from . import common_index
 
 default_url = "http://localhost:23820/"
 
@@ -92,6 +94,27 @@ def type_to_dtype(type):
         case _:
             return object
 
+def  ExplainType_transfrom(ExplainType):
+    if ExplainType == ExplainType.Ast:
+        return "ast"
+    elif ExplainType == ExplainType.UnOpt:
+        return "unopt"
+    elif ExplainType == ExplainType.UnOpt:
+        return "unopt"
+    elif ExplainType == ExplainType.Opt:
+        return "opt"
+    elif ExplainType == ExplainType.Physical:
+        return "physical"
+    elif ExplainType == ExplainType.Pipeline:
+        return "pipeline"
+    elif ExplainType == ExplainType.Fragment:
+        return "fragment"
+    elif ExplainType == ExplainType.Analyze:
+        return "analyze"
+    else:
+        return "invalid"
+
+
 def is_float(str):
     try:
         float(str)
@@ -109,8 +132,8 @@ def is_list(str):
 def is_bool(str):
     return str.lower() == "true" or str.lower() == "false"
 
-def is_sparse(str):
-    tmp = str.replace("[", "")
+def is_sparse(str_input):
+    tmp = str_input.replace("[", "")
     tmp = tmp.replace("]", "")
     pairs = tmp.split(",")
     for pair in pairs:
@@ -121,27 +144,24 @@ def is_sparse(str):
             return False
     return True
 
-def str2sparse(str):
+def str2sparse(str_input):
     sparce_vec = {}
-    sparce_vec["indices"] = []
-    sparce_vec["values"] = []
-    tmp = str.replace("[", "")
+    tmp = str_input.replace("[", "")
     tmp = tmp.replace("]", "")
     pairs = tmp.split(",")
     for pair in pairs:
         t = pair.split(":")
-        sparce_vec["indices"].append(eval(t[0]))
-        sparce_vec["values"].append(eval(t[1]))
+        sparce_vec[str(eval(t[0]))] = eval(t[1])
 
     return sparce_vec
 
 index_type_transfrom = {
-    index.IndexType.IVFFlat:"IVFFlat",
-    index.IndexType.Hnsw:"HNSW",
-    index.IndexType.FullText:"FULLTEXT",
-    index.IndexType.Secondary:"SECONDARY",
-    index.IndexType.BMP:"BMP",
-    index.IndexType.EMVB:"EMVB",
+    1:"IVFFLAT",
+    2:"HNSW",
+    3:"FULLTEXT",
+    4:"SECONDARY",
+    5:"EMVB",
+    6:"BMP",
 }
 
 baseResponse = {
@@ -229,13 +249,20 @@ class literaltype(Enum):
 
 type_to_literaltype = {
     "boolean" : literaltype.kBoolean.value,
+    "bool" : literaltype.kBoolean.value,
     "tinyint" : literaltype.kInteger.value,
+    "int8" : literaltype.kInteger.value,
     "smallint" : literaltype.kInteger.value,
+    "int16" : literaltype.kInteger.value,
     "int" : literaltype.kInteger.value,
+    "int32" : literaltype.kInteger.value,
     "integer" : literaltype.kInteger.value,
     "bigint" : literaltype.kInteger.value,
+    "int64" : literaltype.kInteger.value,
     "float" : literaltype.kDouble.value,
-    "double": literaltype.kDouble.value
+    "float32" : literaltype.kDouble.value,
+    "double": literaltype.kDouble.value,
+    "float64": literaltype.kDouble.value
 }
 
 type_to_vector_literaltype = {

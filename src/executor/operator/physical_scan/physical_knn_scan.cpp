@@ -53,7 +53,7 @@ import ann_ivf_flat;
 import annivfflat_index_data;
 import buffer_handle;
 import data_block;
-import bitmask;
+import roaring_bitmap;
 import column_vector;
 import index_hnsw;
 import status;
@@ -63,6 +63,7 @@ import block_entry;
 import segment_entry;
 import abstract_hnsw;
 import physical_match_tensor_scan;
+import hnsw_alg;
 
 namespace infinity {
 
@@ -137,8 +138,17 @@ void PhysicalKnnScan::Init() {
     KnnExpression *knn_expr = knn_expression_.get();
     const auto *column_expr = static_cast<const ColumnExpression *>(knn_expr->arguments()[0].get());
     const auto column_data_type = column_expr->Type();
-    if (column_data_type.type() != LogicalType::kEmbedding) {
-        UnrecoverableError(fmt::format("KnnScan: Execute(): Column type {} is not embedding.", column_data_type.ToString()));
+    switch (column_data_type.type()) {
+        case LogicalType::kEmbedding:
+        case LogicalType::kMultiVector: {
+            // support knn
+            column_logical_type_ = column_data_type.type();
+            break;
+        }
+        default: {
+            RecoverableError(Status::NotSupport(fmt::format("KnnScan: Init(): Column type {} is not embedding.", column_data_type.ToString())));
+            break;
+        }
     }
     const auto *embedding_type_info = static_cast<const EmbeddingInfo *>(column_data_type.type_info().get());
     const auto column_elem_type = embedding_type_info->Type();
@@ -181,79 +191,91 @@ SizeT PhysicalKnnScan::TaskletCount() { return BlockScanTaskCount() + index_entr
 
 bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
+    switch (column_logical_type_) {
+        case LogicalType::kEmbedding: {
+            ExecuteInternalByColumnLogicalType<LogicalType::kEmbedding>(query_context, knn_scan_operator_state);
+            break;
+        }
+        case LogicalType::kMultiVector: {
+            ExecuteInternalByColumnLogicalType<LogicalType::kMultiVector>(query_context, knn_scan_operator_state);
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("KnnScan: Execute(): Invalid column logical type {}.", LogicalType2Str(column_logical_type_)));
+        }
+    }
+    return true;
+}
+
+template <LogicalType t>
+void PhysicalKnnScan::ExecuteInternalByColumnLogicalType(QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state) {
     switch (column_elem_type_) {
         case EmbeddingDataType::kElemUInt8: {
-            ExecuteInternalByColumnDataType<u8>(query_context, knn_scan_operator_state);
-            break;
+            return ExecuteInternalByColumnDataType<t, u8>(query_context, knn_scan_operator_state);
         }
         case EmbeddingDataType::kElemInt8: {
-            ExecuteInternalByColumnDataType<i8>(query_context, knn_scan_operator_state);
-            break;
+            return ExecuteInternalByColumnDataType<t, i8>(query_context, knn_scan_operator_state);
         }
         case EmbeddingDataType::kElemFloat: {
-            ExecuteInternalByColumnDataType<f32>(query_context, knn_scan_operator_state);
-            break;
+            return ExecuteInternalByColumnDataType<t, f32>(query_context, knn_scan_operator_state);
         }
         case EmbeddingDataType::kElemDouble: {
-            ExecuteInternalByColumnDataType<f64>(query_context, knn_scan_operator_state);
-            break;
+            return ExecuteInternalByColumnDataType<t, f64>(query_context, knn_scan_operator_state);
         }
         case EmbeddingDataType::kElemFloat16: {
-            ExecuteInternalByColumnDataType<Float16T>(query_context, knn_scan_operator_state);
-            break;
+            return ExecuteInternalByColumnDataType<t, Float16T>(query_context, knn_scan_operator_state);
         }
         case EmbeddingDataType::kElemBFloat16: {
-            ExecuteInternalByColumnDataType<BFloat16T>(query_context, knn_scan_operator_state);
-            break;
+            return ExecuteInternalByColumnDataType<t, BFloat16T>(query_context, knn_scan_operator_state);
         }
         case EmbeddingDataType::kElemBit:
         case EmbeddingDataType::kElemInt16:
         case EmbeddingDataType::kElemInt32:
         case EmbeddingDataType::kElemInt64:
         case EmbeddingDataType::kElemInvalid: {
-            UnrecoverableError("KnnScan: Execute(): Invalid embedding data type.");
+            UnrecoverableError(
+                fmt::format("KnnScan: Execute(): Invalid embedding data type {}.", EmbeddingT::EmbeddingDataType2String(column_elem_type_)));
         }
     }
-    return true;
 }
 
-template <typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
 struct ExecuteDispatchHelper {
     static void Execute(PhysicalKnnScan *knn_op, QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state) {
         UnrecoverableError("Unexpected ColumnDataType and QueryDataType type match.");
     }
 };
 
-template <typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
     requires(((IsAnyOf<ColumnDataType, u8, i8> && std::same_as<ColumnDataType, QueryDataType>) ||
               (IsAnyOf<ColumnDataType, f32, f64, Float16T, BFloat16T> && std::same_as<QueryDataType, f32>)) &&
              std::same_as<DistanceDataType, f32>)
-struct ExecuteDispatchHelper<ColumnDataType, QueryDataType, C, DistanceDataType> {
+struct ExecuteDispatchHelper<t, ColumnDataType, QueryDataType, C, DistanceDataType> {
     static void Execute(PhysicalKnnScan *knn_op, QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state) {
-        return knn_op->ExecuteInternalByColumnDataTypeAndQueryDataType<ColumnDataType, QueryDataType, C, DistanceDataType>(query_context,
-                                                                                                                           knn_scan_operator_state);
+        return knn_op->ExecuteInternalByColumnDataTypeAndQueryDataType<t, ColumnDataType, QueryDataType, C, DistanceDataType>(
+            query_context,
+            knn_scan_operator_state);
     }
 };
 
-template <typename ColumnDataT>
+template <LogicalType t, typename ColumnDataT>
 void PhysicalKnnScan::ExecuteInternalByColumnDataType(QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state) {
     static_assert(IsAnyOf<ColumnDataT, u8, i8, f32, f64, Float16T, BFloat16T>, "Unexpected ColumnDataT type.");
     const auto query_elem_type = knn_scan_operator_state->knn_scan_function_data_->knn_scan_shared_data_->query_elem_type_;
     const auto query_dist_type = knn_scan_operator_state->knn_scan_function_data_->knn_scan_shared_data_->knn_distance_type_;
     auto knn_distance_error = [query_dist_type] {
-        Status status = Status::NotSupport(fmt::format("Not implemented KNN distance: {}", KnnExpression::KnnDistanceType2Str(query_dist_type)));
-        RecoverableError(std::move(status));
+        RecoverableError(Status::NotSupport(fmt::format("Not implemented KNN distance: {}", KnnExpression::KnnDistanceType2Str(query_dist_type))));
     };
     switch (query_elem_type) {
         case EmbeddingDataType::kElemFloat: {
             switch (query_dist_type) {
                 case KnnDistanceType::kL2:
                 case KnnDistanceType::kHamming: {
-                    return ExecuteDispatchHelper<ColumnDataT, f32, CompareMax, f32>::Execute(this, query_context, knn_scan_operator_state);
+                    return ExecuteDispatchHelper<t, ColumnDataT, f32, CompareMax, f32>::Execute(this, query_context, knn_scan_operator_state);
                 }
                 case KnnDistanceType::kCosine:
                 case KnnDistanceType::kInnerProduct: {
-                    return ExecuteDispatchHelper<ColumnDataT, f32, CompareMin, f32>::Execute(this, query_context, knn_scan_operator_state);
+                    return ExecuteDispatchHelper<t, ColumnDataT, f32, CompareMin, f32>::Execute(this, query_context, knn_scan_operator_state);
                 }
                 default: {
                     return knn_distance_error();
@@ -265,11 +287,11 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataType(QueryContext *query_contex
             switch (query_dist_type) {
                 case KnnDistanceType::kL2:
                 case KnnDistanceType::kHamming: {
-                    return ExecuteDispatchHelper<ColumnDataT, u8, CompareMax, f32>::Execute(this, query_context, knn_scan_operator_state);
+                    return ExecuteDispatchHelper<t, ColumnDataT, u8, CompareMax, f32>::Execute(this, query_context, knn_scan_operator_state);
                 }
                 case KnnDistanceType::kCosine:
                 case KnnDistanceType::kInnerProduct: {
-                    return ExecuteDispatchHelper<ColumnDataT, u8, CompareMin, f32>::Execute(this, query_context, knn_scan_operator_state);
+                    return ExecuteDispatchHelper<t, ColumnDataT, u8, CompareMin, f32>::Execute(this, query_context, knn_scan_operator_state);
                 }
                 default: {
                     return knn_distance_error();
@@ -281,11 +303,11 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataType(QueryContext *query_contex
             switch (query_dist_type) {
                 case KnnDistanceType::kL2:
                 case KnnDistanceType::kHamming: {
-                    return ExecuteDispatchHelper<ColumnDataT, i8, CompareMax, f32>::Execute(this, query_context, knn_scan_operator_state);
+                    return ExecuteDispatchHelper<t, ColumnDataT, i8, CompareMax, f32>::Execute(this, query_context, knn_scan_operator_state);
                 }
                 case KnnDistanceType::kCosine:
                 case KnnDistanceType::kInnerProduct: {
-                    return ExecuteDispatchHelper<ColumnDataT, i8, CompareMin, f32>::Execute(this, query_context, knn_scan_operator_state);
+                    return ExecuteDispatchHelper<t, ColumnDataT, i8, CompareMin, f32>::Execute(this, query_context, knn_scan_operator_state);
                 }
                 default: {
                     return knn_distance_error();
@@ -297,20 +319,16 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataType(QueryContext *query_contex
         case EmbeddingDataType::kElemBFloat16:
         case EmbeddingDataType::kElemDouble: {
             // bug
-            const auto err_msg = fmt::format("BUG: Query embedding data type: {} should be cast to Float before knn search!",
-                                             EmbeddingT::EmbeddingDataType2String(query_elem_type));
-            LOG_ERROR(err_msg);
-            Status status = Status::NotSupport(err_msg);
-            RecoverableError(std::move(status));
+            UnrecoverableError(fmt::format("BUG: Query embedding data type: {} should be cast to Float before knn search!",
+                                           EmbeddingT::EmbeddingDataType2String(query_elem_type)));
         }
         case EmbeddingDataType::kElemBit:
         case EmbeddingDataType::kElemInt16:
         case EmbeddingDataType::kElemInt32:
         case EmbeddingDataType::kElemInt64:
         case EmbeddingDataType::kElemInvalid: {
-            Status status = Status::NotSupport(
-                fmt::format("Not implemented query embedding data type: {}", EmbeddingT::EmbeddingDataType2String(query_elem_type)));
-            RecoverableError(std::move(status));
+            RecoverableError(Status::NotSupport(
+                fmt::format("Not implemented query embedding data type: {}", EmbeddingT::EmbeddingDataType2String(query_elem_type))));
         }
     }
 }
@@ -341,11 +359,11 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     Map<u32, SharedPtr<SegmentIndexEntry>> index_entry_map;
 
-    if(knn_expression_->ignore_index_) {
+    if (knn_expression_->ignore_index_) {
         LOG_TRACE("Not use index"); // No index need to check
     } else {
         auto map_guard = table_entry->IndexMetaMap();
-        if(knn_expression_->using_index_.empty()) {
+        if (knn_expression_->using_index_.empty()) {
             LOG_TRACE("Try to find a index to use");
             for (auto &[index_name, table_index_meta] : *map_guard) {
                 auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
@@ -374,12 +392,12 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
         } else {
             LOG_TRACE(fmt::format("Use index: {}", knn_expression_->using_index_));
             auto iter = (*map_guard).find(knn_expression_->using_index_);
-            if(iter == (*map_guard).end()) {
+            if (iter == (*map_guard).end()) {
                 Status status = Status::IndexNotExist(knn_expression_->using_index_);
                 RecoverableError(std::move(status));
             }
 
-            auto& table_index_meta = iter->second;
+            auto &table_index_meta = iter->second;
 
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
@@ -399,7 +417,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             if (auto index_type = table_index_entry->index_base()->index_type_;
                 index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
                 LOG_ERROR("Invalid index type");
-                Status error_status = Status::InvalidIndexType();
+                Status error_status = Status::InvalidIndexType("invalid index");
                 RecoverableError(std::move(error_status));
             }
 
@@ -428,7 +446,21 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
 SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
+template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+struct BruteForceBlockScan;
+
 template <typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+void MultiVectorSearchOneLine(MergeKnn<QueryDataType, C, DistanceDataType> *merge_heap,
+                              KnnDistance1<QueryDataType, DistanceDataType> *dist_func,
+                              const QueryDataType *knn_query_ptr,
+                              u32 embedding_dim,
+                              UniquePtr<QueryDataType[]> &buffer_ptr_for_cast,
+                              const ColumnVector &column_vector,
+                              SegmentID segment_id,
+                              SegmentOffset segment_offset,
+                              BlockOffset block_offset);
+
+template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
 void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryContext *query_context, KnnScanOperatorState *knn_scan_operator_state) {
     // knn expr output data type is always f32
     static_assert(std::is_same_v<DistanceDataType, f32>);
@@ -468,13 +500,13 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
     BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
     SizeT knn_column_id = GetColumnID();
 
+    UniquePtr<QueryDataType[]> buffer_ptr_for_cast;
     if (u64 block_column_idx =
             knn_scan_function_data->execute_block_scan_job_ ? knn_scan_shared_data->current_block_idx_++ : std::numeric_limits<u64>::max();
         block_column_idx < brute_task_n) {
         LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{}", knn_scan_function_data->task_id_, block_column_idx + 1, brute_task_n));
         // brute force
         // TODO: now will try to finish all block scan job in the task
-        UniquePtr<QueryDataType[]> buffer_ptr_for_cast;
         do {
             BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_->at(block_column_idx);
             const BlockEntry *block_entry = block_column_entry->block_entry();
@@ -489,20 +521,16 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                 //                       brute_task_n));
                 block_entry->SetDeleteBitmask(begin_ts, bitmask);
                 ColumnVector column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
-                auto data = reinterpret_cast<const ColumnDataType *>(column_vector.data());
-                if constexpr (std::is_same_v<ColumnDataType, QueryDataType>) {
-                    merge_heap->Search(knn_query_ptr, data, embedding_dim, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
-                } else {
-                    if (!buffer_ptr_for_cast) {
-                        buffer_ptr_for_cast = MakeUniqueForOverwrite<QueryDataType[]>(DEFAULT_BLOCK_CAPACITY * embedding_dim);
-                    }
-                    const SizeT total_elem_num = row_count * embedding_dim;
-                    auto buffer_ptr = buffer_ptr_for_cast.get();
-                    for (SizeT i = 0; i < total_elem_num; ++i) {
-                        buffer_ptr[i] = static_cast<QueryDataType>(data[i]);
-                    }
-                    merge_heap->Search(knn_query_ptr, buffer_ptr, embedding_dim, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
-                }
+                BruteForceBlockScan<t, ColumnDataType, QueryDataType, C, DistanceDataType>::Execute(merge_heap,
+                                                                                                    dist_func,
+                                                                                                    knn_query_ptr,
+                                                                                                    embedding_dim,
+                                                                                                    buffer_ptr_for_cast,
+                                                                                                    column_vector,
+                                                                                                    segment_id,
+                                                                                                    block_id,
+                                                                                                    row_count,
+                                                                                                    bitmask);
             }
             block_column_idx = knn_scan_shared_data->current_block_idx_++;
         } while (block_column_idx < brute_task_n);
@@ -512,13 +540,12 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         SegmentIndexEntry *segment_index_entry = knn_scan_shared_data->index_entries_->at(index_idx);
 
         auto segment_id = segment_index_entry->segment_id();
-        SegmentEntry *segment_entry = nullptr;
+        SegmentOffset segment_row_count = 0;
         const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
-            String error_message = fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
         } else {
-            segment_entry = iter->second.segment_entry_;
+            segment_row_count = iter->second.segment_offset_;
         }
 
         bool has_some_result = false;
@@ -526,25 +553,15 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         bool use_bitmask = false;
         if (common_query_filter_->AlwaysTrue()) {
             has_some_result = true;
-            bitmask.SetAllTrue();
         } else {
-            auto it = common_query_filter_->filter_result_.find(segment_id);
-            if (it != common_query_filter_->filter_result_.end()) {
+            if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
                 LOG_TRACE(fmt::format("KnnScan: {} index {}/{} not skipped after common_query_filter",
                                       knn_scan_function_data->task_id_,
                                       index_idx + 1,
                                       index_task_n));
-                auto segment_row_count = segment_entry->row_count();
-                const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
-                if (std::holds_alternative<Vector<u32>>(filter_result)) {
-                    const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                    bitmask.Initialize(std::ceil(segment_row_count));
-                    bitmask.SetAllFalse();
-                    for (u32 row_id : filter_result_vector) {
-                        bitmask.SetTrue(row_id);
-                    }
-                } else {
-                    bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+                bitmask = it->second;
+                if (segment_row_count != bitmask.count()) {
+                    UnrecoverableError(fmt::format("Segment row count mismatch with filter result: {} vs {}", segment_row_count, bitmask.count()));
                 }
                 has_some_result = true;
                 use_bitmask = !bitmask.IsAllTrue();
@@ -554,7 +571,9 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         if (has_some_result) {
             switch (segment_index_entry->table_index_entry()->index_base()->index_type_) {
                 case IndexType::kIVFFlat: {
-                    if constexpr (std::is_same_v<ColumnDataType, f32>) {
+                    if constexpr (!(t == LogicalType::kEmbedding && std::is_same_v<ColumnDataType, f32>)) {
+                        UnrecoverableError("Invalid data type");
+                    } else {
                         BufferHandle index_handle = segment_index_entry->GetIndex();
                         auto index = static_cast<const AnnIVFFlatIndexData<ColumnDataType> *>(index_handle.GetData());
                         i32 n_probes = 1;
@@ -604,23 +623,21 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                         } else {
                             IVFFlatScan();
                         }
-                        break;
-                    } else {
-                        String error_message = "Invalid data type";
-                        UnrecoverableError(error_message);
                     }
+                    break;
                 }
                 case IndexType::kHnsw: {
                     if constexpr (!(IsAnyOf<ColumnDataType, u8, i8, f32> && std::is_same_v<ColumnDataType, QueryDataType>)) {
-                        String error_message = "Invalid data type";
-                        UnrecoverableError(error_message);
+                        UnrecoverableError("Invalid data type");
                     } else {
                         auto hnsw_search = [&](auto *hnsw_index, bool with_lock) {
                             bool rerank = false;
+                            KnnSearchOption search_option;
+                            search_option.column_logical_type_ = t;
                             for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
                                 if (opt_param.param_name_ == "ef") {
                                     u64 ef = std::stoull(opt_param.param_value_);
-                                    hnsw_index->SetEf(ef);
+                                    search_option.ef_ = ef;
                                 } else if (opt_param.param_name_ == "rerank") {
                                     rerank = true;
                                 }
@@ -640,21 +657,27 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                         std::tie(result_n1, d_ptr, l_ptr) =
                                             hnsw_index->template KnnSearch<BitmaskFilter<SegmentOffset>, true>(query,
                                                                                                                knn_scan_shared_data->topk_,
-                                                                                                               filter);
+                                                                                                               filter,
+                                                                                                               search_option);
                                     } else {
                                         std::tie(result_n1, d_ptr, l_ptr) =
                                             hnsw_index->template KnnSearch<BitmaskFilter<SegmentOffset>, false>(query,
                                                                                                                 knn_scan_shared_data->topk_,
-                                                                                                                filter);
+                                                                                                                filter,
+                                                                                                                search_option);
                                     }
                                 } else {
                                     SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
                                     if (!with_lock) {
-                                        std::tie(result_n1, d_ptr, l_ptr) = hnsw_index->template KnnSearch<false>(query, knn_scan_shared_data->topk_);
+                                        std::tie(result_n1, d_ptr, l_ptr) =
+                                            hnsw_index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, search_option);
                                     } else {
                                         AppendFilter filter(max_segment_offset);
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_index->template KnnSearch<AppendFilter, true>(query, knn_scan_shared_data->topk_, filter);
+                                            hnsw_index->template KnnSearch<AppendFilter, true>(query,
+                                                                                               knn_scan_shared_data->topk_,
+                                                                                               filter,
+                                                                                               search_option);
                                     }
                                 }
 
@@ -683,14 +706,28 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(knn_column_id);
                                             column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
                                         }
-                                        const auto *data = reinterpret_cast<const ColumnDataType *>(column_vector.data());
-                                        data += block_offset * knn_scan_shared_data->dimension_;
-                                        merge_heap->Search(query,
-                                                           data,
-                                                           knn_scan_shared_data->dimension_,
-                                                           dist_func->dist_func_,
-                                                           segment_id,
-                                                           segment_offset);
+                                        if constexpr (t == LogicalType::kEmbedding) {
+                                            const auto *data = reinterpret_cast<const ColumnDataType *>(column_vector.data());
+                                            data += block_offset * knn_scan_shared_data->dimension_;
+                                            merge_heap->Search(query,
+                                                               data,
+                                                               knn_scan_shared_data->dimension_,
+                                                               dist_func->dist_func_,
+                                                               segment_id,
+                                                               segment_offset);
+                                        } else if constexpr (t == LogicalType::kMultiVector) {
+                                            MultiVectorSearchOneLine<ColumnDataType, QueryDataType, C, DistanceDataType>(merge_heap,
+                                                                                                                         dist_func,
+                                                                                                                         query,
+                                                                                                                         embedding_dim,
+                                                                                                                         buffer_ptr_for_cast,
+                                                                                                                         column_vector,
+                                                                                                                         segment_id,
+                                                                                                                         segment_offset,
+                                                                                                                         block_offset);
+                                        } else {
+                                            static_assert(false, "Unexpected logical type");
+                                        }
                                     }
                                 } else {
                                     switch (knn_scan_shared_data->knn_distance_type_) {
@@ -752,8 +789,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     break;
                 }
                 default: {
-                    Status status = Status::NotSupport("Not implemented index type");
-                    RecoverableError(status);
+                    RecoverableError(Status::NotSupport("Not implemented index type"));
                 }
             }
         }
@@ -777,5 +813,103 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         knn_scan_operator_state->SetComplete();
     }
 }
+
+template <typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+struct BruteForceBlockScan<LogicalType::kEmbedding, ColumnDataType, QueryDataType, C, DistanceDataType> {
+    static void Execute(MergeKnn<QueryDataType, C, DistanceDataType> *merge_heap,
+                        KnnDistance1<QueryDataType, DistanceDataType> *dist_func,
+                        const QueryDataType *knn_query_ptr,
+                        const u32 embedding_dim,
+                        UniquePtr<QueryDataType[]> &buffer_ptr_for_cast,
+                        const ColumnVector &column_vector,
+                        const SegmentID segment_id,
+                        const BlockID block_id,
+                        const BlockOffset row_count,
+                        const Bitmask &bitmask) {
+        auto data = reinterpret_cast<const ColumnDataType *>(column_vector.data());
+        const QueryDataType *target_ptr = nullptr;
+        if constexpr (std::is_same_v<ColumnDataType, QueryDataType>) {
+            target_ptr = data;
+        } else {
+            if (!buffer_ptr_for_cast) {
+                buffer_ptr_for_cast = MakeUniqueForOverwrite<QueryDataType[]>(DEFAULT_BLOCK_CAPACITY * embedding_dim);
+            }
+            const SizeT total_elem_num = row_count * embedding_dim;
+            for (SizeT i = 0; i < total_elem_num; ++i) {
+                buffer_ptr_for_cast[i] = static_cast<QueryDataType>(data[i]);
+            }
+            target_ptr = buffer_ptr_for_cast.get();
+        }
+        merge_heap->Search(knn_query_ptr, target_ptr, embedding_dim, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
+    }
+};
+
+template <typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+struct BruteForceBlockScan<LogicalType::kMultiVector, ColumnDataType, QueryDataType, C, DistanceDataType> {
+    static void Execute(MergeKnn<QueryDataType, C, DistanceDataType> *merge_heap,
+                        KnnDistance1<QueryDataType, DistanceDataType> *dist_func,
+                        const QueryDataType *knn_query_ptr,
+                        const u32 embedding_dim,
+                        UniquePtr<QueryDataType[]> &buffer_ptr_for_cast,
+                        const ColumnVector &column_vector,
+                        const SegmentID segment_id,
+                        const BlockID block_id,
+                        const BlockOffset row_count,
+                        const Bitmask &bitmask) {
+        for (BlockOffset row_id = 0; row_id < row_count; ++row_id) {
+            if (bitmask.IsTrue(row_id)) {
+                SegmentOffset segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + row_id;
+                MultiVectorSearchOneLine<ColumnDataType, QueryDataType, C, DistanceDataType>(merge_heap,
+                                                                                             dist_func,
+                                                                                             knn_query_ptr,
+                                                                                             embedding_dim,
+                                                                                             buffer_ptr_for_cast,
+                                                                                             column_vector,
+                                                                                             segment_id,
+                                                                                             segment_offset,
+                                                                                             row_id);
+            }
+        }
+    }
+};
+
+template <typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+void MultiVectorSearchOneLine(MergeKnn<QueryDataType, C, DistanceDataType> *merge_heap,
+                              KnnDistance1<QueryDataType, DistanceDataType> *dist_func,
+                              const QueryDataType *knn_query_ptr,
+                              const u32 embedding_dim,
+                              UniquePtr<QueryDataType[]> &buffer_ptr_for_cast,
+                              const ColumnVector &column_vector,
+                              const SegmentID segment_id,
+                              const SegmentOffset segment_offset,
+                              const BlockOffset block_offset) {
+    using Compare = C<DistanceDataType, RowID>;
+    const QueryDataType *target_ptr = nullptr;
+    if constexpr (!std::is_same_v<ColumnDataType, QueryDataType>) {
+        if (!buffer_ptr_for_cast) {
+            buffer_ptr_for_cast = MakeUniqueForOverwrite<QueryDataType[]>(embedding_dim);
+        }
+        target_ptr = buffer_ptr_for_cast.get();
+    }
+    const auto [data_span, embedding_num] = column_vector.GetMultiVectorRaw(block_offset);
+    auto result_dist = Compare::InitialValue();
+    auto raw_data_ptr = reinterpret_cast<const ColumnDataType *>(data_span.data());
+    for (u32 i = 0; i < embedding_num; ++i) {
+        if constexpr (!std::is_same_v<ColumnDataType, QueryDataType>) {
+            for (u32 j = 0; j < embedding_dim; ++j) {
+                buffer_ptr_for_cast[j] = static_cast<QueryDataType>(raw_data_ptr[j]);
+            }
+        } else {
+            target_ptr = raw_data_ptr;
+        }
+        const auto new_dist = dist_func->dist_func_(knn_query_ptr, target_ptr, embedding_dim);
+        static_assert(std::is_same_v<decltype(result_dist), std::decay_t<decltype(new_dist)>>);
+        result_dist = Compare::Compare(result_dist, new_dist) ? new_dist : result_dist;
+        raw_data_ptr += embedding_dim;
+    }
+    const RowID db_row_id(segment_id, segment_offset);
+    merge_heap->Search(0, &result_dist, &db_row_id, 1);
+}
+
 
 } // namespace infinity

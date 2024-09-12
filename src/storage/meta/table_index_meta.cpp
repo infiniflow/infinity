@@ -42,6 +42,16 @@ struct SegmentEntry;
 TableIndexMeta::TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name)
     : index_name_(std::move(index_name)), table_entry_(table_entry) {}
 
+TableIndexMeta::TableIndexMeta(const TableIndexMeta &meta)
+    : index_name_(meta.index_name_), table_entry_(meta.table_entry_) {}
+
+UniquePtr<TableIndexMeta> TableIndexMeta::Clone(TableEntry *table_entry) const {
+    auto ret = UniquePtr<TableIndexMeta>(new TableIndexMeta(*this));
+    ret->table_entry_ = table_entry;
+    ret->index_entry_list_ = index_entry_list_.Clone(ret.get());
+    return ret;
+}
+
 UniquePtr<TableIndexMeta> TableIndexMeta::NewTableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name) {
     auto table_index_meta = MakeUnique<TableIndexMeta>(table_entry, index_name);
     return table_index_meta;
@@ -124,10 +134,9 @@ TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, 
         return {nullptr, status};
     }
 
-    SharedPtr<String> full_index_dir = MakeShared<String>(fmt::format("{}/{}", *table_index_entry->base_dir_, *table_index_entry->index_dir()));
     SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
     table_index_info->index_name_ = index_name_;
-    table_index_info->index_entry_dir_ = full_index_dir;
+    table_index_info->index_entry_dir_ = table_index_entry->index_dir();
     table_index_info->segment_index_count_ = table_index_entry->index_by_segment().size();
 
     auto index_base = table_index_entry->index_base();

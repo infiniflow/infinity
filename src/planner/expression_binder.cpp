@@ -77,7 +77,7 @@ import match_tensor_expr;
 import match_sparse_expr;
 import fusion_expr;
 import data_type;
-
+import expression_type;
 import catalog;
 import table_entry;
 
@@ -109,41 +109,40 @@ SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindCon
 SharedPtr<BaseExpression> ExpressionBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     switch (expr.type_) {
         case ParsedExprType::kConstant: {
-            return BuildValueExpr((const ConstantExpr &)expr, bind_context_ptr, depth, root);
+            return BuildValueExpr(static_cast<const ConstantExpr &>(expr), bind_context_ptr, depth, root);
         }
         case ParsedExprType::kColumn: {
-            return BuildColExpr((const ColumnExpr &)expr, bind_context_ptr, depth, root);
+            return BuildColExpr(static_cast<const ColumnExpr &>(expr), bind_context_ptr, depth, root);
         }
         case ParsedExprType::kFunction: {
-            return BuildFuncExpr((const FunctionExpr &)expr, bind_context_ptr, depth, root);
+            return BuildFuncExpr(static_cast<const FunctionExpr &>(expr), bind_context_ptr, depth, root);
         }
         case ParsedExprType::kSubquery: {
             // subquery expression
-            const SubqueryExpr &sub_expr = (const SubqueryExpr &)expr;
+            const SubqueryExpr &sub_expr = static_cast<const SubqueryExpr &>(expr);
             return BuildSubquery(sub_expr, bind_context_ptr, sub_expr.subquery_type_, depth, root);
         }
         case ParsedExprType::kBetween: {
-            return BuildBetweenExpr((const BetweenExpr &)expr, bind_context_ptr, depth, root);
+            return BuildBetweenExpr(static_cast<const BetweenExpr &>(expr), bind_context_ptr, depth, root);
         }
         case ParsedExprType::kCase: {
-            return BuildCaseExpr((const CaseExpr &)expr, bind_context_ptr, depth, root);
+            return BuildCaseExpr(static_cast<const CaseExpr &>(expr), bind_context_ptr, depth, root);
         }
         case ParsedExprType::kCast: {
             // cast function expression
-            return BuildCastExpr((const CastExpr &)expr, bind_context_ptr, depth, root);
+            return BuildCastExpr(static_cast<const CastExpr &>(expr), bind_context_ptr, depth, root);
         }
         case ParsedExprType::kIn: {
-            return BuildInExpr((const InExpr &)expr, bind_context_ptr, depth, root);
-        }
-        case ParsedExprType::kKnn: {
-            return BuildKnnExpr((const KnnExpr &)expr, bind_context_ptr, depth, root);
+            return BuildInExpr(static_cast<const InExpr &>(expr), bind_context_ptr, depth, root);
         }
         case ParsedExprType::kSearch: {
-            return BuildSearchExpr((const SearchExpr &)expr, bind_context_ptr, depth, root);
+            return BuildSearchExpr(static_cast<const SearchExpr &>(expr), bind_context_ptr, depth, root);
+        }
+        case ParsedExprType::kMatch: {
+            return BuildMatchTextExpr(static_cast<const MatchExpr &>(expr), bind_context_ptr, depth, root);
         }
         default: {
-            String error_message = "Unexpected expression type.";
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("ExpressionBinder::BuildExpression: Unexpected ParsedExprType for ParsedExpr: {}.", expr.ToString()));
         }
     }
 
@@ -480,7 +479,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, 
     // two kinds of case statement, please check:
     // https://docs.oracle.com/en/database/oracle/oracle-database/21/lnpls/CASE-statement.html
 
-    DataType return_type{kInvalid};
+    DataType return_type{LogicalType::kInvalid};
     if (expr.expr_) {
         // Simple case
         SharedPtr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr_, bind_context_ptr, depth, false);
@@ -616,6 +615,52 @@ inline bool EmbeddingEmbeddingQueryTypeValidated(const EmbeddingDataType column_
     return false;
 }
 
+void ValidateSearchSubExprOptionalFilter(BaseExpression *optional_filter,
+                                         const int inner_used_depth = 0,
+                                         const BaseExpression *original_filter = nullptr) {
+    // expect the optional filter to be a boolean expression
+    if (inner_used_depth == 0 && optional_filter->Type().type() != LogicalType::kBoolean) {
+        RecoverableError(
+            Status::InvalidFilterExpression(fmt::format("SearchSubExprOptionalFilter: Invalid expression type {} for filter expression {}.",
+                                                        optional_filter->Type().ToString(),
+                                                        optional_filter->ToString())));
+    }
+    if (!original_filter) {
+        original_filter = optional_filter;
+    }
+    // can use: column, cast, constant, function, in, match text
+    switch (optional_filter->type()) {
+        case ExpressionType::kColumn:
+        case ExpressionType::kCast:
+        case ExpressionType::kValue:
+        case ExpressionType::kFunction:
+        case ExpressionType::kIn:
+        case ExpressionType::kMatch: {
+            break;
+        }
+        default: {
+            RecoverableError(
+                Status::InvalidFilterExpression(fmt::format("SearchSubExprOptionalFilter: Invalid subexpression '{}' for filter expression '{}'."
+                                                            "Now can only use column, cast, value, function, in, match text expressions in filter.",
+                                                            optional_filter->ToString(),
+                                                            original_filter->ToString())));
+        }
+    }
+    // check all children
+    for (const auto &child : optional_filter->arguments()) {
+        ValidateSearchSubExprOptionalFilter(child.get(), inner_used_depth + 1, optional_filter);
+    }
+}
+
+auto BuildSearchSubExprOptionalFilter(ExpressionBinder *src_this, const ParsedExpr *filter_expr, BindContext *bind_context_ptr, const i64 depth) {
+    SharedPtr<BaseExpression> optional_filter;
+    if (filter_expr) {
+        optional_filter = src_this->Bind(*filter_expr, bind_context_ptr, depth, false);
+        ValidateSearchSubExprOptionalFilter(optional_filter.get());
+    }
+    return optional_filter;
+}
+
 SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_knn_expr, BindContext *bind_context_ptr, i64 depth, bool) {
     // Bind KNN expression
     Vector<SharedPtr<BaseExpression>> arguments;
@@ -663,18 +708,29 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
         RecoverableError(std::move(status));
     }
 
+    // create optional filter
+    auto optional_filter = BuildSearchSubExprOptionalFilter(this, parsed_knn_expr.filter_expr_.get(), bind_context_ptr, depth);
+
     SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(parsed_knn_expr.embedding_data_type_,
                                                                         parsed_knn_expr.dimension_,
                                                                         parsed_knn_expr.distance_type_,
                                                                         std::move(query_embedding),
-                                                                        arguments,
+                                                                        std::move(arguments),
                                                                         parsed_knn_expr.topn_,
                                                                         parsed_knn_expr.opt_params_,
+                                                                        std::move(optional_filter),
                                                                         parsed_knn_expr.index_name_,
                                                                         parsed_knn_expr.ignore_index_);
 
     return bound_knn_expr;
 }
+
+SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTextExpr(const MatchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
+    auto match_text = MakeShared<MatchExpression>(expr.fields_, expr.matching_text_, expr.options_text_);
+    match_text->optional_filter_ = BuildSearchSubExprOptionalFilter(this, expr.filter_expr_.get(), bind_context_ptr, depth);
+    return match_text;
+}
+
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     // Bind query column
@@ -710,13 +766,16 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
     arguments.emplace_back(std::move(expr_ptr));
     // Create query embedding
     EmbeddingT query_embedding(expr.query_tensor_data_ptr_.get(), false);
+    // create optional filter
+    auto optional_filter = BuildSearchSubExprOptionalFilter(this, expr.filter_expr_.get(), bind_context_ptr, depth);
     auto bound_match_tensor_expr = MakeShared<MatchTensorExpression>(std::move(arguments),
                                                                      expr.search_method_enum_,
                                                                      expr.embedding_data_type_,
                                                                      expr.dimension_,
                                                                      std::move(query_embedding),
                                                                      tensor_column_basic_embedding_dim,
-                                                                     expr.options_text_);
+                                                                     expr.options_text_,
+                                                                     std::move(optional_filter));
     return bound_match_tensor_expr;
 }
 
@@ -737,38 +796,61 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSpar
 
     SharedPtr<BaseExpression> query_expr = BuildExpression(*expr.query_sparse_expr_, bind_context_ptr, depth, root);
 
+    if (expr.topn_ == 0) {
+        RecoverableError(Status::InvalidParameterValue("topn", std::to_string(expr.topn_), "100"));
+    }
+    // create optional filter
+    auto optional_filter = BuildSearchSubExprOptionalFilter(this, expr.filter_expr_.get(), bind_context_ptr, depth);
     auto bound_match_sparse_expr = MakeShared<MatchSparseExpression>(std::move(arguments),
                                                                      query_expr,
                                                                      expr.metric_type_,
                                                                      expr.query_n_,
                                                                      expr.topn_,
-                                                                     std::move(expr.opt_params_));
+                                                                     std::move(expr.opt_params_),
+                                                                     std::move(optional_filter));
     return bound_match_sparse_expr;
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     Vector<SharedPtr<BaseExpression>> match_exprs;
     Vector<SharedPtr<FusionExpression>> fusion_exprs;
-    for (ParsedExpr *match_expr : expr.match_exprs_) {
+    bool have_filter_in_subsearch = false;
+    for (const ParsedExpr *match_expr : expr.match_exprs_) {
         switch (match_expr->type_) {
-            case ParsedExprType::kKnn:
-                match_exprs.push_back(BuildKnnExpr(*static_cast<KnnExpr *>(match_expr), bind_context_ptr, depth, false));
-                break;
-            case ParsedExprType::kMatch: {
-                MatchExpr *match_text_expr = static_cast<MatchExpr *>(match_expr);
-                match_exprs.push_back(
-                    MakeShared<MatchExpression>(match_text_expr->fields_, match_text_expr->matching_text_, match_text_expr->options_text_));
+            case ParsedExprType::kKnn: {
+                const auto &match_dense = *static_cast<const KnnExpr *>(match_expr);
+                if (match_dense.filter_expr_) {
+                    have_filter_in_subsearch = true;
+                }
+                match_exprs.push_back(BuildKnnExpr(match_dense, bind_context_ptr, depth, false));
                 break;
             }
-            case ParsedExprType::kMatchTensor:
-                match_exprs.push_back(BuildMatchTensorExpr(*static_cast<MatchTensorExpr *>(match_expr), bind_context_ptr, depth, false));
+            case ParsedExprType::kMatch: {
+                const auto &match_text = *static_cast<const MatchExpr *>(match_expr);
+                if (match_text.filter_expr_) {
+                    have_filter_in_subsearch = true;
+                }
+                match_exprs.push_back(BuildMatchTextExpr(match_text, bind_context_ptr, depth, false));
                 break;
-            case ParsedExprType::kMatchSparse:
-                match_exprs.push_back(BuildMatchSparseExpr(std::move(*static_cast<MatchSparseExpr *>(match_expr)), bind_context_ptr, depth, false));
+            }
+            case ParsedExprType::kMatchTensor: {
+                const auto &match_tensor = *static_cast<const MatchTensorExpr *>(match_expr);
+                if (match_tensor.filter_expr_) {
+                    have_filter_in_subsearch = true;
+                }
+                match_exprs.push_back(BuildMatchTensorExpr(match_tensor, bind_context_ptr, depth, false));
                 break;
+            }
+            case ParsedExprType::kMatchSparse: {
+                const auto &match_sparse = *static_cast<const MatchSparseExpr *>(match_expr);
+                if (match_sparse.filter_expr_) {
+                    have_filter_in_subsearch = true;
+                }
+                match_exprs.push_back(BuildMatchSparseExpr(match_sparse, bind_context_ptr, depth, false));
+                break;
+            }
             default: {
-                const auto error_info = fmt::format("Unsupported match expression: {}", match_expr->ToString());
-                RecoverableError(Status::SyntaxError(error_info));
+                RecoverableError(Status::SyntaxError(fmt::format("Unsupported match expression: {}", match_expr->ToString())));
             }
         }
     }
@@ -781,6 +863,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
         fusion_exprs.push_back(std::move(output_expr));
     }
     SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, fusion_exprs);
+    bound_search_expr->have_filter_in_subsearch_ = have_filter_in_subsearch;
     return bound_search_expr;
 }
 

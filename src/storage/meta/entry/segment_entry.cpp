@@ -43,6 +43,8 @@ import compact_state_data;
 import cleanup_scanner;
 import background_process;
 import wal_entry;
+import infinity_context;
+import roaring_bitmap;
 
 namespace infinity {
 
@@ -70,12 +72,37 @@ SegmentEntry::SegmentEntry(TableEntry *table_entry,
                            SizeT row_capacity,
                            SizeT column_count,
                            SegmentStatus status)
-    : BaseEntry(EntryType::kSegment,
-                false,
-                table_entry ? table_entry->base_dir_ : MakeShared<String>(),
-                SegmentEntry::EncodeIndex(segment_id, table_entry)),
-      table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity), column_count_(column_count),
-      status_(status) {}
+    : BaseEntry(EntryType::kSegment, false, SegmentEntry::EncodeIndex(segment_id, table_entry)), table_entry_(table_entry), segment_dir_(segment_dir),
+      segment_id_(segment_id), row_capacity_(row_capacity), column_count_(column_count), status_(status) {}
+
+SegmentEntry::SegmentEntry(const SegmentEntry &other)
+    : BaseEntry(other), table_entry_(other.table_entry_), segment_dir_(other.segment_dir_), segment_id_(other.segment_id_),
+      row_capacity_(other.row_capacity_), column_count_(other.column_count_) {
+    {
+        std::shared_lock lock(other.rw_locker_);
+        row_count_ = other.row_count_;
+        actual_row_count_ = other.actual_row_count_;
+        checkpoint_row_count_ = other.checkpoint_row_count_;
+        min_row_ts_ = other.min_row_ts_;
+        max_row_ts_ = other.max_row_ts_;
+        first_delete_ts_ = other.first_delete_ts_;
+        deprecate_ts_ = other.deprecate_ts_;
+
+        fast_rough_filter_ = other.fast_rough_filter_;
+        compact_state_data_ = nullptr;
+        status_ = other.status_;
+        delete_txns_ = other.delete_txns_;
+    }
+}
+
+UniquePtr<SegmentEntry> SegmentEntry::Clone(TableEntry *table_entry) const {
+    auto ret = UniquePtr<SegmentEntry>(new SegmentEntry(*this));
+    ret->table_entry_ = table_entry;
+    for (auto &block : block_entries_) {
+        ret->block_entries_.emplace_back(block->Clone(ret.get()));
+    }
+    return ret;
+}
 
 SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
@@ -414,10 +441,17 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
     return delete_row_n;
 }
 
-void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts) {
+void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts, WalSegmentInfo *segment_info) {
     std::shared_lock w_lock(rw_locker_);
     for (auto &block_entry : block_entries_) {
-        block_entry->CommitFlushed(commit_ts);
+        WalBlockInfo *block_info_ptr = nullptr;
+        for (auto &block_info : segment_info->block_infos_) {
+            if (block_info.block_id_ == block_entry->block_id()) {
+                block_info_ptr = &block_info;
+                break;
+            }
+        }
+        block_entry->CommitFlushed(commit_ts, block_info_ptr);
     }
 }
 
@@ -468,6 +502,9 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
     // hold the lock here
     for (const auto &[block_id, block_entry] : segment_store.block_entries_) {
         block_entry->CommitBlock(txn_id, commit_ts);
+    }
+    for (auto *block_column_entry : segment_store.block_column_entries_) {
+        block_column_entry->CommitColumn(txn_id, commit_ts);   
     }
 }
 
@@ -564,7 +601,7 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
         for (const auto &block_json : segment_entry_json["block_entries"]) {
             UniquePtr<BlockEntry> block_entry = BlockEntry::Deserialize(block_json, segment_entry.get(), buffer_mgr);
             auto block_entries_size = segment_entry->block_entries_.size();
-            segment_entry->block_entries_.resize(std::max(block_entries_size, static_cast<SizeT>(block_entry->block_id() + 1)));
+            segment_entry->block_entries_.resize(std::max(static_cast<SizeT>(block_entries_size), static_cast<SizeT>(block_entry->block_id() + 1)));
             segment_entry->block_entries_[block_entry->block_id()] = std::move(block_entry);
         }
     }
@@ -597,7 +634,7 @@ void SegmentEntry::Cleanup() {
         block_entry->Cleanup();
     }
 
-    String full_segment_dir = fmt::format("{}/{}", *base_dir(), *segment_dir_);
+    String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_dir_;
     LOG_DEBUG(fmt::format("Cleaning up segment dir: {}", full_segment_dir));
     CleanupScanner::CleanupDir(full_segment_dir);
     LOG_DEBUG(fmt::format("Cleaned segment dir: {}", full_segment_dir));
@@ -614,7 +651,7 @@ void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data) {
         String error_message = "Should not call LoadFilterBinaryData from Unsealed segment";
         UnrecoverableError(error_message);
     }
-    fast_rough_filter_.DeserializeFromString(segment_filter_data);
+    fast_rough_filter_->DeserializeFromString(segment_filter_data);
 }
 
 String SegmentEntry::SegmentStatusToString(const SegmentStatus &type) {
@@ -634,10 +671,18 @@ String SegmentEntry::SegmentStatusToString(const SegmentStatus &type) {
     }
 }
 
-SharedPtr<String> SegmentEntry::base_dir() const { return table_entry_->base_dir(); }
-
 String SegmentEntry::ToString() const {
     return fmt::format("Segment path: {}, id: {}, row_count: {}, block_count: {}, status: {}", *segment_dir_, segment_id_, row_count_, block_entries_.size(), SegmentStatusToString(status_));
+}
+
+void SegmentEntry::AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store) {
+    for (auto &block : block_entries_) {
+        block->AddColumns(columns, table_store);
+    }
+}
+
+void SegmentEntry::DropColumns(const Vector<ColumnID> &column_ids, Txn *txn) {
+    //
 }
 
 } // namespace infinity

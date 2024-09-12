@@ -54,6 +54,8 @@ private:
 
     void DoDump(DumpIndexTask *dump_task);
 
+    void DoDumpByline(DumpIndexBylineTask *dump_task);
+
     void Process();
 
 private:

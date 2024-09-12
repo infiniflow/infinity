@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -32,41 +33,25 @@ import logical_type;
 import data_type;
 import compilation_config;
 
-class ColumnVectorDateTimeTest : public BaseTestParamStr {
+using namespace infinity;
+
+class ColumnVectorDateTimeTest : public BaseTest {
     void SetUp() override {
-        RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        std::string config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
+        using namespace infinity;
+
+        LoggerConfig logger_config;
+        logger_config.log_level_ = LogLevel::kOff;
+        Logger::Initialize(logger_config);
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
+        using namespace infinity;
+
+        Logger::Shutdown();
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ColumnVectorDateTimeTest,
-                         ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
-
-
-TEST_P(ColumnVectorDateTimeTest, flat_date) {
+TEST_F(ColumnVectorDateTimeTest, flat_date) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
@@ -164,7 +149,7 @@ TEST_P(ColumnVectorDateTimeTest, flat_date) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, contant_date) {
+TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     using namespace infinity;
 
@@ -243,7 +228,7 @@ TEST_P(ColumnVectorDateTimeTest, contant_date) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, date_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
@@ -279,7 +264,7 @@ TEST_P(ColumnVectorDateTimeTest, date_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, date_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
@@ -314,7 +299,7 @@ TEST_P(ColumnVectorDateTimeTest, date_column_slice_init) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, flat_time) {
+TEST_F(ColumnVectorDateTimeTest, flat_time) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
@@ -411,7 +396,7 @@ TEST_P(ColumnVectorDateTimeTest, flat_time) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, contant_time) {
+TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     using namespace infinity;
 
@@ -490,7 +475,7 @@ TEST_P(ColumnVectorDateTimeTest, contant_time) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, time_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
@@ -526,7 +511,7 @@ TEST_P(ColumnVectorDateTimeTest, time_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, time_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, time_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
@@ -561,7 +546,7 @@ TEST_P(ColumnVectorDateTimeTest, time_column_slice_init) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, flat_datetime) {
+TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
@@ -662,7 +647,7 @@ TEST_P(ColumnVectorDateTimeTest, flat_datetime) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, contant_datetime) {
+TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     using namespace infinity;
 
@@ -744,7 +729,7 @@ TEST_P(ColumnVectorDateTimeTest, contant_datetime) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, datetime_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
@@ -782,7 +767,7 @@ TEST_P(ColumnVectorDateTimeTest, datetime_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, datetime_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
@@ -819,7 +804,7 @@ TEST_P(ColumnVectorDateTimeTest, datetime_column_slice_init) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, flat_timestamp) {
+TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
@@ -921,7 +906,7 @@ TEST_P(ColumnVectorDateTimeTest, flat_timestamp) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, contant_timestamp) {
+TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     using namespace infinity;
 
@@ -1003,7 +988,7 @@ TEST_P(ColumnVectorDateTimeTest, contant_timestamp) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
@@ -1041,7 +1026,7 @@ TEST_P(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
@@ -1078,7 +1063,7 @@ TEST_P(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, flat_interval) {
+TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
@@ -1179,7 +1164,7 @@ TEST_P(ColumnVectorDateTimeTest, flat_interval) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, contant_flat) {
+TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     using namespace infinity;
 
@@ -1260,7 +1245,7 @@ TEST_P(ColumnVectorDateTimeTest, contant_flat) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, interval_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
@@ -1297,7 +1282,7 @@ TEST_P(ColumnVectorDateTimeTest, interval_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorDateTimeTest, interval_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, interval_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);

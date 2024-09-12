@@ -31,7 +31,7 @@ public:
     [[nodiscard]] i64 GetCastCost(LogicalType from, LogicalType to) const;
 
 private:
-    Array<Array<i64, LogicalType::kInvalid>, LogicalType::kInvalid> matrix_{};
+    Array<Array<i64, to_underlying_val(LogicalType::kInvalid)>, to_underlying_val(LogicalType::kInvalid)> matrix_{};
 };
 
 } // namespace infinity

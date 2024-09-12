@@ -1,4 +1,5 @@
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import posting_merger;
 import stl;
@@ -37,25 +38,7 @@ class PostingMergerTest : public BaseTestParamStr {
 public:
     PostingMergerTest() {}
     ~PostingMergerTest() {}
-    void SetUp() override {
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-        CleanupDbDirs();
-        config_path_ = GetParam();
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            std::shared_ptr<std::string> config_path = std::make_shared<std::string>(config_path_);
-            infinity::InfinityContext::instance().Init(config_path);
-        }
-    }
-    void TearDown() override {
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            if (InfinityContext::instance().persistence_manager() != nullptr) {
-                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
-            }
-            infinity::InfinityContext::instance().UnInit();
-        }
-    }
+
 public:
     struct ExpectedPosting {
         String term;
@@ -72,15 +55,9 @@ protected:
     String config_path_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    TestWithDifferentParams,
-    PostingMergerTest,
-    ::testing::Values(
-        BaseTestParamStr::NULL_CONFIG_PATH,
-        BaseTestParamStr::VFS_CONFIG_PATH
-    )
-);
-
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         PostingMergerTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 void PostingMergerTest::CreateIndex() {
 

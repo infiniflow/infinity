@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -32,40 +33,25 @@ import logical_type;
 import data_type;
 import compilation_config;
 
-class ColumnVectorRowTest : public BaseTestParamStr {
+using namespace infinity;
+
+class ColumnVectorRowTest : public BaseTest {
     void SetUp() override {
-        RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        std::string config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
+        using namespace infinity;
+
+        LoggerConfig logger_config;
+        logger_config.log_level_ = LogLevel::kOff;
+        Logger::Initialize(logger_config);
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
+        using namespace infinity;
+
+        Logger::Shutdown();
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ColumnVectorRowTest,
-                         ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
-
-TEST_P(ColumnVectorRowTest, flat_row) {
+TEST_F(ColumnVectorRowTest, flat_row) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);
@@ -176,7 +162,7 @@ TEST_P(ColumnVectorRowTest, flat_row) {
     }
 }
 
-TEST_P(ColumnVectorRowTest, contant_row) {
+TEST_F(ColumnVectorRowTest, contant_row) {
 
     using namespace infinity;
 
@@ -260,7 +246,7 @@ TEST_P(ColumnVectorRowTest, contant_row) {
     }
 }
 
-TEST_P(ColumnVectorRowTest, row_column_vector_select) {
+TEST_F(ColumnVectorRowTest, row_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);
@@ -298,7 +284,7 @@ TEST_P(ColumnVectorRowTest, row_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorRowTest, row_column_slice_init) {
+TEST_F(ColumnVectorRowTest, row_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);

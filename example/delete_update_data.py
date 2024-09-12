@@ -16,14 +16,17 @@
 This example is to connect local infinity instance, create table, insert data, delete and update data.
 '''
 
+# import infinity_embedded as infinity
 import infinity
+import sys
 
 try:
-    # open a local directory to store the data
-    infinity_instance = infinity.connect("/var/infinity")
+    # Use infinity_embedded module to open a local directory
+    # infinity_instance = infinity.connect("/var/infinity")
 
-    # connect to server with 127.0.0.1
-    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+    #  Use infinity module to connect a remote server
+    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -39,6 +42,7 @@ try:
     })
 
     # Insert 3 rows of data into the 'my_table'
+    print('about to insert data')
     table_instance.insert(
         [
             {
@@ -61,9 +65,11 @@ try:
 
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
+    print('about to delete data')
     table_instance.delete("num = 2")
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
+    print('about to insert data again')
     table_instance.insert([
         {
             "num": 2,
@@ -79,11 +85,15 @@ try:
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
 
-    table_instance.update("num = 2", [{"body": "unnecessary and harmful", "vec": [14.0, 7.2, 0.8, 10.9]}])
+    print('about to update data')
+    table_instance.update("num = 2", {"body": "unnecessary and harmful", "vec": [14.0, 7.2, 0.8, 10.9]})
     result = table_instance.output(["*"]).to_pl()
     print(result)
 
     infinity_instance.disconnect()
+    print('test done')
+    sys.exit(0)
 
 except Exception as e:
     print(str(e))
+    sys.exit(-1)

@@ -28,42 +28,47 @@ export struct ObjAddr {
     SizeT part_offset_{};
     SizeT part_size_{};
 
-    bool Valid() const { return !obj_key_.empty() && part_size_ > 0; }
+    bool Valid() const { return !obj_key_.empty(); }
 
     nlohmann::json Serialize() const;
 
     void Deserialize(const nlohmann::json &obj);
 
+    SizeT GetSizeInBytes() const;
+
     void WriteBufAdv(char *&buf) const;
 
-    void ReadBufAdv(char *&buf);
+    static ObjAddr ReadBufAdv(const char *&buf);
 };
 
 export struct Range {
-    SizeT start_{};
-    SizeT end_{};
+    SizeT start_{}; // inclusive
+    SizeT end_{};   // exclusive
     bool operator<(const Range &rhs) const { return start_ < rhs.start_; }
-
-    bool HasIntersection(const Range &rhs) const {
-        SizeT max_start = std::max(start_, rhs.start_);
-        SizeT min_end = std::min(end_, rhs.end_);
-        return max_start < min_end;
-    }
+    bool operator==(const Range &rhs) const { return start_ == rhs.start_ && end_ == rhs.end_; }
+    bool Cover(const Range &rhs) const { return start_ <= rhs.start_ && rhs.end_ <= end_; }
+    bool Intersect(const Range &rhs) const { return start_ < rhs.end_ && rhs.start_ < end_; }
 };
 
 export struct ObjStat {
-    SizeT obj_size_{};
-    int ref_count_{};
-    SizeT deleted_size_{};
+    SizeT obj_size_{}; // footer (if present) is excluded
+    SizeT parts_{};    // an object attribute
+    SizeT ref_count_{}; // the number of user (R and W) of some part of this object
     Set<Range> deleted_ranges_{};
+
+    ObjStat() = default;
+
+    ObjStat(SizeT obj_size, SizeT parts, SizeT ref_count) : obj_size_(obj_size), parts_(parts), ref_count_(ref_count) {}
 
     nlohmann::json Serialize() const;
 
     void Deserialize(const nlohmann::json &obj);
 
+    SizeT GetSizeInBytes() const;
+
     void WriteBufAdv(char *&buf) const;
 
-    void ReadBufAdv(char *&buf);
+    static ObjStat ReadBufAdv(const char *&buf);
 };
 
 export class PersistenceManager {
@@ -73,38 +78,41 @@ public:
 
     ~PersistenceManager();
 
+    /**
+     * For composed objects
+     */
     // Create new object or append to current object, and returns the location.
-    ObjAddr Persist(const String &file_path, bool allow_compose = true);
+    ObjAddr Persist(const String &file_path);
 
     // Create new object or append to current object, and returns the location.
-    ObjAddr Persist(const char *data, SizeT len, bool allow_compose = true);
+    ObjAddr Persist(const char *data, SizeT len);
 
     // Force finalize current object. Subsequent append on the finalized object is forbidden.
-    void CurrentObjFinalize();
+    void CurrentObjFinalize(bool validate = false);
 
+    /**
+     * For dedicated objects
+     */
+    ObjAddr ObjCreateRefCount(const String &file_path);
+
+    /**
+     * For composed and dedicated objects
+     */
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
     String GetObjCache(const String &local_path);
 
     ObjAddr GetObjFromLocalPath(const String &file_path);
 
-    // Decrease refcount
     void PutObjCache(const String &file_path);
-
-    ObjAddr ObjCreateRefCount(const String &file_path);
 
     void Cleanup(const String &file_path);
 
+    /**
+     * Utils
+     */
     nlohmann::json Serialize();
 
     void Deserialize(const nlohmann::json &obj);
-
-    SizeT SumRefCounts();
-  
-    void WriteBufAdv(char *&buf, const Vector<String> &local_paths);
-
-    void ReadBufAdv(char *&buf);
-
-    SizeT GetSizeInBytes(const Vector<String> &local_paths);
 
     HashMap<String, ObjStat> GetAllObjects() const;
     HashMap<String, ObjAddr> GetAllFiles() const;
@@ -129,8 +137,10 @@ private:
 
     ObjStat GetObjStatByObjAddr(const ObjAddr &obj_addr);
 
+public: // for unit test
     void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
 
+private:
     void SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat);
 
     String workspace_;
@@ -143,5 +153,27 @@ private:
     // Current unsealed object key
     String current_object_key_;
     SizeT current_object_size_;
+    SizeT current_object_parts_;
+
+    friend struct AddrSerializer;
 };
+
+export struct AddrSerializer {
+    void Initialize(PersistenceManager *pm, const Vector<String> &path);
+
+    void InitializeValid(PersistenceManager *pm);
+
+    SizeT GetSizeInBytes() const;
+ 
+    void WriteBufAdv(char *&buf) const;
+
+    Vector<String> ReadBufAdv(const char *&buf);
+
+    void AddToPersistenceManager(PersistenceManager *pm) const;
+
+    Vector<String> paths_;
+    Vector<ObjAddr> obj_addrs_; // set mutable to minimize refactor
+    Vector<ObjStat> obj_stats_;
+};
+
 } // namespace infinity

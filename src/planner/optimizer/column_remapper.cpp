@@ -24,6 +24,7 @@ import special_function;
 import default_values;
 import third_party;
 import logger;
+import infinity_exception;
 
 module column_remapper;
 
@@ -46,6 +47,20 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
     };
 
     switch (op.operator_type()) {
+        case LogicalNodeType::kInsert:
+        case LogicalNodeType::kImport:
+        case LogicalNodeType::kExport:
+        case LogicalNodeType::kCreateTable:
+        case LogicalNodeType::kDropTable:
+        case LogicalNodeType::kDropIndex:
+        case LogicalNodeType::kCreateSchema:
+        case LogicalNodeType::kDropSchema:
+        case LogicalNodeType::kShow:
+        case LogicalNodeType::kCommand:
+        case LogicalNodeType::kPrepare: {
+            // skip
+            return;
+        }
         case LogicalNodeType::kJoin:
         case LogicalNodeType::kMatch:
         case LogicalNodeType::kMatchSparseScan:
@@ -105,10 +120,10 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
             return ReferenceExpression::Make(expression->Type(), expression->table_name(), expression->column_name(), expression->alias_, idx);
         }
     }
-    LOG_ERROR(fmt::format("Can't bind column expression: {} [{}.{}]",
-                          expression->table_name(),
-                          expression->binding().table_idx,
-                          expression->binding().column_idx));
+    UnrecoverableError(fmt::format("Can't bind column expression: {} [{}.{}]",
+                                   expression->table_name(),
+                                   expression->binding().table_idx,
+                                   expression->binding().column_idx));
     return nullptr;
 }
 

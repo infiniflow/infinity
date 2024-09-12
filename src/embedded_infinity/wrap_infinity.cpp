@@ -529,7 +529,7 @@ WrapQueryResult WrapShowDatabase(Infinity &instance, const String &db_name) {
         }
         {
             Value value = data_block->GetValue(1, 2);
-            result.table_count = value.value_.big_int;
+            result.table_count = std::stol(value.GetVarchar());
         }
     }
     return result;
@@ -595,13 +595,23 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
     for (SizeT i = 0; i < column_defs.size(); ++i) {
         auto &wrap_column_def = column_defs[i];
         SharedPtr<TypeInfo> type_info_ptr = nullptr;
-        auto &logical_type = wrap_column_def.column_type.logical_type;
-        if (logical_type == LogicalType::kEmbedding || logical_type == LogicalType::kTensor || logical_type == LogicalType::kTensorArray) {
-            auto &embedding_type = wrap_column_def.column_type.embedding_type;
-            type_info_ptr = MakeShared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
-        } else if (logical_type == LogicalType::kSparse) {
-            auto &sparse_type = wrap_column_def.column_type.sparse_type;
-            type_info_ptr = SparseInfo::Make(sparse_type.element_type, sparse_type.index_type, sparse_type.dimension, SparseStoreType::kSort);
+        switch (wrap_column_def.column_type.logical_type) {
+            case LogicalType::kEmbedding:
+            case LogicalType::kMultiVector:
+            case LogicalType::kTensor:
+            case LogicalType::kTensorArray: {
+                auto &embedding_type = wrap_column_def.column_type.embedding_type;
+                type_info_ptr = MakeShared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
+                break;
+            }
+            case LogicalType::kSparse: {
+                auto &sparse_type = wrap_column_def.column_type.sparse_type;
+                type_info_ptr = SparseInfo::Make(sparse_type.element_type, sparse_type.index_type, sparse_type.dimension, SparseStoreType::kSort);
+                break;
+            }
+            default: {
+                break;
+            }
         }
         auto column_type = MakeShared<DataType>(wrap_column_def.column_type.logical_type, type_info_ptr);
         Status status;
@@ -634,7 +644,17 @@ WrapQueryResult WrapDropTable(Infinity &instance, const String &db_name, const S
 
 WrapQueryResult WrapListTables(Infinity &instance, const String &db_name) {
     auto query_result = instance.ListTables(db_name);
-    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+
+    WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
+
+    SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+    auto &names = result.names;
+    names.resize(data_block->row_count());
+    for (SizeT i = 0; i < names.size(); ++i) {
+        Value value = data_block->GetValue(1, i);
+        names[i] = value.GetVarchar();
+    }
+    return result;
 }
 
 WrapQueryResult WrapShowTable(Infinity &instance, const String &db_name, const String &table_name) {
@@ -872,29 +892,21 @@ void HandlePodType(ColumnField &output_column_field, SizeT row_count, const Shar
 }
 
 void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
-    String dst;
-    SizeT total_varchar_data_size = 0;
+    SizeT all_size = 0;
+    Vector<Pair<const char *, SizeT>> raw_data;
     for (SizeT index = 0; index < row_count; ++index) {
-        VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
-        total_varchar_data_size += varchar.length_;
+        Span<const char> data = column_vector->GetVarchar(index);
+        all_size += sizeof(i32) + data.size();
+        raw_data.emplace_back(data.data(), data.size());
     }
-
-    auto all_size = total_varchar_data_size + row_count * sizeof(i32);
+    String dst;
     dst.resize(all_size);
-
-    i32 current_offset = 0;
-    for (SizeT index = 0; index < row_count; ++index) {
-        VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
-        i32 length = varchar.length_;
-        if (varchar.IsInlined()) {
-            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
-        } else {
-            const char *data = column_vector->buffer_->GetVarchar(varchar.vector_.file_offset_, varchar.length_);
-            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            std::memcpy(dst.data() + current_offset + sizeof(i32), data, varchar.length_);
-        }
-        current_offset += sizeof(i32) + varchar.length_;
+    SizeT current_offset = 0;
+    for (const auto [data_ptr, data_size] : raw_data) {
+        i32 length = data_size;
+        std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+        std::memcpy(dst.data() + current_offset + sizeof(i32), data_ptr, data_size);
+        current_offset += sizeof(i32) + length;
     }
 
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
@@ -907,26 +919,46 @@ void HandleEmbeddingType(ColumnField &output_column_field, SizeT row_count, cons
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleTensorType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
-    String dst;
-    SizeT total_tensor_embedding_num = 0;
+void HandleMultiVectorType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+    SizeT all_size = 0;
+    Vector<Pair<const char *, SizeT>> multi_vector_data(row_count);
     for (SizeT index = 0; index < row_count; ++index) {
-        TensorT &tensor = ((TensorT *)column_vector->data())[index];
-        total_tensor_embedding_num += tensor.embedding_num_;
+        Span<const char> raw_data = column_vector->GetMultiVectorRaw(index).first;
+        all_size += sizeof(i32) + raw_data.size();
+        multi_vector_data[index] = {raw_data.data(), raw_data.size()};
     }
-    const auto embedding_info = static_cast<const EmbeddingInfo *>(column_vector->data_type()->type_info().get());
-    const auto unit_embedding_byte_size = embedding_info->Size();
-    dst.resize(total_tensor_embedding_num * unit_embedding_byte_size + row_count * sizeof(i32));
+    String dst;
+    dst.resize(all_size);
 
     i32 current_offset = 0;
     for (SizeT index = 0; index < row_count; ++index) {
-        TensorT &tensor = ((TensorT *)column_vector->data())[index];
-        i32 length = tensor.embedding_num_ * unit_embedding_byte_size;
+        const auto &[data, length] = multi_vector_data[index];
         std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-        current_offset += sizeof(i32);
-        const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(tensor.chunk_id_, tensor.chunk_offset_);
-        std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
-        current_offset += length;
+        std::memcpy(dst.data() + current_offset + sizeof(i32), data, length);
+        current_offset += sizeof(i32) + length;
+    }
+
+    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+    output_column_field.column_type = column_vector->data_type()->type();
+}
+
+void HandleTensorType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+    SizeT all_size = 0;
+    Vector<Pair<const char *, SizeT>> tensor_data(row_count);
+    for (SizeT index = 0; index < row_count; ++index) {
+        Span<const char> raw_data = column_vector->GetTensorRaw(index).first;
+        all_size += sizeof(i32) + raw_data.size();
+        tensor_data[index] = {raw_data.data(), raw_data.size()};
+    }
+    String dst;
+    dst.resize(all_size);
+
+    i32 current_offset = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        const auto &[data, length] = tensor_data[index];
+        std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+        std::memcpy(dst.data() + current_offset + sizeof(i32), data, length);
+        current_offset += sizeof(i32) + length;
     }
 
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
@@ -934,42 +966,30 @@ void HandleTensorType(ColumnField &output_column_field, SizeT row_count, const S
 }
 
 void HandleTensorArrayType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
-    const auto embedding_info = static_cast<const EmbeddingInfo *>(column_vector->data_type()->type_info().get());
-    const auto unit_embedding_byte_size = embedding_info->Size();
-    Vector<Vector<TensorT>> tensors_v(row_count);
-    SizeT expect_offset = 0;
+    SizeT all_size = 0;
+    Vector<Vector<Pair<const char *, SizeT>>> tensor_array_data;
     for (SizeT index = 0; index < row_count; ++index) {
-        const auto &tensorarray = ((const TensorArrayT *)column_vector->data())[index];
-        const i32 tensor_num = tensorarray.tensor_num_;
-        expect_offset += sizeof(i32);
-        Vector<TensorT> &tensors = tensors_v[index];
-        tensors.resize(tensor_num);
-        column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(tensors.data()),
-                                                            tensorarray.chunk_id_,
-                                                            tensorarray.chunk_offset_,
-                                                            tensor_num * sizeof(TensorT));
-        for (SizeT i = 0; i < tensors.size(); ++i) {
-            const auto &tensor = tensors[i];
-            expect_offset += sizeof(i32) + tensor.embedding_num_ * unit_embedding_byte_size;
+        all_size += sizeof(i32);
+        Vector<Pair<const char *, SizeT>> tensor_data;
+        Vector<Pair<Span<const char>, SizeT>> array_data = column_vector->GetTensorArrayRaw(index);
+        for (const auto [raw_data, embedding_num] : array_data) {
+            all_size += sizeof(i32) + raw_data.size();
+            tensor_data.emplace_back(raw_data.data(), raw_data.size());
         }
+        tensor_array_data.push_back(std::move(tensor_data));
     }
     String dst;
-    dst.resize(expect_offset);
+    dst.resize(all_size);
 
     i32 current_offset = 0;
-    for (SizeT i = 0; i < tensors_v.size(); ++i) {
-        auto &tensors = tensors_v[i];
-        const i32 tensor_num = tensors.size();
+    for (const auto &tensor_data : tensor_array_data) {
+        i32 tensor_num = tensor_data.size();
         std::memcpy(dst.data() + current_offset, &tensor_num, sizeof(i32));
         current_offset += sizeof(i32);
-        for (SizeT j = 0; j < tensors.size(); ++j) {
-            auto tensor = tensors[j];
-            i32 length = tensor.embedding_num_ * unit_embedding_byte_size;
-            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            current_offset += sizeof(i32);
-            const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_1_->GetRawPtrFromChunk(tensor.chunk_id_, tensor.chunk_offset_);
-            std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
-            current_offset += length;
+        for (const auto [raw_data, size] : tensor_data) {
+            std::memcpy(dst.data() + current_offset, &size, sizeof(i32));
+            std::memcpy(dst.data() + current_offset + sizeof(i32), raw_data, size);
+            current_offset += sizeof(i32) + size;
         }
     }
 
@@ -978,28 +998,24 @@ void HandleTensorArrayType(ColumnField &output_column_field, SizeT row_count, co
 }
 
 void HandleSparseType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
-    const auto sparse_info = static_cast<const SparseInfo *>(column_vector->data_type()->type_info().get());
-    SizeT total_length = 0;
+    SizeT all_size = 0;
+    Vector<Tuple<Span<const char>, Span<const char>, SizeT>> raw_data;
     for (SizeT index = 0; index < row_count; ++index) {
-        SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
-        total_length += sparse_info->SparseSize(sparse.nnz_) + sizeof(i32);
+        auto [data_span, index_span, nnz_size_t] = column_vector->GetSparseRaw(index);
+        all_size += sizeof(i32) + data_span.size() + index_span.size();
+        raw_data.emplace_back(data_span, index_span, nnz_size_t);
     }
     String dst;
-    dst.resize(total_length);
-
-    i32 current_offset = 0;
-    for (SizeT index = 0; index < row_count; ++index) {
-        SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
-        i32 nnz = sparse.nnz_;
+    dst.resize(all_size);
+    SizeT current_offset = 0;
+    for (const auto [data_span, index_span, nnz_size_t] : raw_data) {
+        i32 nnz = nnz_size_t;
         std::memcpy(dst.data() + current_offset, &nnz, sizeof(i32));
         current_offset += sizeof(i32);
-        SizeT data_size = sparse_info->DataSize(sparse.nnz_);
-        SizeT idx_size = sparse_info->IndiceSize(sparse.nnz_);
-        auto [raw_data_ptr, raw_idx_ptr] = column_vector->buffer_->GetSparseRaw(sparse.file_offset_, sparse.nnz_, sparse_info);
-        std::memcpy(dst.data() + current_offset, raw_idx_ptr, idx_size);
-        current_offset += idx_size;
-        std::memcpy(dst.data() + current_offset, raw_data_ptr, data_size);
-        current_offset += data_size;
+        std::memcpy(dst.data() + current_offset, index_span.data(), index_span.size());
+        current_offset += index_span.size();
+        std::memcpy(dst.data() + current_offset, data_span.data(), data_span.size());
+        current_offset += data_span.size();
     }
 
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
@@ -1036,6 +1052,10 @@ void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, c
         }
         case LogicalType::kEmbedding: {
             HandleEmbeddingType(output_column_field, row_count, column_vector);
+            break;
+        }
+        case LogicalType::kMultiVector: {
+            HandleMultiVectorType(output_column_field, row_count, column_vector);
             break;
         }
         case LogicalType::kTensor: {
@@ -1088,6 +1108,7 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
             proto_data_type.logical_type = data_type->type();
             break;
         }
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
         case LogicalType::kEmbedding: {

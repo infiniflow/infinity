@@ -19,12 +19,23 @@ export module version_file_worker;
 import stl;
 import file_worker;
 import file_worker_type;
+import buffer_obj;
 
 namespace infinity {
 
+export struct VersionFileWorkerSaveCtx : public FileWorkerSaveCtx {
+    VersionFileWorkerSaveCtx(TxnTimeStamp checkpoint_ts) : checkpoint_ts_(checkpoint_ts) {}
+
+    TxnTimeStamp checkpoint_ts_{};
+};
+
 export class VersionFileWorker : public FileWorker {
 public:
-    explicit VersionFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT capacity);
+    explicit VersionFileWorker(SharedPtr<String> data_dir,
+                               SharedPtr<String> temp_dir,
+                               SharedPtr<String> file_dir,
+                               SharedPtr<String> file_name,
+                               SizeT capacity);
 
     virtual ~VersionFileWorker() override;
 
@@ -35,18 +46,15 @@ public:
 
     SizeT GetMemoryCost() const override;
 
-    void SetCheckpointTS(TxnTimeStamp ts) { checkpoint_ts_ = ts; }
-
     FileWorkerType Type() const override { return FileWorkerType::kVersionDataFile; }
 
 protected:
-    void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
+    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void ReadFromFileImpl(SizeT file_size) override;
 
 private:
     SizeT capacity_{};
-    TxnTimeStamp checkpoint_ts_{};
 };
 
 } // namespace infinity

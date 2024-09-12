@@ -56,7 +56,7 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     u64 new_txn_id = ++catalog_->next_txn_id_;
 
     // Record the start ts of the txn
-    TxnTimeStamp begin_ts = ++start_ts_;
+    TxnTimeStamp begin_ts = start_ts_ + 1;
     if (ckp_txn) {
         if (ckp_begin_ts_ != UNCOMMIT_TS) {
             // not set ckp_begin_ts_ may not truncate the wal file.
@@ -111,7 +111,7 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
 // Prepare to commit ReadTxn
 TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
     std::lock_guard guard(locker_);
-    TxnTimeStamp commit_ts = ++start_ts_;
+    TxnTimeStamp commit_ts = start_ts_ + 1;
     txn->SetTxnRead();
     return commit_ts;
 }
@@ -119,7 +119,8 @@ TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
 // Prepare to commit WriteTxn
 TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
     std::lock_guard guard(locker_);
-    TxnTimeStamp commit_ts = ++start_ts_;
+    start_ts_ += 2;
+    TxnTimeStamp commit_ts = start_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
     finishing_txns_.emplace(txn);
     txn->SetTxnWrite();
@@ -276,7 +277,7 @@ UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
 
 TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
 
-TxnTimeStamp TxnManager::GetNewTimeStamp() { return start_ts_++; }
+TxnTimeStamp TxnManager::GetNewTimeStamp() { return start_ts_ + 1; }
 
 TxnTimeStamp TxnManager::GetCleanupScanTS() {
     std::lock_guard guard(locker_);

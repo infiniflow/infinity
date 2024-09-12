@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 import internal_types;
@@ -31,40 +32,25 @@ import logical_type;
 import data_type;
 import compilation_config;
 
-class ColumnVectorBoolTest : public BaseTestParamStr {
+using namespace infinity;
+
+class ColumnVectorBoolTest : public BaseTest {
     void SetUp() override {
-        RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        std::string config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
+        using namespace infinity;
+
+        LoggerConfig logger_config;
+        logger_config.log_level_ = LogLevel::kOff;
+        Logger::Initialize(logger_config);
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
+        using namespace infinity;
+
+        Logger::Shutdown();
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ColumnVectorBoolTest,
-                         ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
-
-TEST_P(ColumnVectorBoolTest, flat_boolean) {
+TEST_F(ColumnVectorBoolTest, flat_boolean) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
@@ -128,13 +114,7 @@ TEST_P(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
-    //    EXPECT_EQ(column_vector.data_type(), DataType(LogicalType::kInvalid));
-    //    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kInvalid);
 
-    // ====
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
-    //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kCompactBit), UnrecoverableException);
 
@@ -172,7 +152,7 @@ TEST_P(ColumnVectorBoolTest, flat_boolean) {
     }
 }
 
-TEST_P(ColumnVectorBoolTest, contant_bool) {
+TEST_F(ColumnVectorBoolTest, contant_bool) {
 
     using namespace infinity;
 
@@ -250,7 +230,7 @@ TEST_P(ColumnVectorBoolTest, contant_bool) {
     }
 }
 
-TEST_P(ColumnVectorBoolTest, bool_column_vector_select) {
+TEST_F(ColumnVectorBoolTest, bool_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
@@ -284,7 +264,7 @@ TEST_P(ColumnVectorBoolTest, bool_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorBoolTest, bool_column_slice_init) {
+TEST_F(ColumnVectorBoolTest, bool_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);

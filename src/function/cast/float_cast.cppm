@@ -192,22 +192,8 @@ inline bool FloatTryCastToFixlen::Run(FloatT, DecimalT &) {
 // Cast FloatT to varlen type
 template <>
 inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, ColumnVector* vector_ptr) {
-    target.is_value_ = false;
     String tmp_str = std::to_string(source);
-    target.length_ = static_cast<u32>(tmp_str.size());
-
-    if (target.length_ <= VARCHAR_INLINE_LEN) {
-        std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
-    } else {
-        std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
-        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
-            String error_message = "Varchar column vector should use VarBuffer.";
-            UnrecoverableError(error_message);
-        }
-        SizeT offset = vector_ptr->buffer_->AppendVarchar(tmp_str.c_str(), target.length_);
-        target.vector_.file_offset_ = offset;
-    }
-
+    vector_ptr->AppendVarcharInner({tmp_str.data(), tmp_str.size()}, target);
     return true;
 }
 
@@ -298,21 +284,8 @@ inline bool FloatTryCastToFixlen::Run(DoubleT, DecimalT &) {
 template <>
 inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, ColumnVector* vector_ptr) {
     // TODO: High-performance to_string implementation is needed.
-    target.is_value_ = false;
     String tmp_str = std::to_string(source);
-    target.length_ = static_cast<u32>(tmp_str.size());
-
-    if (target.length_ <= VARCHAR_INLINE_LEN) {
-        std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
-    } else {
-        std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
-        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
-            String error_message = "Varchar column vector should use MemoryVectorBuffer. ";
-            UnrecoverableError(error_message);
-        }
-        SizeT offset = vector_ptr->buffer_->AppendVarchar(tmp_str.c_str(), target.length_);
-        target.vector_.file_offset_ = offset;
-    }
+    vector_ptr->AppendVarcharInner({tmp_str.data(), tmp_str.size()}, target);
 
     return true;
 }

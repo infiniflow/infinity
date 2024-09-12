@@ -24,7 +24,11 @@ namespace infinity {
 
 export class DataFileWorker : public FileWorker {
 public:
-    explicit DataFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size);
+    explicit DataFileWorker(SharedPtr<String> data_dir,
+                            SharedPtr<String> temp_dir,
+                            SharedPtr<String> file_dir,
+                            SharedPtr<String> file_name,
+                            SizeT buffer_size);
 
     virtual ~DataFileWorker() override;
 
@@ -38,7 +42,7 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kDataFile; }
 
 protected:
-    void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
+    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void ReadFromFileImpl(SizeT file_size) override;
 

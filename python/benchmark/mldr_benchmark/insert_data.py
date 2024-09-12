@@ -16,7 +16,7 @@ import os
 from tqdm import tqdm
 from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield, get_all_part_begin_ends
 import infinity
-from infinity.common import ConflictType, LOCAL_HOST
+from infinity.common import ConflictType, LOCAL_HOST, SparseVector
 import infinity.index as index
 from infinity.errors import ErrorCode
 
@@ -77,7 +77,7 @@ class InfinityClientForInsert:
                     sparse_base_name = f"sparse-{sparse_pos_part_begin}-{sparse_pos_part_end}.data"
                     sparse_data = read_mldr_sparse_embedding_yield(os.path.join(sparse_embedding_dir, sparse_base_name))
                 insert_dict = {"docid_col": docid_list[row_pos], "fulltext_col": corpus_text_list[row_pos],
-                               "dense_col": next(dense_data), "sparse_col": next(sparse_data)}
+                               "dense_col": next(dense_data), "sparse_col": SparseVector(**(next(sparse_data)))}
                 buffer.append(insert_dict)
             self.infinity_table.insert(buffer)
             buffer.clear()
@@ -100,7 +100,6 @@ class InfinityClientForInsert:
                                                                              {
                                                                                  "m": "16",
                                                                                  "ef_construction": "200",
-                                                                                 "ef": "200",
                                                                                  "metric": "ip",
                                                                                  "encode": "lvq"
                                                                              }),

@@ -1,0 +1,47 @@
+[general]
+version                  = "0.4.0"
+time_zone                = "utc-8"
+
+[network]
+server_address           = "999.999.999.999"  # Changed to an invalid IP address
+postgres_port            = 5432
+http_port                = 23820
+client_port              = 23817
+connection_pool_size     = 128
+
+[log]
+log_filename             = "infinity.log"
+log_dir                  = "/var/infinity/log"
+log_to_stdout            = false
+log_file_max_size        = "10GB"
+log_file_rotate_count    = 10
+
+log_level                = "info"
+
+[storage]
+data_dir                 = "/var/infinity/data"
+persistence_dir          = "/var/infinity/persistence"
+
+optimize_interval        = "10s"
+cleanup_interval         = "60s"
+compact_interval         = "120s"
+
+mem_index_capacity       = 1048576
+
+[buffer]
+buffer_manager_size      = "4GB"
+lru_num                  = 7
+temp_dir                 = "/var/infinity/tmp"
+
+memindex_memory_quota    = "1GB"
+
+[wal]
+wal_dir                       = "/var/infinity/wal"
+full_checkpoint_interval      = "86400s"
+delta_checkpoint_interval     = "60s"
+wal_compact_threshold         = "1GB"
+
+wal_flush                     = "only_write"
+
+[resource]
+resource_dir                  = "/var/infinity/resource"

@@ -1,0 +1,16 @@
+[general]
+version = "0.4.0"
+time_zone = "utc-8"
+
+[network]
+[log]
+log_to_stdout = true
+
+[storage]
+
+[buffer]
+[wal]
+delta_checkpoint_interval = "1s"
+full_checkpoint_interval = "0s"
+
+[resource]

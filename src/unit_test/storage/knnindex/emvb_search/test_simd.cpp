@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-#include <algorithm>
 #include <cstdlib>
 #include <immintrin.h>
-#include <random>
-#include <vector>
 
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import emvb_simd_funcs;
 import simd_common_tools;
@@ -43,8 +41,8 @@ TEST_F(SIMDTest, testsum256) {
         const f32 expect_sum = std::reduce(random_f32.begin(), random_f32.end());
         const f32 abs_sum = std::accumulate(random_f32.begin(), random_f32.end(), 0.0f, [](f32 acc, f32 v) { return acc + std::abs(v); });
         const f32 diff_percent = std::abs(sum_f32 - expect_sum) / abs_sum;
-        std::cerr << "sum_f32: " << sum_f32 << " expect_sum: " << expect_sum << " abs_sum: " << abs_sum << " diff_percent: " << diff_percent
-                  << std::endl;
+//        std::cerr << "sum_f32: " << sum_f32 << " expect_sum: " << expect_sum << " abs_sum: " << abs_sum << " diff_percent: " << diff_percent
+//                  << std::endl;
         EXPECT_LE(diff_percent, 1e-6);
     }
 }
@@ -98,6 +96,7 @@ TEST_F(SIMDTest, testmax) {
 }
 
 TEST_F(SIMDTest, testleftpack) {
+#if defined(__AVX2__)
     auto ptr = std::aligned_alloc(32, 128 * sizeof(u32));
     EXPECT_NE(ptr, nullptr);
     std::unique_ptr<u32[], decltype([](u32 *p) { std::free(p); })> test_output(static_cast<u32 *>(ptr));
@@ -135,9 +134,11 @@ TEST_F(SIMDTest, testleftpack) {
     for (; i < 70; ++i) {
         EXPECT_EQ(misaligned_addr[expect_out_id++], i);
     }
+#endif
 }
 
 TEST_F(SIMDTest, testleftpackf) {
+#if defined(__AVX2__)
     auto ptr = std::aligned_alloc(32, 1024 * sizeof(f32));
     EXPECT_NE(ptr, nullptr);
     std::unique_ptr<f32[], decltype([](f32 *p) { std::free(p); })> test_input(static_cast<f32 *>(ptr));
@@ -164,4 +165,5 @@ TEST_F(SIMDTest, testleftpackf) {
         EXPECT_EQ(out_ptr[i], expect_out_ids[i]);
         EXPECT_EQ(out_ptr_compare[i], out_ptr[i]);
     }
+#endif
 }

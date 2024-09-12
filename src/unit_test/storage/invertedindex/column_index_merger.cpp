@@ -1,5 +1,6 @@
 #include "type/complex/row_id.h"
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import posting_merger;
@@ -32,44 +33,6 @@ import infinity_context;
 
 using namespace infinity;
 class ColumnIndexMergerTest : public BaseTestParamStr {
-public:
-    void SetUp() override {
-        BaseTestParamStr::SetUp();
-        BaseTestParamStr::RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-        config_path_ = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = std::make_shared<std::string>(config_path_);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            if (InfinityContext::instance().persistence_manager() != nullptr) {
-                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
-            }
-        }
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
-    }
-
-public:
-    ColumnIndexMergerTest() {}
-
-    ~ColumnIndexMergerTest() {}
-
 public:
     struct ExpectedPosting {
         String term;
@@ -112,14 +75,9 @@ protected:
     String config_path_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    TestWithDifferentParams,
-    ColumnIndexMergerTest,
-    ::testing::Values(
-        BaseTestParamStr::NULL_CONFIG_PATH,
-        BaseTestParamStr::VFS_CONFIG_PATH
-    )
-);
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         ColumnIndexMergerTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
                                         const String& index_dir,

@@ -28,8 +28,10 @@ static thread_local std::stringstream string_buffer;
 
 [ \t\n]+        /* ignore \t\n and space */;
 
+ADD             { return ADD; }
 ADMIN           { return ADMIN; }
 ALL             { return ALL; }
+ALLOCATION      { return ALLOCATION; }
 ALTER           { return ALTER; }
 ANALYZE         { return ANALYZE; }
 AND             { return AND; }
@@ -60,6 +62,7 @@ COLUMNS         { return COLUMNS; }
 COMPACT         { return COMPACT; }
 CONFIGS         { return CONFIGS; }
 CONFIG          { return CONFIG; }
+CONNECT         { return CONNECT; }
 COPY            { return COPY; }
 CREATE          { return CREATE; }
 CROSS           { return CROSS; }
@@ -93,6 +96,7 @@ FILES           { return FILES; }
 FLOAT           { return FLOAT; }
 FLOAT16         { return FLOAT16; }
 FLUSH           { return FLUSH; }
+FOLLOWER        { return FOLLOWER; }
 FORMAT          { return FORMAT; }
 FRAGMENT        { return FRAGMENT; }
 FROM            { return FROM; }
@@ -120,23 +124,30 @@ INTO            { return INTO; }
 IS              { return IS; }
 JOIN            { return JOIN; }
 KEY             { return KEY; }
+LEADER          { return LEADER; }
+LEARNER         { return LEARNER; }
 LEFT            { return LEFT; }
 LIKE            { return LIKE; }
 LIMIT           { return LIMIT; }
 LINE            { return LINE; }
+LOCK            { return LOCK; }
 LOG             { return LOG; }
 LOGS            { return LOGS; }
 LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
 MATCH           { return MATCH; }
 MAXSIM          { return MAXSIM; }
+MEMORY          { return MEMORY; }
 MEMINDEX        { return MEMINDEX; }
 MINUTE          { return MINUTE; }
 MINUTES         { return MINUTES; }
 MONTH           { return MONTH; }
 MONTHS          { return MONTHS; }
+MULTIVECTOR     { return MULTIVECTOR; }
 NATURAL         { return NATURAL; }
 NULL            { return NULLABLE; }
+NODE            { return NODE; }
+NODES           { return NODES; }
 NOT             { return NOT; }
 OBJECT          { return OBJECT; }
 OBJECTS         { return OBJECTS; }
@@ -162,6 +173,7 @@ QUERIES         { return QUERIES; }
 QUERY           { return QUERY; }
 RAW             { return RAW; }
 REAL            { return REAL; }
+RENAME          { return RENAME; }
 RIGHT           { return RIGHT; }
 ROWLIMIT        { return ROWLIMIT; }
 SEARCH          { return SEARCH; }
@@ -175,6 +187,7 @@ SEGMENTS        { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
 SPARSE          { return SPARSE; }
+STANDALONE      { return STANDALONE; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
 TENSOR          { return TENSOR; }
@@ -190,6 +203,7 @@ TRANSACTIONS    { return TRANSACTIONS; }
 TRUE            { return TRUE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
+UNLOCK          { return UNLOCK; }
 UNSIGNED        { return UNSIGNED; }
 USING           { return USING; }
 UPDATE          { return UPDATE; }

@@ -36,8 +36,12 @@ export enum class BGTaskType {
     kCleanup,
     kUpdateSegmentBloomFilterData, // Not used
     kDumpIndex,
+    kDumpIndexByline,
     kInvalid
 };
+
+class BaseMemIndex;
+class ChunkIndexEntry;
 
 export struct BGTask {
     BGTask(BGTaskType type, bool async) : type_(type), async_(async) {}
@@ -169,20 +173,35 @@ public:
 
 export class DumpIndexTask final : public BGTask {
 public:
-    DumpIndexTask(i64 id, SharedPtr<String> db_name, SharedPtr<String> table_name, SharedPtr<String> index_name)
-        : BGTask(BGTaskType::kDumpIndex, true), task_id_(id), db_name_(db_name), table_name_(table_name), index_name_(index_name) {}
+    DumpIndexTask(BaseMemIndex *mem_index, Txn *txn);
 
     ~DumpIndexTask() override = default;
 
-    String ToString() const override {
-        return fmt::format("DumpIndexTask, index: {}, table: {}, db: {}", index_name_->c_str(), table_name_->c_str(), db_name_->c_str());
-    }
+    String ToString() const override { return "DumpIndexTask"; }
 
 public:
-    i64 task_id_{};
+    BaseMemIndex *mem_index_{};
+    Txn *txn_{};
+};
+
+export class DumpIndexBylineTask final : public BGTask {
+public:
+    DumpIndexBylineTask(SharedPtr<String> db_name,
+                        SharedPtr<String> table_name,
+                        SharedPtr<String> index_name,
+                        SegmentID segment_id,
+                        SharedPtr<ChunkIndexEntry> dumped_chunk);
+
+    ~DumpIndexBylineTask() override = default;
+
+    String ToString() const override { return "DumpIndexBylineTask"; }
+
+public:
     SharedPtr<String> db_name_;
     SharedPtr<String> table_name_;
     SharedPtr<String> index_name_;
+    SegmentID segment_id_;
+    SharedPtr<ChunkIndexEntry> dumped_chunk_;
 };
 
 } // namespace infinity

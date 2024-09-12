@@ -38,6 +38,7 @@ import background_process;
 import bg_task;
 import compact_statement;
 import build_fast_rough_filter_task;
+import create_index_info;
 
 namespace infinity {
 
@@ -74,6 +75,10 @@ void TxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState
         for (const auto &column_entry : block_entry->columns()) {
             local_delta_ops->AddOperation(MakeUnique<AddColumnEntryOp>(column_entry.get(), commit_ts));
         }
+    }
+
+    for (auto *block_column_entry : block_column_entries_) {
+        local_delta_ops->AddOperation(MakeUnique<AddColumnEntryOp>(block_column_entry, commit_ts));
     }
 }
 
@@ -278,6 +283,9 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
 }
 
 void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
+    if (added_txn_num_) {
+        table_entry_->DecWriteTxnNum();
+    }
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
         Catalog::RollbackAppend(table_entry_, txn_id, abort_ts, this);
@@ -314,7 +322,7 @@ bool TxnTableStore::CheckConflict(Catalog *catalog, Txn *txn) const {
         if (auto *segment_entry = table_entry_->GetSegmentEntry(segment_id); segment_entry != nullptr) {
             for (const auto &[block_id, block_offsets] : block_map) {
                 if (auto block_entry = segment_entry->GetBlockEntryByID(block_id); block_entry.get() != nullptr) {
-                    if (block_entry->CheckDeleteConflict(block_offsets)) {
+                    if (block_entry->CheckDeleteConflict(block_offsets, txn->CommitTS())) {
                         return true;
                     }
                 }
@@ -366,10 +374,21 @@ bool TxnTableStore::CheckConflict(const TxnTableStore *other_table_store) const 
     return false;
 }
 
-void TxnTableStore::PrepareCommit1() const {
+void TxnTableStore::PrepareCommit1(const Vector<WalSegmentInfo *> &segment_infos) const {
     TxnTimeStamp commit_ts = txn_->CommitTS();
     for (auto *segment_entry : flushed_segments_) {
-        segment_entry->CommitFlushed(commit_ts);
+        WalSegmentInfo *segment_info_ptr = nullptr;
+        for (auto *segment_info : segment_infos) {
+            if (segment_info->segment_id_ == segment_entry->segment_id()) {
+                segment_info_ptr = segment_info;
+                break;
+            }
+        }
+        if (segment_info_ptr == nullptr) {
+            String error_message = fmt::format("Segment info not found, segment id: {}", segment_entry->segment_id());
+            UnrecoverableError(error_message);
+        }
+        segment_entry->CommitFlushed(commit_ts, segment_info_ptr);
     }
 }
 
@@ -411,6 +430,18 @@ void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
     for (auto [table_index_entry, ptr_seq_n] : txn_indexes_) {
         table_index_entry->Commit(commit_ts);
+        switch (table_index_entry->index_base()->index_type_) {
+            case IndexType::kFullText: {
+                table_index_entry->UpdateFulltextSegmentTs(commit_ts);
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+    if (added_txn_num_) {
+        table_entry_->DecWriteTxnNum();
     }
 }
 
@@ -440,6 +471,15 @@ void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block
         iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore(segment_entry)).first;
     }
     iter->second.block_entries_.emplace(block_entry->block_id(), block_entry);
+    has_update_ = true;
+}
+
+void TxnTableStore::AddBlockColumnStore(SegmentEntry *segment_entry, BlockEntry *block_entry, BlockColumnEntry *block_column_entry) {
+    auto iter = txn_segments_store_.find(segment_entry->segment_id());
+    if (iter == txn_segments_store_.end()) {
+        iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore(segment_entry)).first;
+    }
+    iter->second.block_column_entries_.emplace_back(block_column_entry);
     has_update_ = true;
 }
 
@@ -581,8 +621,21 @@ bool TxnStore::CheckConflict(const TxnStore &other_txn_store) {
 }
 
 void TxnStore::PrepareCommit1() {
+    WalEntry *wal_entry = txn_->GetWALEntry();
+    Vector<WalSegmentInfo *> segment_infos;
+    for (auto &cmd : wal_entry->cmds_) {
+        if (cmd->GetType() == WalCommandType::IMPORT) {
+            auto *import_cmd = static_cast<WalCmdImport *>(cmd.get());
+            segment_infos.emplace_back(&import_cmd->segment_info_);
+        } else if (cmd->GetType() == WalCommandType::COMPACT) {
+            auto *compact_cmd = static_cast<WalCmdCompact *>(cmd.get());
+            for (auto &segment_info : compact_cmd->new_segment_infos_) {
+                segment_infos.emplace_back(&segment_info);
+            }
+        }
+    }
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        table_store->PrepareCommit1();
+        table_store->PrepareCommit1(segment_infos);
     }
 }
 

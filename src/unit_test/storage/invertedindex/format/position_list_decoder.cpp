@@ -1,5 +1,5 @@
-
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 
@@ -22,9 +22,6 @@ public:
     PositionListDecoderTest() {}
 
     ~PositionListDecoderTest() {}
-
-    void SetUp() override {}
-    void TearDown() override {}
 
 protected:
     static constexpr SizeT BUFFER_SIZE_ = 10240;

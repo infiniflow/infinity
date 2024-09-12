@@ -19,6 +19,7 @@ export module options;
 import stl;
 import third_party;
 import status;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -146,7 +147,11 @@ export enum class GlobalOptionIndex {
     kPersistenceDir = 31,
     kPersistenceObjectSizeLimit = 32,
     kMemIndexMemoryQuota = 33,
-    kInvalid = 34,
+    kServerMode = 34,
+    kPeerServerIP = 35,
+    kPeerServerPort = 36,
+    kPeerServerConnectionPoolSize = 37,
+    kInvalid = 38,
 };
 
 export struct GlobalOptions {

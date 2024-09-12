@@ -123,7 +123,7 @@ public:
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<DataBlock> ReadAdv(char *&ptr, i32 maxbytes);
+    static SharedPtr<DataBlock> ReadAdv(const char *&ptr, i32 maxbytes);
 
     Vector<SharedPtr<ColumnVector>> column_vectors;
 

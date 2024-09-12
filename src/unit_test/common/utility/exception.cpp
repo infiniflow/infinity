@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 import status;
 
+using namespace infinity;
 class ExceptionTest : public BaseTest {};
 
 TEST_F(ExceptionTest, all_exception_cases) {
@@ -33,40 +35,4 @@ TEST_F(ExceptionTest, all_exception_cases) {
     } catch (std::exception &e) {
         EXPECT_EQ(std::string(e.what()), "Unexpected error: recoverable error");
     }
-//
-//    try {
-//        throw infinity::CatalogException("Can't find");
-//    } catch (std::exception &e) {
-//        EXPECT_EQ(std::string(e.what()), "Catalog Error: Can't find");
-//    }
-//
-//    try {
-//        throw infinity::NetworkException("Can't connected");
-//    } catch (std::exception &e) {
-//        EXPECT_EQ(std::string(e.what()), "Network Error: Can't connected");
-//    }
-//
-//    try {
-//        throw infinity::PlannerException("Doesn't support this usage:", "SELECT *");
-//    } catch (std::exception &e) {
-//        EXPECT_EQ(std::string(e.what()), "Planner Error: Doesn't support this usage: SELECT *");
-//    }
-//
-//    try {
-//        throw infinity::OptimizerException("Unsupported syntax");
-//    } catch (std::exception &e) {
-//        EXPECT_EQ(std::string(e.what()), "Optimizer Error: Unsupported syntax");
-//    }
-//
-//    try {
-//        throw infinity::UnrecoverableException("Can't execute:", "out of memory");
-//    } catch (std::exception &e) {
-//        EXPECT_EQ(std::string(e.what()), "Executor Error: Can't execute: out of memory");
-//    }
-//
-//    try {
-//        throw infinity::SchedulerException("Schedule the task:", "timeout,", "need to restart");
-//    } catch (std::exception &e) {
-//        EXPECT_EQ(std::string(e.what()), "Scheduler Error: Schedule the task: timeout, need to restart");
-//    }
 }

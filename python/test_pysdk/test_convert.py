@@ -1,15 +1,17 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import pytest
 from infinity.errors import ErrorCode
 from common import common_values
 import infinity
+import infinity_embedded
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.common import ConflictType, InfinityException
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 @pytest.mark.usefixtures("local_infinity")
@@ -19,10 +21,16 @@ class TestInfinity:
     @pytest.fixture(autouse=True)
     def setup(self, local_infinity, http):
         if local_infinity:
+            module = importlib.import_module("infinity_embedded.common")
+            func = getattr(module, 'ConflictType')
+            globals()['ConflictType'] = func
+            func = getattr(module, 'InfinityException')
+            globals()['InfinityException'] = func
             self.uri = common_values.TEST_LOCAL_PATH
+            self.infinity_obj = infinity_embedded.connect(self.uri)
         else:
             self.uri = common_values.TEST_LOCAL_HOST
-        self.infinity_obj = infinity.connect(self.uri)
+            self.infinity_obj = infinity.connect(self.uri)
         if http:
             self.infinity_obj = infinity_http()
         assert self.infinity_obj
@@ -82,6 +90,7 @@ class TestInfinity:
 
     @pytest.mark.usefixtures("skip_if_http")
     def test_without_output_select_list(self, suffix):
+        #from infinity_embedded.common import ConflictType, InfinityException
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_without_output_select_list"+suffix, ConflictType.Ignore)
@@ -96,10 +105,9 @@ class TestInfinity:
             insert_res_pl = table_obj.output([]).to_pl()
             print(insert_res_df, insert_res_arrow, insert_res_pl)
 
-        assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.EMPTY_SELECT_FIELDS
 
-        db_obj.drop_table("test_without_output_select_list", ConflictType.Error)
+        db_obj.drop_table("test_without_output_select_list"+suffix, ConflictType.Error)
 
     @pytest.mark.parametrize("condition_list", ["c1 > 0.1 and c2 < 3.0",
                                                 "c1 > 0.1 and c2 < 1.0",

@@ -1,0 +1,2373 @@
+---
+sidebar_position: 3
+slug: /http_api_reference
+---
+
+# HTTP API Reference
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+## Create database
+
+**POST** `/databases/{database_name}`
+
+Creates a database by its name. If the database already exists, the action taken depends on the `"create_option"` parameter.
+
+### Request
+
+- Method: POST
+- URL: `/database/{database_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"create_option"`: `enum<string>`
+
+#### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/databases/{database_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {"create_option": "ignore_if_exists"} '
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+- `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if a database with the same name exists.
+  - `"ignore_if_exists"`: Ignore the database creation request and keep the existing database.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0 
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3016,
+    "error_message": "Duplicate database: {database_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Drop database
+
+**DELETE** `/databases/{database_name}`
+
+Deletes a database by its name. If the database does not exist, the action taken depends on the `"drop_option"` parameter.
+
+### Request
+
+- Method: DELETE
+- URL: `/database/{database_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"drop_option"`: `enum<string>`
+
+#### Request example
+
+```shell
+curl --request DELETE \
+     --url http://localhost:23820/databases/{database_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {"drop_option": "error"} '
+```
+
+#### Request parameter
+
+- `database_name`: (*Path parameter*)  
+  The name of the database to delete.
+- `"drop_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if the specified database does not exist.
+  - `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3021,
+    "error_message": "{database_name} doesn't exist."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## List databases
+
+**GET** `/databases`
+
+Retrieves a list of all available databases within the Infinity system.
+
+### Request
+
+- Method: GET
+- URL: `/databases`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases \
+     --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "databases": [
+        "default_db",
+        "my_db"
+    ]  
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+- `databases`: `string[]`  
+  An array of strings representing the names of the databases in the system.
+
+---
+
+## Show database
+
+**GET** `/databases/{database_name}`
+
+Shows detailed information about a specified database.
+
+### Request
+
+- Method: GET
+- URL: `/database/{database_name}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/{database_name} \
+     --header 'accept: application/json'
+```
+
+#### Request parameter
+
+- `database_name`: (*Path parameter*)  
+  The name of the database to retrieve.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "database_name": "default_db"
+    "storage_directory": "/var/infinity/data/nIHniKeHIB_db_default"
+    "table_count": "4"
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+- `database_name`: `string`  
+  The name of the database.
+- `storage_directory`: `string`  
+  The directory path where the database is stored.
+- `table_count`: `integer`  
+  The number of tables present in the database.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3021,
+    "error_message": "{database_name} doesn't exist."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Create table
+
+**POST** `/databases/{database_name}/tables/{table_name}`
+
+Creates a table with a specified name and defined fields (columns) within a given database. If the table already exists, the action taken depends on the `"create_option"` parameter.
+
+### Request
+
+- Method: POST
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"create_option"`: `enum<string>`
+  - `"fields"`: `object[]`
+
+#### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {
+         "create_option": "ignore_if_exists",
+         "fields": [
+             {
+                  "name": "name",
+                  "type": "varchar"
+             },
+             {
+                  "name": "score",
+                  "type": "float",
+                  "default": 3.0
+             },
+             {
+                  "name": "dense_column",
+                  "type": "vector,8,float",
+                  "default": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+             },
+             {
+                  "name": "fulltext_column",
+                  "type": "varchar",
+                  "default": ""
+             },
+             {
+                  "name": "sparse_column",
+                  "type": "sparse,128,float,int",
+                  "default": {"10":1.1, "20":2.2, "30": 3.3}
+             },
+             {
+                  "name": "tensor_column",
+                  "type": "tensor,4,float",
+                  "default": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]
+             },  
+             {
+                  "name": "multivector_column",
+                  "type": "multivector,4,float",
+                  "default": [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
+             },    
+             {
+                  "name": "tensorarray_column",
+                  "type": "tensorarray,2,float",
+                  "default": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]]
+             }          
+        ]
+    } '
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table to create, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+- `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if a table with the same name exists.
+  - `"ignore_if_exists"`: Ignore the table creation request and keep the existing table.
+- `field`: (*Body parameter*), `object[]`, *Required*
+  - `"name"`: `string`, *Required*  
+    A non-empty string indicating the name of the column to create, which must adhere to the following requirements:  
+    - Permitted characters include:
+      - English letters (a-z, A-Z)
+      - Digits (0-9)
+      - "_" (underscore)
+    - Must begin with an English letter or underscore.
+    - Maximum 65,535 characters.
+    - Case-insensitive.
+  - `"type"`: `string`, *Required*  
+    The data type of the column.  
+    - Numeric:  
+      - `"int8"`
+      - `"int16"`
+      - `"int"`/`"int32"`/`"integer"`
+      - `"int64"`
+      - `"float"`/`"float32"`
+      - `"double"`/`"float64"`
+      - `"float16"`
+      - `"bfloat16"`
+    - String: `"varchar"`
+    - Dense vector: e.g., `"vector,128,float"`
+      - `vector`: The column is a dense vector column.
+      - The second item in the string: The dimension of the dense vector.
+      - The third item in the string: The element type of the dense vector. Can be:
+        - `"int8"`
+        - `"int16"`
+        - `"int"`/`"int32"`/`"integer"`
+        - `"int64"`
+        - `"float"`/`"float32"`
+        - `"double"`/`"float64"`
+        - `"float16"`
+        - `"bfloat16"`
+    - Sparse vector: e.g., `"sparse,128,float,int"`
+      - `sparse`: The column is a sparse vector column.
+      - The second item in the string: The dimension of the sparse vector.
+      - The third item in the string: The element type of the sparse vector. Can be:
+        - `"int8"`
+        - `"int16"`
+        - `"int"`/`"int32"`/`"integer"`
+        - `"int64"`
+        - `"float"`/`"float32"`
+        - `"double"`/`"float64"`
+        - `"float16"`
+        - `"bfloat16"`
+      - The fourth item in the string: The data type of the sparse vector indices. Can be:
+        - `int8`
+        - `int16`
+        - `int`/`int32`/`integer`
+        - `int64`
+    - Tensor vector: e.g., `"tensor,4,float"`
+      - `tensor`: The column is a tensor column.
+      - The second item in the string: The dimension of each vector unit in the tensor.
+      - The third item in the string: The element type of the tensors. Can be:
+        - `"int8"`
+        - `"int16"`
+        - `"int"`/`"int32"`/`"integer"`
+        - `"int64"`
+        - `"float"`/`"float32"`
+        - `"double"`/`"float64"`
+        - `"float16"`
+        - `"bfloat16"`
+    - Tensor array: e.g., `"tensorarray,6,float"`
+      - `tensorarray`: The column is a tensor-array column.
+      - The second item in the string: The dimension of each vector unit in the tensor arrays.
+      - The third item in the string: The element type of the tensors. Can be:
+        - `"int8"`
+        - `"int16"`
+        - `"int"`/`"int32"`/`"integer"`
+        - `"int64"`
+        - `"float"`/`"float32"`
+        - `"double"`/`"float64"`
+        - `"float16"`
+        - `"bfloat16"`
+    - Multivector: e.g., `"multivector,128,float"`
+      - `multivector`: The column is a multi-vector column.
+      - The second item in the string: The dimension of each vector unit.
+      - The third item in the string: The element type of the tensors. Can be:
+        - `"int8"`
+        - `"int16"`
+        - `"int"`/`"int32"`/`"integer"`
+        - `"int64"`
+        - `"float"`/`"float32"`
+        - `"double"`/`"float64"`
+        - `"float16"`
+        - `"bfloat16"`
+  - `"default"`: `Any`, *Optional*  
+    The default value for unspecified cells in that column.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3017,
+    "error_message": "Duplicate table: {table_name} in {database_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Drop table
+
+**DELETE** `/databases/{database_name}/tables/{table_name}`
+
+Deletes a table from a specified database. If the table does not exist, the action taken depends on the `"drop_option"` parameter.
+
+### Request
+
+- Method: DELETE
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"drop_option"`: `enum<string>`
+
+#### Request example
+
+```shell
+curl --request DELETE \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {"drop_option": "ignore_if_not_exists"} '
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table to delete.
+- `"drop_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if the specified table does not exist.
+  - `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3022,
+    "error_message": "Table {table_name} doesn't exist in {database_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## List tables
+
+**GET** `/databases/{database_name}/tables`
+
+Retrieves a list of all available tables in a specified database.
+
+### Request
+
+- Method: GET
+- URL: `/databases/{database_name}/tables`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/{database_name}/tables \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "tables": 
+    [
+         "table_1",
+         "table_2",
+         "table_n"
+    ]
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show table
+
+**GET** `/databases/{database_name}/tables/{table_name}`
+
+Shows detailed information about a specified table within a given database.
+
+### Request
+
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "database_name": "default_db",
+    "table_name": "my_table",
+    "storage_directory": "/var/infinity/data/nIHniKeHIB_db_default/h1abZcWuBs_table_my_table",
+    "column_count" : 3,
+    "segment_count" : 1,
+    "row_count" : 5
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3022,
+    "error_message": "Table {table_name} doesn't exist in {database_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Show table columns
+
+**GET** `/databases/{database_name}/tables/{table_name}/columns`
+
+Shows the column information about a specified table.
+
+### Request
+
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/columns`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/columns \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "columns": 
+    [
+        {
+             "column_name": "name",
+             "column_type": "Varchar",
+             "constraints": "",
+             "default": "Null"
+        },
+        {
+             "column_name": "score",
+             "column_type": "Float",
+             "constraints": "",
+             "default": "Null",
+        }
+        {
+            "column_name": "vector_column",
+            "column_type": "Embedding(float,8)",
+            "constraints": "",
+            "default": "Null"
+        },
+    ]
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3022,
+    "error_message": "Table {table_name} doesn't exist in {database_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Create index
+
+**POST** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+
+Creates an index on a specified table. If an index with the same name exists, the action taken depends on the `"create_option"` parameter.
+
+### Request
+
+- Method: POST
+- URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"fields"`: `string[]`
+  - `"index"`: `object`
+  - `"create_option"`: `enum<string>`
+
+#### Request example
+
+- Creates an HNSW index on a vector column:
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' 
+     {
+          "fields": 
+          [
+              "vector_column"
+          ],
+          "index": 
+          {
+              "type": "Hnsw",
+              "M": "16",
+              "ef_construction": "50",
+              "metric": "l2"
+          },
+          "create_option": "ignore_if_exists"
+     } '
+```
+
+- Creates a full-text index on a full-text column:
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' 
+     {
+          "fields": 
+          [
+              "fulltext_column"
+          ],
+          "index": 
+          {
+              "type": "fulltext",
+              "analyzer": "chinese"
+          },
+          "create_option": "ignore_if_exists"
+     } '
+```
+
+- Creates a BMP index on a tensor column
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' 
+     {
+          "fields": 
+          [
+              "vector_column"
+          ],
+          "index": 
+          {
+              "block_size": "16",
+              "compress_type": "raw"
+          },
+          "create_option": "ignore_if_exists"
+     } '
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.  
+- `index_name`: (*Path parameter*)  
+  The name of the index to create, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+- `"fields"`: (*Body parameter*), `string[]`, *Required*  
+  A non-empty list of strings indicating the names of the columns to build index on. For now, you are only allowed to create an index on one column.
+- `"index"`: (*Body parameter*), `dict[string, string]`  
+  - Parameter settings for an HNSW index:
+    - `"type"`: `"hnsw"`
+    - `"M"`: *Optional* - Defaults to`"16"`.
+    - `"ef_construction"`: *Optional* - Defaults to`"50"`.
+    - `"metric"` *Required* - The distance metric to use in similarity search.
+      - `"ip"`: Inner product.
+      - `"l2"`: Euclidean distance.
+      - `"cosine"`: Cosine similarity.
+    - `"encode"`: *Optional*
+      - `"plain"`: (Default) Plain encoding.
+      - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
+  - Parameter settings for a full-text index:  
+    - `"type"`: `"fulltext"`
+    - `"ANALYZER"`: *Optional*
+      - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs. Use `-` to specify stemmer for languages, `English` is the default stemmer: `"standard-english"` and `"standard"` have the same stemmer setting. Supported language stemmer includes: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`,`Russian`,`Spanish`,`Swedish`,`Turkish`.
+      - `"chinese"`: Simplified Chinese
+      - `"tradition"`: Traditional Chinese
+      - `"japanese"`: Japanese
+      - `"korea"`: Korea
+      - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
+  - Parameter settings for a secondary index:  
+    - `"type"`: `"secondary"`
+  - Parameter settings for a BMP index:  
+    - `"type"`: `"bmp"`
+    - `block_size`: *Optional* - The size of the block in a BMP index. Range: `"1"` ~ `"256"`. Defaults to `"16"`.
+    - `"compress_type"`: *Optional*  
+      - `"compress"`: (Default) Store the block-max index in sparse format. Works best with small block size situations.
+      - `"raw"`: Store the block-max index without compression.
+- `"create_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if a table with the same name exists.
+  - `"ignore_if_exists"`: Ignore the table creation request and keep the existing table.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3018,
+    "error_message": "Duplicate index: {index} in {table_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Drop index
+
+**DELETE** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+
+Deletes an index by its name.
+
+### Request
+
+- Method: DELETE
+- URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"drop_option"`: `enum<string>`
+
+#### Request example
+
+```shell
+curl --request DELETE \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {"drop_option": "ignore_if_not_exists"} '
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.  
+- `index_name`: (*Path parameter*)  
+  The name of the index to delete.
+- `"drop_option"`: (*Body parameter*), `enum<string>`, *Optional*  
+  - `"error"`: (Default) Raise an error if the specified index does not exist.
+  - `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified index does not exist.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3018,
+    "error_message": "Index {index_name} doesn't exist in {table_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## List indexes
+
+**GET** `/databases/{database_name}/tables/{table_name}/indexes`
+
+Retrieves a list of all indexes created on a given table.
+
+### Request
+
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/indexes`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "indexes": 
+    [
+        {
+            "columns": "vector_column_1",
+            "index_name": "idx1",
+            "index_type": "HNSW"
+        },
+        {
+            "columns": "vector_column_2",
+            "index_name": "idx2",
+            "index_type": "HNSW"
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show index
+
+**GET** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+
+Shows detailed information about a specified index.
+
+### Request
+
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `index_name`: (*Path parameter*)  
+  The name of the index.
+
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "database_name": "default_db",
+    "table_name": "test_vector_table",
+    "index_name": "idx1",
+    "index_column_ids": "2",
+    "index_column_names": "vector_column",
+    "index_type": "HNSW",
+    "other_parameters": "metric = l2, encode_type = plain, M = 16, ef_construction = 50",
+    "segment_index_count": "0",
+    "storage_directory": "/var/infinity/data/3C1tizeluV_db_default_db/O0wSJ88IrJ_table_test_vector_table/RYurmCbD5h_index_idx1"
+    "storage_size": "0B"
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3018,
+    "error_message": "Index {index_name} doesn't exist in {table_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Import data
+
+**PUT** `/databases/{database_name}/tables/{table_name}`
+
+Imports data from a selected file into a specified table.
+
+### Request
+
+- Method: PUT
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"file_path"`: `string`
+  - `"file_type"`: `string`  
+  - `"header"`: `boolean`
+  - `"delimiter"`: `string`
+
+#### Request example
+
+```shell
+curl --request PUT \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {
+         "file_path":"./filename.csv",
+         "file_type":"csv",
+         "header": true,
+         "delimiter": `\t"
+    } '
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"file_path"`: (*Body parameter*)   
+  Absolute path to the file to import
+- `"file_type"`: (*Body parameter*)  
+  The type of the file to import. Supported file types include:
+  - `csv`
+  - `json`
+  - `jsonl`
+  - `parquet`
+- `"header"`: (*Body parameter*), `boolean`, *Optional*  
+  Whether to display table header or not. Works with **.csv** files only:
+  - `True`: Display table header.
+  - `False`: (Default) Do not display table header.
+- `"delimiter"`: (*Body parameter*), `string`, *Optional*, Defaults to ","  
+  Delimiter to separate columns. Works with **.csv** files only.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3032,
+    "error_message": "Not supported file type: docx"
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Export data
+
+**GET** `/databases/{database_name}/tables/{table_name}`
+
+Exports data from a specified table to a specified file.
+
+### Request
+
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"file_path"`: `string`
+  - `"file_type"`: `string`
+  - `"header"`: `boolean`  
+  - `"delimiter"`: `string`
+  - `"offset"`: `int`
+  - `"limit"`: `int`
+  - `"row_limit"`: `int`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/{database_name}/table/{table_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {
+         "file_path": "/var/infinity/filename.csv",
+         "file_type": "csv",
+         "header": false, 
+         "delimiter": "\t",
+         "offset": 2,
+         "limit": 6,
+         "row_limit": 2
+    } '
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"file_path"`: (*Body parameter*)   
+  Absolute path to the file for export.
+- `"file_type"`: (*Body parameter*)  
+  The type of the file for export. Supported file types include:
+  - `csv`
+  - `jsonl`
+  - `parquet`
+- `"header"`: (*Body parameter*), `boolean`, *Optional*
+  Whether to display table header or not. Works with **.csv** files only:
+  - `True`: Display table header.
+  - `False`: (Default) Do not display table header.
+- `"delimiter"`: (*Body parameter*), `string`, *Optional*, Defaults to ","  
+  Delimiter to separate columns. Works with **.csv** files only.
+- `"offset"`: (*Body parameter*), `int`, *Optional*  
+  Index specifying the starting row for export. Usually used in conjunction with `limit`. If not specified, the file export starts from the first row. 
+- `"limit"`: `int`, *Optional*  
+  The maximum number of rows to export. Usually used in conjunction with `offset`. If the table's row count exceeds `offset` + `limit`, the excess rows are excluded from the export.
+- `"row_limit"`: (*Body parameter*), `int`, *Optional*  
+  Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so on.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 7002,
+    "error_message": "File already existed: /var/infinity/filename.csv"
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Insert data
+
+**POST** `/databases/{database_name}/tables/{table_name}/docs`
+
+Inserts rows of data into a specified table.
+
+### Request
+
+- Method: POST
+- URL: `/databases/{database_name}/tables/{table_name}/docs`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `object[]`
+
+#### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' 
+     [    
+          {
+               "name": "Jennifer",
+               "score": 5.0,
+               "fulltext_column": "You have a heart like gold.",
+               "dense_column": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+               "sparse_column": {"10":1.1, "20":2.2, "30": 3.3},
+               "tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
+               "tensorarray_column": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]],
+               "multivector_column": [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
+          },
+          {
+               "name": "Neil",
+               "score": 2.0,
+               "fulltext_column": "You're absolutely lucky.",
+               "dense_column": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+               "sparse_column": {"10":1.1, "20":2.2, "30": 3.3},
+               "tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
+               "tensorarray_column": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]],
+               "multivector_column": [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
+          }
+     ] '  
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"file_path"`: (*Body parameter*), `string`, *Required* 
+- `Body`: (*Body parameter*),  `object[]`, *Required*  
+  Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `object[]`. Each JSON object corresponds to a row to insert, and each key-value pair it corresponds to a column name and the table cell value.
+
+:::tip NOTE
+- When inserting incomplete rows of data, ensure that all uninserted columns have default values when creating the table. Otherwise, an error will occur.  
+- You are not allowed to insert both complete and incomplete rows of data in one request. 
+:::
+
+:::tip NOTE
+Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once.
+:::
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3005,
+    "error_message": "Column {column_name} doesn't exist in {table_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Delete data
+
+**DELETE** `/databases/{database_name}/tables/{table_name}/docs`
+
+Deletes rows from a table based on the specified condition.
+
+### Request
+
+- Method: DELETE
+- URL: `/databases/{database_name}/tables/{table_name}/docs`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"filter"`: `string`
+
+#### Request example
+
+```shell
+curl --request DELETE \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {"filter": "score >= 4.0 and score <= 5.0"} '
+```
+
+```shell
+curl --request DELETE \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {"filter": "name = '"'Toby'"'"} '
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"filter"`: (*Body parameter*), `string`, *Optional*  
+  A string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `"filter"` is not specified or set to `Null`, the method will delete all rows in the table.
+
+:::tip NOTE
+The `filter` parameter currently supports 'and' and 'or' logical expressions only.
+:::
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "delete_row_count": 10
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3005,
+    "error_message": "Column {column_name} doesn't exist in {table_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Update data
+
+**PUT** `/databases/{database_name}/tables/{table_name}/docs`
+
+Searches for rows that match the specified condition and updates them accordingly.
+
+### Request
+
+- Method: PUT
+- URL: `/databases/{database_name}/tables/{table_name}/docs`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"update"`: `object`
+  - `"filter"`: `string`
+
+#### Request example
+
+The following code updates the score to `1.0` for rows where the `name` field is `Neil`.
+
+```shell
+curl --request PUT \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --header 'accept: application/json' \
+    --header 'content-type: application/json' \
+    --data ' 
+    {
+        "update": {"score": 1.0},
+        "filter": "name = '"'Neil'"'"
+    } '
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+- `"filter"`: (*Body parameter*), `string`, *Optional*  
+  A string that defines the condition for selecting rows to update. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be updated. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.
+
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "update_row_count": 10
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3005,
+    "error_message": "Column {column_name} doesn't exist in {table_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Search data
+
+**GET** `/databases/{database_name}/tables/{table_name}/docs`
+
+Searches for data in a specified table. The search can range from a simple vector search, sparse vector search, or full-text search to complex hybrid searches involving reranking methods.
+
+### Request
+
+- Method: GET
+- URL: `/databases/{database_name}/tables/{table_name}/docs`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"output"`: `string[]`
+  - `"filter"`: `string`
+  - `"fusion"`: `object`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/docs \
+     --header 'accept: application/json' \
+    --header 'content-type: application/json' \
+    --data ' 
+    {
+        "output":
+        [
+            "name",
+            "score"
+        ],
+        "filter": "score >= 4.0",
+        "search":
+        [
+            {
+                "match_method": "dense",
+                "fields": "dense_column",
+                "query_vector": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                "element_type": "float",
+                "metric_type": "l2",
+                "topn": 2,
+                "params": {"ef": "10"}
+            },
+            {
+                "match_method": "text",
+                "fields": "body",
+                "matching_text": "bloom",
+                "topn": 1,
+                "params":
+                {
+                    "default_fields": "body",
+                    "operator": "or"
+                }
+            },
+            {
+                "match_method": "sparse",
+                "fields": "sparse_column",
+                "query_vector": {"10":1.1, "20":2.2, "30": 3.3},
+                "metric_type": "l2",
+                "topn": 3,
+                "params": {"ef": "150"}   
+            },
+            {
+                "fusion_method": "rrf",
+                "topn": 2,
+                "params":{"rank_constant": "60"}
+            }
+        ]
+    } '
+```
+
+#### Request parameters
+
+- `database_name`: (*Path parameter*)  
+  The name of the database.
+- `table_name`: (*Path parameter*)  
+  The name of the table.
+
+- `"output"`: (*Body parameter*), `string[]`, *Required*  
+  A non-empty list of strings specifying the columns to include in the output. Each string in the list can represent:  
+  - A user-defined column name: The name of the column to include in the output, e.g., `"body"`.
+  - All user-defined columns: Use a wildcard `"*"` to select all columns.
+  - A special system column: system-generated columns include:
+    - `_row_id`:  An automatically generated, unique identifier for each row in the table. It serves as a unique key for each row but does not necessarily correspond to the actual row number. When the data in a row is updated, the `_row_id` for that row is also changed to reflect the update.
+    - `_score`: A BM25 score used in full-text search.
+    - `_similarity`: Used by IP and cosine metrics in dense or sparse vector search.
+    - `_distance`: Used by L2 metric in dense vector search.
+  - An aggregation function: Apply an aggregation operation on specified columns. Supported aggragation functions include:
+    - `count`
+    - `min`
+    - `max`
+    - `sum`
+    - `avg`
+  - An arithmetic function: Apply an arithmetic operation on specified columns (e.g., `c1+5`).  
+  > The list must contain at least one element. Empty lists are not allowed.
+
+- `"filter"`: (*Body parameter*), `string`, *Optional*  
+  A string that defines the condition for selecting rows. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be updated. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.  
+  > The `filter` parameter currently supports 'and' and 'or' logical expressions only.  
+
+- `"search"`: (*Body parameter*), `object[]`, *Required*  
+  A list of JSON objects, each representing a matching or fusion method. Note that if you have specified multiple matching methods, you must specify a fusion method.  
+  - `"match_method"`: (*Body parameter*), `enum<string>`, *Required*  
+    The matching method for a specified column/field:  
+    - `"dense"`: Creates a dense vector search expression to identify the top n most similar rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).  
+    - `"sparse"`: Creates a sparse vector search expression to identify the top n most similar rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
+    - `"text"`: Creates a full-text search expression on the specified field(s)/column(s) to identify the top n most similar rows.  
+      > Ensure that a full-text index has been successfully built on each column involved before executing a full-text search; otherwise, an error will occur.  
+
+  - `"fields"`: `string`, *Required*  
+    A non-empty string indicating the name of the column/field to search on.  
+  - `"query_vector"`: `[]/object`, *Optional*  
+    The query vector data to compare against. This should be provided as a list or a JSON object.  
+    Used *only* when `"match_method"` is set to `"dense"` or `"sparse"`.  
+    - Dense query vector example:  `[1.0, 2.2, 3.4, 1.5]`
+    - Sparse query vector example: `{"10":1.1, "20":2.2, "30": 3.3}`
+  - `"matching_text"`: `string`, *Optional*  
+    A non-empty text string to search for. Used *only* when `"match_method"` is set to `"text"`.  
+    You can use various search options within the matching text, including:  
+    - Single terms: `"blooms"`
+    - OR multiple terms: `"Bloom OR filter"`, `"Bloom || filter"` or just `"Bloom filter"`
+    - Phrase search: `'"Bloom filter"'`
+    - AND multiple terms: `"space AND efficient"`, `"space && efficient"` or `"space + efficient"`
+    - Escaping reserved characters: `"space\-efficient"`
+    - Sloppy phrase search: `'"harmful chemical"~10'`
+    - Field-specific search: `"title:(quick OR brown) AND body:foobar"`
+  - `element_type`: `str`, *Required*  
+    Specifies the data type of the embedding vector. Used *only* when `"match_method"` is set to `"dense"`. Commonly used types (values) include:  
+    - `"float"`
+    - `"uint8"`.
+  - `metric_type`: `string`, *Required*  
+    The distance metric to use in similarity search. Used *only* when `"match_method"` is set to `"dense"` or `"sparse"`.  
+    - `"ip"`: Inner product.
+    - `"l2"`: Euclidean distance.
+    - `"cosine"`: Cosine similarity.
+  - `"fusion_method"`: (*Body parameter*), `enum<string>`, *Required when you have specified multiple matching methods*  
+    - `"rrf"`: [Reciprocal rank fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)  
+      RRF is a method for combining multiple result sets with varying relevance indicators into a single result set. It requires no tuning, and the relevance indicators need not be related to achieve high-quality results. RRF is particularly useful when you are uncertain of the relative importance of each retrieval way.  
+      RRF uses the following formula to calculate the score for matching each document:  
+      ```python
+      score = 0.0
+      for q in queries:
+          if d in result(q):
+              score += 1.0 / ( k + rank( result(q), d ) )
+      return score
+
+      # Where
+      # k is the ranking constant,
+      # q is a query in a set of queries,
+      # d is a document in the result set of q,
+      # result(q) is the result set of q, and
+      # rank( result(q), d ) is the rank of d within the result(q), starting from 1.
+      ```
+
+    - `"weighted_sum"`  
+      The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.  
+    - `"match_tensor"`  
+      Infinity's tensor-based late interaction reranking approach.  
+
+  - `"topn"`: `int`, *Required*  
+    An integer indicating the number of nearest neighbours (vector search) or most relevant rows (full-text search) to return.  
+  - `"params"`: `object`, *Optional*  
+    Additional matching or reranking parameters. 
+    - If you set `"match_method"` to `"dense"`:  
+      - `"ef"`: `str`, Recommended value: one to ten times the value of `topn`.  
+        - For example, if you set `topn` to `10`, you can set `"ef"` to `"50"`.
+        - If you set `"ef"` too high, search performance may worsen.  
+        - If you do not set `"ef"` or set it to a value lower than `topn`, the search uses the `topn` value as the value for `"ef"`.
+    - If you set `"match_method"` to `"sparse"`:  
+      - `"alpha"`: `str`  
+        `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Termination Conditions" parameter. The smaller the value, the more aggressive the pruning.
+      - `"beta"`: `str`  
+        `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Query Term Pruning" parameter. The smaller the value, the more aggressive the pruning.
+
+    - If you set `"match_method"` to `"text"`:  
+      - **"default_field"**: `str`, *Optional*  
+        - If `"fields"` is an empty string, this parameter specifies the default field to search on.  
+      - **"operator"**: `str`, *Optional*  
+        - If not specified, the search follows Infinity's full-text search syntax, meaning that logical and arithmetic operators, quotation marks and escape characters will function as full-text search operators, such as:
+          - AND operator: `AND`, `&&`, `+`
+          - OR operator: `OR`, `||`
+          - NOT operator: `NOT`, `!`, `-`
+          - PAREN operator: `(`, `)`, need to appear in pairs, and can be nested.
+          - COLON operator: `:`: Used to specify field-specific search, e.g., `body:foobar` searches for `foobar` in the `body` field.
+          - CARAT operator: `^`: Used to boost the importance of a term, e.g., `quick^2 brown` boosts the importance of `quick` by a factor of 2, making it twice as important as `brown`.
+          - TILDE operator: `~`: Used for sloppy phrase search, e.g., `"harmful chemical"~10` searches for the phrase `"harmful chemical"` within a tolerable distance of 10 words.
+          - SINGLE_QUOTED_STRING: Used to search for a phrase, e.g., `'Bloom filter'`.
+          - DOUBLE_QUOTED_STRING: Used to search for a phrase, e.g., `"Bloom filter"`.
+          - Escape characters: Used to escape reserved characters, e.g., `space\-efficient`. Starting with a backslash `\` will escape the following characters:   
+            `' '`, `'+'`, `'-'`, `'='`, `'&'`, `'|'`, `'!'`, `'('`, `')'`, `'{'`, `'}'`, `'['`, `']'`, `'^'`, `'"'`, `'~'`, `'*'`, `'?'`, `':'`, `'\'`, `'/'`
+        - If specified, Infinity's full-text search syntax will not take effect, and the specified operator will be interpolated into `matching_text`.  
+          Useful for searching text including code numbers like `"A01-233:BC"`.  
+          - `{"operator": "or"}`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.  
+            For example, reinterprets `"A01-233:BC"` as `'"A01" OR "-233" OR "BC"'`.  
+          - `{"operator": "and"}`: Interpolates the `AND` operator between words in `matching_text` to create a new search text.  
+            For example, reinterprets `"A01-233:BC"` as `'"A01" AND "-233" AND "BC"'`.      
+
+    - If you set `"fusion_method"` to `"rrf"`, use a separate JSON to set the following parameter:  
+      - `"rank_constant"`: The smoothing constant for RRF reranking, e.g., `{"rank_constant": 60}`. Defaults to `60`.  
+    - If you set `"fusion_method"` to `"weighted_sum"`, use a separate JSON to set the following parameter:  
+      - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assiged the default weight of `1.0`.
+    - If you set `"fusion_method"` to `"match_tensor"`, use a separate JSON to set the following parameters:  
+      - `"fields"`: The name of the tensor column for reranking.
+      - `"query_tensor"`: The tensor data to compare against. This should be provided as a list of lists of numerical values.
+      - `"element_type"`: The element data type of the query tensor. Usually `"float"`.
+
+
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "output": [
+        {
+            "name": "Tom",
+            "age": 16
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3005,
+    "error_message": "Column {column_name} doesn't exist in {table_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Set variable
+
+**POST** `/variables/{variable_name}`
+
+Assigns a value to a global variable.
+
+### Request
+
+- Method: POST
+- URL: `/variables/{variable_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body:
+  - `"profile_record_capacity"`: `integer`
+
+#### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/variables/{variable_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' { "profile_record_capacity" : 120 } '
+```
+
+#### Request parameter
+
+- `variable_name`: (*Path parameter*)  
+  The name of the variable, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3076,
+    "error_message": "Invalid command: unknown global variable {variable_name}"
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Show variables
+
+**GET** `/variables`
+
+Retrieves all global variables in the Infinity system.
+
+### Request
+
+- Method: GET
+- URL: `/variables`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/variables \
+     --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "active_txn_count":"1",
+    "active_wal_filename":"/var/infinity/wal/wal.log",
+    "buffer_object_count":"6",
+    "buffer_usage":"0B/4.00GB",
+    "current_timestamp":"16774",
+    "delta_log_count":"1",
+    "next_transaction_id":"6",
+    "profile_record_capacity":"128",
+    "query_count":"0",
+    "schedule_policy":"round robin",
+    "session_count":"1",
+    "total_commit_count":"0",
+    "total_rollback_count":"0",
+    "unused_buffer_object":"0"
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show variable
+
+**GET** `/variables/{variable_name}`
+
+Retrieves the value of a global variable.
+
+### Request
+
+- Method: GET
+- URL: `/variables/{variable_name}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/variables/{variable_name} \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `variable_name`: (*Path parameter*)  
+  The name of the variable.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "buffer_object_count":"6"
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3027,
+    "error_message": "No such system variable {variable_name}."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Set config
+
+**PUT** `/configs/{config_name}`
+
+Assigns a value to a configuration parameter.
+
+### Request
+
+- Method: PUT
+- URL: `/config/{config_name}`
+- Headers:
+  - `accept: application/json`
+  - `content-Type: application/json`
+- Body: `object`
+
+#### Request example
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/configs/{config_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' { "log_level": "trace" } '
+```
+
+#### Request parameter
+
+- `config_name`: (*Path parameter*)  
+  The name of the configuration parameter, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+- `Body`:  (*Body parameter*),  `object`, *Required*  
+  The configuration parameters to update, where each key (`string`) in the JSON object represents an entry, and the corresponding value (`string`) represents its value. 
+
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 3028,
+    "error_message": "log level value range is trace, debug, info, warning, error, critical"
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Show configs
+
+**GET** `/configs`
+
+Retrieves the values of all configuration parameters.
+
+### Request
+
+- Method: GET
+- URL: `/configs`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/configs \
+     --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "buffer_manager_size":"4294967296",
+    "cleanup_interval":"10",
+    "client_port":"23817",
+    "compact_interval":"10",
+    "connection_pool_size":"256",
+    "cpu_limit":"16",
+    "data_dir":"/var/infinity/data",
+    "delta_checkpoint_interval":"5",
+    "delta_checkpoint_threshold":"67108864",
+    "error_code":0,
+    "full_checkpoint_interval":"30",
+    "http_port":"23820",
+    "log_dir":"/var/infinity/log",
+    "log_file_max_size":"1073741824",
+    "log_file_rotate_count":"8",
+    "log_filename":"infinity.log",
+    "log_level":"Info",
+    "log_to_stdout":"False",
+    "mem_index_capacity":"1048576",
+    "optimize_interval":"10",
+    "postgres_port":"5432",
+    "resource_dir":"/var/infinity/resource",
+    "server_address":"0.0.0.0",
+    "temp_dir":"/var/infinity/tmp",
+    "time_zone":"UTC+8",
+    "version":"0.4.0",
+    "wal_compact_threshold":"1073741824",
+    "wal_dir":"/var/infinity/wal",
+    "wal_flush":"FlushAtOnce"
+}
+```
+
+---
+
+## Show config
+
+**GET** `/configs/{config_name}`
+
+Retrieves the value of a configuration parameter.
+
+### Request
+
+- Method: GET
+- URL: `/configs/{config_name}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/configs/{config_name} \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `config_name`: (*Path parameter*)  
+  The name of the configuration parameter.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "version":"0.4.0"
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 1008,
+    "error_message": "Attempt to get option: {config_name} which doesn't exist."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---

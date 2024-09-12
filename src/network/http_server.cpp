@@ -16,6 +16,8 @@ module;
 #include <arrow/type_fwd.h>
 #include <cstring>
 #include <iostream>
+#include <ranges>
+#include <vector>
 
 module http_server;
 
@@ -57,6 +59,7 @@ import decimal_info;
 import status;
 import constant_expr;
 import command_statement;
+import physical_import;
 
 namespace {
 
@@ -317,127 +320,112 @@ public:
             String value_type = field_element["type"];
             ToLower(value_type);
 
+            std::vector<std::string> tokens;
+            tokens = SplitStrByComma(value_type);
+
             SharedPtr<DataType> column_type{nullptr};
             SharedPtr<TypeInfo> type_info{nullptr};
-            if (value_type == "vector") {
-                String etype = field_element["element_type"];
-                int dimension = field_element["dimension"];
-                EmbeddingDataType e_data_type;
-                if (etype == "integer") {
-                    e_data_type = EmbeddingDataType::kElemInt32;
-                } else if (etype == "uint8") {
-                    e_data_type = EmbeddingDataType::kElemUInt8;
-                } else if (etype == "int8") {
-                    e_data_type = EmbeddingDataType::kElemInt8;
-                } else if (etype == "float") {
-                    e_data_type = EmbeddingDataType::kElemFloat;
-                } else if (etype == "double") {
-                    e_data_type = EmbeddingDataType::kElemDouble;
-                } else if (etype == "float16") {
-                    e_data_type = EmbeddingDataType::kElemFloat16;
-                } else if (etype == "bfloat16") {
-                    e_data_type = EmbeddingDataType::kElemBFloat16;
-                } else {
-                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
-                    json_response["error_code"] = status.code();
-                    json_response["error_message"] = status.message();
-                    HTTPStatus http_status;
-                    http_status = HTTPStatus::CODE_500;
-                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                }
-                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
-                column_type = std::make_shared<DataType>(LogicalType::kEmbedding, type_info);
-            } else if (value_type == "sparse") {
-                String dtype = field_element["data_type"];
-                String itype = field_element["index_type"];
-                int dimension = field_element["dimension"];
-                EmbeddingDataType d_data_type;
-                EmbeddingDataType i_data_type;
-                if (dtype == "integer") {
-                    d_data_type = EmbeddingDataType::kElemInt32;
-                } else if (dtype == "float") {
-                    d_data_type = EmbeddingDataType::kElemFloat;
-                } else if (dtype == "double") {
-                    d_data_type = EmbeddingDataType::kElemDouble;
-                } else {
-                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(dtype);
-                    json_response["error_code"] = status.code();
-                    json_response["error_message"] = status.message();
-                    HTTPStatus http_status;
-                    http_status = HTTPStatus::CODE_500;
-                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                }
+            try{
+                if (tokens[0] == "vector" || tokens[0] == "multivector" || tokens[0] == "tensor" || tokens[0] == "tensorarray") {
+                    int dimension = std::stoi(tokens[1]);
+                    String etype = tokens[2];
+                    EmbeddingDataType e_data_type;
+                    if (etype == "int" || etype == "integer" || etype == "int32") {
+                        e_data_type = EmbeddingDataType::kElemInt32;
+                    } else if (etype == "uint8") {
+                        e_data_type = EmbeddingDataType::kElemUInt8;
+                    } else if (etype == "int8" || etype == "tinyint") {
+                        e_data_type = EmbeddingDataType::kElemInt8;
+                    } else if (etype == "float" || etype == "float32") {
+                        e_data_type = EmbeddingDataType::kElemFloat;
+                    } else if (etype == "double" || etype == "float64") {
+                        e_data_type = EmbeddingDataType::kElemDouble;
+                    } else if (etype == "float16") {
+                        e_data_type = EmbeddingDataType::kElemFloat16;
+                    } else if (etype == "bfloat16") {
+                        e_data_type = EmbeddingDataType::kElemBFloat16;
+                    } else {
+                        infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
+                        json_response["error_code"] = status.code();
+                        json_response["error_message"] = status.message();
+                        HTTPStatus http_status;
+                        http_status = HTTPStatus::CODE_500;
+                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                    }
+                    type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+                    LogicalType logical_type_v = LogicalType::kInvalid;
+                    if (tokens[0] == "vector") {
+                        logical_type_v = LogicalType::kEmbedding;
+                    } else if (tokens[0] == "multivector") {
+                        logical_type_v = LogicalType::kMultiVector;
+                    } else if (tokens[0] == "tensor") {
+                        logical_type_v = LogicalType::kTensor;
+                    } else if (tokens[0] == "tensorarray") {
+                        logical_type_v = LogicalType::kTensorArray;
+                    }
+                    column_type = std::make_shared<DataType>(logical_type_v, type_info);
+                } else if (tokens[0] == "sparse") {
+                    int dimension = std::stoi(tokens[1]);
+                    String dtype = tokens[2];
+                    String itype = tokens[3];
+                    EmbeddingDataType d_data_type;
+                    EmbeddingDataType i_data_type;
+                    if (dtype == "integer" || dtype == "int" || dtype == "int32") {
+                        d_data_type = EmbeddingDataType::kElemInt32;
+                    } else if (dtype == "float" || dtype == "float32") {
+                        d_data_type = EmbeddingDataType::kElemFloat;
+                    } else if (dtype == "double" || dtype == "float64") {
+                        d_data_type = EmbeddingDataType::kElemDouble;
+                    } else {
+                        infinity::Status status = infinity::Status::InvalidEmbeddingDataType(dtype);
+                        json_response["error_code"] = status.code();
+                        json_response["error_message"] = status.message();
+                        HTTPStatus http_status;
+                        http_status = HTTPStatus::CODE_500;
+                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                    }
 
-                if (itype == "tinyint") {
-                    i_data_type = EmbeddingDataType::kElemInt8;
-                } else if (itype == "smallint") {
-                    i_data_type = EmbeddingDataType::kElemInt16;
-                } else if (itype == "integer") {
-                    i_data_type = EmbeddingDataType::kElemInt32;
-                } else if (itype == "bigint") {
-                    i_data_type = EmbeddingDataType::kElemInt64;
+                    if (itype == "tinyint" || itype == "int8") {
+                        i_data_type = EmbeddingDataType::kElemInt8;
+                    } else if (itype == "smallint" || itype == "int16") {
+                        i_data_type = EmbeddingDataType::kElemInt16;
+                    } else if (itype == "integer" || itype == "int" || itype == "int32") {
+                        i_data_type = EmbeddingDataType::kElemInt32;
+                    } else if (itype == "bigint" || itype == "int64") {
+                        i_data_type = EmbeddingDataType::kElemInt64;
+                    } else {
+                        infinity::Status status = infinity::Status::InvalidEmbeddingDataType(itype);
+                        json_response["error_code"] = status.code();
+                        json_response["error_message"] = status.message();
+                        HTTPStatus http_status;
+                        http_status = HTTPStatus::CODE_500;
+                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                    }
+                    type_info = SparseInfo::Make(d_data_type, i_data_type, size_t(dimension), SparseStoreType::kSort);
+                    column_type = std::make_shared<DataType>(LogicalType::kSparse, type_info);
+                } else if (tokens[0] == "decimal") {
+                    type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
+                    column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
+                } else if (tokens[0] == "array") {
+                    infinity::Status::ParserError("Array isn't implemented here.");
+                    type_info = nullptr;
+                } else if (tokens.size() == 1) {
+                    column_type = DataType::StringDeserialize(tokens[0]);
                 } else {
-                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(itype);
+                    infinity::Status status = infinity::Status::ParserError("type syntax error");
                     json_response["error_code"] = status.code();
                     json_response["error_message"] = status.message();
                     HTTPStatus http_status;
                     http_status = HTTPStatus::CODE_500;
                     return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
-                type_info = SparseInfo::Make(d_data_type, i_data_type, size_t(dimension), SparseStoreType::kSort);
-                column_type = std::make_shared<DataType>(LogicalType::kSparse, type_info);
-            } else if (value_type == "tensor") {
-                String etype = field_element["element_type"];
-                int dimension = field_element["dimension"];
-                EmbeddingDataType e_data_type;
-                if (etype == "integer") {
-                    e_data_type = EmbeddingDataType::kElemInt32;
-                } else if (etype == "float") {
-                    e_data_type = EmbeddingDataType::kElemFloat;
-                } else if (etype == "double") {
-                    e_data_type = EmbeddingDataType::kElemDouble;
-                } else if (etype == "float16") {
-                    e_data_type = EmbeddingDataType::kElemFloat16;
-                } else if (etype == "bfloat16") {
-                    e_data_type = EmbeddingDataType::kElemBFloat16;
-                } else {
-                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
-                    json_response["error_code"] = status.code();
-                    json_response["error_message"] = status.message();
-                    HTTPStatus http_status;
-                    http_status = HTTPStatus::CODE_500;
-                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                }
-                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
-                column_type = std::make_shared<DataType>(LogicalType::kTensor, type_info);
-            } else if(value_type == "tensorarray") {
-                String etype = field_element["element_type"];
-                int dimension = field_element["dimension"];
-                EmbeddingDataType e_data_type;
-                if (etype == "integer") {
-                    e_data_type = EmbeddingDataType::kElemInt32;
-                } else if (etype == "float") {
-                    e_data_type = EmbeddingDataType::kElemFloat;
-                } else if (etype == "double") {
-                    e_data_type = EmbeddingDataType::kElemDouble;
-                } else {
-                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
-                    json_response["error_code"] = status.code();
-                    json_response["error_message"] = status.message();
-                    HTTPStatus http_status;
-                    http_status = HTTPStatus::CODE_500;
-                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                }
-                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
-                column_type = std::make_shared<DataType>(LogicalType::kTensorArray, type_info);
-            }else if (value_type == "decimal") {
-                type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
-                column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
-            } else if (value_type == "array") {
-                infinity::Status::ParserError("Array isn't implemented here.");
-                type_info = nullptr;
-            } else {
-                column_type = DataType::StringDeserialize(value_type);
+            } catch(std::exception &e) {
+                infinity::Status status = infinity::Status::ParserError("type syntax error");
+                json_response["error_code"] = status.code();
+                json_response["error_message"] = status.message();
+                HTTPStatus http_status;
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
             if (column_type) {
@@ -449,7 +437,17 @@ public:
                 }
                 SharedPtr<ParsedExpr> default_expr{nullptr};
                 if (field_element.contains("default")) {
-                    default_expr = ConstantExpr::Deserialize(field_element["default"]);
+                    switch (column_type->type()) {
+                        case LogicalType::kSparse: {
+                            default_expr = BuildConstantSparseExprFromJson(field_element["default"],
+                                                                           dynamic_cast<const SparseInfo *>(column_type->type_info().get()));
+                            break;
+                        }
+                        default: {
+                            default_expr = BuildConstantExprFromJson(field_element["default"]);
+                            break;
+                        }
+                    }
                 }
                 ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, default_expr);
                 column_definitions.emplace_back(col_def);
@@ -571,16 +569,11 @@ public:
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
                 DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
                 for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 1; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
-                    }
-                    json_response["tables"].push_back(json_table);
+                    // Column 1: table name
+                    Value value = data_block->GetValue(1, row);
+                    const String &column_value = value.ToString();
+                    json_response["tables"].push_back(column_value);
                 }
             }
 
@@ -936,8 +929,7 @@ public:
 
                     for (const auto &item : first_row_json.items()) {
                         const auto &key = item.key();
-                        auto iter = column_name_id_map.find(key);
-                        if (iter != column_name_id_map.end()) {
+                        if (column_name_id_map.contains(key)) {
                             json_response["error_code"] = ErrorCode::kDuplicateColumnName;
                             json_response["error_message"] = fmt::format("Duplicated column name: {}", key);
                             return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -1323,161 +1315,76 @@ public:
                                 break;
                             }
                             case nlohmann::json::value_t::object: {
-                                auto it = value.items().begin();
-                                auto index_itr = it;
-                                ++it;
-                                auto value_itr = it;
-                                if(index_itr.value().size() == 0) {
+                                ConstantExpr *const_sparse_expr = nullptr;
+                                DeferFn defer_free_sparse([&]() {
+                                    if (const_sparse_expr != nullptr) {
+                                        delete const_sparse_expr;
+                                        const_sparse_expr = nullptr;
+                                    }
+                                });
+                                if (value.size() == 0) {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Empty sparse index");
+                                    json_response["error_message"] = fmt::format("Empty sparse vector, cannot decide type");
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
-                                if(value_itr.value().size() == 0) {
-                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Empty sparse value");
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                switch (value.begin().value().type()) {
+                                    case nlohmann::json::value_t::number_unsigned:
+                                    case nlohmann::json::value_t::number_integer: {
+                                        const_sparse_expr = new ConstantExpr(LiteralType::kLongSparseArray);
+                                        break;
+                                    }
+                                    case nlohmann::json::value_t::number_float: {
+                                        const_sparse_expr = new ConstantExpr(LiteralType::kDoubleSparseArray);
+                                        break;
+                                    }
+                                    default: {
+                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                        json_response["error_message"] = fmt::format("Sparse value element type error");
+                                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    }
                                 }
-                                auto first_value_elem = value_itr.value()[0];
-                                auto first_value_elem_type = first_value_elem.type();
-                                if(first_value_elem_type == nlohmann::json::value_t::number_float) {
-                                    //std::cout<<"DoubleSparseArray"<<std::endl;
-                                    ConstantExpr *const_expr = new ConstantExpr(LiteralType::kDoubleSparseArray);
-                                    DeferFn defer_free_sparse([&]() {
-                                            if (const_expr != nullptr) {
-                                                delete const_expr;
-                                                const_expr = nullptr;
+                                HashSet<i64> key_set;
+                                for (const auto &sparse_it : value.items()) {
+                                    const auto &sparse_k = sparse_it.key();
+                                    const auto &sparse_v = sparse_it.value();
+                                    i64 key_val = std::stoll(sparse_k);
+                                    if (const auto [_, insert_ok] = key_set.insert(key_val); !insert_ok) {
+                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                        json_response["error_message"] = fmt::format("Duplicate key {} in sparse array!", key);
+                                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    }
+                                    bool good_v = false;
+                                    switch (sparse_v.type()) {
+                                        case nlohmann::json::value_t::number_unsigned:
+                                        case nlohmann::json::value_t::number_integer: {
+                                            if (const_sparse_expr->literal_type_ == LiteralType::kLongSparseArray) {
+                                                const_sparse_expr->long_sparse_array_.first.push_back(key_val);
+                                                const_sparse_expr->long_sparse_array_.second.push_back(sparse_v.get<i64>());
+                                                good_v = true;
                                             }
-                                        });
-                                    const_expr->double_sparse_array_.first.reserve(value.items().begin().value().size());
-                                    const_expr->double_sparse_array_.second.reserve(value.items().begin().value().size());
-                                    for(auto &pairs : value.items()) {
-                                        if(pairs.key() == "indices") {
-                                            if(pairs.value().type() == nlohmann::json::value_t::array) {
-                                                //std::cout<<"indices array!"<<std::endl;
-                                                for (SizeT idx = 0; idx < pairs.value().size(); ++idx) {
-                                                    const auto &value_ref = pairs.value()[idx];
-                                                    const auto &value_type = value_ref.type();
-
-                                                    switch (value_type) {
-                                                        case nlohmann::json::value_t::number_integer: {
-                                                            const_expr->double_sparse_array_.first.emplace_back(value_ref.template get<i64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_unsigned: {
-                                                            const_expr->double_sparse_array_.first.emplace_back(value_ref.template get<u64>());
-                                                            break;
-                                                        }
-                                                        default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] = fmt::format("Sparse index element type error");
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                        }
-                                                    }
-                                                }
+                                            break;
+                                        }
+                                        case nlohmann::json::value_t::number_float: {
+                                            if (const_sparse_expr->literal_type_ == LiteralType::kDoubleSparseArray) {
+                                                const_sparse_expr->double_sparse_array_.first.push_back(key_val);
+                                                const_sparse_expr->double_sparse_array_.second.push_back(sparse_v.get<double>());
+                                                good_v = true;
                                             }
-                                        } else if(pairs.key() == "values") {
-                                            if(pairs.value().type() == nlohmann::json::value_t::array) {
-                                                //std::cout<<"indices array!"<<std::endl;
-                                                for (SizeT idx = 0; idx < pairs.value().size(); ++idx) {
-                                                    const auto &value_ref = pairs.value()[idx];
-                                                    const auto &value_type = value_ref.type();
-
-                                                    switch (value_type) {
-                                                        case nlohmann::json::value_t::number_integer: {
-                                                            const_expr->double_sparse_array_.second.emplace_back(value_ref.template get<i64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_unsigned: {
-                                                            const_expr->double_sparse_array_.second.emplace_back(value_ref.template get<u64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_float: {
-                                                            const_expr->double_sparse_array_.second.emplace_back(value_ref.template get<double>());
-                                                            break;
-                                                        }
-                                                        default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] = fmt::format("Sparse value element type error");
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                            break;
+                                        }
+                                        default: {
+                                            break;
                                         }
                                     }
-                                    values_row->emplace_back(const_expr);
-                                    const_expr = nullptr;
-                                    break;
-                                } else if(first_value_elem_type == nlohmann::json::value_t::number_integer or first_value_elem_type == nlohmann::json::value_t::number_unsigned) {
-                                    //std::cout<<"LongSparseArray"<<std::endl;
-                                    ConstantExpr *const_expr = new ConstantExpr(LiteralType::kLongSparseArray);
-                                    DeferFn defer_free_sparse([&]() {
-                                            if (const_expr != nullptr) {
-                                                delete const_expr;
-                                                const_expr = nullptr;
-                                            }
-                                        });
-                                    const_expr->long_sparse_array_.first.reserve(value.items().begin().value().size());
-                                    const_expr->long_sparse_array_.second.reserve(value.items().begin().value().size());
-                                    for(auto &pairs : value.items()) {
-                                        if(pairs.key() == "indices") {
-                                            if(pairs.value().type() == nlohmann::json::value_t::array) {
-                                                //std::cout<<"indices array!"<<std::endl;
-                                                for (SizeT idx = 0; idx < pairs.value().size(); ++idx) {
-                                                    const auto &value_ref = pairs.value()[idx];
-                                                    const auto &value_type = value_ref.type();
-
-                                                    switch (value_type) {
-                                                        case nlohmann::json::value_t::number_integer: {
-                                                            const_expr->long_sparse_array_.first.emplace_back(value_ref.template get<i64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_unsigned: {
-                                                            const_expr->long_sparse_array_.first.emplace_back(value_ref.template get<u64>());
-                                                            break;
-                                                        }
-                                                        default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] = fmt::format("Sparse index element type error");
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        } else if(pairs.key() == "values") {
-                                            if(pairs.value().type() == nlohmann::json::value_t::array) {
-                                                //std::cout<<"indices array!"<<std::endl;
-                                                for (SizeT idx = 0; idx < pairs.value().size(); ++idx) {
-                                                    const auto &value_ref = pairs.value()[idx];
-                                                    const auto &value_type = value_ref.type();
-
-                                                    switch (value_type) {
-                                                        case nlohmann::json::value_t::number_integer: {
-                                                            const_expr->long_sparse_array_.second.emplace_back(value_ref.template get<i64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_unsigned: {
-                                                            const_expr->long_sparse_array_.second.emplace_back(value_ref.template get<u64>());
-                                                            break;
-                                                        }
-                                                        default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] = fmt::format("Sparse value element type error");
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                    if (!good_v) {
+                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                        json_response["error_message"] = fmt::format("Sparse value element type error");
+                                        return ResponseFactory::createResponse(http_status, json_response.dump());
                                     }
-                                    values_row->emplace_back(const_expr);
-                                    const_expr = nullptr;
-                                    break;
-                                } else {
-                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Invalid sparse vector type!");
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
+                                values_row->emplace_back(const_sparse_expr);
+                                const_sparse_expr = nullptr;
+                                break;
                             }
                             case nlohmann::json::value_t::binary:
                             case nlohmann::json::value_t::null:
@@ -1888,160 +1795,77 @@ public:
 
                                 break;
                             }
-                            case nlohmann::json::value_t::object:{
-                                auto it = value.items().begin();
-                                auto index_itr = it;
-                                ++it;
-                                auto value_itr = it;
-                                if(index_itr.value().size() == 0) {
+                            case nlohmann::json::value_t::object: {
+                                ConstantExpr *const_sparse_expr = nullptr;
+                                DeferFn defer_free_sparse([&]() {
+                                    if (const_sparse_expr != nullptr) {
+                                        delete const_sparse_expr;
+                                        const_sparse_expr = nullptr;
+                                    }
+                                });
+                                if (value.size() == 0) {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Empty sparse index");
+                                    json_response["error_message"] = fmt::format("Empty sparse vector, cannot decide type");
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
-                                if(value_itr.value().size() == 0) {
-                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Empty sparse value");
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                switch (value.begin().value().type()) {
+                                    case nlohmann::json::value_t::number_unsigned:
+                                    case nlohmann::json::value_t::number_integer: {
+                                        const_sparse_expr = new ConstantExpr(LiteralType::kLongSparseArray);
+                                        break;
+                                    }
+                                    case nlohmann::json::value_t::number_float: {
+                                        const_sparse_expr = new ConstantExpr(LiteralType::kDoubleSparseArray);
+                                        break;
+                                    }
+                                    default: {
+                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                        json_response["error_message"] = fmt::format("Sparse value element type error");
+                                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    }
                                 }
-                                auto first_value_elem = value_itr.value()[0];
-                                auto first_value_elem_type = first_value_elem.type();
-                                if(first_value_elem_type == nlohmann::json::value_t::number_float) {
-                                    ConstantExpr *const_expr = new ConstantExpr(LiteralType::kDoubleSparseArray);
-                                    DeferFn defer_free_sparse([&]() {
-                                            if (const_expr != nullptr) {
-                                                delete const_expr;
-                                                const_expr = nullptr;
+                                HashSet<i64> key_set;
+                                for (const auto &sparse_it : value.items()) {
+                                    const auto &sparse_k = sparse_it.key();
+                                    const auto &sparse_v = sparse_it.value();
+                                    i64 key_val = std::stoll(sparse_k);
+                                    if (const auto [_, insert_ok] = key_set.insert(key_val); !insert_ok) {
+                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                        json_response["error_message"] = fmt::format("Duplicate key {} in sparse array!", key);
+                                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    }
+                                    bool good_v = false;
+                                    switch (sparse_v.type()) {
+                                        case nlohmann::json::value_t::number_unsigned:
+                                        case nlohmann::json::value_t::number_integer: {
+                                            if (const_sparse_expr->literal_type_ == LiteralType::kLongSparseArray) {
+                                                const_sparse_expr->long_sparse_array_.first.push_back(key_val);
+                                                const_sparse_expr->long_sparse_array_.second.push_back(sparse_v.get<i64>());
+                                                good_v = true;
                                             }
-                                        });
-                                    const_expr->double_sparse_array_.first.reserve(value.items().begin().value().size());
-                                    const_expr->double_sparse_array_.second.reserve(value.items().begin().value().size());
-                                    for(auto &pairs : value.items()) {
-                                        if(pairs.key() == "indices") {
-                                            if(pairs.value().type() == nlohmann::json::value_t::array) {
-                                                //std::cout<<"indices array!"<<std::endl;
-                                                for (SizeT idx = 0; idx < pairs.value().size(); ++idx) {
-                                                    const auto &value_ref = pairs.value()[idx];
-                                                    const auto &value_type = value_ref.type();
-
-                                                    switch (value_type) {
-                                                        case nlohmann::json::value_t::number_integer: {
-                                                            const_expr->double_sparse_array_.first.emplace_back(value_ref.template get<i64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_unsigned: {
-                                                            const_expr->double_sparse_array_.first.emplace_back(value_ref.template get<u64>());
-                                                            break;
-                                                        }
-                                                        default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] = fmt::format("Sparse index element type error");
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                        }
-                                                    }
-                                                }
+                                            break;
+                                        }
+                                        case nlohmann::json::value_t::number_float: {
+                                            if (const_sparse_expr->literal_type_ == LiteralType::kDoubleSparseArray) {
+                                                const_sparse_expr->double_sparse_array_.first.push_back(key_val);
+                                                const_sparse_expr->double_sparse_array_.second.push_back(sparse_v.get<double>());
+                                                good_v = true;
                                             }
-                                        } else if(pairs.key() == "values") {
-                                            if(pairs.value().type() == nlohmann::json::value_t::array) {
-                                                //std::cout<<"indices array!"<<std::endl;
-                                                for (SizeT idx = 0; idx < pairs.value().size(); ++idx) {
-                                                    const auto &value_ref = pairs.value()[idx];
-                                                    const auto &value_type = value_ref.type();
-
-                                                    switch (value_type) {
-                                                        case nlohmann::json::value_t::number_integer: {
-                                                            const_expr->double_sparse_array_.second.emplace_back(value_ref.template get<i64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_unsigned: {
-                                                            const_expr->double_sparse_array_.second.emplace_back(value_ref.template get<u64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_float: {
-                                                            const_expr->double_sparse_array_.second.emplace_back(value_ref.template get<double>());
-                                                            break;
-                                                        }
-                                                        default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] = fmt::format("Sparse value element type error");
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                            break;
+                                        }
+                                        default: {
+                                            break;
                                         }
                                     }
-                                    (*values_row)[column_id] = const_expr;
-                                    const_expr = nullptr;
-                                    break;
-                                } else if(first_value_elem_type == nlohmann::json::value_t::number_integer or first_value_elem_type == nlohmann::json::value_t::number_unsigned) {
-                                    ConstantExpr *const_expr = new ConstantExpr(LiteralType::kLongSparseArray);
-                                    DeferFn defer_free_sparse([&]() {
-                                            if (const_expr != nullptr) {
-                                                delete const_expr;
-                                                const_expr = nullptr;
-                                            }
-                                        });
-                                    const_expr->long_sparse_array_.first.reserve(value.items().begin().value().size());
-                                    const_expr->long_sparse_array_.second.reserve(value.items().begin().value().size());
-                                    for(auto &pairs : value.items()) {
-                                        if(pairs.key() == "indices") {
-                                            if(pairs.value().type() == nlohmann::json::value_t::array) {
-                                                //std::cout<<"indices array!"<<std::endl;
-                                                for (SizeT idx = 0; idx < pairs.value().size(); ++idx) {
-                                                    const auto &value_ref = pairs.value()[idx];
-                                                    const auto &value_type = value_ref.type();
-
-                                                    switch (value_type) {
-                                                        case nlohmann::json::value_t::number_integer: {
-                                                            const_expr->long_sparse_array_.first.emplace_back(value_ref.template get<i64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_unsigned: {
-                                                            const_expr->long_sparse_array_.first.emplace_back(value_ref.template get<u64>());
-                                                            break;
-                                                        }
-                                                        default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] = fmt::format("Sparse index element type error");
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        } else if(pairs.key() == "values") {
-                                            if(pairs.value().type() == nlohmann::json::value_t::array) {
-                                                //std::cout<<"indices array!"<<std::endl;
-                                                for (SizeT idx = 0; idx < pairs.value().size(); ++idx) {
-                                                    const auto &value_ref = pairs.value()[idx];
-                                                    const auto &value_type = value_ref.type();
-
-                                                    switch (value_type) {
-                                                        case nlohmann::json::value_t::number_integer: {
-                                                            const_expr->long_sparse_array_.second.emplace_back(value_ref.template get<i64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_unsigned: {
-                                                            const_expr->long_sparse_array_.second.emplace_back(value_ref.template get<u64>());
-                                                            break;
-                                                        }
-                                                        default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] = fmt::format("Sparse value element type error");
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                    if (!good_v) {
+                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                        json_response["error_message"] = fmt::format("Sparse value element type error");
+                                        return ResponseFactory::createResponse(http_status, json_response.dump());
                                     }
-                                    (*values_row)[column_id] = const_expr;
-                                    const_expr = nullptr;
-                                    break;
-                                } else {
-                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Invalid sparse vector type!");
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
+                                (*values_row)[column_id] = const_sparse_expr;
+                                const_sparse_expr = nullptr;
+                                break;
                             }
                             case nlohmann::json::value_t::binary:
                             case nlohmann::json::value_t::null:
@@ -2227,9 +2051,8 @@ public:
                     }
                     case nlohmann::json::value_t::string: {
                         infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
-                        auto str_value = value.template get<std::string>();
-                        const_expr->str_value_ = new char[str_value.size() + 1]{0};
-                        memcpy(const_expr->str_value_, str_value.c_str(), str_value.size());
+                        String str_value = value.template get<String>();
+                        const_expr->str_value_ = strdup(str_value.c_str());
                         update_expr->value = const_expr;
                         const_expr = nullptr;
                         break;
@@ -2376,6 +2199,25 @@ public:
         HTTPStatus http_status;
 
         HTTPSearch::Process(infinity.get(), database_name, table_name, data_body, http_status, json_response);
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ExplainHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        String data_body = request->readBodyToString();
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+        HTTPSearch::Explain(infinity.get(), database_name, table_name, data_body, http_status, json_response);
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
@@ -2665,6 +2507,7 @@ public:
         });
         {
             index_info->column_name_ = fields[0];
+            ToLower(index_info->column_name_);
             auto index_param_list = new Vector<InitParameter *>();
             DeferFn release_index_param_list([&]() {
                 if(index_param_list != nullptr) {
@@ -2678,13 +2521,16 @@ public:
 
             for (auto &ele : index.items()) {
                 String name = ele.key();
+                ToLower(name);
                 auto value = ele.value();
                 if (!ele.value().is_string()) {
                     value = ele.value().dump();
                 }
 
                 if (strcmp(name.c_str(), "type") == 0) {
-                    index_info->index_type_ = IndexInfo::StringToIndexType(value);
+                    String version_str = value;
+                    ToUpper(version_str);
+                    index_info->index_type_ = IndexInfo::StringToIndexType(version_str);
                     if (index_info->index_type_ == IndexType::kInvalid) {
                         json_response["error_code"] = ErrorCode::kInvalidIndexType;
                         json_response["error_message"] = fmt::format("Invalid index type: {}", name);
@@ -2711,6 +2557,56 @@ public:
                 json_response["error_message"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class OptimizeIndexHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto index_name = request->getPathVariable("index_name");
+
+        String body_info_str = request->readBodyToString();
+        nlohmann::json body_info_json = nlohmann::json::parse(body_info_str);
+
+        nlohmann::json json_response;
+        json_response["error_code"] = 0;
+        HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_200;
+
+        OptimizeOptions optimize_options;
+        optimize_options.index_name_ = index_name;
+        if (body_info_json.contains("optimize_options")) {
+            if(body_info_json["optimize_options"].type() != nlohmann::json::value_t::object) {
+                json_response["error_code"] = ErrorCode::kInvalidParameterValue;
+                json_response["error_message"] = "Optimize options should be key value pairs!";
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+            for(const auto &option : body_info_json["optimize_options"].items()) {
+                const auto &key = option.key();
+                const auto &value = option.value();
+                auto *init_param = new InitParameter();
+                init_param->param_name_ = key;
+                init_param->param_value_ = value;
+                optimize_options.opt_params_.emplace_back(init_param);
+            }
+        }
+
+        const QueryResult result = infinity->Optimize(database_name, table_name, std::move(optimize_options));
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
@@ -3220,7 +3116,7 @@ public:
 
 namespace infinity {
 
-void HTTPServer::Start(u16 port) {
+void HTTPServer::Start(const String& ip_address, u16 port) {
 
     WebEnvironment::init();
 
@@ -3248,6 +3144,7 @@ void HTTPServer::Start(u16 port) {
 
     // DQL
     router->route("GET", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<SelectHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/meta", MakeShared<ExplainHandler>());
 
     // index
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());
@@ -3256,6 +3153,7 @@ void HTTPServer::Start(u16 port) {
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id}", MakeShared<ShowTableIndexChunkHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<DropIndexHandler>());
     router->route("POST", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<CreateIndexHandler>());
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<OptimizeIndexHandler>());
 
     // segment
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}", MakeShared<ShowSegmentDetailHandler>());
@@ -3282,12 +3180,12 @@ void HTTPServer::Start(u16 port) {
 
     router->route("POST", "/variables", MakeShared<SetGlobalVariableHandler>());
 
-    SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({"localhost", port, WebAddress::IP_4});
+    SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({ip_address, port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler = HttpConnectionHandler::createShared(router);
 
     server_ = MakeShared<WebServer>(connection_provider, connection_handler);
 
-    fmt::print("HTTP server listen on port: {}\n", port);
+    fmt::print("HTTP server listen on {}: {}\n", ip_address, port);
 
     server_->run();
 }

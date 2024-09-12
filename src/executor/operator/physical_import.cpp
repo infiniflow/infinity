@@ -125,12 +125,12 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
-    if (column_type->type() != kEmbedding) {
+    if (column_type->type() != LogicalType::kEmbedding) {
         Status status = Status::ImportFileFormatError("FVECS file must have only one embedding column.");
         RecoverableError(status);
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-    if (embedding_info->Type() != kElemFloat) {
+    if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
         Status status = Status::ImportFileFormatError("FVECS file must have only one embedding column with float element.");
         RecoverableError(status);
     }
@@ -227,12 +227,12 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
-    if (column_type->type() != kEmbedding) {
+    if (column_type->type() != LogicalType::kEmbedding) {
         Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column.");
         RecoverableError(status);
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-    if (embedding_info->Type() != kElemUInt8) {
+    if (embedding_info->Type() != EmbeddingDataType::kElemUInt8) {
         Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column with uint8 element.");
         RecoverableError(status);
     }
@@ -360,7 +360,7 @@ UniquePtr<char[]> ConvertCSRIndice(UniquePtr<char[]> tmp_indice_ptr, SparseInfo 
             return ConvertCSRIndice<BigIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
         }
         default: {
-            String error_message = fmt::format("Unsupported index type {}.", sparse_info->IndexType());
+            String error_message = fmt::format("Unsupported index type {}.", EmbeddingT::EmbeddingDataType2String(sparse_info->IndexType()));
             UnrecoverableError(error_message);
         }
     }
@@ -373,13 +373,13 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         RecoverableError(status);
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
-    if (column_type->type() != kSparse) {
+    if (column_type->type() != LogicalType::kSparse) {
         Status status = Status::ImportFileFormatError("CSR file must have only one sparse column.");
         RecoverableError(status);
     }
     // nocheck sort or not sort
     auto sparse_info = std::static_pointer_cast<SparseInfo>(column_type->type_info());
-    if (sparse_info->DataType() != kElemFloat) {
+    if (sparse_info->DataType() != EmbeddingDataType::kElemFloat) {
         Status status = Status::ImportFileFormatError("FVECS file must has only one sparse column with float element");
         RecoverableError(status);
     }
@@ -848,8 +848,8 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_obj
         }
         case nlohmann::json::value_t::string: {
             auto res = MakeShared<ConstantExpr>(LiteralType::kString);
-            auto str = json_object.get<String>();
-            res->str_value_ = strdup(json_object.get<String>().c_str());
+            const auto str = json_object.get<String>();
+            res->str_value_ = strdup(str.c_str());
             return res;
         }
         case nlohmann::json::value_t::array: {
@@ -924,7 +924,7 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
             break;
         }
         case EmbeddingDataType::kElemInvalid: {
-            const auto error_info = fmt::format("Unsupported sparse data type: {}", sparse_info->DataType());
+            const auto error_info = fmt::format("Unsupported sparse data type: {}", EmbeddingT::EmbeddingDataType2String(sparse_info->DataType()));
             RecoverableError(Status::ImportFileFormatError(error_info));
             return nullptr;
         }
@@ -999,147 +999,6 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
             RecoverableError(Status::ImportFileFormatError(error_info));
             return nullptr;
         }
-    }
-}
-
-ConstantExpr * BuildConstantSparseExprFromJson(const nlohmann::json &json_object) {
-    //SharedPtr<ConstantExpr> res = nullptr;
-    //auto res = new ConstantExpr(LiteralType::kDoubleSparseArray);
-    //res->double_sparse_array_.first.emplace_back(0);
-    //res->double_sparse_array_.first.emplace_back(20);
-    //res->double_sparse_array_.first.emplace_back(80);
-    //res->double_sparse_array_.second.emplace_back(1.0);
-    //res->double_sparse_array_.second.emplace_back(2.0);
-    //res->double_sparse_array_.second.emplace_back(3.0);
-    //return res;
-
-    auto it = json_object.items().begin();
-    auto index_itr = it;
-    ++it;
-    auto value_itr = it;
-    auto first_value_elem = value_itr.value()[0];
-    auto first_value_elem_type = first_value_elem.type();
-    if(first_value_elem_type == nlohmann::json::value_t::number_float) {
-        auto res = new ConstantExpr(LiteralType::kDoubleSparseArray);
-        res->double_sparse_array_.first.reserve(json_object.items().begin().value().size());
-        res->double_sparse_array_.second.reserve(json_object.items().begin().value().size());
-        for(auto &pairs : json_object.items()) {
-            if(pairs.key() == "indices") {
-                if(pairs.value().type() == nlohmann::json::value_t::array) {
-                    for (size_t idx = 0; idx < pairs.value().size(); ++idx) {
-                        const auto &value_ref = pairs.value()[idx];
-                        const auto &value_type = value_ref.type();
-                        switch (value_type) {
-                            case nlohmann::json::value_t::number_integer: {
-                                res->double_sparse_array_.first.emplace_back(value_ref.template get<int64_t>());
-                                break;
-                            }
-                            case nlohmann::json::value_t::number_unsigned: {
-                                res->double_sparse_array_.first.emplace_back(value_ref.template get<uint64_t>());
-                                break;
-                            }
-                            default: {
-                                const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-                                RecoverableError(Status::ImportFileFormatError(error_info));
-                                delete res;
-                                res = nullptr;
-                                return nullptr;
-                            }
-                        }
-                    }
-                }
-            } else if(pairs.key() == "values") {
-                if(pairs.value().type() == nlohmann::json::value_t::array) {
-                    for (size_t idx = 0; idx < pairs.value().size(); ++idx) {
-                        const auto &value_ref = pairs.value()[idx];
-                        const auto &value_type = value_ref.type();
-
-                        switch (value_type) {
-                            case nlohmann::json::value_t::number_integer: {
-                                res->double_sparse_array_.second.emplace_back(value_ref.template get<int64_t>());
-                                break;
-                            }
-                            case nlohmann::json::value_t::number_unsigned: {
-                                res->double_sparse_array_.second.emplace_back(value_ref.template get<uint64_t>());
-                                break;
-                            }
-                            case nlohmann::json::value_t::number_float: {
-                                res->double_sparse_array_.second.emplace_back(value_ref.template get<double>());
-                                break;
-                            }
-                            default: {
-                                const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-                                RecoverableError(Status::ImportFileFormatError(error_info));
-                                delete res;
-                                res = nullptr;
-                                return nullptr;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return res;
-    } else if(first_value_elem_type == nlohmann::json::value_t::number_integer or first_value_elem_type == nlohmann::json::value_t::number_unsigned) {
-        auto res = new ConstantExpr(LiteralType::kLongSparseArray);
-        res->long_sparse_array_.first.reserve(json_object.items().begin().value().size());
-        res->long_sparse_array_.second.reserve(json_object.items().begin().value().size());
-        for(auto &pairs : json_object.items()) {
-            if(pairs.key() == "indices") {
-                if(pairs.value().type() == nlohmann::json::value_t::array) {
-                    for (size_t idx = 0; idx < pairs.value().size(); ++idx) {
-                        const auto &value_ref = pairs.value()[idx];
-                        const auto &value_type = value_ref.type();
-                        switch (value_type) {
-                            case nlohmann::json::value_t::number_integer: {
-                                res->long_sparse_array_.first.emplace_back(value_ref.template get<int64_t>());
-                                break;
-                            }
-                            case nlohmann::json::value_t::number_unsigned: {
-                                res->long_sparse_array_.first.emplace_back(value_ref.template get<uint64_t>());
-                                break;
-                            }
-                            default: {
-                                const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-                                RecoverableError(Status::ImportFileFormatError(error_info));
-                                delete res;
-                                res = nullptr;
-                                return nullptr;
-                            }
-                        }
-                    }
-                }
-            } else if(pairs.key() == "values") {
-                if(pairs.value().type() == nlohmann::json::value_t::array) {
-                    for (size_t idx = 0; idx < pairs.value().size(); ++idx) {
-                        const auto &value_ref = pairs.value()[idx];
-                        const auto &value_type = value_ref.type();
-                        switch (value_type) {
-                            case nlohmann::json::value_t::number_integer: {
-                                res->long_sparse_array_.second.emplace_back(value_ref.template get<int64_t>());
-                                break;
-                            }
-                            case nlohmann::json::value_t::number_unsigned: {
-                                res->long_sparse_array_.second.emplace_back(value_ref.template get<uint64_t>());
-                                break;
-                            }
-                            default: {
-                                const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-                                RecoverableError(Status::ImportFileFormatError(error_info));
-                                delete res;
-                                res = nullptr;
-                                return nullptr;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return res;
-    } else {
-        const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-        RecoverableError(Status::ImportFileFormatError(error_info));
-        return nullptr;
     }
 }
 
@@ -1345,6 +1204,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                     }
                     break;
                 }
+                case LogicalType::kMultiVector:
                 case LogicalType::kTensor:
                 case LogicalType::kTensorArray: {
                     // build ConstantExpr
@@ -1856,7 +1716,7 @@ ParquetTensorHandler(SharedPtr<arrow::ListArray> list_array, const EmbeddingInfo
 } // namespace
 
 void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx) {
-    switch (column_vector.data_type()->type()) {
+    switch (const auto column_data_logical_type = column_vector.data_type()->type(); column_data_logical_type) {
         case LogicalType::kBoolean: {
             auto value = std::dynamic_pointer_cast<arrow::BooleanArray>(array)->Value(value_idx);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
@@ -1981,7 +1841,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             }
 
             switch (sparse_info->IndexType()) {
-                case kElemInt8: {
+                case EmbeddingDataType::kElemInt8: {
                     auto int8_index_array = std::dynamic_pointer_cast<arrow::Int8Array>(index_array->values());
                     if (int8_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
@@ -1994,7 +1854,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                                                                     end_offset);
                     break;
                 }
-                case kElemInt16: {
+                case EmbeddingDataType::kElemInt16: {
                     auto int16_index_array = std::dynamic_pointer_cast<arrow::Int16Array>(index_array->values());
                     if (int16_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
@@ -2007,7 +1867,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                                                                       end_offset);
                     break;
                 }
-                case kElemInt32: {
+                case EmbeddingDataType::kElemInt32: {
                     auto int32_index_array = std::dynamic_pointer_cast<arrow::Int32Array>(index_array->values());
                     if (int32_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
@@ -2020,7 +1880,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                                                                       end_offset);
                     break;
                 }
-                case kElemInt64: {
+                case EmbeddingDataType::kElemInt64: {
                     auto int64_index_array = std::dynamic_pointer_cast<arrow::Int64Array>(index_array->values());
                     if (int64_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
@@ -2039,18 +1899,25 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             }
             break;
         }
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor: {
-            const auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(column_vector.data_type()->type_info());
+            auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(column_vector.data_type()->type_info());
             auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
             if (list_array.get() == nullptr) {
                 RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
             Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(list_array, embedding_info.get(), value_idx);
             Vector<Pair<ptr_t, SizeT>> embedding_data;
-            for (auto &data : embedding_vec) {
-                embedding_data.push_back({data.first.get(), data.second});
+            for (const auto &[data_ptr, data_bytes] : embedding_vec) {
+                embedding_data.emplace_back(data_ptr.get(), data_bytes);
             }
-            column_vector.AppendValue(Value::MakeTensor(embedding_data, embedding_info));
+            if (column_data_logical_type == LogicalType::kMultiVector) {
+                column_vector.AppendValue(Value::MakeMultiVector(embedding_data, std::move(embedding_info)));
+            } else if (column_data_logical_type == LogicalType::kTensor) {
+                column_vector.AppendValue(Value::MakeTensor(embedding_data, std::move(embedding_info)));
+            } else {
+                UnrecoverableError("Unhandled case.");
+            }
             break;
         }
         case LogicalType::kTensorArray: {

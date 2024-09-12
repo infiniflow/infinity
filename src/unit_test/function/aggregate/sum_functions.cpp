@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -36,33 +37,15 @@ import internal_types;
 import logical_type;
 import data_type;
 
-class SumFunctionTest : public BaseTest {
-    void SetUp() override {
-        BaseTest::SetUp();
-        RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::InfinityContext::instance().Init(config_path);
-    }
+using namespace infinity;
+class SumFunctionTest : public BaseTestParamStr {};
 
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        RemoveDbDirs();
-        BaseTest::TearDown();
-    }
-};
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, SumFunctionTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
 
-TEST_F(SumFunctionTest, avg_func) {
+TEST_P(SumFunctionTest, sum_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterSumFunction(catalog_ptr);
 

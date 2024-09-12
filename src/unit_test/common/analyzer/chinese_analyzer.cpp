@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+#include <filesystem>
+import base_test;
 
 import stl;
 import term;
@@ -34,10 +36,10 @@ TEST_F(ChineseAnalyzerTest, test1) {
         std::cerr << "Error resolving the path: " << executablePath << " " << ec.message() << std::endl;
         return;
     }
-    std::cerr << "/proc/self/exe: " << executablePath << std::endl;
+//    std::cerr << "/proc/self/exe: " << executablePath << std::endl;
 
     fs::path ROOT_PATH = executablePath.parent_path().parent_path().parent_path().parent_path() / "resource";
-    std::cerr << "ROOT_PATH: " << ROOT_PATH << std::endl;
+//    std::cerr << "ROOT_PATH: " << ROOT_PATH << std::endl;
 
     if (!fs::exists(ROOT_PATH)) {
         std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
@@ -60,16 +62,16 @@ TEST_F(ChineseAnalyzerTest, test1) {
     for (auto &query : queries) {
         TermList term_list;
         analyzer.Analyze(query, term_list);
-        std::cout << "Text #" << query << "# parsed as:" << std::endl;
-        for (unsigned i = 0; i < term_list.size(); ++i) {
-            std::cout << "\t" << i << "#" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "#";
-        }
-        std::cout << std::endl;
+//        std::cout << "Text #" << query << "# parsed as:" << std::endl;
+//        for (unsigned i = 0; i < term_list.size(); ++i) {
+//            std::cout << "\t" << i << "#" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "#";
+//        }
+//        std::cout << std::endl;
         TermList term_list2;
         analyzer2.Analyze(query, term_list2);
-        for (unsigned i = 0; i < term_list2.size(); ++i) {
-            std::cout << "\t" << i << "#" << term_list2[i].text_ << "@" << term_list2[i].word_offset_ << "#";
-        }
-        std::cout << std::endl;
+//        for (unsigned i = 0; i < term_list2.size(); ++i) {
+//            std::cout << "\t" << i << "#" << term_list2[i].text_ << "@" << term_list2[i].word_offset_ << "#";
+//        }
+//        std::cout << std::endl;
     }
 }

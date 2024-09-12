@@ -21,5 +21,7 @@ std::string SetCmd::ToString() const { return "Set Command"; }
 std::string ExportCmd::ToString() const { return "Export Command"; }
 std::string CheckTable::ToString() const { return "Check Table Command"; }
 std::string CommandStatement::ToString() const { return command_info_->ToString(); }
+std::string LockCmd::ToString() const { return "Lock Command"; }
+std::string UnlockCmd::ToString() const { return "Unlock Command"; }
 
 } // namespace infinity

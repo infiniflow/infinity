@@ -63,7 +63,7 @@ import column_index_reader;
 import filter_value_type_classification;
 import common_analyzer;
 import analyzer_pool;
-import bitmask;
+import roaring_bitmap;
 import segment_entry;
 import knn_filter;
 
@@ -127,7 +127,7 @@ struct FilterQueryNode final : public QueryNode {
     // filter info
     CommonQueryFilter *common_query_filter_;
     const SizeT filter_result_count_ = common_query_filter_->filter_result_count_;
-    const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr_ = &common_query_filter_->filter_result_;
+    const Map<SegmentID, Bitmask> *filter_result_ptr_ = &common_query_filter_->filter_result_;
     const BaseExpression *secondary_index_filter_ = common_query_filter_->secondary_index_filter_qualified_.get();
 
     explicit FilterQueryNode(CommonQueryFilter *common_query_filter, UniquePtr<QueryNode> &&query_tree)
@@ -180,8 +180,10 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
 
 void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt) {
     // et_iter is nullptr if fulltext index is present but there's no data
-    if (et_iter == nullptr)
+    if (et_iter == nullptr) {
+        LOG_DEBUG(fmt::format("et_iter is nullptr"));
         return;
+    }
     while (true) {
         ++blockmax_loop_cnt;
         bool ok = et_iter->Next();
@@ -190,6 +192,13 @@ void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &r
         }
         RowID id = et_iter->DocID();
         float et_score = et_iter->BM25Score();
+        if (SHOULD_LOG_DEBUG()) {
+            OStringStream oss;
+            et_iter->PrintTree(oss, "", true);
+            String msg = fmt::format("Found candidate doc_id {} score {}\n", id.ToUint64(), et_score);
+            msg += oss.str();
+            LOG_DEBUG(msg);
+        }
         if (result_heap.AddResult(et_score, id)) {
             // update threshold
             et_iter->UpdateScoreThreshold(result_heap.GetScoreThreshold());

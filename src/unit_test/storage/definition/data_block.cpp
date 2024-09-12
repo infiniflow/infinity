@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -35,42 +36,13 @@ import array_info;
 import knn_expr;
 import data_type;
 
-class DataBlockTest : public BaseTestParamStr {
-    void SetUp() override {
-        RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
-        infinity::String config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<infinity::String>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
-    }
+using namespace infinity;
 
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
-    }
-};
+class DataBlockTest : public BaseTestParamStr {};
 
-INSTANTIATE_TEST_SUITE_P(
-    TestWithDifferentParams,
-    DataBlockTest,
-    ::testing::Values(
-        BaseTestParamStr::NULL_CONFIG_PATH,
-        BaseTestParamStr::VFS_CONFIG_PATH
-    )
-);
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         DataBlockTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(DataBlockTest, test1) {
     using namespace infinity;
@@ -322,9 +294,9 @@ TEST_P(DataBlockTest, ReadWrite) {
     data_block.WriteAdv(ptr);
     EXPECT_EQ(ptr - buf.data(), exp_size);
 
-    ptr = buf.data();
-    SharedPtr<DataBlock> data_block2 = DataBlock::ReadAdv(ptr, exp_size);
-    EXPECT_EQ(ptr - buf.data(), exp_size);
+    const char *ptr_r = buf.data();
+    SharedPtr<DataBlock> data_block2 = DataBlock::ReadAdv(ptr_r, exp_size);
+    EXPECT_EQ(ptr_r - buf.data(), exp_size);
     EXPECT_NE(data_block2, nullptr);
     EXPECT_EQ(data_block == *data_block2, true);
 }

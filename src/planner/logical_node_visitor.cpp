@@ -41,6 +41,7 @@ import logical_index_scan;
 import logical_match;
 import logical_match_tensor_scan;
 import logical_match_scan_base;
+import logical_fusion;
 import aggregate_expression;
 import between_expression;
 import case_expression;
@@ -62,6 +63,11 @@ void LogicalNodeVisitor::VisitNodeChildren(LogicalNode &op) {
     }
     if (op.right_node()) {
         VisitNode(*op.right_node());
+    }
+    if (op.operator_type() == LogicalNodeType::kFusion) {
+        for (const auto &fusion = static_cast<const LogicalFusion &>(op); auto &child : fusion.other_children_) {
+            VisitNode(*child);
+        }
     }
 }
 
@@ -130,9 +136,14 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kUpdate: {
             auto &node = (LogicalUpdate &)op;
+            for (auto &column : node.all_columns_in_table_) {
+                VisitExpression(column);
+            }
+            for (auto &column : node.final_result_columns_) {
+                VisitExpression(column);
+            }
             for (auto &update_column_pair : node.update_columns_) {
-                SharedPtr<BaseExpression> &expression = update_column_pair.second;
-                VisitExpression(expression);
+                VisitExpression(update_column_pair.second);
             }
             break;
         }

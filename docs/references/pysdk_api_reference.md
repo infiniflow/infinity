@@ -10,7 +10,11 @@ slug: /python_api_reference
 infinity.connect(uri)
 ```
 
-Connects to the Infinity server and gets an Infinity object.
+Connects to the local directory or the Infinity server, and gets an Infinity object.
+
+:::tip NOTE
+You must have an Infinity object ready to perform database-specific operations.
+:::
 
 ### Parameters
 
@@ -18,20 +22,22 @@ Connects to the Infinity server and gets an Infinity object.
 
 The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
-- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is deployed as a Python module.
+- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is imported as a Python module.
 - `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
   - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
-  - `<PORT>`: `int` - The port number on which the Infinity server is listening. Defaults to `23817`.
+  - `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
 
 :::caution IMPORTANT
 When connecting to Infinity in client-server mode, ensure that the client version *exactly* matches the server version. For example:
 
 | **Client version** | **Server version** |
-| ------------------ | ------------------ |
+|--------------------|--------------------|
 | v0.1.0             | v0.1.0             |
 | v0.1.1             | v0.1.1             |
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
+| v0.3.0             | v0.3.0             |
+| v0.4.0.dev1        | v0.4.0.dev1        |
 
 If the versions do not match, please update your client or server to ensure compatibility.
 
@@ -43,7 +49,7 @@ In client-server mode, also ensure that your server version matches the version 
 This allows for bug fixes without requiring changes to the configuration file.
 
 | **Configuration version** | **Compatible server version** |
-| ------------------------- | ----------------------------- |
+|---------------------------|-------------------------------|
 | v0.1.0                    | v0.1.0, v0.1.1                |
 | v0.2.0                    | v0.2.0, v0.2.1                |
 
@@ -58,7 +64,7 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 ### Examples
 
-#### Connect to Python module Infinity
+#### Connect to the local directory of Infinity
 
 From v0.2.1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed Infinity via `pip install infinity-sdk==<v0.2.1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
@@ -74,7 +80,7 @@ If you have deployed Infinity as a separate server, connect to it via its IP add
 ```python
 import infinity
 # If Infinity is deployed on the local machine, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
-infinity_object = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+infinity_object = infinity.connect(infinity.NetworkAddress("192.168.1.101", 23817)) 
 ```
 
 ---
@@ -85,16 +91,17 @@ infinity_object = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>"
 infinity_object.disconnect()
 ```
 
-Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is deployed as a Python module.
+Disconnects the client from the Infinity server in client-server mode, or destructs the Infinity object and releases all associated resources when Infinity is imported as a Python module.
 
 ### Returns
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -118,20 +125,18 @@ Creates a database with a specified name.
 
 A non-empty string indicating the name of the database, which must adhere to the following requirements:
 
-- Maximum 65,535 characters.
-- Case-insensitive.
-- Must begin with an English letter or underscore.
 - Permitted characters include:
   - English letters (a-z, A-Z)
   - Digits (0-9)
   - "_" (underscore)
+- Must begin with an English letter or underscore.
+- Maximum 65,535 characters.
+- Case-insensitive.
 
 #### conflict_type: `ConflictType`, *Optional*
 
-Conflict policy in `enum` for handling situations where a database with the same name exists.
-
 - `Error`: Raise an error if a database with the same name exists.
-- `Ignore`: Ignore the database creation requrest and keep the existing database with the same name.
+- `Ignore`: Ignore the database creation request and keep the existing database with the same name.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
@@ -191,8 +196,6 @@ A non-empty string indicating the name of the database to delete.
 
 #### conflict_type: `ConflictType`, *Optional*
 
-Conflict policy in `enum` for handling situations where a database with the specified name does not exist.
-
 - `Error`: Raise an error if the specified database does not exist.
 - `Ignore`: Ignore the operation and proceed regardless, if the specified database does not exist.
 
@@ -213,10 +216,11 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -254,10 +258,11 @@ Retrieves a list of all available databases within the Infinity system.
 A structure containing the following attributes:
 
 - `db_names`: `list[str]` A list of strings indicating the names of all available databases.
-- `error_code`: `int` An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` A message providing additional details about the error.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -271,7 +276,7 @@ print(res.db_names) # ['my_database', 'database_1']
 ## get_database
 
 ```python
-Infinity.get_database(db_name)
+Infinity.get_database(database_name)
 ```
 
 Retrieves a database object by its name.
@@ -305,35 +310,112 @@ db_object.create_table(table_name, columns_definition, conflict_type = ConflictT
 
 Creates a table with a specified name and defined columns.
 
+:::tip NOTE
+Call `create_database()` or `get_database()` to get a database object for all table-specific operations.
+:::
+
 ### Parameters
 
 #### table_name: `str`, *Required*
 
 A non-empty string indicating the name of the table, which must adhere to the following requirements:
 
-- Maximum 65,535 characters.
-- Case-insensitive.
-- Must begin with an English letter or underscore.
 - Permitted characters include:
   - English letters (a-z, A-Z)
   - Digits (0-9)
   - "_" (underscore)
+- Must begin with an English letter or underscore.
+- Maximum 65,535 characters.
+- Case-insensitive.
 
 #### columns_definition: `dict[str, dict[str, Any]]`, *Required*
 
 Definitions for all table columns as a dictionary. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value information in key-value pairs:
 
 - **Data type** (`"type"`)  
-  The data type of the column.
+  The data type of the column.  
+  - Numeric:  
+  - `"int8"`
+  - `"int16"`
+  - `"int"`/`"int32"`/`"integer"`
+  - `"int64"`
+  - `"float"`/`"float32"`
+  - `"double"`/`"float64"`
+  - `"float16"`
+  - `"bfloat16"`
+- String: `"varchar"`
+- Dense vector: e.g., `"vector,128,float"`
+  - `vector`: The column is a dense vector column.
+  - The second item in the string: The dimension of the dense vector.
+  - The third item in the string: The element type of the dense vector. Can be:
+    - `"int8"`
+    - `"int16"`
+    - `"int"`/`"int32"`/`"integer"`
+    - `"int64"`
+    - `"float"`/`"float32"`
+    - `"double"`/`"float64"`
+    - `"float16"`
+    - `"bfloat16"`
+- Sparse vector: e.g., `"sparse,128,float,int"`
+  - `sparse`: The column is a sparse vector column.
+  - The second item in the string: The dimension of the sparse vector.
+  - The third item in the string: The element type of the sparse vector. Can be:
+    - `"int8"`
+    - `"int16"`
+    - `"int"`/`"int32"`/`"integer"`
+    - `"int64"`
+    - `"float"`/`"float32"`
+    - `"double"`/`"float64"`
+    - `"float16"`
+    - `"bfloat16"`
+  - The fourth item in the string: The data type of the sparse vector indices. Can be:
+    - `int8`
+    - `int16`
+    - `int`/`int32`/`integer`
+    - `int64`
+- Tensor vector: e.g., `"tensor,4,float"`
+  - `tensor`: The column is a tensor column.
+  - The second item in the string: The dimension of each vector unit in the tensor.
+  - The third item in the string: The element type of the tensors. Can be:
+    - `"int8"`
+    - `"int16"`
+    - `"int"`/`"int32"`/`"integer"`
+    - `"int64"`
+    - `"float"`/`"float32"`
+    - `"double"`/`"float64"`
+    - `"float16"`
+    - `"bfloat16"`
+- Tensor array: e.g., `"tensorarray,6,float"`
+  - `tensorarray`: The column is a tensor-array column.
+  - The second item in the string: The dimension of each vector unit in the tensor arrays.
+  - The third item in the string: The element type of the tensors. Can be:
+    - `"int8"`
+    - `"int16"`
+    - `"int"`/`"int32"`/`"integer"`
+    - `"int64"`
+    - `"float"`/`"float32"`
+    - `"double"`/`"float64"`
+    - `"float16"`
+    - `"bfloat16"`
+- Multivector: e.g., `"multivector,128,float"`
+  - `multivector`: The column is a multi-vector column.
+  - The second item in the string: The dimension of each vector unit.
+  - The third item in the string: The element type of the tensors. Can be:
+    - `"int8"`
+    - `"int16"`
+    - `"int"`/`"int32"`/`"integer"`
+    - `"int64"`
+    - `"float"`/`"float32"`
+    - `"double"`/`"float64"`
+    - `"float16"`
+    - `"bfloat16"`
 - **Default value** (`"default"`)  
   The default value for unspecified cells in that column.  
 
 #### conflict_type: `ConflictType`, *Optional*
 
-Conflict policy in `enum` for handling situations where a table with the same name exists.
-
 - `Error`: Raise an error if a table with the same name exists.
-- `Ignore`: Ignore the table creation requrest and keep the existing table with the same name.
+- `Ignore`: Ignore the table creation request and keep the existing table with the same name.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
@@ -374,6 +456,8 @@ db_object.create_table("my_table", {"c1": {"type": "int", "default": 1}})
 # The `create_table`method supports creating float columns in the following data types:
 # - float/float32
 # - double/float64
+# - float16
+# - bfloat16
 db_object.create_table("my_table", {"c1": {"type": "float64"}})
 ```
 
@@ -391,16 +475,39 @@ db_object.create_table("my_table", {"c1": {"type": "bool"}})
 
 #### Create a table with a vector column only
 
+:::tip NOTE
+You can build a HNSW index on the vector column to speed up the match_dense search.
+:::
+
 ```python
 # Create a table with a vector column only:  
 # - `vector`: The column is a vector column
 # - `128`: The vector dimension
-# - `float`: The primitive data type of the vectors. Can be `float`/`float32` or `double`/`float64`
+# - `float`: The primitive data type of the vectors. Can be `float`/`float32`, `float16`, `bfloat16`, `uint8` or `int8`
 db_object.create_table("my_table", {"c1": {"type": "vector,128,float"}}, None)
 
 ```
 
+#### Create a table with a multi-vector column only
+
+:::tip NOTE
+You can build an HNSW index on the multi-vector column to accelerate match_dense search.
+:::
+
+```python
+# Create a table with a multi-vector column only:  
+# - `multivector`: The column is a multi-vector column
+# - `128`: The basic vector dimension
+# - `float`: The primitive data type of the basic vectors. Can be `float`/`float32`, `float16`, `bfloat16`, `uint8` or `int8`
+db_object.create_table("my_table", {"c1": {"type": "multivector,128,float"}}, None)
+
+```
+
 #### Create a table with a sparse vector column only
+
+:::tip NOTE
+You can build a BMP index on the sparse vector column to speed up the match_sparse search.
+:::
 
 ```python
 from infinity.common import ConflictType
@@ -419,8 +526,8 @@ from infinity.common import ConflictType
 # Create a table with a tensor column only:  
 # - `tensor`: The column is a tensor column
 # - `4`: Dimension of each vector unit in the tensor
-# - `float64`: The primitive data type of the tensors. Can be `float`/`float32` or `double`/`float64`
-db_object.create_table("my_table", {"c1": {"type": "tensor,4,float64"}}, ConflictType.Ignore)
+# - `float`: The primitive data type of the tensors. Can be `float`/`float32`, `float16`, `bfloat16` or `bit`
+db_object.create_table("my_table", {"c1": {"type": "tensor,4,float"}}, ConflictType.Ignore)
 ```
 
 #### Create a table with a tensor array column only
@@ -430,7 +537,7 @@ from infinity.common import ConflictType
 # Create a table with a tensor array column only:  
 # - `tensorarray`: The column is a tensor array column
 # - `6`: Dimension of each vector unit in the tensor arrays
-# - `float`: The primitive data type of the tensor arrays. Can be `float`/`float32` or `double`/`float64`
+# - `float`: The primitive data type of the tensor arrays. Can be `float`/`float32`, `float16`, `bfloat16` or `bit`
 db_object.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Ignore)
 ```
 
@@ -452,8 +559,6 @@ A non-empty string indicating the name of the table to delete.
 
 #### conflict_type: `ConflictType`, *Optional*
 
-Conflict policy in `enum` for handling situations where a table with the specified name does not exist.
-
 - `Error`: Raise an error if the specified table does not exist.
 - `Ignore`: Ignore the operation and proceed regardless, if the specified table does not exist.
 
@@ -474,10 +579,11 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -543,10 +649,11 @@ Retrieves a list of all available tables within the current database.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `table_names`: `list[str]` - A list of strings indicating the names of all available tables in the current database.
 
 ### Examples
@@ -564,7 +671,11 @@ res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 table_object.create_index(index_name, index_info, conflict_type = ConflictType.Error)
 ```
 
-Creates index on a specified column.
+Creates an index on a specified column.
+
+:::tip NOTE
+Call `create_table()` or `get_table()` to get a database object for all index-specific operations.
+:::
 
 ### Parameters
 
@@ -572,34 +683,31 @@ Creates index on a specified column.
 
 A non-empty string indicating the name of the index, which must adhere to the following requirements:
 
-- Maximum 65,535 characters.
-- Case-insensitive.
-- Must begin with an English letter or underscore.
 - Permitted characters include:
   - English letters (a-z, A-Z)
   - Digits (0-9)
   - "_" (underscore)
+- Must begin with an English letter or underscore.
+- Maximum 65,535 characters.
+- Case-insensitive.
 
 #### index_info: `IndexInfo()`, *Required*
 
 An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and `index_param_list`.
 
 - **column_name**: `str`, *Required*  
-  The name of the column to build index on. Must not be empty. 
+  The name of the column to build index on. Must not be empty.  
 - **index_type**: `IndexType`, *Required*  
   Index type. You may want to import `infinity.index` to set `IndexType`: `from infinity.index import IndexType`  
   - `Hnsw`: An HNSW index.
-  - `EMVB`: An EMVB index. Works with tensors only.
   - `FullText`: A full-text index.  
-  - `IVFFlat`: An IVFFlat index.
   - `Secondary`: A secondary index. Works with structured data only.
   - `BMP`: A Block-Max Pruning index. Works with sparse vectors only.
-- **index_param_list**: `list[InitParameter(str, str)]`  
-  A list of `InitParameter` objects specifying parameter settings for the chosen index type. Each object handles one parameter setting. To set a specific index parameter, pass the parameter name and its corresponding value as two separate strings to the `InitParameter` object: 
+- **index_param_list**: `dict[str, str]`  
+  A dictionary specifying the parameter settings for the selected index type. Each key-value pair in the dictionary corresponds to a parameter and its value:
   - Parameter settings for an HNSW index:
     - `"M"`: *Optional* - Defaults to`"16"`.
     - `"ef_construction"`: *Optional* - Defaults to`"50"`.
-    - `"ef"`: *Optional* - Defaults to `"50"`.
     - `"metric"` *Required* - The distance metric to use in similarity search.
       - `"ip"`: Inner product.
       - `"l2"`: Euclidean distance.
@@ -607,29 +715,14 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"encode"`: *Optional*
       - `"plain"`: (Default) Plain encoding.
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
-  - Parameter settings for an EMVB index:
-    - `"pq_subspace_num"`: *Required*
-      - `"8"` 
-      - `"16"` (recommended)
-      - `"32"`
-      - `"64"`
-      - `"128"`
-    - `"pq_subspace_bits"`: *Required*
-      - `"8"` (recommended)
-      - `"16"`
   - Parameter settings for a full-text index:
     - `"ANALYZER"`: *Optional*
-      - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs.
+      - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs. Use `-` to specify stemmer for languages, `English` is the default stemmer: `"standard-english"` and `"standard"` have the same stemmer setting. Supported language stemmer includes: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`,`Russian`,`Spanish`,`Swedish`,`Turkish`.
       - `"chinese"`: Simplified Chinese
       - `"tradition"`: Traditional Chinese
       - `"japanese"`: Japanese
+      - `"korea"`: Korea
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
-  - Parameter settings for an IVFFlat index:  
-    - `"centroids_count"`: *Optional* - Defaults to`"128"`.
-    - `"metric"`: *Required* - The distance metric to use in similarity search.
-      - `"ip"`: Inner product.
-      - `"l2"`: Euclidean distance.
-      - `"cosine"`: Cosine similarity.
   - Parameter settings for a secondary index:  
     No parameters are required. For now, use an empty list `[]`.
   - Parameter settings for a BMP index:
@@ -639,20 +732,18 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"raw"`: Store the block-max index without compression.
 
 :::tip NOTE
-Import the `infinity.index` package to set `IndexInfo`, `IndexType`, and `InitParameter`.
+Import the `infinity.index` package to set `IndexInfo`, and `IndexType`.
 
 ```python
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 ```
 
 :::
 
 #### conflict_type: `ConflictType`, *Optional*
 
-Conflict policy in `enum` for handling situations where an index with the same name exists.
-
 - `Error`: Raise an error if an index with the same name exists.
-- `Ignore`: Ignore the index creation requrest and keep the existing table with the same name.
+- `Ignore`: Ignore the index creation request and keep the existing table with the same name.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
@@ -671,47 +762,46 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing these attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.  
-  - `0`: The operation succeeds.  
-  - A non-zero value indicating a specific error condition.  
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.  
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
 #### Create an HNSW index
 
 ```python {1}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
 table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an HNSW index named "my_index" on column "c1" with default parameter settings:
 # - "M": "16", 
 # - "ef_construction": "50",
-# - "ef": "50", 
 # - "encode": "plain"
 # Only the "metric" parameter (required) is explicitly set to L2 distance. 
-table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, [InitParameter("metric", "l2")]), None)
+table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}), None)
 ```
 
 ```python {1}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
 table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an HNSW index named "my_index" on column "c1"
-# Settings for "M", "ef_construction", "ef", and "metric" are the same as above, except:
+# Settings for "M", "ef_construction", and "metric" are the same as above, except:
 # "encoding" is set to "lvq" 
 table_object.create_index(
     "my_index",
         IndexInfo(
             "c1",
             IndexType.Hnsw,
-            [
-                InitParameter("M", "16"),
-                InitParameter("ef_construction", "50"),
-                InitParameter("ef", "50"),
-                InitParameter("metric", "l2"),
-                InitParameter("encode", "lvq") # "lvq" applies to float vector element only
-            ]
+            {
+              "M": "16",
+              "ef_construction": "50",
+              "metric": "l2",
+              "encode": "lvq"
+            }
         ),
     None
 )
@@ -719,8 +809,8 @@ table_object.create_index(
 
 #### Create a full-text index
 
-```python {12}
-from infinity.index import IndexInfo, IndexType, InitParameter
+```python
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_fulltext" with a varchar column "body"
 table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
 # Create a full-text index named "my_index" on column "body" with default parameter settings:
@@ -730,14 +820,13 @@ table_object.create_index(
         IndexInfo(
             "body", 
             IndexType.FullText, 
-            []
         ),
     None
 )
 ```
 
-```python {13}
-from infinity.index import IndexInfo, IndexType, InitParameter
+```python
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_fulltext" with a varchar column "body"
 table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
 # Create a full-text index named "my_index" on column "body"
@@ -747,70 +836,9 @@ table_object.create_index(
         IndexInfo(
             "body", 
             IndexType.FullText, 
-            [
-                InitParameter("ANALYZER", "standard")
-            ]
-        ),
-    None
-)
-```
-
-```python {11-13}
-from infinity.index import IndexInfo, IndexType, InitParameter
-# In the following code snippet, you will see an index built on three columns
-# IMPORTANT: For now, multi-column index works with full-text index ONLY. 
-# Create a table named "test_index_fulltext" with three varchar columns "doctitle", "docdate", and "body"
-table_object = db_object.create_table("test_index_fulltext", {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}}, None)
-# Create a full-text index named "my_index" on three columns "doctitle", "docdate", and "body" with default parameter settings:
-# - "ANALYZER": "standard"
-table_object.create_index(
-    "my_index",
-    [
-        IndexInfo("doctitle", IndexType.FullText, []),
-        IndexInfo("docdate", IndexType.FullText, []),
-        IndexInfo("body", IndexType.FullText, []),
-    ],
-    None
-)
-```
-
-#### Create an IVFFlat index
-
-```python {14}
-from infinity.index import IndexInfo, IndexType, InitParameter
-# Create a table named "test_index_ivfflat" with a vector column "c1"
-table_ojbect = db_object.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
-# Create an IVFFlat index named "my_index" on column "c1" with default parameter settings:
-# - "centroids_count": "128"
-# Only the metric parameter (required) is explicitly set to L2 distance. 
-table_object.create_index(
-    "my_index",
-        IndexInfo(
-            "c1",
-            IndexType.IVFFlat,
-            [
-                InitParameter("metric", "l2")
-            ]
-        ),
-    None
-)
-```
-
-```python {13,14}
-from infinity.index import IndexInfo, IndexType, InitParameter
-# Create a table named "test_index_ivfflat" with a vector column "c1"
-table_ojbect = db_object.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
-# Create an IVFFlat index named "my_index" on column "c1"
-# Explicitly settings "centroids_count" to "128" and "metric" to "l2" (same as above)
-table_object.create_index(
-    "my_index",
-        IndexInfo(
-            "c1",
-            IndexType.IVFFlat,
-            [
-                InitParameter("centroids_count", "128"),
-                InitParameter("metric", "l2")
-            ]
+            {
+                "ANALYZER": "standard"
+            }
         ),
     None
 )
@@ -819,7 +847,7 @@ table_object.create_index(
 #### Create a secondary index
 
 ```python {11}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_secondary" with a varchar column "body"
 table_object = db_object.create_table("test_index_secondary", {"c1": {"type": "varchar"}}, None)
 # Create a secondary index named "my_index" on column "c1"
@@ -827,8 +855,7 @@ table_object.create_index(
     "my_index",
         IndexInfo(
             "c1", 
-            IndexType.Secondary, 
-            []
+            IndexType.Secondary 
         ),
     None
 )
@@ -837,7 +864,7 @@ table_object.create_index(
 #### Create a BMP index
 
 ```python {13}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
 # Create a BMP index named "my_index" on column "c1" with default parameter settings:
@@ -847,15 +874,14 @@ table_object.create_index(
     "my_index",
         IndexInfo(
             "c1",
-            IndexType.BMP,
-            []
+            IndexType.BMP
         ),
     None
 )
 ```
 
 ```python {13,14}
-from infinity.index import IndexInfo, IndexType, InitParameter
+from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
 # Create a BMP index named "my_index" on column "c1"
@@ -865,10 +891,10 @@ table_object.create_index(
         IndexInfo(
             "c1",
             IndexType.BMP,
-            [
-                InitParameter("block_size", "16"),
-                InitParameter("compress_type", "compress")
-            ]
+            {
+              "block_size": "16",
+              "compress_type": "compress"
+            }
         ),
     None
 )
@@ -892,10 +918,8 @@ A non-empty string indicating the name of the index to delete.
 
 #### conflict_type: `ConflictType`, *Optional*
 
-Conflict policy in `enum` for handling situations where a specified index does not exist.
-
 - `Error`: Raise an error if an index with the specified name does not exist.
-- `Ignore`: Ignore the index creation requrest.
+- `Ignore`: Ignore the index creation request if the index does not exist.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
@@ -913,11 +937,11 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing these attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.  
-  - `0`: The operation succeeds.  
-  - A non-zero value indicating a specific error condition.  
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.  
-
+- `error_code`: `int`  
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.  
 
 ### Examples
 
@@ -939,10 +963,11 @@ Retrieves a list of all available indexes built on the current table.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `table_names`: `list[str]` - A list of strings indicating the names of all available indexes.
 
 ### Examples
@@ -966,25 +991,27 @@ Inserts rows of data into the current table.
 
 #### data: `dict[str, Any]`, *Required*
 
-Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `dict[str, Any]` (one row) or `list[dict[str, Any]]` (multiple rows), with each key-value pair corresponding to a column name and table cell value.
+Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `dict[str, Any]` (one row) or `list[dict[str, Any]]` (multiple rows), with each key-value pair corresponding to a column name and a table cell value.
 
 :::tip NOTE
-Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once.
+- When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table()`. Otherwise, an error will occur.
+- You are not allowed to insert both complete and incomplete rows of data in one request.
+For information about setting default column values, see `create_table()`.
 :::
 
 :::tip NOTE
-When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table()`. Otherwise, an error will occur.  
-For information about setting default column values, see `create_table()`.
+Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once.
 :::
 
 ### Returns
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`  
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1029,13 +1056,14 @@ table_object.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4,
 #### Insert sparse vectors
 
 ```python
+from infinity.common import SparseVector
 # Create a table with a integer column and a 100-d sparse vector column:
 table_object = db_object.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
 
 # Insert one row into the table:
 # `indices` specifies the correspoing indices to the values in `values`.
 # Note that the second row sets "c1" as 2024 by default. 
-table_object.insert([{"c1": 2022, "sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}, {"sparse_column":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}}}])
+table_object.insert([{"c1": 2022, "sparse_column": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])}, {"sparse_column": SparseVector([70, 80, 90], [7.7, 8.8, 9.9])}])
 ```
 
 #### Insert tensors
@@ -1070,11 +1098,7 @@ Imports data from a specified file into the current table.
 
 #### file_path: `str`, *Required*
 
-Absolute path to the file for export. Supported file types include:
-
-- `csv`
-- `json`
-- `jsonl`
+Absolute path to the file for export.
 
 #### import_options: `dict[str, bool | str]`
 
@@ -1098,10 +1122,11 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
 
 A structure containing the following attributes:
 
-- `error_code`: `int` An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1114,7 +1139,7 @@ table_object.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file
 #### Import a jsonl file
 
 ```python
-table_object.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
+table_object.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "jsonl"})
 ```
 
 ---
@@ -1125,16 +1150,13 @@ table_object.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
 table_object.export_data(filepath, export_options, columns = None)
 ```
 
-Exports the current table to a specified file.
+Exports data in the current table to a specified file.
 
 ### Parameters
 
 #### file_path: `str`, *Required*
 
-Absolute path to the file for export. Supported file types include:
-
-- `csv`
-- `jsonl`
+Absolute path to the file for export.
   
 #### export_options: `dict[str, Any]`, *Required*
 
@@ -1160,7 +1182,7 @@ Example: `{"header": False, "delimiter": "\t", "file_type": "jsonl", "offset": 2
   The maximum number of rows to export. Usually used in conjunction with `offset`. If the table's row count exceeds `offset` + `limit`, the excess rows are excluded from the export.
 
 - **row_limit**: `int`, *Optional*  
-  Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so one.
+  Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so on.
 
 #### columns: `[str]`, *Optional*
 
@@ -1170,10 +1192,11 @@ Columns to export to the output file, for example, `["num", "name", "score"]`. I
 
 A structure containing the following attributes:
 
-- `error_code`: `int` An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1201,9 +1224,9 @@ Deletes rows from the table based on the specified condition.
 
 ### Parameters
 
-#### cond: `str` (non-empty), *Optional*
+#### cond: `str`, *Optional*
 
-A condition or filter that determines which rows to delete from the table. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
+A string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
 
 :::tip NOTE
 
@@ -1215,10 +1238,11 @@ A condition or filter that determines which rows to delete from the table. The p
 
 A structure containing the following attributes:
 
-- `error_code`: `int` An error code indicating the result of the operation.
+- `error_code`: `int`  
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1259,10 +1283,10 @@ table_object.delete("c1 >= 70 and c1 <= 90")
 
 ---
 
-## update
+## update data
 
 ```python
-table_object.update(cond = None, data)
+table_object.update(cond, data)
 ```
 
 Searches for rows that match the specified condition and updates them accordingly.
@@ -1271,31 +1295,32 @@ Searches for rows that match the specified condition and updates them accordingl
 
 #### cond: `str`, *Required*
 
-A non-empty string that defines the condition for selecting rows to update. It represents a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated.
+A string that defines the condition for selecting rows to update. It represents a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated. If `cond` is not specified or set to `Null`, the method will update all rows in the table.
 
-#### data: `list[dict[str, Any]]]` (non-empty), *Required*
+#### data: `dict[str, Any]`, *Required*
 
-A list of dictionaries where each key indicates a column name and each value indicates the new value for the corresponding cell. This list must not be empty.
+A non-empty dictionary where each key indicates a column name and each value indicates the new value for the corresponding cell.
 
 ### Returns
 
 A structure containing the following attributes:
 
-- `error_code`: `int` An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
 ```python
 # Update rows where column "c1" equals 1, setting "c2" to 90 and "c3" to 900
-table_object.update("c1 = 1", [{"c2": 90, "c3": 900}])
+table_object.update("c1 = 1", {"c2": 90, "c3": 900})
 ```
 
 ```python
 # Update rows where column "c1" is greater than 2, setting "c2" to 100 and "c3" to 1,000
-table_object.update("c1 > 2", [{"c2": 100, "c3": 1000}])
+table_object.update("c1 > 2", {"c2": 100, "c3": 1000})
 ```
 
 ---
@@ -1319,7 +1344,7 @@ A non-empty list of strings specifying the columns to include in the output. Eac
 - A special system column: system-generated columns include:
   - `_row_id`:  An automatically generated, unique identifier for each row in the table. It serves as a unique key for each row but does not necessarily correspond to the actual row number. When the data in a row is updated, the `_row_id` for that row is also changed to reflect the update.
   - `_score`: A BM25 score used in full-text search.
-  - `_similarity`: Used by IP and cosine metric in dense or sparse vector search.
+  - `_similarity`: Used by IP and cosine metrics in dense or sparse vector search.
   - `_distance`: Used by L2 metric in dense vector search.
 - An aggregation function: Apply an aggregation operation on specified columns. Supported aggragation functions include:
   - `count`
@@ -1410,7 +1435,7 @@ table_object.filter(cond)
 Creates a filtering condition expression for the current table.
 
 :::tip NOTE
-Call `filter(cond)` in a chain with the `output(columns)` method call on the same table object.
+This method creates a filtering condition for your query. To display the results, you must chain it with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
 :::
 
 ### Parameters
@@ -1443,19 +1468,23 @@ table_object.output(["*"]).filter("c2 = 3").to_pl()
 
 ---
 
-## knn
+## match_dense
 
 ```python
-table_object.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
+table_object.match_dense(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
-Performs a k-nearest neighbor (KNN) or approximate nearest neighbor (ANN) vector search to identify the top k closest rows to the given vector. Suitable for working with dense vectors (dense embeddings).
+Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).
+
+:::tip NOTE
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
+:::
 
 ### Parameters
 
 #### vector_column_name: `str`, *Required*
 
-A non-empty string indicating the name of the vector column to search on.
+A non-empty string indicating the name of the vector multi-vector column to search on.
 
 #### embedding_data: `list/np.ndarray`, *Required*
 
@@ -1482,7 +1511,12 @@ An integer indicating the number of nearest neighbours to return.
 
 #### knn_params: `dict[str, str]`, *Optional*
 
-A dictionary representing additional parameters for the KNN or ANN search.
+A dictionary representing additional KNN or ANN search parameters. Currently only `"ef"` is supported.
+
+- `"ef"`: `str`, Recommended value: one to ten times the value of `topn`.  
+  - For example, if you set `topn` to `10`, you can set `"ef"` to `"50"`.
+  - If you set `"ef"` too high, search performance may worsen.  
+  - If you do not set `"ef"` or set it to a value lower than `topn`, the search uses the `topn` value as the value for `"ef"`.
 
 ### Returns
 
@@ -1499,7 +1533,7 @@ A dictionary representing additional parameters for the KNN or ANN search.
 # Find the 100 nearest neighbors using Euclidean distance
 # If no vector index is created on the column being queried, then the vector search defaults to a brute-force search.
 # In such case, set `knn_params` to `None` or leave it blank.
-table_object.knn("vec", [0.1,0.2,0.3], "float", "l2", 100)
+table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "l2", 100).to_pl()
 ```
 
 :::caution NOTE
@@ -1508,27 +1542,26 @@ table_object.knn("vec", [0.1,0.2,0.3], "float", "l2", 100)
 
 #### Perform a vector search in HNSW
 
-1. Ensure that you have successfully built an HNSW index. If you are uncertain, you can rebuild the index, setting `ConflictType` to `Ignore`.
+1. Ensure that you have successfully built an HNSW index. If uncertain, you can rebuild the index, setting `ConflictType` to `Ignore`.
 2. Set the `ef` value as follows:
 
 ```python
-from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")]))
+from infinity.index import IndexInfo, IndexType
+table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, {"ef_construction": "50"}))
 # Find the 2 nearest neighbors using cosine distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
-# If you leave `knn_params` blank, the search takes the `"ef"` value set in `create_index()`.
-table_object.knn("vec", [1, 2, 3], "uint8", "cosine", 2)
+# If you leave `knn_params` blank, the search uses the `topn` value as the value for `"ef"`.
+table_object.output(["*"]).match_dense("vec", [1, 2, 3], "uint8", "cosine", 2).to_pl()
 ```
 
 ```python
-from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")]))
+from infinity.index import IndexInfo, IndexType
+table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, {"ef_construction": "50"}))
 # Find the 2 nearest neighbors using inner product distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
-# You can specify the value of `"ef"` in `knn_params`, which overrides the value set in `create_index()`
-table_object.knn("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"})
+table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"}).to_pl()
 ```
 
 :::tip NOTE
@@ -1543,7 +1576,11 @@ If the HNSW index is not created successfully, the search will fall back to a br
 table_object.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
 ```
 
-Performs a sparse vector search to to identify the top n closest rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
+Creates a sparse vector search expression to identify the top n closest rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
+
+:::tip NOTE
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
+:::
 
 ### Parameters
 
@@ -1551,12 +1588,23 @@ Performs a sparse vector search to to identify the top n closest rows to the giv
 
 A non-empty string indicating the name of the column to query on.
 
-#### sparse_data: `dict[str, list[int | float]]`, *Required*
+#### sparse_data: `SparseVector(list[int], list[int] | list[float])`, *Required*
 
-The query sparse vector data to compare against. The `sparse_data` parameter should be provided as a dictionary like `{"indices": list[int], "values": list[int | float]}`:
+The query sparse vector data to compare against. The `sparse_data` parameter should be provided as a SparseVector object, which has two members:
 
-- `"indices"`: A list of the indices, each corresponding to a non-zero value in the sparse vector.
-- `"values"`: A list of non-zero values in the sparse vector.
+- `indices`: A list of the indices, each corresponding to a non-zero value in the sparse vector.
+- `values`: A list of the corresponding values for each index in the `indices` list.
+
+:::tip NOTE
+If you have a dictionary of indices and values, you can create a SparseVector object using the `SparseVector` class. For example:
+
+```python
+from infinity.common import SparseVector
+dic_sparse_vector = {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}
+sparse_vector = SparseVector(**dic_sparse_vector)
+```
+
+:::
 
 #### distance_type: `str`, *Required*
 
@@ -1566,7 +1614,7 @@ The query sparse vector data to compare against. The `sparse_data` parameter sho
 
 An integer indicating the number of nearest neighbours to return.
 
-#### opt_params: `dict[str, str]`, *Required*
+#### opt_params: `dict[str, str]`, *Optional*
 
 A dictionary representing additional parameters for the sparse vector search. Following are parameters for the BMP index:
 
@@ -1589,13 +1637,14 @@ A dictionary representing additional parameters for the sparse vector search. Fo
 ```python
 # As demonstrated in the following example:
 # The sparse vector search is performed on column "sparse_column" to find the 100 nearest neighbors using inner product
-# {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]} represents the sparse vector to compare against:
+# SparseVector([0, 10, 20], [0.1, 0.2, 0.3]) represents the sparse vector to compare against:
 # - 0: the index of 0.1
 # - 10: the index of 0.2
 # - 20: the index of 0.3
 # If no sparse vector index is created on the column being queried, then the search defaults to a brute-force search.
 # In such case, set `opt_params` to `None` or leave it blank.
-table_object.match_sparse('sparse', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100)
+from infinity.common import SparseVector
+table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100).to_df()
 ```
 
 :::caution NOTE
@@ -1605,34 +1654,40 @@ table_object.match_sparse('sparse', {"indices": [0, 10, 20], "values": [0.1, 0.2
 #### Perform a sparse vector search in BMP
 
 ```python
-from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", [IndexInfo("sparse", IndexType.BMP, [])])
+from infinity.index import IndexInfo, IndexType
+table_object.create_index("my_index", [IndexInfo("sparse_column", IndexType.BMP)])
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
 # If you leave `opt_params` blank, the search takes the default settings for `"alpha"` and `"beta"`.
-table_object.match_sparse('sparse', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
+from infinity.common import SparseVector
+table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
 ```
 
 ```python
-from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", IndexInfo("sparse", IndexType.BMP, []))
+from infinity.index import IndexInfo, IndexType
+table_object.create_index("my_index", IndexInfo("sparse_column", IndexType.BMP))
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
 # You can set the values of `"alpha"` or `"beta"` in `opt_params`, which overrides the default settings.
-table_object.match_sparse('sparse', {"indices": [0, 10, 20], "values": [8, 10, 66]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
+from infinity.common import SparseVector
+table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20], [8, 10, 66]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
 ```
 
 ---
 
-## match
+## match_text
 
 ```python
-table_object.match(fields, matching_text, distance_type, options_text)
+table_object.match_text(fields, matching_text, topn, extra_options)
 ```
 
-Performs a full-text search on the specified field(s)/column(s) and returns the most relevant rows to the provided matching text.
+Creates a full-text search expression on the specified field(s)/column(s) to identify the most relevant rows.
+
+:::tip NOTE
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
+:::
 
 ### Parameters
 
@@ -1640,9 +1695,12 @@ Performs a full-text search on the specified field(s)/column(s) and returns the 
 
 A non-empty, comma-separated string of column names on which the full-text search will be performed.
 
+:::danger NOTE
+Ensure that a full-text index has been successfully built on each column involved before executing a full-text search; otherwise, an error will occur.
+:::
 
 :::tip NOTE
-Ensure that you have created a full-text index on these columns before executing a full-text search; otherwise, an error will occur.
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
 :::
 
 #### matching_text: `str`, *Required*
@@ -1650,31 +1708,42 @@ Ensure that you have created a full-text index on these columns before executing
 A non-empty text string to search for. You can use various search options within the matching text, including:
 
 - Single terms: `"blooms"`
-- OR multiple terms: `"Bloom filter"`
+- OR multiple terms: `"Bloom OR filter"`, `"Bloom || filter"` or just `"Bloom filter"`
 - Phrase search: `'"Bloom filter"'`
-- AND multiple terms: "space efficient"
-- Escaping reserved characters: "space\-efficient"
-- Sloppy phrase search: "harmful chemical"~10
-- Field-specific search: title:(quick OR brown) AND body:foobar
+- AND multiple terms: `"space AND efficient"`, `"space && efficient"` or `"space + efficient"`
+- Escaping reserved characters: `"space\-efficient"`
+- Sloppy phrase search: `'"harmful chemical"~10'`
+- Field-specific search: `"title:(quick OR brown) AND body:foobar"`
 
+#### topn: `int`, *Required*
 
-#### options_text: `str`, *Required*
+Specifies the number of the most relevant rows to retrieve, e.g., assign `10` to obtain the ten most relevant rows.
 
-A non-empty string specifying the following search options:
+#### extra_options: `dict`, *Optional*
 
-- **"topn"**: `str`, *Required*  
-  Specifies the number of the most relevant rows to retrieve, e.g., `"topn=10"` to obtain the ten most relevant rows.
+An optional dictionary specifying the following search options:
+
+- **"default_field"**: `str`, *Optional*
+  - If `"fields"` is an empty string, this parameter specifies the default field to search on.
 - **"operator"**: `str`, *Optional*
-  - If not specified, the search follows Infinity's full-text search syntax, meaning that logical and arithmetic operators and escape characters will function as full-text search operators, such as:
-    - `&&`, `+`, `||`, `!`, `NOT`, `AND`, `OR` `-`, `(`, `)`, `~`, `^`, `:`, `"`.
-    - Escape characters like `\`, `\t`, and more.
-  - If specified, Infinity's full-text search syntax will not take effect, and the specified operator will be interpolated into `matching_text`.
-    - `"operator=OR"`/`"operator=or"`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.
-    - `"operator=AND"`/`"operator=and"`: Interpolates the `AND` operator between words in `matching_text` to create a new search text. Useful for searching text including code numbers like `"A01-233:BC"`, resulting in `"A01" AND "-233" AND "BC"`.
-  
-:::tip NOTE
-If both `"topn"` and `"operator"` options are specified, separate them with a semicolon, e.g., `"topn=100;operator=OR"`
-:::
+  - If not specified, the search follows Infinity's full-text search syntax, meaning that logical and arithmetic operators, quotation marks and escape characters will function as full-text search operators, such as:
+    - AND operator: `AND`, `&&`, `+`
+    - OR operator: `OR`, `||`
+    - NOT operator: `NOT`, `!`, `-`
+    - PAREN operator: `(`, `)`, need to appear in pairs, and can be nested.
+    - COLON operator: `:`: Used to specify field-specific search, e.g., `body:foobar` searches for `foobar` in the `body` field.
+    - CARAT operator: `^`: Used to boost the importance of a term, e.g., `quick^2 brown` boosts the importance of `quick` by a factor of 2, making it twice as important as `brown`.
+    - TILDE operator: `~`: Used for sloppy phrase search, e.g., `"harmful chemical"~10` searches for the phrase `"harmful chemical"` within a tolerable distance of 10 words.
+    - SINGLE_QUOTED_STRING: Used to search for a phrase, e.g., `'Bloom filter'`.
+    - DOUBLE_QUOTED_STRING: Used to search for a phrase, e.g., `"Bloom filter"`.
+    - Escape characters: Used to escape reserved characters, e.g., `space\-efficient`. Starting with a backslash `\` will escape the following characters:   
+      `' '`, `'+'`, `'-'`, `'='`, `'&'`, `'|'`, `'!'`, `'('`, `')'`, `'{'`, `'}'`, `'['`, `']'`, `'^'`, `'"'`, `'~'`, `'*'`, `'?'`, `':'`, `'\'`, `'/'`
+  - If specified, Infinity's full-text search syntax will not take effect, and the specified operator will be interpolated into `matching_text`.  
+    Useful for searching text including code numbers like `"A01-233:BC"`.
+    - `{"operator": "or"}`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.  
+      For example, reinterprets `"A01-233:BC"` as `'"A01" OR "-233" OR "BC"'`.
+    - `{"operator": "and"}`: Interpolates the `AND` operator between words in `matching_text` to create a new search text.  
+      For example, reinterprets `"A01-233:BC"` as `'"A01" AND "-233" AND "BC"'`.
 
 ### Returns
 
@@ -1698,7 +1767,8 @@ questions = [
     r'title:(quick OR brown) AND body:foobar', # search `(quick OR brown)` in the `title` field. keep fields empty.
 ]
 for question in questions:
-    table_object.match('body', question, 'topn=2')
+    table_object.output(["*"]).match_text('body', question, 2).to_df()
+    table_object.output(["*"]).match_text('', question, 2, {'default_field': 'body'}).to_df()
 ```
 
 ---
@@ -1706,41 +1776,67 @@ for question in questions:
 ## fusion
 
 ```python
-table_object.fusion(method, options_text, commonMatchTensorExpr = None)
+table_object.fusion(method, topn, fusion_params = None)
 ```
 
-Builds a fusion expression.
+Creates a reranking expression for multiple retrieval ways to identify the top n closest rows.
+
+:::tip NOTE
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
+:::
 
 ### Parameters
 
-#### method: `str`
+#### method: `str`, *Required*
 
-Supported reranking methods for multi-way retrieval include:
+A non-empty string indicating the reranking methods to use:
 
 - `"rrf"`: [Reciprocal rank fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)  
-  RRF scores all retrieved documents from each retrieval path using the reciprocals of their rankings. It then calculates the final score of each retrieved document by summing its scores from all retrieval paths. This technique is particularly useful when you are uncertain of the importance of each retrieval path.
+  RRF is a method for combining multiple result sets with varying relevance indicators into a single result set. It requires no tuning, and the relevance indicators need not be related to achieve high-quality results. RRF is particularly useful when you are uncertain of the relative importance of each retrieval way.  
+  RRF uses the following formula to calculate the score for ranking each document:  
+
+  ```python
+  score = 0.0
+  for q in queries:
+      if d in result(q):
+          score += 1.0 / ( k + rank( result(q), d ) )
+  return score
+
+  # Where
+  # k is the ranking constant,
+  # q is a query in a set of queries,
+  # d is a document in the result set of q,
+  # result(q) is the result set of q, and
+  # rank( result(q), d ) is the rank of d within the result(q), starting from 1.
+  ```
+
 - `"weighted_sum"`  
-  The weighted sum approach assigns different weights to different retrieval paths, allowing you to emphasize specific paths. This is particularly useful when you are certain of each path's relative importance.  
+  The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.  
 - `"match_tensor"`  
-  Infinity's tensor-based reranking approach. This is used for reranker dense vector, sparse vector, or full-text retrieval paths.  
+  Infinity's tensor-based late interaction reranking approach.  
 
-#### options_text: `str`, *Required
+#### topn: `int`, *Required*
 
-A non-empty, semicolon-separated string specifying the following reranking options:
+An integer indicating the number of the most relevant rows to retrieve.
 
-- **Common options**: `str`, *Required*  
-  Mandatory settings for the fused reranking.  
-  - `"topn"`: Specifies the number of the most relevant rows to retrieve, e.g., `"topn=10"` to obtain the ten most relevant rows.
+#### fusion_params: `dict[str, Any]`, *Optional*
 
-- **RRF-specific options**: `str`, *Optional*  
+A dictionary representing additional options for the selected reranking method:
+
+- **RRF-specific options**: *Optional*  
   Settings when employing RRF for reranking.  
-  - `"rank_constant"`: The smoothing constant for RRF reranking. Typically set to `60`, e.g., `"topn=10;rank_constant=60"`.
+  - `"rank_constant"`: The smoothing constant for RRF reranking, e.g., `{"rank_constant": 60}`. Defaults to `60`.
 
-- **weighted_sum-specific options**: `str`, *Optional*
+- **weighted_sum-specific options**: *Optional*  
   Settings when employing Weighted Sum for reranking.  
-  - `"weights"`: Specifies the weight for each retrieval path. For example, `"weights=1,2,0.5"` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval paths, respectively. The default weight of each retrieval path is `1.0`. If `"weight"` is not specified, all retrieval paths will be assiged the default weight of `1.0`.
+  - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assiged the default weight of `1.0`.
 
-#### commonMatchTensorExpr: `commonMatchTensorExpr()`, *Optional*
+- **match_tensor-specific options**: *Optional*  
+  Settings when employing match_tensor for reranking.
+  - `"field"`: The name of the tensor column for reranking.
+  - `"data"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy
+    array of numerical values.
+  - `"data_type"`: The element data type of the query tensor. Usually `"float"`.
 
 ### Returns
 
@@ -1751,53 +1847,55 @@ A non-empty, semicolon-separated string specifying the following reranking optio
 
 ### Examples
 
-The following code snippets illustrate the use of fused reranking in a four-way retrieval.
+The following code snippets illustrate the use of fused reranking in a three-way retrieval.
 
 #### Use RRF for reranking
 
 ```python {6}
-table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
-            .match("body", "blooms", "topn=10")
+from infinity.common import SparseVector
+table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_score"])
+            .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse_column", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_text("body", "blooms", 10)
             .filter("year < 2024")
-            .fusion("rrf", "topn=2")
+            .fusion("rrf", 2)
             .to_pl()
 ```
 
 ```python {6}
-table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
-            .match("body", "blooms", "topn=10")
+from infinity.common import SparseVector
+table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_score"])
+            .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse_column", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_text("body", "blooms", 10)
             .filter("year < 2024")
-            .fusion("rrf", "topn=2;rank_constant=30")
+            .fusion("rrf", 2, {"rank_constant": 30})
             .to_pl()
 ```
 
 #### Use Weighted Sum for reranking
 
 ```python {6}
-table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
-            .match("body", "blooms", "topn=10")
+from infinity.common import SparseVector
+table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_score"])
+            .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse_column", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_text("body", "blooms", 10)
             .filter("year < 2024")
-            .fusion("weighted_sum", "topn=2;weights=1,2,0.5")
+            .fusion("weighted_sum", 2, {"weights": "1,2,0.5"})
             .to_pl()
 ```
 
 #### Use tensor reranking
 
 ```python {8}
-# You must import `CommonMatchTensorExpr`to set tensor reranking parameters
-from infinity.common import CommonMatchTensorExpr
-table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
-            .match("body", "blooms", "topn=10")
+from infinity.common import SparseVector
+table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_score"])
+            .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse_column", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_text("body", "blooms", 10)
             .filter("year < 2024")
-            .fusion("match_tensor", "topn=2", commonMatchTensorExpr("tensor", [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], "float", "maxsim"))
+            .fusion("match_tensor", 2, {"field": "tensor", "data_type": "float", "data": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
             .to_pl()
 ```
 
@@ -1867,9 +1965,7 @@ A `polas.DataFrame` object.
 
 ```python
 # Format a vector search result into a Polas DataFrame. 
-res = table_object.output(["*"])
-               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10)
-               .to_pl()
+res = table_object.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10).to_pl()
 ```
 
 ## to_arrow
@@ -1892,9 +1988,7 @@ A `pyarrow.Table` object.
 
 ```python
 # Format the current table object into an Apache Arrow Table. 
-res = table_object.output(["*"])
-               .filter("score >= 90")
-               .to_pl()
+res = table_object.output(["*"]).filter("score >= 90").to_arrow()
 ```
 
 ---

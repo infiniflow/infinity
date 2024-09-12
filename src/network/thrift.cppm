@@ -39,12 +39,16 @@ export namespace apache {
 
         namespace transport {
             using apache::thrift::transport::TSocket;
+            using apache::thrift::transport::TTransport;
             using apache::thrift::transport::TServerSocket;
+            using apache::thrift::transport::TBufferedTransport;
             using apache::thrift::transport::TBufferedTransportFactory;
 
         }
 
         namespace protocol {
+            using apache::thrift::protocol::TProtocol;
+            using apache::thrift::protocol::TBinaryProtocol;
             using apache::thrift::protocol::TBinaryProtocolFactory;
             using apache::thrift::protocol::TCompactProtocolFactory;
             using apache::thrift::protocol::TProtocolFactory;

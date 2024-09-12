@@ -1,11 +1,12 @@
 module;
 
+#include <cassert>
+#include <cstring>
 #include <fcntl.h>
 #include <filesystem>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <cstring>
 
 import stl;
 import infinity_exception;
@@ -16,7 +17,15 @@ namespace fs = std::filesystem;
 
 namespace infinity {
 
-export int MmapFile(const String &fp, u8 *&data_ptr, SizeT &data_len, int advice = (MADV_RANDOM | MADV_DONTDUMP)) {
+export int MmapFile(const String &fp,
+                    u8 *&data_ptr,
+                    SizeT &data_len,
+                    int advice = (MADV_RANDOM
+#if defined(linux) || defined(__linux) || defined(__linux__)
+                                  | MADV_DONTDUMP
+#endif
+                                  )) {
+    assert(std::filesystem::path(fp).is_absolute());
     data_ptr = nullptr;
     data_len = 0;
     long len_f = fs::file_size(fp);
@@ -97,7 +106,16 @@ export struct MmapReader {
         return buf;
     }
 
-    int MmapPartFile(const String &fp, u8 *&data_ptr, SizeT &data_len, int advice = (MADV_RANDOM | MADV_DONTDUMP), SizeT offset = 0) {
+    int MmapPartFile(const String &fp,
+                     u8 *&data_ptr,
+                     SizeT &data_len,
+                     int advice = (MADV_RANDOM
+#if defined(linux) || defined(__linux) || defined(__linux__)
+                                   | MADV_DONTDUMP
+#endif
+                                   ),
+                     SizeT offset = 0) {
+        assert(std::filesystem::path(fp).is_absolute());
         data_ptr = nullptr;
         long len_f = fs::file_size(fp);
         if (len_f == 0) {

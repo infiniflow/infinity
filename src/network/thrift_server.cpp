@@ -63,13 +63,14 @@ public:
 
 // Thrift server
 
-void ThreadedThriftServer::Init(i32 port_no) {
+void ThreadedThriftServer::Init(const String& server_address, i32 port_no) {
 
-    std::cout << "API server listen on: 0.0.0.0:" << port_no << std::endl;
+    fmt::print("API server listen on {}: {}\n", server_address, port_no);
+//    std::cout << "API server listen on: " << server_address << ": " << port_no << std::endl;
     SharedPtr<TBinaryProtocolFactory> binary_protocol_factory = MakeShared<TBinaryProtocolFactory>();
     binary_protocol_factory->setStrict(true, true);
     server = MakeUnique<TThreadedServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
-                                         MakeShared<TServerSocket>(port_no), // port
+                                         MakeShared<TServerSocket>(server_address, port_no),
                                          MakeShared<TBufferedTransportFactory>(),
                                          binary_protocol_factory);
 }
@@ -78,9 +79,9 @@ void ThreadedThriftServer::Start() { server->serve(); }
 
 void ThreadedThriftServer::Shutdown() { server->stop(); }
 
-void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
+void PoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_size) {
 
-    SharedPtr<TServerSocket> server_socket = MakeShared<TServerSocket>(port_no);
+    SharedPtr<TServerSocket> server_socket = MakeShared<TServerSocket>(server_address, port_no);
 
     SharedPtr<TBinaryProtocolFactory> protocol_factory = MakeShared<TBinaryProtocolFactory>();
 //    SharedPtr<TCompactProtocolFactory> protocol_factory = MakeShared<TCompactProtocolFactory>();
@@ -91,7 +92,8 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
     threadManager->threadFactory(threadFactory);
     threadManager->start();
 
-    std::cout << "API server listen on: 0.0.0.0:" << port_no << ", thread pool: " << pool_size << std::endl;
+    fmt::print("API server(for Infinity-SDK) listen on {}: {}, connection limit: {}\n", server_address, port_no, pool_size);
+//    std::cout << "API server listen on: " << server_address << ": " << port_no << ", thread pool: " << pool_size << std::endl;
 
     server =
         MakeUnique<TThreadPoolServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
@@ -105,7 +107,7 @@ void PoolThriftServer::Start() { server->serve(); }
 
 void PoolThriftServer::Shutdown() { server->stop(); }
 
-void NonBlockPoolThriftServer::Init(i32 port_no, i32 pool_size) {
+void NonBlockPoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_size) {
 
     SharedPtr<ThreadFactory> thread_factory = MakeShared<ThreadFactory>();
     service_handler_ = MakeShared<InfinityThriftService>();
@@ -117,9 +119,10 @@ void NonBlockPoolThriftServer::Init(i32 port_no, i32 pool_size) {
     threadManager->threadFactory(thread_factory);
     threadManager->start();
 
-    std::cout << "Non-block API server listen on: 0.0.0.0:" << port_no << ", thread pool: " << pool_size << std::endl;
+    fmt::print("Non-block API server listen on {}: {}, connection limit: {}\n", server_address, port_no, pool_size);
+//    std::cout << "Non-block API server listen on: " << server_address << ": " << port_no << ", thread pool: " << pool_size << std::endl;
 
-    SharedPtr<TNonblockingServerSocket> non_block_socket = MakeShared<TNonblockingServerSocket>(port_no);
+    SharedPtr<TNonblockingServerSocket> non_block_socket = MakeShared<TNonblockingServerSocket>(server_address, port_no);
 
     //    server_thread_ = thread_factory->newThread(std::shared_ptr<TServer>(
     //        new TNonblockingServer(serviceProcessor, protocolFactory, nbSocket1, threadManager)));

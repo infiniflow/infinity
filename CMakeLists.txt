@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28.1)
 
-project(infinity VERSION 0.3.0)
+project(infinity VERSION 0.4.0)
 
 if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
     message(FATAL_ERROR "This project requires the Ninja generator. Refers to https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html#generator-support")
@@ -18,6 +18,7 @@ endif()
 
 set(CMAKE_CXX_STANDARD 20)
 
+message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
 string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
 if (CLANG_VERSION_STRING VERSION_GREATER 16)
@@ -48,7 +49,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
 
 else ()
 
-    message(FATAL_ERROR "Please use clang version 17.0 and above, current version: ${CLANG_VERSION_STRING}")
+    message(FATAL_ERROR "Please use clang version 17.0 and above, current version: ${CLANG_VERSION_STRING} ${CMAKE_CXX_COMPILER}")
 
 endif ()
 
@@ -89,10 +90,10 @@ set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
 set(TMP_DATA_PATH ${CMAKE_SOURCE_DIR}/tmp)
 
 # You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
-option(ENABLE_JEMALLOC "Enable jemalloc support" OFF)
+option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
 if(ENABLE_JEMALLOC)
     find_package(jemalloc REQUIRED)
-    set(JEMALLOC_STATIC_LIB "jemalloc.a")
+    set(JEMALLOC_STATIC_LIB "jemalloc_pic.a")
     if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
         set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
         set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
@@ -114,18 +115,27 @@ message(STATUS "Build type = ${CMAKE_BUILD_TYPE}")
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 
-    set(CMAKE_CXX_FLAGS "-Ofast -DNDEBUG")
-    set(CMAKE_C_FLAGS  "-Ofast -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Ofast -DNDEBUG")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Ofast -DNDEBUG")
 
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
 
-    set(CMAKE_CXX_FLAGS "-O2 -g -DNDEBUG")
-    set(CMAKE_C_FLAGS  "-O2 -g -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -O2 -g -DNDEBUG")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -O2 -g -DNDEBUG")
 
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
-    set(CMAKE_CXX_FLAGS "-O0 -g")
-    set(CMAKE_C_FLAGS "-O0 -g")
+    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -O0 -g")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g")
+
+    if ("${CODE_COVERAGE}" STREQUAL "ON")
+        add_compile_options(--coverage)
+        add_link_options(--coverage)
+    else ()
+        set(CODE_COVERAGE "OFF")
+    endif()
+
+    message(STATUS "Code Coverage = ${CODE_COVERAGE}")
 
     if(NOT ENABLE_JEMALLOC)
 
@@ -183,10 +193,10 @@ find_package(Lz4 REQUIRED)
 
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-
-find_package(Python 3.8
-        REQUIRED COMPONENTS Interpreter Development.Module
-        OPTIONAL_COMPONENTS Development.SABIModule)
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+#find_package(Python 3.8
+#        REQUIRED COMPONENTS Interpreter Development.Module
+#        OPTIONAL_COMPONENTS Development.SABIModule)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
@@ -223,7 +233,7 @@ if(DEFINED CPACK_PACKAGE_VERSION)
     string(REPLACE "-" "." CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
 endif()
 if(NOT DEFINED CPACK_PACKAGE_VERSION OR CPACK_PACKAGE_VERSION STREQUAL "")
-    set(CPACK_PACKAGE_VERSION "0.3.0")
+    set(CPACK_PACKAGE_VERSION "0.4.0")
 endif()
 set(CPACK_PACKAGE_RELEASE 1)
 set(CPACK_PACKAGE_CONTACT "Zhichang Yu <yuzhichang@gmail.com>")

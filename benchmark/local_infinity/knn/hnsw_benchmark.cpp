@@ -223,7 +223,7 @@ void Query(const BenchmarkOption &option) {
     if (gt_num != query_num) {
         UnrecoverableError("gt_num != query_num");
     }
-    hnsw->SetEf(option.ef_);
+    KnnSearchOption search_option{.ef_ = option.ef_};
 
     Vector<Vector<LabelT>> results(query_num, Vector<LabelT>(topk));
 
@@ -237,7 +237,7 @@ void Query(const BenchmarkOption &option) {
                 SizeT i;
                 while ((i = cur_i.fetch_add(1)) < query_num) {
                     const float *query = query_data.get() + i * query_dim;
-                    Vector<Pair<float, LabelT>> pairs = hnsw->KnnSearchSorted(query, topk);
+                    Vector<Pair<float, LabelT>> pairs = hnsw->KnnSearchSorted(query, topk, search_option);
                     if (pairs.size() < SizeT(topk)) {
                         UnrecoverableError("result_n != topk");
                     }

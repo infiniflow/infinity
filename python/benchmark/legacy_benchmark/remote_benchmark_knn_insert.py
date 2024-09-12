@@ -128,7 +128,6 @@ def create_index(table_name):
                                              {
                                                  "m": "16",
                                                  "ef_construction": "200",
-                                                 "ef": "200",
                                                  "metric": "l2",
                                                  "encode": "lvq"
                                              }))

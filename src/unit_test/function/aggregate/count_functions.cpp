@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -36,12 +37,15 @@ import internal_types;
 import logical_type;
 import data_type;
 
-class CountFunctionTest : public BaseTest {};
+using namespace infinity;
+class CountFunctionTest : public BaseTestParamStr {};
 
-TEST_F(CountFunctionTest, count_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, CountFunctionTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(CountFunctionTest, count_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterCountFunction(catalog_ptr);
 

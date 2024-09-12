@@ -1,0 +1,18 @@
+[general]
+version = "0.4.0"
+time_zone = "utc-8"
+
+[network]
+[log]
+
+[wal]
+# make delta and full checkpoint manual to test recyle
+delta_checkpoint_interval = "0s"
+full_checkpoint_interval = "0s"
+wal_compact_threshold            = "10KB"
+
+[storage]
+data_dir          = "/var/infinity/data"
+
+[buffer]
+[resource]

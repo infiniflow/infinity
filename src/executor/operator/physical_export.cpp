@@ -197,6 +197,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                     Value v = column_vectors[select_column_idx].GetValue(row_idx);
                     switch (v.type().type()) {
                         case LogicalType::kEmbedding:
+                        case LogicalType::kMultiVector:
                         case LogicalType::kTensor:
                         case LogicalType::kTensorArray:
                         case LogicalType::kSparse: {
@@ -355,7 +356,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                     file_handler = std::move(result.first);
                 }
 
-                LOG_DEBUG(line_json.dump());
+                // LOG_DEBUG(line_json.dump());
                 String to_write = line_json.dump() + "\n";
                 fs.Write(*file_handler, to_write.c_str(), to_write.size());
                 ++row_count;
@@ -386,7 +387,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
     EmbeddingInfo *embedding_type_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
     switch(embedding_type_info->Type()) {
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             // Supported
             break;
         }
@@ -527,7 +528,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                         break;
                     }
                     default: {
-                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(buffer_manager));
+                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetConstColumnVector(buffer_manager));
                         if (column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
                             LOG_CRITICAL(error_message);
@@ -568,7 +569,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
 
 SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
     auto &column_type = column_def->type();
-    switch (column_type->type()) {
+    switch (const auto column_logical_type = column_type->type(); column_logical_type) {
         case LogicalType::kBoolean:
             return arrow::boolean();
         case LogicalType::kTinyInt:
@@ -674,6 +675,7 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
             return arrow::struct_(std::move(fields));
         }
         case LogicalType::kEmbedding:
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_type->type_info().get());
@@ -726,15 +728,15 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
                 }
             }
             auto arrow_embedding_type = ::arrow::fixed_size_list(std::move(arrow_embedding_elem_type), dimension);
-            if (column_type->type() == LogicalType::kEmbedding) {
+            if (column_logical_type == LogicalType::kEmbedding) {
                 return arrow_embedding_type;
             }
             auto arrow_tensor_type = ::arrow::list(std::move(arrow_embedding_type));
-            if (column_type->type() == LogicalType::kTensor) {
+            if (column_logical_type == LogicalType::kTensor || column_logical_type == LogicalType::kMultiVector) {
                 return arrow_tensor_type;
             }
             auto arrow_tensor_array_type = ::arrow::list(std::move(arrow_tensor_type));
-            if (column_type->type() == LogicalType::kTensorArray) {
+            if (column_logical_type == LogicalType::kTensorArray) {
                 return arrow_tensor_array_type;
             }
             UnrecoverableError("Unreachable code!");
@@ -769,7 +771,7 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
     SharedPtr<arrow::ArrayBuilder> array_builder = nullptr;
     auto &column_type = column_def->type();
 
-    switch (column_type->type()) {
+    switch (const auto column_logical_type = column_type->type(); column_logical_type) {
         case LogicalType::kBoolean: {
             array_builder = MakeShared<arrow::BooleanBuilder>();
             break;
@@ -914,6 +916,7 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
             break;
         }
         case LogicalType::kEmbedding:
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_type->type_info().get());
@@ -969,17 +972,17 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
             const SizeT dimension = embedding_info->Dimension();
             auto embedding_arrow_array_builder =
                 MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), embedding_element_builder, dimension);
-            if (column_type->type() == LogicalType::kEmbedding) {
+            if (column_logical_type == LogicalType::kEmbedding) {
                 array_builder = std::move(embedding_arrow_array_builder);
                 break;
             }
             auto tensor_arrow_array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), embedding_arrow_array_builder);
-            if (column_type->type() == LogicalType::kTensor) {
+            if (column_logical_type == LogicalType::kTensor || column_logical_type == LogicalType::kMultiVector) {
                 array_builder = std::move(tensor_arrow_array_builder);
                 break;
             }
             auto tensor_array_arrow_array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_arrow_array_builder);
-            if (column_type->type() == LogicalType::kTensorArray) {
+            if (column_logical_type == LogicalType::kTensorArray) {
                 array_builder = std::move(tensor_array_arrow_array_builder);
                 break;
             }

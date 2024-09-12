@@ -32,6 +32,7 @@ public:
     void SetSearchMethod(char *&raw_search_method);
     void SetSearchMethodStr(std::string search_method);
     void SetSearchColumn(ParsedExpr *&column_expr) noexcept;
+    void SetOptionalFilter(ParsedExpr *&filter_expr) noexcept;
     void SetExtraOptions(char *&raw_options_text);
     void SetQueryTensor(char *&raw_embedding_data_type, ConstantExpr *&raw_tensor_expr);
     void SetQueryTensorStr(std::string embedding_data_type, const ConstantExpr *tensor_expr);
@@ -43,6 +44,7 @@ public:
     std::unique_ptr<char[]> query_tensor_data_ptr_;
     uint32_t dimension_ = 0;
     std::string options_text_;
+    std::unique_ptr<ParsedExpr> filter_expr_;
 };
 
 } // namespace infinity

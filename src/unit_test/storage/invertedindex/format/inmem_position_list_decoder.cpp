@@ -1,4 +1,5 @@
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 
@@ -17,9 +18,6 @@ using namespace infinity;
 class InMemPositionListDecoderTest : public BaseTest {
 public:
     InMemPositionListDecoderTest() {}
-
-    void SetUp() override {}
-    void TearDown() override {}
 
 protected:
     void TestDecodeWithOptionFlag(const optionflag_t flag, tf_t tf, pos_t *pos_list, bool need_flush) {

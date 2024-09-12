@@ -28,7 +28,11 @@ namespace infinity {
 // - The file size is consistant since creation.
 export class RawFileWorker : public FileWorker {
 public:
-    explicit RawFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, u32 file_size);
+    explicit RawFileWorker(SharedPtr<String> data_dir,
+                           SharedPtr<String> temp_dir,
+                           SharedPtr<String> file_dir,
+                           SharedPtr<String> file_name,
+                           u32 file_size);
 
     virtual ~RawFileWorker() override;
 
@@ -42,7 +46,7 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kRawFile; }
 
 protected:
-    void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
+    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void ReadFromFileImpl(SizeT file_size) override;
 

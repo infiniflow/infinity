@@ -14,9 +14,9 @@
 module;
 
 import stl;
-import bitmask_buffer;
+import deprecated_bitmask_buffer;
 
-export module bitmask;
+export module deprecated_bitmask;
 
 namespace infinity {
 
@@ -84,7 +84,7 @@ public:
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<Bitmask> ReadAdv(char *&ptr, i32 maxbytes);
+    static SharedPtr<Bitmask> ReadAdv(const char *&ptr, i32 maxbytes);
 
     // Swap two bitmasks, used when swap two std::variant<std::vector, Bitmask>
     friend void swap(infinity::Bitmask &left, infinity::Bitmask &right) {

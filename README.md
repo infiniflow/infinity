@@ -60,7 +60,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 Infinity, also available as a Python module, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
 
    ```bash
-   pip install infinity-sdk==0.3.0.dev5
+   pip install infinity-sdk==0.4.0.dev1
    ```
 
    ```python
@@ -72,7 +72,7 @@ Infinity, also available as a Python module, eliminates the need for a separate 
    table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
    table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
    table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
-   res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
+   res = table.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
    print(res)
    ```
 

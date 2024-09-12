@@ -32,7 +32,11 @@ String MatchExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
-    String expr_str = fmt::format("MATCH TEXT ('{}', '{}', '{}')", fields_, matching_text_, options_text_);
+    String expr_str = fmt::format("MATCH TEXT ('{}', '{}', '{}'{})",
+                                  fields_,
+                                  matching_text_,
+                                  options_text_,
+                                  optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "");
     return expr_str;
 }
 

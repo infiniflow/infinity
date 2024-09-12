@@ -552,11 +552,43 @@ Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
         String error_message = fmt::format("Value::MakeEmbedding(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
         UnrecoverableError(error_message);
     }
-    EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
-    SizeT len = embedding_info->Size();
-    SharedPtr<EmbeddingValueInfo> embedding_value_info = MakeShared<EmbeddingValueInfo>(ptr, len);
-    Value value(LogicalType::kEmbedding, type_info_ptr);
-    value.value_info_ = embedding_value_info;
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
+    const SizeT len = embedding_info->Size();
+    Value value(LogicalType::kEmbedding, std::move(type_info_ptr));
+    value.value_info_ = MakeShared<EmbeddingValueInfo>(ptr, len);
+    return value;
+}
+
+Value Value::MakeMultiVector(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr) {
+    if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
+        String error_message = fmt::format("Value::MakeMultiVector(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
+        UnrecoverableError(error_message);
+    }
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
+    if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
+        auto status = Status::SyntaxError(fmt::format("Value::MakeMultiVector(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
+        RecoverableError(std::move(status));
+    }
+    Value value(LogicalType::kMultiVector, std::move(type_info_ptr));
+    value.value_info_ = EmbeddingValueInfo::MakeMultiVectorValueInfo(ptr, bytes);
+    return value;
+}
+
+Value Value::MakeMultiVector(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr) {
+    if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
+        String error_message = fmt::format("Value::MakeMultiVector(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
+        UnrecoverableError(error_message);
+    }
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
+    const SizeT len = embedding_info->Size();
+    for (const auto [_, bytes] : ptr_bytes) {
+        if (bytes == 0 || bytes % len != 0) {
+            auto status = Status::SyntaxError(fmt::format("Value::MakeMultiVector(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
+            RecoverableError(std::move(status));
+        }
+    }
+    Value value(LogicalType::kMultiVector, std::move(type_info_ptr));
+    value.value_info_ = EmbeddingValueInfo::MakeMultiVectorValueInfo(ptr_bytes);
     return value;
 }
 
@@ -565,10 +597,10 @@ Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_i
         String error_message = fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
         UnrecoverableError(error_message);
     }
-    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
-        Status status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
-        RecoverableError(status);
+        auto status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
+        RecoverableError(std::move(status));
     }
     Value value(LogicalType::kTensor, std::move(type_info_ptr));
     value.value_info_ = EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes);
@@ -580,12 +612,12 @@ Value Value::MakeTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<T
         String error_message = fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
         UnrecoverableError(error_message);
     }
-    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
-    SizeT len = embedding_info->Size();
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
+    const SizeT len = embedding_info->Size();
     for (const auto [_, bytes] : ptr_bytes) {
         if (bytes == 0 || bytes % len != 0) {
-            Status status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
-            RecoverableError(status);
+            auto status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
+            RecoverableError(std::move(status));
         }
     }
     Value value(LogicalType::kTensor, std::move(type_info_ptr));
@@ -598,9 +630,9 @@ Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
         String error_message = fmt::format("Value::MakeTensorArray(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
         UnrecoverableError(error_message);
     }
-    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); len == 0) {
-        Status status = Status::SyntaxError(fmt::format("Value::MakeTensorArray(unit embedding bytes = {}) is invalid", len));
+        auto status = Status::SyntaxError(fmt::format("Value::MakeTensorArray(unit embedding bytes = {}) is invalid", len));
         RecoverableError(std::move(status));
     }
     Value value(LogicalType::kTensorArray, std::move(type_info_ptr));
@@ -632,9 +664,9 @@ void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
         String error_message = fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString());
         UnrecoverableError(error_message);
     }
-    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
     if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
-        Status status =
+        auto status =
             Status::SyntaxError(fmt::format("Value::AppendToTensorArray(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
         RecoverableError(std::move(status));
     }
@@ -987,6 +1019,7 @@ bool Value::operator==(const Value &other) const {
             return s1 == s2;
         }
         case LogicalType::kEmbedding:
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor: {
             const Span<char> data1 = this->GetEmbedding();
             const Span<char> data2 = other.GetEmbedding();
@@ -1122,6 +1155,7 @@ void Value::CopyUnionValue(const Value &other) {
         case LogicalType::kVarchar:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
+        case LogicalType::kMultiVector:
         case LogicalType::kEmbedding:
         case LogicalType::kSparse: {
             this->value_info_ = other.value_info_;
@@ -1242,6 +1276,7 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         case LogicalType::kVarchar:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
+        case LogicalType::kMultiVector:
         case LogicalType::kEmbedding:
         case LogicalType::kSparse: {
             this->value_info_ = std::move(other.value_info_);
@@ -1355,6 +1390,7 @@ String Value::ToString() const {
             const EmbeddingT embedding(data_span.data(), false);
             return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
         }
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             Span<char> data_span = this->GetEmbedding();
@@ -1493,6 +1529,7 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
             Embedding2Json(embedding, embedding_info->Type(), embedding_info->Dimension(), json[name]);
             return;
         }
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             Tensor2Json(this->GetEmbedding(), embedding_info->Type(), embedding_info->Dimension(), json[name]);
@@ -1651,6 +1688,7 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
             }
             break;
         }
+        case LogicalType::kMultiVector:
         case LogicalType::kTensor: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type->type_info().get());
 
@@ -1701,20 +1739,19 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
 
 SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes) {
     if (bytes == 0) {
-        String error_message = "EmbeddingValueInfo::MakeTensorValueInfo(bytes=0) is invalid.";
-        UnrecoverableError(error_message);
-    }
-    if (bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
-        Status status = Status::SyntaxError(fmt::format("EmbeddingValueInfo::MakeTensorValueInfo(bytes={}) is larger than the maximum tensor size={}",
-                                                        bytes,
-                                                        DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE));
-        RecoverableError(status);
+        UnrecoverableError("EmbeddingValueInfo::MakeTensorValueInfo(bytes=0) is invalid.");
     }
     return MakeShared<EmbeddingValueInfo>(ptr, bytes);
 }
 
 SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
     return MakeShared<EmbeddingValueInfo>(ptr_bytes);
+}
+
+SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeMultiVectorValueInfo(const_ptr_t ptr, SizeT bytes) { return MakeTensorValueInfo(ptr, bytes); }
+
+SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeMultiVectorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
+    return MakeTensorValueInfo(ptr_bytes);
 }
 
 } // namespace infinity

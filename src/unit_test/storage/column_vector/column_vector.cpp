@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -29,6 +30,7 @@ import internal_types;
 import logical_type;
 import data_type;
 
+using namespace infinity;
 class ColumnVectorTest : public BaseTest {};
 
 TEST_F(ColumnVectorTest, ReadWrite) {
@@ -147,9 +149,9 @@ TEST_F(ColumnVectorTest, ReadWrite) {
         act_size = ptr - buf.data();
         EXPECT_EQ(act_size, exp_size);
 
-        ptr = buf.data();
-        SharedPtr<ColumnVector> column2 = ColumnVector::ReadAdv(ptr, exp_size);
-        act_size = ptr - buf.data();
+        const char *ptr_r = buf.data();
+        SharedPtr<ColumnVector> column2 = ColumnVector::ReadAdv(ptr_r, exp_size);
+        act_size = ptr_r - buf.data();
         EXPECT_EQ(act_size, exp_size);
         EXPECT_NE(column2, nullptr);
         EXPECT_EQ(*columns[i] == *column2, true);

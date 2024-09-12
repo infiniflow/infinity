@@ -27,6 +27,8 @@ import vector_buffer;
 import txn;
 import internal_types;
 import base_entry;
+import column_def;
+import value;
 
 namespace infinity {
 
@@ -43,18 +45,22 @@ public:
     static String EncodeIndex(const ColumnID column_id, const BlockEntry *block_entry);
 
 public:
-    explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref);
+    explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id);
+
+private:
+    BlockColumnEntry(const BlockColumnEntry &other);
+
+public:
+    UniquePtr<BlockColumnEntry> Clone(BlockEntry *block_entry) const;
 
     static UniquePtr<BlockColumnEntry> NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn);
 
     static UniquePtr<BlockColumnEntry> NewReplayBlockColumnEntry(const BlockEntry *block_entry,
                                                                  ColumnID column_id,
                                                                  BufferManager *buffer_manager,
-                                                                 u32 next_outline_idx_0,
-                                                                 u32 next_outline_idx_1,
-                                                                 u64 last_chunk_offset_0,
-                                                                 u64 last_chunk_offset_1,
-                                                                 TxnTimeStamp commit_ts);
+                                                                 const u32 next_outline_idx,
+                                                                 const u64 last_chunk_offset,
+                                                                 const TxnTimeStamp commit_ts);
 
     nlohmann::json Serialize();
 
@@ -66,15 +72,20 @@ public:
     // Getter
     inline const BlockEntry *GetBlockEntry() const { return block_entry_; }
     inline const SharedPtr<DataType> &column_type() const { return column_type_; }
-    inline BufferObj *buffer() const { return buffer_; }
+    inline BufferObj *buffer() const { return buffer_.get(); }
     inline u64 column_id() const { return column_id_; }
-    inline const SharedPtr<String> &base_dir() const { return base_dir_; }
     inline const SharedPtr<String> &filename() const { return file_name_; }
     inline const BlockEntry *block_entry() const { return block_entry_; }
 
-    SharedPtr<String> OutlineFilename(u32 buffer_group_id, SizeT file_idx) const;
+    SharedPtr<String> OutlineFilename(SizeT file_idx) const { return MakeShared<String>(fmt::format("col_{}_out_{}", column_id_, file_idx)); }
 
-    String FilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_); }
+    // Relative to `data_dir` config item
+    String FilePath() const;
+
+    // Relative to `data_dir` config item
+    SharedPtr<String> FileDir() const;
+
+    Vector<String> FilePaths() const;
 
     ColumnVector GetColumnVector(BufferManager *buffer_mgr);
 
@@ -84,15 +95,24 @@ private:
     ColumnVector GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe);
 
 public:
-    void AppendOutlineBuffer(u32 buffer_group_id, BufferObj *buffer);
+    void AppendOutlineBuffer(BufferObj *buffer) {
+        std::unique_lock lock(mutex_);
+        outline_buffers_.emplace_back(buffer);
+    }
 
-    BufferObj *GetOutlineBuffer(u32 buffer_group_id, SizeT idx) const;
+    BufferObj *GetOutlineBuffer(SizeT idx) const {
+        std::shared_lock lock(mutex_);
+        return outline_buffers_.empty() ? nullptr : outline_buffers_[idx].get();
+    }
 
-    SizeT OutlineBufferCount(u32 buffer_group_id) const;
+    SizeT OutlineBufferCount() const {
+        std::shared_lock lock(mutex_);
+        return outline_buffers_.size();
+    }
 
-    u64 LastChunkOff(u32 buffer_group_id) const;
+    u64 LastChunkOff() const { return last_chunk_offset_; }
 
-    void SetLastChunkOff(u32 buffer_group_id, u64 offset);
+    void SetLastChunkOff(u64 offset) { last_chunk_offset_ = offset; }
 
 public:
     void Append(const ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows, BufferManager *buffer_mgr);
@@ -101,20 +121,19 @@ public:
 
     void Cleanup();
 
+    void FillWithDefaultValue(SizeT row_count, const Value *default_value, BufferManager *buffer_mgr);
+
 private:
     const BlockEntry *block_entry_{nullptr};
     ColumnID column_id_{};
     SharedPtr<DataType> column_type_{};
-    BufferObj *buffer_{};
+    BufferPtr buffer_{};
 
-    SharedPtr<String> base_dir_{};
     SharedPtr<String> file_name_{};
 
     mutable std::shared_mutex mutex_{};
-    Vector<BufferObj *> outline_buffers_group_0_;
-    Vector<BufferObj *> outline_buffers_group_1_;
-    u64 last_chunk_offset_0_{};
-    u64 last_chunk_offset_1_{};
+    Vector<BufferPtr> outline_buffers_;
+    u64 last_chunk_offset_{};
 };
 
 } // namespace infinity

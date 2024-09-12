@@ -49,6 +49,8 @@ import base_table_ref;
 import compact_statement;
 import default_values;
 import chunk_index_entry;
+import persistence_manager;
+import infinity_context;
 
 namespace infinity {
 
@@ -246,6 +248,35 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     return Status::OK();
 }
 
+Status Txn::RenameTable(TableEntry *old_table_entry, const String &new_table_name) {
+    UnrecoverableError("Not implemented yet");
+    return Status::OK();
+}
+
+Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+
+    auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_id_, begin_ts);
+    if (!db_status.ok()) {
+        return db_status;
+    }
+    UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
+    TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
+    new_table_entry->AddColumns(column_defs, default_values, txn_table_store);
+    auto add_status = db_entry->AddTable(std::move(new_table_entry), txn_id_, begin_ts, txn_mgr_, true/*add_if_found*/);
+    if (!add_status.ok()) {
+        return add_status;
+    }
+
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdAddColumns>(*table_entry->GetDBName(), *table_entry->GetTableName(), column_defs));
+    return Status::OK();
+}
+
+Status Txn::DropColumns(const Vector<String> &column_names) {
+    //
+    return Status::OK();
+}
+
 Status Txn::DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type) {
     this->CheckTxn(db_name);
 
@@ -320,8 +351,10 @@ Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_
 // TODO: use table ref instead of table entry
 Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
     auto *table_entry = table_ref->table_entry_ptr_;
+    const auto &db_name = *table_entry->GetDBName();
+    const auto &table_name = *table_entry->GetTableName();
 
-    auto [table_index_entry, status] = this->GetIndexByName(db_name_, *table_entry->GetTableName(), index_name);
+    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, index_name);
     if (!status.ok()) {
         return status;
     }
@@ -436,11 +469,11 @@ TxnTimeStamp Txn::Commit() {
 
     // register commit ts in wal manager here, define the commit sequence
     TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampW(this);
-    LOG_TRACE(fmt::format("Txn: {} is committing, committing ts: {}", txn_id_, commit_ts));
+    LOG_TRACE(fmt::format("Txn: {} is committing, begin_ts:{} committing ts: {}", txn_id_, BeginTS(), commit_ts));
 
     this->SetTxnCommitting(commit_ts);
 
-    txn_store_.PrepareCommit1();
+    txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     // LOG_INFO(fmt::format("Txn {} commit ts: {}", txn_id_, commit_ts));
 
     if (txn_mgr_->CheckConflict(this)) {
@@ -527,6 +560,11 @@ void Txn::Rollback() {
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { 
     std::lock_guard guard(txn_store_.mtx_);
+    auto state = txn_context_.GetTxnState();
+    if (state != TxnState::kStarted) {
+        auto begin_ts = BeginTS();
+        UnrecoverableError(fmt::format("Should add wal cmd in started state, begin_ts: {}", begin_ts));
+    }
     wal_entry_->cmds_.push_back(cmd);
 }
 
@@ -539,6 +577,7 @@ bool Txn::DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts)
         return false;
     }
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path, delta_name));
+
     return true;
 }
 
@@ -548,6 +587,11 @@ void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
 
     catalog_->SaveFullCatalog(max_commit_ts, full_path, full_name);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, full_path, full_name));
+}
+
+void Txn::AddWriteTxnNum(TableEntry *table_entry) {
+    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
+    table_store->AddWriteTxnNum();
 }
 
 } // namespace infinity

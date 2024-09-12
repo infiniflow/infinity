@@ -14,6 +14,8 @@
 
 module;
 
+#include <cassert>
+
 export module file_worker;
 
 import stl;
@@ -24,16 +26,21 @@ import persistence_manager;
 
 namespace infinity {
 
+export struct FileWorkerSaveCtx {};
+
 export class FileWorker {
 public:
     // spill_dir_ is not init here
-    explicit FileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name) : file_dir_(std::move(file_dir)), file_name_(std::move(file_name)) {}
+    explicit FileWorker(SharedPtr<String> data_dir, SharedPtr<String> temp_dir, SharedPtr<String> file_dir, SharedPtr<String> file_name)
+        : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)) {
+        assert(!std::filesystem::path(*file_dir_).is_absolute());
+    }
 
     // No destruct here
     virtual ~FileWorker();
 
 public:
-    void WriteToFile(bool to_spill);
+    [[nodiscard]] bool WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx = {});
 
     void ReadFromFile(bool from_spill);
 
@@ -49,27 +56,24 @@ public:
 
     void *GetData() { return data_; }
 
-    void SetBaseTempDir(SharedPtr<String> base_dir, SharedPtr<String> temp_dir) {
-        base_dir_ = std::move(base_dir);
-        temp_dir_ = std::move(temp_dir);
-    }
-
-    // Get file path. As key of buffer handle.
-    String GetFilePath() const { return fmt::format("{}/{}", *file_dir_, *file_name_); }
+    // Get absolute file path. As key of buffer handle.
+    String GetFilePath() const;
 
     void CleanupFile() const;
 
     void CleanupTempFile() const;
 
 protected:
-    virtual void WriteToFileImpl(bool to_spill, bool &prepare_success) = 0;
+    virtual bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
     virtual void ReadFromFileImpl(SizeT file_size) = 0;
 
 private:
-    String ChooseFileDir(bool spill) const { return spill ? fmt::format("{}{}", *temp_dir_, *file_dir_) : *file_dir_; }
+    String ChooseFileDir(bool spill) const;
 
 public:
+    const SharedPtr<String> data_dir_{};
+    const SharedPtr<String> temp_dir_{};
     const SharedPtr<String> file_dir_{};
     const SharedPtr<String> file_name_{};
     ObjAddr obj_addr_{};
@@ -77,10 +81,5 @@ public:
 protected:
     void *data_{nullptr};
     UniquePtr<FileHandler> file_handler_{nullptr};
-
-private:
-    // following members are not init in constructor
-    SharedPtr<String> base_dir_{};
-    SharedPtr<String> temp_dir_{};
 };
 } // namespace infinity

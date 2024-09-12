@@ -88,6 +88,7 @@ import physical_create_index_finish;
 
 import logical_node;
 import logical_node_type;
+import logical_alter;
 import logical_create_schema;
 import logical_create_view;
 import logical_create_table;
@@ -139,6 +140,7 @@ import infinity_exception;
 import create_index_info;
 import command_statement;
 import explain_statement;
+import alter_statement;
 import load_meta;
 import block_index;
 import logger;
@@ -537,6 +539,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<Logical
                                                       std::move(input_physical_operator),
                                                       logical_update->table_entry_ptr_,
                                                       logical_update->update_columns_,
+                                                      logical_update->all_columns_in_table_,
+                                                      logical_update->final_result_columns_,
                                                       logical_operator->load_metas());
     return physical_update;
 }
@@ -571,10 +575,31 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExport(const SharedPtr<Logical
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeUnique<PhysicalAlter>(logical_operator->GetOutputNames(),
-                                     logical_operator->GetOutputTypes(),
-                                     logical_operator->node_id(),
-                                     logical_operator->load_metas());
+    auto *logical_alter = const_cast<LogicalAlter *>(static_cast<const LogicalAlter *>(logical_operator.get()));
+    switch (logical_alter->type_) {
+        case AlterStatementType::kRenameTable: {
+            auto *logical_rename_table = static_cast<LogicalRenameTable *>(logical_alter);
+            return MakeUnique<PhysicalRenameTable>(logical_rename_table->table_entry_,
+                                                   std::move(logical_rename_table->new_table_name_),
+                                                   logical_operator->GetOutputNames(),
+                                                   logical_operator->GetOutputTypes(),
+                                                   logical_operator->node_id(),
+                                                   logical_operator->load_metas());
+        }
+        case AlterStatementType::kAddColumns: {
+            auto *logical_add_columns = static_cast<LogicalAddColumns *>(logical_alter);
+            return MakeUnique<PhysicalAddColumns>(logical_add_columns->table_entry_,
+                                                  logical_add_columns->column_defs_,
+                                                  logical_operator->GetOutputNames(),
+                                                  logical_operator->GetOutputTypes(),
+                                                  logical_operator->node_id(),
+                                                  logical_operator->load_metas());
+        }
+        default: {
+            RecoverableError(Status::NotSupport("Alter statement isn't supported."));
+        }
+    }
+    return {};
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -876,6 +901,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const SharedPtr<Logi
                                          std::move(logical_index_scan->filter_execute_command_),
                                          std::move(logical_index_scan->fast_rough_filter_evaluator_),
                                          logical_operator->load_metas(),
+                                         logical_operator->GetOutputNames(),
+                                         logical_operator->GetOutputTypes(),
                                          logical_index_scan->add_row_id_);
 }
 

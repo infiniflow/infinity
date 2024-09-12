@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -32,40 +33,25 @@ import logical_type;
 import data_type;
 import compilation_config;
 
-class ColumnVectorFloatTest : public BaseTestParamStr {
+using namespace infinity;
+
+class ColumnVectorFloatTest : public BaseTest {
     void SetUp() override {
-        RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        std::string config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
+        using namespace infinity;
+
+        LoggerConfig logger_config;
+        logger_config.log_level_ = LogLevel::kOff;
+        Logger::Initialize(logger_config);
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
+        using namespace infinity;
+
+        Logger::Shutdown();
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ColumnVectorFloatTest,
-                         ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
-
-TEST_P(ColumnVectorFloatTest, flat_float) {
+TEST_F(ColumnVectorFloatTest, flat_float) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
@@ -169,7 +155,7 @@ TEST_P(ColumnVectorFloatTest, flat_float) {
     }
 }
 
-TEST_P(ColumnVectorFloatTest, contant_float) {
+TEST_F(ColumnVectorFloatTest, contant_float) {
 
     using namespace infinity;
 
@@ -248,7 +234,7 @@ TEST_P(ColumnVectorFloatTest, contant_float) {
     }
 }
 
-TEST_P(ColumnVectorFloatTest, float_column_vector_select) {
+TEST_F(ColumnVectorFloatTest, float_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
@@ -283,7 +269,7 @@ TEST_P(ColumnVectorFloatTest, float_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorFloatTest, float_column_slice_init) {
+TEST_F(ColumnVectorFloatTest, float_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
@@ -317,7 +303,7 @@ TEST_P(ColumnVectorFloatTest, float_column_slice_init) {
     }
 }
 
-TEST_P(ColumnVectorFloatTest, flat_double) {
+TEST_F(ColumnVectorFloatTest, flat_double) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
@@ -415,7 +401,7 @@ TEST_P(ColumnVectorFloatTest, flat_double) {
     }
 }
 
-TEST_P(ColumnVectorFloatTest, contant_double) {
+TEST_F(ColumnVectorFloatTest, contant_double) {
 
     using namespace infinity;
 
@@ -494,7 +480,7 @@ TEST_P(ColumnVectorFloatTest, contant_double) {
     }
 }
 
-TEST_P(ColumnVectorFloatTest, double_column_vector_select) {
+TEST_F(ColumnVectorFloatTest, double_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
@@ -529,7 +515,7 @@ TEST_P(ColumnVectorFloatTest, double_column_vector_select) {
     }
 }
 
-TEST_P(ColumnVectorFloatTest, double_column_slice_init) {
+TEST_F(ColumnVectorFloatTest, double_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);

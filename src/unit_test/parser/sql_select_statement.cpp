@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -44,6 +45,7 @@ import cross_product_reference;
 import subquery_reference;
 import parser_result;
 
+using namespace infinity;
 class SelectStatementParsingTest : public BaseTest {};
 
 TEST_F(SelectStatementParsingTest, good_test1) {
@@ -1327,7 +1329,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
         // bit only support hamming
         String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 'bit', 'cosine', 3) WHERE a > 0;";
         parser->Parse(input_sql, result.get());
-        std::cout << result->error_message_ << std::endl;
+//        std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
     }
@@ -1359,7 +1361,7 @@ TEST_F(SelectStatementParsingTest, bad_search_test) {
         // bit only support hamming
         String input_sql = "SELECT b FROM t1 SEARCH MATCH TEXT ('author^2,name^5', 'frank dune') LIMIT 5;";
         parser->Parse(input_sql, result.get());
-        std::cout << result->error_message_ << std::endl;
+//        std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
     }

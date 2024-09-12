@@ -19,7 +19,6 @@ import base_expression;
 import expression_state;
 import data_block;
 import selection;
-import bitmask;
 
 export module expression_selector;
 

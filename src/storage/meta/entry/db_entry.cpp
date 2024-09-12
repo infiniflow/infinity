@@ -35,6 +35,7 @@ import column_def;
 import local_file_system;
 import extra_ddl_info;
 import cleanup_scanner;
+import infinity_context;
 
 namespace infinity {
 
@@ -50,49 +51,43 @@ String DBEntry::EncodeIndex(const String &db_name) { return fmt::format("#{}", d
 
 DBEntry::DBEntry(DBMeta *db_meta,
                  bool is_delete,
-                 const SharedPtr<String> &base_dir,
                  const SharedPtr<String> &db_entry_dir,
                  const SharedPtr<String> &db_name,
                  TransactionID txn_id,
                  TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kDatabase, is_delete, base_dir, DBEntry::EncodeIndex(*db_name)), db_meta_(db_meta), db_entry_dir_(db_entry_dir),
-      db_name_(db_name) {
+    : BaseEntry(EntryType::kDatabase, is_delete, DBEntry::EncodeIndex(*db_name)), db_meta_(db_meta), db_entry_dir_(db_entry_dir), db_name_(db_name) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 }
 
-SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
-                                       bool is_delete,
-                                       const SharedPtr<String> &base_dir,
-                                       const SharedPtr<String> &db_name,
-                                       TransactionID txn_id,
-                                       TxnTimeStamp begin_ts) {
-    String delete_str = fmt::format("{}/", *base_dir);
+SharedPtr<DBEntry>
+DBEntry::NewDBEntry(DBMeta *db_meta, bool is_delete, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     SharedPtr<String> db_entry_dir;
     if (is_delete) {
         db_entry_dir = MakeShared<String>("deleted");
     } else {
-        db_entry_dir = DetermineDBDir(*base_dir, *db_name);
-        auto pos = db_entry_dir->find(delete_str);
-        db_entry_dir->erase(pos, delete_str.size());
+        db_entry_dir = DetermineDBDir(*db_name);
     }
-    return MakeShared<DBEntry>(db_meta, is_delete, base_dir, db_entry_dir, db_name, txn_id, begin_ts);
+    return MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
+}
+
+SharedPtr<String> DBEntry::DetermineDBDir(const String &db_name) {
+    return DetermineRandomString(InfinityContext::instance().config()->DataDir(), fmt::format("db_{}", db_name));
 }
 
 SharedPtr<DBEntry> DBEntry::ReplayDBEntry(DBMeta *db_meta,
                                           bool is_delete,
-                                          const SharedPtr<String> &base_dir,
                                           const SharedPtr<String> &db_entry_dir,
                                           const SharedPtr<String> &db_name,
                                           TransactionID txn_id,
                                           TxnTimeStamp begin_ts,
                                           TxnTimeStamp commit_ts) noexcept {
-    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, base_dir, db_entry_dir, db_name, txn_id, begin_ts);
+    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
     db_entry->commit_ts_ = commit_ts;
     return db_entry;
 }
 
-SharedPtr<String> DBEntry::AbsoluteDir() const { return MakeShared<String>(fmt::format("{}/{}", *db_meta_->data_dir(), *db_entry_dir_)); }
+SharedPtr<String> DBEntry::AbsoluteDir() const { return MakeShared<String>(Path(InfinityContext::instance().config()->DataDir()) / *db_entry_dir_); }
 
 Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type,
                                                  const SharedPtr<String> &table_name,
@@ -101,7 +96,7 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
                                                  TxnTimeStamp begin_ts,
                                                  TxnManager *txn_mgr,
                                                  ConflictType conflict_type) {
-    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->base_dir_, this->db_entry_dir_, table_name, this); };
+    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_name, this); };
     LOG_TRACE(fmt::format("Adding new table entry: {}", *table_name));
     auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(*table_name, std::move(init_table_meta));
     return table_meta->CreateEntry(std::move(r_lock), table_entry_type, table_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
@@ -145,11 +140,20 @@ void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
     table_meta->DeleteEntry(txn_id);
 }
 
+Status
+DBEntry::AddTable(SharedPtr<TableEntry> table_entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, bool add_if_found) {
+    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_entry->GetTableName(), this); };
+    const String &table_name = *table_entry->GetTableName();
+    LOG_TRACE(fmt::format("Adding new table entry: {}", table_name));
+    auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(table_name, std::move(init_table_meta));
+    return table_meta->AddEntry(std::move(r_lock), table_entry, txn_id, begin_ts, txn_mgr, add_if_found);
+}
+
 void DBEntry::CreateTableReplay(const SharedPtr<String> &table_name,
                                 std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
                                 TransactionID txn_id,
                                 TxnTimeStamp begin_ts) {
-    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->base_dir_, this->db_entry_dir_, table_name, this); };
+    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_name, this); };
     auto *table_meta = table_meta_map_.GetMetaNoLock(*table_name, std::move(init_table_meta));
     table_meta->CreateEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(table_meta, table_name, txn_id, begin_ts); },
                                   txn_id,
@@ -245,7 +249,7 @@ Tuple<Vector<String>, Vector<TableMeta*>, std::shared_lock<std::shared_mutex>> D
 
 SharedPtr<String> DBEntry::ToString() {
     SharedPtr<String> res =
-        MakeShared<String>(fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *AbsoluteDir(), txn_id_, table_meta_map_.Size()));
+        MakeShared<String>(fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: {}", *AbsoluteDir(), txn_id_, table_meta_map_.Size()));
     return res;
 }
 
@@ -284,7 +288,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
     if (!deleted) {
         db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
     }
-    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta, deleted, db_meta->data_dir(), db_entry_dir, db_name, txn_id, begin_ts);
+    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta, deleted, db_entry_dir, db_name, txn_id, begin_ts);
 
     u64 commit_ts = db_entry_json["commit_ts"];
     db_entry->commit_ts_.store(commit_ts);
@@ -315,10 +319,10 @@ void DBEntry::Cleanup() {
     }
     table_meta_map_.Cleanup();
 
-    String full_db_dir = fmt::format("{}/{}", *base_dir_, *db_entry_dir_);
-    LOG_DEBUG(fmt::format("Cleaning up db dir: {}", full_db_dir));
-    CleanupScanner::CleanupDir(full_db_dir);
-    LOG_DEBUG(fmt::format("Cleaned db dir: {}", full_db_dir));
+    SharedPtr<String> full_db_dir = AbsoluteDir();
+    LOG_DEBUG(fmt::format("Cleaning up db dir: {}", *full_db_dir));
+    CleanupScanner::CleanupDir(*full_db_dir);
+    LOG_DEBUG(fmt::format("Cleaned db dir: {}", *full_db_dir));
 }
 
 void DBEntry::MemIndexCommit() {

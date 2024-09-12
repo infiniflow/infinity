@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -46,11 +47,14 @@ import internal_types;
 import column_def;
 import data_type;
 
-class ExpressionEvaluatorTest : public BaseTest {};
+using namespace infinity;
+class ExpressionEvaluatorTest : public BaseTestParamStr {};
 
-TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, ExpressionEvaluatorTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(ExpressionEvaluatorTest, add_bigint_constant_1) {
     using namespace infinity;
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
     RegisterAddFunction(catalog_ptr);
 
     String op = "+";
@@ -148,9 +152,9 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     }
 }
 
-TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
+TEST_P(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     using namespace infinity;
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
     RegisterSubtractFunction(catalog_ptr);
 
     String op = "-";

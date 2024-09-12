@@ -86,10 +86,11 @@ void EMVBIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void EMVBIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool EMVBIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     auto *index = static_cast<EMVBIndex *>(data_);
     index->SaveIndexInner(*file_handler_);
     prepare_success = true;
+    return true;
 }
 
 void EMVBIndexFileWorker::ReadFromFileImpl(SizeT file_size) {

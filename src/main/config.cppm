@@ -46,6 +46,7 @@ public:
 
     // General
     String Version();
+    String ServerMode();
     String TimeZone();
     i64 TimeZoneBias();
 
@@ -58,16 +59,22 @@ public:
 
     // Network
     String ServerAddress();
+    String PeerServerIP();
+    i64 PeerServerPort();
     i64 PostgresPort();
     i64 HTTPPort();
     i64 ClientPort();
     i64 ConnectionPoolSize();
+    i64 PeerServerConnectionPoolSize();
 
     // Log
     String LogFileName();
     String LogDir();
     String LogFilePath();
+
+    void SetLogToStdout(bool log_to_stdout);
     bool LogToStdout();
+
     i64 LogFileMaxSize();
     i64 LogFileRotateCount();
 

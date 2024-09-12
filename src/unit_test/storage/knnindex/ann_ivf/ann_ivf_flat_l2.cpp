@@ -12,50 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 import stl;
 import knn_filter;
 import ann_ivf_flat;
-import bitmask;
+import roaring_bitmap;
 import knn_expr;
 import internal_types;
 import infinity_context;
 import global_resource_usage;
 
-class AnnIVFFlatL2Test : public BaseTestParamStr {
-    void SetUp() override {
-        BaseTestParamStr::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        std::shared_ptr<std::string> config_path = nullptr;
-        RemoveDbDirs();
-        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
-        std::string config_path_str = GetParam();
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
-    }
+using namespace infinity;
 
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
-    }
-};
+class AnnIVFFlatL2Test : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          AnnIVFFlatL2Test,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(AnnIVFFlatL2Test, test1) {
     using namespace infinity;
@@ -129,7 +105,7 @@ TEST_P(AnnIVFFlatL2Test, test1) {
 
     {
         AnnIVFFlatL2<f32> ann_distance_m(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
-        auto p_bitmask = Bitmask::Make(64);
+        auto p_bitmask = Bitmask::MakeSharedAllTrue(base_embedding_count);
         BitmaskFilter<SegmentOffset> filter(*p_bitmask);
         p_bitmask->SetFalse(1);
         {

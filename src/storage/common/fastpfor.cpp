@@ -67,14 +67,14 @@ FastPForWrapper<Codec>::~FastPForWrapper() = default;
 template <FastPForCodec Codec>
 u32 FastPForWrapper<Codec>::Compress(const u32 *src, u32 count, u32 *dest, SizeT &outsize) const {
     auto &codec = this->impl_->codec;
-    codec.encodeArray(src, count, dest, outsize);
+    codec.encodeArray(src, count, dest, reinterpret_cast<size_t &>(outsize));
     return outsize;
 }
 // -------------------------------------------------------------------------------------
 template <FastPForCodec Codec>
 const u32 *FastPForWrapper<Codec>::Decompress(const u32 *src, u32 count, u32 *dest, SizeT &outsize) const {
     auto &codec = this->impl_->codec;
-    return codec.decodeArray(src, count, dest, outsize);
+    return codec.decodeArray(src, count, dest, reinterpret_cast<size_t &>(outsize));
 }
 
 template <FastPForCodec Codec>

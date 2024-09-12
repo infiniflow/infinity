@@ -33,8 +33,8 @@ import local_file_system;
 namespace infinity {
 
 // Use by default
-UniquePtr<DBMeta> DBMeta::NewDBMeta(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name) {
-    auto db_meta = MakeUnique<DBMeta>(data_dir, db_name);
+UniquePtr<DBMeta> DBMeta::NewDBMeta(const SharedPtr<String> &db_name) {
+    auto db_meta = MakeUnique<DBMeta>(db_name);
     return db_meta;
 }
 
@@ -45,7 +45,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(std::shared_lock<std::shared_mut
                                                 TxnManager *txn_mgr,
                                                 ConflictType conflict_type) {
     auto init_db_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
-        return DBEntry::NewDBEntry(this, false, this->data_dir_, this->db_name_, txn_id, begin_ts);
+        return DBEntry::NewDBEntry(this, false, this->db_name_, txn_id, begin_ts);
     };
     return db_entry_list_.AddEntry(std::move(r_lock), std::move(init_db_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
@@ -56,7 +56,7 @@ Tuple<SharedPtr<DBEntry>, Status> DBMeta::DropNewEntry(std::shared_lock<std::sha
                                                        TxnManager *txn_mgr,
                                                        ConflictType conflict_type) {
     auto init_drop_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
-        return DBEntry::NewDBEntry(this, true, this->data_dir_, this->db_name_, txn_id, begin_ts);
+        return DBEntry::NewDBEntry(this, true, this->db_name_, txn_id, begin_ts);
     };
     return db_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
@@ -101,20 +101,18 @@ DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, Transactio
     db_info->db_name_ = db_entry->db_name_ptr();
     db_info->db_entry_dir_ = db_entry->db_entry_dir();
     db_info->absolute_db_path_ = db_entry->AbsoluteDir();
-
+    db_info->table_count_ = db_entry->TableCollections(txn_id, begin_ts).size();
     return {db_info, Status::OK()};
 }
 
 SharedPtr<String> DBMeta::ToString() {
-    SharedPtr<String> res = MakeShared<String>(
-        fmt::format("DBMeta, data_dir: {}, db name: {}, entry count: ", *this->data_dir_, *this->db_name_, db_entry_list_.size()));
+    SharedPtr<String> res = MakeShared<String>(fmt::format("DBMeta, db name: {}, entry count: {}", *this->db_name_, db_entry_list_.size()));
     return res;
 }
 
 nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
-    json_res["data_dir"] = *this->data_dir_;
     json_res["db_name"] = *this->db_name_;
 
     Vector<BaseEntry *> entry_candidates = db_entry_list_.GetCandidateEntry(max_commit_ts, EntryType::kDatabase);
@@ -128,10 +126,9 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts) {
 
 }
 
-UniquePtr<DBMeta> DBMeta::Deserialize(const String &data_dir, const nlohmann::json &db_meta_json, BufferManager *buffer_mgr) {
-    SharedPtr<String> data_dir_ptr = MakeShared<String>(data_dir);
+UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr) {
     SharedPtr<String> db_name = MakeShared<String>(db_meta_json["db_name"]);
-    UniquePtr<DBMeta> res = MakeUnique<DBMeta>(data_dir_ptr, db_name);
+    UniquePtr<DBMeta> res = MakeUnique<DBMeta>(db_name);
 
     if (db_meta_json.contains("db_entries")) {
         for (const auto &db_entry_json : db_meta_json["db_entries"]) {

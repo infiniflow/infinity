@@ -1,9 +1,6 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import os
 import time
 import pandas as pd
@@ -11,9 +8,14 @@ import pytest
 from numpy import dtype
 from common import common_values
 import infinity
+import infinity_embedded
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
 from common.utils import trace_expected_exceptions
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 
@@ -28,11 +30,17 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.common")
+        func = getattr(module, 'ConflictType')
+        globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
         uri = common_values.TEST_LOCAL_PATH
+        request.cls.infinity_obj = infinity_embedded.connect(uri)
     else:
         uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    request.cls.infinity_obj = infinity.connect(uri)
     if http:
         request.cls.infinity_obj = infinity_http()
     yield
@@ -89,7 +97,7 @@ class TestInfinity:
              {"c1": 4, "c2": 40, "c3": 400}])
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
+        res = table_obj.update("c1 = 1", {"c2": 90, "c3": 900})
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
@@ -98,7 +106,7 @@ class TestInfinity:
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
         with pytest.raises(Exception):
-            table_obj.update(None, [{"c2": 90, "c3": 900}])
+            table_obj.update(None, {"c2": 90, "c3": 900})
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
@@ -123,7 +131,7 @@ class TestInfinity:
         tb_obj = db_obj.get_table("test_update_empty_table"+suffix)
 
         try:
-            tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
+            tb_obj.update("c1 = 1", {"c2": 90, "c3": 900})
         except Exception as e:
             print(e)
 
@@ -184,8 +192,7 @@ class TestInfinity:
                 print(e)
 
             try:
-                tb_obj.update("c1 = 2",
-                              [{"c2": common_values.types_example_array[i]}])
+                tb_obj.update("c1 = 2", {"c2": common_values.types_example_array[i]})
                 res = tb_obj.output(["*"]).to_df()
                 print("update type: {} \n {}".format(common_values.types_array[i], res))
 
@@ -223,7 +230,7 @@ class TestInfinity:
 
             try:
                 tb_obj.update("c1 = " + str(common_values.types_example_array[i]),
-                              [{"c2": common_values.types_example_array[i]}])
+                              {"c2": common_values.types_example_array[i]})
                 res = tb_obj.output(["*"]).to_df()
                 print("update type: {} \n {}".format(common_values.types_array[i], res))
 
@@ -249,7 +256,7 @@ class TestInfinity:
         print(insert_res)
 
         # update
-        table_obj.update("c1 = 1", [{"c2": 20}])
+        table_obj.update("c1 = 1", {"c2": 20})
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
 
@@ -272,7 +279,7 @@ class TestInfinity:
         print(insert_res)
 
         # update
-        table_obj.update("c1 = 1", [{"c2": 20}])
+        table_obj.update("c1 = 1", {"c2": 20})
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
 
@@ -298,7 +305,7 @@ class TestInfinity:
         print(delete_res)
 
         # update
-        table_obj.update("c1 = 1", [{"c2": 20}])
+        table_obj.update("c1 = 1", {"c2": 20})
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
@@ -319,7 +326,7 @@ class TestInfinity:
         print(insert_res)
 
         # update
-        table_obj.update("c1 = 1", [{"c2": 21}])
+        table_obj.update("c1 = 1", {"c2": 21})
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
@@ -345,7 +352,7 @@ class TestInfinity:
         time.sleep(60)
 
         # update
-        table_obj.update("c1 = 1", [{"c2": 21}])
+        table_obj.update("c1 = 1", {"c2": 21})
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
@@ -363,7 +370,7 @@ class TestInfinity:
 
         # update
         with pytest.raises(InfinityException) as e:
-            table_obj.update("c1 = 1", [{"c2": 21}])
+            table_obj.update("c1 = 1", {"c2": 21})
             update_res = table_obj.output(["*"]).to_df()
             print(update_res)
 
@@ -379,13 +386,13 @@ class TestInfinity:
         table_obj = db_obj.create_table("test_update_invalid_value"+suffix, {"c1": {"type": "int"}, "c2": {"type": types}},
                                         ConflictType.Error)
         # update
-        table_obj.update("c1 = 1", [{"c2": types_example}])
+        table_obj.update("c1 = 1", {"c2": types_example})
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
         res = db_obj.drop_table("test_update_invalid_value"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-    @pytest.mark.usefixtures("skip_if_http")
+
     @pytest.mark.parametrize("types", ["int", "float"])
     @pytest.mark.parametrize("types_example", [
         1,
@@ -400,7 +407,7 @@ class TestInfinity:
                                         ConflictType.Error)
 
         # update
-        table_obj.update("c1 = 1", [{"c2": types_example}])
+        table_obj.update("c1 = 1", {"c2": types_example})
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
@@ -420,7 +427,7 @@ class TestInfinity:
 
         # update
         with pytest.raises(InfinityException) as e:
-            table_obj.update("c1 = 1", [{"c2": types_example}])
+            table_obj.update("c1 = 1", {"c2": types_example})
 
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.NOT_SUPPORTED_TYPE_CONVERSION
@@ -456,7 +463,7 @@ class TestInfinity:
         print(insert_res)
 
         # delete
-        table_obj.update(filter_list, [{"c2": types_example}])
+        table_obj.update(filter_list, {"c2": types_example})
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
 
@@ -490,7 +497,7 @@ class TestInfinity:
 
         # delete
         with pytest.raises(Exception):
-            table_obj.update(filter_list, [{"c2": types_example}])
+            table_obj.update(filter_list, {"c2": types_example})
 
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)

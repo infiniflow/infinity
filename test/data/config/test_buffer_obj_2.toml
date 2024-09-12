@@ -1,5 +1,5 @@
 [general]
-version = "0.3.0"
+version = "0.4.0"
 time_zone = "utc-8"
 
 [network]
@@ -12,13 +12,13 @@ cleanup_interval = "0s"
 compact_interval = "0s"
 
 [wal]
-#short checkpoint interval to allow quick cleanup
-full_checkpoint_interval = "1s"
+# close full checkpoint
+full_checkpoint_interval = "0s"
+# close delta checkpoint
+delta_checkpoint_interval = "0s"
 
 [buffer]
 buffer_manager_size = "32mb"
 temp_dir         = "/var/infinity/tmp"
 
 [resource]
-
-[persistence]

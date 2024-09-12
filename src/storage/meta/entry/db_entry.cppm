@@ -49,22 +49,16 @@ public:
 public:
     explicit DBEntry(DBMeta *db_meta,
                      bool is_delete,
-                     const SharedPtr<String> &base_dir,
                      const SharedPtr<String> &db_entry_dir,
                      const SharedPtr<String> &db_name,
                      TransactionID txn_id,
                      TxnTimeStamp begin_ts);
 
-    static SharedPtr<DBEntry> NewDBEntry(DBMeta *db_meta,
-                                         bool is_delete,
-                                         const SharedPtr<String> &base_dir,
-                                         const SharedPtr<String> &db_name,
-                                         TransactionID txn_id,
-                                         TxnTimeStamp begin_ts);
+    static SharedPtr<DBEntry>
+    NewDBEntry(DBMeta *db_meta, bool is_delete, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry> ReplayDBEntry(DBMeta *db_meta,
                                             bool is_delete,
-                                            const SharedPtr<String> &base_dir,
                                             const SharedPtr<String> &db_entry_dir,
                                             const SharedPtr<String> &db_name,
                                             TransactionID txn_id,
@@ -103,6 +97,8 @@ public:
 
     void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);
 
+    Status AddTable(SharedPtr<TableEntry> table_entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, bool add_if_found = false);
+
     // replay
     void CreateTableReplay(const SharedPtr<String> &table_name,
                            std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
@@ -128,9 +124,7 @@ public:
     Tuple<Vector<String>, Vector<TableMeta*>, std::shared_lock<std::shared_mutex>> GetAllTableMetas() const;
 
 private:
-    static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
-        return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));
-    }
+    static SharedPtr<String> DetermineDBDir(const String &db_name);
 
     friend void RecreateSegmentSealingTasksInStorageInit(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp system_start_ts);
 
@@ -146,7 +140,7 @@ private:
 private: // TODO: remote it
     std::shared_mutex &GetTableMetaLock() { return table_meta_map_.GetMetaLock(); }
 
-//    HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
+    //    HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
 
 public:
     void PickCleanup(CleanupScanner *scanner) override;

@@ -18,7 +18,8 @@
 
 namespace infinity {
 
-std::string TensorType::Tensor2String(char *tensor_ptr, const EmbeddingDataType type, const size_t embedding_dimension, const size_t embedding_num) {
+std::string TensorType::Tensor2String(const char *tensor_p, const EmbeddingDataType type, const size_t embedding_dimension, const size_t embedding_num) {
+    auto *tensor_ptr = const_cast<char *>(tensor_p);
     const size_t embedding_size = EmbeddingType::EmbeddingSize(type, embedding_dimension);
     std::ostringstream oss;
     // first embedding

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import global_resource_usage;
@@ -52,22 +53,17 @@ protected:
     static std::shared_ptr<std::string> close_ckp_config() {
         return GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
                    ? std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml")
-                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp_vfs.toml");
+                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp_vfs_off.toml");
     }
 
-    void SetUp() override {
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-    }
+    void SetUp() override { CleanupDbDirs(); }
 
-    void TearDown() override { RemoveDbDirs(); }
+    void TearDown() override {}
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          RepeatReplayTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(RepeatReplayTest, append) {
     std::shared_ptr<std::string> config_path = RepeatReplayTest::close_ckp_config();
@@ -123,7 +119,7 @@ TEST_P(RepeatReplayTest, append) {
                 ASSERT_EQ(block_entry->columns().size(), 2ul);
                 {
                     auto &col2 = block_entry->columns()[1];
-                    EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
+                    EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
                 }
             }
         }

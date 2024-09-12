@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #include "type/complex/row_id.h"
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import compilation_config;
@@ -40,7 +41,7 @@ protected:
     void SetUp() override {
         RemoveDbDirs();
 
-        auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_all_bgtask.toml");
+        auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_bgtask.toml");
         infinity::InfinityContext::instance().Init(config_path);
 
         storage_ = InfinityContext::instance().storage();
@@ -49,8 +50,6 @@ protected:
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
-
-        RemoveDbDirs();
     }
 
     Txn *DeleteRow(const String &db_name, const String &table_name, Vector<SegmentOffset> segment_offsets) {

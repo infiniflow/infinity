@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <typeinfo>
 
 export module wal_entry;
@@ -25,6 +26,8 @@ import stl;
 import statement_common;
 import infinity_exception;
 import internal_types;
+import persistence_manager;
+import column_def;
 
 namespace infinity {
 
@@ -60,6 +63,13 @@ export enum class WalCommandType : i8 {
     UPDATE_SEGMENT_BLOOM_FILTER_DATA = 32,
 
     // -----------------------------
+    // Alter
+    // -----------------------------
+    RENAME_TABLE = 40,
+    ADD_COLUMNS = 41,
+    DROP_COLUMNS = 42,
+
+    // -----------------------------
     // Flush
     // -----------------------------
     CHECKPOINT = 99,
@@ -76,8 +86,10 @@ export struct WalBlockInfo {
     BlockID block_id_{};
     u16 row_count_{};
     u16 row_capacity_{};
-    Vector<Vector<Pair<u32, u64>>> outline_infos_;
+    Vector<Pair<u32, u64>> outline_infos_;
     Vector<String> paths_;
+    AddrSerializer addr_serializer_;
+    mutable SizeT pm_size_ = 0; // tmp for test. should delete when stable
 
     WalBlockInfo() = default;
 
@@ -89,7 +101,7 @@ export struct WalBlockInfo {
 
     void WriteBufferAdv(char *&buf) const;
 
-    static WalBlockInfo ReadBufferAdv(char *&ptr);
+    static WalBlockInfo ReadBufferAdv(const char *&ptr);
 
     String ToString() const;
 };
@@ -112,7 +124,7 @@ export struct WalSegmentInfo {
 
     void WriteBufferAdv(char *&buf) const;
 
-    static WalSegmentInfo ReadBufferAdv(char *&ptr);
+    static WalSegmentInfo ReadBufferAdv(const char *&ptr);
 
     String ToString() const;
 };
@@ -121,6 +133,8 @@ export struct WalChunkIndexInfo {
     ChunkID chunk_id_{};
     String base_name_{};
     Vector<String> paths_{};
+    AddrSerializer addr_serializer_;
+    mutable SizeT pm_size_; // tmp for test. should delete when stable
     RowID base_rowid_{};
     u32 row_count_{};
     TxnTimeStamp deprecate_ts_{};
@@ -135,7 +149,7 @@ export struct WalChunkIndexInfo {
 
     void WriteBufferAdv(char *&buf) const;
 
-    static WalChunkIndexInfo ReadBufferAdv(char *&ptr);
+    static WalChunkIndexInfo ReadBufferAdv(const char *&ptr);
 
     String ToString() const;
 };
@@ -157,13 +171,15 @@ export struct WalCmd {
     virtual String CompactInfo() const = 0;
 
     // Read from a serialized version
-    static SharedPtr<WalCmd> ReadAdv(char *&ptr, i32 max_bytes);
+    static SharedPtr<WalCmd> ReadAdv(const char *&ptr, i32 max_bytes);
 
     static String WalCommandTypeToString(WalCommandType type);
 };
 
 export struct WalCmdCreateDatabase final : public WalCmd {
-    explicit WalCmdCreateDatabase(String db_name, String db_dir_tail) : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)) {}
+    explicit WalCmdCreateDatabase(String db_name, String db_dir_tail) : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)) {
+        assert(!std::filesystem::path(db_dir_tail_).is_absolute());
+    }
 
     WalCommandType GetType() const final { return WalCommandType::CREATE_DATABASE; }
     bool operator==(const WalCmd &other) const final {
@@ -231,7 +247,9 @@ export struct WalCmdDropTable final : public WalCmd {
 export struct WalCmdCreateIndex final : public WalCmd {
     WalCmdCreateIndex(String db_name, String table_name, String index_dir_tail_, SharedPtr<IndexBase> index_base)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_dir_tail_(std::move(index_dir_tail_)),
-          index_base_(std::move(index_base)) {}
+          index_base_(std::move(index_base)) {
+        assert(!std::filesystem::path(index_dir_tail_).is_absolute());
+    }
 
     WalCommandType GetType() const final { return WalCommandType::CREATE_INDEX; }
     bool operator==(const WalCmd &other) const final;
@@ -329,7 +347,7 @@ export struct WalCmdSetSegmentStatusSealed final : public WalCmd {
     String ToString() const final;
     String CompactInfo() const final;
 
-    static WalCmdSetSegmentStatusSealed ReadBufferAdv(char *&ptr);
+    static WalCmdSetSegmentStatusSealed ReadBufferAdv(const char *&ptr);
 
     const String db_name_{};
     const String table_name_{};
@@ -355,7 +373,7 @@ export struct WalCmdUpdateSegmentBloomFilterData final : public WalCmd {
     String ToString() const final;
     String CompactInfo() const final;
 
-    static WalCmdUpdateSegmentBloomFilterData ReadBufferAdv(char *&ptr);
+    static WalCmdUpdateSegmentBloomFilterData ReadBufferAdv(const char *&ptr);
 
     const String db_name_{};
     const String table_name_{};
@@ -366,7 +384,9 @@ export struct WalCmdUpdateSegmentBloomFilterData final : public WalCmd {
 
 export struct WalCmdCheckpoint final : public WalCmd {
     WalCmdCheckpoint(i64 max_commit_ts, bool is_full_checkpoint, String catalog_path, String catalog_name)
-        : max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path), catalog_name_(catalog_name) {}
+        : max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path), catalog_name_(catalog_name) {
+        assert(!std::filesystem::path(catalog_path_).is_absolute());
+    }
     virtual WalCommandType GetType() const final { return WalCommandType::CHECKPOINT; }
     virtual bool operator==(const WalCmd &other) const final;
     virtual i32 GetSizeInBytes() const final;
@@ -394,7 +414,7 @@ export struct WalCmdCompact final : public WalCmd {
 
     const String db_name_{};
     const String table_name_{};
-    const Vector<WalSegmentInfo> new_segment_infos_{};
+    Vector<WalSegmentInfo> new_segment_infos_{};
     const Vector<SegmentID> deprecated_segment_ids_{};
 };
 
@@ -440,6 +460,54 @@ export struct WalCmdDumpIndex final : public WalCmd {
     Vector<ChunkID> deprecate_ids_{};
 };
 
+export struct WalCmdRenameTable : public WalCmd {
+    WalCmdRenameTable(String db_name, String table_name, String new_table_name)
+        : db_name_(db_name), table_name_(table_name), new_table_name_(new_table_name) {}
+
+    WalCommandType GetType() const final { return WalCommandType::RENAME_TABLE; }
+    bool operator==(const WalCmd &other) const final;
+    i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    String db_name_{};
+    String table_name_{};
+    String new_table_name_{};
+};
+
+export struct WalCmdAddColumns : public WalCmd {
+    WalCmdAddColumns(String db_name, String table_name, Vector<SharedPtr<ColumnDef>> column_defs)
+        : db_name_(db_name), table_name_(table_name), column_defs_(std::move(column_defs)) {}
+
+    WalCommandType GetType() const final { return WalCommandType::ADD_COLUMNS; }
+    bool operator==(const WalCmd &other) const final;
+    i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    String db_name_{};
+    String table_name_{};
+    Vector<SharedPtr<ColumnDef>> column_defs_{};
+};
+
+export struct WalCmdDropColumns : public WalCmd {
+    WalCmdDropColumns(String db_name, String table_name, Vector<String> column_names)
+        : db_name_(db_name), table_name_(table_name), column_names_(std::move(column_names)) {}
+
+    WalCommandType GetType() const final { return WalCommandType::DROP_COLUMNS; }
+    bool operator==(const WalCmd &other) const final;
+    i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    String db_name_{};
+    String table_name_{};
+    Vector<String> column_names_{};
+};
+
 export struct WalEntryHeader {
     i32 size_{}; // size of header + payload + 4 bytes pad. There's 4 bytes pad just after the payload storing
     // the same value to assist backward iterating.
@@ -461,16 +529,12 @@ export struct WalEntry : WalEntryHeader {
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<WalEntry> ReadAdv(char *&ptr, i32 max_bytes);
+    static SharedPtr<WalEntry> ReadAdv(const char *&ptr, i32 max_bytes);
 
     Vector<SharedPtr<WalCmd>> cmds_{};
 
     // Return if the entry is a full checkpoint or delta checkpoint.
-    [[nodiscard]] bool IsCheckPoint() const;
-
-    [[nodiscard]] WalCmdCheckpoint *GetCheckPoint() const;
-
-    [[nodiscard]] bool IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const;
+    [[nodiscard]] bool IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const;
 
     [[nodiscard]] String ToString() const;
     [[nodiscard]] String CompactInfo() const;

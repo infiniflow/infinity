@@ -1,5 +1,5 @@
 [general]
-version = "0.3.0"
+version = "0.4.0"
 time_zone = "utc-8"
 
 [network]
@@ -14,4 +14,3 @@ wal_compact_threshold            = "10KB"
 [storage]
 [buffer]
 [resource]
-[persistence]

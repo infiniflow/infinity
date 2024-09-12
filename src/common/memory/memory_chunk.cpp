@@ -15,16 +15,6 @@ void *MemoryChunk::Allocate(SizeT num_bytes) {
     return ptr;
 }
 
-void *MemoryChunk::Allocate(SizeT num_bytes, SizeT align) {
-    auto ptr = (void *)((char *)(this) + pos_);
-    auto space = size_ - pos_;
-    auto aligned_ptr = std::align(align, num_bytes, ptr, space);
-    if (aligned_ptr) {
-        pos_ = (char *)aligned_ptr - (char *)(this) + num_bytes;
-    }
-    return aligned_ptr;
-}
-
 MemoryChunk *ChunkAllocator::Allocate(SizeT num_bytes) {
     u32 alloc_size = num_bytes + sizeof(ChainedMemoryChunk);
     if (alloc_size <= chunk_size_) {

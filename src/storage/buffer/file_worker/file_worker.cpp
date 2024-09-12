@@ -33,7 +33,7 @@ namespace infinity {
 
 FileWorker::~FileWorker() = default;
 
-void FileWorker::WriteToFile(bool to_spill) {
+bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         String error_message = "No data will be written.";
         UnrecoverableError(error_message);
@@ -64,7 +64,7 @@ void FileWorker::WriteToFile(bool to_spill) {
         file_handler_ = nullptr;
     });
 
-    WriteToFileImpl(to_spill, prepare_success);
+    bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
     if (prepare_success) {
         if (to_spill) {
             LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
@@ -78,6 +78,7 @@ void FileWorker::WriteToFile(bool to_spill) {
         obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(write_path);
         fs.DeleteFile(write_path);
     }
+    return all_save;
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {
@@ -88,9 +89,11 @@ void FileWorker::ReadFromFile(bool from_spill) {
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
         obj_addr_ = pm->GetObjFromLocalPath(read_path);
-        if (obj_addr_.Valid()) {
-            read_path = pm->GetObjCache(read_path);
+        if (!obj_addr_.Valid()) {
+            String error_message = fmt::format("Failed to find object for local path {}", read_path);
+            UnrecoverableError(error_message);
         }
+        read_path = pm->GetObjCache(read_path);
     }
     SizeT file_size = 0;
     u8 flags = FileFlags::READ_FLAG;
@@ -139,6 +142,14 @@ void FileWorker::MoveFile() {
     }
 }
 
+// Get absolute file path. As key of buffer handle.
+String FileWorker::GetFilePath() const { return Path(*data_dir_) / *file_dir_ / *file_name_; }
+
+String FileWorker::ChooseFileDir(bool spill) const {
+    return spill ? (Path(*temp_dir_) / *file_dir_)
+                 : (Path(*data_dir_) / *file_dir_);
+}
+
 void FileWorker::CleanupFile() const {
     if (InfinityContext::instance().persistence_manager() != nullptr) {
         String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
@@ -168,5 +179,4 @@ void FileWorker::CleanupTempFile() const {
         UnrecoverableError(error_message);
     }
 }
-
 } // namespace infinity

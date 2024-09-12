@@ -44,22 +44,26 @@ void ObjAddr::Deserialize(const nlohmann::json &obj) {
     part_size_ = obj["part_size"];
 }
 
+SizeT ObjAddr::GetSizeInBytes() const { return sizeof(int32_t) + obj_key_.size() + sizeof(SizeT) + sizeof(SizeT); }
+
 void ObjAddr::WriteBufAdv(char *&buf) const {
     ::infinity::WriteBufAdv(buf, obj_key_);
     ::infinity::WriteBufAdv(buf, part_offset_);
     ::infinity::WriteBufAdv(buf, part_size_);
 }
 
-void ObjAddr::ReadBufAdv(char *&buf) {
-    obj_key_ = ::infinity::ReadBufAdv<String>(buf);
-    part_offset_ = ::infinity::ReadBufAdv<SizeT>(buf);
-    part_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
+ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
+    ObjAddr ret;
+    ret.obj_key_ = ::infinity::ReadBufAdv<String>(buf);
+    ret.part_offset_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    ret.part_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    return ret;
 }
 
 nlohmann::json ObjStat::Serialize() const {
     nlohmann::json obj;
     obj["obj_size"] = obj_size_;
-    obj["deleted_size"] = deleted_size_;
+    obj["parts"] = parts_;
     obj["deleted_ranges"] = nlohmann::json::array();
     for (auto &range : deleted_ranges_) {
         nlohmann::json range_obj;
@@ -71,15 +75,9 @@ nlohmann::json ObjStat::Serialize() const {
 }
 
 void ObjStat::Deserialize(const nlohmann::json &obj) {
-    obj_size_ = 0;
     ref_count_ = 0;
-    deleted_size_ = 0;
-    if (obj.contains("obj_size")) {
-        obj_size_ = 0;
-    }
-    if (obj.contains("deleted_size")) {
-        deleted_size_ = 0;
-    }
+    obj_size_ = obj["obj_size"];
+    parts_ = obj["parts"];
     if (obj.contains("deleted_ranges")) {
         SizeT start = 0;
         SizeT end = 0;
@@ -95,9 +93,15 @@ void ObjStat::Deserialize(const nlohmann::json &obj) {
     }
 }
 
+SizeT ObjStat::GetSizeInBytes() const {
+    SizeT size = sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT);
+    size += (sizeof(SizeT) + sizeof(SizeT)) * deleted_ranges_.size();
+    return size;
+}
+
 void ObjStat::WriteBufAdv(char *&buf) const {
     ::infinity::WriteBufAdv(buf, obj_size_);
-    ::infinity::WriteBufAdv(buf, deleted_size_);
+    ::infinity::WriteBufAdv(buf, parts_);
     ::infinity::WriteBufAdv(buf, deleted_ranges_.size());
     for (auto &range : deleted_ranges_) {
         ::infinity::WriteBufAdv(buf, range.start_);
@@ -105,24 +109,27 @@ void ObjStat::WriteBufAdv(char *&buf) const {
     }
 }
 
-void ObjStat::ReadBufAdv(char *&buf) {
-    obj_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
-    ref_count_ = 0;
-    deleted_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
+ObjStat ObjStat::ReadBufAdv(const char *&buf) {
+    ObjStat ret;
+    ret.obj_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    ret.parts_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    ret.ref_count_ = 0;
 
     SizeT start, end;
     SizeT len = ::infinity::ReadBufAdv<SizeT>(buf);
     for (SizeT i = 0; i < len; ++i) {
         start = ::infinity::ReadBufAdv<SizeT>(buf);
         end = ::infinity::ReadBufAdv<SizeT>(buf);
-        deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
+        ret.deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
     }
+    return ret;
 }
 
 PersistenceManager::PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit)
     : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
     current_object_key_ = ObjCreate();
     current_object_size_ = 0;
+    current_object_parts_ = 0;
 
     if (local_data_dir_.empty() || local_data_dir_.back() != '/') {
         local_data_dir_ += '/';
@@ -136,7 +143,7 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
 
 PersistenceManager::~PersistenceManager() {
     [[maybe_unused]] SizeT sum_ref_count = 0;
-    for (auto& [key, obj_stat] : objects_) {
+    for (auto &[key, obj_stat] : objects_) {
         if (obj_stat.ref_count_ > 0) {
             LOG_ERROR(fmt::format("Object {} still has ref count {}", key, obj_stat.ref_count_));
         }
@@ -145,16 +152,40 @@ PersistenceManager::~PersistenceManager() {
     assert(sum_ref_count == 0);
 }
 
-
-ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose) {
+ObjAddr PersistenceManager::Persist(const String &file_path) {
     std::error_code ec;
     fs::path src_fp = file_path;
+
+    String local_path = RemovePrefix(file_path);
+    if (local_path.empty()) {
+        String error_message = fmt::format("Failed to find local path of {}", local_path);
+        UnrecoverableError(error_message);
+    }
+    {
+        // Cleanup the file if it already exists in the local_path_obj_
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = local_path_obj_.find(local_path);
+        if (it != local_path_obj_.end()) {
+            CleanupNoLock(it->second);
+            LOG_TRACE(fmt::format("Persist deleted mapping from local path {} to ObjAddr({}, {}, {})",
+                                  local_path,
+                                  it->second.obj_key_,
+                                  it->second.part_offset_,
+                                  it->second.part_size_));
+            local_path_obj_.erase(it);
+        }
+    }
+
     SizeT src_size = fs::file_size(src_fp, ec);
     if (ec) {
         String error_message = fmt::format("Failed to get file size of {}.", file_path);
         UnrecoverableError(error_message);
     }
-    if (src_size >= object_size_limit_ || !allow_compose) {
+    if (src_size == 0) {
+        String error_message = fmt::format("Persist skipped empty local path {}.", file_path);
+        LOG_WARN(error_message);
+        return ObjAddr();
+    } else if (src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         fs::path dst_fp = workspace_;
         dst_fp.append(obj_key);
@@ -165,14 +196,15 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(src_size, 0, 0));
+        objects_.emplace(obj_key, ObjStat(src_size, 1, 0));
+        LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
-        String local_path = RemovePrefix(file_path);
-        if (local_path.empty()) {
-            String error_message = fmt::format("Failed to find local path of {}", local_path);
-            UnrecoverableError(error_message);
-        }
         local_path_obj_[local_path] = obj_addr;
+        LOG_TRACE(fmt::format("Persist local path {} to dedicated ObjAddr ({}, {}, {})",
+                              local_path,
+                              obj_addr.obj_key_,
+                              obj_addr.part_offset_,
+                              obj_addr.part_size_));
         return obj_addr;
     } else {
         std::lock_guard<std::mutex> lock(mtx_);
@@ -182,19 +214,23 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
         ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
         CurrentObjAppendNoLock(file_path, src_size);
 
-        String local_path = RemovePrefix(file_path);
-        if (local_path.empty()) {
-            String error_message = fmt::format("Failed to find local path of {}", local_path);
-            UnrecoverableError(error_message);
-        }
         local_path_obj_[local_path] = obj_addr;
+        LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
+                              local_path,
+                              obj_addr.obj_key_,
+                              obj_addr.part_offset_,
+                              obj_addr.part_size_));
         return obj_addr;
     }
 }
 
-ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size, bool allow_compose) {
+ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size) {
     fs::path dst_fp = workspace_;
-    if (src_size >= object_size_limit_ || !allow_compose) {
+    if (src_size == 0) {
+        String error_message = fmt::format("Persist skipped empty data.");
+        LOG_WARN(error_message);
+        return ObjAddr();
+    } else if (src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         dst_fp.append(obj_key);
         std::ofstream outFile(dst_fp, std::ios::app);
@@ -206,7 +242,8 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size, bool allow
         outFile.close();
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(src_size, 0, 0));
+        objects_.emplace(obj_key, ObjStat(src_size, 1, 0));
+        LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
         return obj_addr;
     } else {
         dst_fp.append(current_object_key_);
@@ -221,30 +258,90 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size, bool allow
             UnrecoverableError(error_message);
         }
         outFile.write(data, src_size);
-        outFile.close();
         current_object_size_ += src_size;
+        current_object_parts_++;
         if (current_object_size_ >= object_size_limit_) {
-            objects_.emplace(current_object_key_, ObjStat(src_size, 0, 0));
+            if (current_object_parts_ > 1) {
+                // Add footer to composed object -- format version 1
+                const u32 compose_format = 1;
+                outFile.write((char *)&compose_format, sizeof(u32));
+            }
+
+            objects_.emplace(current_object_key_, ObjStat(src_size, current_object_parts_, 0));
+            LOG_TRACE(fmt::format("Persist added composed object {}", current_object_key_));
             current_object_key_ = ObjCreate();
             current_object_size_ = 0;
+            current_object_parts_ = 0;
         }
+        outFile.close();
         return obj_addr;
     }
 }
 
 // TODO:
-// - Add a 4-byte pad CRC32 checksum of the whole object to detect Silent Data Corruption.
 // - Upload the finalized object to object store in background.
-void PersistenceManager::CurrentObjFinalize() {
+void PersistenceManager::CurrentObjFinalize(bool validate) {
     std::lock_guard<std::mutex> lock(mtx_);
     CurrentObjFinalizeNoLock();
+
+    if (!validate)
+        return;
+    for (auto &[local_path, obj_addr] : local_path_obj_) {
+        auto it = objects_.find(obj_addr.obj_key_);
+        if (it == objects_.end()) {
+            String error_message = fmt::format("CurrentObjFinalize Failed to find object for local path {}", local_path);
+            LOG_ERROR(error_message);
+        }
+    }
+    for (auto &[obj_key, obj_stat] : objects_) {
+        Set<Range> &deleted_ranges = obj_stat.deleted_ranges_;
+        if (deleted_ranges.size() >= 2) {
+            auto it1 = deleted_ranges.begin();
+            auto it2 = std::next(it1);
+            while (it2 != deleted_ranges.end()) {
+                if (it1->end_ >= it2->start_) {
+                    String error_message = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
+                                                       obj_key,
+                                                       it1->start_,
+                                                       it1->end_,
+                                                       it2->start_,
+                                                       it2->end_);
+                    LOG_ERROR(error_message);
+                }
+                it1 = it2;
+                it2 = std::next(it2);
+            }
+        } else if (deleted_ranges.size() == 1) {
+            auto it1 = deleted_ranges.begin();
+            if (it1->start_ == 0 && it1->end_ == current_object_size_) {
+                String error_message = fmt::format("CurrentObjFinalize Object {} is fully deleted", obj_key);
+                LOG_ERROR(error_message);
+            }
+        }
+    }
 }
 
 void PersistenceManager::CurrentObjFinalizeNoLock() {
     if (current_object_size_ > 0) {
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, 0, 0));
+        if (current_object_parts_ > 1) {
+            // Add footer to composed object -- format version 1
+            fs::path dst_fp = workspace_;
+            dst_fp.append(current_object_key_);
+            std::ofstream outFile(dst_fp, std::ios::app);
+            if (!outFile.is_open()) {
+                String error_message = fmt::format("Failed to open file {}.", dst_fp.string());
+                UnrecoverableError(error_message);
+            }
+            const u32 compose_format = 1;
+            outFile.write((char *)&compose_format, sizeof(u32));
+            outFile.close();
+        }
+
+        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, 0));
+        LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
+        current_object_parts_ = 0;
     }
 }
 
@@ -258,8 +355,9 @@ String PersistenceManager::GetObjCache(const String &file_path) {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
-        String error_message = fmt::format("Failed to find object for local path {}", local_path);
-        UnrecoverableError(error_message);
+        String error_message = fmt::format("GetObjCache Failed to find object for local path {}", local_path);
+        LOG_WARN(error_message);
+        return "";
     }
     auto oit = objects_.find(it->second.obj_key_);
     if (oit != objects_.end()) {
@@ -301,12 +399,24 @@ void PersistenceManager::PutObjCache(const String &file_path) {
         return;
     }
 
+    assert(oit->second.ref_count_ > 0);
     oit->second.ref_count_--;
-    // For large files linked, fill in the file size when putting to ensure obj valid
-    if ( it->second.part_size_ == 0 && it->second.part_offset_ == 0) {
+    if (it->second.part_size_ == 0 && it->second.part_offset_ == 0) {
+        assert(oit->second.ref_count_ == 0);
+        // For large files linked, fill in the file size when putting to ensure obj valid
+        // There's no footer in dedicated objects.
         String obj_full_path = fs::path(workspace_).append(it->second.obj_key_).string();
         oit->second.obj_size_ = fs::file_size(obj_full_path);
+        oit->second.parts_ = 1;
         it->second.part_size_ = oit->second.obj_size_;
+
+        if (oit->second.obj_size_ == 0) {
+            // Avoid to persist empty objects.
+            objects_.erase(oit);
+            local_path_obj_.erase(it);
+            String error_message = fmt::format("PutObjCache skipped empty local path {}", file_path);
+            LOG_WARN(error_message);
+        }
     }
 }
 
@@ -317,7 +427,8 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
     ObjAddr obj_addr = ObjAddr(obj_key, 0, 0);
     {
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(0, 1, 0));
+        objects_.emplace(obj_key, ObjStat(0, 1, 1));
+        LOG_TRACE(fmt::format("ObjCreateRefCount added dedicated {}, path: {}", obj_key, file_path));
     }
 
     fs::path src_fp = workspace_;
@@ -364,13 +475,22 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &file_path, SizeT f
     }
     dstFile.write(buffer, srcFile.gcount());
     srcFile.close();
-    dstFile.close();
     current_object_size_ += file_size;
+    current_object_parts_++;
     if (current_object_size_ >= object_size_limit_) {
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, 0, 0));
+        if (current_object_parts_ > 1) {
+            // Add footer to composed object -- format version 1
+            const u32 compose_format = 1;
+            dstFile.write((char *)&compose_format, sizeof(u32));
+        }
+
+        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, 0));
+        LOG_TRACE(fmt::format("CurrentObjAppendNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
+        current_object_parts_ = 0;
     }
+    dstFile.close();
 }
 
 void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
@@ -381,33 +501,77 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
             it = objects_.find(object_addr.obj_key_);
             assert(it != objects_.end());
         } else {
-            String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
+            String error_message = fmt::format("CleanupNoLock Failed to find object {}", object_addr.obj_key_);
             UnrecoverableError(error_message);
+            return;
         }
     }
-    Range range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
-    auto target_range = it->second.deleted_ranges_.lower_bound(range);
+    Range orig_range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
+    Range range(orig_range);
+    auto inst_it = it->second.deleted_ranges_.lower_bound(range);
 
-    if (target_range != it->second.deleted_ranges_.end() && target_range->HasIntersection(range)) {
-        String error_message =
-            fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
+    if (inst_it != it->second.deleted_ranges_.begin()) {
+        auto inst_it_prev = std::prev(inst_it);
+        if (inst_it_prev->Cover(orig_range)) {
+            // Check duplication. Cleanup could delete a local file multiple times.
+            String error_message = fmt::format("CleanupNoLock delete [{}, {}) more than once", range.start_, range.end_);
+            LOG_WARN(error_message);
+            return;
+        } else if (inst_it_prev->Intersect(orig_range)) {
+            // Check intersection with prev range
+            String error_message = fmt::format("ObjAddr {} range to delete [{}, {}) intersects with prev one [{}, {})",
+                                               object_addr.obj_key_,
+                                               orig_range.start_,
+                                               orig_range.end_,
+                                               inst_it_prev->start_,
+                                               inst_it_prev->end_);
+            UnrecoverableError(error_message);
+        } else if (orig_range.start_ == inst_it_prev->end_) {
+            // Try merge with prev range
+            range.start_ = inst_it_prev->start_;
+            inst_it = it->second.deleted_ranges_.erase(inst_it_prev);
+        }
+    }
+
+    if (inst_it != it->second.deleted_ranges_.end()) {
+        if (inst_it->Cover(orig_range)) {
+            // Check duplication. Cleanup could delete a local file multiple times.
+            String error_message = fmt::format("CleanupNoLock delete [{}, {}) more than once", orig_range.start_, orig_range.end_);
+            LOG_WARN(error_message);
+            return;
+        } else if (inst_it->Intersect(orig_range)) {
+            // Check intersection with next range
+            String error_message = fmt::format("ObjAddr {} range to delete [{}, {}) intersects with next one [{}, {})",
+                                               object_addr.obj_key_,
+                                               orig_range.start_,
+                                               orig_range.end_,
+                                               inst_it->start_,
+                                               inst_it->end_);
+            UnrecoverableError(error_message);
+        } else if (orig_range.end_ == inst_it->start_) {
+            // Try merge with next range
+            range.end_ = inst_it->end_;
+            it->second.deleted_ranges_.erase(inst_it);
+        }
+    }
+
+    auto [_, ok] = it->second.deleted_ranges_.insert(range);
+    if (!ok) {
+        String error_message = fmt::format("Failed to delete ObjAddr {} range [{}, {})", object_addr.obj_key_, range.start_, range.end_);
         UnrecoverableError(error_message);
     }
 
-    if (target_range != it->second.deleted_ranges_.begin() && std::prev(target_range)->HasIntersection(range)) {
-        String error_message =
-            fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
-        UnrecoverableError(error_message);
-    }
-
-    it->second.deleted_ranges_.insert(range);
-    it->second.deleted_size_ += object_addr.part_size_;
-    assert(it->second.deleted_size_ <= it->second.obj_size_);
-    if (it->second.deleted_size_ == it->second.obj_size_ && object_addr.obj_key_ != current_object_key_) {
+    LOG_TRACE(fmt::format("Deleted object {} range [{}, {})", object_addr.obj_key_, orig_range.start_, orig_range.end_));
+    if (range.start_ == 0 && range.end_ == it->second.obj_size_ && object_addr.obj_key_ != current_object_key_) {
         fs::path fp = workspace_;
+        if (object_addr.obj_key_.empty()) {
+            String error_message = fmt::format("Failed to find object key");
+            UnrecoverableError(error_message);
+        }
         fp.append(object_addr.obj_key_);
         fs::remove(fp);
         objects_.erase(it);
+        LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
     }
 }
 
@@ -443,22 +607,17 @@ void PersistenceManager::SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj
         it->second = obj_stat;
     } else {
         objects_.emplace(obj_addr.obj_key_, obj_stat);
+        LOG_TRACE(fmt::format("SaveObjStat added object {}", obj_addr.obj_key_));
     }
 }
 
 String PersistenceManager::RemovePrefix(const String &path) {
     if (path.starts_with(local_data_dir_)) {
         return path.substr(local_data_dir_.length());
+    } else if (!path.starts_with("/")) {
+        return path;
     }
     return "";
-}
-
-SizeT PersistenceManager::SumRefCounts() {
-    SizeT ref_counts = 0;
-    for (auto& [key, obj_stat] : objects_) {
-        ref_counts += obj_stat.ref_count_;
-    }
-    return ref_counts;
 }
 
 void PersistenceManager::Cleanup(const String &file_path) {
@@ -471,10 +630,16 @@ void PersistenceManager::Cleanup(const String &file_path) {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
-        String error_message = fmt::format("Failed to find object {}", local_path);
+        String error_message = fmt::format("Failed to find object for local path {}", local_path);
         LOG_WARN(error_message);
+        return;
     }
     CleanupNoLock(it->second);
+    LOG_TRACE(fmt::format("Deleted mapping from local path {} to ObjAddr({}, {}, {})",
+                          local_path,
+                          it->second.obj_key_,
+                          it->second.part_offset_,
+                          it->second.part_size_));
     local_path_obj_.erase(it);
 }
 
@@ -483,9 +648,9 @@ nlohmann::json PersistenceManager::Serialize() {
     nlohmann::json json_obj;
     json_obj["obj_stat_size"] = objects_.size();
     json_obj["obj_stat_array"] = nlohmann::json::array();
-    for (auto &[path, obj_stat] : objects_) {
+    for (auto &[obj_key, obj_stat] : objects_) {
         nlohmann::json pair;
-        pair["obj_path"] = path;
+        pair["obj_key"] = obj_key;
         pair["obj_stat"] = obj_stat.Serialize();
         json_obj["obj_stat_array"].emplace_back(pair);
     }
@@ -508,10 +673,11 @@ void PersistenceManager::Deserialize(const nlohmann::json &obj) {
     }
     for (SizeT i = 0; i < len; ++i) {
         auto &json_pair = obj["obj_stat_array"][i];
-        String path = json_pair["obj_path"];
+        String obj_key = json_pair["obj_key"];
         ObjStat obj_stat;
         obj_stat.Deserialize(json_pair["obj_stat"]);
-        objects_.emplace(path, obj_stat);
+        objects_.emplace(obj_key, obj_stat);
+        LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
     }
     len = 0;
     if (obj.contains("obj_addr_size")) {
@@ -526,47 +692,6 @@ void PersistenceManager::Deserialize(const nlohmann::json &obj) {
     }
 }
 
-void PersistenceManager::WriteBufAdv(char *&buf, const Vector<String> &local_paths) {
-    ::infinity::WriteBufAdv(buf, local_paths.size());
-    for (auto &path : local_paths) {
-        ObjAddr obj_addr = GetObjFromLocalPath(path);
-        ::infinity::WriteBufAdv(buf, path);
-        obj_addr.WriteBufAdv(buf);
-        if (!obj_addr.Valid()) {
-            ObjStat invalid_stat;
-            invalid_stat.WriteBufAdv(buf);
-        } else {
-            ObjStat obj_stat = GetObjStatByObjAddr(obj_addr);
-            obj_stat.WriteBufAdv(buf);
-        }
-    }
-}
-
-void PersistenceManager::ReadBufAdv(char *&buf) {
-    SizeT size = ::infinity::ReadBufAdv<SizeT>(buf);
-    for (SizeT i = 0; i < size; ++i) {
-        String path = ::infinity::ReadBufAdv<String>(buf);
-        ObjAddr obj_addr;
-        ObjStat obj_stat;
-        obj_addr.ReadBufAdv(buf);
-        obj_stat.ReadBufAdv(buf);
-        SaveLocalPath(path, obj_addr);
-        SaveObjStat(obj_addr, obj_stat);
-    }
-}
-
-SizeT PersistenceManager::GetSizeInBytes(const Vector<String> &local_paths) {
-    SizeT size = sizeof(SizeT);
-    for (auto &path : local_paths) {
-        ObjAddr obj_addr = GetObjFromLocalPath(path);
-        ObjStat obj_stat = GetObjStatByObjAddr(obj_addr);
-        size += sizeof(i32) + path.size();
-        size += sizeof(i32) + obj_addr.obj_key_.size() + sizeof(SizeT) + sizeof(SizeT);
-        size += sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT) + obj_stat.deleted_ranges_.size() * (2 * sizeof(SizeT));
-    }
-    return size;
-}
-
 HashMap<String, ObjStat> PersistenceManager::GetAllObjects() const {
     std::lock_guard<std::mutex> lock(mtx_);
     return objects_;
@@ -575,6 +700,93 @@ HashMap<String, ObjStat> PersistenceManager::GetAllObjects() const {
 HashMap<String, ObjAddr> PersistenceManager::GetAllFiles() const {
     std::lock_guard<std::mutex> lock(mtx_);
     return local_path_obj_;
+}
+
+void AddrSerializer::Initialize(PersistenceManager *pm, const Vector<String> &path) {
+    if (pm == nullptr) {
+        return; // not use persistence manager
+    }
+    if (!paths_.empty()) {
+        UnrecoverableError("AddrSerializer has been initialized");
+    }
+    for (const String &path : path) {
+        paths_.push_back(path);
+        ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
+        obj_addrs_.push_back(obj_addr);
+        if (!obj_addr.Valid()) {
+            // In ImportWal, version file is not flushed here, set before write wal
+            ObjStat invaild_stat;
+            obj_stats_.push_back(invaild_stat);
+        } else {
+            ObjStat obj_stat = pm->GetObjStatByObjAddr(obj_addr);
+            obj_stats_.push_back(obj_stat);
+        }
+    }
+}
+
+void AddrSerializer::InitializeValid(PersistenceManager *pm) {
+    if (pm == nullptr) {
+        return; // not use persistence manager
+    }
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        if (obj_addrs_[i].Valid()) {
+            continue;
+        }
+        ObjAddr obj_addr = pm->GetObjFromLocalPath(paths_[i]);
+        obj_addrs_[i] = obj_addr;
+        if (!obj_addr.Valid()) {
+            UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
+        } else {
+            ObjStat obj_stat = pm->GetObjStatByObjAddr(obj_addr);
+            obj_stats_[i] = obj_stat;
+        }
+    }
+}
+
+SizeT AddrSerializer::GetSizeInBytes() const {
+    SizeT size = sizeof(SizeT);
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        size += sizeof(i32) + paths_[i].size();
+        size += obj_addrs_[i].GetSizeInBytes();
+        size += obj_stats_[i].GetSizeInBytes();
+    }
+    return size;
+}
+
+void AddrSerializer::WriteBufAdv(char *&buf) const {
+    ::infinity::WriteBufAdv(buf, paths_.size());
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        ::infinity::WriteBufAdv(buf, paths_[i]);
+        if (!obj_addrs_[i].Valid()) {
+            UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
+        }
+        obj_addrs_[i].WriteBufAdv(buf);
+        obj_stats_[i].WriteBufAdv(buf);
+    }
+}
+
+Vector<String> AddrSerializer::ReadBufAdv(const char *&ptr) {
+    SizeT path_count = ::infinity::ReadBufAdv<SizeT>(ptr);
+    for (SizeT i = 0; i < path_count; ++i) {
+        paths_.push_back(::infinity::ReadBufAdv<String>(ptr));
+        obj_addrs_.push_back(ObjAddr::ReadBufAdv(ptr));
+        obj_stats_.push_back(ObjStat::ReadBufAdv(ptr));
+    }
+    return paths_;
+}
+
+void AddrSerializer::AddToPersistenceManager(PersistenceManager *pm) const {
+    if (pm == nullptr) {
+        return;
+    }
+    for (SizeT i = 0; i < paths_.size(); ++i) {
+        if (!obj_addrs_[i].Valid()) {
+            UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
+        }
+        LOG_TRACE(fmt::format("Add path {} to persistence manager", paths_[i]));
+        pm->SaveLocalPath(paths_[i], obj_addrs_[i]);
+        pm->SaveObjStat(obj_addrs_[i], obj_stats_[i]);
+    }
 }
 
 } // namespace infinity

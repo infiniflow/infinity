@@ -38,6 +38,7 @@ export using infinity::DateT;
 
 export using infinity::TimeT;
 export using infinity::DateTimeT;
+export using infinity::DateTOld;
 export using infinity::TimestampT;
 export using infinity::IntervalT;
 
@@ -73,6 +74,9 @@ export using infinity::EmptyArrayT;
 export using infinity::Float16T;
 // BF16
 export using infinity::BFloat16T;
+
+// MultiVector
+export using infinity::MultiVectorT;
 
 export using infinity::RowID;
 export using infinity::TimeUnit;

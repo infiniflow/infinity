@@ -17,6 +17,12 @@ module;
 // #include <fstream>
 #include <string>
 
+import compilation_config;
+
+#ifdef ENABLE_JEMALLOC
+#include <jemalloc/jemalloc.h>
+#endif
+
 module physical_command;
 
 import stl;
@@ -36,6 +42,8 @@ import status;
 import infinity_exception;
 import variables;
 import logger;
+import table_entry;
+import txn;
 
 namespace infinity {
 
@@ -93,6 +101,20 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         case GlobalVariable::kInvalid: {
                             Status status = Status::InvalidCommand(fmt::format("unknown global variable {}", set_command->var_name()));
                             RecoverableError(status);
+                        }
+                        case GlobalVariable::kJeProf: {
+#ifdef ENABLE_JEMALLOC
+                            // dump jeprof
+                            int ret = mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
+                            if (ret != 0) {
+                                Status status = Status::UnexpectedError(fmt::format("mallctl prof1.dump failed {}", ret));
+                                RecoverableError(status);
+                            }
+                            return true;
+#else
+                            Status status = Status::InvalidCommand("jemalloc is not enabled");
+                            RecoverableError(status);
+#endif
                         }
                         default: {
                             Status status = Status::InvalidCommand(fmt::format("Global variable: {} is read-only", set_command->var_name()));
@@ -241,6 +263,26 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case CommandType::kCheckTable: {
+            break;
+        }
+        case CommandType::kLockTable: {
+            [[maybe_unused]] auto *lock_table_command = static_cast<LockCmd *>(command_info_.get());
+            auto *txn = query_context->GetTxn();
+            auto [table_entry, status] = txn->GetTableByName(lock_table_command->db_name(), lock_table_command->table_name());
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            table_entry->SetLocked();
+            break;
+        }
+        case CommandType::kUnlockTable: {
+            [[maybe_unused]] auto *unlock_table_command = static_cast<UnlockCmd *>(command_info_.get());
+            auto *txn = query_context->GetTxn();
+            auto [table_entry, status] = txn->GetTableByName(unlock_table_command->db_name(), unlock_table_command->table_name());
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            table_entry->SetUnlock();
             break;
         }
         default: {

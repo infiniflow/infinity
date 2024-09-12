@@ -2,6 +2,8 @@
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
+#find_package(Python)
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm)
 
 ### Parser
@@ -16,25 +18,48 @@ add_subdirectory(parser)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
-execute_process(COMMAND grep -q fma /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_FMA
-        OUTPUT_QUIET
-        ERROR_QUIET)
+if(APPLE)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA" 
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_SSE42
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q avx2 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_AVX2
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q avx512 /proc/cpuinfo
-        RESULT_VARIABLE SUPPORT_AVX512
-        OUTPUT_QUIET
-        ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+else()
+        #Linux
+        execute_process(COMMAND grep -q fma /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q avx2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+        execute_process(COMMAND grep -q avx512 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+endif()
 
 
 file(GLOB_RECURSE
@@ -198,7 +223,8 @@ add_library(infinity_core
         ${metrics_cpp}
         ${common_cpp}
         ${admin_cpp}
-        storage/buffer/file_worker/file_worker_type.cppm)
+        ${network_cpp}
+)
 
 target_sources(infinity_core
         PUBLIC
@@ -215,10 +241,11 @@ target_sources(infinity_core
         ${executor_cppm}
         ${metrics_cppm}
         ${admin_cppm}
+        ${network_cppm}
 )
 
 add_dependencies(infinity_core thrift thriftnb parquet_static snappy)
-
+target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
@@ -226,7 +253,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/croaring/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/croaring")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
@@ -245,6 +272,8 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/arrow/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
+target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 
 if (NOT SUPPORT_FMA EQUAL 0)
     message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -266,20 +295,20 @@ endif ()
 
 add_executable(infinity
         ${main_cpp}
-        ${network_cpp}
-        network/http_server.cppm
-        network/http_server.cpp
-        network/http/http_search.cppm
-        network/http/http_search.cpp
-        network/infinity_thrift_service.cpp
-        network/infinity_thrift_service.cppm
+
+#        network/http_server.cppm
+#        network/http_server.cpp
+#        network/http/http_search.cppm
+#        network/http/http_search.cpp
+#        network/infinity_thrift_service.cpp
+#        network/infinity_thrift_service.cppm
 )
 
-target_sources(infinity
-        PUBLIC
-        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-        ${network_cppm}
-)
+#target_sources(infinity
+#        PUBLIC
+#        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+#        ${network_cppm}
+#)
 
 add_dependencies(infinity oatpp)
 
@@ -307,7 +336,6 @@ target_link_libraries(infinity
         snappy.a
         ${JEMALLOC_STATIC_LIB}
 )
-
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
@@ -359,6 +387,7 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         thrift.a
         thriftnb.a
         snappy.a
+        ${JEMALLOC_STATIC_LIB}
 )
 
 # WARN: python modules shall not link to static libstdc++!!!
@@ -373,7 +402,7 @@ nanobind_disable_stack_protector(embedded_infinity_ext)
 nanobind_opt_size(embedded_infinity_ext)
 nanobind_strip(embedded_infinity_ext)
 
-install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity)
+install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity_embedded)
 endif ()
 
 ### unit test
@@ -442,6 +471,7 @@ file(GLOB_RECURSE
 file(GLOB_RECURSE
         ut_dependent_cppm
         CONFIGURE_DEPENDS
+        unit_test/base_test.cppm
         unit_test/test_helper/sql_runner.cppm
 )
 
@@ -467,6 +497,7 @@ add_executable(unit_test
         ${common_cpp}
         ${executor_cpp}
         ${admin_cpp}
+        ${network_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
@@ -489,21 +520,23 @@ target_link_libraries(unit_test
         c++abi.a
         parquet.a
         arrow.a
+        snappy.a
+        oatpp.a
+        ${JEMALLOC_STATIC_LIB}
         thrift.a
         thriftnb.a
-        snappy.a
-        ${JEMALLOC_STATIC_LIB}
+        event.a
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 
 target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${ut_dependent_cppm}
-        ${network_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -520,8 +553,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thr
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
-
-target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)

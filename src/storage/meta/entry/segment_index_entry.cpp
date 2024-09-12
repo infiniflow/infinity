@@ -89,14 +89,41 @@ String SegmentIndexEntry::EncodeIndex(const SegmentID segment_id, const TableInd
 }
 
 SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
-    : BaseEntry(EntryType::kSegmentIndex,
-                false,
-                table_index_entry ? table_index_entry->base_dir_ : MakeShared<String>(),
-                SegmentIndexEntry::EncodeIndex(segment_id, table_index_entry)),
-      table_index_entry_(table_index_entry), segment_id_(segment_id), vector_buffer_(std::move(vector_buffer)) {
+    : BaseEntry(EntryType::kSegmentIndex, false, SegmentIndexEntry::EncodeIndex(segment_id, table_index_entry)),
+      table_index_entry_(table_index_entry), segment_id_(segment_id) {
+    for (auto *buffer : vector_buffer) {
+        vector_buffer_.push_back(buffer);
+    }
     if (table_index_entry != nullptr)
         index_dir_ = table_index_entry->index_dir();
 };
+
+SegmentIndexEntry::SegmentIndexEntry(const SegmentIndexEntry &other)
+    : BaseEntry(other), buffer_manager_(other.buffer_manager_), table_index_entry_(other.table_index_entry_), index_dir_(other.index_dir_),
+      segment_id_(other.segment_id_) {
+    vector_buffer_ = other.vector_buffer_;
+    min_ts_ = other.min_ts_;
+    max_ts_ = other.max_ts_;
+    checkpoint_ts_ = other.checkpoint_ts_;
+    next_chunk_id_ = other.next_chunk_id_;
+
+    memory_hnsw_index_ = other.memory_hnsw_index_;
+    memory_indexer_ = other.memory_indexer_;
+    memory_secondary_index_ = other.memory_secondary_index_;
+    memory_emvb_index_ = other.memory_emvb_index_;
+    memory_bmp_index_ = other.memory_bmp_index_;
+    ft_column_len_sum_ = other.ft_column_len_sum_;
+    ft_column_len_cnt_ = other.ft_column_len_cnt_;
+}
+
+UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Clone(TableIndexEntry *table_index_entry) const {
+    auto ret = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(*this));
+    std::shared_lock lock(rw_locker_);
+    for (const auto &chunk_index_entry : chunk_index_entries_) {
+        ret->chunk_index_entries_.emplace_back(chunk_index_entry->Clone(ret.get()));
+    }
+    return ret;
+}
 
 SharedPtr<SegmentIndexEntry> SegmentIndexEntry::CreateFakeEntry(const String &index_dir) {
     SharedPtr<SegmentIndexEntry> fake_entry;
@@ -110,8 +137,7 @@ SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID s
     auto *buffer_mgr = txn->buffer_mgr();
 
     // FIXME: estimate index size.
-    SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *table_index_entry->base_dir_, *table_index_entry->index_dir()));
-    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(full_dir, param, segment_id);
+    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_mgr->AllocateBufferObject(std::move(vector_file_worker[i]));
@@ -143,8 +169,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     String column_name = table_index_entry->index_base()->column_name();
     auto create_index_param =
         SegmentIndexEntry::GetCreateIndexParam(table_index_entry->table_index_def(), segment_row_count, table_entry->GetColumnDefByName(column_name));
-    SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *table_index_entry->base_dir_, *table_index_entry->index_dir()));
-    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(full_dir, create_index_param.get(), segment_id);
+    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), create_index_param.get(), segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
@@ -157,17 +182,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     segment_index_entry->min_ts_ = min_ts;
     segment_index_entry->max_ts_ = max_ts;
     segment_index_entry->next_chunk_id_ = next_chunk_id;
-    {
-        LocalFileSystem fs;
-        for (ChunkID chunk_id = next_chunk_id;; ++chunk_id) {
-            String chunk_file_name = ChunkIndexEntry::IndexFileName(segment_id, chunk_id);
-            String file_path = *table_index_entry->index_dir() + "/" + chunk_file_name;
-            if (!fs.Exists(file_path)) {
-                break;
-            }
-            fs.DeleteFile(file_path);
-        }
-    }
+
     segment_index_entry->commit_ts_.store(commit_ts);
     segment_index_entry->buffer_manager_ = buffer_manager;
     return segment_index_entry;
@@ -210,9 +225,14 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
             auto create_annivfflat_param = static_cast<CreateAnnIVFFlatParam *>(param);
             auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
             switch (elem_type) {
-                case kElemFloat: {
-                    file_worker =
-                        MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(index_dir, file_name, index_base, column_def, create_annivfflat_param->row_count_);
+                case EmbeddingDataType::kElemFloat: {
+                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                             index_dir,
+                                                                             file_name,
+                                                                             index_base,
+                                                                             column_def,
+                                                                             create_annivfflat_param->row_count_);
                     break;
                 }
                 default: {
@@ -240,18 +260,19 @@ String SegmentIndexEntry::IndexFileName(SegmentID segment_id) { return fmt::form
 
 UniquePtr<SegmentIndexEntry>
 SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *param) {
-    SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *table_index_entry->base_dir_, *table_index_entry->index_dir()));
-    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(full_dir, param, segment_id);
+    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
     }
-    return UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
+    auto res = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
+    res->buffer_manager_ = buffer_manager;
+    return res;
 }
 
-BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
+BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0].get()->Load(); }
 
-BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1]->Load(); }
+BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1].get()->Load(); }
 
 void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                        u32 row_offset,
@@ -272,7 +293,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 String base_name = fmt::format("ft_{:016x}", begin_row_id.ToUint64());
                 {
                     std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                    String full_path = fmt::format("{}/{}", *table_index_entry_->base_dir_, *table_index_entry_->index_dir());
+                    String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
                     memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, begin_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
                 }
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
@@ -358,6 +379,12 @@ void SegmentIndexEntry::MemIndexCommit() {
     if (index_base->index_type_ != IndexType::kFullText || memory_indexer_.get() == nullptr)
         return;
     memory_indexer_->Commit();
+}
+void SegmentIndexEntry::MemIndexWaitInflightTasks() {
+    const IndexBase *index_base = table_index_entry_->index_base();
+    if (index_base->index_type_ != IndexType::kFullText || memory_indexer_.get() == nullptr)
+        return;
+    memory_indexer_->WaitInflightTasks();
 }
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *dump_size) {
@@ -450,7 +477,7 @@ void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id)
     // Init the mem index from previously spilled one.
     assert(memory_indexer_.get() == nullptr);
     const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-    String full_path = fmt::format("{}/{}", *table_index_entry_->base_dir_, *table_index_entry_->index_dir());
+    String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
     memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
     memory_indexer_->Load();
 }
@@ -493,7 +520,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
             String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
-            String full_path = fmt::format("{}/{}", *table_index_entry_->base_dir_, *table_index_entry_->index_dir());
+            String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
             memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
             u64 column_id = column_def->id();
             auto block_entry_iter = BlockEntryIter(segment_entry);
@@ -613,7 +640,7 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
             u32 full_row_count = segment_entry->row_count();
             BufferHandle buffer_handle = GetIndex();
             switch (embedding_info->Type()) {
-                case kElemFloat: {
+                case EmbeddingDataType::kElemFloat: {
                     auto annivfflat_index = reinterpret_cast<AnnIVFFlatIndexData<f32> *>(buffer_handle.GetDataMut());
                     // TODO: How to select training data?
                     if (check_ts) {
@@ -783,12 +810,17 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                             UnrecoverableError("Invalid index type.");
                         } else {
                             using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
-                            if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
-                                UnrecoverableError("Invalid index type.");
-                            } else {
-                                auto *p = std::move(*index).CompressToLVQ().release();
-                                delete index;
-                                *abstract_hnsw = p;
+                            if (params->compress_to_lvq) {
+                                if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
+                                    UnrecoverableError("Invalid index type.");
+                                } else {
+                                    auto *p = std::move(*index).CompressToLVQ().release();
+                                    delete index;
+                                    *abstract_hnsw = p;
+                                }
+                            }
+                            if (params->lvq_avg) {
+                                index->Optimize();
                             }
                         }
                     },
@@ -841,12 +873,12 @@ bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
 }
 
 void SegmentIndexEntry::Cleanup() {
-    for (auto *buffer_obj : vector_buffer_) {
-        if (buffer_obj == nullptr) {
+    for (auto &buffer_ptr : vector_buffer_) {
+        if (buffer_ptr.get() == nullptr) {
             String error_message = "vector_buffer should not has nullptr.";
             UnrecoverableError(error_message);
         }
-        buffer_obj->PickForCleanup();
+        buffer_ptr.get()->PickForCleanup();
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->Cleanup();
@@ -1001,8 +1033,14 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
         }
     }
     ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
+    merged_chunk_index_entry->SaveIndexFile();
     AddWalIndexDump(merged_chunk_index_entry.get(), txn, std::move(old_ids));
     return merged_chunk_index_entry.get();
+}
+
+BaseMemIndex *SegmentIndexEntry::GetMemIndex() const {
+    // only support hnsw index now.
+    return static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
 }
 
 void SegmentIndexEntry::SaveIndexFile() {
@@ -1010,7 +1048,7 @@ void SegmentIndexEntry::SaveIndexFile() {
     u64 segment_id = this->segment_id_;
     LOG_TRACE(fmt::format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
     for (auto &buffer_ptr : vector_buffer_) {
-        buffer_ptr->Save();
+        buffer_ptr.get()->Save();
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->SaveIndexFile();
@@ -1046,8 +1084,10 @@ void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_inde
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
     std::shared_lock lock(rw_locker_);
+    ChunkID chunk_id = this->GetNextChunkID();
     // row range of chunk_index_entries_ may overlop and misorder due to deprecated ones.
-    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, base_name, base_rowid, row_count, buffer_manager_);
+    SharedPtr<ChunkIndexEntry> chunk_index_entry =
+        ChunkIndexEntry::NewFtChunkIndexEntry(this, chunk_id, base_name, base_rowid, row_count, buffer_manager_);
     chunk_index_entries_.push_back(chunk_index_entry);
     return chunk_index_entry;
 }
@@ -1082,10 +1122,28 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
 
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, param.get(), base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    chunk_index_entries_.push_back(chunk_index_entry); // replay not need lock
+    bool add = false;
+    for (auto &chunk : chunk_index_entries_) {
+        if (chunk->chunk_id_ == chunk_id) {
+            chunk = chunk_index_entry;
+            add = true;
+            break;
+        }
+    }
+    if (!add) {
+        chunk_index_entries_.push_back(chunk_index_entry);
+    }
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
-        u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
-        UpdateFulltextColumnLenInfo(column_length_sum, row_count);
+        try {
+            u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
+            UpdateFulltextColumnLenInfo(column_length_sum, row_count);
+        } catch (const UnrecoverableException &e) {
+            String msg(e.what());
+            if (!msg.find("No such file or directory")) {
+                throw e;
+            }
+            LOG_WARN("Fulltext index file not found, skip update column length info");
+        }
     };
     return chunk_index_entry;
 }

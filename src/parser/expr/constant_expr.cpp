@@ -90,11 +90,11 @@ std::string ConstantExpr::ToString() const {
         }
         case LiteralType::kIntegerArray: {
             EmbeddingType embedding((char *)(long_array_.data()), false);
-            return EmbeddingType::Embedding2String(embedding, kElemInt64, long_array_.size());
+            return EmbeddingType::Embedding2String(embedding, EmbeddingDataType::kElemInt64, long_array_.size());
         }
         case LiteralType::kDoubleArray: {
             EmbeddingType embedding((char *)(double_array_.data()), false);
-            return EmbeddingType::Embedding2String(embedding, kElemInt64, double_array_.size());
+            return EmbeddingType::Embedding2String(embedding, EmbeddingDataType::kElemInt64, double_array_.size());
         }
         case LiteralType::kSubArrayArray: {
             std::stringstream ss;
@@ -269,8 +269,8 @@ void ConstantExpr::WriteAdv(char *&ptr) const {
     }
 }
 
-std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(char *&ptr, int32_t maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
+std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(const char *&ptr, int32_t maxbytes) {
+    const char *const ptr_end = ptr + maxbytes;
     LiteralType literal_type = ReadBufAdv<LiteralType>(ptr);
     auto const_expr = new ConstantExpr(literal_type);
     switch (literal_type) {

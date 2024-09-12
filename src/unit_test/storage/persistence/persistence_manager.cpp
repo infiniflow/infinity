@@ -1,6 +1,5 @@
-#include "unit_test/base_test.h"
-#include <algorithm>
-
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import persistence_manager;
 import local_file_system;
@@ -20,8 +19,6 @@ public:
         system(("mkdir -p " + file_dir_).c_str());
         pm_ = MakeUnique<PersistenceManager>(workspace_, file_dir_, ObjSizeLimit);
     }
-    void TearDown() override {}
-
     void CheckObjData(const String& obj_addr, const String& data);
 
 protected:

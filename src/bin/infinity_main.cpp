@@ -26,6 +26,7 @@ import pg_server;
 import infinity_exception;
 import infinity_context;
 import thrift_server;
+import peer_thrift_server;
 import http_server;
 import logger;
 import simd_init;
@@ -51,6 +52,9 @@ infinity::ThreadedThriftServer threaded_thrift_server;
 
 #endif
 
+infinity::Thread pool_peer_thrift_thread;
+infinity::PoolPeerThriftServer pool_peer_thrift_server;
+
 infinity::Thread http_server_thread;
 infinity::HTTPServer http_server;
 
@@ -74,7 +78,7 @@ void ShutdownServer() {
 
     http_server.Shutdown();
 
-    infinity::LOG_INFO("HTTP Server is shutdown.");
+    infinity::LOG_INFO("HTTP server is shutdown.");
 
 #if THRIFT_SERVER_TYPE == 0
 
@@ -90,11 +94,15 @@ void ShutdownServer() {
 
 #endif
 
-    infinity::LOG_INFO("Thrift Server is shutdown.");
+    infinity::LOG_INFO("Thrift server is shutdown.");
+
+    pool_peer_thrift_server.Shutdown();
+
+    infinity::LOG_INFO("Peer server is shutdown.");
 
     pg_server.Shutdown();
 
-    infinity::LOG_INFO("PG Server is shutdown.");
+    infinity::LOG_INFO("PG server is shutdown.");
 
     infinity::InfinityContext::instance().UnInit();
 
@@ -191,14 +199,14 @@ auto main(int argc, char **argv) -> int {
 
     fmt::print("Currently enabled SIMD support: {}\n", fmt::join(GetSupportedSimdTypesList(), ", "));
 
-    http_server_thread = infinity::Thread([&]() { http_server.Start(InfinityContext::instance().config()->HTTPPort()); });
+    http_server_thread = infinity::Thread([&]() { http_server.Start(InfinityContext::instance().config()->ServerAddress(), InfinityContext::instance().config()->HTTPPort()); });
 
     u32 thrift_server_port = InfinityContext::instance().config()->ClientPort();
 
 #if THRIFT_SERVER_TYPE == 0
 
     i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
-    pool_thrift_server.Init(thrift_server_port, thrift_server_pool_size);
+    pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
     pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
 
 #elif THRIFT_SERVER_TYPE == 1
@@ -214,6 +222,11 @@ auto main(int argc, char **argv) -> int {
 
 #endif
 
+    u32 peer_server_port = InfinityContext::instance().config()->PeerServerPort();
+    i32 peer_server_connection_pool_size = InfinityContext::instance().config()->PeerServerConnectionPoolSize();
+    pool_peer_thrift_server.Init(InfinityContext::instance().config()->PeerServerIP(), peer_server_port, peer_server_connection_pool_size);
+    pool_peer_thrift_thread = infinity::Thread([&]() { pool_peer_thrift_server.Start(); });
+
     pg_thread = infinity::Thread([&]() { pg_server.Run(); });
 
     shutdown_thread = infinity::Thread([&]() { ShutdownServer(); });
@@ -223,6 +236,8 @@ auto main(int argc, char **argv) -> int {
     shutdown_thread.join();
 
     http_server_thread.join();
+
+    pool_peer_thrift_thread.join();
 
 #if THRIFT_SERVER_TYPE == 0
 
@@ -239,8 +254,6 @@ auto main(int argc, char **argv) -> int {
 #endif
 
     pg_thread.join();
-
-
 
     fmt::print("Server is shutdown\n");
     return 0;

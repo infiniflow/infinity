@@ -24,7 +24,7 @@ import third_party;
 import data_type;
 import local_file_system;
 import column_vector;
-import bitmask;
+import roaring_bitmap;
 import internal_types;
 import base_entry;
 import block_column_entry;
@@ -32,7 +32,9 @@ import block_version;
 import fast_rough_filter;
 import value;
 import buffer_obj;
-import bitmask;
+import wal_entry;
+import column_def;
+import txn_store;
 
 namespace infinity {
 
@@ -56,6 +58,12 @@ public:
 public:
     // for iterator unit test
     explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
+
+private:
+    BlockEntry(const BlockEntry &other);
+
+public:
+    UniquePtr<BlockEntry> Clone(SegmentEntry *segment_entry) const;
 
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);
@@ -100,17 +108,17 @@ protected:
 
     SizeT DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
 
-    void CommitFlushed(TxnTimeStamp commit_ts);
+    void CommitFlushed(TxnTimeStamp commit_ts, WalBlockInfo *block_info);
 
     void CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    static SharedPtr<String> DetermineDir(const String &base_dir, const String &parent_dir, BlockID block_id);
+    static SharedPtr<String> DetermineDir(const String &parent_dir, BlockID block_id);
 
 public:
     // Getter
     inline const SegmentEntry *GetSegmentEntry() const { return segment_entry_; }
 
-    inline SizeT row_count() const { return row_count_; }
+    inline SizeT row_count() const { return block_row_count_; }
 
     inline SizeT row_capacity() const { return row_capacity_; }
 
@@ -132,15 +140,14 @@ public:
 
     RowID base_row_id() const { return RowID(segment_id(), segment_offset()); }
 
+    // Relative to the `data_dir` config item
     const SharedPtr<String> &block_dir() const { return block_dir_; }
-
-    SharedPtr<String> base_dir() const { return this->base_dir_; }
 
     BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
 
-    FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
+    FastRoughFilter *GetFastRoughFilter() { return fast_rough_filter_.get(); }
 
-    const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
+    const FastRoughFilter *GetFastRoughFilter() const { return fast_rough_filter_.get(); }
 
     SizeT row_count(TxnTimeStamp check_ts) const;
 
@@ -153,7 +160,7 @@ public:
 
     void CheckRowsVisible(Bitmask &segment_offsets, TxnTimeStamp check_ts) const;
 
-    bool CheckDeleteConflict(const Vector<BlockOffset> &block_offsets) const;
+    bool CheckDeleteConflict(const Vector<BlockOffset> &block_offsets, TxnTimeStamp commit_ts) const;
 
     void SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const;
 
@@ -169,9 +176,13 @@ public:
 
     ColumnVector GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
 
+    void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
+
+    void DropColumns(const Vector<ColumnID> &column_ids, Txn *txn);
+
 public:
-    // Setter
-    inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
+    // Setter, Used in import, segment append block, and block append block in compact
+    inline void IncreaseRowCount(SizeT increased_row_count) { block_row_count_ += increased_row_count; }
 
 private:
     void FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count);
@@ -185,14 +196,13 @@ protected:
     BlockID block_id_{};
     SharedPtr<String> block_dir_{};
 
-    u16 row_count_{};
+    u16 block_row_count_{};
     u16 row_capacity_{};
 
-    // UniquePtr<BlockVersion> block_version_{};
-    BufferObj *block_version_{};
+    BufferPtr version_buffer_object_{};
 
     // check if a value must not exist in the block
-    FastRoughFilter fast_rough_filter_;
+    SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
 
     TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this BlockEntry
     TxnTimeStamp max_row_ts_{0};           // Indicate the max commit_ts which create/update/delete data inside this BlockEntry

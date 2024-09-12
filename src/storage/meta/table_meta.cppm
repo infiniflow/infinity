@@ -45,11 +45,8 @@ export struct TableMeta : public MetaInterface {
     friend struct Catalog;
 
 public:
-    inline explicit TableMeta(const SharedPtr<String> &base_dir,
-                              const SharedPtr<String> &db_entry_dir,
-                              const SharedPtr<String> table_name,
-                              DBEntry *db_entry)
-        : base_dir_(base_dir), db_entry_dir_(db_entry_dir), table_name_(table_name), db_entry_(db_entry) {}
+    inline explicit TableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> table_name, DBEntry *db_entry)
+        : db_entry_dir_(db_entry_dir), table_name_(table_name), db_entry_(db_entry) {}
 
     static UniquePtr<TableMeta> NewTableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> &name, DBEntry *db_entry);
 
@@ -65,7 +62,8 @@ public:
     [[nodiscard]] const SharedPtr<String> &table_name_ptr() const { return table_name_; }
     [[nodiscard]] const String &table_name() const { return *table_name_; }
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const;
-    [[nodiscard]] const SharedPtr<String> &base_dir() const { return base_dir_; }
+
+    // Relative to the `data_dir`config item
     [[nodiscard]] const SharedPtr<String> &db_entry_dir() const { return db_entry_dir_; }
 
     DBEntry *db_entry() { return db_entry_; }
@@ -100,6 +98,13 @@ private:
         return table_entry_list_.GetEntryNolock(txn_id, begin_ts);
     }
 
+    Status AddEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                    SharedPtr<TableEntry> table_entry,
+                    TransactionID txn_id,
+                    TxnTimeStamp begin_ts,
+                    TxnManager *txn_mgr,
+                    bool add_if_exist = false);
+
     void DeleteEntry(TransactionID txn_id);
 
     // replay
@@ -117,8 +122,8 @@ private:
     void PushBackEntry(const SharedPtr<TableEntry>& new_table_entry);
 
     void Sort();
+
 private:
-    SharedPtr<String> base_dir_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> table_name_{};
 

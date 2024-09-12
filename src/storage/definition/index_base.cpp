@@ -101,8 +101,8 @@ void IndexBase::WriteAdv(char *&ptr) const {
     }
 }
 
-SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
+SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
+    const char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
         String error_message = "ptr goes out of range when reading IndexBase";
         UnrecoverableError(error_message);
@@ -128,9 +128,8 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             HnswEncodeType encode_type = ReadBufAdv<HnswEncodeType>(ptr);
             SizeT M = ReadBufAdv<SizeT>(ptr);
             SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
-            SizeT ef = ReadBufAdv<SizeT>(ptr);
             SizeT block_size = ReadBufAdv<SizeT>(ptr);
-            res = MakeShared<IndexHnsw>(index_name, file_name, column_names, metric_type, encode_type, M, ef_construction, ef, block_size);
+            res = MakeShared<IndexHnsw>(index_name, file_name, column_names, metric_type, encode_type, M, ef_construction, block_size);
             break;
         }
         case IndexType::kDiskAnn: {
@@ -221,12 +220,11 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
         case IndexType::kHnsw: {
             SizeT M = index_def_json["M"];
             SizeT ef_construction = index_def_json["ef_construction"];
-            SizeT ef = index_def_json["ef"];
             SizeT block_size = index_def_json["block_size"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             HnswEncodeType encode_type = StringToHnswEncodeType(index_def_json["encode_type"]);
             auto ptr =
-                MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef, block_size);
+                MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, block_size);
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }

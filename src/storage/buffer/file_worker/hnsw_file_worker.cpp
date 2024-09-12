@@ -36,18 +36,26 @@ import file_system_type;
 
 namespace infinity {
 
-HnswFileWorker::HnswFileWorker(SharedPtr<String> file_dir,
+HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
+                               SharedPtr<String> temp_dir,
+                               SharedPtr<String> file_dir,
                                SharedPtr<String> file_name,
                                SharedPtr<IndexBase> index_base,
                                SharedPtr<ColumnDef> column_def,
                                SizeT index_size)
-    : IndexFileWorker(file_dir, file_name, index_base, column_def) {
+    : IndexFileWorker(std::move(data_dir),
+                      std::move(temp_dir),
+                      std::move(file_dir),
+                      std::move(file_name),
+                      std::move(index_base),
+                      std::move(column_def)) {
     if (index_size == 0) {
         LocalFileSystem fs;
 
         String index_path = GetFilePath();
         auto [file_handler, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
-        if (status.ok()) { // file may deleted if cleaned up happens
+        if (status.ok()) {
+            // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
             index_size = fs.GetFileSize(*file_handler);
         }
     }
@@ -89,7 +97,7 @@ void HnswFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (!data_) {
         String error_message = "WriteToFileImpl: Data is not allocated.";
         UnrecoverableError(error_message);
@@ -106,6 +114,7 @@ void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         },
         *hnsw_index);
     prepare_success = true;
+    return true;
 }
 
 void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {

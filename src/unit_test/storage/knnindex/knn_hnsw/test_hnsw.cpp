@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-#include <fstream>
-#include <gtest/gtest.h>
 #include <thread>
+
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import hnsw_alg;
@@ -69,11 +69,11 @@ public:
             // os.flush();
             hnsw_index->Check();
 
-            hnsw_index->SetEf(10);
+            KnnSearchOption search_option{.ef_ = 10};
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {
                 const float *query = data.get() + i * dim;
-                auto result = hnsw_index->KnnSearchSorted(query, 1);
+                auto result = hnsw_index->KnnSearchSorted(query, 1, search_option);
                 if (result[0].second == (LabelT)i) {
                     ++correct;
                 }
@@ -133,11 +133,12 @@ public:
         auto test_func = [&](auto &hnsw_index) {
             hnsw_index->Check();
 
-            hnsw_index->SetEf(10);
+            KnnSearchOption search_option{.ef_ = 10};
+
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {
                 const float *query = data.get() + i * dim;
-                auto result = hnsw_index->KnnSearchSorted(query, 1);
+                auto result = hnsw_index->KnnSearchSorted(query, 1, search_option);
                 if (result[0].second == (LabelT)i) {
                     ++correct;
                 }
@@ -252,8 +253,6 @@ public:
                     }
                 });
 
-                write_thread2.detach();
-
                 std::atomic<i32> idx = start_i;
                 std::vector<std::thread> worker_threads;
                 for (int i = 0; i < 4; ++i) {
@@ -271,6 +270,7 @@ public:
                 for (int i = 0; i < 4; ++i) {
                     worker_threads[i].join();
                 }
+                write_thread2.join();
             }
             stop.store(true);
         });

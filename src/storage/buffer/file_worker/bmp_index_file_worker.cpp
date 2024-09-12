@@ -29,21 +29,23 @@ import file_system_type;
 
 namespace infinity {
 
-BMPIndexFileWorker::BMPIndexFileWorker(SharedPtr<String> file_dir,
+BMPIndexFileWorker::BMPIndexFileWorker(SharedPtr<String> data_dir,
+                                       SharedPtr<String> temp_dir,
+                                       SharedPtr<String> file_dir,
                                        SharedPtr<String> file_name,
                                        SharedPtr<IndexBase> index_base,
                                        SharedPtr<ColumnDef> column_def,
                                        SizeT index_size)
-    : IndexFileWorker(file_dir, file_name, index_base, column_def) {
+    : IndexFileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), std::move(index_base), std::move(column_def)) {
     if (index_size == 0) {
         LocalFileSystem fs;
 
         String index_path = GetFilePath();
         auto [file_handler, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
+        if (status.ok()) {
+            // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
+            index_size = fs.GetFileSize(*file_handler);
         }
-        index_size = fs.GetFileSize(*file_handler);
     }
     index_size_ = index_size;
 }
@@ -83,7 +85,7 @@ void BMPIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (!data_) {
         UnrecoverableError("Data is not allocated.");
     }
@@ -99,6 +101,7 @@ void BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         },
         *bmp_index);
     prepare_success = true;
+    return true;
 }
 
 void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size) {

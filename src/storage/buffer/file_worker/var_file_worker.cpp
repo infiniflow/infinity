@@ -24,8 +24,12 @@ import local_file_system;
 
 namespace infinity {
 
-VarFileWorker::VarFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size)
-    : FileWorker(std::move(file_dir), std::move(file_name)), buffer_size_(buffer_size) {}
+VarFileWorker::VarFileWorker(SharedPtr<String> data_dir,
+                             SharedPtr<String> temp_dir,
+                             SharedPtr<String> file_dir,
+                             SharedPtr<String> file_name,
+                             SizeT buffer_size)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), buffer_size_(buffer_size) {}
 
 VarFileWorker::~VarFileWorker() {
     if (data_ != nullptr) {
@@ -49,11 +53,20 @@ void VarFileWorker::FreeInMemory() {
         UnrecoverableError(error_message);
     }
     auto *buffer = static_cast<VarBuffer *>(data_);
+    buffer_size_ = buffer->TotalSize();
     delete buffer;
     data_ = nullptr;
 }
 
-void VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+SizeT VarFileWorker::GetMemoryCost() const {
+    if (data_ == nullptr) {
+        return buffer_size_;
+    }
+    auto *buffer = static_cast<VarBuffer *>(data_);
+    return buffer->TotalSize();
+}
+
+bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         String error_message = "Data is not allocated.";
         UnrecoverableError(error_message);
@@ -71,6 +84,8 @@ void VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         UnrecoverableError(error_message);
     }
     prepare_success = true;
+    buffer_size_ = data_size;
+    return true;
 }
 
 void VarFileWorker::ReadFromFileImpl(SizeT file_size) {

@@ -31,7 +31,10 @@ import value;
 import meta_entry_interface;
 import cleanup_scanner;
 import logger;
-import bitmask;
+import roaring_bitmap;
+import wal_entry;
+import column_def;
+import constant_expr;
 
 namespace infinity {
 
@@ -81,6 +84,12 @@ public:
                           SizeT row_capacity,
                           SizeT column_count,
                           SegmentStatus status);
+
+private:
+    SegmentEntry(const SegmentEntry &other);
+
+public:
+    UniquePtr<SegmentEntry> Clone(TableEntry *table_entry) const;
 
     static SharedPtr<SegmentEntry> NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
@@ -143,9 +152,9 @@ public:
     // `this` called in wal thread, and `block_entry_` is also accessed in flush, so lock is needed
     void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
 
-    FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
+    FastRoughFilter *GetFastRoughFilter() { return fast_rough_filter_.get(); }
 
-    const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
+    const FastRoughFilter *GetFastRoughFilter() const { return fast_rough_filter_.get(); }
 
     void LoadFilterBinaryData(const String &segment_filter_data);
     static String SegmentStatusToString(const SegmentStatus &type);
@@ -154,7 +163,7 @@ public:
 public:
     // Const getter
     const TableEntry *GetTableEntry() const { return table_entry_; }
-    SharedPtr<String> base_dir() const;
+    // Relative to the `data_dir` config item
     const SharedPtr<String> &segment_dir() const { return segment_dir_; }
     SegmentID segment_id() const { return segment_id_; }
     SizeT row_capacity() const { return row_capacity_; }
@@ -209,7 +218,7 @@ public:
 
     SizeT DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, Txn *txn);
 
-    void CommitFlushed(TxnTimeStamp commit_ts);
+    void CommitFlushed(TxnTimeStamp commit_ts, WalSegmentInfo *segment_info);
 
     void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnSegmentStore &segment_store, const DeleteState *delete_state);
 
@@ -255,7 +264,7 @@ private:
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
     // check if a value must not exist in the segment
-    FastRoughFilter fast_rough_filter_;
+    SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
 
     CompactStateData *compact_state_data_{};
     SegmentStatus status_;
@@ -266,6 +275,10 @@ public:
     void Cleanup() override;
 
     void PickCleanup(CleanupScanner *scanner) override;
+
+    void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
+
+    void DropColumns(const Vector<ColumnID> &column_ids, Txn *txn);
 };
 
 } // namespace infinity

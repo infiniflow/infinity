@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -34,26 +35,8 @@ import logical_type;
 import internal_types;
 import data_type;
 
-class ExpressionExecutorSelectTest : public BaseTest {
-    void SetUp() override {
-        RemoveDbDirs();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::InfinityContext::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTest::TearDown();
-    }
-};
+using namespace infinity;
+class ExpressionExecutorSelectTest : public BaseTest {};
 
 TEST_F(ExpressionExecutorSelectTest, test1) {
     using namespace infinity;

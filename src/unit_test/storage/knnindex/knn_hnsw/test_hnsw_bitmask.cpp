@@ -12,10 +12,11 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
-import bitmask;
+import roaring_bitmap;
 import data_store;
 import vec_store_type;
 import dist_func_l2;
@@ -85,8 +86,9 @@ TEST_F(HnswAlgBitmaskTest, test1) {
 
     Vector<f32> distance_array(top_k);
     Vector<u64> id_array(top_k);
+    KnnSearchOption search_option{.ef_ = 2ul * top_k};
     {
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, search_option);
 
         EXPECT_NEAR(result[0].first, 0, error);
         EXPECT_NEAR(result[0].second, 0, error);
@@ -101,12 +103,12 @@ TEST_F(HnswAlgBitmaskTest, test1) {
         EXPECT_NEAR(result[3].second, 3, error);
     }
 
-    auto p_bitmask = Bitmask::Make(64);
+    auto p_bitmask = Bitmask::MakeSharedAllTrue(base_embedding_count);
     p_bitmask->SetFalse(1);
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter, search_option);
 
         EXPECT_NEAR(result[0].first, 0, error);
         EXPECT_NEAR(result[0].second, 0, error);
@@ -122,7 +124,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter, search_option);
 
         EXPECT_NEAR(result[0].first, 0.08, error);
         EXPECT_NEAR(result[0].second, 2, error);
@@ -135,7 +137,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter, search_option);
 
         EXPECT_NEAR(result[0].first, 0.2, error);
         EXPECT_NEAR(result[0].second, 3, error);

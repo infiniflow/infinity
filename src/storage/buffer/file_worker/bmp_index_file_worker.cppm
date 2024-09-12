@@ -28,7 +28,9 @@ namespace infinity {
 
 export class BMPIndexFileWorker final : public IndexFileWorker {
 public:
-    explicit BMPIndexFileWorker(SharedPtr<String> file_dir,
+    explicit BMPIndexFileWorker(SharedPtr<String> data_dir,
+                                SharedPtr<String> temp_dir,
+                                SharedPtr<String> file_dir,
                                 SharedPtr<String> file_name,
                                 SharedPtr<IndexBase> index_base,
                                 SharedPtr<ColumnDef> column_def,
@@ -46,7 +48,7 @@ public:
     SizeT GetMemoryCost() const override { return index_size_; }
 
 protected:
-    void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
+    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void ReadFromFileImpl(SizeT file_size) override;
 

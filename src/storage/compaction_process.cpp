@@ -38,6 +38,11 @@ import bg_query_state;
 import txn_store;
 import memindex_tracer;
 import segment_entry;
+import table_index_entry;
+import base_memindex;
+import segment_index_entry;
+import status;
+import default_values;
 
 namespace infinity {
 
@@ -126,7 +131,7 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
                 }
 
                 LOG_TRACE("Construct compact task: ");
-                for(SegmentEntry* segment_ptr: compact_segments) {
+                for (SegmentEntry *segment_ptr : compact_segments) {
                     LOG_TRACE(fmt::format("To compact segment: {}", segment_ptr->ToString()));
                 }
 
@@ -140,6 +145,7 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
 
 void CompactionProcessor::ScanAndOptimize() {
     Txn *opt_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanAndOptimize"));
+    LOG_INFO(fmt::format("ScanAndOptimize opt begin ts: {}", opt_txn->BeginTS()));
     TransactionID txn_id = opt_txn->TxnID();
     TxnTimeStamp begin_ts = opt_txn->BeginTS();
 
@@ -158,31 +164,53 @@ void CompactionProcessor::ScanAndOptimize() {
 }
 
 void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
-    Txn *dump_txn = txn_mgr_->BeginTxn(MakeUnique<String>(dump_task->ToString()));
-    TransactionID txn_id = dump_txn->TxnID();
-    TxnTimeStamp begin_ts = dump_txn->BeginTS();
-
+    Txn *dump_txn = dump_task->txn_;
+    BaseMemIndex *mem_index = dump_task->mem_index_;
     auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
     try {
-        auto [table_entry, status1] = catalog_->GetTableByName(*dump_task->db_name_, *dump_task->table_name_, txn_id, begin_ts);
-        if (!status1.ok()) {
-            RecoverableError(status1);
-        }
-        auto [table_index_entry, status2] = table_entry->GetIndex(*dump_task->index_name_, txn_id, begin_ts);
-        if (!status2.ok()) {
-            RecoverableError(status2);
-        }
-
+        TableIndexEntry *table_index_entry = mem_index->table_index_entry();
+        auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
         TxnTableStore *txn_table_store = dump_txn->GetTxnTableStore(table_entry);
         SizeT dump_size = 0;
         table_index_entry->MemIndexDump(dump_txn, txn_table_store, false /*spill*/, &dump_size);
 
         txn_mgr_->CommitTxn(dump_txn);
-        memindex_tracer->DumpDone(dump_size, dump_task->task_id_);
+
+        memindex_tracer->DumpDone(dump_size, mem_index);
     } catch (const RecoverableException &e) {
         txn_mgr_->RollBackTxn(dump_txn);
-        memindex_tracer->DumpFail(dump_task->task_id_);
+        memindex_tracer->DumpFail(mem_index);
         LOG_WARN(fmt::format("Dump index task failed: {}, task: {}", e.what(), dump_task->ToString()));
+    }
+}
+
+void CompactionProcessor::DoDumpByline(DumpIndexBylineTask *dump_task) {
+    String msg = fmt::format("Dump index by line, table name: {}, index name: {}", *dump_task->table_name_, *dump_task->index_name_);
+    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>(msg));
+    try {
+        auto [table_index_entry, status] = txn->GetIndexByName(*dump_task->db_name_, *dump_task->table_name_, *dump_task->index_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        auto *dumped_chunk = dump_task->dumped_chunk_.get();
+        if (dumped_chunk->deprecate_ts_ != UNCOMMIT_TS) {
+            RecoverableError(Status::TxnRollback(txn->TxnID(), fmt::format("Dumped chunk {} is deleted.", dumped_chunk->encode())));
+        }
+        auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+        TxnTableStore *txn_table_store = txn->GetTxnTableStore(table_entry);
+        txn_table_store->AddChunkIndexStore(table_index_entry, dumped_chunk);
+
+        SharedPtr<SegmentIndexEntry> segment_index_entry;
+        bool created = table_index_entry->GetOrCreateSegment(dump_task->segment_id_, txn, segment_index_entry);
+        if (created) {
+            UnrecoverableError(fmt::format("DumpByline: Cannot find segment index entry with id: {}", dump_task->segment_id_));
+        }
+        segment_index_entry->AddWalIndexDump(dumped_chunk, txn);
+
+        txn_mgr_->CommitTxn(txn);
+    } catch (const RecoverableException &e) {
+        txn_mgr_->RollBackTxn(txn);
+        LOG_WARN(fmt::format("Rollback {}", msg));
     }
 }
 
@@ -214,6 +242,13 @@ void CompactionProcessor::Process() {
                     LOG_DEBUG(dump_task->ToString());
                     DoDump(dump_task);
                     LOG_DEBUG("Dump index done.");
+                    break;
+                }
+                case BGTaskType::kDumpIndexByline: {
+                    auto dump_task = static_cast<DumpIndexBylineTask *>(bg_task.get());
+                    LOG_DEBUG(dump_task->ToString());
+                    DoDumpByline(dump_task);
+                    LOG_DEBUG("Dump index byline done.");
                     break;
                 }
                 default: {

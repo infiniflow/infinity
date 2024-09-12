@@ -21,7 +21,7 @@ import stl;
 import knn_result_handler;
 
 import infinity_exception;
-import bitmask;
+import roaring_bitmap;
 import default_values;
 import internal_types;
 
@@ -51,7 +51,7 @@ public:
 
     void Search(const QueryElemType *query, const QueryElemType *data, u32 dim, DistFunc dist_f, u32 segment_id, u32 segment_offset);
 
-    void Search(const QueryElemType *query, const QueryElemType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id, Bitmask &bitmask);
+    void Search(const QueryElemType *query, const QueryElemType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id, const Bitmask &bitmask);
 
     void Search(const DistType *dist, const RowID *row_ids, u16 count);
 
@@ -117,7 +117,7 @@ void MergeKnn<QueryElemType, C, DistType>::Search(const QueryElemType *query,
                                              u16 row_cnt,
                                              u32 segment_id,
                                              u16 block_id,
-                                             Bitmask &bitmask) {
+                                             const Bitmask &bitmask) {
     if (bitmask.IsAllTrue()) {
         Search(query, data, dim, dist_f, row_cnt, segment_id, block_id);
         return;

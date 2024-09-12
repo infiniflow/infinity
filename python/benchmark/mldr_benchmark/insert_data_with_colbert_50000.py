@@ -18,7 +18,7 @@ from tqdm import tqdm
 from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield, read_colbert_data_yield
 from mldr_common_tools import get_all_part_begin_ends, get_bit_array
 import infinity.index as index
-from infinity.common import ConflictType, LOCAL_HOST
+from infinity.common import ConflictType, LOCAL_HOST, SparseVector
 from infinity.errors import ErrorCode
 
 
@@ -93,7 +93,7 @@ class InfinityClientForInsert:
             if int(docid_str.split('-')[-1]) >= 189796:
                 continue
             insert_dict = {"docid_col": docid_str, "fulltext_col": corpus_text_list[row_pos],
-                           "dense_col": insert_dense_data, "sparse_col": insert_sparse_data,
+                           "dense_col": insert_dense_data, "sparse_col": SparseVector(**insert_sparse_data),
                            "colbert_col": colbert_list, "colbert_bit_col": get_bit_array(colbert_list)}
             self.infinity_table.insert(insert_dict)
         print("Finish inserting data.")
@@ -116,7 +116,6 @@ class InfinityClientForInsert:
                                                                              {
                                                                                  "m": "16",
                                                                                  "ef_construction": "200",
-                                                                                 "ef": "200",
                                                                                  "metric": "ip",
                                                                                  "encode": "lvq"
                                                                              }),
@@ -132,11 +131,9 @@ class InfinityClientForInsert:
         self.infinity_table.optimize("bmp_index", {"topk": "1000", "bp_reorder": ""})
         print("Finish creating BMP index.")
         # print("Start creating EMVB index...")
-        # res = self.infinity_table.create_index("emvb_index",
-        #                                        index.IndexInfo("colbert_col",
-        #                                                        index.IndexType.EMVB,
-        #                                                        [index.InitParameter("pq_subspace_num", "32"),
-        #                                                         index.InitParameter("pq_subspace_bits", "8")]),
+        # res = self.infinity_table.create_index("emvb_index", index.IndexInfo("colbert_col", index.IndexType.EMVB,
+        #                                                                      {"pq_subspace_num": "32",
+        #                                                                       "pq_subspace_bits": "8"}),
         #                                        ConflictType.Error)
         # assert res.error_code == ErrorCode.OK
         # print("Finish creating EMVB index.")

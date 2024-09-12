@@ -117,19 +117,16 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
 
 // extern SharedPtr<spdlogger> infinity_logger;
 
-Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default_config) {
-
+Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
     LocalFileSystem fs;
 
     toml::table config_toml{};
-    if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
-        if (config_path.get() == nullptr) {
+    if (config_path.get() == nullptr || config_path->empty() || !fs.Exists(std::filesystem::absolute(*config_path))) {
+        if (config_path.get() == nullptr || config_path->empty()) {
 //            fmt::print("No config file is given, use default configs.\n");
             ;
         } else {
-            if (!fs.Exists(*config_path)) {
-                fmt::print("Config file: {} is not existent.\n", *config_path);
-            }
+            fmt::print("Config file: {} is not existent.\n", *config_path);
         }
 
         Status status;
@@ -138,6 +135,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
         String current_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
         UniquePtr<StringOption> version_option = MakeUnique<StringOption>(VERSION_OPTION_NAME, current_version);
         status = global_options_.AddOption(std::move(version_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Server mode
+        String server_mode = "standalone";
+        UniquePtr<StringOption> server_mode_option = MakeUnique<StringOption>(SERVER_MODE_OPTION_NAME, server_mode);
+        status = global_options_.AddOption(std::move(server_mode_option));
         if(!status.ok()) {
             fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
@@ -188,6 +194,24 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             UnrecoverableError(status.message());
         }
 
+        // Peer server address
+        String peer_server_ip_str = "0.0.0.0";
+        UniquePtr<StringOption> peer_server_ip_option = MakeUnique<StringOption>(PEER_SERVER_IP_OPTION_NAME, peer_server_ip_str);
+        status = global_options_.AddOption(std::move(peer_server_ip_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Peer server port
+        i64 peer_server_port = 23850;
+        UniquePtr<IntegerOption> peer_server_port_option = MakeUnique<IntegerOption>(PEER_SERVER_PORT_OPTION_NAME, peer_server_port, 65535, 1024);
+        status = global_options_.AddOption(std::move(peer_server_port_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Postgres port
         i64 pg_port = 5432;
         UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>(POSTGRES_PORT_OPTION_NAME, pg_port, 65535, 1024);
@@ -219,6 +243,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
         i64 connection_pool_size = 256;
         UniquePtr<IntegerOption> connection_pool_size_option = MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, connection_pool_size, 65536, 1);
         status = global_options_.AddOption(std::move(connection_pool_size_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Peer server connection pool size
+        i64 peer_server_connection_pool_size = 64;
+        UniquePtr<IntegerOption> peer_server_connection_pool_size_option = MakeUnique<IntegerOption>(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME, peer_server_connection_pool_size, 65536, 1);
+        status = global_options_.AddOption(std::move(peer_server_connection_pool_size_option));
         if(!status.ok()) {
             fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
@@ -299,6 +332,17 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
+
+        // Persistence Dir
+        String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
+        UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
+        global_options_.AddOption(std::move(persistence_dir_option));
+
+        // Persistence Object Size Limit
+        i64 persistence_object_size_limit = DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT;
+        UniquePtr<IntegerOption> persistence_object_size_limit_option =
+            MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME, persistence_object_size_limit, std::numeric_limits<i64>::max(), 0);
+        global_options_.AddOption(std::move(persistence_object_size_limit_option));
 
         // Cleanup Interval
         i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
@@ -454,17 +498,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
         if(!status.ok()) {
             UnrecoverableError(status.message());
         }
-
-        // Persistence Dir
-        String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
-        UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
-        global_options_.AddOption(std::move(persistence_dir_option));
-
-        // Persistence Object Size Limit
-        i64 persistence_object_size_limit = DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT;
-        UniquePtr<IntegerOption> persistence_object_size_limit_option =
-            MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME, persistence_object_size_limit, std::numeric_limits<i64>::max(), 0);
-        global_options_.AddOption(std::move(persistence_object_size_limit_option));
     } else {
         config_toml = toml::parse_file(*config_path);
 
@@ -520,6 +553,27 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                                 }
                             } else {
                                 return Status::InvalidConfig("'version' field isn't string.");
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kServerMode: {
+                            // Server Mode
+                            String server_mode = "standalone";
+                            if(elem.second.is_string()) {
+                                server_mode = elem.second.value_or(server_mode);
+                            } else {
+                                return Status::InvalidConfig("'server_mode' field isn't string.");
+                            }
+
+                            ToLower(server_mode);
+                            if(server_mode == "standalone" or server_mode == "cluster") {
+                                UniquePtr<StringOption> server_mode_option = MakeUnique<StringOption>(SERVER_MODE_OPTION_NAME, server_mode);
+                                Status status = global_options_.AddOption(std::move(server_mode_option));
+                                if(!status.ok()) {
+                                    UnrecoverableError(status.message());
+                                }
+                            } else {
+                                return Status::InvalidConfig(fmt::format("Invalid server mode: {}", server_mode));
                             }
                             break;
                         }
@@ -607,6 +661,16 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                     UnrecoverableError(error_message);
                 }
 
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kServerMode) == nullptr) {
+                    // Server mode
+                    String server_mode = "standalone";
+                    UniquePtr<StringOption> server_mode_option = MakeUnique<StringOption>(SERVER_MODE_OPTION_NAME, server_mode);
+                    Status status = global_options_.AddOption(std::move(server_mode_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZone) == nullptr) {
                     // Time zone
                     String error_message = "Missing time zone field";
@@ -675,6 +739,48 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
                             UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_address);
                             Status status = global_options_.AddOption(std::move(server_address_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kPeerServerIP: {
+                            // Server address
+                            String peer_server_ip = "0.0.0.0";
+                            if(elem.second.is_string()) {
+                                peer_server_ip = elem.second.value_or(peer_server_ip);
+                            } else {
+                                return Status::InvalidConfig("'peer_server_ip' field isn't string.");
+                            }
+
+                            // Validate the address format
+                            boost::system::error_code error;
+                            boost::asio::ip::make_address(peer_server_ip, error);
+                            if (error) {
+                                return Status::InvalidIPAddr(peer_server_ip);
+                            }
+
+                            UniquePtr<StringOption> peer_server_ip_option = MakeUnique<StringOption>(PEER_SERVER_IP_OPTION_NAME, peer_server_ip);
+                            Status status = global_options_.AddOption(std::move(peer_server_ip_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kPeerServerPort: {
+                            // Peer server port
+                            i64 peer_server_port = 23850;
+                            if (elem.second.is_integer()) {
+                                peer_server_port = elem.second.value_or(peer_server_port);
+                            } else {
+                                return Status::InvalidConfig("'peer_server_port' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> peer_server_port_option = MakeUnique<IntegerOption>(PEER_SERVER_PORT_OPTION_NAME, peer_server_port, 65535, 1024);
+                            if (!peer_server_port_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid peer server port: {}", peer_server_port));
+                            }
+                            Status status = global_options_.AddOption(std::move(peer_server_port_option));
                             if(!status.ok()) {
                                 UnrecoverableError(status.message());
                             }
@@ -758,6 +864,27 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kPeerServerConnectionPoolSize: {
+                            // Client pool size
+                            i64 peer_server_connection_pool_size = 64;
+                            if (elem.second.is_integer()) {
+                                peer_server_connection_pool_size = elem.second.value_or(peer_server_connection_pool_size);
+                            } else {
+                                return Status::InvalidConfig("'peer_server_connection_pool_size' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> peer_server_connection_pool_size_option =
+                                MakeUnique<IntegerOption>(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME, peer_server_connection_pool_size, 65536, 1);
+                            if (!peer_server_connection_pool_size_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid peer server connection pool size: {}", peer_server_connection_pool_size));
+                            }
+
+                            Status status = global_options_.AddOption(std::move(peer_server_connection_pool_size_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'network' field", var_name));
                         }
@@ -769,6 +896,26 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                     String server_address_str = "0.0.0.0";
                     UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_address_str);
                     Status status = global_options_.AddOption(std::move(server_address_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerServerIP) == nullptr) {
+                    // Peer server address
+                    String peer_server_ip_str = "0.0.0.0";
+                    UniquePtr<StringOption> peer_server_ip_str_option = MakeUnique<StringOption>(PEER_SERVER_IP_OPTION_NAME, peer_server_ip_str);
+                    Status status = global_options_.AddOption(std::move(peer_server_ip_str_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerServerPort) == nullptr) {
+                    // Peer server port
+                    i64 pg_port = 23850;
+                    UniquePtr<IntegerOption> peer_server_port_option = MakeUnique<IntegerOption>(PEER_SERVER_PORT_OPTION_NAME, pg_port, 65535, 1024);
+                    Status status = global_options_.AddOption(std::move(peer_server_port_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -809,6 +956,16 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                     i64 connection_pool_size = 256;
                     UniquePtr<IntegerOption> connection_pool_size_option = MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, connection_pool_size, 65536, 1);
                     Status status = global_options_.AddOption(std::move(connection_pool_size_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerServerConnectionPoolSize) == nullptr) {
+                    // peer server pool size
+                    i64 peer_server_connection_pool_size = 64;
+                    UniquePtr<IntegerOption> peer_server_connection_pool_size_option = MakeUnique<IntegerOption>(PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME, peer_server_connection_pool_size, 65536, 1);
+                    Status status = global_options_.AddOption(std::move(peer_server_connection_pool_size_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -1066,6 +1223,39 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kPersistenceDir: {
+                            String persistence_dir;
+                            if (elem.second.is_string()) {
+                                persistence_dir = elem.second.value_or(DEFAULT_PERSISTENCE_DIR.data());
+                            } else {
+                                return Status::InvalidConfig("'persistence_dir' field isn't string, such as \"persistence\"");
+                            }
+                            UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
+                            global_options_.AddOption(std::move(persistence_dir_option));
+                            break;
+                        }
+                        case GlobalOptionIndex::kPersistenceObjectSizeLimit: {
+                            i64 persistence_object_size_limit;
+                            if (elem.second.is_string()) {
+                                String persistence_object_size_limit_str = elem.second.value_or(DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR.data());
+                                auto res = ParseByteSize(persistence_object_size_limit_str, persistence_object_size_limit);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'persistence_object_size_limit' field isn't string, such as \"100MB\"");
+                            }
+                            UniquePtr<IntegerOption> persistence_object_size_limit_option =
+                                MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME,
+                                                          persistence_object_size_limit,
+                                                          std::numeric_limits<i64>::max(),
+                                                          0);
+                            if (!persistence_object_size_limit_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid persistence_object_size_limit: {}", persistence_object_size_limit));
+                            }
+                            global_options_.AddOption(std::move(persistence_object_size_limit_option));
+                            break;
+                        }
                         case GlobalOptionIndex::kCleanupInterval: {
                             // Cleanup Interval
                             i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
@@ -1164,6 +1354,21 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                     }
                 }
 
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPersistenceDir) == nullptr) {
+                    String persistence_dir =
+                        (global_options_.GetOptionByIndex(GlobalOptionIndex::kDataDir) == nullptr) ? DEFAULT_PERSISTENCE_DIR.data() : "";
+                    UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
+                    global_options_.AddOption(std::move(persistence_dir_option));
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPersistenceObjectSizeLimit) == nullptr) {
+                    i64 persistence_object_size_limit = DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT;
+                    UniquePtr<IntegerOption> persistence_object_size_limit_option =
+                        MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME,
+                                                  persistence_object_size_limit,
+                                                  std::numeric_limits<i64>::max(),
+                                                  0);
+                    global_options_.AddOption(std::move(persistence_object_size_limit_option));
+                }
                 if(global_options_.GetOptionByIndex(GlobalOptionIndex::kDataDir) == nullptr) {
                     // Data Dir
                     String data_dir = "/var/infinity/data";
@@ -1220,73 +1425,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
             } else {
                 return Status::InvalidConfig("No 'storage' section in configure file.");
-            }
-        }
-
-        // Persistence
-        {
-            if (config_toml.contains("persistence")) {
-                auto persistence_config = config_toml["persistence"];
-                auto persistence_config_table = persistence_config.as_table();
-                for (auto &elem : *persistence_config_table) {
-                    String var_name = String(elem.first);
-                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
-                    switch (option_index) {
-                        case GlobalOptionIndex::kPersistenceDir: {
-                            String persistence_dir;
-                            if (elem.second.is_string()) {
-                                persistence_dir = elem.second.value_or(DEFAULT_PERSISTENCE_DIR.data());
-                            } else {
-                                return Status::InvalidConfig("'persistence_dir' field isn't string, such as \"persistence\"");
-                            }
-                            UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
-                            global_options_.AddOption(std::move(persistence_dir_option));
-                            break;
-                        }
-                        case GlobalOptionIndex::kPersistenceObjectSizeLimit: {
-                            i64 persistence_object_size_limit;
-                            if (elem.second.is_string()) {
-                                String persistence_object_size_limit_str = elem.second.value_or(DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR.data());
-                                auto res = ParseByteSize(persistence_object_size_limit_str, persistence_object_size_limit);
-                                if (!res.ok()) {
-                                    return res;
-                                }
-                            } else {
-                                return Status::InvalidConfig("'persistence_object_size_limit' field isn't string, such as \"100MB\"");
-                            }
-                            UniquePtr<IntegerOption> persistence_object_size_limit_option =
-                                MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME,
-                                                          persistence_object_size_limit,
-                                                          std::numeric_limits<i64>::max(),
-                                                          0);
-                            if (!persistence_object_size_limit_option->Validate()) {
-                                return Status::InvalidConfig(fmt::format("Invalid persistence_object_size_limit: {}", persistence_object_size_limit));
-                            }
-                            global_options_.AddOption(std::move(persistence_object_size_limit_option));
-                            break;
-                        }
-                        case GlobalOptionIndex::kInvalid:
-                        default: {
-                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'persistence' field", var_name));
-                        }
-                    }
-                }
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPersistenceDir) == nullptr) {
-                    String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
-                    UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
-                    global_options_.AddOption(std::move(persistence_dir_option));
-                }
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPersistenceObjectSizeLimit) == nullptr) {
-                    i64 persistence_object_size_limit = DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT;
-                    UniquePtr<IntegerOption> persistence_object_size_limit_option =
-                        MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME,
-                                                  persistence_object_size_limit,
-                                                  std::numeric_limits<i64>::max(),
-                                                  0);
-                    global_options_.AddOption(std::move(persistence_object_size_limit_option));
-                }
-            } else {
-                return Status::InvalidConfig("No 'persistence' section in configure file.");
             }
         }
 
@@ -1722,6 +1860,11 @@ String Config::Version() {
     return global_options_.GetStringValue(GlobalOptionIndex::kVersion);
 }
 
+String Config::ServerMode() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kServerMode);
+}
+
 String Config::TimeZone() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetStringValue(GlobalOptionIndex::kTimeZone);
@@ -1757,6 +1900,16 @@ String Config::ServerAddress() {
     return global_options_.GetStringValue(GlobalOptionIndex::kServerAddress);
 }
 
+String Config::PeerServerIP() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kPeerServerIP);
+}
+
+i64 Config::PeerServerPort() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerServerPort);
+}
+
 i64 Config::PostgresPort() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kPostgresPort);
@@ -1777,6 +1930,11 @@ i64 Config::ConnectionPoolSize() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kConnectionPoolSize);
 }
 
+i64 Config::PeerServerConnectionPoolSize() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerServerConnectionPoolSize);
+}
+
 // Log
 String Config::LogFileName() {
     std::lock_guard<std::mutex> guard(mutex_);
@@ -1790,6 +1948,17 @@ String Config::LogDir() {
 
 String Config::LogFilePath() {
     return fmt::format("{}/{}", global_options_.GetStringValue(GlobalOptionIndex::kLogDir), global_options_.GetStringValue(GlobalOptionIndex::kLogFileName));
+}
+
+void Config::SetLogToStdout(bool log_to_stdout) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogToStdout);
+    if (base_option->data_type_ != BaseOptionDataType::kBoolean) {
+        String error_message = "Attempt to set bool value to log to stdout data type option";
+        UnrecoverableError(error_message);
+    }
+    BooleanOption *log_to_stdout_option = static_cast<BooleanOption *>(base_option);
+    log_to_stdout_option->value_ = log_to_stdout;
 }
 
 bool Config::LogToStdout() {
@@ -2007,6 +2176,7 @@ void Config::PrintAll() {
     fmt::print(" - version: {}\n", Version());
     fmt::print(" - timezone: {}{}\n", TimeZone(), TimeZoneBias());
     fmt::print(" - cpu_limit: {}\n", CPULimit());
+    fmt::print(" - server mode: {}\n", ServerMode());
 
     //    // Profiler
     //    fmt::print(" - enable_profiler: {}\n", system_option_.enable_profiler);
@@ -2014,10 +2184,13 @@ void Config::PrintAll() {
 
     // Network
     fmt::print(" - server address: {}\n", ServerAddress());
+    fmt::print(" - peer server ip: {}\n", PeerServerIP());
+    fmt::print(" - peer server port: {}\n", PeerServerPort());
     fmt::print(" - postgres port: {}\n", PostgresPort());
     fmt::print(" - http port: {}\n", HTTPPort());
     fmt::print(" - rpc client port: {}\n", ClientPort());
     fmt::print(" - connection pool size: {}\n", ConnectionPoolSize());
+    fmt::print(" - peer server connection pool size: {}\n", ConnectionPoolSize());
 
     // Log
     fmt::print(" - log_filename: {}\n", LogFileName());
@@ -2026,9 +2199,11 @@ void Config::PrintAll() {
     fmt::print(" - log_to_stdout: {}\n", LogToStdout());
     fmt::print(" - log_file_max_size: {}\n", Utility::FormatByteSize(LogFileMaxSize()));
     fmt::print(" - log_file_rotate_count: {}\n", LogFileRotateCount());
-    fmt::print(" - log_level: {}\n", LogLevel2Str(LogLevel()));
+    fmt::print(" - log_level: {}\n", LogLevel2Str(GetLogLevel()));
 
     // Storage
+    fmt::print(" - persistence_dir: {}\n", PersistenceDir());
+    fmt::print(" - persistence_file_size: {}\n", PersistenceObjectSizeLimit());
     fmt::print(" - data_dir: {}\n", DataDir());
     fmt::print(" - cleanup_interval: {}\n", Utility::FormatTimeInfo(CleanupInterval()));
     fmt::print(" - compact_interval: {}\n", Utility::FormatTimeInfo(CompactInterval()));

@@ -59,12 +59,11 @@ void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
 }
 
 void SearchExpr::Validate() const {
-    size_t num_sub_expr = match_exprs_.size();
-    if (num_sub_expr <= 0) {
-        ParserError("Need at least one MATCH VECTOR / MATCH TENSOR / MATCH TEXT / MATCH SPARSE / QUERY expression");
+    if (const size_t num_sub_expr = match_exprs_.size(); num_sub_expr <= 0) {
+        ParserError("Need at least one MATCH VECTOR / MATCH TENSOR / MATCH TEXT / MATCH SPARSE expression");
     } else if (num_sub_expr >= 2) {
         if (fusion_exprs_.empty()) {
-            ParserError("Need FUSION expr since there are multiple MATCH VECTOR / MATCH TENSOR / MATCH TEXT / MATCH SPARSE / QUERY expressions");
+            ParserError("Need FUSION expr since there are multiple MATCH VECTOR / MATCH TENSOR / MATCH TEXT / MATCH SPARSE expressions");
         }
     }
 }

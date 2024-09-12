@@ -13,7 +13,6 @@
 // limitations under the License.
 #if 0
 
-#include "base_test.h"
 #include "bin/compilation_config.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
@@ -21,20 +20,18 @@
 #include "legacy_sched/operator_pipeline.h"
 #include "main/infinity.h"
 #include "main/logger.h"
+#include "main/profiler/show_logical_plan.h"
 #include "main/session.h"
 #include "parser/sql_parser.h"
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
 #include "test_helper/sql_runner.h"
-#include <gtest/gtest.h>
 
-#include "main/profiler/show_logical_plan.h"
+#include "gtest/gtest.h"
+import base_test;
 
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <streambuf>
 
+using namespace infinity;
 class LogicalPlannerTpchTest : public BaseTest {};
 
 TEST_F(LogicalPlannerTpchTest, test1) {

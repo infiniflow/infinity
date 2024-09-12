@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-#include <gtest/gtest.h>
-
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import buffer_manager;
 import data_file_worker;
@@ -23,40 +22,13 @@ import infinity_exception;
 import global_resource_usage;
 import infinity_context;
 
-class BufferHandleTest : public BaseTestParamStr {
-    void SetUp() override {
-        BaseTestParamStr::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        std::shared_ptr<std::string> config_path = nullptr;
-        RemoveDbDirs();
-        system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + infinity::String(GetFullTmpDir())).c_str());
-        std::string config_path_str = GetParam();
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
-    }
+using namespace infinity;
 
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
-    }
-};
+class BufferHandleTest : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          BufferHandleTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
-
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(BufferHandleTest, test1) {
     using namespace infinity;
@@ -69,21 +41,21 @@ TEST_P(BufferHandleTest, test1) {
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
     SizeT test_size1 = 512;
-    auto file_dir1 = MakeShared<String>(data_dir + "/dir1");
+    auto file_dir1 = MakeShared<String>("dir1");
     auto test_fname1 = MakeShared<String>("test1");
-    auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
+    auto file_worker1 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir1, test_fname1, test_size1);
     auto buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
     SizeT test_size2 = 512;
-    auto file_dir2 = MakeShared<String>(data_dir + "/dir2");
+    auto file_dir2 = MakeShared<String>("dir2");
     auto test_fname2 = MakeShared<String>("test2");
-    auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
+    auto file_worker2 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir2, test_fname2, test_size2);
     auto buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
 
     SizeT test_size3 = 512;
-    auto file_dir3 = MakeShared<String>(data_dir + "/dir3");
+    auto file_dir3 = MakeShared<String>("dir3");
     auto test_fname3 = MakeShared<String>("test3");
-    auto file_worker3 = MakeUnique<DataFileWorker>(file_dir3, test_fname3, test_size3);
+    auto file_worker3 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir3, test_fname3, test_size3);
     auto buf3 = buffer_manager.AllocateBufferObject(std::move(file_worker3));
 
     {

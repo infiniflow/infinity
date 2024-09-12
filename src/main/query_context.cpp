@@ -17,10 +17,9 @@ module;
 #include <csignal>
 #include <cstdio>
 #include <sstream>
-//#include "gperftools/profiler.h"
+// #include "gperftools/profiler.h"
 
 module query_context;
-
 
 import stl;
 import session;
@@ -57,6 +56,8 @@ import show_statement;
 import admin_statement;
 import admin_executor;
 import persistence_manager;
+import global_resource_usage;
+import infinity_context;
 
 namespace infinity {
 
@@ -110,16 +111,46 @@ QueryResult QueryContext::Query(const String &query) {
     StopProfile(QueryPhase::kParser);
 
     BaseStatement *base_statement = parsed_result->statements_ptr_->at(0);
-    if(base_statement->Type() == StatementType::kAdmin) {
-        if(session_ptr_->MaintenanceMode()) {
-            AdminStatement* admin_statement = static_cast<AdminStatement*>(base_statement);
+
+    if (InfinityContext::instance().IsAdminRole()) {
+        if (base_statement->Type() == StatementType::kAdmin) {
+            AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
             QueryResult query_result = HandleAdminStatement(admin_statement);
             return query_result;
         } else {
             QueryResult query_result;
             query_result.result_table_ = nullptr;
-            query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
+            query_result.status_ = Status::NotSupportInMaintenanceMode();
             return query_result;
+        }
+    } else {
+        if (base_statement->Type() == StatementType::kAdmin) {
+            AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
+
+            switch(admin_statement->admin_type_) {
+                case AdminStmtType::kShowVariable: {
+                    String var_name = admin_statement->variable_name_.value();
+                    ToLower(var_name);
+                    if(var_name == "server_role") {
+                        QueryResult query_result = HandleAdminStatement(admin_statement);
+                        return query_result;
+                    }
+                    break;
+                }
+                case AdminStmtType::kShowNode:
+                case AdminStmtType::kShowCurrentNode:
+                case AdminStmtType::kListNodes:
+                case AdminStmtType::kSetRole: {
+                    QueryResult query_result = HandleAdminStatement(admin_statement);
+                    return query_result;
+                }
+                default: {
+                    QueryResult query_result;
+                    query_result.result_table_ = nullptr;
+                    query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
+                    return query_result;
+                }
+            }
         }
     }
 
@@ -129,30 +160,36 @@ QueryResult QueryContext::Query(const String &query) {
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
     QueryResult query_result;
+    if (InfinityContext::instance().IsAdminRole()) {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
+        return query_result;
+    }
+
     Vector<SharedPtr<LogicalNode>> logical_plans{};
     Vector<UniquePtr<PhysicalOperator>> physical_plans{};
     SharedPtr<PlanFragment> plan_fragment{};
     UniquePtr<Notifier> notifier{};
 
     query_id_ = session_ptr_->query_count();
-//    ProfilerStart("Query");
-//    BaseProfiler profiler;
-//    profiler.Begin();
+    //    ProfilerStart("Query");
+    //    BaseProfiler profiler;
+    //    profiler.Begin();
     try {
 
-        if(global_config_->RecordRunningQuery()) {
+        if (global_config_->RecordRunningQuery()) {
             bool add_record_flag = false;
-            if(base_statement->type_ == StatementType::kShow) {
-                const ShowStatement* show_statement = static_cast<const ShowStatement*>(base_statement);
+            if (base_statement->type_ == StatementType::kShow) {
+                const ShowStatement *show_statement = static_cast<const ShowStatement *>(base_statement);
                 ShowStmtType show_type = show_statement->show_type_;
-                if(show_type != ShowStmtType::kQueries and show_type != ShowStmtType::kQuery) {
+                if (show_type != ShowStmtType::kQueries and show_type != ShowStmtType::kQuery) {
                     add_record_flag = true;
                 }
             } else {
                 add_record_flag = true;
             }
 
-            if(add_record_flag) {
+            if (add_record_flag) {
                 LOG_DEBUG(fmt::format("Record running query: {}", base_statement->ToString()));
                 session_manager_->AddQueryRecord(session_ptr_->session_id(),
                                                  query_id_,
@@ -162,10 +199,10 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
         }
 
         this->BeginTxn(base_statement);
-//        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, base_statement: {}",
-//                        session_ptr_->GetTxn()->TxnID(),
-//                        session_ptr_->GetTxn()->BeginTS(),
-//                        base_statement->ToString()));
+        //        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, base_statement: {}",
+        //                        session_ptr_->GetTxn()->TxnID(),
+        //                        session_ptr_->GetTxn()->BeginTS(),
+        //                        base_statement->ToString()));
         RecordQueryProfiler(base_statement->type_);
 
         // Build unoptimized logical plan for each SQL base_statement.
@@ -180,7 +217,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
         logical_plans = logical_planner_->LogicalPlans();
         StopProfile(QueryPhase::kLogicalPlan);
-//        LOG_WARN(fmt::format("Before optimizer cost: {}", profiler.ElapsedToString()));
+        //        LOG_WARN(fmt::format("Before optimizer cost: {}", profiler.ElapsedToString()));
         // Apply optimized rule to the logical plan
         StartProfile(QueryPhase::kOptimizer);
         for (auto &logical_plan : logical_plans) {
@@ -195,7 +232,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
             physical_plans.push_back(std::move(physical_plan));
         }
         StopProfile(QueryPhase::kPhysicalPlan);
-//        LOG_WARN(fmt::format("Before pipeline cost: {}", profiler.ElapsedToString()));
+        //        LOG_WARN(fmt::format("Before pipeline cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
         {
@@ -211,13 +248,13 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
         notifier = MakeUnique<Notifier>();
         FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());
         StopProfile(QueryPhase::kTaskBuild);
-//        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
+        //        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kExecution);
         scheduler_->Schedule(plan_fragment.get(), base_statement);
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = logical_plans.back()->operator_type();
         StopProfile(QueryPhase::kExecution);
-//        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
+        //        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);
         this->CommitTxn();
         StopProfile(QueryPhase::kCommit);
@@ -240,32 +277,32 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
         printf("UnrecoverableException %s\n", e.what());
         LOG_CRITICAL(e.what());
         raise(SIGUSR1);
-//        throw e;
+        //        throw e;
     }
 
-//    ProfilerStop();
+    //    ProfilerStop();
     session_ptr_->IncreaseQueryCount();
     session_manager_->IncreaseQueryCount();
 
-    if(global_config_->RecordRunningQuery()) {
+    if (global_config_->RecordRunningQuery()) {
         bool remove_record_flag = false;
-        if(base_statement->type_ == StatementType::kShow) {
-            const ShowStatement* show_statement = static_cast<const ShowStatement*>(base_statement);
+        if (base_statement->type_ == StatementType::kShow) {
+            const ShowStatement *show_statement = static_cast<const ShowStatement *>(base_statement);
             ShowStmtType show_type = show_statement->show_type_;
-            if(show_type != ShowStmtType::kQueries and show_type != ShowStmtType::kQuery) {
+            if (show_type != ShowStmtType::kQueries and show_type != ShowStmtType::kQuery) {
                 remove_record_flag = true;
             }
         } else {
             remove_record_flag = true;
         }
 
-        if(remove_record_flag) {
+        if (remove_record_flag) {
             LOG_DEBUG(fmt::format("Remove the query string from running query container: {}", base_statement->ToString()));
             session_manager_->RemoveQueryRecord(session_ptr_->session_id());
         }
     }
-//    profiler.End();
-//    LOG_WARN(fmt::format("Query cost: {}", profiler.ElapsedToString()));
+    //    profiler.End();
+    //    LOG_WARN(fmt::format("Query cost: {}", profiler.ElapsedToString()));
     return query_result;
 }
 
@@ -333,20 +370,18 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts,
     return true;
 }
 
-QueryResult QueryContext::HandleAdminStatement(const AdminStatement* admin_statement) {
-    return AdminExecutor::Execute(this, admin_statement);
-}
+QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_statement) { return AdminExecutor::Execute(this, admin_statement); }
 
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     if (session_ptr_->GetTxn() == nullptr) {
         bool is_checkpoint = base_statement != nullptr && base_statement->type_ == StatementType::kFlush;
-        Txn* new_txn = storage_->txn_manager()->BeginTxn(nullptr, is_checkpoint);
+        Txn *new_txn = storage_->txn_manager()->BeginTxn(nullptr, is_checkpoint);
         session_ptr_->SetTxn(new_txn);
     }
 }
 
 TxnTimeStamp QueryContext::CommitTxn() {
-    Txn* txn = session_ptr_->GetTxn();
+    Txn *txn = session_ptr_->GetTxn();
     TxnTimeStamp commit_ts = storage_->txn_manager()->CommitTxn(txn);
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseCommittedTxnCount();
@@ -355,7 +390,7 @@ TxnTimeStamp QueryContext::CommitTxn() {
 }
 
 void QueryContext::RollbackTxn() {
-    Txn* txn = session_ptr_->GetTxn();
+    Txn *txn = session_ptr_->GetTxn();
     storage_->txn_manager()->RollBackTxn(txn);
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseRollbackedTxnCount();

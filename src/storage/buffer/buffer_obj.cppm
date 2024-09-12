@@ -86,6 +86,8 @@ public:
     BufferObj(const BufferObj &) = delete;
     BufferObj &operator=(const BufferObj &) = delete;
 
+    void SetFileWorker(UniquePtr<FileWorker> file_worker);
+
 public:
     // called by ObjectHandle when load first time for that ObjectHandle
     BufferHandle Load();
@@ -94,7 +96,7 @@ public:
     bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
-    bool Save();
+    bool Save(const FileWorkerSaveCtx &ctx = {});
 
     void PickForCleanup();
 
@@ -147,10 +149,45 @@ protected:
     BufferStatus status_{BufferStatus::kNew};
     BufferType type_{BufferType::kTemp};
     u64 rc_{0};
-    const UniquePtr<FileWorker> file_worker_;
+    UniquePtr<FileWorker> file_worker_;
 
 private:
     u32 id_;
+
+    friend class BufferPtr;
+    SharedPtr<u32> ptr_rc_ = MakeShared<u32>(0);
+};
+
+export class BufferPtr {
+public:
+    BufferPtr() : buffer_obj_(nullptr) {}
+
+    ~BufferPtr() {
+        if (buffer_obj_ != nullptr && *ptr_rc_ > 0) {
+            --*ptr_rc_;
+        }
+    }
+
+    BufferPtr(BufferObj *buffer_obj) : buffer_obj_(buffer_obj), ptr_rc_(buffer_obj->ptr_rc_) { ++*buffer_obj_->ptr_rc_; }
+
+    BufferPtr(const BufferPtr &other) : buffer_obj_(other.buffer_obj_), ptr_rc_(other.ptr_rc_) { ++*buffer_obj_->ptr_rc_; }
+    BufferPtr &operator=(const BufferPtr &other) {
+        if (this != &other) {
+            if (buffer_obj_ != nullptr) {
+                --*ptr_rc_;
+            }
+            buffer_obj_ = other.buffer_obj_;
+            ptr_rc_ = other.ptr_rc_;
+            ++*buffer_obj_->ptr_rc_;
+        }
+        return *this;
+    }
+
+    BufferObj *get() const { return buffer_obj_; }
+
+private:
+    BufferObj *buffer_obj_;
+    SharedPtr<u32> ptr_rc_;
 };
 
 } // namespace infinity

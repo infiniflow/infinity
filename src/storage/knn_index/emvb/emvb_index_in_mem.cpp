@@ -22,7 +22,7 @@ import stl;
 import logical_type;
 import internal_types;
 import column_def;
-import bitmask;
+import roaring_bitmap;
 import default_values;
 import buffer_manager;
 import block_column_entry;
@@ -44,7 +44,6 @@ import embedding_info;
 import emvb_product_quantization;
 import column_vector;
 import block_index;
-import bitmask;
 
 namespace infinity {
 
@@ -69,7 +68,6 @@ u32 EMVBIndexInMem::GetRowCount() const {
 
 void EMVBIndexInMem::Insert(u16 block_id, BlockColumnEntry *block_column_entry, BufferManager *buffer_manager, u32 row_offset, u32 row_count) {
     const ColumnVector column_vector = block_column_entry->GetConstColumnVector(buffer_manager);
-    const auto tensor_ptr_start = reinterpret_cast<const TensorT *>(column_vector.data()) + row_offset;
     std::unique_lock lock(rw_mutex_);
     const auto income_segment_entry = block_column_entry->GetBlockEntry()->GetSegmentEntry();
     if (segment_entry_ == nullptr) {
@@ -79,15 +77,14 @@ void EMVBIndexInMem::Insert(u16 block_id, BlockColumnEntry *block_column_entry, 
     }
     if (is_built_.test(std::memory_order_acquire)) {
         for (u32 i = 0; i < row_count; ++i) {
-            const auto &[embedding_num, chunk_id, chunk_offset] = tensor_ptr_start[i];
-            const auto embedding_ptr = column_vector.buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-            emvb_index_->AddOneDocEmbeddings(reinterpret_cast<const f32 *>(embedding_ptr), embedding_num);
+            auto [raw_data, embedding_num] = column_vector.GetTensorRaw(row_offset + i);
+            emvb_index_->AddOneDocEmbeddings(reinterpret_cast<const f32 *>(raw_data.data()), embedding_num);
             ++row_count_;
             embedding_count_ += embedding_num;
         }
     } else {
         for (u32 i = 0; i < row_count; ++i) {
-            const auto &[embedding_num, chunk_id, chunk_offset] = tensor_ptr_start[i];
+            auto [raw_data, embedding_num] = column_vector.GetTensorRaw(row_offset + i);
             ++row_count_;
             embedding_count_ += embedding_num;
         }

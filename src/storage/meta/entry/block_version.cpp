@@ -80,13 +80,16 @@ void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, FileHandler &file_hand
     BlockOffset capacity = deleted_.size();
     file_handler.Write(&capacity, sizeof(capacity));
     TxnTimeStamp dump_ts = 0;
+    u32 deleted_row_count = 0;
     for (const auto &ts : deleted_) {
         if (ts <= checkpoint_ts) {
             file_handler.Write(&ts, sizeof(ts));
         } else {
+            ++ deleted_row_count;
             file_handler.Write(&dump_ts, sizeof(dump_ts));
         }
     }
+    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, 0 delete {}", checkpoint_ts, create_size, deleted_row_count));
 }
 
 void BlockVersion::SpillToFile(FileHandler &file_handler) const {
@@ -110,6 +113,7 @@ UniquePtr<BlockVersion> BlockVersion::LoadFromFile(FileHandler &file_handler) {
     for (BlockOffset i = 0; i < create_size; i++) {
         block_version->created_.push_back(CreateField::LoadFromFile(file_handler));
     }
+    LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
     BlockOffset capacity;
     file_handler.Read(&capacity, sizeof(capacity));
     block_version->deleted_.resize(capacity);
@@ -140,12 +144,30 @@ void BlockVersion::GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) cons
     }
 }
 
-// void BlockVersion::Cleanup(const String &version_path) {
-//     LocalFileSystem fs;
+void BlockVersion::GetDeleteTS(SizeT offset, SizeT size, ColumnVector &res) const {
+    for (SizeT i = offset; i < offset + size; ++i) {
+        res.AppendByPtr(reinterpret_cast<const char *>(&deleted_[i]));
+    }
+}
 
-//     if (fs.Exists(version_path)) {
-//         fs.DeleteFile(version_path);
-//     }
-// }
+void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
+    created_.emplace_back(commit_ts, row_count);
+    latest_change_ts_ = commit_ts;
+}
+
+void BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
+    if (deleted_[offset] != 0) {
+        UnrecoverableError(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
+    }
+    deleted_[offset] = commit_ts;
+    latest_change_ts_ = commit_ts;
+}
+
+bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
+    if (SizeT(offset) >= deleted_.size()) {
+        return false;
+    }
+    return deleted_[offset] != 0 && deleted_[offset] <= check_ts;
+}
 
 } // namespace infinity

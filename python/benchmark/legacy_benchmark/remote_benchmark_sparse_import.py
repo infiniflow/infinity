@@ -73,12 +73,7 @@ def import_data(
         index.IndexInfo(
             "col1",
             index.IndexType.BMP,
-            [
-                index.InitParameter("block_size", str(block_size)),
-                index.InitParameter(
-                    "compress_type", "compress" if compress else "raww"
-                ),
-            ],
+            {"block_size": str(block_size), "compress_type": "compress" if compress else "raww"}
         )
     )
     assert res.error_code == ErrorCode.OK

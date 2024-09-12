@@ -1,5 +1,5 @@
-
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 
@@ -20,7 +20,6 @@ public:
     PositionListEncoderTest() {}
 
     void SetUp() override { file_ = String(GetFullTmpDir()) + "/position"; }
-    void TearDown() override {}
 
 protected:
     String file_;

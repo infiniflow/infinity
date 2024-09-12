@@ -16,15 +16,13 @@
 This example is to connect local infinity instance, create table, insert data, search the data
 """
 
-import infinity
-from infinity.common import CommonMatchTensorExpr
+import infinity_embedded as infinity
+#import infinity
+import sys
 
 try:
-    # open a local directory to store the data
-    infinity_instance = infinity.connect("/var/infinity")
-
-    # connect to server with 127.0.0.1
-    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+    # open a local directory(default = "/var/infinity") or connect to server(default = NetworkAddress("127.0.0.1", 23817)) to store the data
+    infinity_instance = infinity.connect()
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -52,7 +50,7 @@ try:
                 "num": 1,
                 "body": r"unnecessary and harmful",
                 "vec": [1.0, 1.2, 0.8, 0.9],
-                "sparse": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]},
+                "sparse": infinity.common.SparseVector([10, 20, 30], [1.1, 2.2, 3.3]),
                 "year": 2024,
                 "tensor": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
             },
@@ -60,7 +58,7 @@ try:
                 "num": 2,
                 "body": r"Office for Harmful Blooms",
                 "vec": [4.0, 4.2, 4.3, 4.5],
-                "sparse": {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]},
+                "sparse": infinity.common.SparseVector([40, 50, 60], [4.4, 5.5, 6.6]),
                 "year": 2023,
                 "tensor": [[4.0, 0.0, 4.3, 4.5], [4.0, 4.2, 4.4, 5.0]],
             },
@@ -68,7 +66,7 @@ try:
                 "num": 3,
                 "body": r"A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
                 "vec": [4.0, 4.2, 4.3, 4.2],
-                "sparse": {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]},
+                "sparse": infinity.common.SparseVector([70, 80, 90], [7.7, 8.8, 9.9]),
                 "year": 2019,
                 "tensor": [[0.9, 0.1, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
             },
@@ -76,7 +74,7 @@ try:
                 "num": 4,
                 "body": r"The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.",
                 "vec": [4.0, 4.2, 4.3, 4.5],
-                "sparse": {"indices": [20, 80, 90], "values": [7.7, 7.8, 97.9]},
+                "sparse": infinity.common.SparseVector([20, 80, 90], [7.7, 7.8, 97.9]),
                 "year": 2018,
                 "tensor": [[4.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]],
             },
@@ -84,27 +82,29 @@ try:
     )
 
     # TODO: dense vector + sparse vector + full-text + structured data filter + tensor reranker
-    # result = table_instance.output(["num", "body"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match("body", "blooms","topn=1").fusion("rrf").to_pl()
+    # result = table_instance.output(["num", "body"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match_text("body", "blooms","topn=1").fusion(method="rrf").to_pl()
+
+    res = table_instance.create_index(
+        "my_index",
+        infinity.index.IndexInfo("body", infinity.index.IndexType.FullText),
+        infinity.common.ConflictType.Error,
+    )
 
     result = (
         table_instance.output(
             ["num", "body", "vec", "sparse", "year", "tensor", "_score"]
         )
-        .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+        .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
         .match_sparse(
-            "sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3
+            "sparse", infinity.common.SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3
         )
-        .match("body", "blooms", "topn=10")
+        .match_text("body", "blooms", 10)
         .filter("year < 2024")
         .fusion(
-            "match_tensor",
-            "topn=2",
-            CommonMatchTensorExpr(
-                "tensor",
-                [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
-                "float",
-                "maxsim",
-            ),
+            method="match_tensor", topn=2,
+            fusion_params={"field": "tensor", "data_type": "float",
+                           "data": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]},
+            params={"filter": "year < 2024"}
         )
         .to_pl()
     )
@@ -112,5 +112,8 @@ try:
     print(result)
     infinity_instance.disconnect()
 
+    print('test done')
+    sys.exit(0)
 except Exception as e:
     print(str(e))
+    sys.exit(-1)

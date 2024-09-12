@@ -1,28 +1,38 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 from common import common_values
 import infinity
+import infinity_embedded
 from infinity.errors import ErrorCode
 from infinity.table import ExplainType
 from infinity.common import ConflictType
 import polars as pl
 import pytest
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 @pytest.mark.usefixtures("local_infinity")
 @pytest.mark.usefixtures("http")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
     @pytest.fixture(autouse=True)
     def setup(self, local_infinity, http):
         if local_infinity:
+            module = importlib.import_module("infinity_embedded.common")
+            func = getattr(module, 'ConflictType')
+            globals()['ConflictType'] = func
+            module = importlib.import_module("infinity_embedded.table")
+            func = getattr(module, 'ExplainType')
+            globals()['ExplainType'] = func
             self.uri = common_values.TEST_LOCAL_PATH
+            self.infinity_obj = infinity_embedded.connect(self.uri)
         else:
             self.uri = common_values.TEST_LOCAL_HOST
-        self.infinity_obj = infinity.connect(self.uri)
+            self.infinity_obj = infinity.connect(self.uri)
         if http:
            self.infinity_obj = infinity_http()
         assert self.infinity_obj
@@ -31,8 +41,7 @@ class TestInfinity:
         res = self.infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
-    def test_explain(self):
+    def test_explain(self, suffix):
         """
             # Analyze = 1
             # Ast = 2
@@ -43,8 +52,8 @@ class TestInfinity:
             # Fragment = 7
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_explain_default", ConflictType.Ignore)
-        table = db_obj.create_table("test_explain_default", {
+        db_obj.drop_table("test_explain_default"+suffix, ConflictType.Ignore)
+        table = db_obj.create_table("test_explain_default"+suffix, {
             "c1": {"type": "varchar", "constraints": ["primary key"]}, "c2": {"type": "float"}}, ConflictType.Error)
         assert table
 
@@ -78,4 +87,4 @@ class TestInfinity:
                 res = table.output(["*"]).explain(ExplainType.Analyze)
                 print(res)
 
-        db_obj.drop_table("test_explain_default", ConflictType.Error)
+        db_obj.drop_table("test_explain_default"+suffix, ConflictType.Error)

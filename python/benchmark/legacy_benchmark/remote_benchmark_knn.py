@@ -119,10 +119,10 @@ def work(queries, topk, metric_type, column_name, data_type,ef: int, remote: boo
     table = infinity_obj.get_database("default_db").get_table(table_name)
     for query in queries:
         # print(len(query))
-        # table.knn(column_name, query_vec, data_type, metric_type, topk).output(["_row_id"]).to_result()
+        # table.match_dense(column_name, query_vec, data_type, metric_type, topk).output(["_row_id"]).to_result()
         query_builder = InfinityThriftQueryBuilder(table)
         query_builder.output(["_row_id"])
-        query_builder.knn(column_name, query, data_type, metric_type, topk, {"ef": str(ef)})
+        query_builder.match_dense(column_name, query, data_type, metric_type, topk, {"ef": str(ef)})
         query_builder.to_result()
     infinity_obj.disconnect()
 
@@ -188,7 +188,7 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, tab
     table = infinity_obj.get_database("default_db").get_table(table_name)
     query_builder = InfinityThriftQueryBuilder(table)
     query_builder.output(["_row_id"])
-    query_builder.knn('col1', queries[0], 'float', 'l2', 100, {'ef': str(ef)})
+    query_builder.match_dense('col1', queries[0], 'float', 'l2', 100, {'ef': str(ef)})
     res, _ = query_builder.to_result()
 
     dur_sum = 0
@@ -203,7 +203,7 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, tab
 
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["_row_id"])
-            query_builder.knn('col1', query_vec, 'float', 'l2', 100, {'index_name': 'hnsw_index', 'ef': str(ef)})
+            query_builder.match_dense('col1', query_vec, 'float', 'l2', 100, {'index_name': 'hnsw_index', 'ef': str(ef)})
             res, _ = query_builder.to_result()
             end = time.time()
 

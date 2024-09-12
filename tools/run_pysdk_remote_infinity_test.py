@@ -12,18 +12,22 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print("python test path is {}".format(python_test_dir))
     # run test
     print(f"start pysdk test with {pytest_mark}")
+    args = [
+        python_executable,
+        "-m",
+        "pytest",
+        # "--capture=tee-sys",
+        "--tb=short",
+        "-x",
+        "-m",
+        pytest_mark,
+        f"{python_test_dir}/test_pysdk",
+    ]
+    quoted_args = ['"' + arg + '"' if " " in arg else arg for arg in args]
+    print(" ".join(quoted_args))
+
     process = subprocess.Popen(
-        # ["python", "-m", "pytest", "--tb=line", '-s', '-x', '-m', pytest_mark, f'{python_test_dir}/test'],
-        [
-            python_executable,
-            "-m",
-            "pytest",
-            "--tb=line",
-            "-x",
-            "-m",
-            pytest_mark,
-            f"{python_test_dir}/test_pysdk",
-        ],
+        args,
         stdout=sys.stdout,
         stderr=sys.stderr,
         universal_newlines=True,

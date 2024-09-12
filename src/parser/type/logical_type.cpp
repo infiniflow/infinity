@@ -85,23 +85,34 @@ static const char *type2name[] = {
     // BF16
     "BFloat16",
 
+    // multi-vector
+    "MultiVector",
+
     "Invalid",
 };
 
-static_assert(std::size(type2name) == static_cast<size_t>(LogicalType::kInvalid) + 1);
+static_assert(std::size(type2name) == to_underlying_val(LogicalType::kInvalid) + 1);
 
 std::unordered_map<std::string, LogicalType> name2type = {
     // Bool
     {"boolean", LogicalType::kBoolean }, 
+    {"bool", LogicalType::kBoolean }, 
 
     {"tinyint", LogicalType::kTinyInt },
+    {"int8", LogicalType::kTinyInt },
     {"smallint" , LogicalType::kSmallInt },
+    {"int16" , LogicalType::kSmallInt },
     {"integer" , LogicalType::kInteger },
+    {"int" , LogicalType::kInteger },
+    {"int32" , LogicalType::kInteger },
     {"bigint" , LogicalType::kBigInt },
+    {"int64" , LogicalType::kBigInt },
     {"hugeint" , LogicalType::kHugeInt },
     {"decimal" , LogicalType::kDecimal },
     {"float" , LogicalType::kFloat },
+    {"float32" , LogicalType::kFloat },
     {"double" , LogicalType::kDouble },
+    {"float64" , LogicalType::kDouble },
 
     // std::string
     {"varchar" , LogicalType::kVarchar }, 
@@ -152,6 +163,9 @@ std::unordered_map<std::string, LogicalType> name2type = {
     {"float16", LogicalType::kFloat16},
     // BF16
     {"bfloat16", LogicalType::kBFloat16},
+
+    // multi-vector
+    {"multivector", LogicalType::kMultiVector},
 
     { "invalid" , LogicalType::kInvalid },
 };
@@ -223,12 +237,14 @@ static int64_t type_size[] = {
     2, // Float16
     2, // BFloat16
 
+    8, // MultiVector
+
     0, // Invalid
 };
 
-static_assert(std::size(type_size) == static_cast<size_t>(LogicalType::kInvalid) + 1);
+static_assert(std::size(type_size) == to_underlying_val(LogicalType::kInvalid) + 1);
 
-const char *LogicalType2Str(LogicalType logical_type) { return type2name[logical_type]; }
+const char *LogicalType2Str(LogicalType logical_type) { return type2name[to_underlying_val(logical_type)]; }
 
 LogicalType Str2LogicalType(const std::string &str) {
     auto iter = name2type.find(str);
@@ -239,7 +255,7 @@ LogicalType Str2LogicalType(const std::string &str) {
     }
 }
 
-int64_t LogicalTypeWidth(LogicalType logical_type) { return type_size[logical_type]; }
+int64_t LogicalTypeWidth(LogicalType logical_type) { return type_size[to_underlying_val(logical_type)]; }
 
 template <typename T, typename U>
 LogicalType GetCommonLogicalType() {

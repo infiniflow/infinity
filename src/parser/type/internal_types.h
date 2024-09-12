@@ -15,6 +15,7 @@
 #pragma once
 
 
+#include "type/datetime/date_type_std.h"
 #include "type/number/float16.h"
 #include "type/number/bfloat16.h"
 #include "type/number/huge_int.h"
@@ -29,9 +30,10 @@
 #include "type/geo/box_type.h"
 #include "type/geo/circle_type.h"
 #include "type/complex/embedding_type.h"
-#include "type/complex/tensor_type.h"
 #include "type/complex/sparse_type.h"
+#include "type/complex/tensor_type.h"
 #include "type/complex/tensor_array_type.h"
+#include "type/complex/multi_vector_type.h"
 #include "type/complex/row_id.h"
 #include "type/complex/varchar.h"
 #include "type/complex/uuid_type.h"
@@ -62,7 +64,8 @@ using DecimalT = DecimalType;
 using VarcharT = Varchar;
 
 // Date and Time
-using DateT = DateType;
+using DateTOld = DateType;
+using DateT = DateTypeStd;
 using TimeT = TimeType;
 using DateTimeT = DateTimeType;
 using TimestampT = TimestampType;
@@ -107,5 +110,8 @@ using EmptyArrayT = std::nullptr_t;
 using Float16T = float16_t;
 // BF16
 using BFloat16T = bfloat16_t;
+
+// MultiVector
+using MultiVectorT = MultiVectorType;
 
 }

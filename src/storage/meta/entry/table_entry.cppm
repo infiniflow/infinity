@@ -43,6 +43,7 @@ import random;
 import meta_info;
 import block_entry;
 import column_index_reader;
+import value;
 
 namespace infinity {
 
@@ -67,7 +68,6 @@ public:
 
 public:
     explicit TableEntry(bool is_delete,
-                        const SharedPtr<String> &base_dir,
                         const SharedPtr<String> &table_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
@@ -78,8 +78,13 @@ public:
                         SegmentID unsealed_id,
                         SegmentID next_segment_id);
 
+private:
+    TableEntry(const TableEntry &other);
+
+public:
+    UniquePtr<TableEntry> Clone(TableMeta *meta = nullptr) const;
+
     static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
-                                               const SharedPtr<String> &base_dir,
                                                const SharedPtr<String> &db_entry_dir,
                                                SharedPtr<String> table_collection_name,
                                                const Vector<SharedPtr<ColumnDef>> &columns,
@@ -90,7 +95,6 @@ public:
 
     static SharedPtr<TableEntry> ReplayTableEntry(bool is_delete,
                                                   TableMeta *table_meta,
-                                                  SharedPtr<String> base_dir,
                                                   SharedPtr<String> table_entry_dir,
                                                   SharedPtr<String> table_name,
                                                   const Vector<SharedPtr<ColumnDef>> &column_defs,
@@ -136,6 +140,8 @@ public:
 
     TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    Vector<TableIndexEntry *> TableIndexes(TransactionID txn_id, TxnTimeStamp begin_ts);
+
     void AddSegmentReplayWalImport(SharedPtr<SegmentEntry> segment_entry);
 
     void AddSegmentReplayWalCompact(SharedPtr<SegmentEntry> segment_entry);
@@ -178,9 +184,7 @@ public:
 
     SegmentID next_segment_id() const { return next_segment_id_; }
 
-    static SharedPtr<String> DetermineTableDir(const String&base_dir, const String &parent_dir, const String &table_name) {
-        return DetermineRandomString(base_dir, parent_dir, fmt::format("table_{}", table_name));
-    }
+    static SharedPtr<String> DetermineTableDir(const String &parent_dir, const String &table_name);
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges);
@@ -245,6 +249,8 @@ public:
 public:
     u64 GetColumnIdByName(const String &column_name) const;
 
+    i64 GetColumnID(const String &column_name) const;
+
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
     SegmentEntry *GetSegmentEntry(SegmentID seg_id) const {
@@ -261,11 +267,11 @@ public:
     IndexReader GetFullTextIndexReader(Txn *txn);
 
     void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
-        return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
+        return fulltext_column_index_cache_->UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
 
 private:
-    TableMeta *const table_meta_{};
+    TableMeta *table_meta_{};
 
     MetaMap<TableIndexMeta> index_meta_map_{};
 
@@ -273,9 +279,9 @@ private:
 
     const SharedPtr<String> table_entry_dir_{};
 
-    const SharedPtr<String> table_name_{};
+    SharedPtr<String> table_name_{};
 
-    const Vector<SharedPtr<ColumnDef>> columns_{};
+    Vector<SharedPtr<ColumnDef>> columns_{};
 
     const TableEntryType table_entry_type_{TableEntryType::kTableEntry};
 
@@ -289,7 +295,7 @@ private:
     Atomic<SegmentID> next_segment_id_{};
 
     // for full text search cache
-    TableIndexReaderCache fulltext_column_index_cache_;
+    SharedPtr<TableIndexReaderCache> fulltext_column_index_cache_;
 
 public:
     // set nullptr to close auto compaction
@@ -319,6 +325,27 @@ public:
     void PickCleanup(CleanupScanner *scanner) override;
 
     void Cleanup() override;
+
+public:
+    Status AddWriteTxnNum(Txn *txn);
+
+    void DecWriteTxnNum();
+
+    void SetLocked();
+
+    void SetUnlock();
+
+private:
+    std::mutex mtx_; // when table is locked, write is not allowed.
+    std::condition_variable cv_;
+    bool locked_ = false;
+    bool wait_lock_ = false;
+    SizeT write_txn_num_ = 0;
+
+public:
+    void AddColumns(const Vector<SharedPtr<ColumnDef>> &columns, const Vector<Value> &default_values, TxnTableStore *txn_store);
+
+    void DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store);
 };
 
 } // namespace infinity

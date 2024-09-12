@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -26,6 +27,7 @@ import infinity_context;
 import default_values;
 import vector_heap_chunk;
 
+using namespace infinity;
 class VectorHeapTest : public BaseTest {};
 #if 0
 TEST_F(VectorHeapTest, var_heap1) {
@@ -104,7 +106,7 @@ TEST_F(VectorHeapTest, var_heap2) {
 
 TEST_F(VectorHeapTest, fix_heap1) {
     using namespace infinity;
-    FixHeapManager vector_heap_mgr_(0, DEFAULT_FIXLEN_CHUNK_SIZE, true);
+    FixHeapManager vector_heap_mgr_(DEFAULT_FIXLEN_CHUNK_SIZE, true);
 
     SizeT size_count = 20;
     SizeT allocate_size = 1;
@@ -130,13 +132,13 @@ TEST_F(VectorHeapTest, fix_heap1) {
 
     EXPECT_EQ(total_size, vector_heap_mgr_.total_size());
 
-    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
-    std::cout << vector_heap_mgr_.Stats() << std::endl;
+//    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
+//    std::cout << vector_heap_mgr_.Stats() << std::endl;
 }
 
 TEST_F(VectorHeapTest, fix_heap2) {
     using namespace infinity;
-    FixHeapManager vector_heap_mgr_(0, DEFAULT_FIXLEN_CHUNK_SIZE, true);
+    FixHeapManager vector_heap_mgr_(DEFAULT_FIXLEN_CHUNK_SIZE, true);
 
     SizeT size_count = 5000;
     SizeT allocate_size = 260;
@@ -161,8 +163,8 @@ TEST_F(VectorHeapTest, fix_heap2) {
 
     EXPECT_EQ(total_size, vector_heap_mgr_.total_size());
 
-    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
-    std::cout << vector_heap_mgr_.Stats() << std::endl;
+//    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
+//    std::cout << vector_heap_mgr_.Stats() << std::endl;
 }
 
 

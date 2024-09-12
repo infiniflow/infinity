@@ -1,4 +1,5 @@
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import random;
 import third_party;
@@ -15,8 +16,6 @@ public:
         numbers.clear();
         loser.clear();
     }
-    void TearDown() override {}
-
     u64 GetRandom(u64 max_val) {
         return static_cast<u64>(random() % max_val) * random() % max_val;
     }

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 #include <iostream>
 #include <unistd.h>
@@ -59,20 +60,12 @@ protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     SharedPtr<ColumnVector> column_;
     Vector<ExpectedPosting> expected_postings_;
+    SharedPtr<ColumnVector> empty_column_;
     String config_path_{};
 
 public:
     void SetUp() override {
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-        CleanupDbDirs();
-        config_path_ = GetParam();
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            std::shared_ptr<std::string> config_path = std::make_shared<std::string>(config_path_);
-            infinity::InfinityContext::instance().Init(config_path);
-        }
-
+        BaseTestParamStr::SetUp();
         // https://en.wikipedia.org/wiki/Finite-state_transducer
         const char *paragraphs[] = {
             R"#(A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.)#",
@@ -90,14 +83,12 @@ public:
             column_->AppendValue(v);
         }
         expected_postings_ = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
-    }
 
-    void TearDown() override {
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            if (InfinityContext::instance().persistence_manager() != nullptr) {
-                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
-            }
-            infinity::InfinityContext::instance().UnInit();
+        empty_column_ = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
+        empty_column_->Initialize();
+        for (SizeT i = 0; i < 10; ++i) {
+            Value v = Value::MakeVarchar(String(""));
+            empty_column_->AppendValue(v);
         }
     }
 
@@ -130,14 +121,9 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    TestWithDifferentParams,
-    MemoryIndexerTest,
-    ::testing::Values(
-        BaseTestParamStr::NULL_CONFIG_PATH,
-        BaseTestParamStr::VFS_CONFIG_PATH
-    )
-);
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         MemoryIndexerTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(MemoryIndexerTest, Insert) {
     // prepare fake segment index entry
@@ -176,6 +162,22 @@ TEST_P(MemoryIndexerTest, test2) {
     ColumnIndexReader reader;
     reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
     Check(reader);
+}
+
+TEST_P(MemoryIndexerTest, test3) {
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    indexer1.Insert(empty_column_, 0, 10, true);
+    indexer1.Dump(true);
+    fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
+
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
+
+    ColumnIndexReader reader;
+    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
+    Pair<u64, float> res = reader.GetTotalDfAndAvgColumnLength();
+    ASSERT_EQ(res.first, 0U);
+    ASSERT_EQ(res.second, 0.0f);
 }
 
 TEST_P(MemoryIndexerTest, SpillLoadTest) {

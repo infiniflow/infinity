@@ -66,6 +66,8 @@ public:
     Vector<SharedPtr<BaseExpression>> where_conditions_{};
 
     Vector<Pair<SizeT, SharedPtr<BaseExpression>>> update_columns_{};
+    Vector<SharedPtr<BaseExpression>> all_columns_in_table_{};
+    Vector<SharedPtr<BaseExpression>> final_result_columns_{};
 
     // For build subquery
     bool building_subquery_{false};

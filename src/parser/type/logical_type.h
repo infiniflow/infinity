@@ -40,7 +40,7 @@
 namespace infinity {
 
 // 40 types in total now.
-enum LogicalType : int8_t {
+enum class LogicalType : int8_t {
     // Bool * 1
     kBoolean = 0,
 
@@ -111,13 +111,21 @@ enum LogicalType : int8_t {
 
     kEmptyArray,
 
-    // FP16
+    // extended floating-point types * 2
+    // FP16 (IEEE 754-2008)
+    // std::float16_t will be supported in C++23
     kFloat16,
     // BF16
+    // std::bfloat16_t will be supported in C++23
     kBFloat16,
+
+    // multi-vector type * 1
+    kMultiVector,
 
     kInvalid,
 };
+
+constexpr auto to_underlying_val(LogicalType type) { return static_cast<std::underlying_type_t<LogicalType>>(type); }
 
 extern const char *LogicalType2Str(LogicalType logical_type);
 extern LogicalType Str2LogicalType(const std::string &string);

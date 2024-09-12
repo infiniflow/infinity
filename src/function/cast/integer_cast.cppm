@@ -167,7 +167,6 @@ inline bool IntegerTryCastToFixlen::Run(u8, DecimalT &) {
 // Cast u8 to VarcharT type
 template <>
 inline bool IntegerTryCastToVarlen::Run(u8 source, VarcharT &target, ColumnVector*) {
-    target.is_value_ = false;
     if (source == 0) {
         target.short_.data_[0] = '0';
         target.length_ = 1;
@@ -251,7 +250,6 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT, DecimalT &) {
 // Cast TinyIntT to VarcharT type
 template <>
 inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, ColumnVector*) {
-    target.is_value_ = false;
     if (source == 0) {
         target.short_.data_[0] = '0';
         target.length_ = 1;
@@ -341,7 +339,6 @@ inline bool IntegerTryCastToFixlen::Run(SmallIntT, DecimalT &) {
 // Cast SmallIntT to VarcharT type
 template <>
 inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, ColumnVector*) {
-    target.is_value_ = false;
     if (source == 0) {
         target.short_.data_[0] = '0';
         target.length_ = 1;
@@ -434,7 +431,6 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT, DecimalT &) {
 // Cast IntegerT to VarcharT type
 template <>
 inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, ColumnVector*) {
-    target.is_value_ = false;
     if (source == 0) {
         target.short_.data_[0] = '0';
         target.length_ = 1;
@@ -530,7 +526,6 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT, DecimalT &) {
 // Cast integer to varlen type
 template <>
 inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, ColumnVector* vector_ptr) {
-    target.is_value_ = false;
     if (source == 0) {
         target.short_.data_[0] = '0';
         target.length_ = 1;
@@ -538,18 +533,7 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, Column
     }
     // TODO: High performance itoa needed here.
     String tmp_str = std::to_string(source);
-    target.length_ = static_cast<u32>(tmp_str.size());
-    if (target.length_ <= VARCHAR_INLINE_LEN) {
-        std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
-    } else {
-        std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
-        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
-            String error_message = "Varchar column vector should use VarBuffer.";
-            UnrecoverableError(error_message);
-        }
-        SizeT offset = vector_ptr->buffer_->AppendVarchar(tmp_str.c_str(), target.length_);
-        target.vector_.file_offset_ = offset;
-    }
+    vector_ptr->AppendVarcharInner({tmp_str.data(), tmp_str.size()}, target);
 
     return true;
 }

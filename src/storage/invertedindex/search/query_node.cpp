@@ -41,9 +41,7 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
         root->FilterOptimizeQueryTree();
         return root;
     }
-#ifdef INFINITY_DEBUG
     auto start_time = std::chrono::high_resolution_clock::now();
-#endif
     std::unique_ptr<QueryNode> optimized_root;
     if (!root) {
         Status status = Status::SyntaxError("Invalid query statement: Empty query tree");
@@ -88,8 +86,7 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
             break;
         }
     }
-#ifdef INFINITY_DEBUG
-    {
+    if (SHOULD_LOG_DEBUG()) {
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(end_time - start_time);
         OStringStream oss;
@@ -102,7 +99,6 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
         }
         LOG_DEBUG(std::move(oss).str());
     }
-#endif
     return optimized_root;
 }
 
@@ -410,6 +406,7 @@ TermQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_re
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader) {
+        RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
         return nullptr;
     }
 
@@ -435,6 +432,7 @@ PhraseQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader) {
+        RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
         return nullptr;
     }
     bool fetch_position = false;

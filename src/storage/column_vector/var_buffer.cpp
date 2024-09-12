@@ -25,6 +25,7 @@ import block_column_entry;
 import buffer_manager;
 import var_file_worker;
 import logger;
+import infinity_context;
 
 namespace infinity {
 
@@ -51,6 +52,9 @@ SizeT VarBuffer::Append(const char *data, SizeT size, bool *free_success) {
 }
 
 const char *VarBuffer::Get(SizeT offset, SizeT size) const {
+    if (size == 0) {
+        return nullptr;
+    }
     std::shared_lock lock(mtx_);
     // find the last index i such that buffer_size_prefix_sum_[i] <= offset
     auto it = std::upper_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
@@ -92,11 +96,16 @@ SizeT VarBuffer::Write(char *ptr, SizeT offset, SizeT size) const {
     return size;
 }
 
+SizeT VarBuffer::TotalSize() const {
+    std::shared_lock lock(mtx_);
+    return buffer_size_prefix_sum_.back();
+}
+
 SizeT VarBufferManager::Append(UniquePtr<char[]> data, SizeT size, bool *free_success) {
     auto *buffer = GetInnerMut();
     SizeT offset = buffer->Append(std::move(data), size, free_success);
     if (type_ == BufferType::kBufferObj) {
-        block_column_entry_->SetLastChunkOff(0, buffer->TotalSize());
+        block_column_entry_->SetLastChunkOff(buffer->TotalSize());
     }
     return offset;
 }
@@ -117,11 +126,15 @@ void VarBufferManager::InitBuffer() {
         }
     } else {
         if (!buffer_handle_.has_value()) {
-            if (auto *block_obj = block_column_entry_->GetOutlineBuffer(0, 0); block_obj == nullptr) {
-                auto file_worker = MakeUnique<VarFileWorker>(block_column_entry_->base_dir(), block_column_entry_->OutlineFilename(0, 0), 0
+            if (auto *block_obj = block_column_entry_->GetOutlineBuffer(0); block_obj == nullptr) {
+                auto file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                             block_column_entry_->block_entry()->block_dir(),
+                                                             block_column_entry_->OutlineFilename(0),
+                                                             0
                                                              /*buffer_size*/);
                 auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
-                block_column_entry_->AppendOutlineBuffer(0, buffer_obj);
+                block_column_entry_->AppendOutlineBuffer(buffer_obj);
                 buffer_handle_ = buffer_obj->Load();
             } else {
                 buffer_handle_ = block_obj->Load();

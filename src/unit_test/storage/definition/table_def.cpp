@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -28,6 +29,7 @@ import logical_type;
 import column_def;
 import data_type;
 
+using namespace infinity;
 class TableDefTest : public BaseTest {};
 
 TEST_F(TableDefTest, test1) {
@@ -88,10 +90,10 @@ TEST_F(TableDefTest, ReadWrite) {
     table_def.WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 
-    ptr = buf_beg;
+    const char *ptr_r = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<TableDef> table_def2 = table_def.ReadAdv(ptr, maxbytes);
-    EXPECT_EQ(ptr - buf_beg, exp_size);
+    SharedPtr<TableDef> table_def2 = table_def.ReadAdv(ptr_r, maxbytes);
+    EXPECT_EQ(ptr_r - buf_beg, exp_size);
     EXPECT_NE(table_def2, nullptr);
     EXPECT_EQ(*table_def2, table_def);
 }

@@ -26,8 +26,12 @@ import logger;
 
 namespace infinity {
 
-RawFileWorker::RawFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, u32 file_size)
-    : FileWorker(std::move(file_dir), std::move(file_name)), buffer_size_(file_size) {}
+RawFileWorker::RawFileWorker(SharedPtr<String> data_dir,
+                             SharedPtr<String> temp_dir,
+                             SharedPtr<String> file_dir,
+                             SharedPtr<String> file_name,
+                             u32 file_size)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), buffer_size_(file_size) {}
 
 RawFileWorker::~RawFileWorker() {
     if (data_ != nullptr) {
@@ -57,7 +61,7 @@ void RawFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     assert(data_ != nullptr && buffer_size_ > 0);
     LocalFileSystem fs;
     i64 nbytes = fs.Write(*file_handler_, data_, buffer_size_);
@@ -66,6 +70,7 @@ void RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         RecoverableError(status);
     }
     prepare_success = true; // Not run defer_fn
+    return true;
 }
 
 void RawFileWorker::ReadFromFileImpl(SizeT file_size) {

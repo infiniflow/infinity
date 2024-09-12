@@ -12,7 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import search_driver;
@@ -25,43 +26,11 @@ import logger;
 
 using namespace infinity;
 
-class QueryParserAndOptimizerTest : public BaseTestParamStr {
-    void SetUp() override {
-        BaseTestParamStr::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-        String config_path_str = GetParam();
-
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = MakeShared<String>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
-        BaseTestParamStr::TearDown();
-    }
-
+class QueryParserAndOptimizerTest : public BaseTest {
 public:
     static constexpr FulltextQueryOperatorOption ops[] = {FulltextQueryOperatorOption::kOr, FulltextQueryOperatorOption::kAnd};
     static constexpr const char *ops_chars[] = {"OR", "AND"};
 };
-
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         QueryParserAndOptimizerTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
 
 struct LogHelper {
     void Reset() {
@@ -115,7 +84,7 @@ int ParseAndOptimizeFromStream(const SearchDriver &driver, std::istream &ist) {
     return 0;
 }
 
-TEST_P(QueryParserAndOptimizerTest, test1) {
+TEST_F(QueryParserAndOptimizerTest, test1) {
     using namespace infinity;
 
     std::string row_quires = R"##(
@@ -179,7 +148,7 @@ sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
     EXPECT_EQ(rc, 0);
 }
 
-TEST_P(QueryParserAndOptimizerTest, operator_option_test_standard) {
+TEST_F(QueryParserAndOptimizerTest, operator_option_test_standard) {
     using namespace infinity;
     std::string row_quires = R"##(
 #query
@@ -217,7 +186,7 @@ sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
     }
 }
 
-TEST_P(QueryParserAndOptimizerTest, operator_option_test_chinese) {
+TEST_F(QueryParserAndOptimizerTest, operator_option_test_chinese) {
     using namespace infinity;
     std::string row_quires = R"##(
 #basic_filter_boost with explicit field

@@ -48,12 +48,20 @@ class AnnIVFFlatIndexFileWorker : public IndexFileWorker {
     u32 default_centroid_num_;
 
 public:
-    explicit AnnIVFFlatIndexFileWorker(SharedPtr<String> file_dir,
+    explicit AnnIVFFlatIndexFileWorker(SharedPtr<String> data_dir,
+                                       SharedPtr<String> temp_dir,
+                                       SharedPtr<String> file_dir,
                                        SharedPtr<String> file_name,
                                        SharedPtr<IndexBase> index_base,
                                        SharedPtr<ColumnDef> column_def,
                                        SizeT row_count)
-        : IndexFileWorker(std::move(file_dir), std::move(file_name), index_base, column_def), default_centroid_num_((u32)std::sqrt(row_count)) {}
+        : IndexFileWorker(std::move(data_dir),
+                          std::move(temp_dir),
+                          std::move(file_dir),
+                          std::move(file_name),
+                          std::move(index_base),
+                          std::move(column_def)),
+          default_centroid_num_((u32)std::sqrt(row_count)) {}
 
     virtual ~AnnIVFFlatIndexFileWorker() override;
 
@@ -65,7 +73,7 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kIVFFlatIndexFile; }
 
 protected:
-    void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
+    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void ReadFromFileImpl(SizeT file_size) override;
 
@@ -106,7 +114,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
         centroids_count = default_centroid_num_;
     }
     switch (GetType()) {
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             data_ = static_cast<void *>(new AnnIVFFlatIndexData<DataType>(index_ivfflat->metric_type_, dimension, centroids_count));
             break;
         }
@@ -129,10 +137,11 @@ void AnnIVFFlatIndexFileWorker<DataType>::FreeInMemory() {
 }
 
 template <typename DataType>
-void AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     auto *index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
     index->SaveIndexInner(*file_handler_);
     prepare_success = true;
+    return true;
 }
 
 template <typename DataType>

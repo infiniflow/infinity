@@ -30,13 +30,13 @@ import buffer_handle;
 import default_values;
 import column_def;
 import txn;
+import buffer_obj;
 
 namespace infinity {
 
 class SegmentIndexEntry;
 struct BlockEntry;
 class BufferManager;
-class BufferObj;
 struct SegmentEntry;
 
 // ChunkIndexEntry is an immutable chunk of SegmentIndexEntry. MemIndexer(for fulltext) is the mutable chunk of SegmentIndexEntry.
@@ -47,6 +47,12 @@ public:
     static String EncodeIndex(const ChunkID chunk_id, const String &base_name, const SegmentIndexEntry *segment_index_entry);
 
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
+
+private:
+    ChunkIndexEntry(const ChunkIndexEntry &other);
+
+public:
+    UniquePtr<ChunkIndexEntry> Clone(SegmentIndexEntry *segment_index_entry) const;
 
 public:
     static String IndexFileName(SegmentID segment_id, ChunkID chunk_id);
@@ -60,7 +66,7 @@ public:
                                                                   SizeT index_size);
 
     static SharedPtr<ChunkIndexEntry>
-    NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
+    NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry, ChunkID chunk_id, const String &base_name, RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
 
     static SharedPtr<ChunkIndexEntry> NewSecondaryIndexChunkIndexEntry(ChunkID chunk_id,
                                                                        SegmentIndexEntry *segment_index_entry,
@@ -124,13 +130,9 @@ public:
 
     void LoadPartsReader(BufferManager *buffer_mgr);
 
-    BufferObj *GetBufferObj() { return buffer_obj_; }
+    BufferObj *GetBufferObj() { return buffer_obj_.get(); }
 
-    void DeprecateChunk(TxnTimeStamp commit_ts) {
-        assert(commit_ts_.load() < commit_ts);
-        deprecate_ts_.store(commit_ts);
-        ResetOptimizing();
-    }
+    void DeprecateChunk(TxnTimeStamp commit_ts);
 
     bool CheckVisible(Txn *txn) const override;
 
@@ -155,8 +157,8 @@ public:
     Atomic<TxnTimeStamp> deprecate_ts_{UNCOMMIT_TS};
 
 private:
-    BufferObj *buffer_obj_{};
-    Vector<BufferObj *> part_buffer_objs_;
+    BufferPtr buffer_obj_{};
+    Vector<BufferPtr> part_buffer_objs_;
     Atomic<bool> optimizing_{false};
 };
 

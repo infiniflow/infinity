@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-#include <algorithm>
-#include <random>
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import third_party;
 
@@ -61,7 +60,6 @@ public:
         cnt = std::unique(data.begin(), data.end()) - data.begin();
         pgm = std::make_unique<PGM>(data.begin(), data.begin() + cnt);
     }
-    void TearDown() override {}
 };
 
 using TestPGMTypes = ::testing::Types<int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t, uint64_t, float, double>;

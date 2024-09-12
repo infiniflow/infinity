@@ -19,6 +19,18 @@ SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'tex
 2 second text multiple 1 0.133531
 3 third text many words 2 0.110856
 
+query I
+SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text') WHERE num != 1;
+----
+2 second text multiple 1 0.133531
+3 third text many words 2 0.110856
+
+query I
+SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text', WHERE num != 1);
+----
+2 second text multiple 1 0.133531
+3 third text many words 2 0.110856
+
 statement ok
 DELETE FROM ft_delete WHERE 1 = num;
 
@@ -26,6 +38,16 @@ query I
 SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text');
 ----
 2 second text multiple 1 0.133531
+3 third text many words 2 0.110856
+
+query I
+SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text') WHERE num > 2;
+----
+3 third text many words 2 0.110856
+
+query I
+SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text', 'topn=3', WHERE num > 2);
+----
 3 third text many words 2 0.110856
 
 # Clean up

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import global_resource_usage;
@@ -38,22 +39,17 @@ protected:
     static std::shared_ptr<std::string> test_ckp_recycle_config() {
         return GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
                    ? std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml")
-                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp_vfs.toml");
+                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp_vfs_off.toml");
     }
 
-    void SetUp() override {
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-    }
+    void SetUp() override { CleanupDbDirs(); }
 
-    void TearDown() override { RemoveDbDirs(); }
+    void TearDown() override {}
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          RecycleLogTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
     {

@@ -70,7 +70,7 @@ void Infinity::Hello() {
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
 
-    SharedPtr<String> config_path = MakeShared<String>(path + "/infinity_conf.toml");
+    SharedPtr<String> config_path = MakeShared<String>(std::filesystem::absolute(path + "/infinity_conf.toml"));
     if (fs.Exists(*config_path)) {
         InfinityContext::instance().Init(config_path);
     } else {
@@ -93,7 +93,7 @@ SharedPtr<Infinity> Infinity::LocalConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
 
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    infinity_ptr->session_ = session_mgr->CreateLocalSession(InfinityContext::instance().MaintenanceMode());
+    infinity_ptr->session_ = session_mgr->CreateLocalSession();
     return infinity_ptr;
 }
 
@@ -104,7 +104,7 @@ void Infinity::LocalDisconnect() {
 SharedPtr<Infinity> Infinity::RemoteConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    SharedPtr<RemoteSession> remote_session = session_mgr->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
+    SharedPtr<RemoteSession> remote_session = session_mgr->CreateRemoteSession();
     if(remote_session == nullptr) {
         return nullptr;
     }

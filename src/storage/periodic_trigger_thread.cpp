@@ -24,43 +24,55 @@ import logger;
 
 namespace infinity {
 
+PeriodicTriggerThread::~PeriodicTriggerThread() {
+    if (running_) {
+        Stop();
+    }
+}
+
 void PeriodicTriggerThread::Start() {
     LOG_INFO("Periodic trigger start ...");
-    running_.store(true);
+    running_ = true;
     thread_ = Thread([this] { Run(); });
 }
 
 void PeriodicTriggerThread::Stop() {
-    running_.store(false);
+    {
+        std::lock_guard lock(mtx_);
+        running_ = false;
+        cv_.notify_all();
+    }
     thread_.join();
     LOG_INFO("Periodic trigger stop ...");
 }
 
 void PeriodicTriggerThread::Run() {
-    while (running_.load()) {
-
-        if(cleanup_trigger_->Check()) {
+    auto sleep_time = std::chrono::milliseconds(1000);
+    while (true) {
+        std::unique_lock lock(mtx_);
+        cv_.wait_for(lock, sleep_time, [this] { return !running_; });
+        if (!running_) {
+            break;
+        }
+        if (cleanup_trigger_ != nullptr && cleanup_trigger_->Check()) {
             cleanup_trigger_->Trigger();
         }
 
-        if(full_checkpoint_trigger_->Check()) {
+        if (full_checkpoint_trigger_ != nullptr && full_checkpoint_trigger_->Check()) {
             full_checkpoint_trigger_->Trigger();
         }
 
-        if(delta_checkpoint_trigger_->Check()) {
+        if (delta_checkpoint_trigger_ != nullptr && delta_checkpoint_trigger_->Check()) {
             delta_checkpoint_trigger_->Trigger();
         }
 
-        if(compact_segment_trigger_->Check()) {
+        if (compact_segment_trigger_ != nullptr && compact_segment_trigger_->Check()) {
             compact_segment_trigger_->Trigger();
         }
 
-        if(optimize_index_trigger_->Check()) {
+        if (optimize_index_trigger_ != nullptr && optimize_index_trigger_->Check()) {
             optimize_index_trigger_->Trigger();
         }
-
-        // sleep for 1s
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 }
 

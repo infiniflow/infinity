@@ -1,18 +1,20 @@
+import importlib
 import sys
 import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 import pandas as pd
 import pytest
 import numpy as np
 from numpy import dtype
 from common import common_values
 import infinity
+import infinity_embedded
 import infinity.index as index
-from infinity.common import ConflictType, InfinityException
+from infinity.common import ConflictType, InfinityException, SparseVector
 from infinity.errors import ErrorCode
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
 
@@ -29,11 +31,21 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.index")
+        globals()["index"] = module
+        module = importlib.import_module("infinity_embedded.common")
+        func = getattr(module, 'ConflictType')
+        globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
+        func = getattr(module, 'SparseVector')
+        globals()['SparseVector'] = func
         uri = common_values.TEST_LOCAL_PATH
+        request.cls.infinity_obj = infinity_embedded.connect(uri)
     else:
         uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    request.cls.infinity_obj = infinity.connect(uri)
     if http:
         request.cls.infinity_obj = infinity_http()
     yield
@@ -404,7 +416,6 @@ class TestInfinity:
                                                {
                                                    "M": "16",
                                                    "ef_construction": "50",
-                                                   "ef": "50",
                                                    "metric": "l2"
                                                }), ConflictType.Error)
 
@@ -502,25 +513,73 @@ class TestInfinity:
         table_obj = db_obj.create_table("test_insert_sparse"+suffix, {"c1": {"type": "sparse,100,float,int"}},
                                         ConflictType.Error)
         assert table_obj
-        res = table_obj.insert([{"c1": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}}])
+        res = table_obj.insert([{"c1": SparseVector(**{"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]})}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]}}])
+        res = table_obj.insert([{"c1": SparseVector([40, 50, 60], [4.4, 5.5, 6.6])}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}},
-                                {"c1": {"indices": [70, 80, 90], "values": [-7.7, -8.8, -9.9]}}])
+        res = table_obj.insert([{"c1": {"70": 7.7, "80": 8.8, "90": 9.9}},
+                                {"c1": {"70": -7.7, "80": -8.8, "90": -9.9}}])
         assert res.error_code == ErrorCode.OK
-
+        print(table_obj.output(["*"]).to_pl())
         res = table_obj.output(["*"]).to_df()
+        print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (
-                {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]},
-                {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]},
-                {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]},
-                {"indices": [70, 80, 90], "values": [-7.7, -8.8, -9.9]})}))
+                {"10": 1.1, "20": 2.2, "30": 3.3},
+                {"40": 4.4, "50": 5.5, "60": 6.6},
+                {"70": 7.7, "80": 8.8, "90": 9.9},
+                {"70": -7.7, "80": -8.8, "90": -9.9})}))
 
         res = db_obj.drop_table("test_insert_sparse"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         pass
+
+    def _test_insert_multivector(self, suffix):
+        """
+        target: test insert multivector column
+        method: create table with multivector column
+        expected: ok
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_multivector"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_multivector"+suffix, {"c1": {"type": "multivector,3,int"}}, ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": [1, 2, 3]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [[4, 5, 6]]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": np.array([[7, 8, 9], [-7, -8, -9]])}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
+        res = table_obj.insert([{"c1": [1, 2, 3]}, {"c1": [4, 5, 6]}, {
+            "c1": [7, 8, 9, -7, -8, -9]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]],
+                                                                [[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
+
+        res = db_obj.drop_table("test_insert_multivector"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        db_obj.drop_table("test_insert_multivector_2"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_insert_multivector_2"+suffix, {"c1": {"type": "multivector,3,float"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_insert_multivector_2"+suffix)
+        assert table_obj
+        res = table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [[4.4, 5.5, 6.6]]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]]}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': ([[1.1, 2.2, 3.3]], [[4.4, 5.5, 6.6]], [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]])}))
+
+        res = db_obj.drop_table("test_insert_multivector_2"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     def _test_insert_tensor(self, suffix):
         """
@@ -611,6 +670,7 @@ class TestInfinity:
         self._test_batch_insert(suffix)
         self._test_insert_zero_column(suffix)
         self._test_insert_sparse(suffix)
+        self._test_insert_multivector(suffix)
         self._test_insert_tensor(suffix)
         self._test_insert_tensor_array(suffix)
 
@@ -838,3 +898,59 @@ class TestInfinity:
         res = db_obj.drop_table(
             "test_insert_no_match_column"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.slow
+    def test_insert_with_large_data(self, suffix):
+        total_row_count = 1000000
+
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("hr_data_mix"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("hr_data_mix" + suffix, {
+            "id": {"type": "varchar"},
+            "content": {"type": "varchar"},
+            "dense_vec": {"type": "vector, 1024, float"},
+            "sparse_vec": {"type": "sparse,250002,float,int"},
+        })
+
+        import json
+        import time
+        def read_jsonl(file_path):
+            data = []
+            with open(file_path, 'r') as file:
+                for line in file:
+                    data.append(json.loads(line))
+            return data
+        data_array = read_jsonl("./test/data/jsonl/test_table.jsonl")
+        loop_count: int = total_row_count // len(data_array)
+
+        start = time.time()
+        for global_idx in range(loop_count):
+            insert_data = []
+            for local_idx, data in enumerate(data_array):
+
+                # each 1000, a duplicated row is generated
+                if local_idx == 9 and global_idx % 1000 == 0:
+                    end = time.time()
+                    print(f"ID: {global_idx}@{local_idx}, cost: {end - start}s")
+                    data = data_array[0]
+                    local_idx = 0
+
+                indices = []
+                values = []
+                for key, value in data['sparse_vec'].items():
+                    indices.append(int(key))
+                    values.append(value)
+
+                insert_data.append(
+                    {
+                        "id": f'{global_idx}@{local_idx}',
+                        "content": data['content'],
+                        "dense_vec": data['dense_vec'],
+                        "sparse_vec": SparseVector(indices, values)
+                    }
+                )
+            table_obj.insert(insert_data)
+        res = table_obj.output(["count(*)"]).to_pl()
+        assert res.height == 1 and res.width == 1 and res.item(0, 0) == total_row_count
+
+        db_obj.drop_table("hr_data_mix"+suffix, ConflictType.Error)

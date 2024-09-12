@@ -19,7 +19,7 @@ CREATE INDEX ft_index ON enwiki_embedding(body) USING FULLTEXT;
 
 
 query TTT
-SELECT doctitle, docdate, body, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('doctitle^2,body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf');
+SELECT doctitle, docdate, body, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf');
 ----
 Antimony 26-APR-2012 05:43:07.000  of Canadian and European bottled waters with antimony from PET containers|volume=8|issue=2|pages=288–92|pmid=16470261|journal=Journal of Environmental Monitoring}}</ref> [[fruit juice]] concentrates (for which no guidelines are established) produced in the UK were found to contain up to 44.7&nbsp;µg/L of antimony, well above the EU limits for [[tap water]] of 5&nbsp;µg/L.<ref>{{cite journal|title=Elevated antimony concentrations in commercial juices|first7=Helle Rüsz|last7=Hansen|first6=Bente|last6=Gammelgaard|first5=Stefan|last5=Stürup|first4=Spiros A.|last4=Pergantis|first3=Søren Alex|last3=Bak|first2=Alexandra|last=Hansen|last2=Tsirigotaki|journal=Journal of Environmental Monitoring|first=Claus|volume=12|issue=4|pages=822–4|date= 17 February 2010|pmid=20383361|doi=10.1039/b926551a}}</ref><ref>{{cite web|url=http://www.dailymail.co.uk/news/article-1254534/Fruit-juice-cancer-warning-scientists-harmful-chemical-16-drinks.html|title=Fruit juice cancer warning as scientists find harmful chemical in 16 6989 [6989,6989,6989,6989]
 Anarchism 30-APR-2012 03:25:17.000 {{Redirect|Anarchist|the fictional character|Anarchist (comics)}} {{Redirect|Anarchists}} {{Anarchism sidebar}} {{Libertarianism sidebar}}  '''Anarchism''' is generally defined as the [[political philosophy]] which holds the [[state (polity)|state]] to be undesirable, unnecessary, and harmful,<ref name="definition"> {{Cite journal|last=Malatesta|first=Errico|title=Towards Anarchism|journal=MAN!|publisher=International Group of San Francisco|location=Los Angeles|oclc=3930443|url=http://www.marxists.org/archive/malatesta/1930s/xx/toanarchy.htm|authorlink=Errico Malatesta}} {{Cite journal|url=http://www.theglobeandmail.com/servlet/story/RTGAM.20070514.wxlanarchist14/BNStory/lifeWork/home/ |title=Working for The Man |journal=[[The Globe and Mail]] |accessdate=2008-04-14 |last=Agrell |first=Siri |date=2007-05-14}} {{cite web|url=http://www.britannica.com/eb/article-9117285|title=Anarchism|year=2006|work=Encyclopædia Britannica|publisher=Encyclopædia Britannica Premium Service|accessdate=2006-08-29| archiveurl= 0 [0,0,0,0]
@@ -30,7 +30,7 @@ Anarchism 30-APR-2012 03:25:17.000  [[hierarchical organization]] in the conduct
 
 
 query TTT
-SELECT doctitle, docdate, body, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('doctitle^2,body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf', 'window_size=3');
+SELECT doctitle, docdate, body, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf', 'window_size=3');
 ----
 Antimony 26-APR-2012 05:43:07.000  of Canadian and European bottled waters with antimony from PET containers|volume=8|issue=2|pages=288–92|pmid=16470261|journal=Journal of Environmental Monitoring}}</ref> [[fruit juice]] concentrates (for which no guidelines are established) produced in the UK were found to contain up to 44.7&nbsp;µg/L of antimony, well above the EU limits for [[tap water]] of 5&nbsp;µg/L.<ref>{{cite journal|title=Elevated antimony concentrations in commercial juices|first7=Helle Rüsz|last7=Hansen|first6=Bente|last6=Gammelgaard|first5=Stefan|last5=Stürup|first4=Spiros A.|last4=Pergantis|first3=Søren Alex|last3=Bak|first2=Alexandra|last=Hansen|last2=Tsirigotaki|journal=Journal of Environmental Monitoring|first=Claus|volume=12|issue=4|pages=822–4|date= 17 February 2010|pmid=20383361|doi=10.1039/b926551a}}</ref><ref>{{cite web|url=http://www.dailymail.co.uk/news/article-1254534/Fruit-juice-cancer-warning-scientists-harmful-chemical-16-drinks.html|title=Fruit juice cancer warning as scientists find harmful chemical in 16 6989 [6989,6989,6989,6989]
 Anarchism 30-APR-2012 03:25:17.000 {{Redirect|Anarchist|the fictional character|Anarchist (comics)}} {{Redirect|Anarchists}} {{Anarchism sidebar}} {{Libertarianism sidebar}}  '''Anarchism''' is generally defined as the [[political philosophy]] which holds the [[state (polity)|state]] to be undesirable, unnecessary, and harmful,<ref name="definition"> {{Cite journal|last=Malatesta|first=Errico|title=Towards Anarchism|journal=MAN!|publisher=International Group of San Francisco|location=Los Angeles|oclc=3930443|url=http://www.marxists.org/archive/malatesta/1930s/xx/toanarchy.htm|authorlink=Errico Malatesta}} {{Cite journal|url=http://www.theglobeandmail.com/servlet/story/RTGAM.20070514.wxlanarchist14/BNStory/lifeWork/home/ |title=Working for The Man |journal=[[The Globe and Mail]] |accessdate=2008-04-14 |last=Agrell |first=Siri |date=2007-05-14}} {{cite web|url=http://www.britannica.com/eb/article-9117285|title=Anarchism|year=2006|work=Encyclopædia Britannica|publisher=Encyclopædia Britannica Premium Service|accessdate=2006-08-29| archiveurl= 0 [0,0,0,0]
@@ -38,7 +38,7 @@ Avicenna 29-APR-2012 07:47:29.000  [[saliva]]tion, [[Somnolence|sleepiness]] | [
 
 
 query TTT
-SELECT doctitle, docdate, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('doctitle^2,body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') where 10 > num;
+SELECT doctitle, docdate, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') where 10 > num;
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 [0,0,0,0]
 Anarchism 30-APR-2012 03:25:17.000 1 [1,1,1,1]
@@ -48,14 +48,14 @@ statement ok
 CREATE INDEX sec_idx ON enwiki_embedding(num);
 
 query TTT
-SELECT doctitle, docdate, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('doctitle^2,body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') where 10 > num;
+SELECT doctitle, docdate, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') where 10 > num;
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 [0,0,0,0]
 Anarchism 30-APR-2012 03:25:17.000 1 [1,1,1,1]
 Anarchism 30-APR-2012 03:25:17.000 2 [2,2,2,2]
 
 query TTT
-SELECT doctitle, docdate, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('doctitle^2,body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') where 2000 < num and num < 3000;
+SELECT doctitle, docdate, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') where 2000 < num and num < 3000;
 ----
 Algae 02-MAY-2012 02:41:42.000 2123 [2123,2123,2123,2123]
 Agriculture 28-APR-2012 20:16:08.000 2001 [2001,2001,2001,2001]
@@ -122,6 +122,19 @@ SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical'
 1
 2
 6989
+9893
+2123
+
+# cannot have both where clause and subsearch filter
+statement error
+SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3, WHERE 33 + 5 < num), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') WHERE 100 > num;
+
+# subsearch filter
+query I
+SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=2', WHERE num != 6989), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 2, WHERE num != 0), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 2, WHERE num != 0), FUSION('rrf');
+----
+1
+2
 9893
 2123
 

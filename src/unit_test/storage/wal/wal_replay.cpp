@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "type/complex/embedding_type.h"
-#include "unit_test/base_test.h"
-#include <memory>
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import global_resource_usage;
@@ -67,21 +67,18 @@ protected:
     static std::shared_ptr<std::string> config_path() {
         return GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
                    ? std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml")
-                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp_vfs.toml");
+                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp_vfs_off.toml");
     }
 
     void SetUp() override {
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        CleanupDbDirs();
         tree_cmd = "tree ";
         tree_cmd += GetFullDataDir();
     }
 
     void TearDown() override {
         // system(tree_cmd.c_str());
-        RemoveDbDirs();
+//        RemoveDbDirs();
     }
 
     String tree_cmd;
@@ -89,7 +86,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          WalReplayTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 TEST_P(WalReplayTest, wal_replay_database) {
     {
@@ -619,7 +616,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
 #endif
     }
     // Restart the db instance
-    system(tree_cmd.c_str());
+//    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -758,7 +755,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 #endif
     }
     // Restart db instance
-    system(tree_cmd.c_str());
+//    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -869,7 +866,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-    system(tree_cmd.c_str());
+//    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -940,7 +937,6 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             parameters1.emplace_back(new InitParameter("encode", "plain"));
             parameters1.emplace_back(new InitParameter("m", "16"));
             parameters1.emplace_back(new InitParameter("ef_construction", "200"));
-            parameters1.emplace_back(new InitParameter("ef", "200"));
 
             SharedPtr<String> index_name = MakeShared<String>("hnsw_index");
             auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
@@ -976,7 +972,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-    system(tree_cmd.c_str());
+//    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();

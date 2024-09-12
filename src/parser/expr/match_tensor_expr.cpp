@@ -39,15 +39,15 @@ std::string MatchTensorExpr::ToString() const {
     const auto query_str = EmbeddingT::Embedding2String(query_embedding, embedding_data_type_, dimension_);
     const auto data_type_str = EmbeddingT::EmbeddingDataType2String(embedding_data_type_);
     const auto method_str = SearchMethodToString(search_method_enum_);
-    if (options_text_.empty()) {
-        return fmt::format("MATCH TENSOR ({}, {}, {}, {})", column_expr_->ToString(), query_str, data_type_str, method_str);
-    }
-    return fmt::format("MATCH TENSOR ({}, {}, {}, {}, EXTRA OPTION : '{}')",
+    const auto extra_option_str = options_text_.empty() ? "" : fmt::format(", EXTRA OPTION : '{}'", options_text_);
+    const auto filter_str = filter_expr_ ? fmt::format(", WHERE {}", filter_expr_->ToString()) : "";
+    return fmt::format("MATCH TENSOR ({}, {}, {}, {}{}{})",
                        column_expr_->ToString(),
                        query_str,
                        data_type_str,
                        method_str,
-                       options_text_);
+                       extra_option_str,
+                       filter_str);
 }
 
 void MatchTensorExpr::SetSearchMethod(char *&raw_search_method) {
@@ -68,6 +68,11 @@ void MatchTensorExpr::SetSearchMethodStr(std::string search_method) {
 void MatchTensorExpr::SetSearchColumn(ParsedExpr *&column_expr) noexcept {
     column_expr_.reset(column_expr);
     column_expr = nullptr;
+}
+
+void MatchTensorExpr::SetOptionalFilter(ParsedExpr *&filter_expr) noexcept {
+    filter_expr_.reset(filter_expr);
+    filter_expr = nullptr;
 }
 
 void MatchTensorExpr::SetExtraOptions(char *&raw_options_text) {

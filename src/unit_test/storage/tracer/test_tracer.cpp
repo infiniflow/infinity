@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-#include <random>
-
+#include "gtest/gtest.h"
+import base_test;
 import stl;
 import memindex_tracer;
 import base_memindex;
@@ -22,6 +21,8 @@ import bg_task;
 import blocking_queue;
 import third_party;
 import logger;
+import txn;
+import table_index_entry;
 
 using namespace infinity;
 
@@ -37,6 +38,8 @@ public:
         std::lock_guard lck(mtx_);
         return MemIndexTracerInfo(index_name_, table_name_, db_name_, mem_used_, row_count_);
     }
+
+    TableIndexEntry *table_index_entry() const override { return nullptr; }
 
     void AddMemUsed(SizeT usage, SizeT row_cnt);
 
@@ -71,6 +74,8 @@ private:
     TestMemIndex *GetMemIndexInner(const String &index_name);
 
 public:
+    Vector<BaseMemIndex *> GetMemIndexes();
+
     TestMemIndex *GetMemIndex(const String &index_name);
 
     void AppendMemIndex(const String &index_name, SizeT mem_used, SizeT row_cnt);
@@ -79,10 +84,7 @@ public:
 
     bool CleanupIndex(const String &index_name);
 
-    void reset() {
-        std::lock_guard lck(mtx_);
-        memindexes_.clear();
-    }
+    void reset() { memindexes_.clear(); }
 
 private:
     TestMemIndexTracer *tracer_;
@@ -90,6 +92,14 @@ private:
     std::mutex mtx_;
     HashMap<String, UniquePtr<TestMemIndex>> memindexes_;
 };
+
+Vector<BaseMemIndex *> TestCatalog::GetMemIndexes() {
+    Vector<BaseMemIndex *> ret;
+    for (auto &iter : memindexes_) {
+        ret.push_back(iter.second.get());
+    }
+    return ret;
+}
 
 TestMemIndex *TestCatalog::GetMemIndexInner(const String &index_name) {
     auto iter = memindexes_.find(index_name);
@@ -143,10 +153,15 @@ public:
     virtual ~TestMemIndexTracer() {
         task_queue_.Enqueue(nullptr);
         dump_thread_.join();
+        catalog_.reset();
         EXPECT_EQ(this->cur_index_memory(), 0ul);
     }
 
     void TriggerDump(UniquePtr<DumpIndexTask> task) override { task_queue_.Enqueue(std::move(task)); }
+
+    Txn *GetTxn() override { return nullptr; }
+
+    Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override { return catalog_.GetMemIndexes(); }
 
     void HandleDump(UniquePtr<DumpIndexTask> task);
 
@@ -165,14 +180,11 @@ TestMemIndex::TestMemIndex(SharedPtr<String> index_name, TestMemIndexTracer *tra
     db_name_ = MakeShared<String>("test_db");
     table_name_ = MakeShared<String>("test_table");
     index_name_ = index_name;
-    if (trace_) {
-        tracer_->RegisterMemIndex(this);
-    }
 }
 
 TestMemIndex::~TestMemIndex() {
     if (trace_) {
-        tracer_->UnregisterMemIndex(this, mem_used_);
+        tracer_->DecreaseMemUsed(mem_used_);
     }
 }
 
@@ -186,15 +198,17 @@ void TestMemIndex::AddMemUsed(SizeT usage, SizeT row_cnt) {
 }
 
 void TestMemIndexTracer::HandleDump(UniquePtr<DumpIndexTask> task) {
-    if (task->task_id_ % 4 != 0 || !may_fail_) { // success dump
+    auto *mem_index = static_cast<TestMemIndex *>(task->mem_index_);
+    static int dump_id = 0;
+    if ((dump_id++) % 4 != 0 || !may_fail_) { // success dump
         SizeT dumped_size = 0;
         SizeT row_cnt = 0;
-        bool res = catalog_.DumpMemIndex(*task->index_name_, dumped_size, row_cnt);
+        bool res = catalog_.DumpMemIndex(*mem_index->index_name_, dumped_size, row_cnt);
         if (res) {
-            this->DumpDone(dumped_size, task->task_id_);
+            this->DumpDone(dumped_size, mem_index);
         }
     } else { // fail dump
-        this->DumpFail(task->task_id_);
+        this->DumpFail(mem_index);
     }
 }
 
@@ -220,7 +234,6 @@ TEST_F(MemIndexTracerTest, test1) {
     catalog.AppendMemIndex("idx1", 10, 10);
     catalog.AppendMemIndex("idx2", 30, 30);
     catalog.AppendMemIndex("idx3", 20, 20);
-    catalog.reset();
 }
 
 TEST_F(MemIndexTracerTest, test2) {
@@ -251,7 +264,6 @@ TEST_F(MemIndexTracerTest, test2) {
         for (auto &th : threads) {
             th.join();
         }
-        catalog.reset();
     };
     Test(false);
     Test(true);

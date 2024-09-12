@@ -9,7 +9,6 @@ from threading import Thread
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
-from infinity.table import Table
 
 TEST_DATA_DIR = "/test/data/"
 fulltext_file_path = os.getcwd() + TEST_DATA_DIR + "csv/enwiki_99.csv"
@@ -41,7 +40,6 @@ class TestIndexParallel:
                                      index.IndexInfo("other_vector", index.IndexType.Hnsw,{
                                          "M": "16",
                                          "ef_construction": "50",
-                                         "ef": "50",
                                          "metric": "l2"
                                      }), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -83,18 +81,18 @@ def read_out_data():
     return data
 
 
-def search_fulltext(table_obj: Table):
-    res = table_obj.output(["index", "body", "other_vector", "_row_id", "_score"]).match(
-        "body^5", "harmful chemical", "topn=3").to_pl()
+def search_fulltext(table_obj):
+    res = table_obj.output(["index", "body", "other_vector", "_row_id", "_score"]).match_text(
+        "body^5", "harmful chemical", 3).to_pl()
     print(res)
 
 
-def search_vector(table_obj: Table):
-    res = table_obj.output(["*"]).knn("other_vector", [2] * 4, "float", "l2", 3).to_pl()
+def search_vector(table_obj):
+    res = table_obj.output(["*"]).match_dense("other_vector", [2] * 4, "float", "l2", 3).to_pl()
     print(res)
 
 
-def insert(table_obj: Table, data):
+def insert(table_obj, data):
     try:
         pos = random.randint(0, int(data_size / insert_delete_size) - 1)
         value = []
@@ -106,7 +104,7 @@ def insert(table_obj: Table, data):
         print(e)
 
 
-def delete(table_obj: Table):
+def delete(table_obj):
     pos = random.randint(0, int(data_size / insert_delete_size) - 1)
     try:
         table_obj.delete(f"index >= {pos} and index < {pos + insert_delete_size}")
@@ -114,7 +112,7 @@ def delete(table_obj: Table):
         print(e)
 
 
-def updata(table_obj: Table):
+def updata(table_obj):
     pos = random.randint(0, data_size - 1)
     try:
         table_obj.update(f"index = {pos}", [{"index": pos, "body": "infinity", "other_vector": [0.0, 0.0, 0.0, 0.0]}])

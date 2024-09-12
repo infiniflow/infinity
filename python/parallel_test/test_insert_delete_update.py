@@ -6,8 +6,6 @@ from threading import Thread
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
-from infinity.table import Table
-
 kRunningTime = 30
 kNumThread = 4
 
@@ -43,7 +41,7 @@ class TestInsertDeleteUpdate:
         assert res.error_code == ErrorCode.OK
 
 
-def insert(table_obj: Table):
+def insert(table_obj):
     try:
         value = []
         for i in range(100):
@@ -54,21 +52,21 @@ def insert(table_obj: Table):
         print(e)
 
 
-def delete(table_obj: Table):
+def delete(table_obj):
     try:
         table_obj.delete(f"tag = {random.randint(0, 9)}")
     except Exception as e:
         print(e)
 
 
-def updata(table_obj: Table):
+def updata(table_obj):
     try:
         table_obj.update(f"tag = {random.randint(0, 9)}", [{"tag": 0, "c1": [0.0, 0.0, 0.0, 0.0]}])
     except Exception as e:
         print(e)
 
 
-def search(table_obj: Table):
+def search(table_obj):
     res = table_obj.output(['*']).to_df()
     print(res)
 

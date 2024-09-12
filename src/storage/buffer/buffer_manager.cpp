@@ -118,13 +118,17 @@ BufferObj *BufferManager::AllocateBufferObject(UniquePtr<FileWorker> file_worker
     return res;
 }
 
-BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker) {
+BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker, bool restart) {
     String file_path = file_worker->GetFilePath();
     // LOG_TRACE(fmt::format("Get buffer object: {}", file_path));
 
     std::unique_lock lock(w_locker_);
     if (auto iter1 = buffer_map_.find(file_path); iter1 != buffer_map_.end()) {
-        return iter1->second.get();
+        BufferObj *buffer_obj = iter1->second.get();
+        if (restart) {
+            buffer_obj->SetFileWorker(std::move(file_worker));
+        }
+        return buffer_obj;
     }
 
     auto buffer_obj = MakeBufferObj(std::move(file_worker), false);
@@ -180,6 +184,7 @@ void BufferManager::RemoveClean() {
                 UnrecoverableError(error_message);
             }
         }
+        buffer_map_.rehash(buffer_map_.size());
     }
 }
 

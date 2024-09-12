@@ -62,7 +62,6 @@ export {
 
     // Each row has one chunk.
     constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L; // 1MB
-    constexpr u64 DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE = 8192UL * 128UL * 8UL;
 
     // segment related constants
     constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 1024 * 8192; // 1024 * 8192 = 8M rows
@@ -158,7 +157,6 @@ export {
     // default hnsw parameter
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
-    constexpr SizeT HNSW_EF = 200;
     constexpr SizeT HNSW_BLOCK_SIZE = 8192;
 
     constexpr SizeT BMP_BLOCK_SIZE = 16;
@@ -189,21 +187,25 @@ export {
     constexpr SizeT INSERT_BATCH_ROW_LIMIT = 8192;
 
     // default persistence parameter
-    constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "";                        // Empty means disabled
+    constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence"; // Empty means disabled
     constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "100MB"; // 100MB
     constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 100 * 1024lu * 1024lu;  // 100MB
 
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";
+    constexpr std::string_view SERVER_MODE_OPTION_NAME = "server_mode";
     constexpr std::string_view TIME_ZONE_OPTION_NAME = "time_zone";
     constexpr std::string_view TIME_ZONE_BIAS_OPTION_NAME = "time_zone_bias";
     constexpr std::string_view CPU_LIMIT_OPTION_NAME = "cpu_limit";
     constexpr std::string_view SERVER_ADDRESS_OPTION_NAME = "server_address";
+    constexpr std::string_view PEER_SERVER_IP_OPTION_NAME = "peer_ip";
+    constexpr std::string_view PEER_SERVER_PORT_OPTION_NAME = "peer_port";
 
     constexpr std::string_view POSTGRES_PORT_OPTION_NAME = "postgres_port";
     constexpr std::string_view HTTP_PORT_OPTION_NAME = "http_port";
     constexpr std::string_view CLIENT_PORT_OPTION_NAME = "client_port";
     constexpr std::string_view CONNECTION_POOL_SIZE_OPTION_NAME = "connection_pool_size";
+    constexpr std::string_view PEER_SERVER_CONNECTION_POOL_SIZE_OPTION_NAME = "peer_server_connection_pool_size";
     constexpr std::string_view LOG_FILENAME_OPTION_NAME = "log_filename";
 
     constexpr std::string_view LOG_DIR_OPTION_NAME = "log_dir";

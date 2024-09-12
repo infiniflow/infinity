@@ -25,8 +25,12 @@ import logger;
 
 namespace infinity {
 
-DataFileWorker::DataFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size)
-    : FileWorker(std::move(file_dir), std::move(file_name)), buffer_size_(buffer_size) {}
+DataFileWorker::DataFileWorker(SharedPtr<String> data_dir,
+                               SharedPtr<String> temp_dir,
+                               SharedPtr<String> file_dir,
+                               SharedPtr<String> file_name,
+                               SizeT buffer_size)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), buffer_size_(buffer_size) {}
 
 DataFileWorker::~DataFileWorker() {
     if (data_ != nullptr) {
@@ -57,7 +61,7 @@ void DataFileWorker::FreeInMemory() {
 }
 
 // FIXME: to_spill
-void DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     LocalFileSystem fs;
     // File structure:
     // - header: magic number
@@ -91,6 +95,7 @@ void DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         RecoverableError(status);
     }
     prepare_success = true; // Not run defer_fn
+    return true;
 }
 
 void DataFileWorker::ReadFromFileImpl(SizeT file_size) {

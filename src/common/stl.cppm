@@ -31,6 +31,7 @@ module;
 #include <filesystem>
 #include <forward_list>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <list>
@@ -38,6 +39,7 @@ module;
 #include <memory>
 #include <optional>
 #include <random>
+#include <ranges>
 #include <set>
 #include <shared_mutex>
 #include <source_location>
@@ -189,12 +191,28 @@ export namespace std {
 
         using std::chrono::steady_clock;
         using std::chrono::time_point;
+        
+        using std::chrono::ceil;
+        using std::chrono::days;
 
+        using std::chrono::year;
+        using std::chrono::month;
+        using std::chrono::day;
+
+        using std::chrono::year_month_day;
+        using std::chrono::sys_days;
+        using std::chrono::system_clock;
+
+        using std::chrono::high_resolution_clock;
     } // namespace chrono
 
+    using std::format;
     using std::cout;
     using std::cerr;
     using std::endl;
+
+    using std::setfill;
+    using std::setw;
 
     using std::ostream;
     using std::ofstream;
@@ -212,15 +230,25 @@ export namespace std {
     using std::dynamic_pointer_cast;
 
     namespace filesystem {
+    using std::filesystem::absolute;
     using std::filesystem::canonical;
     using std::filesystem::copy;
     using std::filesystem::copy_file;
     using std::filesystem::copy_options;
+    using std::filesystem::create_directories;
+    using std::filesystem::directory_iterator;
+    using std::filesystem::directory_options;
     using std::filesystem::exists;
     using std::filesystem::file_size;
+    using std::filesystem::filesystem_error;
     using std::filesystem::path;
+    using std::filesystem::read_symlink;
     using std::filesystem::remove;
     using std::filesystem::remove_all;
+
+    using std::filesystem::is_directory;
+    using std::filesystem::is_regular_file;
+    using std::filesystem::is_symlink;
     }
 
     namespace this_thread {
@@ -249,6 +277,7 @@ export namespace std {
     using std::get;
     using std::visit;
 
+    using std::invocable;
     using std::unsigned_integral;
     using std::is_integral_v;
     using std::is_floating_point_v;
@@ -256,6 +285,7 @@ export namespace std {
     using std::underlying_type_t;
     using std::conditional_t;
     using std::remove_pointer_t;
+    using std::remove_reference_t;
 
     using std::function;
     using std::monostate;
@@ -372,6 +402,42 @@ namespace infinity {
         if (pos == String::npos)
             return path;
         return path.substr(pos + 1);
+    }
+
+    inline String TrimString(const String &s) {
+        int len=s.length();
+        int i=0;
+    
+        while(i<len && isspace(s[i]))
+        {
+            i++;
+        }
+    
+        while (len>i && isspace(s[len-1]))
+        {
+            len--;
+        }
+    
+        if(i==len)
+        {
+            return "";
+        }
+
+        String ss=s.substr(i,len-i);
+        return ss;
+    }
+
+    std::vector<std::string> SplitStrByComma(String str){
+        std::vector<std::string> tokens;
+        for(const auto& token : str | std::views::split(',')){
+            tokens.emplace_back(token.begin(), token.end());
+        }
+
+        for(auto &s : tokens){
+            s = TrimString(s);
+        }
+
+        return tokens;
     }
 
     void ToUpper(String &str) { std::transform(str.begin(), str.end(), str.begin(), ::toupper); }

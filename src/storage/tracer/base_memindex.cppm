@@ -22,9 +22,13 @@ import infinity_context;
 
 namespace infinity {
 
+class TableIndexEntry;
+
 export class BaseMemIndex {
 public:
     virtual MemIndexTracerInfo GetInfo() const = 0;
+
+    virtual TableIndexEntry *table_index_entry() const = 0;
 
 protected:
     void AddMemUsed(SizeT mem) {

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import search_driver;
@@ -30,33 +31,30 @@ using namespace infinity;
 class SearchDriverTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        RemoveDbDirs();
         BaseTest::TearDown();
     }
 };
 
 struct LogHelper {
     void Reset() {
-        LOG_INFO(std::move(oss).str());
+//        LOG_INFO(std::move(oss).str());
         oss.str("");
         oss.clear();
     }
-    ~LogHelper() { LOG_INFO(std::move(oss).str()); }
+    ~LogHelper() {
+//        LOG_INFO(std::move(oss).str());
+    }
     OStringStream oss;
 };
 
@@ -71,16 +69,16 @@ int ParseStream(const SearchDriver &driver, std::istream &ist) {
             continue;
         }
         line = line.substr(firstNonBlank);
-        oss << "---query: ###" << line << "###" << std::endl;
+//        oss << "---query: ###" << line << "###" << std::endl;
         std::unique_ptr<QueryNode> parser_result = driver.ParseSingle(line);
         if (!parser_result) {
-            oss << "---failed" << std::endl;
+//            oss << "---failed" << std::endl;
             return -1;
         } else {
-            oss << "---accepted" << std::endl;
-            oss << "---parser output tree:" << std::endl;
+//            oss << "---accepted" << std::endl;
+//            oss << "---parser output tree:" << std::endl;
             parser_result->PrintTree(oss);
-            oss << std::endl;
+//            oss << std::endl;
         }
     }
     return 0;
@@ -225,7 +223,7 @@ graphic cards
         EXPECT_EQ(rc, 0);
     } catch (RecoverableException &e) {
         // catch because dict resource file does not exist in CI environment
-        std::cerr << fmt::format("RecoverableException: {}\n", e.what());
+//        std::cerr << fmt::format("RecoverableException: {}\n", e.what());
     }
 }
 
@@ -253,13 +251,13 @@ graphic cards
     )##";
 
     static constexpr FulltextQueryOperatorOption ops[] = {FulltextQueryOperatorOption::kOr, FulltextQueryOperatorOption::kAnd};
-    static constexpr const char *ops_chars[] = {"OR", "AND"};
+//    static constexpr const char *ops_chars[] = {"OR", "AND"};
     Map<String, String> column2analyzer;
     column2analyzer["body"] = "chinese";
     String default_field("body");
     for (size_t i = 0; i < std::size(ops); ++i) {
         const auto op = ops[i];
-        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
+//        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
         SearchDriver driver(column2analyzer, default_field, op);
         IStringStream iss(row_quires);
         try {
@@ -267,7 +265,7 @@ graphic cards
             EXPECT_EQ(rc, 0);
         } catch (RecoverableException &e) {
             // catch because dict resource file does not exist in CI environment
-            std::cerr << fmt::format("RecoverableException: {}\n", e.what());
+//            std::cerr << fmt::format("RecoverableException: {}\n", e.what());
         }
     }
 }

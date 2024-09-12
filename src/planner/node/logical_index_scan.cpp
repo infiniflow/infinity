@@ -57,7 +57,7 @@ Vector<ColumnBinding> LogicalIndexScan::GetColumnBindings() const {
 }
 
 SharedPtr<Vector<String>> LogicalIndexScan::GetOutputNames() const {
-    auto result_names = MakeShared<Vector<String>>(*base_table_ref_->column_names_); // copy initialize
+    auto result_names = MakeShared<Vector<String>>();
     if (add_row_id_) {
         result_names->emplace_back(COLUMN_NAME_ROW_ID);
     }
@@ -65,7 +65,7 @@ SharedPtr<Vector<String>> LogicalIndexScan::GetOutputNames() const {
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalIndexScan::GetOutputTypes() const {
-    auto result_types = MakeShared<Vector<SharedPtr<DataType>>>(*base_table_ref_->column_types_); // copy initialize
+    auto result_types = MakeShared<Vector<SharedPtr<DataType>>>();
     if (add_row_id_) {
         result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     }

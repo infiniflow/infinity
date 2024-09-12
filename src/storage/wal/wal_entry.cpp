@@ -15,8 +15,8 @@
 module;
 
 #include <cassert>
-#include <fstream>
 #include <vector>
+#include <sstream>
 
 module wal_entry;
 
@@ -28,7 +28,7 @@ import index_base;
 import infinity_exception;
 
 import stl;
-
+import defer_op;
 import third_party;
 import internal_types;
 import logger;
@@ -46,19 +46,24 @@ import infinity_context;
 namespace infinity {
 
 WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
-    : block_id_(block_entry->block_id_), row_count_(block_entry->row_count_), row_capacity_(block_entry->row_capacity_) {
+    : block_id_(block_entry->block_id_), row_count_(block_entry->block_row_count_), row_capacity_(block_entry->row_capacity_) {
     outline_infos_.resize(block_entry->columns_.size());
     for (SizeT i = 0; i < block_entry->columns_.size(); i++) {
         auto &col_i_outline_info = outline_infos_[i];
         auto *column = block_entry->columns_[i].get();
-        for (u32 layer_n = 0; layer_n < 2; ++layer_n) {
-            col_i_outline_info.emplace_back(column->OutlineBufferCount(layer_n), column->LastChunkOff(layer_n));
-        }
-        paths_.push_back(column->FilePath());
+        col_i_outline_info = {column->OutlineBufferCount(), column->LastChunkOff()};
+        Vector<String> paths = column->FilePaths();
+        paths_.insert(paths_.end(), paths.begin(), paths.end());
     }
-    String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
-    String version_file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
+    String version_file_path = fmt::format("{}/{}", *block_entry->block_dir(), *BlockVersion::FileName());
     paths_.push_back(version_file_path);
+    auto *pm = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(pm, paths_);
+#ifdef INFINITY_DEBUG
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
+#endif
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
@@ -68,39 +73,45 @@ bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
 
 i32 WalBlockInfo::GetSizeInBytes() const {
     i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_);
-    size += sizeof(i32);
-    for (const auto &v : outline_infos_) {
-        size += sizeof(i32) + v.size() * (sizeof(u32) + sizeof(u64));
-    }
+    size += sizeof(i32) + outline_infos_.size() * (sizeof(u32) + sizeof(u64));
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        size += pm->GetSizeInBytes(paths_);
+        pm_size_ = addr_serializer_.GetSizeInBytes();
+        size += pm_size_;
     }
     return size;
 }
 
 void WalBlockInfo::WriteBufferAdv(char *&buf) const {
+#ifdef INFINITY_DEBUG
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
+#endif
     WriteBufAdv(buf, block_id_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, row_capacity_);
     WriteBufAdv(buf, static_cast<i32>(outline_infos_.size()));
-    for (const auto &outline_info : outline_infos_) {
-        WriteBufAdv(buf, static_cast<i32>(outline_info.size()));
-        for (const auto &[idx, off] : outline_info) {
-            WriteBufAdv(buf, idx);
-            WriteBufAdv(buf, off);
-        }
+    for (const auto &[idx, off] : outline_infos_) {
+        WriteBufAdv(buf, idx);
+        WriteBufAdv(buf, off);
     }
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->WriteBufAdv(buf, paths_);
+        char *start = buf;
+        addr_serializer_.WriteBufAdv(buf);
+        SizeT size = buf - start;
+        if (size != pm_size_) {
+            String error_message = fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size);
+            UnrecoverableError(error_message);
+        }
     }
 }
 
-WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
+WalBlockInfo WalBlockInfo::ReadBufferAdv(const char *&ptr) {
     WalBlockInfo block_info;
     block_info.block_id_ = ReadBufAdv<BlockID>(ptr);
     block_info.row_count_ = ReadBufAdv<u16>(ptr);
@@ -109,18 +120,14 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
     block_info.outline_infos_.resize(count);
     for (i32 i = 0; i < count; i++) {
         auto &outline_info = block_info.outline_infos_[i];
-        const i32 info_count = ReadBufAdv<i32>(ptr);
-        outline_info.resize(info_count);
-        for (i32 j = 0; j < info_count; j++) {
-            const auto buffer_cnt = ReadBufAdv<u32>(ptr);
-            const auto last_chunk_offset = ReadBufAdv<u64>(ptr);
-            outline_info[j] = {buffer_cnt, last_chunk_offset};
-        }
+        const auto buffer_cnt = ReadBufAdv<u32>(ptr);
+        const auto last_chunk_offset = ReadBufAdv<u64>(ptr);
+        outline_info = {buffer_cnt, last_chunk_offset};
     }
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ReadBufAdv(ptr);
+        block_info.paths_ = block_info.addr_serializer_.ReadBufAdv(ptr);
     }
     return block_info;
 }
@@ -130,16 +137,9 @@ String WalBlockInfo::ToString() const {
     ss << "block_id: " << block_id_ << ", row_count: " << row_count_ << ", row_capacity: " << row_capacity_;
     ss << ", next_outline_idxes: [";
     for (SizeT i = 0; i < outline_infos_.size(); i++) {
-        ss << "outline_buffer_group_" << i << ": [";
-        const auto &outline_info = outline_infos_[i];
-        for (SizeT j = 0; j < outline_info.size(); ++j) {
-            auto &[idx, off] = outline_info[j];
-            ss << "(" << idx << ", " << off << ")";
-            if (j != outline_info.size() - 1) {
-                ss << ", ";
-            }
-        }
-        ss << "]";
+        ss << "outline_buffer_group_" << i << ": (";
+        const auto &[idx, off] = outline_infos_[i];
+        ss << idx << ", " << off << ")";
         if (i != outline_infos_.size() - 1) {
             ss << ", ";
         }
@@ -182,7 +182,7 @@ void WalSegmentInfo::WriteBufferAdv(char *&buf) const {
     }
 }
 
-WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
+WalSegmentInfo WalSegmentInfo::ReadBufferAdv(const char *&ptr) {
     WalSegmentInfo segment_info;
     segment_info.segment_id_ = ReadBufAdv<SegmentID>(ptr);
     segment_info.column_count_ = ReadBufAdv<u64>(ptr);
@@ -211,20 +211,19 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
     IndexType index_type = segment_index_entry->table_index_entry()->index_base()->index_type_;
     switch (index_type) {
         case IndexType::kFullText: {
-            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-            paths_.push_back(full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX);
-            paths_.push_back(full_path + chunk_index_entry->base_name_ + DICT_SUFFIX);
-            paths_.push_back(full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            Path rela_dir = *(segment_index_entry->index_dir());
+            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + POSTING_SUFFIX));
+            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + DICT_SUFFIX));
+            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + LENGTH_SUFFIX));
             break;
         }
         case IndexType::kHnsw:
         case IndexType::kEMVB:
         case IndexType::kSecondary:
         case IndexType::kBMP: {
-            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
             String file_name = ChunkIndexEntry::IndexFileName(segment_index_entry->segment_id(), chunk_index_entry->chunk_id_);
-            String full_path = fmt::format("{}/{}", full_dir, file_name);
-            paths_.push_back(full_path);
+            String file_path = Path(*(segment_index_entry->index_dir())) / file_name;
+            paths_.push_back(file_path);
             break;
         }
         default: {
@@ -232,6 +231,8 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
             UnrecoverableError(error_message);
         }
     }
+    auto *pm = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(pm, paths_);
 }
 
 bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
@@ -244,12 +245,18 @@ i32 WalChunkIndexInfo::GetSizeInBytes() const {
     bool use_object_cache = pm != nullptr;
     SizeT size = 0;
     if (use_object_cache) {
-        size = pm->GetSizeInBytes(paths_);
+        pm_size_= addr_serializer_.GetSizeInBytes();
+        size += pm_size_;
     }
     return size + sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);
 }
 
 void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
+#ifdef INFINITY_DEBUG
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
+#endif
     WriteBufAdv(buf, chunk_id_);
     WriteBufAdv(buf, base_name_);
     WriteBufAdv(buf, base_rowid_);
@@ -259,11 +266,17 @@ void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->WriteBufAdv(buf, paths_);
+        char *start = buf;
+        addr_serializer_.WriteBufAdv(buf);
+        SizeT size = buf - start;
+        if (size != pm_size_) {
+            String error_message = fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size);
+            UnrecoverableError(error_message);
+        }
     }
 }
 
-WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
+WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(const char *&ptr) {
     WalChunkIndexInfo chunk_index_info;
     chunk_index_info.chunk_id_ = ReadBufAdv<ChunkID>(ptr);
     chunk_index_info.base_name_ = ReadBufAdv<String>(ptr);
@@ -274,7 +287,7 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ReadBufAdv(ptr);
+        chunk_index_info.paths_ = chunk_index_info.addr_serializer_.ReadBufAdv(ptr);
     }
     return chunk_index_info;
 }
@@ -286,8 +299,8 @@ String WalChunkIndexInfo::ToString() const {
     return ss.str();
 }
 
-SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
-    char *const ptr_end = ptr + max_bytes;
+SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
+    const char *const ptr_end = ptr + max_bytes;
     SharedPtr<WalCmd> cmd = nullptr;
     auto cmd_type = ReadBufAdv<WalCommandType>(ptr);
     switch (cmd_type) {
@@ -453,6 +466,36 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
                                               std::move(old_chunk_ids));
             break;
         }
+        case WalCommandType::RENAME_TABLE: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String new_table_name = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdRenameTable>(std::move(db_name), std::move(table_name), std::move(new_table_name));
+            break;
+        }
+        case WalCommandType::ADD_COLUMNS: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            i32 column_n = ReadBufAdv<i32>(ptr);
+            Vector<SharedPtr<ColumnDef>> columns;
+            for (i32 i = 0; i < column_n; i++) {
+                auto cd = ColumnDef::ReadAdv(ptr, max_bytes);
+                columns.push_back(cd);
+            }
+            cmd = MakeShared<WalCmdAddColumns>(std::move(db_name), std::move(table_name), std::move(columns));
+            break;
+        }
+        case WalCommandType::DROP_COLUMNS: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            i32 column_n = ReadBufAdv<i32>(ptr);
+            Vector<String> column_names;
+            for (i32 i = 0; i < column_n; i++) {
+                column_names.push_back(ReadBufAdv<String>(ptr));
+            }
+            cmd = MakeShared<WalCmdDropColumns>(std::move(db_name), std::move(table_name), std::move(column_names));
+            break;
+        }
         default: {
             String error_message = fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type));
             UnrecoverableError(error_message);
@@ -570,6 +613,33 @@ bool WalCmdDumpIndex::operator==(const WalCmd &other) const {
            deprecate_ids_ == other_cmd->deprecate_ids_;
 }
 
+bool WalCmdRenameTable::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdRenameTable *>(&other);
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
+           IsEqual(new_table_name_, other_cmd->new_table_name_);
+}
+
+bool WalCmdAddColumns::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdAddColumns *>(&other);
+    bool res = other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
+               column_defs_.size() == other_cmd->column_defs_.size();
+    if (!res) {
+        return false;
+    }
+    for (SizeT i = 0; i < column_defs_.size(); i++) {
+        if (*(column_defs_[i]) != *(other_cmd->column_defs_[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool WalCmdDropColumns::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdDropColumns *>(&other);
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
+           column_names_ == other_cmd->column_names_;
+}
+
 i32 WalCmdCreateDatabase::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size();
 }
@@ -660,7 +730,29 @@ i32 WalCmdDumpIndex::GetSizeInBytes() const {
     return size;
 }
 
+i32 WalCmdRenameTable::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+           this->new_table_name_.size();
+}
+
+i32 WalCmdAddColumns::GetSizeInBytes() const {
+    SizeT res = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32);
+    for (const auto &column_def : column_defs_) {
+        res += column_def->GetSizeInBytes();
+    }
+    return res;
+}
+
+i32 WalCmdDropColumns::GetSizeInBytes() const {
+    SizeT res = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32);
+    for (const auto &column_name : column_names_) {
+        res += sizeof(i32) + column_name.size();
+    }
+    return res;
+}
+
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
+    assert(!std::filesystem::path(db_dir_tail_).is_absolute());
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_dir_tail_);
@@ -754,6 +846,7 @@ void WalCmdUpdateSegmentBloomFilterData::WriteAdv(char *&buf) const {
 }
 
 void WalCmdCheckpoint::WriteAdv(char *&buf) const {
+    assert(!std::filesystem::path(catalog_path_).is_absolute());
     WriteBufAdv(buf, WalCommandType::CHECKPOINT);
     WriteBufAdv(buf, this->max_commit_ts_);
     WriteBufAdv(buf, i8(this->is_full_checkpoint_));
@@ -801,6 +894,33 @@ void WalCmdDumpIndex::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, static_cast<i32>(this->deprecate_ids_.size()));
     for (const auto &chunk_id : this->deprecate_ids_) {
         WriteBufAdv(buf, chunk_id);
+    }
+}
+
+void WalCmdRenameTable::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::RENAME_TABLE);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->new_table_name_);
+}
+
+void WalCmdAddColumns::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::ADD_COLUMNS);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, static_cast<i32>(this->column_defs_.size()));
+    for (const auto &column_def : column_defs_) {
+        column_def->WriteAdv(buf);
+    }
+}
+
+void WalCmdDropColumns::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::DROP_COLUMNS);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, static_cast<i32>(this->column_names_.size()));
+    for (const auto &column_name : column_names_) {
+        WriteBufAdv(buf, column_name);
     }
 }
 
@@ -923,6 +1043,7 @@ String WalCmdOptimize::ToString() const {
     for (auto &param_ptr : params_) {
         ss << param_ptr->ToString() << " | ";
     }
+    ss << std::endl;
     return ss.str();
 }
 
@@ -939,6 +1060,37 @@ String WalCmdDumpIndex::ToString() const {
     ss << "deprecated chunk ids: ";
     for (auto &chunk_id : deprecate_ids_) {
         ss << chunk_id << " | ";
+    }
+    ss << std::endl;
+    return ss.str();
+}
+
+String WalCmdRenameTable::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "new table name: " << new_table_name_ << std::endl;
+    return ss.str();
+}
+
+String WalCmdAddColumns::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "columns: ";
+    for (auto &column_def : column_defs_) {
+        ss << column_def->ToString() << " | ";
+    }
+    return ss.str();
+}
+
+String WalCmdDropColumns::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "columns: ";
+    for (auto &column_name : column_names_) {
+        ss << column_name << " | ";
     }
     return ss.str();
 }
@@ -1058,6 +1210,30 @@ String WalCmdDumpIndex::CompactInfo() const {
     return ss.str();
 }
 
+String WalCmdRenameTable::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, new table: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       new_table_name_);
+}
+
+String WalCmdAddColumns::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, columns: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       column_defs_.size());
+}
+
+String WalCmdDropColumns::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, columns: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       column_names_.size());
+}
+
 bool WalEntry::operator==(const WalEntry &other) const {
     if (this->txn_id_ != other.txn_id_ || this->commit_ts_ != other.commit_ts_ || this->cmds_.size() != other.cmds_.size()) {
         return false;
@@ -1118,27 +1294,28 @@ void WalEntry::WriteAdv(char *&ptr) const {
     header->checksum_ = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
 }
 
-SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
-    char *const ptr_end = ptr + max_bytes;
+SharedPtr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
+    const char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
         String error_message = "ptr goes out of range when reading WalEntry";
         LOG_WARN(error_message);
         return nullptr;
     }
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
-    auto *header = (WalEntryHeader *)ptr;
+    auto *header = reinterpret_cast<WalEntryHeader *>(const_cast<char *>(ptr));
     entry->size_ = header->size_;
     entry->checksum_ = header->checksum_;
     entry->txn_id_ = header->txn_id_;
     entry->commit_ts_ = header->commit_ts_;
-    i32 size2 = *(i32 *)(ptr + entry->size_ - sizeof(i32));
-    if (entry->size_ != size2) {
+    if (const i32 size2 = ReadBuf<i32>(ptr + entry->size_ - sizeof(i32)); entry->size_ != size2) {
         return nullptr;
     }
-    header->checksum_ = 0;
-    u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size_);
-    if (entry->checksum_ != checksum2) {
-        return nullptr;
+    {
+        header->checksum_ = 0;
+        DeferFn defer([&] { header->checksum_ = entry->checksum_; });
+        if (const u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size_); entry->checksum_ != checksum2) {
+            return nullptr;
+        }
     }
     ptr += sizeof(WalEntryHeader);
     i32 cnt = ReadBufAdv<i32>(ptr);
@@ -1162,47 +1339,15 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     return entry;
 }
 
-bool WalEntry::IsCheckPoint() const {
+bool WalEntry::IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const {
     for (auto &cmd : cmds_) {
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+            assert(cmds_.size() == 1);
+            checkpoint_cmd = static_cast<WalCmdCheckpoint *>(cmd.get());
             return true;
         }
     }
     return false;
-}
-
-bool WalEntry::IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const {
-    auto iter = cmds_.begin();
-    while (iter != cmds_.end()) {
-        if ((*iter)->GetType() == WalCommandType::CHECKPOINT) {
-            checkpoint_cmd = static_cast<WalCmdCheckpoint *>((*iter).get());
-            break;
-        }
-        ++iter;
-    }
-    if (iter == cmds_.end()) {
-        return false;
-    }
-    Vector<SharedPtr<WalCmd>> tail_cmds(iter + 1, cmds_.end());
-    if (!tail_cmds.empty()) {
-        auto tail_entry = MakeShared<WalEntry>();
-        tail_entry->txn_id_ = txn_id_;
-        tail_entry->commit_ts_ = commit_ts_;
-        tail_entry->cmds_ = std::move(tail_cmds);
-        replay_entries.push_back(std::move(tail_entry));
-    }
-    return true;
-}
-
-WalCmdCheckpoint *WalEntry::GetCheckPoint() const {
-    auto iter = cmds_.begin();
-    while (iter != cmds_.end()) {
-        if ((*iter)->GetType() == WalCommandType::CHECKPOINT) {
-            return static_cast<WalCmdCheckpoint *>((*iter).get());
-        }
-        ++iter;
-    }
-    return nullptr;
 }
 
 String WalEntry::ToString() const {
@@ -1223,11 +1368,11 @@ String WalEntry::ToString() const {
 String WalEntry::CompactInfo() const {
     std::stringstream ss;
     SizeT cmd_size = cmds_.size();
-    for(SizeT idx = 0; idx < cmd_size - 1; ++ idx) {
-        auto& cmd = cmds_[idx];
+    for (SizeT idx = 0; idx < cmd_size - 1; ++idx) {
+        auto &cmd = cmds_[idx];
         ss << cmd->CompactInfo() << std::endl;
     }
-    if(cmds_.size() > 0) {
+    if (cmds_.size() > 0) {
         ss << cmds_.back()->CompactInfo();
     }
     return ss.str();
@@ -1287,6 +1432,15 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::DUMP_INDEX:
             command = "DUMP_INDEX";
             break;
+        case WalCommandType::RENAME_TABLE:
+            command = "RENAME_TABLE";
+            break;
+        case WalCommandType::ADD_COLUMNS:
+            command = "ADD_COLUMNS";
+            break;
+        case WalCommandType::DROP_COLUMNS:
+            command = "DROP_COLUMNS";
+            break;
         default: {
             String error_message = "Unknown command type";
             UnrecoverableError(error_message);
@@ -1313,11 +1467,11 @@ UniquePtr<WalEntryIterator> WalEntryIterator::Make(const String &wal_path, bool 
 SharedPtr<WalEntry> WalEntryIterator::Next() {
     if (is_backward_) {
         assert(off_ > 0);
-        i32 entry_size = *(i32 *)(buf_.data() + off_ - sizeof(i32));
+        const i32 entry_size = ReadBuf<i32>(buf_.data() + off_ - sizeof(i32));
         if ((SizeT)entry_size > off_) {
             return nullptr;
         }
-        char *ptr = buf_.data() + off_ - (SizeT)entry_size;
+        const char *ptr = buf_.data() + off_ - (SizeT)entry_size;
         auto entry = WalEntry::ReadAdv(ptr, entry_size);
         if (entry.get() != nullptr) {
             off_ -= entry_size;
@@ -1325,11 +1479,11 @@ SharedPtr<WalEntry> WalEntryIterator::Next() {
         return entry;
     } else {
         assert(off_ < buf_.size());
-        i32 entry_size = *(i32 *)(buf_.data() + off_);
+        const i32 entry_size = ReadBuf<i32>(buf_.data() + off_);
         if (off_ + (SizeT)entry_size > buf_.size()) {
             return nullptr;
         }
-        char *ptr = buf_.data() + off_;
+        const char *ptr = buf_.data() + off_;
         auto entry = WalEntry::ReadAdv(ptr, entry_size);
         if (entry.get() != nullptr) {
             off_ += (SizeT)entry_size;
@@ -1384,7 +1538,8 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
         while (iter_->HasNext()) {
             auto entry = iter_->Next();
             if (entry.get() != nullptr) {
-                if (entry->IsCheckPoint()) {
+                WalCmdCheckpoint *checkpoint_cmd = nullptr;
+                if (entry->IsCheckPoint(checkpoint_cmd)) {
                     found_checkpoint = true;
                 }
             } else {

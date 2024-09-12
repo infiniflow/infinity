@@ -11,8 +11,17 @@ INCLUDE(libmecab/ConfigureChecks.cmake)
 add_definitions(-DLIBDIR="/usr/local/lib")
 
 add_library(jma STATIC ${jma_SRC})
-target_link_libraries(jma
-    z
-    c++.a
-    c++abi.a
-)
+if(APPLE)
+    target_link_libraries(jma
+        z
+        c++.a
+        c++abi.a
+        iconv.a
+    )
+else()
+    target_link_libraries(jma
+        z
+        c++.a
+        c++abi.a
+    )
+endif()

@@ -24,7 +24,7 @@ table.insert([{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec":
 table.insert([{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0] * 5}])
 table.insert([{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
 
-res = table.output(["*"]).knn("vec", [3.0] * 5, "float", "ip", 2).to_pl()
+res = table.output(["*"]).match_dense("vec", [3.0] * 5, "float", "ip", 2).to_pl()
 print(res)
 
 ```
@@ -33,11 +33,15 @@ print(res)
 ```shell
 pip install -e .
 ```
-Build the release version of infinity-sdk in the target location `cmake-build-release`
+Build infinity-sdk 
+```shell
+pip install ./python/infinity_sdk 
+```
+Build the release version of infinity-embedded-sdk in the target location `cmake-build-release`
 ```shell
 pip install . -v --config-settings=cmake.build-type="Release"  --config-settings=build-dir="cmake-build-release"
 ```
-Build the debug version of infinity-sdk in the target location `cmake-build-debug`
+Build the debug version of infinity-embedded-sdk in the target location `cmake-build-debug`
 ```shell
 pip install . -v --config-settings=cmake.build-type="Debug"  --config-settings=build-dir="cmake-build-debug"
 ```

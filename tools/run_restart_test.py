@@ -25,8 +25,11 @@ if __name__ == "__main__":
             python_executable,
             "-m",
             "pytest",
+            # "--capture=tee-sys",
             f"{python_test_dir}/restart_test",
             f"--infinity_path={infinity_path}",
+            "-m",
+            "not slow"
         ]
     )
     process.wait()

@@ -41,6 +41,7 @@ public:
     // Eash match_expr shall be one of MatchExpression, KnnExpression, MatchTensorExpression, MatchSparseExpression
     Vector<SharedPtr<BaseExpression>> match_exprs_{};
     Vector<SharedPtr<FusionExpression>> fusion_exprs_{};
+    bool have_filter_in_subsearch_{false};
 };
 
 } // namespace infinity

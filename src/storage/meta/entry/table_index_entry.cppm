@@ -45,6 +45,7 @@ struct TableEntry;
 struct SegmentEntry;
 class BaseTableRef;
 class AddTableIndexEntryOp;
+class BaseMemIndex;
 
 export struct SegmentIndexesGuard {
     const Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment_;
@@ -70,6 +71,12 @@ public:
                     TransactionID txn_id,
                     TxnTimeStamp begin_ts);
 
+private:
+    TableIndexEntry(const TableIndexEntry &other);
+
+public:
+    UniquePtr<TableIndexEntry> Clone(TableIndexMeta *table_index_meta) const;
+
     static SharedPtr<TableIndexEntry> NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                                          bool is_delete,
                                                          const SharedPtr<String> &table_entry_dir,
@@ -93,6 +100,8 @@ public:
 public:
     // Getter
     const SharedPtr<String> &GetIndexName() const { return index_base_->index_name_; }
+
+    BaseMemIndex *GetMemIndex() const;
 
     inline TableIndexMeta *table_index_meta() { return table_index_meta_; }
     inline const IndexBase *index_base() const { return index_base_.get(); }
@@ -142,17 +151,15 @@ public:
     void OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
 private:
-    static SharedPtr<String> DetermineIndexDir(const String &base_dir, const String &parent_dir, const String &index_name) {
-        return DetermineRandomString(base_dir, parent_dir, fmt::format("index_{}", index_name));
-    }
+    static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
 
 private:
     // For fulltext index
     std::shared_mutex segment_update_ts_mutex_{};
     TxnTimeStamp segment_update_ts_{0};
 
-    std::shared_mutex rw_locker_{};
-    TableIndexMeta *const table_index_meta_{};
+    mutable std::shared_mutex rw_locker_{};
+    TableIndexMeta *table_index_meta_{};
     const SharedPtr<IndexBase> index_base_{};
     const SharedPtr<String> index_dir_{};
     SharedPtr<ColumnDef> column_def_{};

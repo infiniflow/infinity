@@ -1,7 +1,9 @@
-#include "unit_test/base_test.h"
-#include <iostream>
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
+import global_resource_usage;
+import third_party;
 
 import file_writer;
 import file_reader;
@@ -14,9 +16,6 @@ using namespace infinity;
 
 class ByteSliceReaderWriterTest : public BaseTest {
 public:
-    void SetUp() override {}
-    void TearDown() override {}
-
     template <typename T>
     void CheckList(const ByteSliceList *list, u32 num_elem, T value = 0) {
         ASSERT_EQ(num_elem * sizeof(T), list->GetTotalSize());
@@ -42,6 +41,34 @@ public:
         }
         ASSERT_EQ(i, num_elem);
         delete[] buffer;
+    }
+
+    u8 *GetData(const ByteSliceList* list) {
+        u8 *buffer = new u8[list->GetTotalSize()];
+        SizeT n = 0;
+        ByteSlice *slice = list->GetHead();
+        while (slice) {
+            memcpy(buffer + n, slice->data_, slice->size_);
+            n += slice->size_;
+            // std::cout << "n: " << n << ", list->GetTotalSize(): " << list->GetTotalSize() << std::endl;
+            // ASSERT_TRUE((n <= list->GetTotalSize()));
+            slice = slice->next_;
+        }
+        return buffer;
+    }
+
+    bool CheckListEq(const ByteSliceList* list_1, const ByteSliceList* list_2) {
+        if(list_1->GetTotalSize() != list_2->GetTotalSize()) {
+            return false;
+        }
+        auto buffer_1 = GetData(list_1);
+        auto buffer_2 = GetData(list_2);
+
+        bool eq = memcmp(buffer_1, buffer_2, list_1->GetTotalSize()) == 0;
+        
+        delete[] buffer_1;
+        delete[] buffer_2;
+        return eq;
     }
 };
 
@@ -120,3 +147,52 @@ TEST_F(ByteSliceReaderWriterTest, test5) {
         ASSERT_EQ(value, i);
     }
 }
+
+TEST_F(ByteSliceReaderWriterTest, TestDataConsistency) {
+    using namespace infinity;
+    ByteSliceWriter writer;
+
+    // Write various data
+    writer.WriteByte(255);
+    writer.WriteInt16(-12345);
+    writer.WriteInt32(123456789);
+    writer.WriteUInt32(987654321);
+
+    ByteSliceReader reader(writer.GetByteSliceList());
+
+    // Verify data consistency
+    ASSERT_EQ(reader.ReadByte(), 255);
+    ASSERT_EQ(reader.ReadInt16(), -12345);
+    ASSERT_EQ(reader.ReadInt32(), 123456789);
+    ASSERT_EQ(reader.ReadUInt32(), 987654321);
+}
+
+// TEST_F(ByteSliceReaderWriterTest, TestWriterDumpAndLoad) {
+//     using namespace infinity;
+//     LocalFileSystem local_file_system;
+//     String path = String(GetFullTmpDir()) + "/test_byteslice_dump";
+    
+
+//     ByteSliceWriter writer;
+
+//     i64 i = 0;
+//     for (i = 0; i < 10000; i++) {
+//         writer.WriteVLong(i);
+//     }
+    
+//     auto filewriter = MakeShared<FileWriter>(local_file_system, path, 128);
+
+//     std::cout << writer.GetSize() << std::endl;
+
+//     writer.Dump(filewriter); 
+//     filewriter->Sync();
+
+//     ByteSliceWriter loader;
+//     auto filereader = MakeShared<FileReader>(local_file_system, path, 128);
+
+//     std::cout << writer.GetSize() << std::endl;
+
+//     loader.Load(filereader, writer.GetSize());
+
+//     ASSERT_TRUE(CheckListEq(writer.GetByteSliceList(), loader.GetByteSliceList()));
+// }

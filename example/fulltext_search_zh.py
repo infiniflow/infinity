@@ -16,19 +16,20 @@
 This example is to connect local infinity instance, create table, insert data, search the data which Chinese words
 """
 
-import infinity
-
 """
 Checkout https://github.com/infiniflow/resource.git under /var/infinity (defined by 'resource_dir' of config file). The jieba dict is
 /var/infinity/resource/jieba/dict/jieba.dict.utf8
 """
+# import infinity_embedded as infinity
+import infinity
+import sys
 
 try:
-    # open a local directory to store the data
-    infinity_instance = infinity.connect("/var/infinity")
+    # Use infinity_embedded module to open a local directory
+    # infinity_instance = infinity.connect("/var/infinity")
 
-    # connect to server with 127.0.0.1
-    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+    #  Use infinity module to connect a remote server
+    infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
@@ -111,11 +112,14 @@ try:
         r'"Bloom filter"',  # phrase: adjacent multiple terms
     ]
     for question in questions:
-        qb_result = table_instance.output(["num", "body", "_score"]).match("body", question, "topn=10").to_pl()
+        qb_result = table_instance.output(["num", "body", "_score"]).match_text("body", question, 10).to_pl()
         print(f"question: {question}")
         print(qb_result)
 
     infinity_instance.disconnect()
 
+    print('test done')
+    sys.exit(0)
 except Exception as e:
     print(str(e))
+    sys.exit(-1)

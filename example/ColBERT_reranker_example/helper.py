@@ -15,9 +15,7 @@
 from typing import Union
 # NOTICE: please check which infinity you are using, local or remote
 # this statement is for local infinity
-from infinity.local_infinity.types import make_match_tensor_expr
 # enable the following import statement to use remote infinity
-# from infinity.remote_thrift.types import make_match_tensor_expr
 # from infinity.common import LOCAL_HOST
 
 
@@ -56,21 +54,18 @@ class InfinityHelperForColBERT:
         schema[self.inner_col_txt] = {"type": "varchar"}
         schema[self.inner_col_float] = {"type": "tensorarray,128,float"}
         schema[self.inner_col_bit] = {"type": "tensorarray,128,bit"}
-        import infinity
-        from infinity import NetworkAddress
-        import infinity.index as index
-        from infinity.common import ConflictType
         # NOTICE: the following statement is for local infinity
-        self.infinity_obj = infinity.connect("/var/infinity")
+        import infinity_embedded as infinity
         # enable the following statement to use remote infinity
-        # self.infinity_obj = infinity.connect(LOCAL_HOST)
-        self.infinity_obj.drop_database(self.test_db_name, ConflictType.Ignore)
+        #import infinity
+        self.infinity_obj = infinity.connect()
+        self.infinity_obj.drop_database(self.test_db_name, infinity.common.ConflictType.Ignore)
         self.colbert_test_db = self.infinity_obj.create_database(self.test_db_name)
-        self.colbert_test_table = self.colbert_test_db.create_table(self.test_table_name, schema, ConflictType.Error)
+        self.colbert_test_table = self.colbert_test_db.create_table(self.test_table_name, schema, infinity.common.ConflictType.Error)
         # NOTICE: the following statement is for english text
         self.colbert_test_table.create_index("test_ft_index",
-                                             index.IndexInfo(self.inner_col_txt, index.IndexType.FullText),
-                                             ConflictType.Error)
+                                             infinity.index.IndexInfo(self.inner_col_txt, infinity.index.IndexType.FullText),
+                                             infinity.common.ConflictType.Error)
         # please enable the following statement to use chinese text
         # self.colbert_test_table.create_index("test_ft_index",
         #                                      index.IndexInfo(self.inner_col_txt, index.IndexType.FullText,
@@ -127,8 +122,8 @@ class InfinityHelperForColBERT:
             output_columns.append('_row_id')
         if '_score' not in output_columns:
             output_columns.append('_score')
-        query_result = self.colbert_test_table.output(output_columns).match(self.inner_col_txt, query_str,
-                                                                            f'topn={top_n}').to_pl()
+        query_result = self.colbert_test_table.output(output_columns).match_text(self.inner_col_txt, query_str,
+                                                                                 top_n).to_pl()
         print(query_result)
         return query_result
 
@@ -142,8 +137,7 @@ class InfinityHelperForColBERT:
             raise ValueError("Dimension error.")
         query_result = self.colbert_test_table.output(output_columns).match_tensor(target_col_name,
                                                                                    query_tensor.numpy(force=True),
-                                                                                   'float', 'maxsim',
-                                                                                   f'topn={top_n}').to_pl()
+                                                                                   'float', top_n).to_pl()
         print(query_result)
         return query_result
 
@@ -164,10 +158,11 @@ class InfinityHelperForColBERT:
         query_tensor = self.ckpt.queryFromText([query_str])[0]
         if query_tensor.dim() != 2 or query_tensor.size(1) != 128:
             raise ValueError("Dimension error.")
-        rerank_expr = make_match_tensor_expr(target_col_name, query_tensor.numpy(force=True), 'float', 'maxsim')
-        query_result = self.colbert_test_table.output(output_columns).match(self.inner_col_txt, query_str,
-                                                                            f'topn={first_stage_top_n}').fusion(
-            'match_tensor', f'topn={final_top_n}', match_tensor_expr=rerank_expr).to_pl()
+        query_result = self.colbert_test_table.output(output_columns).match_text(self.inner_col_txt, query_str,
+                                                                                 first_stage_top_n).fusion(
+            method='match_tensor', topn=final_top_n,
+            fusion_params={"field": target_col_name, "data": query_tensor.numpy(force=True),
+                           "data_type": "float"}).to_pl()
         print(query_result)
         return query_result
 

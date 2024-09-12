@@ -110,7 +110,7 @@ public:
     Status BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Alter operator
-    Status BuildAlter(const AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildAlter(AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Show operator
     Status BuildShow(ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
@@ -182,6 +182,12 @@ public:
     Status BuildShowPersistenceObjects(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowPersistenceObject(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowMemory(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowMemoryObjects(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowMemoryAllocation(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Flush
     Status BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

@@ -43,80 +43,80 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
         UnrecoverableError(error_message);
     }
     switch (target.type()) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, BooleanT, TryCastVarchar>);
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, TinyIntT, TryCastVarchar>);
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, SmallIntT, TryCastVarchar>);
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, IntegerT, TryCastVarchar>);
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, BigIntT, TryCastVarcharVector>);
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, HugeIntT, TryCastVarchar>);
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, FloatT, TryCastVarcharVector>);
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, DoubleT, TryCastVarcharVector>);
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, Float16T, TryCastVarcharVector>);
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, BFloat16T, TryCastVarcharVector>);
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             String error_message = fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString());
             UnrecoverableError(error_message);
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             String error_message = "Attempt to cast from varchar to varchar";
             UnrecoverableError(error_message);
         }
-        case kDate: {
+        case LogicalType::kDate: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DateT, TryCastVarchar>);
         }
-        case kTime: {
+        case LogicalType::kTime: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, TimeT, TryCastVarchar>);
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DateTimeT, TryCastVarchar>);
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, TimestampT, TryCastVarchar>);
         }
-        case kInterval: {
+        case LogicalType::kInterval: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, IntervalT, TryCastVarchar>);
         }
-        case kArray: {
+        case LogicalType::kArray: {
             String error_message = "Cast from varchar to array";
             UnrecoverableError(error_message);
         }
-        case kTuple: {
+        case LogicalType::kTuple: {
             String error_message = "Cast from varchar to tuple";
             UnrecoverableError(error_message);
         }
-        case kPoint: {
+        case LogicalType::kPoint: {
             String error_message = "Cast from varchar to point";
             UnrecoverableError(error_message);
         }
-        case kLine: {
+        case LogicalType::kLine: {
             String error_message = "Cast from varchar to line";
             UnrecoverableError(error_message);
         }
-        case kLineSeg: {
+        case LogicalType::kLineSeg: {
             String error_message = "Cast from varchar to line segment";
             UnrecoverableError(error_message);
         }
-        case kBox: {
+        case LogicalType::kBox: {
             String error_message = "Cast from varchar to box";
             UnrecoverableError(error_message);
         }
@@ -126,27 +126,27 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             //        case kPolygon: {
             //            UnrecoverableError("Cast from varchar to polygon");
             //        }
-        case kCircle: {
+        case LogicalType::kCircle: {
             String error_message = "Cast from varchar to circle";
             UnrecoverableError(error_message);
         }
             //        case kBitmap: {
             //            UnrecoverableError("Cast from varchar to bitmap");
             //        }
-        case kUuid: {
+        case LogicalType::kUuid: {
             String error_message = "Cast from varchar to uuid";
             UnrecoverableError(error_message);
         }
             //        case kBlob: {
             //            UnrecoverableError("Cast from varchar to blob");
             //        }
-        case kEmbedding: {
+        case LogicalType::kEmbedding: {
             RecoverableError(Status::NotSupport(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString())));
         }
-        case kRowID: {
+        case LogicalType::kRowID: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, RowID, TryCastVarchar>);
         }
-        case kMixed: {
+        case LogicalType::kMixed: {
             String error_message = "Cast from varchar to mix";
             UnrecoverableError(error_message);
         }
@@ -299,22 +299,10 @@ struct TryCastVarcharVector {
 // Cast VarcharT to BigIntT type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, i64 &target) {
-    if (source.IsInlined()) {
-        auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        if (ec != std::errc()) {
-            return false;
-        }
-    } else {
-        {
-            // varchar is vector
-            SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
-
-            auto [ptr, ec] = std::from_chars(data, data + varchar_len, target);
-            if (ec != std::errc()) {
-                return false;
-            }
-        }
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    auto [ptr, ec] = std::from_chars(data.data(), data.data() + data.size(), target);
+    if (ec != std::errc()) {
+        return false;
     }
     return true;
 }
@@ -322,82 +310,38 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
 // Cast VarcharT to FloatT type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, FloatT &target) {
-    if (source.IsInlined()) {
-        // Used in libc++
-        String substr(source.short_.data_, source.length_);
-        try {
-            target = std::stof(substr);
-        } catch(const std::exception &e) {
-            return false;
-        }
-
-        // Used in libstdc++
-        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        // if (ec != std::errc()) {
-        //     return false;
-        // }
-    } else {
-        {
-            // varchar is vector
-            SizeT varchar_len = source.length_;
-
-            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
-            String varchar_ptr(data, varchar_len);
-
-            // Used in libc++
-            try {
-                target = std::stof(varchar_ptr);
-            } catch(const std::exception &e) {
-                return false;
-            }
-            // Used in libstdc++
-            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
-            // if (ec != std::errc()) {
-            //    return false;
-            // }
-        }
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    // Used in libc++
+    String substr(data.data(), data.size());
+    try {
+        target = std::stof(substr);
+    } catch(const std::exception &e) {
+        return false;
     }
+    // Used in libstdc++
+    // auto [ptr, ec] = std::from_chars(data.data(), data.data() + data.size(), target);
+    // if (ec != std::errc()) {
+    //     return false;
+    // }
     return true;
 }
 
 // Cast VarcharT to DoubleT type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, DoubleT &target) {
-    if (source.IsInlined()) {
-        // Used in libc++
-        String substr(source.short_.data_, source.length_);
-        try {
-            target = std::stod(substr);
-        } catch(const std::exception &e) {
-            return false;
-        }
-
-        // Used in libstdc++
-        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        // if (ec != std::errc()) {
-        //     return false;
-        // }
-    } else {
-        {
-            // varchar is vector
-            SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
-
-            String varchar_ptr(data, varchar_len);
-
-            // Used in libc++
-            try {
-                target = std::stod(varchar_ptr);
-            } catch(const std::exception &e) {
-                return false;
-            }
-            // Used in libstdc++
-            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
-            // if (ec != std::errc()) {
-            //    return false;
-            // }
-        }
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    // Used in libc++
+    String substr(data.data(), data.size());
+    try {
+        target = std::stod(substr);
+    } catch(const std::exception &e) {
+        return false;
     }
+    // Used in libstdc++
+    // auto [ptr, ec] = std::from_chars(data.data(), data.data() + data.size(), target);
+    // if (ec != std::errc()) {
+    //     return false;
+    // }
     return true;
 }
 
@@ -405,82 +349,38 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
 // Cast VarcharT to Float16T type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, Float16T &target) {
-    if (source.IsInlined()) {
-        // Used in libc++
-        String substr(source.short_.data_, source.length_);
-        try {
-            target = std::stof(substr);
-        } catch(const std::exception &e) {
-            return false;
-        }
-
-        // Used in libstdc++
-        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        // if (ec != std::errc()) {
-        //     return false;
-        // }
-    } else {
-        {
-            // varchar is vector
-            SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
-
-            String varchar_ptr(data, varchar_len);
-
-            // Used in libc++
-            try {
-                target = std::stof(varchar_ptr);
-            } catch(const std::exception &e) {
-                return false;
-            }
-            // Used in libstdc++
-            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
-            // if (ec != std::errc()) {
-            //    return false;
-            // }
-        }
+    // Used in libc++
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    String substr(data.data(), data.size());
+    try {
+        target = std::stof(substr);
+    } catch(const std::exception &e) {
+        return false;
     }
+    // Used in libstdc++
+    // auto [ptr, ec] = std::from_chars(data.data(), data.data() + data.size(), target);
+    // if (ec != std::errc()) {
+    //     return false;
+    // }
     return true;
 }
 
 // Cast VarcharT to BFloat16T type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, BFloat16T &target) {
-    if (source.IsInlined()) {
-        // Used in libc++
-        String substr(source.short_.data_, source.length_);
-        try {
-            target = std::stof(substr);
-        } catch(const std::exception &e) {
-            return false;
-        }
-
-        // Used in libstdc++
-        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        // if (ec != std::errc()) {
-        //     return false;
-        // }
-    } else {
-        {
-            // varchar is vector
-            SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
-
-            String varchar_ptr(data, varchar_len);
-
-            // Used in libc++
-            try {
-                target = std::stof(varchar_ptr);
-            } catch(const std::exception &e) {
-                return false;
-            }
-            // Used in libstdc++
-            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
-            // if (ec != std::errc()) {
-            //    return false;
-            // }
-        }
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    // Used in libc++
+    String substr(data.data(), data.size());
+    try {
+        target = std::stof(substr);
+    } catch(const std::exception &e) {
+        return false;
     }
+    // Used in libstdc++
+    // auto [ptr, ec] = std::from_chars(data.data(), data.size() + data.size(), target);
+    // if (ec != std::errc()) {
+    //     return false;
+    // }
     return true;
 }
 

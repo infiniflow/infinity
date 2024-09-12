@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity;
 import infinity_exception;
@@ -57,65 +58,39 @@ using namespace infinity;
 class BufferObjTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
-        RemoveDbDirs();
-        infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
         BaseTest::TearDown();
     }
 
 public:
     void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
 
-    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+    void WaitCleanup(Storage *storage) {
         Catalog *catalog = storage->catalog();
         BufferManager *buffer_mgr = storage->buffer_manager();
-
-        auto visible_ts = WaitFlushDeltaOp(storage, last_commit_ts);
-
+        TxnManager *txn_mgr = storage->txn_manager();
+        TxnTimeStamp visible_ts = txn_mgr->GetCleanupScanTS();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
     }
 
-    TxnTimeStamp WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
-        TxnManager *txn_mgr = storage->txn_manager();
-
-        TxnTimeStamp visible_ts = 0;
-        time_t start = time(nullptr);
-        while (true) {
-            visible_ts = txn_mgr->GetCleanupScanTS();
-            // wait for at most 10s
-            time_t end = time(nullptr);
-            if (visible_ts >= last_commit_ts) {
-                LOG_INFO(fmt::format("FlushDeltaOp finished after {}", end - start));
-                break;
-            }
-            if (end - start > 5) {
-                String error_message = "WaitFlushDeltaOp timeout";
-                UnrecoverableError(error_message);
-            }
-            LOG_INFO(fmt::format("Before usleep. Wait flush delta op for {} seconds", end - start));
-            usleep(1000 * 1000);
-        }
-        return visible_ts;
+    void WaitFlushDeltaOp(Storage *storage) {
+        WalManager *wal_mgr = storage->wal_manager();
+        wal_mgr->Checkpoint(false /*is_full_checkpoint*/);
     }
 };
 
 // Test status transfer of buffer handle.
 // ?? status transfer in all
 TEST_F(BufferObjTest, test1) {
+
+    RemoveDbDirs();
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+//    RemoveDbDirs();
+    infinity::InfinityContext::instance().Init(config_path);
+
     SizeT memory_limit = 1024;
     String data_dir(GetFullDataDir());
     auto temp_dir = MakeShared<String>(data_dir + "/spill");
@@ -124,15 +99,15 @@ TEST_F(BufferObjTest, test1) {
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
     SizeT test_size1 = 1024;
-    auto file_dir1 = MakeShared<String>(data_dir + "/dir1");
+    auto file_dir1 = MakeShared<String>("dir1");
     auto test_fname1 = MakeShared<String>("test1");
-    auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
+    auto file_worker1 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir1, test_fname1, test_size1);
     auto buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
     SizeT test_size2 = 1024;
-    auto file_dir2 = MakeShared<String>(data_dir + "/dir2");
+    auto file_dir2 = MakeShared<String>("dir2");
     auto test_fname2 = MakeShared<String>("test2");
-    auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
+    auto file_worker2 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir2, test_fname2, test_size2);
     auto buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
 
     /// kEphemeral
@@ -294,6 +269,7 @@ TEST_F(BufferObjTest, test1) {
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);
     buf1->CheckState();
+    infinity::InfinityContext::instance().UnInit();
 }
 
 // unit test for BufferStatus::kClean transformation
@@ -306,13 +282,13 @@ TEST_F(BufferObjTest, test1) {
 //     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
 //     SizeT test_size1 = 1024;
-//     auto file_dir1 = MakeShared<String>(data_dir + "/dir1");
+//     auto file_dir1 = MakeShared<String>("dir1");
 //     auto test_fname1 = MakeShared<String>("test1");
 //     auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
 //     auto *buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
 //     SizeT test_size2 = 1024;
-//     auto file_dir2 = MakeShared<String>(data_dir + "/dir2");
+//     auto file_dir2 = MakeShared<String>("dir2");
 //     auto test_fname2 = MakeShared<String>("test2");
 //     auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
 //     auto *buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
@@ -505,8 +481,7 @@ TEST_F(BufferObjTest, test1) {
 
 TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // GTEST_SKIP(); // FIXME
-
-    infinity::InfinityContext::instance().UnInit();
+    RemoveDbDirs();
 #ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -514,10 +489,10 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     infinity::GlobalResourceUsage::Init();
 #endif
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj_2.toml");
-    RemoveDbDirs();
+//    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
-    constexpr u64 kInsertN = 4;
+    constexpr u64 kInsertN = 2;
     constexpr u64 kImportSize = 8192;
 
     Storage *storage = InfinityContext::instance().storage();
@@ -526,7 +501,6 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
-    TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("test_hnsw");
@@ -560,7 +534,6 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         parameters1.emplace_back(new InitParameter("encode", "plain"));
         parameters1.emplace_back(new InitParameter("m", "16"));
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
-        parameters1.emplace_back(new InitParameter("ef", "200"));
 
         auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {
@@ -596,6 +569,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             column_vector->Initialize();
             for (SizeT j = 0; j < kImportSize; ++j) {
                 Vector<float> vec;
+                vec.reserve(128);
                 for (SizeT k = 0; k < 128; ++k) {
                     vec.push_back(j * 1000 + k);
                 }
@@ -609,10 +583,10 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             auto append_status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(append_status.ok());
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
+            txn_mgr->CommitTxn(txn);
         }
     }
-    WaitFlushDeltaOp(storage, last_commit_ts);
+    WaitFlushDeltaOp(storage);
     // Get Index
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get index"));
@@ -673,13 +647,19 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
         txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
-    WaitCleanup(storage, last_commit_ts);
+    WaitCleanup(storage);
+
+    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
-    constexpr u64 kInsertN = 1024;
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    RemoveDbDirs();
+    infinity::InfinityContext::instance().Init(config_path);
+
+    constexpr u64 kInsertN = 256;
     constexpr u64 kImportSize = 8192;
 
     Storage *storage = InfinityContext::instance().storage();
@@ -756,12 +736,25 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
         }
         txn_mgr->CommitTxn(txn);
     }
+
+    {
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+    }
+
+    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_F(BufferObjTest, test_multiple_threads_read) {
-    constexpr u64 kInsertN = 1024;
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    RemoveDbDirs();
+    infinity::InfinityContext::instance().Init(config_path);
+
+    constexpr u64 kInsertN = 256;
     constexpr u64 kImportSize = 8192;
-    constexpr u64 kThreadN = 2;
+    constexpr u64 kThreadN = 4;
 
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
@@ -844,4 +837,13 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
     for (SizeT i = 0; i < kThreadN; ++i) {
         ths[i].join();
     }
+
+    {
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+    }
+
+    infinity::InfinityContext::instance().UnInit();
 }

@@ -94,7 +94,7 @@ void FstBuilder::CheckLastKey(u8 *bs_ptr, SizeT bs_len, bool check_dupe) {
         return;
     if (check_dupe && last_.size() == bs_len && std::memcmp(last_.data(), bs_ptr, bs_len) == 0)
         throw FstError::DuplicatedKey(bs_ptr, bs_len);
-    SizeT min_len = std::min(last_.size(), bs_len);
+    SizeT min_len = std::min(static_cast<SizeT>(last_.size()), bs_len);
     for (SizeT i = 0; i < min_len; i++) {
         if (last_[i] > bs_ptr[i]) {
             throw FstError::OutOfOrder(last_.data(), last_.size(), bs_ptr, bs_len);

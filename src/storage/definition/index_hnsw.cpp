@@ -62,7 +62,6 @@ SharedPtr<IndexBase>
 IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
     SizeT M = HNSW_M;
     SizeT ef_construction = HNSW_EF_CONSTRUCTION;
-    SizeT ef = HNSW_EF;
     SizeT block_size = HNSW_BLOCK_SIZE;
     MetricType metric_type = MetricType::kInvalid;
     HnswEncodeType encode_type = HnswEncodeType::kPlain;
@@ -71,8 +70,6 @@ IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
             M = std::stoi(param->param_value_);
         } else if (param->param_name_ == "ef_construction") {
             ef_construction = std::stoi(param->param_value_);
-        } else if (param->param_name_ == "ef") {
-            ef = std::stoi(param->param_value_);
         } else if (param->param_name_ == "metric") {
             metric_type = StringToMetricType(param->param_value_);
         } else if (param->param_name_ == "encode") {
@@ -95,7 +92,7 @@ IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
         RecoverableError(status);
     }
 
-    return MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef, block_size);
+    return MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, block_size);
 }
 
 bool IndexHnsw::operator==(const IndexHnsw &other) const {
@@ -103,7 +100,7 @@ bool IndexHnsw::operator==(const IndexHnsw &other) const {
         return false;
     }
     return metric_type_ == other.metric_type_ && encode_type_ == other.encode_type_ && M_ == other.M_ && ef_construction_ == other.ef_construction_ &&
-           ef_ == other.ef_ && block_size_ == other.block_size_;
+           block_size_ == other.block_size_;
 }
 
 bool IndexHnsw::operator!=(const IndexHnsw &other) const { return !(*this == other); }
@@ -114,7 +111,6 @@ i32 IndexHnsw::GetSizeInBytes() const {
     size += sizeof(encode_type_);
     size += sizeof(M_);
     size += sizeof(ef_construction_);
-    size += sizeof(ef_);
     size += sizeof(block_size_);
     return size;
 }
@@ -125,21 +121,19 @@ void IndexHnsw::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, encode_type_);
     WriteBufAdv(ptr, M_);
     WriteBufAdv(ptr, ef_construction_);
-    WriteBufAdv(ptr, ef_);
     WriteBufAdv(ptr, block_size_);
 }
 
 String IndexHnsw::ToString() const {
     std::stringstream ss;
-    ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << M_ << ", " << ef_construction_ << ", " << ef_ << ", "
-       << block_size_;
+    ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << M_ << ", " << ef_construction_ << ", " << block_size_;
     return ss.str();
 }
 
 String IndexHnsw::BuildOtherParamsString() const {
     std::stringstream ss;
     ss << "metric = " << MetricTypeToString(metric_type_) << ", encode_type = " << HnswEncodeTypeToString(encode_type_) << ", M = " << M_
-       << ", ef_construction = " << ef_construction_ << ", ef = " << ef_ << ", block_size = " << block_size_;
+       << ", ef_construction = " << ef_construction_;
     return ss.str();
 }
 
@@ -149,7 +143,6 @@ nlohmann::json IndexHnsw::Serialize() const {
     res["encode_type"] = HnswEncodeTypeToString(encode_type_);
     res["M"] = M_;
     res["ef_construction"] = ef_construction_;
-    res["ef"] = ef_;
     res["block_size"] = block_size_;
     return res;
 }
@@ -157,31 +150,49 @@ nlohmann::json IndexHnsw::Serialize() const {
 void IndexHnsw::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref,
                                        const String &column_name,
                                        const Vector<InitParameter *> &index_param_list) {
-    SharedPtr<DataType> data_type_ptr;
-    auto &column_names_vector = *(base_table_ref->column_names_);
-    auto &column_types_vector = *(base_table_ref->column_types_);
-    SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    const auto &column_names_vector = *(base_table_ref->column_names_);
+    const auto &column_types_vector = *(base_table_ref->column_types_);
+    const SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
-        Status status = Status::ColumnNotExist(column_name);
-        RecoverableError(status);
+        RecoverableError(Status::ColumnNotExist(column_name));
     }
-    if (data_type_ptr = column_types_vector[column_id]; data_type_ptr->type() != LogicalType::kEmbedding) {
-        Status status = Status::InvalidIndexDefinition(
-            fmt::format("Attempt to create HNSW index on column: {}, data type: {}.", column_name, data_type_ptr->ToString()));
-        RecoverableError(status);
+    const DataType *data_type_ptr = column_types_vector[column_id].get();
+    switch (data_type_ptr->type()) {
+        case LogicalType::kEmbedding:
+        case LogicalType::kMultiVector: {
+            break;
+        }
+        default: {
+            RecoverableError(Status::InvalidIndexDefinition(
+                fmt::format("Attempt to create HNSW index on column: {}, data type: {}.", column_name, data_type_ptr->ToString())));
+        }
     }
-    SharedPtr<EmbeddingInfo> embedding_info = std::dynamic_pointer_cast<EmbeddingInfo>(data_type_ptr->type_info());
-    EmbeddingDataType embedding_data_type = embedding_info->Type();
+    const auto embedding_info = dynamic_cast<const EmbeddingInfo *>(data_type_ptr->type_info().get());
+    const EmbeddingDataType embedding_data_type = embedding_info->Type();
     for (const auto *param : index_param_list) {
         if (param->param_name_ == "encode" && StringToHnswEncodeType(param->param_value_) == HnswEncodeType::kLVQ) {
             // TODO: now only support float?
             if (embedding_data_type != EmbeddingDataType::kElemFloat) {
-                Status status =
-                    Status::InvalidIndexDefinition(fmt::format("Attempt to create HNSW index with LVQ encoding on column: {}, data type: {}.",
-                                                               column_name,
-                                                               data_type_ptr->ToString()));
-                RecoverableError(status);
+                RecoverableError(Status::InvalidIndexDefinition(
+                    fmt::format("Attempt to create HNSW index with LVQ encoding on column: {}, data type: {}. now only support float element type.",
+                                column_name,
+                                data_type_ptr->ToString())));
             }
+        }
+    }
+    // TODO: now only support float, int8, uint8?
+    switch (embedding_data_type) {
+        case EmbeddingDataType::kElemFloat:
+        case EmbeddingDataType::kElemInt8:
+        case EmbeddingDataType::kElemUInt8: {
+            // supported
+            break;
+        }
+        default: {
+            RecoverableError(Status::InvalidIndexDefinition(
+                fmt::format("Attempt to create HNSW index on column: {}, data type: {}. now only support float, int8, uint8 element type.",
+                            column_name,
+                            data_type_ptr->ToString())));
         }
     }
 }

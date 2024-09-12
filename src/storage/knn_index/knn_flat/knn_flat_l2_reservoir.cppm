@@ -19,7 +19,7 @@ export module knn_flat_l2_reservoir;
 import stl;
 import knn_result_handler;
 import knn_distance;
-import bitmask;
+import roaring_bitmap;
 import logger;
 
 import infinity_exception;

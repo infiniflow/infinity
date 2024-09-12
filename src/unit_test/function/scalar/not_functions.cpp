@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import infinity_exception;
 
@@ -38,12 +39,15 @@ import logical_type;
 import internal_types;
 import data_type;
 
-class NotFunctionsTest : public BaseTest {};
+using namespace infinity;
+class NotFunctionsTest : public BaseTestParamStr {};
 
-TEST_F(NotFunctionsTest, not_func) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, NotFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+
+TEST_P(NotFunctionsTest, not_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
     RegisterNotFunction(catalog_ptr);
 

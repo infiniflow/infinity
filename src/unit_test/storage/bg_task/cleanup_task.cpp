@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+#include "gtest/gtest.h"
+import base_test;
 
 import stl;
 import logger;
@@ -45,63 +46,26 @@ import compaction_process;
 using namespace infinity;
 
 class CleanupTaskTest : public BaseTestParamStr {
-public:
-    void SetUp() override {
-        RemoveDbDirs();
-        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-        std::string config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = infinity::MakeShared<std::string>(config_path_str);
-        }
-        infinity::InfinityContext::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-    }
-
 protected:
-    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+    void WaitCleanup(Storage *storage) {
         Catalog *catalog = storage->catalog();
         BufferManager *buffer_mgr = storage->buffer_manager();
-
-        auto visible_ts = WaitFlushDeltaOp(storage, last_commit_ts);
-
+        TxnManager *txn_mgr = storage->txn_manager();
+        TxnTimeStamp visible_ts = txn_mgr->GetCleanupScanTS();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
     }
 
-    TxnTimeStamp WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
-        TxnManager *txn_mgr = storage->txn_manager();
-
-        TxnTimeStamp visible_ts = 0;
-        time_t start = time(nullptr);
-        while (true) {
-            visible_ts = txn_mgr->GetCleanupScanTS();
-            // wait for at most 10s
-            time_t end = time(nullptr);
-            if (visible_ts >= last_commit_ts) {
-                LOG_INFO(fmt::format("FlushDeltaOp finished after {}", end - start));
-                break;
-            }
-            if (end - start > 10) {
-                String error_message = "WaitFlushDeltaOp timeout";
-                UnrecoverableError(error_message);
-            }
-            LOG_INFO(fmt::format("Before usleep. Wait flush delta op for {} seconds", end - start));
-            usleep(1000 * 1000);
-        }
-        return visible_ts;
+    void WaitFlushDeltaOp(Storage *storage) {
+        WalManager *wal_mgr = storage->wal_manager();
+        wal_mgr->Checkpoint(false /*is_full_checkpoint*/);
     }
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CleanupTaskTest,
-                         ::testing::Values((std::string(test_data_path()) + "/config/test_cleanup_task.toml").c_str(),
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+                         ::testing::Values((std::string(test_data_path()) + "/config/test_close_bgtask.toml").c_str(),
+                                           (std::string(test_data_path()) + "/config/test_close_bgtask_vfs_off.toml").c_str()));
 
 TEST_P(CleanupTaskTest, test_delete_db_simple) {
     // close auto cleanup task
@@ -109,22 +73,21 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
-    TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("db1");
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
         txn->CreateDatabase(*db_name, ConflictType::kError);
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
-    WaitFlushDeltaOp(storage, last_commit_ts);
+    WaitFlushDeltaOp(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"));
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
-    WaitCleanup(storage, last_commit_ts);
+    WaitCleanup(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"));
         auto [db_entry, status] = txn->GetDatabase(*db_name);
@@ -139,7 +102,6 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
-    TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("db1");
     {
@@ -161,13 +123,13 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
         txn->CreateDatabase(*db_name, ConflictType::kError);
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"));
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        WaitCleanup(storage, last_commit_ts);
+        WaitCleanup(storage);
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -184,7 +146,6 @@ TEST_P(CleanupTaskTest, test_delete_table_simple) {
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
-    TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
@@ -200,19 +161,19 @@ TEST_P(CleanupTaskTest, test_delete_table_simple) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table1"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
-    WaitFlushDeltaOp(storage, last_commit_ts);
+    WaitFlushDeltaOp(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table1"));
 
         Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
 
-    WaitCleanup(storage, last_commit_ts);
+    WaitCleanup(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"));
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
@@ -228,7 +189,6 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
-    TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
@@ -266,7 +226,7 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table1"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
 
     {
@@ -274,7 +234,7 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
 
         Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        WaitCleanup(storage, last_commit_ts);
+        WaitCleanup(storage);
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -297,7 +257,6 @@ TEST_P(CleanupTaskTest, test_compact_and_cleanup) {
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
     CompactionProcessor *compaction_processor = storage->compaction_processor();
-    TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
@@ -356,10 +315,10 @@ TEST_P(CleanupTaskTest, test_compact_and_cleanup) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto last_commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
-        EXPECT_NE(last_commit_ts, 0u);
+        auto commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
+        EXPECT_NE(commit_ts, 0u);
     }
-    WaitCleanup(storage, last_commit_ts);
+    WaitCleanup(storage);
 }
 
 TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
@@ -373,7 +332,6 @@ TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
     CompactionProcessor *compaction_processor = storage->compaction_processor();
-    TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
@@ -452,9 +410,9 @@ TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        last_commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
-        EXPECT_NE(last_commit_ts, 0u);
+        auto commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
+        EXPECT_NE(commit_ts, 0u);
     }
 
-    WaitCleanup(storage, last_commit_ts);
+    WaitCleanup(storage);
 }

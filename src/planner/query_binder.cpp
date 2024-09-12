@@ -39,6 +39,7 @@ import column_expression;
 import expression_transformer;
 import third_party;
 import logger;
+import expression_binder;
 import where_binder;
 import join_binder;
 import group_binder;
@@ -76,6 +77,7 @@ import view_entry;
 import table_entry;
 import txn;
 import logger;
+import defer_op;
 
 namespace infinity {
 
@@ -982,15 +984,21 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     UniquePtr<BoundDeleteStatement> bound_delete_statement = BoundDeleteStatement::Make(bind_context_ptr_);
     SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
 
-    bound_delete_statement->table_ref_ptr_ = base_table_ref;
+    Txn *txn = query_context_ptr_->GetTxn();
+    auto status = base_table_ref->table_entry_ptr_->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
     if (base_table_ref.get() == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
         RecoverableError(status);
     }
+    bound_delete_statement->table_ref_ptr_ = base_table_ref;
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
-    auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
     if (statement.where_expr_ != nullptr) {
+        auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         if(where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
@@ -1006,6 +1014,12 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     UniquePtr<BoundUpdateStatement> bound_update_statement = BoundUpdateStatement::Make(bind_context_ptr_);
     SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_, true);
 
+    Txn *txn = query_context_ptr_->GetTxn();
+    auto status = base_table_ref->table_entry_ptr_->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
     bound_update_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
@@ -1013,8 +1027,8 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     }
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
-    auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
     if (statement.where_expr_ != nullptr) {
+        auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         if(where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
@@ -1026,10 +1040,32 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         Status status = Status::SyntaxError(fmt::format("Update expr array is empty"));
         RecoverableError(status);
     }
-
     const Vector<String> &column_names = *base_table_ref->column_names_;
     const Vector<SharedPtr<DataType>> &column_types = *base_table_ref->column_types_;
-    //    const Vector<String> &column_names = *base_table_ref->column_names_;
+    // add all columns in table to all_columns_in_table_
+    {
+        ExpressionBinder expression_binder(query_context_ptr_);
+        const auto fake_star = MakeUnique<ColumnExpr>();
+        fake_star->star_ = true;
+        const Vector<ParsedExpr *> fake_input = {fake_star.get()};
+        Vector<ParsedExpr *> all_columns;
+        DeferFn defer([&all_columns] {
+            for (auto &expr : all_columns) {
+                delete expr;
+                expr = nullptr;
+            }
+        });
+        UnfoldStarExpression(query_context_ptr_, fake_input, all_columns);
+        bound_update_statement->all_columns_in_table_.reserve(all_columns.size());
+        for (const auto expr : all_columns) {
+            auto bound_expr = expression_binder.Bind(*expr, this->bind_context_ptr_.get(), 0, true);
+            bound_update_statement->all_columns_in_table_.push_back(std::move(bound_expr));
+        }
+        if (column_names.size() != column_types.size() || bound_update_statement->all_columns_in_table_.size() != column_names.size()) {
+            RecoverableError(
+                Status::SyntaxError(fmt::format("Column count mismatch, failed to bind table {}.{}", statement.schema_name_, statement.table_name_)));
+        }
+    }
     auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
     for (UpdateExpr *upd_expr : *statement.update_expr_array_) {
         std::string &column_name = upd_expr->column_name;
@@ -1046,6 +1082,25 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         bound_update_statement->update_columns_.emplace_back(column_id, update_expr);
     }
     std::sort(bound_update_statement->update_columns_.begin(), bound_update_statement->update_columns_.end());
+    // check duplicate in update_columns_
+    for (SizeT i = 1; i < bound_update_statement->update_columns_.size(); i++) {
+        if (bound_update_statement->update_columns_[i].first == bound_update_statement->update_columns_[i - 1].first) {
+            RecoverableError(Status::SyntaxError("Duplicate column in update statement"));
+        }
+    }
+    {
+        // generate final_result_columns_
+        bound_update_statement->final_result_columns_.reserve(column_names.size());
+        auto update_iter = bound_update_statement->update_columns_.begin();
+        for (SizeT i = 0; i < column_names.size(); ++i) {
+            if (update_iter != bound_update_statement->update_columns_.end() && update_iter->first == i) {
+                bound_update_statement->final_result_columns_.push_back(update_iter->second);
+                ++update_iter;
+            } else {
+                bound_update_statement->final_result_columns_.push_back(bound_update_statement->all_columns_in_table_[i]);
+            }
+        }
+    }
     return bound_update_statement;
 }
 
@@ -1063,7 +1118,11 @@ UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement
         }
         base_table_ref = MakeShared<BaseTableRef>(compact_statement.table_entry_, std::move(block_index));
     }
-    TableEntry *table_entry = base_table_ref->table_entry_ptr_;
+    TableEntry *table_entry = base_table_ref->table_entry_ptr_;\
+    auto status = table_entry->AddWriteTxnNum(txn);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
     base_table_ref->index_index_ = table_entry->GetIndexIndex(txn);
 
     return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref, statement.compact_type_);
