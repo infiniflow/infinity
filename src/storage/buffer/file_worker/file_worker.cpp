@@ -17,7 +17,7 @@ module;
 module file_worker;
 
 import stl;
-
+import utility;
 import infinity_exception;
 import local_file_system;
 import third_party;
@@ -38,47 +38,71 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         String error_message = "No data will be written.";
         UnrecoverableError(error_message);
     }
+
     LocalFileSystem fs;
+    bool use_persistence_manager = InfinityContext::instance().persistence_manager();
 
-    String write_dir = ChooseFileDir(to_spill);
-    if (!fs.Exists(write_dir)) {
-        fs.CreateDirectory(write_dir);
-    }
-    String write_path = fmt::format("{}/{}", write_dir, *file_name_);
+    if(use_persistence_manager && !to_spill) {
+        String write_dir = *file_dir_;
+        StringTransform(write_dir, "/", "_");
+        String write_path = fmt::format("{}/{}_{}", *temp_dir_, write_dir, *file_name_);
 
-    u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-    auto [file_handler, status] = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-    file_handler_ = std::move(file_handler);
-
-    if (to_spill) {
-        auto local_file_handle = static_cast<LocalFileHandler *>(file_handler_.get());
-        LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, local_file_handle->fd_));
-    }
-    bool prepare_success = false;
-
-    DeferFn defer_fn([&]() {
-        fs.Close(*file_handler_);
-        file_handler_ = nullptr;
-    });
-
-    bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
-    if (prepare_success) {
-        if (to_spill) {
-            LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
+        u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+        auto [file_handler, status] = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
         }
-        fs.SyncFile(*file_handler_);
-    }
+        file_handler_ = std::move(file_handler);
+        bool prepare_success = false;
 
-    bool use_object_cache = !to_spill && InfinityContext::instance().persistence_manager() != nullptr;
-    if (use_object_cache) {
+        DeferFn defer_fn([&]() {
+            fs.Close(*file_handler_);
+            file_handler_ = nullptr;
+        });
+
+        bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
+        if (prepare_success) {
+            fs.SyncFile(*file_handler_);
+        }
+
         fs.SyncFile(*file_handler_);
         obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(write_path);
         fs.DeleteFile(write_path);
+        return all_save;
+    } else {
+        String write_dir = ChooseFileDir(to_spill);
+        if (!fs.Exists(write_dir)) {
+            fs.CreateDirectory(write_dir);
+        }
+        String write_path = fmt::format("{}/{}", write_dir, *file_name_);
+
+        u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+        auto [file_handler, status] = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        file_handler_ = std::move(file_handler);
+
+        if (to_spill) {
+            auto local_file_handle = static_cast<LocalFileHandler *>(file_handler_.get());
+            LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, local_file_handle->fd_));
+        }
+        bool prepare_success = false;
+
+        DeferFn defer_fn([&]() {
+            fs.Close(*file_handler_);
+            file_handler_ = nullptr;
+        });
+
+        bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
+        if (prepare_success) {
+            if (to_spill) {
+                LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
+            }
+            fs.SyncFile(*file_handler_);
+        }
+        return all_save;
     }
-    return all_save;
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {

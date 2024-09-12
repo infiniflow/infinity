@@ -39,5 +39,7 @@ IdentifierValidationStatus IdentifierValidation(const String &identifier);
 
 bool ParseIPPort(const String &str, String &ip, i64 &port);
 
+void StringTransform(String& source, const String& from, const String& to);
+
 }
 
