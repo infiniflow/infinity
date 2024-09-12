@@ -13,7 +13,7 @@ def transaction_routine(connection_pool, transaction_id, results):
     try:
         db_connection = connection_pool.get_conn()
         db = db_connection.get_database("default_db")
-        table = db.get_table("concurrency_test_table")
+        table = get_table(db_connection, "default_db", "parallel_test_table")
 
         db.start_transaction()
 
