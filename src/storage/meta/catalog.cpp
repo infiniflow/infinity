@@ -473,10 +473,12 @@ void Catalog::AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFuncti
         case SpecialType::kRowID:
         case SpecialType::kDistance:
         case SpecialType::kSimilarity:
-        case SpecialType::kScore: {
+        case SpecialType::kScore:
+        case SpecialType::kFilterFullText: {
             return;
         }
-        default: {
+        case SpecialType::kCreateTs:
+        case SpecialType::kDeleteTs: {
             break;
         }
     }
