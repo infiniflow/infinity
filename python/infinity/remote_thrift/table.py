@@ -426,3 +426,6 @@ class RemoteTable(Table, ABC):
             return select_res_to_polars(res)
         else:
             raise InfinityException(res.error_code, res.error_msg)
+    
+    def get_table(conn, db_name: str, table_name: str):
+        return RemoteTable(conn, db_name, table_name)
