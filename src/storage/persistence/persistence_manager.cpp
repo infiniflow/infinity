@@ -450,6 +450,11 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
         UnrecoverableError(error_message);
     }
     local_path_obj_[local_path] = obj_addr;
+    LOG_TRACE(fmt::format("ObjCreateRefCount local path {} to dedicated ObjAddr ({}, {}, {})",
+                          local_path,
+                          obj_addr.obj_key_,
+                          obj_addr.part_offset_,
+                          obj_addr.part_size_));
     return obj_addr;
 }
 
@@ -595,8 +600,18 @@ void PersistenceManager::SaveLocalPath(const String &file_path, const ObjAddr &o
     auto it = local_path_obj_.find(local_path);
     if (it != local_path_obj_.end()) {
         it->second = object_addr;
+        LOG_TRACE(fmt::format("SaveLocalPath updated local path {} to ObjAddr({}, {}, {})",
+                              local_path,
+                              object_addr.obj_key_,
+                              object_addr.part_offset_,
+                              object_addr.part_size_));
     } else {
         local_path_obj_.emplace(local_path, object_addr);
+        LOG_TRACE(fmt::format("SaveLocalPath added local path {} to ObjAddr({}, {}, {})",
+                              local_path,
+                              object_addr.obj_key_,
+                              object_addr.part_offset_,
+                              object_addr.part_size_));
     }
 }
 
@@ -689,6 +704,7 @@ void PersistenceManager::Deserialize(const nlohmann::json &obj) {
         ObjAddr obj_addr;
         obj_addr.Deserialize(json_pair["obj_addr"]);
         local_path_obj_.emplace(path, obj_addr);
+        LOG_TRACE(fmt::format("Deserialize added local path {}", path));
     }
 }
 
