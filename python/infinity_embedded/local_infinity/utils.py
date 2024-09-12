@@ -127,6 +127,20 @@ def traverse_conditions(cons, fn=None):
             parsed_expr.constant_expr = constant_expr
 
             return parsed_expr
+    elif isinstance(cons, exp.Anonymous):
+        arguments = []
+        for arg in cons.args['expressions']:
+            if arg:
+                parsed_expr = parse_expr(arg)
+                arguments.append(parsed_expr)
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = cons.args['this']
+        func_expr.arguments = arguments
+
+        parsed_expr = WrapParsedExpr()
+        parsed_expr.type = ParsedExprType.kFunction
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
     elif isinstance(cons, exp.Func):
         arguments = []
         for arg in cons.args.values():
