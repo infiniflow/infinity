@@ -846,6 +846,36 @@ void InfinityThriftService::Optimize(infinity_thrift_rpc::CommonResponse &respon
     ProcessQueryResult(response, result);
 }
 
+void InfinityThriftService::AddColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::AddColumnsRequest &request) {
+    Vector<SharedPtr<ColumnDef>> column_defs;
+    for (auto &proto_column_def : request.column_defs) {
+        auto [column_def, column_def_status] = GetColumnDefFromProto(proto_column_def);
+        if (!column_def_status.ok()) {
+            ProcessStatus(response, column_def_status);
+            return;
+        }
+        column_defs.emplace_back(column_def);
+    }
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+    auto result = infinity->AddColumns(request.db_name, request.table_name, std::move(column_defs));
+    ProcessQueryResult(response, result);
+}
+
+void InfinityThriftService::DropColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropColumnsRequest &request) {
+    Vector<String> column_names = request.column_names;
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+    auto result = infinity->DropColumns(request.db_name, request.table_name, std::move(column_names));
+    ProcessQueryResult(response, result);
+}
+
 void InfinityThriftService::ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response,
                                          const infinity_thrift_rpc::ListDatabaseRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);

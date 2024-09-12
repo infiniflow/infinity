@@ -97,6 +97,10 @@ public:
 
     void Optimize(infinity_thrift_rpc::CommonResponse& response, const infinity_thrift_rpc::OptimizeRequest& request) final;
 
+    void AddColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::AddColumnsRequest &request) final;
+
+    void DropColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropColumnsRequest &request) final;
+
     void ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response, const infinity_thrift_rpc::ListDatabaseRequest &request) final;
 
     void ListTable(infinity_thrift_rpc::ListTableResponse &response, const infinity_thrift_rpc::ListTableRequest &request) final;

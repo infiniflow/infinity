@@ -55,6 +55,8 @@ export using infinity_thrift_rpc::DropIndexRequest;
 export using infinity_thrift_rpc::ListIndexRequest;
 export using infinity_thrift_rpc::ShowIndexRequest;
 export using infinity_thrift_rpc::OptimizeRequest;
+export using infinity_thrift_rpc::AddColumnsRequest;
+export using infinity_thrift_rpc::DropColumnsRequest;
 export using infinity_thrift_rpc::ListDatabaseResponse;
 export using infinity_thrift_rpc::ListTableResponse;
 export using infinity_thrift_rpc::ShowDatabaseResponse;

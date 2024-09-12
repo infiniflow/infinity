@@ -397,6 +397,19 @@ class RemoteTable():
         opt_options.index_name = index_name
         opt_options.opt_params = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
         return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
+    
+    def add_columns(self, column_def_dict: dict):
+        column_defs = []
+        for index, (column_name, column_info) in enumerate(column_def_dict.items()):
+            check_valid_name(column_name, "Column")
+            get_ordinary_info(column_info, column_defs, column_name, index)
+        return self._conn.add_columns(db_name=self._db_name, table_name=self._table_name, column_defs=column_defs)
+
+    def drop_columns(self, column_names: list[str] | str):
+        if isinstance(column_names, str):
+            column_names = [column_names]
+
+        return self._conn.drop_columns(db_name=self._db_name, table_name=self._table_name, column_names=column_names)
 
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
 
