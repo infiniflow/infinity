@@ -17,6 +17,7 @@ import functools
 import inspect
 import pandas as pd
 import polars as pl
+from sqlglot import condition
 import sqlglot.expressions as exp
 import numpy as np
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
@@ -188,6 +189,24 @@ def parse_expr(expr) -> ttypes.ParsedExpr:
             return parsed_expr
         else:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {expr}")
+
+
+def get_search_optional_filter_from_opt_params(opt_params: dict):
+    optional_filter = None
+    k_to_pop = []
+    for k, v in opt_params.items():
+        if k.lower() == "filter":
+            if optional_filter is not None:
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                        "Only one filter is allowed in search optional parameters")
+            if not isinstance(v, str):
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                        f"Invalid filter expression '{v}', type should be string, but get {type(v)}")
+            optional_filter = traverse_conditions(condition(v))
+            k_to_pop.append(k)
+    for k in k_to_pop:
+        opt_params.pop(k)
+    return optional_filter
 
 
 def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:

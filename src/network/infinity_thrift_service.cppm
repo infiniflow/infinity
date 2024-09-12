@@ -158,7 +158,7 @@ private:
 
     static MatchTensorExpr *GetMatchTensorExprFromProto(Status &status, const infinity_thrift_rpc::MatchTensorExpr &expr);
 
-    static MatchExpr *GetMatchExprFromProto(const infinity_thrift_rpc::MatchExpr &expr);
+    static MatchExpr *GetMatchExprFromProto(Status &status, const infinity_thrift_rpc::MatchExpr &expr);
 
     static ParsedExpr *GetGenericMatchExprFromProto(Status &status, const infinity_thrift_rpc::GenericMatchExpr &expr);
 
