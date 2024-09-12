@@ -570,7 +570,14 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
     return relative_dir;
 }
 
-void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id) { columns_.emplace_back(std::move(column_entry)); }
+void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id) {
+    auto iter = std::find_if(columns_.begin(), columns_.end(), [&](const auto &column) { return column->column_id() == column_id; });
+    if (iter == columns_.end()) {
+        columns_.emplace_back(std::move(column_entry));
+    } else {
+        *iter = std::move(column_entry);
+    }
+}
 
 void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {
     if (read_size + block_row_count_ > row_capacity_) {
