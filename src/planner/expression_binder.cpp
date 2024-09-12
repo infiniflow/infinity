@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "expr/parsed_expr.h"
 module;
 
 #include <string>
@@ -544,6 +545,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
 
     for (SizeT idx = 0; idx < argument_count; ++idx) {
         auto bound_argument_expr = BuildExpression(*expr.arguments_->at(idx), bind_context_ptr, depth, false);
+        if (bound_argument_expr->type() != ParsedExprType::kConstant) {
+            UnrecoverableError(std::fmt("In expressions now only supports constant list!"));
+        }
         arguments.emplace_back(bound_argument_expr);
     }
 
@@ -553,7 +557,13 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
     } else {
         in_type = InType::kNotIn;
     }
+
     SharedPtr<InExpression> in_expression_ptr = MakeShared<InExpression>(in_type, bound_left_expr, arguments);
+
+    for (SizeT idx = 0; idx < argument_count; ++idx) {
+        //try cast if argument's datatype and set's datatype don't match
+    }
+
     return in_expression_ptr;
 }
 

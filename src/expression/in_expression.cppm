@@ -38,13 +38,11 @@ namespace infinity {
 // kDouble,
 // kVarchar,
 
-
-
 class ValueSet {
 public:
     void TryPut(Value &&val) {
-        if(val.type().type() != data_type.type()) {
-            UnrecoverableError(fmt::format("Mismatched type in ValueSet : {}, {}", val.type().ToString(), data_type_.ToString()));
+        if (val.type().type() != data_type_.type()) {
+            UnrecoverableError(std::format("Mismatched type in ValueSet : {}, {}", val.type().ToString(), data_type_.ToString()));
             return;
         }
         set_.emplace(std::move(val));
@@ -52,7 +50,7 @@ public:
 
     inline bool Exist(const Value &val) const { return set_.contains(val); }
 
-    ValueSet(LogicalType logical_type) : (data_type_(logical_type)) {
+    ValueSet(LogicalType logical_type) : data_type_(logical_type) {
         switch (logical_type) {
             case LogicalType::kBoolean:
                 break;
@@ -68,58 +66,57 @@ public:
                 break;
             case LogicalType::kDecimal:
                 break;
-            case LogicalType::kFloat;
+            case LogicalType::kFloat:
                 break;
-            case LogicalType::kDouble;
+            case LogicalType::kDouble:
                 break;
-            case LogicalType::kVarchar: 
+            case LogicalType::kVarchar:
                 break;
             default:
-                UnrecoverableError(fmt::format("Not supported type in ValueSet for InExpression: {}", val.type().ToString()));
+                UnrecoverableError(std::format("Not supported type in ValueSet for InExpression: {}", LogicalType2Str(logical_type)));
                 return;
         }
     }
-private:
-    // only constructed from logical type
-    DataType data_type_;
-    HashSet<Value, ValueHasher, ValueComparator> set_;
 
+private:
     struct ValueComparator {
-        bool operator()(const Value& lhs, const Value& rhs) const {
-            return lhs == rhs;
-        }
-    }
+        bool operator()(const Value &lhs, const Value &rhs) const { return lhs == rhs; }
+    };
 
     struct ValueHasher {
-        SizeT operator()(const Value& val) {
+        u64 operator()(const Value &val) const {
             switch (val.type().type()) {
                 case LogicalType::kBoolean:
-                    return std::hash<BooleanT>{}(Value.GetValue<BooleanT>());
+                    return std::hash<BooleanT>{}(val.GetValue<BooleanT>());
                 case LogicalType::kTinyInt:
-                    return std::hash<TinyIntT>{}(Value.GetValue<TinyIntT>());
+                    return std::hash<TinyIntT>{}(val.GetValue<TinyIntT>());
                 case LogicalType::kSmallInt:
-                    return std::hash<SmallIntT>{}(Value.GetValue<SmallIntT>());
+                    return std::hash<SmallIntT>{}(val.GetValue<SmallIntT>());
                 case LogicalType::kInteger:
-                    return std::hash<IntegerT>{}(Value.GetValue<IntegerT>());
+                    return std::hash<IntegerT>{}(val.GetValue<IntegerT>());
                 case LogicalType::kBigInt:
-                    return std::hash<BigIntT>{}(Value.GetValue<BigIntT>());
+                    return std::hash<BigIntT>{}(val.GetValue<BigIntT>());
                 case LogicalType::kHugeInt:
-                    return Value.GetValue<HugeIntT>().GetHash();
+                    return val.GetValue<HugeIntT>().GetHash();
                 case LogicalType::kDecimal:
-                    return Value.GetValue<DecimalT>().GetHash();
-                case LogicalType::kFloat;
-                return std::hash<FloatT>{}(Value.GetValue<FloatT>());
-                case LogicalType::kDouble;
-                return std::hash<DoubleT>{}(Value.GetValue<DoubleT>());
-                case LogicalType::kVarchar: 
-                    return std::hash<String>{}(Value.GetVarchar());
+                    return val.GetValue<DecimalT>().GetHash();
+                case LogicalType::kFloat:
+                    return std::hash<FloatT>{}(val.GetValue<FloatT>());
+                case LogicalType::kDouble:
+                    return std::hash<DoubleT>{}(val.GetValue<DoubleT>());
+                case LogicalType::kVarchar:
+                    return std::hash<String>{}(val.GetVarchar());
                 default:
-                    String error_message = fmt::format("Not supported type : {}", val.type().ToString);
+                    String error_message = std::format("Not supported type : {}", val.type().ToString());
                     UnrecoverableError(error_message);
                     break;
             }
+            return 0;
         }
     };
+    // only constructed from logical type
+    DataType data_type_;
+    HashSet<Value, ValueHasher, ValueComparator> set_;
 };
 
 export enum class InType {
@@ -130,7 +127,7 @@ export enum class InType {
 
 export class InExpression : public BaseExpression {
 public:
-    InExpression(InType in_type, SharedPtr<BaseExpression> left_operand, const Vector<SharedPtr<BaseExpression>> &value_list);
+    InExpression(InType in_type, SharedPtr<BaseExpression> left_operand, Vector<SharedPtr<BaseExpression>> arguments);
 
     String ToString() const override;
 
@@ -141,6 +138,10 @@ public:
     inline SharedPtr<BaseExpression> &left_operand() { return left_operand_ptr_; }
 
     inline InType in_type() const { return in_type_; }
+
+    inline void TryPut(Value&& val) { set_.TryPut(std::move(val)); }
+
+    inline bool exists(const Value& val) const { return set_.Exist(val); }
 
 private:
     SharedPtr<BaseExpression> left_operand_ptr_;
