@@ -1112,38 +1112,42 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
             break;
         }
         case AlterStatementType::kAddColumns: {
-            auto *add_columns_statement = static_cast<AddColumnStatement *>(statement);
-            ColumnDef *column_def = add_columns_statement->column_def_;
-            if (!column_def->has_default_value()) {
-                RecoverableError(Status::NotSupport("Add column without default value isn't supported."));
-            }
-            bool found = true;
-            try {
-                [[maybe_unused]] i64 column_id = table_entry->GetColumnIdByName(column_def->name());
-            } catch (const RecoverableException &e) {
-                if (e.ErrorCode() != ErrorCode::kColumnNotExist) {
-                    throw;
+            auto *add_columns_statement = static_cast<AddColumnsStatement *>(statement);
+            std::vector<std::shared_ptr<ColumnDef>> column_defs = std::move(add_columns_statement->column_defs_);
+            for (const auto &column_def : column_defs) {
+                if (!column_def->has_default_value()) {
+                    RecoverableError(Status::NotSupport("Add column without default value isn't supported."));
                 }
-                found = false;
-            }
-            if (found) {
-                RecoverableError(Status::DuplicateColumnName(column_def->name()));
+                bool found = true;
+                try {
+                    [[maybe_unused]] i64 column_id = table_entry->GetColumnIdByName(column_def->name());
+                } catch (const RecoverableException &e) {
+                    if (e.ErrorCode() != ErrorCode::kColumnNotExist) {
+                        throw;
+                    }
+                    found = false;
+                }
+                if (found) {
+                    RecoverableError(Status::DuplicateColumnName(column_def->name()));
+                }
             }
             this->logical_plan_ = MakeShared<LogicalAddColumns>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                 table_entry,
-                                                                column_def);
+                                                                std::move(column_defs));
             break;
         }
         case AlterStatementType::kDropColumns: {
-            auto *drop_columns_statement = static_cast<DropColumnStatement *>(statement);
-            const String &column_name = drop_columns_statement->column_name_;
-            i64 column_id = table_entry->GetColumnIdByName(column_name);
-            if (table_entry->CheckIfIndexColumn(column_id, txn->TxnID(), txn->BeginTS())) {
-                RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+            auto *drop_columns_statement = static_cast<DropColumnsStatement *>(statement);
+            Vector<String> column_names = std::move(drop_columns_statement->column_names_);
+            for (const auto &column_name : column_names) {
+                i64 column_id = table_entry->GetColumnIdByName(column_name);
+                if (table_entry->CheckIfIndexColumn(column_id, txn->TxnID(), txn->BeginTS())) {
+                    RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+                }
             }
             this->logical_plan_ = MakeShared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                  table_entry,
-                                                                 column_name);
+                                                                 std::move(column_names));
             break;
         }
         default: {

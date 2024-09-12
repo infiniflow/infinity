@@ -60,31 +60,26 @@ public:
     std::string new_table_name_;
 };
 
-class AddColumnStatement final : public AlterStatement {
+class AddColumnsStatement final : public AlterStatement {
 public:
-    AddColumnStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kAddColumns) {}
+    AddColumnsStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kAddColumns) {}
 
-    ~AddColumnStatement() {
-        if (column_def_ != nullptr) {
-            delete column_def_;
-            column_def_ = nullptr;
-        }
-    }
+    ~AddColumnsStatement() = default;
 
-    std::string ToString() const final { return "AddColumnStatement"; }
+    std::string ToString() const final { return "AddColumnsStatement"; }
 
-    ColumnDef *column_def_{};
+    std::vector<std::shared_ptr<ColumnDef>> column_defs_{};
 };
 
-class DropColumnStatement final : public AlterStatement {
+class DropColumnsStatement final : public AlterStatement {
 public:
-    DropColumnStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kDropColumns) {}
+    DropColumnsStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kDropColumns) {}
 
-    ~DropColumnStatement() = default;
+    ~DropColumnsStatement() = default;
 
-    std::string ToString() const final { return "DropColumnStatement"; }
+    std::string ToString() const final { return "DropColumnsStatement"; }
 
-    std::string column_name_;
+    std::vector<std::string> column_names_;
 };
 
 class AlterColumnStatement final : public AlterStatement {
