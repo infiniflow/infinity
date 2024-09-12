@@ -26,7 +26,5 @@ export using infinity::AlterStatement;
 export using infinity::RenameTableStatement;
 export using infinity::AddColumnsStatement;
 export using infinity::DropColumnsStatement;
-export using infinity::AlterColumnStatement;
-export using infinity::RenameColumnStatement;
 
 } // namespace infinity

@@ -2399,13 +2399,13 @@ admin_statement: ADMIN SHOW CATALOGS {
 }
 
 alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
-    auto *ret = new infinity::RenameTableStatement($3);
+    auto *ret = new infinity::RenameTableStatement($3->schema_name_ptr_, $3->table_name_ptr_);
     $$ = ret;
     ret->new_table_name_ = $6;
     free($6);
 }
 | ALTER TABLE table_name ADD COLUMN '(' column_def_array ')' {
-    auto *ret = new infinity::AddColumnsStatement($3);
+    auto *ret = new infinity::AddColumnsStatement($3->schema_name_ptr_, $3->table_name_ptr_);
     $$ = ret;
 
     for (infinity::ColumnDef*& column_def : *$7) {
@@ -2414,25 +2414,12 @@ alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
     delete $7;
 }
 | ALTER TABLE table_name DROP COLUMN '(' identifier_array ')' {
-    auto *ret = new infinity::DropColumnsStatement($3);
+    auto *ret = new infinity::DropColumnsStatement($3->schema_name_ptr_, $3->table_name_ptr_);
     $$ = ret;
     for (std::string &column_name : *$7) {
         ret->column_names_.emplace_back(std::move(column_name));
     }
     free($7);
-}
-| ALTER TABLE table_name ALTER COLUMN table_column {
-    auto *ret = new infinity::AlterColumnStatement($3);
-    $$ = ret;
-    ret->column_def_ = $6;
-}
-| ALTER TABLE table_name RENAME COLUMN IDENTIFIER TO IDENTIFIER {
-    auto *ret = new infinity::RenameColumnStatement($3);
-    $$ = ret;
-    ret->column_name_ = $6;
-    free($6);
-    ret->new_column_name_ = $8;
-    free($8);
 }
 
 /*
