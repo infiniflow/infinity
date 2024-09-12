@@ -2,9 +2,11 @@ from concurrent import futures
 import os
 from run_pytest_parallel import commands, run_command
 import time
+import argparse
 
-infinity_log_path = "/var/infinity/log/infinity.log"
-test_sec = 600
+
+LOG_PATH = "/var/infinity/log/infinity.log"
+TEST_SEC = 3600
 
 
 def clear_infinity_log():
@@ -13,6 +15,25 @@ def clear_infinity_log():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Pytest Parallel Continuous")
+    parser.add_argument(
+        "-t",
+        "--test_sec",
+        type=int,
+        default=TEST_SEC,
+        dest="test_sec",
+    )
+    parser.add_argument(
+        "-l",
+        "--log_path",
+        type=str,
+        default=LOG_PATH,
+        dest="log_path",
+    )
+    args = parser.parse_args()
+    test_sec = args.test_sec
+    infinity_log_path = args.log_path
+
     command_failed = False
     begin_time = time.time()
     try:
