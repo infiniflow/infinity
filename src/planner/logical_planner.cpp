@@ -254,14 +254,15 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             // Create value list with table column size and null value
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
-            Map<SizeT, bool> map;
+            Vector<bool> has_value(table_column_count, false);
             for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
                 const auto &column_name = statement->columns_->at(column_idx);
-                SizeT table_column_id = table_entry->GetColumnIdByName(column_name);
-                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByID(table_column_id)->column_type_;
+                const SharedPtr<ColumnDef> &column_def = table_entry->GetColumnDefByName(column_name);
+                SizeT table_column_idx = table_entry->GetColumnIdxByID(column_def->id());
+                const SharedPtr<DataType> &table_column_type = column_def->column_type_;
                 DataType value_type = value_list[column_idx]->Type();
                 if (value_type == *table_column_type) {
-                    rewrite_value_list[table_column_id] = value_list[column_idx];
+                    rewrite_value_list[table_column_idx] = value_list[column_idx];
                 } else {
                     if (LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
                         // If the inserted value type mismatches with table
@@ -269,17 +270,17 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                         // one.
                         BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
                         SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, value_list[column_idx], *table_column_type);
-                        rewrite_value_list[table_column_id] = cast_expr;
+                        rewrite_value_list[table_column_idx] = cast_expr;
                     } else {
                         // LogicalType are same and type info is also OK.
                         rewrite_value_list[column_idx] = value_list[column_idx];
                     }
                 }
-                map[table_column_id] = true;
+                has_value[table_column_idx] = true;
             }
 
             for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
-                if (map.find(column_idx) != map.end()) {
+                if (has_value[column_idx]) {
                     continue;
                 }
 
