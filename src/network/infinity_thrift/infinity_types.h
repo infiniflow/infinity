@@ -1373,13 +1373,14 @@ void swap(ConstantExpr &a, ConstantExpr &b);
 std::ostream& operator<<(std::ostream& out, const ConstantExpr& obj);
 
 typedef struct _KnnExpr__isset {
-  _KnnExpr__isset() : column_expr(false), embedding_data(false), embedding_data_type(false), distance_type(false), topn(false), opt_params(true) {}
+  _KnnExpr__isset() : column_expr(false), embedding_data(false), embedding_data_type(false), distance_type(false), topn(false), opt_params(true), filter_expr(false) {}
   bool column_expr :1;
   bool embedding_data :1;
   bool embedding_data_type :1;
   bool distance_type :1;
   bool topn :1;
   bool opt_params :1;
+  bool filter_expr :1;
 } _KnnExpr__isset;
 
 class KnnExpr : public virtual ::apache::thrift::TBase {
@@ -1409,6 +1410,7 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
   KnnDistanceType::type distance_type;
   int64_t topn;
   std::vector<InitParameter>  opt_params;
+  ParsedExpr filter_expr;
 
   _KnnExpr__isset __isset;
 
@@ -1424,6 +1426,8 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
 
   void __set_opt_params(const std::vector<InitParameter> & val);
 
+  void __set_filter_expr(const ParsedExpr& val);
+
   bool operator == (const KnnExpr & rhs) const
   {
     if (!(column_expr == rhs.column_expr))
@@ -1437,6 +1441,10 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
     if (!(topn == rhs.topn))
       return false;
     if (!(opt_params == rhs.opt_params))
+      return false;
+    if (__isset.filter_expr != rhs.__isset.filter_expr)
+      return false;
+    else if (__isset.filter_expr && !(filter_expr == rhs.filter_expr))
       return false;
     return true;
   }
@@ -1457,12 +1465,13 @@ void swap(KnnExpr &a, KnnExpr &b);
 std::ostream& operator<<(std::ostream& out, const KnnExpr& obj);
 
 typedef struct _MatchSparseExpr__isset {
-  _MatchSparseExpr__isset() : column_expr(false), query_sparse_expr(false), metric_type(false), topn(false), opt_params(true) {}
+  _MatchSparseExpr__isset() : column_expr(false), query_sparse_expr(false), metric_type(false), topn(false), opt_params(true), filter_expr(false) {}
   bool column_expr :1;
   bool query_sparse_expr :1;
   bool metric_type :1;
   bool topn :1;
   bool opt_params :1;
+  bool filter_expr :1;
 } _MatchSparseExpr__isset;
 
 class MatchSparseExpr : public virtual ::apache::thrift::TBase {
@@ -1482,6 +1491,7 @@ class MatchSparseExpr : public virtual ::apache::thrift::TBase {
   std::string metric_type;
   int64_t topn;
   std::vector<InitParameter>  opt_params;
+  ParsedExpr filter_expr;
 
   _MatchSparseExpr__isset __isset;
 
@@ -1495,6 +1505,8 @@ class MatchSparseExpr : public virtual ::apache::thrift::TBase {
 
   void __set_opt_params(const std::vector<InitParameter> & val);
 
+  void __set_filter_expr(const ParsedExpr& val);
+
   bool operator == (const MatchSparseExpr & rhs) const
   {
     if (!(column_expr == rhs.column_expr))
@@ -1506,6 +1518,10 @@ class MatchSparseExpr : public virtual ::apache::thrift::TBase {
     if (!(topn == rhs.topn))
       return false;
     if (!(opt_params == rhs.opt_params))
+      return false;
+    if (__isset.filter_expr != rhs.__isset.filter_expr)
+      return false;
+    else if (__isset.filter_expr && !(filter_expr == rhs.filter_expr))
       return false;
     return true;
   }
@@ -1526,12 +1542,13 @@ void swap(MatchSparseExpr &a, MatchSparseExpr &b);
 std::ostream& operator<<(std::ostream& out, const MatchSparseExpr& obj);
 
 typedef struct _MatchTensorExpr__isset {
-  _MatchTensorExpr__isset() : search_method(false), column_expr(false), embedding_data_type(false), embedding_data(false), extra_options(false) {}
+  _MatchTensorExpr__isset() : search_method(false), column_expr(false), embedding_data_type(false), embedding_data(false), extra_options(false), filter_expr(false) {}
   bool search_method :1;
   bool column_expr :1;
   bool embedding_data_type :1;
   bool embedding_data :1;
   bool extra_options :1;
+  bool filter_expr :1;
 } _MatchTensorExpr__isset;
 
 class MatchTensorExpr : public virtual ::apache::thrift::TBase {
@@ -1555,6 +1572,7 @@ class MatchTensorExpr : public virtual ::apache::thrift::TBase {
   ElementType::type embedding_data_type;
   EmbeddingData embedding_data;
   std::string extra_options;
+  ParsedExpr filter_expr;
 
   _MatchTensorExpr__isset __isset;
 
@@ -1568,6 +1586,8 @@ class MatchTensorExpr : public virtual ::apache::thrift::TBase {
 
   void __set_extra_options(const std::string& val);
 
+  void __set_filter_expr(const ParsedExpr& val);
+
   bool operator == (const MatchTensorExpr & rhs) const
   {
     if (!(search_method == rhs.search_method))
@@ -1579,6 +1599,10 @@ class MatchTensorExpr : public virtual ::apache::thrift::TBase {
     if (!(embedding_data == rhs.embedding_data))
       return false;
     if (!(extra_options == rhs.extra_options))
+      return false;
+    if (__isset.filter_expr != rhs.__isset.filter_expr)
+      return false;
+    else if (__isset.filter_expr && !(filter_expr == rhs.filter_expr))
       return false;
     return true;
   }
@@ -1599,10 +1623,11 @@ void swap(MatchTensorExpr &a, MatchTensorExpr &b);
 std::ostream& operator<<(std::ostream& out, const MatchTensorExpr& obj);
 
 typedef struct _MatchExpr__isset {
-  _MatchExpr__isset() : fields(false), matching_text(false), options_text(false) {}
+  _MatchExpr__isset() : fields(false), matching_text(false), options_text(false), filter_expr(false) {}
   bool fields :1;
   bool matching_text :1;
   bool options_text :1;
+  bool filter_expr :1;
 } _MatchExpr__isset;
 
 class MatchExpr : public virtual ::apache::thrift::TBase {
@@ -1620,6 +1645,7 @@ class MatchExpr : public virtual ::apache::thrift::TBase {
   std::string fields;
   std::string matching_text;
   std::string options_text;
+  ParsedExpr filter_expr;
 
   _MatchExpr__isset __isset;
 
@@ -1629,6 +1655,8 @@ class MatchExpr : public virtual ::apache::thrift::TBase {
 
   void __set_options_text(const std::string& val);
 
+  void __set_filter_expr(const ParsedExpr& val);
+
   bool operator == (const MatchExpr & rhs) const
   {
     if (!(fields == rhs.fields))
@@ -1636,6 +1664,10 @@ class MatchExpr : public virtual ::apache::thrift::TBase {
     if (!(matching_text == rhs.matching_text))
       return false;
     if (!(options_text == rhs.options_text))
+      return false;
+    if (__isset.filter_expr != rhs.__isset.filter_expr)
+      return false;
+    else if (__isset.filter_expr && !(filter_expr == rhs.filter_expr))
       return false;
     return true;
   }

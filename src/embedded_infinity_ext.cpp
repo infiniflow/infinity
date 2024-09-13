@@ -139,7 +139,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("embedding_data_type", &WrapKnnExpr::embedding_data_type)
         .def_rw("distance_type", &WrapKnnExpr::distance_type)
         .def_rw("topn", &WrapKnnExpr::topn)
-        .def_rw("opt_params", &WrapKnnExpr::opt_params);
+        .def_rw("opt_params", &WrapKnnExpr::opt_params)
+        .def_rw("filter_expr", &WrapKnnExpr::filter_expr);
 
     nb::class_<EmbeddingData>(m, "EmbeddingData")
         .def(nb::init<>())
@@ -159,7 +160,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def(nb::init<>())
         .def_rw("fields", &WrapMatchExpr::fields)
         .def_rw("matching_text", &WrapMatchExpr::matching_text)
-        .def_rw("options_text", &WrapMatchExpr::options_text);
+        .def_rw("options_text", &WrapMatchExpr::options_text)
+        .def_rw("filter_expr", &WrapMatchExpr::filter_expr);
 
     // Bind WrapFusionExpr
     nb::class_<WrapFusionExpr>(m, "WrapFusionExpr")
@@ -177,7 +179,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("column_expr", &WrapMatchTensorExpr::column_expr)
         .def_rw("embedding_data", &WrapMatchTensorExpr::embedding_data)
         .def_rw("embedding_data_type", &WrapMatchTensorExpr::embedding_data_type)
-        .def_rw("options_text", &WrapMatchTensorExpr::options_text);
+        .def_rw("options_text", &WrapMatchTensorExpr::options_text)
+        .def_rw("filter_expr", &WrapMatchTensorExpr::filter_expr);
 
     // Bind WrapMatchSparseExpr
     nb::class_<WrapMatchSparseExpr>(m, "WrapMatchSparseExpr")
@@ -187,7 +190,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("sparse_expr", &WrapMatchSparseExpr::sparse_expr)
         .def_rw("metric_type", &WrapMatchSparseExpr::metric_type)
         .def_rw("topn", &WrapMatchSparseExpr::topn)
-        .def_rw("opt_params", &WrapMatchSparseExpr::opt_params);
+        .def_rw("opt_params", &WrapMatchSparseExpr::opt_params)
+        .def_rw("filter_expr", &WrapMatchSparseExpr::filter_expr);
 
     // Bind WrapSearchExpr
     nb::class_<WrapSearchExpr>(m, "WrapSearchExpr")

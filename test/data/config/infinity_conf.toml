@@ -13,7 +13,7 @@ connection_pool_size    = 128
 [log]
 log_filename            = "infinity.log"
 log_dir                 = "/var/infinity/log"
-log_to_stdout           = true
+log_to_stdout           = false
 log_file_max_size       = "2GB"
 log_file_rotate_count   = 3
 

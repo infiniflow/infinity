@@ -14,6 +14,7 @@ from infinity_embedded.common import VEC, SparseVector, InfinityException
 from infinity_embedded.embedded_infinity_ext import *
 from infinity_embedded.local_infinity.types import logic_type_to_dtype, make_match_tensor_expr
 from infinity_embedded.local_infinity.utils import traverse_conditions, parse_expr
+from infinity_embedded.local_infinity.utils import get_search_optional_filter_from_opt_params
 from infinity_embedded.table import ExplainType as BaseExplainType
 from infinity_embedded.errors import ErrorCode
 
@@ -153,7 +154,10 @@ class InfinityLocalQueryBuilder(ABC):
             raise InfinityException(ErrorCode.INVALID_KNN_DISTANCE_TYPE, f"Invalid distance type {distance_type}")
 
         knn_opt_params = []
-        if knn_params != None:
+        optional_filter = None
+        if knn_params is not None:
+            # check if there is a filter
+            optional_filter = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
                 value = v.lower()
@@ -169,6 +173,8 @@ class InfinityLocalQueryBuilder(ABC):
         knn_expr.distance_type = dist_type
         knn_expr.topn = topn
         knn_expr.opt_params = knn_opt_params
+        if optional_filter is not None:
+            knn_expr.filter_expr = optional_filter
 
         generic_match_expr = WrapParsedExpr()
         generic_match_expr.type = ParsedExprType.kKnn
@@ -198,7 +204,10 @@ class InfinityLocalQueryBuilder(ABC):
             )
 
         sparse_opt_params = []
-        if opt_params != None:
+        optional_filter = None
+        if opt_params is not None:
+            # check if there is a filter
+            optional_filter = get_search_optional_filter_from_opt_params(opt_params)
             for k, v in opt_params.items():
                 params = InitParameter()
                 params.param_name = k
@@ -206,6 +215,8 @@ class InfinityLocalQueryBuilder(ABC):
                 sparse_opt_params.append(params)
         match_sparse_expr = WrapMatchSparseExpr()
         match_sparse_expr.column_expr = column_expr
+        if optional_filter is not None:
+            match_sparse_expr.filter_expr = optional_filter
 
         sparse_expr = WrapConstantExpr()
         match sparse_data:
@@ -261,10 +272,15 @@ class InfinityLocalQueryBuilder(ABC):
         match_expr.fields = fields
         match_expr.matching_text = matching_text
         options_text = f"topn={topn}"
+        optional_filter = None
         if extra_options is not None:
+            # check if there is a filter
+            optional_filter = get_search_optional_filter_from_opt_params(extra_options)
             for k, v in extra_options.items():
                 options_text += f";{k}={v}"
         match_expr.options_text = options_text
+        if optional_filter is not None:
+            match_expr.filter_expr = optional_filter
 
         generic_match_expr = WrapParsedExpr()
         generic_match_expr.type = ParsedExprType.kMatch
@@ -284,10 +300,15 @@ class InfinityLocalQueryBuilder(ABC):
             self._search = WrapSearchExpr()
             self._search.match_exprs = list()
         option_str = f"topn={topn}"
+        optional_filter = None
         if extra_option is not None:
+            # check if there is a filter
+            optional_filter = get_search_optional_filter_from_opt_params(extra_option)
             for k, v in extra_option.items():
                 option_str += f";{k}={v}"
         match_tensor_expr = WrapParsedExpr(ParsedExprType.kMatchTensor)
+        if optional_filter is not None:
+            match_tensor_expr.filter_expr = optional_filter
         match_tensor_expr.match_tensor_expr = make_match_tensor_expr(
             vector_column_name=column_name,
             embedding_data=query_data,

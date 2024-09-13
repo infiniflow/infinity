@@ -122,7 +122,7 @@ public:
     static SharedPtr<ChunkIndexEntry>
     Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry, CreateIndexParam *param, BufferManager *buffer_mgr);
 
-    virtual void Cleanup(bool dropped = true) override;
+    virtual void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     virtual void PickCleanup(CleanupScanner *scanner) override {}
 

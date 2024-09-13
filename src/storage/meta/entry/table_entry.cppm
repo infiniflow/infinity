@@ -334,7 +334,7 @@ public:
 public:
     void PickCleanup(CleanupScanner *scanner) override;
 
-    void Cleanup(bool dropped = true) override;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
 public:
     Status AddWriteTxnNum(Txn *txn);

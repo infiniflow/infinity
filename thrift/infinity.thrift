@@ -182,6 +182,7 @@ struct KnnExpr {
 4: KnnDistanceType distance_type,
 5: i64 topn,
 6: list<InitParameter> opt_params = [],
+7: optional ParsedExpr filter_expr,
 }
 
 struct MatchSparseExpr {
@@ -190,6 +191,7 @@ struct MatchSparseExpr {
 3: string  metric_type,
 4: i64  topn,
 5: list<InitParameter> opt_params = [],
+6: optional ParsedExpr filter_expr,
 }
 
 struct MatchTensorExpr {
@@ -198,12 +200,14 @@ struct MatchTensorExpr {
 3: ElementType embedding_data_type,
 4: EmbeddingData embedding_data,
 5: string extra_options,
+6: optional ParsedExpr filter_expr,
 }
 
 struct MatchExpr {
 	1: string fields,
 	2: string matching_text,
 	3: string options_text,
+    4: optional ParsedExpr filter_expr,
 }
 
 union GenericMatchExpr {

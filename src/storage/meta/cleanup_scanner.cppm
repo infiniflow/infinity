@@ -25,13 +25,32 @@ class Catalog;
 class EntryInterface;
 class MetaInterface;
 
+export class CleanupInfoTracer {
+public:
+    void ResetInfo(TxnTimeStamp cleanup_ts) {
+        cleanup_ts_ = cleanup_ts;
+        cleanup_info_.clear();
+    }
+
+    void AddCleanupInfo(String path) {
+        cleanup_info_.emplace_back(std::move(path));
+    }
+
+    String GetCleanupInfo() const;
+
+private:
+    TxnTimeStamp cleanup_ts_ = 0;
+
+    Vector<String> cleanup_info_;
+};
+
 export class CleanupScanner {
 public:
     CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr);
 
     void Scan();
 
-    void Cleanup() &&;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr) &&;
 
     void AddEntry(SharedPtr<EntryInterface> entry, bool dropped = true);
 

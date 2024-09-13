@@ -310,6 +310,9 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         case ExpressionType::kReference: {
             break;
         }
+        case ExpressionType::kFilterFullText: {
+            break;
+        }
         default: {
             String error_message = fmt::format("Unexpected expression type: {}", expression->Name());
             UnrecoverableError(error_message);

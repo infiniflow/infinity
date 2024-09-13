@@ -153,7 +153,7 @@ void DBMeta::PushFrontEntry(const SharedPtr<DBEntry>& new_db_entry) {
     db_entry_list_.PushFrontEntry(new_db_entry);
 }
 
-void DBMeta::Cleanup(bool dropped) { db_entry_list_.Cleanup(dropped); }
+void DBMeta::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) { db_entry_list_.Cleanup(info_tracer, dropped); }
 
 bool DBMeta::PickCleanup(CleanupScanner *scanner) { return db_entry_list_.PickCleanup(scanner); }
 

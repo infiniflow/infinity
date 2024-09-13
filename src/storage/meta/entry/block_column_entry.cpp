@@ -278,13 +278,21 @@ void BlockColumnEntry::DropColumn() {
     deleted_ = true;
 }
 
-void BlockColumnEntry::Cleanup([[maybe_unused]] bool dropped) {
+void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer, [[maybe_unused]] bool dropped) {
     if (buffer_.get() != nullptr) {
         buffer_.get()->PickForCleanup();
+        if (info_tracer != nullptr) {
+            String file_path = buffer_.get()->GetFilename();
+            info_tracer->AddCleanupInfo(std::move(file_path));
+        }
     }
     for (auto &outline_buffer : outline_buffers_) {
         if (outline_buffer.get() != nullptr) {
             outline_buffer.get()->PickForCleanup();
+            if (info_tracer != nullptr) {
+                String file_path = outline_buffer.get()->GetFilename();
+                info_tracer->AddCleanupInfo(std::move(file_path));
+            }
         }
     }
 }

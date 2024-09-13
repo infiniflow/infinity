@@ -258,7 +258,12 @@ cmake --build . -t test_main
    ./cmake-build-debug/src/infinity
    ```
 
-2. Run the functional tests:
+2. Install Python sdk of infinity:
+   ```bash
+   pip install infinity-sdk==0.4.0.dev1
+   ```
+
+3. Run the functional tests:
 
    ```shell
    python3 tools/run_pytest_parallel.py
@@ -275,7 +280,12 @@ cmake --build . -t test_main
    ./cmake-build-debug/src/infinity
    ```
 
-2. Run the functional tests: 
+2. Install Python sdk of infinity:
+   ```bash
+   pip install infinity-sdk==0.4.0.dev1
+   ```
+
+3. Run the functional tests: 
 
    ```shell
    python3 tools/run_pytest_parallel.py
@@ -293,19 +303,24 @@ cmake --build . -t test_main
    ./cmake-build-debug/src/infinity
    ```
 
-2. Run the functional tests: 
+2. Install Python sdk of infinity:
+   ```bash
+   pip install infinity-sdk==0.4.0.dev1
+   ```
+
+3. Run the functional tests: 
 
    ```shell
    python3 tools/run_pytest_parallel.py
    ```
 
-3. Shut down the Infinity server:
+4. Shut down the Infinity server:
 
    ```shell
    kill -15 `pidof infinity`
    ```
 
-4. Use Gcovr to generate summarized code coverage results:
+5. Use Gcovr to generate summarized code coverage results:
 
    ```shell
    cd ./cmake-build-debug/src/CMakeFiles

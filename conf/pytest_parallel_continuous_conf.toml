@@ -1,0 +1,24 @@
+[general]
+version                  = "0.4.0"
+time_zone                = "utc-8"
+
+[network]
+server_address           = "0.0.0.0"
+
+[log]
+log_filename             = "infinity.log"
+log_dir                  = "/var/infinity/log"
+log_level                = "trace"
+
+[storage]
+persistence_dir          = "/var/infinity/persistence"
+
+[buffer]
+buffer_manager_size      = "8GB"
+temp_dir                 = "/var/infinity/tmp"
+
+[wal]
+wal_dir                  = "/var/infinity/wal"
+
+[resource]
+resource_dir             = "/var/infinity/resource"

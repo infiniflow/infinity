@@ -1636,6 +1636,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
           if (this->knn_expr->__isset.distance_type) { wasSet = true; }
           if (this->knn_expr->__isset.topn) { wasSet = true; }
           if (this->knn_expr->__isset.opt_params) { wasSet = true; }
+          if (this->knn_expr->__isset.filter_expr) { wasSet = true; }
           if (!wasSet) { this->knn_expr.reset(); }
           this->__isset.knn_expr = true;
         } else {
@@ -1654,6 +1655,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
           if (this->match_sparse_expr->__isset.metric_type) { wasSet = true; }
           if (this->match_sparse_expr->__isset.topn) { wasSet = true; }
           if (this->match_sparse_expr->__isset.opt_params) { wasSet = true; }
+          if (this->match_sparse_expr->__isset.filter_expr) { wasSet = true; }
           if (!wasSet) { this->match_sparse_expr.reset(); }
           this->__isset.match_sparse_expr = true;
         } else {
@@ -1672,6 +1674,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
           if (this->match_tensor_expr->__isset.embedding_data_type) { wasSet = true; }
           if (this->match_tensor_expr->__isset.embedding_data) { wasSet = true; }
           if (this->match_tensor_expr->__isset.extra_options) { wasSet = true; }
+          if (this->match_tensor_expr->__isset.filter_expr) { wasSet = true; }
           if (!wasSet) { this->match_tensor_expr.reset(); }
           this->__isset.match_tensor_expr = true;
         } else {
@@ -1688,6 +1691,7 @@ uint32_t ParsedExprType::read(::apache::thrift::protocol::TProtocol* iprot) {
           if (this->match_expr->__isset.fields) { wasSet = true; }
           if (this->match_expr->__isset.matching_text) { wasSet = true; }
           if (this->match_expr->__isset.options_text) { wasSet = true; }
+          if (this->match_expr->__isset.filter_expr) { wasSet = true; }
           if (!wasSet) { this->match_expr.reset(); }
           this->__isset.match_expr = true;
         } else {
@@ -3377,6 +3381,11 @@ void KnnExpr::__set_topn(const int64_t val) {
 void KnnExpr::__set_opt_params(const std::vector<InitParameter> & val) {
   this->opt_params = val;
 }
+
+void KnnExpr::__set_filter_expr(const ParsedExpr& val) {
+  this->filter_expr = val;
+__isset.filter_expr = true;
+}
 std::ostream& operator<<(std::ostream& out, const KnnExpr& obj)
 {
   obj.printTo(out);
@@ -3469,6 +3478,14 @@ uint32_t KnnExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 7:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->filter_expr.read(iprot);
+          this->__isset.filter_expr = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -3518,6 +3535,11 @@ uint32_t KnnExpr::write(::apache::thrift::protocol::TProtocol* oprot) const {
   }
   xfer += oprot->writeFieldEnd();
 
+  if (this->__isset.filter_expr) {
+    xfer += oprot->writeFieldBegin("filter_expr", ::apache::thrift::protocol::T_STRUCT, 7);
+    xfer += this->filter_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -3531,6 +3553,7 @@ void swap(KnnExpr &a, KnnExpr &b) {
   swap(a.distance_type, b.distance_type);
   swap(a.topn, b.topn);
   swap(a.opt_params, b.opt_params);
+  swap(a.filter_expr, b.filter_expr);
   swap(a.__isset, b.__isset);
 }
 
@@ -3541,6 +3564,7 @@ KnnExpr::KnnExpr(const KnnExpr& other195) {
   distance_type = other195.distance_type;
   topn = other195.topn;
   opt_params = other195.opt_params;
+  filter_expr = other195.filter_expr;
   __isset = other195.__isset;
 }
 KnnExpr& KnnExpr::operator=(const KnnExpr& other196) {
@@ -3550,6 +3574,7 @@ KnnExpr& KnnExpr::operator=(const KnnExpr& other196) {
   distance_type = other196.distance_type;
   topn = other196.topn;
   opt_params = other196.opt_params;
+  filter_expr = other196.filter_expr;
   __isset = other196.__isset;
   return *this;
 }
@@ -3562,6 +3587,7 @@ void KnnExpr::printTo(std::ostream& out) const {
   out << ", " << "distance_type=" << to_string(distance_type);
   out << ", " << "topn=" << to_string(topn);
   out << ", " << "opt_params=" << to_string(opt_params);
+  out << ", " << "filter_expr="; (__isset.filter_expr ? (out << to_string(filter_expr)) : (out << "<null>"));
   out << ")";
 }
 
@@ -3588,6 +3614,11 @@ void MatchSparseExpr::__set_topn(const int64_t val) {
 
 void MatchSparseExpr::__set_opt_params(const std::vector<InitParameter> & val) {
   this->opt_params = val;
+}
+
+void MatchSparseExpr::__set_filter_expr(const ParsedExpr& val) {
+  this->filter_expr = val;
+__isset.filter_expr = true;
 }
 std::ostream& operator<<(std::ostream& out, const MatchSparseExpr& obj)
 {
@@ -3669,6 +3700,14 @@ uint32_t MatchSparseExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->filter_expr.read(iprot);
+          this->__isset.filter_expr = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -3714,6 +3753,11 @@ uint32_t MatchSparseExpr::write(::apache::thrift::protocol::TProtocol* oprot) co
   }
   xfer += oprot->writeFieldEnd();
 
+  if (this->__isset.filter_expr) {
+    xfer += oprot->writeFieldBegin("filter_expr", ::apache::thrift::protocol::T_STRUCT, 6);
+    xfer += this->filter_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -3726,6 +3770,7 @@ void swap(MatchSparseExpr &a, MatchSparseExpr &b) {
   swap(a.metric_type, b.metric_type);
   swap(a.topn, b.topn);
   swap(a.opt_params, b.opt_params);
+  swap(a.filter_expr, b.filter_expr);
   swap(a.__isset, b.__isset);
 }
 
@@ -3735,6 +3780,7 @@ MatchSparseExpr::MatchSparseExpr(const MatchSparseExpr& other203) {
   metric_type = other203.metric_type;
   topn = other203.topn;
   opt_params = other203.opt_params;
+  filter_expr = other203.filter_expr;
   __isset = other203.__isset;
 }
 MatchSparseExpr& MatchSparseExpr::operator=(const MatchSparseExpr& other204) {
@@ -3743,6 +3789,7 @@ MatchSparseExpr& MatchSparseExpr::operator=(const MatchSparseExpr& other204) {
   metric_type = other204.metric_type;
   topn = other204.topn;
   opt_params = other204.opt_params;
+  filter_expr = other204.filter_expr;
   __isset = other204.__isset;
   return *this;
 }
@@ -3754,6 +3801,7 @@ void MatchSparseExpr::printTo(std::ostream& out) const {
   out << ", " << "metric_type=" << to_string(metric_type);
   out << ", " << "topn=" << to_string(topn);
   out << ", " << "opt_params=" << to_string(opt_params);
+  out << ", " << "filter_expr="; (__isset.filter_expr ? (out << to_string(filter_expr)) : (out << "<null>"));
   out << ")";
 }
 
@@ -3780,6 +3828,11 @@ void MatchTensorExpr::__set_embedding_data(const EmbeddingData& val) {
 
 void MatchTensorExpr::__set_extra_options(const std::string& val) {
   this->extra_options = val;
+}
+
+void MatchTensorExpr::__set_filter_expr(const ParsedExpr& val) {
+  this->filter_expr = val;
+__isset.filter_expr = true;
 }
 std::ostream& operator<<(std::ostream& out, const MatchTensorExpr& obj)
 {
@@ -3851,6 +3904,14 @@ uint32_t MatchTensorExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->filter_expr.read(iprot);
+          this->__isset.filter_expr = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -3888,6 +3949,11 @@ uint32_t MatchTensorExpr::write(::apache::thrift::protocol::TProtocol* oprot) co
   xfer += oprot->writeString(this->extra_options);
   xfer += oprot->writeFieldEnd();
 
+  if (this->__isset.filter_expr) {
+    xfer += oprot->writeFieldBegin("filter_expr", ::apache::thrift::protocol::T_STRUCT, 6);
+    xfer += this->filter_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -3900,6 +3966,7 @@ void swap(MatchTensorExpr &a, MatchTensorExpr &b) {
   swap(a.embedding_data_type, b.embedding_data_type);
   swap(a.embedding_data, b.embedding_data);
   swap(a.extra_options, b.extra_options);
+  swap(a.filter_expr, b.filter_expr);
   swap(a.__isset, b.__isset);
 }
 
@@ -3909,6 +3976,7 @@ MatchTensorExpr::MatchTensorExpr(const MatchTensorExpr& other206) {
   embedding_data_type = other206.embedding_data_type;
   embedding_data = other206.embedding_data;
   extra_options = other206.extra_options;
+  filter_expr = other206.filter_expr;
   __isset = other206.__isset;
 }
 MatchTensorExpr& MatchTensorExpr::operator=(const MatchTensorExpr& other207) {
@@ -3917,6 +3985,7 @@ MatchTensorExpr& MatchTensorExpr::operator=(const MatchTensorExpr& other207) {
   embedding_data_type = other207.embedding_data_type;
   embedding_data = other207.embedding_data;
   extra_options = other207.extra_options;
+  filter_expr = other207.filter_expr;
   __isset = other207.__isset;
   return *this;
 }
@@ -3928,6 +3997,7 @@ void MatchTensorExpr::printTo(std::ostream& out) const {
   out << ", " << "embedding_data_type=" << to_string(embedding_data_type);
   out << ", " << "embedding_data=" << to_string(embedding_data);
   out << ", " << "extra_options=" << to_string(extra_options);
+  out << ", " << "filter_expr="; (__isset.filter_expr ? (out << to_string(filter_expr)) : (out << "<null>"));
   out << ")";
 }
 
@@ -3946,6 +4016,11 @@ void MatchExpr::__set_matching_text(const std::string& val) {
 
 void MatchExpr::__set_options_text(const std::string& val) {
   this->options_text = val;
+}
+
+void MatchExpr::__set_filter_expr(const ParsedExpr& val) {
+  this->filter_expr = val;
+__isset.filter_expr = true;
 }
 std::ostream& operator<<(std::ostream& out, const MatchExpr& obj)
 {
@@ -3999,6 +4074,14 @@ uint32_t MatchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->filter_expr.read(iprot);
+          this->__isset.filter_expr = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -4028,6 +4111,11 @@ uint32_t MatchExpr::write(::apache::thrift::protocol::TProtocol* oprot) const {
   xfer += oprot->writeString(this->options_text);
   xfer += oprot->writeFieldEnd();
 
+  if (this->__isset.filter_expr) {
+    xfer += oprot->writeFieldBegin("filter_expr", ::apache::thrift::protocol::T_STRUCT, 4);
+    xfer += this->filter_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -4038,6 +4126,7 @@ void swap(MatchExpr &a, MatchExpr &b) {
   swap(a.fields, b.fields);
   swap(a.matching_text, b.matching_text);
   swap(a.options_text, b.options_text);
+  swap(a.filter_expr, b.filter_expr);
   swap(a.__isset, b.__isset);
 }
 
@@ -4045,12 +4134,14 @@ MatchExpr::MatchExpr(const MatchExpr& other208) {
   fields = other208.fields;
   matching_text = other208.matching_text;
   options_text = other208.options_text;
+  filter_expr = other208.filter_expr;
   __isset = other208.__isset;
 }
 MatchExpr& MatchExpr::operator=(const MatchExpr& other209) {
   fields = other209.fields;
   matching_text = other209.matching_text;
   options_text = other209.options_text;
+  filter_expr = other209.filter_expr;
   __isset = other209.__isset;
   return *this;
 }
@@ -4060,6 +4151,7 @@ void MatchExpr::printTo(std::ostream& out) const {
   out << "fields=" << to_string(fields);
   out << ", " << "matching_text=" << to_string(matching_text);
   out << ", " << "options_text=" << to_string(options_text);
+  out << ", " << "filter_expr="; (__isset.filter_expr ? (out << to_string(filter_expr)) : (out << "<null>"));
   out << ")";
 }
 
@@ -4128,6 +4220,7 @@ uint32_t GenericMatchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
           if (this->match_vector_expr->__isset.distance_type) { wasSet = true; }
           if (this->match_vector_expr->__isset.topn) { wasSet = true; }
           if (this->match_vector_expr->__isset.opt_params) { wasSet = true; }
+          if (this->match_vector_expr->__isset.filter_expr) { wasSet = true; }
           if (!wasSet) { this->match_vector_expr.reset(); }
           this->__isset.match_vector_expr = true;
         } else {
@@ -4146,6 +4239,7 @@ uint32_t GenericMatchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
           if (this->match_sparse_expr->__isset.metric_type) { wasSet = true; }
           if (this->match_sparse_expr->__isset.topn) { wasSet = true; }
           if (this->match_sparse_expr->__isset.opt_params) { wasSet = true; }
+          if (this->match_sparse_expr->__isset.filter_expr) { wasSet = true; }
           if (!wasSet) { this->match_sparse_expr.reset(); }
           this->__isset.match_sparse_expr = true;
         } else {
@@ -4164,6 +4258,7 @@ uint32_t GenericMatchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
           if (this->match_tensor_expr->__isset.embedding_data_type) { wasSet = true; }
           if (this->match_tensor_expr->__isset.embedding_data) { wasSet = true; }
           if (this->match_tensor_expr->__isset.extra_options) { wasSet = true; }
+          if (this->match_tensor_expr->__isset.filter_expr) { wasSet = true; }
           if (!wasSet) { this->match_tensor_expr.reset(); }
           this->__isset.match_tensor_expr = true;
         } else {
@@ -4180,6 +4275,7 @@ uint32_t GenericMatchExpr::read(::apache::thrift::protocol::TProtocol* iprot) {
           if (this->match_text_expr->__isset.fields) { wasSet = true; }
           if (this->match_text_expr->__isset.matching_text) { wasSet = true; }
           if (this->match_text_expr->__isset.options_text) { wasSet = true; }
+          if (this->match_text_expr->__isset.filter_expr) { wasSet = true; }
           if (!wasSet) { this->match_text_expr.reset(); }
           this->__isset.match_text_expr = true;
         } else {

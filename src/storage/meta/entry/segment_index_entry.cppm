@@ -105,7 +105,7 @@ public:
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
-    void Cleanup(bool dropped = true) final;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) final;
 
     void PickCleanup(CleanupScanner *scanner) final;
 

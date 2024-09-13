@@ -96,7 +96,7 @@ private:
     SharedPtr<String> db_name_{};
 
 public:
-    void Cleanup(bool dropped = true) override;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
 

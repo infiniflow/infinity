@@ -162,9 +162,6 @@ void FileWorker::CleanupFile() const {
     if (fs.Exists(path)) {
         fs.DeleteFile(path);
         LOG_INFO(fmt::format("Cleaned file: {}", path));
-    } else {
-        // Now, we cannot check whether a buffer obj has been flushed to disk.
-        LOG_WARN(fmt::format("Cleanup: File {} not found for deletion", path));
     }
 }
 
