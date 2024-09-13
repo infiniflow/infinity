@@ -355,14 +355,14 @@ inline void SimplifyCompareTypeAndValue(Value &right_val, FilterCompareType &com
 }
 
 Tuple<ColumnID, Value, FilterCompareType>
-FilterExpressionPushDownHelper::UnwindCast(SharedPtr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type) {
+FilterExpressionPushDownHelper::UnwindCast(const SharedPtr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type) {
     SimplifyCompareTypeAndValue(right_val, compare_type);
     if (compare_type == FilterCompareType::kAlwaysFalse or compare_type == FilterCompareType::kAlwaysTrue) {
         return {0, Value::MakeNull(), compare_type};
     }
     // now compare_type is one of {kLessEqual, kGreaterEqual, kEqual}
     if (cast_expr->type() == ExpressionType::kColumn) {
-        auto column_expression = std::static_pointer_cast<ColumnExpression>(cast_expr);
+        auto *column_expression = static_cast<const ColumnExpression *>(cast_expr.get());
         ColumnID column_id = column_expression->binding().column_idx;
         return std::make_tuple(column_id, std::move(right_val), compare_type);
     } else if (cast_expr->type() == ExpressionType::kCast) {
@@ -477,10 +477,10 @@ FilterExpressionPushDownHelper::UnwindCast(SharedPtr<BaseExpression> &cast_expr,
     }
 }
 
-Value FilterExpressionPushDownHelper::CalcValueResult(SharedPtr<BaseExpression> &expression) {
+Value FilterExpressionPushDownHelper::CalcValueResult(const SharedPtr<BaseExpression> &expression) {
     if (expression->type() == ExpressionType::kValue) {
         // does not need ExpressionEvaluator
-        auto value_expression = std::static_pointer_cast<ValueExpression>(expression);
+        auto *value_expression = static_cast<const ValueExpression *>(expression.get());
         return value_expression->GetValue();
     } else {
         auto expression_state = ExpressionState::CreateState(expression);

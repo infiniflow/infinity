@@ -21,9 +21,9 @@ import query_context;
 import base_expression;
 import base_table_ref;
 import index_base;
-import table_index_entry;
-import secondary_index_scan_execute_expression;
 import fast_rough_filter;
+import roaring_bitmap;
+import txn;
 
 namespace infinity {
 
@@ -31,17 +31,34 @@ namespace infinity {
 
 // TODO: now do not support "not" expression in index scan
 
+// 1. secondary index
+// 2. filter_fulltext
+// 3. AND, OR
+export struct IndexFilterEvaluator {
+    enum class Type {
+        kAllTrue,
+        kAllFalse,
+        kSecondaryIndex,
+        kFulltextIndex,
+        kAnd,
+        kOr,
+        kInvalid,
+    };
+
+    Type type() const { return type_; }
+    virtual ~IndexFilterEvaluator() = default;
+    [[nodiscard]] virtual Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count, Txn *txn) const = 0;
+
+protected:
+    Type type_;
+    explicit IndexFilterEvaluator(const Type type) : type_(type) {}
+};
+
 export struct IndexScanFilterExpressionPushDownResult {
-    IndexScanFilterExpressionPushDownResult(HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
-                                            SharedPtr<BaseExpression> &&index_filter_qualified,
-                                            SharedPtr<BaseExpression> &&extra_leftover_filter,
-                                            Vector<FilterExecuteElem> &&filter_execute_command)
-        : column_index_map_(std::move(column_index_map)), index_filter_qualified_(std::move(index_filter_qualified)),
-          extra_leftover_filter_(std::move(extra_leftover_filter)), filter_execute_command_(std::move(filter_execute_command)) {}
-    HashMap<ColumnID, TableIndexEntry *> column_index_map_;
-    SharedPtr<BaseExpression> index_filter_qualified_;
-    SharedPtr<BaseExpression> extra_leftover_filter_;
-    Vector<FilterExecuteElem> filter_execute_command_;
+    SharedPtr<BaseExpression> index_filter_;
+    SharedPtr<BaseExpression> leftover_filter_;
+
+    UniquePtr<IndexFilterEvaluator> index_filter_evaluator_;
 };
 
 export class FilterExpressionPushDown {

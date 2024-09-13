@@ -14,8 +14,9 @@
 
 module;
 
-import stl;
+export module column_index_reader;
 
+import stl;
 import third_party;
 import segment_posting;
 import index_segment_reader;
@@ -25,8 +26,6 @@ import memory_indexer;
 import internal_types;
 import segment_index_entry;
 import chunk_index_entry;
-
-export module column_index_reader;
 
 namespace infinity {
 struct TableEntry;

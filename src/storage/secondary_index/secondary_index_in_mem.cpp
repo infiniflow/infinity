@@ -77,8 +77,7 @@ private:
             if constexpr (std::is_same_v<RawValueType, VarcharT>) {
                 auto column_vector = iter.column_vector();
                 Span<const char> data = column_vector->GetVarcharInner(*v_ptr);
-                String str{data.data(), data.size()};
-                const KeyType key = ConvertToOrderedKeyValue(str);
+                const KeyType key = ConvertToOrderedKeyValue(std::string_view{data.data(), data.size()});
                 in_mem_secondary_index_.emplace(key, offset);
             } else {
                 const KeyType key = ConvertToOrderedKeyValue(*v_ptr);

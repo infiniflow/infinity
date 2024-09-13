@@ -14,23 +14,22 @@
 
 module;
 
-export module filter_expression_push_down_helper;
+export module index_scan_builder;
 
 import stl;
-import base_expression;
-import value;
-import internal_types;
+import logical_node;
+import query_context;
+import optimizer_rule;
 
 namespace infinity {
 
-export enum class FilterCompareType : i8 { kEqual, kLess, kLessEqual, kGreater, kGreaterEqual, kAlwaysFalse, kAlwaysTrue, kInvalid };
-
-export class FilterExpressionPushDownHelper {
+export class IndexScanBuilder final : public OptimizerRule {
 public:
-    static Value CalcValueResult(SharedPtr<BaseExpression> &expression);
+    ~IndexScanBuilder() final = default;
 
-    static Tuple<ColumnID, Value, FilterCompareType>
-    UnwindCast(SharedPtr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type);
+    void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) override;
+
+    String name() const final { return "Build SecondaryIndexScan"; }
 };
 
 } // namespace infinity

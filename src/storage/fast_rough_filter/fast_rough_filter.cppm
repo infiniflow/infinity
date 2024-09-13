@@ -106,8 +106,24 @@ private:
     }
 };
 
+export enum class FastRoughFilterEvaluatorTag : u8 {
+    kAlwaysTrue,
+    kAlwaysFalse,
+    kCombineAnd,
+    kCombineOr,
+    kProbabilisticDataFilter,
+    kMinMaxFilter,
+};
+
 class FastRoughFilterEvaluator {
+    FastRoughFilterEvaluatorTag tag_;
+
+protected:
+    explicit FastRoughFilterEvaluator(const FastRoughFilterEvaluatorTag tag) : tag_(tag) {}
+
 public:
+    auto Tag() const { return tag_; }
+
     virtual ~FastRoughFilterEvaluator() = default;
 
     inline bool Evaluate(TxnTimeStamp query_ts, const FastRoughFilter &filter) const {

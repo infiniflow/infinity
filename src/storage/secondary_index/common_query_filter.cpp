@@ -25,7 +25,6 @@ import block_index;
 import segment_entry;
 import fast_rough_filter;
 import table_index_entry;
-import secondary_index_scan_execute_expression;
 import filter_value_type_classification;
 import physical_index_scan;
 import filter_expression_push_down;
@@ -44,6 +43,7 @@ import expression_state;
 import infinity_exception;
 import third_party;
 import logger;
+import index_defines;
 
 namespace infinity {
 
@@ -96,8 +96,9 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
         total_task_num_ = tasks_.size();
     }
     always_true_ = original_filter_ == nullptr && !base_table_ref_->table_entry_ptr_->CheckAnyDelete(begin_ts_);
-    if (always_true_)
+    if (always_true_) {
         finish_build_.test_and_set(std::memory_order_release);
+    }
 }
 
 void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
@@ -111,7 +112,7 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
         return;
     }
     const SizeT segment_row_count = segment_index.at(segment_id).segment_offset_;
-    Bitmask result_elem = SolveSecondaryIndexFilter(filter_execute_command_, secondary_index_column_index_map_, segment_id, segment_row_count, txn);
+    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, txn);
     if (result_elem.CountTrue() == 0) {
         // empty result
         return;
@@ -122,9 +123,9 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
                                        segment_row_count,
                                        result_elem.count()));
     }
-    if (filter_leftover_) {
+    if (leftover_filter_) {
         SizeT segment_row_count_read = 0;
-        auto filter_state = ExpressionState::CreateState(filter_leftover_);
+        auto filter_state = ExpressionState::CreateState(leftover_filter_);
         auto db_for_filter_p = MakeUnique<DataBlock>();
         auto db_for_filter = db_for_filter_p.get();
         db_for_filter->Init(*(base_table_ref_->column_types_));
@@ -140,7 +141,7 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
             ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
             bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
             expr_evaluator.Init(db_for_filter);
-            expr_evaluator.Execute(filter_leftover_, filter_state, bool_column);
+            expr_evaluator.Execute(leftover_filter_, filter_state, bool_column);
             const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
             SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
             MergeFalseIntoBitmask(bool_column_buffer, null_mask, row_count, result_elem, segment_row_count_read);
@@ -172,24 +173,16 @@ void CommonQueryFilter::TryApplyFastRoughFilterOptimizer() {
     fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(original_filter_);
 }
 
-void CommonQueryFilter::TryApplySecondaryIndexFilterOptimizer(QueryContext *query_context) {
-    if (finish_build_secondary_index_filter_) {
+void CommonQueryFilter::TryApplyIndexFilterOptimizer(QueryContext *query_context) {
+    if (finish_build_index_filter_) {
         return;
     }
-    finish_build_secondary_index_filter_ = true;
-    if (!original_filter_) {
-        return;
-    }
+    finish_build_index_filter_ = true;
     IndexScanFilterExpressionPushDownResult index_scan_solve_result =
         FilterExpressionPushDown::PushDownToIndexScan(query_context, *base_table_ref_, original_filter_);
-    auto &column_index_map = index_scan_solve_result.column_index_map_;
-    auto &v_qualified = index_scan_solve_result.index_filter_qualified_;
-    auto &s_leftover = index_scan_solve_result.extra_leftover_filter_;
-    auto &filter_execute_command = index_scan_solve_result.filter_execute_command_;
-    filter_leftover_ = std::move(s_leftover);
-    secondary_index_filter_qualified_ = std::move(v_qualified);
-    secondary_index_column_index_map_ = std::move(column_index_map);
-    filter_execute_command_ = std::move(filter_execute_command);
+    index_filter_ = std::move(index_scan_solve_result.index_filter_);
+    leftover_filter_ = std::move(index_scan_solve_result.leftover_filter_);
+    index_filter_evaluator_ = std::move(index_scan_solve_result.index_filter_evaluator_);
 }
 
 bool CommonQueryFilter::PassFilter(RowID doc_id) {
@@ -197,8 +190,9 @@ bool CommonQueryFilter::PassFilter(RowID doc_id) {
         return true;
     bool finish_build = finish_build_.test();
     assert(finish_build);
-    if (!finish_build)
-        return false;
+    if (!finish_build) {
+        UnrecoverableError("CommonQueryFilter error: not finished.");
+    }
     if (doc_id.segment_id_ != current_segment_id_) [[unlikely]] {
         const auto it = filter_result_.find(doc_id.segment_id_);
         if (it == filter_result_.end()) [[unlikely]] {
@@ -209,6 +203,38 @@ bool CommonQueryFilter::PassFilter(RowID doc_id) {
         doc_id_bitmask_ = &(it->second);
     }
     return doc_id_bitmask_->IsTrue(doc_id.segment_offset_);
+}
+
+RowID CommonQueryFilter::EqualOrLarger(RowID doc_id) {
+    if (always_true_) [[unlikely]]
+        return doc_id;
+    bool finish_build = finish_build_.test();
+    assert(finish_build);
+    if (!finish_build) {
+        UnrecoverableError("CommonQueryFilter error: not finished.");
+    }
+    while (true) {
+        if (doc_id.segment_id_ != current_segment_id_) [[unlikely]] {
+            const auto it = filter_result_.lower_bound(doc_id.segment_id_);
+            if (it == filter_result_.end()) [[unlikely]] {
+                current_segment_id_ = INVALID_SEGMENT_ID;
+                return INVALID_ROWID;
+            }
+            if (it->first != doc_id.segment_id_) [[unlikely]] {
+                doc_id.segment_id_ = it->first;
+                doc_id.segment_offset_ = 0;
+            }
+            current_segment_id_ = doc_id.segment_id_;
+            doc_id_bitmask_ = &(it->second);
+            current_roaring_iterator_ = MakeUnique<RoaringForwardIterator>(doc_id_bitmask_->Begin());
+        }
+        current_roaring_iterator_->equalorlarger(doc_id.segment_offset_);
+        if (*current_roaring_iterator_ != doc_id_bitmask_->End()) [[likely]] {
+            return RowID(doc_id.segment_id_, **current_roaring_iterator_);
+        }
+        ++doc_id.segment_id_;
+        doc_id.segment_offset_ = 0;
+    }
 }
 
 } // namespace infinity
