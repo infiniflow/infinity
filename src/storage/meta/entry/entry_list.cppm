@@ -110,7 +110,7 @@ public:
 
     bool PickCleanup(CleanupScanner *scanner);
 
-    void Cleanup();
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr);
 
     void Iterate(std::function<void(Entry *)> func, TxnTimeStamp visible_ts);
 
@@ -574,10 +574,10 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
 
 // TODO: check if this need to lock
 template <EntryConcept Entry>
-void EntryList<Entry>::Cleanup() {
+void EntryList<Entry>::Cleanup(CleanupInfoTracer *info_tracer) {
     for (auto iter = entry_list_.begin(); iter != entry_list_.end(); ++iter) {
         SharedPtr<Entry> &entry = *iter;
-        entry->Cleanup();
+        entry->Cleanup(info_tracer);
     }
 }
 

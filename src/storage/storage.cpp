@@ -47,6 +47,7 @@ import log_file;
 import query_context;
 import infinity_context;
 import memindex_tracer;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -63,6 +64,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
         LOG_WARN(fmt::format("Set unchanged mode"));
         return;
     }
+    cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
     switch (current_mode) {
         case StorageMode::kUnInitialized: {
             if (target_mode != StorageMode::kAdmin) {

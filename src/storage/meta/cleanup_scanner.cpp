@@ -30,6 +30,15 @@ import infinity_context;
 
 namespace infinity {
 
+String CleanupInfoTracer::GetCleanupInfo() const {
+    String info;
+    info += fmt::format("Cleanup ts: {}\n", cleanup_ts_);
+    for (const auto &path : cleanup_info_) {
+        info += fmt::format("Cleanup: {}\n", path);
+    }
+    return info;
+}
+
 CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr)
     : catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
@@ -40,9 +49,9 @@ void CleanupScanner::Scan() {
     catalog_->PickCleanup(this);
 }
 
-void CleanupScanner::Cleanup() && {
+void CleanupScanner::Cleanup(CleanupInfoTracer *info_tracer) && {
     for (auto &entry : entries_) {
-        std::move(*entry).Cleanup();
+        std::move(*entry).Cleanup(info_tracer);
     }
     buffer_mgr_->RemoveClean();
 }

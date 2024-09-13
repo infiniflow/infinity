@@ -372,13 +372,13 @@ Status TableIndexEntry::CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID
     return Status::OK();
 }
 
-void TableIndexEntry::Cleanup() {
+void TableIndexEntry::Cleanup(CleanupInfoTracer *info_tracer) {
     if (this->deleted_) {
         return;
     }
     std::unique_lock w_lock(rw_locker_);
     for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
-        segment_index_entry->Cleanup();
+        segment_index_entry->Cleanup(info_tracer);
     }
 
     LOG_DEBUG(fmt::format("Cleaning up dir: {}", *index_dir_));
@@ -390,6 +390,9 @@ void TableIndexEntry::Cleanup() {
     }
     fs.DeleteDirectory(absolute_index_dir);
     LOG_DEBUG(fmt::format("Cleaned dir: {}", absolute_index_dir));
+    if (info_tracer != nullptr) {
+        info_tracer->AddCleanupInfo(std::move(absolute_index_dir));
+    }
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {

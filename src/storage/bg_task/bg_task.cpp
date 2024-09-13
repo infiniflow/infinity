@@ -18,8 +18,21 @@ module bg_task;
 
 import base_memindex;
 import chunk_index_entry;
+import cleanup_scanner;
+import infinity_context;
+import storage;
 
 namespace infinity {
+
+void CleanupTask::Execute() {
+    auto *storage = InfinityContext::instance().storage();
+    CleanupScanner scanner(catalog_, visible_ts_, buffer_mgr_);
+    scanner.Scan();
+
+    auto *tracer = storage->cleanup_info_tracer();
+    tracer->ResetInfo(visible_ts_);
+    std::move(scanner).Cleanup(tracer);
+}
 
 DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, Txn *txn) : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), txn_(txn) {}
 
