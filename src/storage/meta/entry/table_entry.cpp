@@ -927,11 +927,14 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     u32 total_row_count = 0;
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
-                        if (!chunk_index_entry->TrySetOptimizing()) {
-                            chunk_index_entries.erase(chunk_index_entries.begin() + i);
-                        }
-                        assert(chunk_index_entry->base_rowid_ == chunk_index_entries[0]->base_rowid_ + total_row_count);
                         msg += " " + chunk_index_entry->base_name_;
+                        if (chunk_index_entry->base_rowid_ != chunk_index_entries[0]->base_rowid_ + total_row_count) {
+                            String error_msg = fmt::format("{}... chunk_index_entry {} base_rowid expects to be {:016x}",
+                                                           msg,
+                                                           chunk_index_entry->base_name_,
+                                                           (chunk_index_entries[0]->base_rowid_ + total_row_count).ToUint64());
+                            UnrecoverableError(error_msg);
+                        }
                         base_names.push_back(chunk_index_entry->base_name_);
                         base_rowids.push_back(chunk_index_entry->base_rowid_);
                         total_row_count += chunk_index_entry->row_count_;
@@ -957,6 +960,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
                     table_index_entry->UpdateFulltextSegmentTs(ts);
+                    LOG_INFO(fmt::format("done merging {} {}", index_name, dst_base_name));
                 }
                 break;
             }
