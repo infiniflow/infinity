@@ -44,11 +44,11 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 
     if(use_persistence_manager && !to_spill) {
         String write_dir = *file_dir_;
-        StringTransform(write_dir, "/", "_");
-        String write_path = fmt::format("{}/{}_{}", *temp_dir_, write_dir, *file_name_);
+        String write_path = fmt::format("{}/{}", write_dir, *file_name_);
+        String tmp_write_path = Path(*temp_dir_) / StringTransform(write_path, "/", "_");
 
         u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        auto [file_handler, status] = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
+        auto [file_handler, status] = fs.OpenFile(tmp_write_path, flags, FileLockType::kWriteLock);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -66,8 +66,8 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         }
 
         fs.SyncFile(*file_handler_);
-        obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(write_path);
-        fs.DeleteFile(write_path);
+        obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(write_path, tmp_write_path);
+        fs.DeleteFile(tmp_write_path);
         return all_save;
     } else {
         String write_dir = ChooseFileDir(to_spill);
@@ -112,12 +112,12 @@ void FileWorker::ReadFromFile(bool from_spill) {
     bool use_object_cache = !from_spill && pm != nullptr;
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
-        obj_addr_ = pm->GetObjFromLocalPath(read_path);
+        obj_addr_ = pm->GetObjCache(read_path);
         if (!obj_addr_.Valid()) {
             String error_message = fmt::format("Failed to find object for local path {}", read_path);
             UnrecoverableError(error_message);
         }
-        read_path = pm->GetObjCache(read_path);
+        read_path = pm->GetObjPath(obj_addr_.obj_key_);
     }
     SizeT file_size = 0;
     u8 flags = FileFlags::READ_FLAG;
@@ -149,20 +149,20 @@ void FileWorker::MoveFile() {
     String src_path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
     String dest_dir = ChooseFileDir(false);
     String dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
-    if (!fs.Exists(src_path)) {
-        Status status = Status::FileNotFound(src_path);
-        RecoverableError(status);
-    }
-    if (!fs.Exists(dest_dir)) {
-        fs.CreateDirectory(dest_dir);
-    }
-    // if (fs.Exists(dest_path)) {
-    //     UnrecoverableError(fmt::format("File {} was already been created before.", dest_path));
-    // }
-    fs.Rename(src_path, dest_path);
-    if (InfinityContext::instance().persistence_manager() != nullptr) {
-        obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(dest_path);
-        fs.DeleteFile(dest_path);
+    if (InfinityContext::instance().persistence_manager() == nullptr) {
+        if (!fs.Exists(src_path)) {
+            Status status = Status::FileNotFound(src_path);
+            RecoverableError(status);
+        }
+        if (!fs.Exists(dest_dir)) {
+            fs.CreateDirectory(dest_dir);
+        }
+        // if (fs.Exists(dest_path)) {
+        //     UnrecoverableError(fmt::format("File {} was already been created before.", dest_path));
+        // }
+        fs.Rename(src_path, dest_path);
+    } else {
+        obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(dest_path, src_path);
     }
 }
 

@@ -33,8 +33,8 @@ ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &
     if (use_object_cache) {
         dict_file_path_ = dict_file;
         posting_file_path_ = posting_file;
-        dict_file = pm->GetObjCache(dict_file);
-        posting_file = pm->GetObjCache(posting_file);
+        dict_file = pm->GetObjPath(pm->GetObjCache(dict_file).obj_key_);
+        posting_file = pm->GetObjPath(pm->GetObjCache(posting_file).obj_key_);
     }
 
     dict_reader_ = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag));

@@ -49,7 +49,7 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
     posting_file_.append(POSTING_SUFFIX);
     String posting_file = posting_file_;
     if (nullptr != pm) {
-        posting_file_obj_ = pm->GetObjCache(posting_file);
+        posting_file_obj_ = pm->GetObjPath(pm->GetObjCache(posting_file).obj_key_);
         posting_file = posting_file_obj_;
     }
     if (posting_file.empty() || std::filesystem::file_size(posting_file) == 0) {
@@ -67,7 +67,7 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
     dict_file_.append(DICT_SUFFIX);
     String dict_file = dict_file_;
     if (nullptr != pm) {
-        dict_file = pm->GetObjCache(dict_file);
+        dict_file = pm->GetObjPath(pm->GetObjCache(dict_file).obj_key_);
     }
     dict_reader_ = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag));
 }

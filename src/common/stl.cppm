@@ -245,6 +245,7 @@ export namespace std {
     using std::filesystem::read_symlink;
     using std::filesystem::remove;
     using std::filesystem::remove_all;
+    using std::filesystem::rename;
 
     using std::filesystem::is_directory;
     using std::filesystem::is_regular_file;
