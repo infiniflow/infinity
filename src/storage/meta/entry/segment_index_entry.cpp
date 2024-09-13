@@ -879,16 +879,20 @@ bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
-void SegmentIndexEntry::Cleanup() {
+void SegmentIndexEntry::Cleanup(CleanupInfoTracer *info_tracer) {
     for (auto &buffer_ptr : vector_buffer_) {
         if (buffer_ptr.get() == nullptr) {
             String error_message = "vector_buffer should not has nullptr.";
             UnrecoverableError(error_message);
         }
         buffer_ptr.get()->PickForCleanup();
+        if (info_tracer != nullptr) {
+            String file_path = buffer_ptr.get()->GetFilename();
+            info_tracer->AddCleanupInfo(std::move(file_path));
+        }
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
-        chunk_index_entry->Cleanup();
+        chunk_index_entry->Cleanup(info_tracer);
     }
 }
 

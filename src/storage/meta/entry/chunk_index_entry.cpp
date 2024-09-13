@@ -353,31 +353,33 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
     return ret;
 }
 
-void ChunkIndexEntry::Cleanup() {
+void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer) {
     if (buffer_obj_.get() != nullptr) {
         buffer_obj_.get()->PickForCleanup();
+        if (info_tracer) {
+            info_tracer->AddCleanupInfo(buffer_obj_.get()->GetFilename());
+        }
     }
     for (auto &part_buffer_obj : part_buffer_objs_) {
         part_buffer_obj.get()->PickForCleanup();
+        if (info_tracer) {
+            info_tracer->AddCleanupInfo(part_buffer_obj.get()->GetFilename());
+        }
     }
     TableIndexEntry *table_index_entry = segment_index_entry_->table_index_entry();
     const auto &index_dir = segment_index_entry_->index_dir();
     const IndexBase *index_base = table_index_entry->index_base();
     if (index_base->index_type_ == IndexType::kFullText) {
         PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        Path path = Path(*index_dir) / base_name_;
+        String index_prefix = path.string();
+        String posting_file = index_prefix + POSTING_SUFFIX;
+        String dict_file = index_prefix + DICT_SUFFIX;
         if (pm != nullptr) {
-            Path path = Path(*index_dir) / base_name_;
-            String index_prefix = path.string();
-            String posting_file = index_prefix + POSTING_SUFFIX;
-            String dict_file = index_prefix + DICT_SUFFIX;
             pm->Cleanup(posting_file);
             pm->Cleanup(dict_file);
             LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}", index_prefix, posting_file, dict_file));
         } else {
-            Path path = Path(*index_dir) / base_name_;
-            String index_prefix = path.string();
-            String posting_file = index_prefix + POSTING_SUFFIX;
-            String dict_file = index_prefix + DICT_SUFFIX;
             String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
             String absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
 
@@ -388,6 +390,10 @@ void ChunkIndexEntry::Cleanup() {
                                   index_prefix,
                                   absolute_posting_file,
                                   absolute_dict_file));
+        }
+        if (info_tracer) {
+            info_tracer->AddCleanupInfo(std::move(posting_file));
+            info_tracer->AddCleanupInfo(std::move(dict_file));
         }
     } else {
         LOG_DEBUG(fmt::format("Cleaned chunk index entry {}/{}", *index_dir, chunk_id_));

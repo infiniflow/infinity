@@ -35,6 +35,7 @@ namespace infinity {
 struct BlockEntry;
 struct TableEntry;
 struct SegmentEntry;
+class CleanupInfoTracer;
 
 export struct BlockColumnEntry : public BaseEntry {
 public:
@@ -119,7 +120,7 @@ public:
 
     static void Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count);
 
-    void Cleanup();
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr);
 
     void DropColumn();
 

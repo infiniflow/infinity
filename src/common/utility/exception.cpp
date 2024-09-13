@@ -22,6 +22,8 @@ module infinity_exception;
 import stl;
 import logger;
 import third_party;
+import infinity_context;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -55,6 +57,10 @@ std::string_view GetErrorMsg(const String &message) {
 }
 
 void UnrecoverableError(const String &message, const char *file_name, u32 line) {
+    CleanupInfoTracer *cleanup_tracer = InfinityContext::instance().storage()->cleanup_info_tracer();
+    String error_msg = cleanup_tracer->GetCleanupInfo();
+    LOG_ERROR(std::move(error_msg));
+
     PrintStacktrace(message);
     throw UnrecoverableException(fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line));
 }

@@ -37,6 +37,8 @@ export enum class StorageMode {
     kWritable,
 };
 
+class CleanupInfoTracer;
+
 export class Storage {
 public:
     explicit Storage(Config *config_ptr);
@@ -56,6 +58,8 @@ public:
     [[nodiscard]] inline PeriodicTriggerThread *periodic_trigger_thread() const noexcept { return periodic_trigger_thread_.get(); }
 
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
+
+    [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
 
 
     StorageMode GetStorageMode() const;
@@ -77,6 +81,7 @@ private:
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
+    UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
 
     mutable std::mutex mutex_;
     StorageMode current_storage_mode_{StorageMode::kUnInitialized};

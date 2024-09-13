@@ -145,7 +145,7 @@ private: // TODO: remote it
 public:
     void PickCleanup(CleanupScanner *scanner) override;
 
-    void Cleanup() override;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr) override;
 
     void MemIndexCommit();
     void MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts);
