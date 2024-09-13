@@ -4,7 +4,7 @@ magic_enum v0.8.1
 spdlog v1.10.0
 simdjson v3.1.8
 tlx v0.6.1
-nlohmann 3.11.2
+nlohmann b36f4c477c40356a0ae1204b567cca3c2a57d201
 zsv commit-id:5c22aae4363fdcd433079d2a9b48007a7c6fbbdf
 mlas onnxruntime:2c53b4a534a9b64466e435d384c91f0b684ea58a
 cppjieba v5.1.0
@@ -16,3 +16,4 @@ PGM-index commit-id: f578e68414c60f9869c5611575143645f75e0ce1
 eigen v3.4.0
 snappy v1.1.10
 croaring 4.1.2
+minio 40824d0872861b06965a032a714a8f4f9097fb32
