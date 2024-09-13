@@ -49,7 +49,9 @@ public:
     }
 
     inline bool Exist(const Value &val) const { return set_.contains(val); }
+    inline DataType Type() const { return data_type_; }
 
+    // constructor will throw when illegal type is passed
     ValueSet(LogicalType logical_type) : data_type_(logical_type) {
         switch (logical_type) {
             case LogicalType::kBoolean:
@@ -139,9 +141,11 @@ public:
 
     inline InType in_type() const { return in_type_; }
 
-    inline void TryPut(Value&& val) { set_.TryPut(std::move(val)); }
+    inline void TryPut(Value &&val) { set_.TryPut(std::move(val)); }
 
-    inline bool exists(const Value& val) const { return set_.Exist(val); }
+    inline bool Exists(const Value &val) const { return set_.Exist(val); }
+
+    inline DataType TypeOfArguments() const { return set_.Type(); }
 
 private:
     SharedPtr<BaseExpression> left_operand_ptr_;

@@ -193,7 +193,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
     output_column_vector = input_data_block_->column_vectors[column_index];
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
+void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector) {
     Status status = Status::NotSupport("IN execution isn't implemented yet.");
     RecoverableError(status);
 }

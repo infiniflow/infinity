@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "expr/parsed_expr.h"
 module;
 
 #include <string>
@@ -57,6 +56,8 @@ import function_set;
 import scalar_function_set;
 import scalar_function;
 import special_function;
+import cast_function;
+import bound_cast_func;
 import status;
 
 import query_context;
@@ -82,6 +83,7 @@ import data_type;
 import expression_type;
 import catalog;
 import table_entry;
+import column_vector;
 
 namespace infinity {
 
@@ -543,11 +545,21 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(argument_count);
 
+    //in operator, all data type shouhld be the same
+    SharedPtr<DataType> arguments_type = nullptr;
+
     for (SizeT idx = 0; idx < argument_count; ++idx) {
-        auto bound_argument_expr = BuildExpression(*expr.arguments_->at(idx), bind_context_ptr, depth, false);
-        if (bound_argument_expr->type() != ParsedExprType::kConstant) {
-            UnrecoverableError(std::fmt("In expressions now only supports constant list!"));
+        if (expr.type_ != ParsedExprType::kConstant) {
+            UnrecoverableError(std::format("In expression now only supports constant list!"));
         }
+        auto bound_argument_expr = BuildExpression(*expr.arguments_->at(idx), bind_context_ptr, depth, false);
+
+        if(arguments_type != nullptr && bound_argument_expr->Type() != *arguments_type) { 
+            UnrecoverableError(std::format("Expressions in In expression should be of the same data type!"));
+        } else if(arguments_type == nullptr){
+            arguments_type = MakeShared<DataType>(bound_argument_expr->Type());
+        }
+
         arguments.emplace_back(bound_argument_expr);
     }
 
@@ -560,9 +572,37 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
 
     SharedPtr<InExpression> in_expression_ptr = MakeShared<InExpression>(in_type, bound_left_expr, arguments);
 
-    for (SizeT idx = 0; idx < argument_count; ++idx) {
-        //try cast if argument's datatype and set's datatype don't match
-    }
+    //if match
+    if(*arguments_type == bound_left_expr->Type()) {
+        for(SizeT idx = 0; idx < argument_count; idx++) {
+            ValueExpression* val_expr = static_cast<ValueExpression *>(arguments[idx].get());
+            Value val = val_expr->GetValue();
+            in_expression_ptr->TryPut(std::move(val));
+        }
+    } else if(CastExpression::CanCast(*arguments_type, bound_left_expr->Type())) {
+        //cast
+        BoundCastFunc cast = CastFunction::GetBoundFunc(bound_left_expr->Type(), *arguments_type);
+
+        SharedPtr<ColumnVector> argument_column_vector = MakeShared<ColumnVector>(arguments_type);
+        argument_column_vector->Initialize(ColumnVectorType::kFlat, argument_count);
+
+        for(SizeT idx = 0; idx < argument_count; idx++) {
+            ValueExpression* val_expr = static_cast<ValueExpression *>(arguments[idx].get());
+            argument_column_vector->AppendValue(val_expr->GetValue());
+        }
+
+        SharedPtr<ColumnVector> cast_column_vector = MakeShared<ColumnVector>(MakeShared<DataType>(in_expression_ptr->Type()));
+        cast_column_vector->Initialize(ColumnVectorType::kFlat, argument_count);
+        CastParameters cast_parameters;
+        cast.function(argument_column_vector, cast_column_vector, argument_count, cast_parameters);
+
+        for(SizeT idx = 0; idx < argument_count; idx++) {
+            in_expression_ptr->TryPut(cast_column_vector->GetValue(idx));
+        }
+    } else { 
+        Status status = Status::NotSupportedTypeConversion(arguments_type->ToString(), bound_left_expr->Type().ToString());
+        UnrecoverableError(fmt::format("Can't cast from {} to {}", arguments_type->ToString(), bound_left_expr->Type().ToString()));
+    } 
 
     return in_expression_ptr;
 }
