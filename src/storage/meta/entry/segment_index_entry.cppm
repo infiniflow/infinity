@@ -79,7 +79,7 @@ public:
 
     void UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> new_entry);
 
-    static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id);
+    static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(BufferManager* buffer_mgr, SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id);
 
     static String IndexFileName(SegmentID segment_id);
 

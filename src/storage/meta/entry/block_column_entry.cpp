@@ -90,13 +90,14 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
         total_data_size = (row_capacity + 7) / 8;
     }
 
+    auto *buffer_mgr = txn->buffer_mgr();
     auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                   block_entry->block_dir(),
                                                   block_column_entry->file_name_,
-                                                  total_data_size);
+                                                  total_data_size,
+                                                  buffer_mgr->persistence_manager());
 
-    auto *buffer_mgr = txn->buffer_mgr();
     block_column_entry->buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
 
     return block_column_entry;
@@ -122,7 +123,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                   block_entry->block_dir(),
                                                   column_entry->file_name_,
-                                                  total_data_size);
+                                                  total_data_size,
+                                                  buffer_manager->persistence_manager());
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker), true /*restart*/);
 
@@ -132,7 +134,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                                     MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                     block_entry->block_dir(),
                                                                     column_entry->OutlineFilename(0),
-                                                                    buffer_size);
+                                                                    buffer_size,
+                                                                    buffer_manager->persistence_manager());
         auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker), true /*restart*/);
         column_entry->outline_buffers_.push_back(buffer_obj);
     }
@@ -158,7 +161,8 @@ ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, c
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                       block_entry_->block_dir(),
                                                       this->file_name_,
-                                                      0);
+                                                      0,
+                                                      buffer_mgr->persistence_manager());
         this->buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
 
