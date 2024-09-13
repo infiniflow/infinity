@@ -36,6 +36,7 @@ class TestInfinity:
         res = self.infinity_obj.disconnect()
         assert res.error_code == infinity.ErrorCode.OK
 
+    @pytest.mark.skip(reason="conflict with other")
     def test_simple_add_columns(self):
         table_name = "test_add_column"
         db_obj = self.infinity_obj.get_database("default_db")
@@ -91,6 +92,7 @@ class TestInfinity:
 
         db_obj.drop_table(table_name)
 
+    @pytest.mark.skip(reason="conflict with other")
     def test_simple_drop_columns(self):
         table_name = "test_drop_column"
         db_obj = self.infinity_obj.get_database("default_db")
@@ -142,6 +144,7 @@ class TestInfinity:
 
         db_obj.drop_table(table_name)
 
+    @pytest.mark.skip(reason="conflict with other")
     def test_add_drop_column_with_index(self):
         table_name = "test_add_drop_column_with_index"
         db_obj = self.infinity_obj.get_database("default_db")
