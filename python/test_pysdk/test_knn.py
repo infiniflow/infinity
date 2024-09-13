@@ -12,6 +12,8 @@ from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException, SparseVector
 from common.utils import copy_data, generate_commas_enwiki
 import pandas as pd
+from polars.testing import assert_frame_equal as pl_assert_frame_equal
+from polars.testing import assert_frame_not_equal as pl_assert_frame_not_equal
 from numpy import dtype
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -741,6 +743,32 @@ class TestInfinity:
                .fusion(method='rrf', topn=10)
                .to_pl())
         print(res)
+        res_filter_1 = (table_obj
+               .output(["*"])
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match_text(match_param_1, "black", 1)
+               .fusion(method='rrf', topn=10)
+               .filter("num!=98 AND num != 12")
+               .to_pl())
+        print(res_filter_1)
+        pl_assert_frame_not_equal(res, res_filter_1)
+        res_filter_2 = (table_obj
+               .output(["*"])
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1, {"filter": "num!=98 AND num != 12"})
+               .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12"})
+               .fusion(method='rrf', topn=10)
+               .to_pl())
+        print(res_filter_2)
+        pl_assert_frame_equal(res_filter_1, res_filter_2)
+        with pytest.raises(InfinityException) as e_info:
+            res_filter_3 = (table_obj
+               .output(["*"])
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1, {"filter": "num!=98 AND num != 12"})
+               .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12"})
+               .fusion(method='rrf', topn=10)
+               .filter("num!=98 AND num != 12")
+               .to_pl())
+        print(e_info)
 
         res = table_obj.drop_index("my_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK

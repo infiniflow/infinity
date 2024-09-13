@@ -1894,12 +1894,13 @@ class KnnExpr(object):
      - distance_type
      - topn
      - opt_params
+     - filter_expr
 
     """
 
 
     def __init__(self, column_expr=None, embedding_data=None, embedding_data_type=None, distance_type=None, topn=None, opt_params=[
-    ],):
+    ], filter_expr=None,):
         self.column_expr = column_expr
         self.embedding_data = embedding_data
         self.embedding_data_type = embedding_data_type
@@ -1909,6 +1910,7 @@ class KnnExpr(object):
             opt_params = [
             ]
         self.opt_params = opt_params
+        self.filter_expr = filter_expr
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1957,6 +1959,12 @@ class KnnExpr(object):
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
+            elif fid == 7:
+                if ftype == TType.STRUCT:
+                    self.filter_expr = ParsedExpr()
+                    self.filter_expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -1994,6 +2002,10 @@ class KnnExpr(object):
                 iter181.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
+        if self.filter_expr is not None:
+            oprot.writeFieldBegin('filter_expr', TType.STRUCT, 7)
+            self.filter_expr.write(oprot)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -2020,12 +2032,13 @@ class MatchSparseExpr(object):
      - metric_type
      - topn
      - opt_params
+     - filter_expr
 
     """
 
 
     def __init__(self, column_expr=None, query_sparse_expr=None, metric_type=None, topn=None, opt_params=[
-    ],):
+    ], filter_expr=None,):
         self.column_expr = column_expr
         self.query_sparse_expr = query_sparse_expr
         self.metric_type = metric_type
@@ -2034,6 +2047,7 @@ class MatchSparseExpr(object):
             opt_params = [
             ]
         self.opt_params = opt_params
+        self.filter_expr = filter_expr
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -2077,6 +2091,12 @@ class MatchSparseExpr(object):
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
+            elif fid == 6:
+                if ftype == TType.STRUCT:
+                    self.filter_expr = ParsedExpr()
+                    self.filter_expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -2110,6 +2130,10 @@ class MatchSparseExpr(object):
                 iter188.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
+        if self.filter_expr is not None:
+            oprot.writeFieldBegin('filter_expr', TType.STRUCT, 6)
+            self.filter_expr.write(oprot)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -2136,16 +2160,18 @@ class MatchTensorExpr(object):
      - embedding_data_type
      - embedding_data
      - extra_options
+     - filter_expr
 
     """
 
 
-    def __init__(self, search_method=None, column_expr=None, embedding_data_type=None, embedding_data=None, extra_options=None,):
+    def __init__(self, search_method=None, column_expr=None, embedding_data_type=None, embedding_data=None, extra_options=None, filter_expr=None,):
         self.search_method = search_method
         self.column_expr = column_expr
         self.embedding_data_type = embedding_data_type
         self.embedding_data = embedding_data
         self.extra_options = extra_options
+        self.filter_expr = filter_expr
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -2183,6 +2209,12 @@ class MatchTensorExpr(object):
                     self.extra_options = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
+            elif fid == 6:
+                if ftype == TType.STRUCT:
+                    self.filter_expr = ParsedExpr()
+                    self.filter_expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -2213,6 +2245,10 @@ class MatchTensorExpr(object):
             oprot.writeFieldBegin('extra_options', TType.STRING, 5)
             oprot.writeString(self.extra_options.encode('utf-8') if sys.version_info[0] == 2 else self.extra_options)
             oprot.writeFieldEnd()
+        if self.filter_expr is not None:
+            oprot.writeFieldBegin('filter_expr', TType.STRUCT, 6)
+            self.filter_expr.write(oprot)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -2237,14 +2273,16 @@ class MatchExpr(object):
      - fields
      - matching_text
      - options_text
+     - filter_expr
 
     """
 
 
-    def __init__(self, fields=None, matching_text=None, options_text=None,):
+    def __init__(self, fields=None, matching_text=None, options_text=None, filter_expr=None,):
         self.fields = fields
         self.matching_text = matching_text
         self.options_text = options_text
+        self.filter_expr = filter_expr
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -2270,6 +2308,12 @@ class MatchExpr(object):
                     self.options_text = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRUCT:
+                    self.filter_expr = ParsedExpr()
+                    self.filter_expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -2291,6 +2335,10 @@ class MatchExpr(object):
         if self.options_text is not None:
             oprot.writeFieldBegin('options_text', TType.STRING, 3)
             oprot.writeString(self.options_text.encode('utf-8') if sys.version_info[0] == 2 else self.options_text)
+            oprot.writeFieldEnd()
+        if self.filter_expr is not None:
+            oprot.writeFieldBegin('filter_expr', TType.STRUCT, 4)
+            self.filter_expr.write(oprot)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -8043,6 +8091,7 @@ KnnExpr.thrift_spec = (
     (5, TType.I64, 'topn', None, None, ),  # 5
     (6, TType.LIST, 'opt_params', (TType.STRUCT, [InitParameter, None], False), [
     ], ),  # 6
+    (7, TType.STRUCT, 'filter_expr', [ParsedExpr, None], None, ),  # 7
 )
 all_structs.append(MatchSparseExpr)
 MatchSparseExpr.thrift_spec = (
@@ -8053,6 +8102,7 @@ MatchSparseExpr.thrift_spec = (
     (4, TType.I64, 'topn', None, None, ),  # 4
     (5, TType.LIST, 'opt_params', (TType.STRUCT, [InitParameter, None], False), [
     ], ),  # 5
+    (6, TType.STRUCT, 'filter_expr', [ParsedExpr, None], None, ),  # 6
 )
 all_structs.append(MatchTensorExpr)
 MatchTensorExpr.thrift_spec = (
@@ -8062,6 +8112,7 @@ MatchTensorExpr.thrift_spec = (
     (3, TType.I32, 'embedding_data_type', None, None, ),  # 3
     (4, TType.STRUCT, 'embedding_data', [EmbeddingData, None], None, ),  # 4
     (5, TType.STRING, 'extra_options', 'UTF8', None, ),  # 5
+    (6, TType.STRUCT, 'filter_expr', [ParsedExpr, None], None, ),  # 6
 )
 all_structs.append(MatchExpr)
 MatchExpr.thrift_spec = (
@@ -8069,6 +8120,7 @@ MatchExpr.thrift_spec = (
     (1, TType.STRING, 'fields', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'matching_text', 'UTF8', None, ),  # 2
     (3, TType.STRING, 'options_text', 'UTF8', None, ),  # 3
+    (4, TType.STRUCT, 'filter_expr', [ParsedExpr, None], None, ),  # 4
 )
 all_structs.append(GenericMatchExpr)
 GenericMatchExpr.thrift_spec = (

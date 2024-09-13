@@ -144,6 +144,7 @@ void VisitExpression(const SharedPtr<BaseExpression> &expression, const std::fun
             break;
         case ExpressionType::kColumn:
         case ExpressionType::kValue:
+        case ExpressionType::kFilterFullText:
             break;
         default: {
             String error_message = fmt::format("Unsupported expression type: {}", expression->Name());

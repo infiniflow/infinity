@@ -26,6 +26,7 @@ import function_expression;
 import reference_expression;
 import value_expression;
 import in_expression;
+import filter_fulltext_expression;
 import data_block;
 import column_vector;
 import expression_state;
@@ -59,6 +60,8 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
             return Execute(std::static_pointer_cast<ReferenceExpression>(expr), state, output_column);
         case ExpressionType::kIn:
             return Execute(std::static_pointer_cast<InExpression>(expr), state, output_column);
+        case ExpressionType::kFilterFullText:
+            return Execute(std::static_pointer_cast<FilterFulltextExpression>(expr), state, output_column);
         default: {
             String error_message = fmt::format("Unknown expression type: {}", expr->Name());
             UnrecoverableError(error_message);
@@ -193,6 +196,15 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
 void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
     Status status = Status::NotSupport("IN execution isn't implemented yet.");
     RecoverableError(status);
+}
+
+void ExpressionEvaluator::Execute(const SharedPtr<FilterFulltextExpression> &expr,
+                                  SharedPtr<ExpressionState> &,
+                                  SharedPtr<ColumnVector> &output_column_vector) {
+    LOG_ERROR("FilterFulltextExpression is not implemented yet. Now output all true.");
+    auto write_ptr = reinterpret_cast<u8 *>(output_column_vector->buffer_->GetDataMut());
+    std::fill_n(write_ptr, 8192 / 8, static_cast<u8>(-1));
+    output_column_vector->Finalize(input_data_block_->row_count());
 }
 
 } // namespace infinity
