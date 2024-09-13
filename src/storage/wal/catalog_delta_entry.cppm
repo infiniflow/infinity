@@ -250,7 +250,11 @@ public:
     void Merge(CatalogDeltaOperation &other) override;
     Vector<String> GetFilePaths() const override { return local_paths_; }
 
+    void FlushDataToDisk(TxnTimeStamp max_commit_ts);
+
 public:
+    BlockColumnEntry *column_entry_{};
+
     Pair<u32, u64> outline_info_;
     Vector<String> local_paths_;
 };

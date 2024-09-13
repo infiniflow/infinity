@@ -384,7 +384,7 @@ AddBlockEntryOp::AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts
 }
 
 AddColumnEntryOp::AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts)
-    : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts) {
+    : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts), column_entry_(column_entry) {
     outline_info_ = {column_entry->OutlineBufferCount(), column_entry->LastChunkOff()};
     Vector<String> paths = column_entry->FilePaths();
     local_paths_.insert(local_paths_.end(), paths.begin(), paths.end());
@@ -957,6 +957,11 @@ void AddChunkIndexEntryOp::Merge(CatalogDeltaOperation &other) {
     MergeFlag flag = this->NextDeleteFlag(add_chunk_index_op.merge_flag_);
     *this = std::move(add_chunk_index_op);
     this->merge_flag_ = flag;
+}
+
+void AddColumnEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
+    LOG_TRACE(fmt::format("ColumnEntry {} flush to disk", column_entry_->column_id()));
+    column_entry_->FlushColumn(max_commit_ts);
 }
 
 void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
