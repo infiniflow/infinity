@@ -540,6 +540,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
+            EXPECT_EQ(table_entry->row_count(), 1ul);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert"));
@@ -567,6 +568,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
+            EXPECT_EQ(table_entry->row_count(), 2ul);
         }
 
         // 1. remain some uncommitted txn before force full checkpoint
@@ -619,6 +621,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             ASSERT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn_record3);
+            EXPECT_EQ(table_entry->row_count(), 3ul);
             WaitFlushDeltaOp(storage);
         }
         infinity::InfinityContext::instance().UnInit();
