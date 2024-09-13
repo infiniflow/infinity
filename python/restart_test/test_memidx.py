@@ -13,7 +13,8 @@ class TestMemIdx:
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
 
-        @infinity_runner_decorator_factory(config1, uri, infinity_runner)
+        decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
+        @decorator1
         def part1(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.create_table(
@@ -47,7 +48,8 @@ class TestMemIdx:
 
         # config1 can held 6 rows of hnsw mem index before dump
         # 1. recover by dumpindex wal & memindex recovery
-        @infinity_runner_decorator_factory(config2, uri, infinity_runner)
+        decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
+        @decorator2
         def part2(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_memidx1")
@@ -71,10 +73,8 @@ class TestMemIdx:
         part2()
 
         # 2. recover by delta ckp & dumpindex wal & memindex recovery
-        infinity_runner.init(config3)
-        infinity_obj = InfinityRunner.connect(uri)
-
-        @infinity_runner_decorator_factory(config3, uri, infinity_runner)
+        decorator3 = infinity_runner_decorator_factory(config3, uri, infinity_runner)
+        @decorator3
         def part3(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_memidx1")
