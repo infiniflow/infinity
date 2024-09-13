@@ -269,26 +269,20 @@ Tuple<void *, i64> GetEmbeddingDataTypeDataPtrFromProto(const EmbeddingData &emb
 ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto knn_expr = new KnnExpr(false);
+    auto knn_expr = MakeUnique<KnnExpr>(false);
 
     knn_expr->distance_type_ = distance_type;
     if (knn_expr->distance_type_ == KnnDistanceType::kInvalid) {
-        delete knn_expr;
-        knn_expr = nullptr;
         status = Status::InvalidKnnDistanceType();
         return nullptr;
     }
     knn_expr->embedding_data_type_ = embedding_data_type;
     if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemInvalid) {
-        delete knn_expr;
-        knn_expr = nullptr;
         status = Status::InvalidEmbeddingDataType("unknown type");
         return nullptr;
     }
     auto [embedding_data_ptr, dimension] = GetEmbeddingDataTypeDataPtrFromProto(embedding_data, status);
     if (status.code_ != ErrorCode::kOk) {
-        delete knn_expr;
-        knn_expr = nullptr;
         return nullptr;
     }
     knn_expr->embedding_data_ptr_ = embedding_data_ptr;
@@ -296,16 +290,12 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
 
     knn_expr->topn_ = topn;
     if (knn_expr->topn_ <= 0) {
-        delete knn_expr;
-        knn_expr = nullptr;
         status = Status::InvalidParameterValue("topn", std::to_string(topn), "topn should be greater than 0");
         return nullptr;
     }
 
     knn_expr->column_expr_ = column_expr.GetParsedExpr(status);
     if (status.code_ != ErrorCode::kOk) {
-        delete knn_expr;
-        knn_expr = nullptr;
         return nullptr;
     }
 
@@ -318,29 +308,42 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
             knn_expr->ignore_index_ = true;
         }
 
-        auto init_parameter = new InitParameter();
+        auto init_parameter = MakeUnique<InitParameter>();
         init_parameter->param_name_ = param.param_name_;
         init_parameter->param_value_ = param.param_value_;
-        knn_expr->opt_params_->emplace_back(init_parameter);
+        knn_expr->opt_params_->emplace_back(init_parameter.release());
     }
 
-    return knn_expr;
+    if (filter_expr) {
+        knn_expr->filter_expr_.reset(filter_expr->GetParsedExpr(status));
+    }
+    if (status.code_ != ErrorCode::kOk) {
+        return nullptr;
+    }
+
+    return knn_expr.release();
 }
 
 ParsedExpr *WrapMatchExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto match_expr = new MatchExpr();
+    auto match_expr = MakeUnique<MatchExpr>();
     match_expr->fields_ = fields;
     match_expr->matching_text_ = matching_text;
     match_expr->options_text_ = options_text;
-    return match_expr;
+    if (filter_expr) {
+        match_expr->filter_expr_.reset(filter_expr->GetParsedExpr(status));
+    }
+    if (status.code_ != ErrorCode::kOk) {
+        return nullptr;
+    }
+    return match_expr.release();
 }
 
 ParsedExpr *WrapFusionExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto fusion_expr = new FusionExpr();
+    auto fusion_expr = MakeUnique<FusionExpr>();
     fusion_expr->method_ = method;
     fusion_expr->options_ = MakeShared<SearchOptions>(options_text);
     if (has_match_tensor_expr) {
@@ -349,26 +352,24 @@ ParsedExpr *WrapFusionExpr::GetParsedExpr(Status &status) {
         fusion_expr->match_tensor_expr_ = nullptr;
     }
 
-    return fusion_expr;
+    return fusion_expr.release();
 }
 
 ParsedExpr *WrapMatchTensorExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto match_tensor_expr = new MatchTensorExpr(own_memory);
+    auto match_tensor_expr = MakeUnique<MatchTensorExpr>(own_memory);
     match_tensor_expr->SetSearchMethodStr(search_method);
     match_tensor_expr->column_expr_.reset(column_expr.GetParsedExpr(status));
     match_tensor_expr->options_text_ = options_text;
     match_tensor_expr->embedding_data_type_ = embedding_data_type;
 
     if (status.code_ != ErrorCode::kOk) {
-        delete match_tensor_expr;
         return nullptr;
     }
 
     auto [embedding_data_ptr, dimension] = GetEmbeddingDataTypeDataPtrFromProto(embedding_data, status);
     if (status.code_ != ErrorCode::kOk) {
-        delete match_tensor_expr;
         return nullptr;
     }
     match_tensor_expr->dimension_ = dimension;
@@ -376,24 +377,28 @@ ParsedExpr *WrapMatchTensorExpr::GetParsedExpr(Status &status) {
     match_tensor_expr->query_tensor_data_ptr_ = MakeUniqueForOverwrite<char[]>(copy_bytes);
     std::memcpy(match_tensor_expr->query_tensor_data_ptr_.get(), embedding_data_ptr, copy_bytes);
 
-    return match_tensor_expr;
+    if (filter_expr) {
+        match_tensor_expr->filter_expr_.reset(filter_expr->GetParsedExpr(status));
+    }
+    if (status.code_ != ErrorCode::kOk) {
+        return nullptr;
+    }
+    return match_tensor_expr.release();
 }
 
 ParsedExpr *WrapMatchSparseExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto match_sparse_expr = new MatchSparseExpr(own_memory);
+    auto match_sparse_expr = MakeUnique<MatchSparseExpr>(own_memory);
 
     auto *column_expr_ptr = column_expr.GetParsedExpr(status);
     if (status.code_ != ErrorCode::kOk) {
-        delete match_sparse_expr;
         return nullptr;
     }
     match_sparse_expr->SetSearchColumn(column_expr_ptr);
 
     auto *query_sparse_ptr = static_cast<ConstantExpr *>(sparse_expr.GetParsedExpr(status));
     if (status.code_ != ErrorCode::kOk) {
-        delete match_sparse_expr;
         return nullptr;
     }
     match_sparse_expr->SetQuerySparse(query_sparse_ptr);
@@ -409,7 +414,13 @@ ParsedExpr *WrapMatchSparseExpr::GetParsedExpr(Status &status) {
     }
     match_sparse_expr->SetOptParams(topn, opt_params_ptr);
 
-    return match_sparse_expr;
+    if (filter_expr) {
+        match_sparse_expr->filter_expr_.reset(filter_expr->GetParsedExpr(status));
+    }
+    if (status.code_ != ErrorCode::kOk) {
+        return nullptr;
+    }
+    return match_sparse_expr.release();
 }
 
 ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {

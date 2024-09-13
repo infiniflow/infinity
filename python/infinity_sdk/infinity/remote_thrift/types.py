@@ -343,12 +343,13 @@ def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, 
     return data_dict, data_type_dict
 
 
-def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embedding_data_type: str,
-                           method_type: str, extra_option: str = None) -> MatchTensorExpr:
+def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embedding_data_type: str, method_type: str,
+                           extra_option: str = None, filter_expr: Optional[ParsedExpr] = None) -> MatchTensorExpr:
     match_tensor_expr = MatchTensorExpr()
     match_tensor_expr.column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
     match_tensor_expr.search_method = method_type
     match_tensor_expr.extra_options = extra_option
+    match_tensor_expr.filter_expr = filter_expr
     data = EmbeddingData()
     if embedding_data_type == 'bit':
         raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
@@ -388,7 +389,7 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
 
 
 def make_match_sparse_expr(vector_column_name: str, sparse_data: SparseVector | dict, metric_type: str, topn: int,
-                           opt_params: Optional[dict] = None):
+                           opt_params: Optional[dict] = None, filter_expr: Optional[ParsedExpr] = None):
     column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
 
     query_sparse_expr = ConstantExpr()
@@ -429,5 +430,5 @@ def make_match_sparse_expr(vector_column_name: str, sparse_data: SparseVector | 
             match_sparse_options.append(InitParameter(param_name=k, param_value=v))
 
     match_sparse_expr = MatchSparseExpr(column_expr=column_expr, query_sparse_expr=query_sparse_expr, metric_type=metric_type,
-                                        topn=topn, opt_params=match_sparse_options)
+                                        topn=topn, opt_params=match_sparse_options, filter_expr=filter_expr)
     return match_sparse_expr

@@ -17,6 +17,7 @@ import functools
 import inspect
 import pandas as pd
 import polars as pl
+from sqlglot import condition
 import sqlglot.expressions as exp
 import numpy as np
 from infinity_embedded.errors import ErrorCode
@@ -126,6 +127,20 @@ def traverse_conditions(cons, fn=None):
             parsed_expr.constant_expr = constant_expr
 
             return parsed_expr
+    elif isinstance(cons, exp.Anonymous):
+        arguments = []
+        for arg in cons.args['expressions']:
+            if arg:
+                parsed_expr = parse_expr(arg)
+                arguments.append(parsed_expr)
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = cons.args['this']
+        func_expr.arguments = arguments
+
+        parsed_expr = WrapParsedExpr()
+        parsed_expr.type = ParsedExprType.kFunction
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
     elif isinstance(cons, exp.Func):
         arguments = []
         for arg in cons.args.values():
@@ -156,6 +171,24 @@ def parse_expr(expr):
             return parsed_expr
         else:
             raise Exception(f"unknown expression type: {expr}")
+
+
+def get_search_optional_filter_from_opt_params(opt_params: dict):
+    optional_filter = None
+    k_to_pop = []
+    for k, v in opt_params.items():
+        if k.lower() == "filter":
+            if optional_filter is not None:
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                        "Only one filter is allowed in search optional parameters")
+            if not isinstance(v, str):
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                        f"Invalid filter expression '{v}', type should be string, but get {type(v)}")
+            optional_filter = traverse_conditions(condition(v))
+            k_to_pop.append(k)
+    for k in k_to_pop:
+        opt_params.pop(k)
+    return optional_filter
 
 
 def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
