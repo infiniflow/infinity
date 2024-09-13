@@ -1,7 +1,5 @@
 from infinity_runner import InfinityRunner
-import infinity
 from common import common_values
-import time
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 

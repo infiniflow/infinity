@@ -7,6 +7,7 @@ import infinity_embedded
 import infinity
 import pandas as pd
 from infinity.common import ConflictType
+import infinity.index as index
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -88,7 +89,7 @@ class TestInfinity:
             ),
         )
 
-        res = db_obj.drop_table(table_name)
+        db_obj.drop_table(table_name)
 
     def test_simple_drop_columns(self):
         table_name = "test_drop_column"
@@ -139,4 +140,56 @@ class TestInfinity:
             ),
         )
 
-        res = db_obj.drop_table(table_name)
+        db_obj.drop_table(table_name)
+
+    def test_add_drop_column_with_index(self):
+        table_name = "test_add_drop_column_with_index"
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            table_name,
+            {
+                "c1": {"type": "int"},
+                "c2": {"type": "int"},
+                "c3": {"type": "varchar"},
+            },
+        )
+        assert table_obj is not None
+
+        res = table_obj.create_index(
+            "index1", index.IndexInfo("c3", index.IndexType.FullText)
+        )
+        assert res.error_code == infinity.ErrorCode.OK
+
+        table_obj.insert([{"c1": 1, "c2": 2, "c3": "test"}])
+
+        # res = table_obj.drop_columns("c3")
+        # assert res.error_code == infinity.ErrorCode.NOT_SUPPORTED
+
+        res = table_obj.drop_columns("c2")
+        assert res.error_code == infinity.ErrorCode.OK
+
+        res = table_obj.add_columns({"c2": {"type": "varchar", "default": "test"}})
+        assert res.error_code == infinity.ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(
+            res,
+            pd.DataFrame({"c1": [1], "c3": ["test"], "c2": ["test"]}).astype(
+                {"c1": dtype("int32"), "c3": dtype("object"), "c2": dtype("object")}
+            ),
+        )
+
+        table_obj.insert([{"c1": 1, "c2": "t1", "c3": "t2"}])
+
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(
+            res,
+            pd.DataFrame(
+                {"c1": [1, 1], "c3": ["test", "t2"], "c2": ["test", "t1"]}
+            ).astype(
+                {"c1": dtype("int32"), "c3": dtype("object"), "c2": dtype("object")}
+            ),
+        )
+
+        db_obj.drop_table(table_name)
