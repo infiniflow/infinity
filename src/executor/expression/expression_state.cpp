@@ -33,6 +33,7 @@ import function_expression;
 import in_expression;
 import reference_expression;
 import value_expression;
+import filter_fulltext_expression;
 import status;
 
 import default_values;
@@ -59,6 +60,9 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
             return CreateState(static_pointer_cast<ReferenceExpression>(expression));
         case ExpressionType::kIn:
             return CreateState(static_pointer_cast<InExpression>(expression));
+        case ExpressionType::kFilterFullText: {
+            return CreateState(static_pointer_cast<FilterFulltextExpression>(expression));
+        }
         case ExpressionType::kKnn: {
             String error_message = "Unexpected expression type: KNN";
             UnrecoverableError(error_message);
@@ -149,16 +153,6 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<Function
         result->AddChild(arg);
     }
 
-    //    Vector<ColumnVectorType> result_column_vector_type(block_count, ColumnVectorType::kConstant);
-    //
-    //    for(SizeT idx = 0; idx < block_count; ++ idx) {
-    //        for(auto& child_state: result->Children()) {
-    //            // Once a child column vector isn't kConstant, the result column vector will be kFlat;
-    //            if(child_state->OutputColumnVectors()[idx]->vector_type() != ColumnVectorType::kConstant) {
-    //                result_column_vector_type[idx] = ColumnVectorType::kFlat;
-    //            }
-    //        }
-    //    }
     bool result_is_constant = true;
     for (auto &child_state : result->Children()) {
         if (auto &column_ptr = child_state->OutputColumnVector(); !column_ptr || column_ptr->vector_type() != ColumnVectorType::kConstant) {
@@ -171,12 +165,9 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<Function
     if (result_is_constant) {
         result->column_vector_->Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     } else {
-        auto column_vector_type =
-            (function_expr_data_type->type() == LogicalType::kBoolean) ? ColumnVectorType::kCompactBit : ColumnVectorType::kFlat;
-        result->column_vector_->Initialize(column_vector_type, DEFAULT_VECTOR_SIZE);
+        result->column_vector_->Initialize();
     }
 
-    //    result->output_data_block_.Init({function_expr->Type()});
     return result;
 }
 
@@ -212,6 +203,13 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<InExpres
     result->column_vector_ = MakeShared<ColumnVector>(in_expr_data_type);
     result->column_vector_->Initialize(result_column_vector_type, DEFAULT_VECTOR_SIZE);
 
+    return result;
+}
+
+SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<FilterFulltextExpression> &filter_fulltext_expr) {
+    auto result = MakeShared<ExpressionState>();
+    result->column_vector_ = MakeShared<ColumnVector>(MakeShared<DataType>(filter_fulltext_expr->Type()));
+    result->column_vector_->Initialize();
     return result;
 }
 

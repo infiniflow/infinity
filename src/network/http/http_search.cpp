@@ -97,15 +97,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     response["error_message"] = "More than one filter field.";
                     return;
                 }
-
-                auto &filter_json = elem.value();
-                if (!filter_json.is_string()) {
-                    response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] = "Filter field should be string";
-                    return;
-                }
-
-                filter = ParseFilter(filter_json, http_status, response);
+                filter = ParseFilter(elem.value(), http_status, response);
                 if (!filter) {
                     return;
                 }
@@ -215,15 +207,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                     response["error_message"] = "More than one output field.";
                     return;
                 }
-
-                auto &filter_json = elem.value();
-                if (!filter_json.is_string()) {
-                    response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] = "Filter field should be string";
-                    return;
-                }
-
-                filter = ParseFilter(filter_json, http_status, response);
+                filter = ParseFilter(elem.value(), http_status, response);
                 if (filter == nullptr) {
                     return;
                 }
@@ -300,7 +284,11 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
 }
 
 UniquePtr<ParsedExpr> HTTPSearch::ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
-
+    if (!json_object.is_string()) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = "Filter field should be string";
+        return nullptr;
+    }
     UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
     ExprParser expr_parser;
     expr_parser.Parse(json_object, expr_parsed_result.get());
@@ -605,6 +593,19 @@ UniquePtr<KnnExpr> HTTPSearch::ParseMatchDense(const nlohmann::json &json_object
             for (const auto &param_it : params.items()) {
                 const auto &param_k = param_it.key();
                 const auto &param_v = param_it.value();
+                if (param_k == "filter") {
+                    if (knn_expr->filter_expr_) {
+                        response["error_code"] = ErrorCode::kInvalidExpression;
+                        response["error_message"] = "More than one filter field in match dense params.";
+                        return nullptr;
+                    }
+                    knn_expr->filter_expr_ = ParseFilter(param_v, http_status, response);
+                    if (!knn_expr->filter_expr_) {
+                        return nullptr;
+                    }
+                    // do not put it into opt_params_
+                    continue;
+                }
                 if (param_k == "index_name") {
                     knn_expr->index_name_ = param_v;
                 }
@@ -694,6 +695,19 @@ UniquePtr<MatchExpr> HTTPSearch::ParseMatchText(const nlohmann::json &json_objec
             }
             for (auto &param : params.items()) {
                 String param_k = param.key(), param_v = param.value();
+                if (param_k == "filter") {
+                    if (match_expr->filter_expr_) {
+                        response["error_code"] = ErrorCode::kInvalidExpression;
+                        response["error_message"] = "More than one filter field in match text params.";
+                        return nullptr;
+                    }
+                    match_expr->filter_expr_ = ParseFilter(param.value(), http_status, response);
+                    if (!match_expr->filter_expr_) {
+                        return nullptr;
+                    }
+                    // do not put it into extra_params
+                    continue;
+                }
                 extra_params += fmt::format(";{}={}", param_k, param_v);
             }
         }
@@ -784,6 +798,19 @@ UniquePtr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(const nlohmann::json &js
             }
             for (auto &param : params.items()) {
                 String param_k = param.key(), param_v = param.value();
+                if (param_k == "filter") {
+                    if (match_tensor_expr->filter_expr_) {
+                        response["error_code"] = ErrorCode::kInvalidExpression;
+                        response["error_message"] = "More than one filter field in match tensor params.";
+                        return nullptr;
+                    }
+                    match_tensor_expr->filter_expr_ = ParseFilter(param.value(), http_status, response);
+                    if (!match_tensor_expr->filter_expr_) {
+                        return nullptr;
+                    }
+                    // do not put it into extra_params
+                    continue;
+                }
                 extra_params += fmt::format(";{}={}", param_k, param_v);
             }
         }
@@ -887,6 +914,19 @@ UniquePtr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(const nlohmann::json &js
                 return nullptr;
             }
             for (auto &param : params.items()) {
+                if (param.key() == "filter") {
+                    if (match_sparse_expr->filter_expr_) {
+                        response["error_code"] = ErrorCode::kInvalidExpression;
+                        response["error_message"] = "More than one filter field in match sparse params.";
+                        return nullptr;
+                    }
+                    match_sparse_expr->filter_expr_ = ParseFilter(param.value(), http_status, response);
+                    if (!match_sparse_expr->filter_expr_) {
+                        return nullptr;
+                    }
+                    // do not put it into opt_params_ptr
+                    continue;
+                }
                 auto *init_parameter = new InitParameter();
                 init_parameter->param_name_ = param.key();
                 init_parameter->param_value_ = param.value();

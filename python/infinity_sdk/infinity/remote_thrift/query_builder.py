@@ -32,7 +32,7 @@ from infinity.remote_thrift.types import (
     make_match_tensor_expr,
     make_match_sparse_expr,
 )
-from infinity.remote_thrift.utils import traverse_conditions, parse_expr
+from infinity.remote_thrift.utils import traverse_conditions, parse_expr, get_search_optional_filter_from_opt_params
 
 """FIXME: How to disable validation of only the search field?"""
 
@@ -170,7 +170,9 @@ class InfinityThriftQueryBuilder(ABC):
             raise InfinityException(ErrorCode.INVALID_KNN_DISTANCE_TYPE, f"Invalid distance type {distance_type}")
 
         knn_opt_params = []
+        optional_filter = None
         if knn_params is not None:
+            optional_filter = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
                 value = v.lower()
@@ -183,6 +185,7 @@ class InfinityThriftQueryBuilder(ABC):
             distance_type=dist_type,
             topn=topn,
             opt_params=knn_opt_params,
+            filter_expr=optional_filter,
         )
         generic_match_expr = GenericMatchExpr(match_vector_expr=knn_expr)
         self._search.match_exprs.append(generic_match_expr)
@@ -200,8 +203,9 @@ class InfinityThriftQueryBuilder(ABC):
             self._search = SearchExpr()
             self._search.match_exprs = list()
 
+        optional_filter = None if opt_params is None else get_search_optional_filter_from_opt_params(opt_params)
         match_sparse_expr = make_match_sparse_expr(
-            vector_column_name, sparse_data, metric_type, topn, opt_params
+            vector_column_name, sparse_data, metric_type, topn, opt_params, optional_filter
         )
         generic_match_expr = GenericMatchExpr(match_sparse_expr=match_sparse_expr)
         self._search.match_exprs.append(generic_match_expr)
@@ -218,6 +222,7 @@ class InfinityThriftQueryBuilder(ABC):
         match_expr.matching_text = matching_text
         options_text = f"topn={topn}"
         if extra_options is not None:
+            match_expr.filter_expr = get_search_optional_filter_from_opt_params(extra_options)
             for k, v in extra_options.items():
                 options_text += f";{k}={v}"
         match_expr.options_text = options_text
@@ -237,7 +242,9 @@ class InfinityThriftQueryBuilder(ABC):
             self._search = SearchExpr()
             self._search.match_exprs = list()
         option_str = f"topn={topn}"
+        optional_filter = None
         if extra_option is not None:
+            optional_filter = get_search_optional_filter_from_opt_params(extra_option)
             for k, v in extra_option.items():
                 option_str += f";{k}={v}"
         match_tensor_expr = make_match_tensor_expr(
@@ -246,6 +253,7 @@ class InfinityThriftQueryBuilder(ABC):
             embedding_data_type=query_data_type,
             method_type="maxsim",
             extra_option=option_str,
+            filter_expr=optional_filter,
         )
         generic_match_expr = GenericMatchExpr(match_tensor_expr=match_tensor_expr)
         self._search.match_exprs.append(generic_match_expr)

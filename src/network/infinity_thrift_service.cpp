@@ -1771,20 +1771,16 @@ FunctionExpr *InfinityThriftService::GetFunctionExprFromProto(Status &status, co
 }
 
 KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infinity_thrift_rpc::KnnExpr &expr) {
-    auto knn_expr = new KnnExpr(false);
+    auto knn_expr = MakeUnique<KnnExpr>(false);
     knn_expr->column_expr_ = GetColumnExprFromProto(expr.column_expr);
 
     knn_expr->distance_type_ = GetDistanceTypeFormProto(expr.distance_type);
     if (knn_expr->distance_type_ == KnnDistanceType::kInvalid) {
-        delete knn_expr;
-        knn_expr = nullptr;
         status = Status::InvalidKnnDistanceType();
         return nullptr;
     }
     knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
     if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemInvalid) {
-        delete knn_expr;
-        knn_expr = nullptr;
         status = Status::InvalidEmbeddingDataType("invalid");
         return nullptr;
     }
@@ -1793,20 +1789,13 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
     knn_expr->embedding_data_ptr_ = embedding_data_ptr;
     knn_expr->dimension_ = dimension;
     if (!status2.ok()) {
-        if (knn_expr != nullptr) {
-            delete knn_expr;
-            knn_expr = nullptr;
-        }
         status = status2;
         return nullptr;
     }
 
     knn_expr->topn_ = expr.topn;
     if (knn_expr->topn_ <= 0) {
-        delete knn_expr;
-        knn_expr = nullptr;
-        String topn = std::to_string(expr.topn);
-        status = Status::InvalidParameterValue("topn", topn, "topn should be greater than 0");
+        status = Status::InvalidParameterValue("topn", std::to_string(expr.topn), "topn should be greater than 0");
         return nullptr;
     }
 
@@ -1824,18 +1813,18 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
         init_parameter->param_value_ = param.param_value;
         knn_expr->opt_params_->emplace_back(init_parameter);
     }
+    if (expr.__isset.filter_expr) {
+        knn_expr->filter_expr_.reset(GetParsedExprFromProto(status, expr.filter_expr));
+        if (!status.ok()) {
+            return nullptr;
+        }
+    }
     status = Status::OK();
-    return knn_expr;
+    return knn_expr.release();
 }
 
 MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &status, const infinity_thrift_rpc::MatchSparseExpr &expr) {
-    auto *match_sparse_expr = new MatchSparseExpr(true);
-    DeferFn defer_fn1([&] {
-        if(match_sparse_expr != nullptr) {
-            delete match_sparse_expr;
-            match_sparse_expr = nullptr;
-        }
-    });
+    auto match_sparse_expr = MakeUnique<MatchSparseExpr>(true);
 
     auto *column_expr = static_cast<ParsedExpr *>(GetColumnExprFromProto(expr.column_expr));
     DeferFn defer_fn2([&] {
@@ -1869,11 +1858,15 @@ MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &stat
     }
     match_sparse_expr->SetOptParams(expr.topn, opt_params_ptr);
 
+    if (expr.__isset.filter_expr) {
+        match_sparse_expr->filter_expr_.reset(GetParsedExprFromProto(status, expr.filter_expr));
+        if (!status.ok()) {
+            return nullptr;
+        }
+    }
     status = Status::OK();
 
-    MatchSparseExpr *return_value = match_sparse_expr;
-    match_sparse_expr = nullptr;
-    return return_value;
+    return match_sparse_expr.release();
 }
 
 MatchTensorExpr *InfinityThriftService::GetMatchTensorExprFromProto(Status &status, const infinity_thrift_rpc::MatchTensorExpr &expr) {
@@ -1883,7 +1876,6 @@ MatchTensorExpr *InfinityThriftService::GetMatchTensorExprFromProto(Status &stat
     match_tensor_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
     auto [embedding_data_ptr, dimension, status2] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
     if (!status2.ok()) {
-        match_tensor_expr.reset();
         status = status2;
         return nullptr;
     }
@@ -1892,16 +1884,28 @@ MatchTensorExpr *InfinityThriftService::GetMatchTensorExprFromProto(Status &stat
     match_tensor_expr->query_tensor_data_ptr_ = MakeUniqueForOverwrite<char[]>(copy_bytes);
     std::memcpy(match_tensor_expr->query_tensor_data_ptr_.get(), embedding_data_ptr, copy_bytes);
     match_tensor_expr->options_text_ = expr.extra_options;
+    if (expr.__isset.filter_expr) {
+        match_tensor_expr->filter_expr_.reset(GetParsedExprFromProto(status, expr.filter_expr));
+        if (!status.ok()) {
+            return nullptr;
+        }
+    }
     status = Status::OK();
     return match_tensor_expr.release();
 }
 
-MatchExpr *InfinityThriftService::GetMatchExprFromProto(const infinity_thrift_rpc::MatchExpr &expr) {
-    auto match_expr = new MatchExpr();
+MatchExpr *InfinityThriftService::GetMatchExprFromProto(Status &status, const infinity_thrift_rpc::MatchExpr &expr) {
+    auto match_expr = MakeUnique<MatchExpr>();
     match_expr->fields_ = expr.fields;
     match_expr->matching_text_ = expr.matching_text;
     match_expr->options_text_ = expr.options_text;
-    return match_expr;
+    if (expr.__isset.filter_expr) {
+        match_expr->filter_expr_.reset(GetParsedExprFromProto(status, expr.filter_expr));
+        if (!status.ok()) {
+            return nullptr;
+        }
+    }
+    return match_expr.release();
 }
 
 ParsedExpr *InfinityThriftService::GetGenericMatchExprFromProto(Status &status, const infinity_thrift_rpc::GenericMatchExpr &expr) {
@@ -1915,8 +1919,7 @@ ParsedExpr *InfinityThriftService::GetGenericMatchExprFromProto(Status &status, 
         auto parsed_expr = GetMatchTensorExprFromProto(status, *expr.match_tensor_expr);
         return parsed_expr;
     } else if (expr.__isset.match_text_expr == true) {
-        auto parsed_expr = GetMatchExprFromProto(*expr.match_text_expr);
-        status = Status::OK();
+        auto parsed_expr = GetMatchExprFromProto(status, *expr.match_text_expr);
         return parsed_expr;
     } else {
         status = Status::InvalidParsedExprType();
@@ -1953,7 +1956,7 @@ ParsedExpr *InfinityThriftService::GetParsedExprFromProto(Status &status, const 
         auto parsed_expr = GetKnnExprFromProto(status, *expr.type.knn_expr);
         return parsed_expr;
     } else if (expr.type.__isset.match_expr == true) {
-        auto parsed_expr = GetMatchExprFromProto(*expr.type.match_expr);
+        auto parsed_expr = GetMatchExprFromProto(status, *expr.type.match_expr);
         return parsed_expr;
     } else if (expr.type.__isset.fusion_expr == true) {
         auto parsed_expr = GetFusionExprFromProto(*expr.type.fusion_expr);

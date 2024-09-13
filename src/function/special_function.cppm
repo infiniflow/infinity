@@ -30,24 +30,22 @@ export enum class SpecialType {
     kScore,
     kCreateTs,
     kDeleteTs,
+    kFilterFullText,
 };
 
 export class SpecialFunction final : public Function {
 public:
-    SpecialFunction(const String func_name, DataType data_type, SizeT extra_idx, SpecialType special_type)
-        : Function(std::move(func_name), FunctionType::kSpecial), data_type_(std::move(data_type)), special_type_(special_type), extra_idx_(extra_idx) {}
-
-    const String &name() const { return name_; }
+    SpecialFunction(String func_name, DataType data_type, const SizeT extra_idx, const SpecialType special_type)
+        : Function(std::move(func_name), FunctionType::kSpecial), data_type_(std::move(data_type)), special_type_(special_type),
+          extra_idx_(extra_idx) {}
 
     const DataType &data_type() const { return data_type_; }
 
-    SizeT extra_idx() { return extra_idx_; }
+    SizeT extra_idx() const { return extra_idx_; }
 
-    FunctionType type() { return type_; }
+    SpecialType special_type() const { return special_type_; }
 
-    SpecialType special_type() { return special_type_; }
-
-    String ToString() const final { return name(); }
+    String ToString() const override { return name(); }
 
 private:
     DataType data_type_;

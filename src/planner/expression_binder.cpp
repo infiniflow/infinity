@@ -42,6 +42,7 @@ import search_expression;
 import match_expression;
 import match_tensor_expression;
 import match_sparse_expression;
+import filter_fulltext_expression;
 import function;
 import aggregate_function;
 import aggregate_function_set;
@@ -628,22 +629,23 @@ void ValidateSearchSubExprOptionalFilter(BaseExpression *optional_filter,
     if (!original_filter) {
         original_filter = optional_filter;
     }
-    // can use: column, cast, constant, function, in, match text
+    // can use: column, cast, constant, function, in, match_text, filter_fulltext
     switch (optional_filter->type()) {
         case ExpressionType::kColumn:
         case ExpressionType::kCast:
         case ExpressionType::kValue:
         case ExpressionType::kFunction:
         case ExpressionType::kIn:
-        case ExpressionType::kMatch: {
+        case ExpressionType::kMatch:
+        case ExpressionType::kFilterFullText: {
             break;
         }
         default: {
-            RecoverableError(
-                Status::InvalidFilterExpression(fmt::format("SearchSubExprOptionalFilter: Invalid subexpression '{}' for filter expression '{}'."
-                                                            "Now can only use column, cast, value, function, in, match text expressions in filter.",
-                                                            optional_filter->ToString(),
-                                                            original_filter->ToString())));
+            RecoverableError(Status::InvalidFilterExpression(
+                fmt::format("SearchSubExprOptionalFilter: Invalid subexpression '{}' for filter expression '{}'."
+                            "Now can only use column, cast, value, function, in, match_text, filter_fulltext expressions in filter.",
+                            optional_filter->ToString(),
+                            original_filter->ToString())));
         }
     }
     // check all children
@@ -915,29 +917,31 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         switch (special_function_ptr->special_type()) {
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
-                    Status status =
-                        Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2");
-                    RecoverableError(status);
+                    RecoverableError(
+                        Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2"));
                 }
                 break;
             }
             case SpecialType::kSimilarity: {
                 if (!bind_context_ptr->allow_similarity) {
-                    Status status = Status::SyntaxError(
-                        "SIMILARITY() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product");
-                    RecoverableError(status);
+                    RecoverableError(Status::SyntaxError(
+                        "SIMILARITY() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product"));
                 }
                 break;
             }
             case SpecialType::kScore: {
                 if (!bind_context_ptr->allow_score) {
-                    Status status = Status::SyntaxError("SCORE() requires Fusion or MATCH TEXT or MATCH TENSOR");
-                    RecoverableError(status);
+                    RecoverableError(Status::SyntaxError("SCORE() requires Fusion or MATCH TEXT or MATCH TENSOR"));
                 }
                 break;
             }
-            default: {
+            case SpecialType::kRowID:
+            case SpecialType::kCreateTs:
+            case SpecialType::kDeleteTs: {
                 break;
+            }
+            case SpecialType::kFilterFullText: {
+                return FilterFulltextExpression::BuildFilterFulltextExpression(expr);
             }
         }
 

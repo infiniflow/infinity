@@ -106,5 +106,8 @@ export enum class ExpressionType {
     kPlaceholder,
     kPredicate, // ?
     kRaw,
+
+    // Fulltext filter
+    kFilterFullText,
 };
 }
