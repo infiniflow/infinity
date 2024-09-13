@@ -387,4 +387,8 @@ export WrapQueryResult WrapSearch(Infinity &instance,
 
 export WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, WrapOptimizeOptions optimize_options);
 
+export WrapQueryResult WrapAddColumns(Infinity &instance, const String &db_name, const String &table_name, Vector<WrapColumnDef> column_defs);
+
+export WrapQueryResult WrapDropColumns(Infinity &instance, const String &db_name, const String &table_name, Vector<String> column_names);
+
 } // namespace infinity

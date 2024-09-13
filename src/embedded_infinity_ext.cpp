@@ -102,7 +102,6 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("element_type", &WrapSparseType::element_type)
         .def_rw("index_type", &WrapSparseType::index_type)
         .def_rw("dimension", &WrapSparseType::dimension);
-        
 
     nb::class_<WrapIndexInfo>(m, "WrapIndexInfo")
         .def(nb::init<>())
@@ -294,11 +293,9 @@ NB_MODULE(embedded_infinity_ext, m) {
              nb::arg("where_expr") = nullptr,
              nb::arg("limit_expr") = nullptr,
              nb::arg("offset_expr") = nullptr)
-        .def("Optimize",
-             &WrapOptimize,
-             nb::arg("db_name"),
-             nb::arg("table_name"),
-             nb::arg("optimize_options"));
+        .def("Optimize", &WrapOptimize, nb::arg("db_name"), nb::arg("table_name"), nb::arg("optimize_options"))
+        .def("AddColumns", &WrapAddColumns, nb::arg("db_name"), nb::arg("table_name"), nb::arg("column_defs"))
+        .def("DropColumns", &WrapDropColumns, nb::arg("db_name"), nb::arg("table_name"), nb::arg("column_names"));
 
     // extra_ddl_info
     nb::enum_<ConflictType>(m, "ConflictType")
