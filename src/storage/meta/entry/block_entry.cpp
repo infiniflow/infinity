@@ -474,17 +474,19 @@ void BlockEntry::FlushForImport() { FlushDataNoLock(0, this->block_row_count_); 
 
 void BlockEntry::LoadFilterBinaryData(const String &block_filter_data) { fast_rough_filter_->DeserializeFromString(block_filter_data); }
 
-void BlockEntry::Cleanup() {
+void BlockEntry::Cleanup(bool dropped) {
     dropped_columns_.clear();
     for (auto &block_column_entry : columns_) {
-        block_column_entry->Cleanup();
+        block_column_entry->Cleanup(dropped);
     }
     version_buffer_object_.get()->PickForCleanup();
 
-    String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_dir_;
-    LOG_DEBUG(fmt::format("Cleaning up block dir: {}", full_block_dir));
-    CleanupScanner::CleanupDir(full_block_dir);
-    LOG_DEBUG(fmt::format("Cleaned block dir: {}", full_block_dir));
+    if (dropped) {
+        String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_dir_;
+        LOG_DEBUG(fmt::format("Cleaning up block dir: {}", full_block_dir));
+        CleanupScanner::CleanupDir(full_block_dir);
+        LOG_DEBUG(fmt::format("Cleaned block dir: {}", full_block_dir));
+    }
 }
 
 // TODO: introduce BlockColumnMeta

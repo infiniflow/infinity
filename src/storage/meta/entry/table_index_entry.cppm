@@ -170,7 +170,7 @@ private:
     SharedPtr<SegmentIndexEntry> last_segment_{};
 
 public:
-    void Cleanup() override;
+    void Cleanup(bool dropped = true) override;
 
     void PickCleanup(CleanupScanner *scanner) override;
 

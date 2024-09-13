@@ -211,7 +211,7 @@ void TableIndexMeta::PushFrontEntry(const SharedPtr<TableIndexEntry>& new_table_
     index_entry_list_.PushFrontEntry(new_table_index_entry);
 }
 
-void TableIndexMeta::Cleanup() { index_entry_list_.Cleanup(); }
+void TableIndexMeta::Cleanup(bool dropped) { index_entry_list_.Cleanup(dropped); }
 
 bool TableIndexMeta::PickCleanup(CleanupScanner *scanner) { return index_entry_list_.PickCleanup(scanner); }
 

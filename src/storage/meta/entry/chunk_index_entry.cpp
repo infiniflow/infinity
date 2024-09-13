@@ -353,13 +353,17 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
     return ret;
 }
 
-void ChunkIndexEntry::Cleanup() {
+void ChunkIndexEntry::Cleanup(bool dropped) {
     if (buffer_obj_.get() != nullptr) {
         buffer_obj_.get()->PickForCleanup();
     }
     for (auto &part_buffer_obj : part_buffer_objs_) {
         part_buffer_obj.get()->PickForCleanup();
     }
+    if (!dropped) {
+        return;
+    }
+
     TableIndexEntry *table_index_entry = segment_index_entry_->table_index_entry();
     const auto &index_dir = segment_index_entry_->index_dir();
     const IndexBase *index_base = table_index_entry->index_base();

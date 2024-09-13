@@ -94,7 +94,7 @@ public:
 
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
-    void Cleanup();
+    void Cleanup(bool dropped = true);
 
     void Flush(TxnTimeStamp checkpoint_ts);
 

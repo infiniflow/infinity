@@ -119,7 +119,7 @@ public:
 
     static void Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count);
 
-    void Cleanup();
+    void Cleanup(bool dropped = true);
 
     void DropColumn();
 

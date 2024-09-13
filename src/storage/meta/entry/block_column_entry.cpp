@@ -270,7 +270,7 @@ void BlockColumnEntry::DropColumn() {
     deleted_ = true;
 }
 
-void BlockColumnEntry::Cleanup() {
+void BlockColumnEntry::Cleanup([[maybe_unused]] bool dropped) {
     if (buffer_.get() != nullptr) {
         buffer_.get()->PickForCleanup();
     }

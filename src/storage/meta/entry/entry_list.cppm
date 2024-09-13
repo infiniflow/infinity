@@ -110,7 +110,7 @@ public:
 
     bool PickCleanup(CleanupScanner *scanner);
 
-    void Cleanup();
+    void Cleanup(bool dropped = true);
 
     void Iterate(std::function<void(Entry *)> func, TxnTimeStamp visible_ts);
 
@@ -542,6 +542,7 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
 
     TxnTimeStamp visible_ts = scanner->visible_ts();
     auto iter = entry_list_.begin();
+    bool dropped = true;
     while (iter != entry_list_.end()) {
         SharedPtr<Entry> &entry = *iter;
         if (entry->commit_ts_ < visible_ts) {
@@ -553,6 +554,7 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
                 entry->PickCleanup(scanner);
                 lock.lock();
                 ++iter;
+                dropped = false;
             }
             break;
         }
@@ -562,7 +564,10 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
         SharedPtr<Entry> &entry = *iter;
         if (entry->Committed()) {
             if (!entry->deleted_) {
-                scanner->AddEntry(std::move(entry));
+                scanner->AddEntry(std::move(entry), dropped);
+                dropped = false;
+            } else {
+                dropped = true;
             }
             iter = entry_list_.erase(iter);
         } else {
@@ -574,10 +579,10 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
 
 // TODO: check if this need to lock
 template <EntryConcept Entry>
-void EntryList<Entry>::Cleanup() {
+void EntryList<Entry>::Cleanup(bool dropped) {
     for (auto iter = entry_list_.begin(); iter != entry_list_.end(); ++iter) {
         SharedPtr<Entry> &entry = *iter;
-        entry->Cleanup();
+        entry->Cleanup(dropped);
     }
 }
 

@@ -879,7 +879,7 @@ bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
-void SegmentIndexEntry::Cleanup() {
+void SegmentIndexEntry::Cleanup(bool dropped) {
     for (auto &buffer_ptr : vector_buffer_) {
         if (buffer_ptr.get() == nullptr) {
             String error_message = "vector_buffer should not has nullptr.";
@@ -888,7 +888,7 @@ void SegmentIndexEntry::Cleanup() {
         buffer_ptr.get()->PickForCleanup();
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
-        chunk_index_entry->Cleanup();
+        chunk_index_entry->Cleanup(dropped);
     }
 }
 
