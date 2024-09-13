@@ -19,6 +19,7 @@ class InfinityRunner:
         os.system(
             f"rm -rf {self.data_dir}/data {self.data_dir}/log {self.data_dir}/persistence {self.data_dir}/tmp {self.data_dir}/wal"
         )
+        os.system(f"rm -rf restart_test.log.*")
         print(f"clear {self.data_dir}")
 
     def init(self, config_path: str | None = None):
@@ -56,7 +57,7 @@ class InfinityRunner:
 
 
 def infinity_runner_decorator_factory(
-    config_path: str, uri: str, infinity_runner: InfinityRunner
+    config_path: str | None, uri: str, infinity_runner: InfinityRunner
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
