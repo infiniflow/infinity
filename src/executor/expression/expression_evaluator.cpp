@@ -194,8 +194,24 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector) {
-    Status status = Status::NotSupport("IN execution isn't implemented yet.");
-    RecoverableError(status);
+    SharedPtr<BaseExpression> &left_expression = expr->left_operand();
+    SharedPtr<ExpressionState> &left_state = state->Children()[0];
+    SharedPtr<ColumnVector> &left_state_output = left_state->OutputColumnVector();
+    Execute(left_expression, left_state, left_state_output);
+    
+    SizeT left_result_count = left_state_output->Size();
+    if(expr->in_type() == InType::kIn) {
+        for(SizeT idx = 0; idx < left_result_count; idx++) {
+            output_column_vector->buffer_->SetCompactBit(idx, expr->Exists(left_state_output->GetValue(idx)));
+        }
+        return;
+    }
+    if (expr->in_type() == InType::kNotIn) {
+        for(SizeT idx = 0; idx < left_result_count; idx++) {
+            output_column_vector->buffer_->SetCompactBit(idx, !expr->Exists(left_state_output->GetValue(idx)));
+        }
+        return;
+    }
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<FilterFulltextExpression> &expr,

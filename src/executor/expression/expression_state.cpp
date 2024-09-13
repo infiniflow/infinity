@@ -75,7 +75,8 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
     return nullptr;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag) {
+SharedPtr<ExpressionState>
+ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag) {
     if (agg_expr->arguments().size() != 1) {
         Status status = Status::FunctionArgsError(agg_expr->ToString());
         RecoverableError(status);
@@ -126,7 +127,6 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpr
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->AddChild(cast_expr->arguments()[0]);
-
 
     ColumnVectorType result_column_vector_type = ColumnVectorType::kFlat;
     if (result->Children()[0]->OutputColumnVector()) {
@@ -188,16 +188,9 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<InExpres
 
     result->AddChild(in_expr->left_operand());
 
-    for (auto &argument_expr : in_expr->arguments()) {
-        result->AddChild(argument_expr);
-    }
-
     ColumnVectorType result_column_vector_type = ColumnVectorType::kConstant;
-    for (SizeT idx = 0; idx < result->Children().size(); ++idx) {
-        if (result->Children()[idx]->OutputColumnVector()->vector_type() != ColumnVectorType::kConstant) {
-            result_column_vector_type = ColumnVectorType::kFlat;
-            break;
-        }
+    if (auto &column_ptr = result->Children()[0]->OutputColumnVector(); !column_ptr || column_ptr->vector_type() != ColumnVectorType::kConstant) {
+        result_column_vector_type = ColumnVectorType::kFlat;
     }
 
     result->column_vector_ = MakeShared<ColumnVector>(in_expr_data_type);

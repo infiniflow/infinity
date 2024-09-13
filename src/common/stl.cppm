@@ -202,21 +202,14 @@ export namespace std {
         using std::chrono::year_month_day;
         using std::chrono::sys_days;
         using std::chrono::system_clock;
+
+        using std::chrono::high_resolution_clock;
     } // namespace chrono
-
-<<<<<<< HEAD
-using std::chrono::sys_days;
-using std::chrono::system_clock;
-using std::chrono::year_month_day;
-
-using std::chrono::high_resolution_clock;
-} // namespace chrono
-=======
+    
     using std::format;
     using std::cout;
     using std::cerr;
     using std::endl;
->>>>>>> d6ab1672 (revert change to src/common/stl.cppm)
 
     using std::setfill;
     using std::setw;

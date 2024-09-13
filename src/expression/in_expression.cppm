@@ -116,7 +116,6 @@ private:
             return 0;
         }
     };
-    // only constructed from logical type
     DataType data_type_;
     HashSet<Value, ValueHasher, ValueComparator> set_;
 };

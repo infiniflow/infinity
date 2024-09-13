@@ -549,13 +549,15 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
     SharedPtr<DataType> arguments_type = nullptr;
 
     for (SizeT idx = 0; idx < argument_count; ++idx) {
-        if (expr.type_ != ParsedExprType::kConstant) {
-            UnrecoverableError(std::format("In expression now only supports constant list!"));
+        if (expr.arguments_->at(idx)->type_ != ParsedExprType::kConstant) {
+            Status status = Status::SyntaxError("In expression now only supports constant list!");
+            RecoverableError(status);
         }
         auto bound_argument_expr = BuildExpression(*expr.arguments_->at(idx), bind_context_ptr, depth, false);
 
         if(arguments_type != nullptr && bound_argument_expr->Type() != *arguments_type) { 
-            UnrecoverableError(std::format("Expressions in In expression should be of the same data type!"));
+            Status status = Status::SyntaxError("Expressions in In expression must be of the same data type!");
+            RecoverableError(status);
         } else if(arguments_type == nullptr){
             arguments_type = MakeShared<DataType>(bound_argument_expr->Type());
         }
@@ -573,7 +575,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
     SharedPtr<InExpression> in_expression_ptr = MakeShared<InExpression>(in_type, bound_left_expr, arguments);
 
     //if match
-    if(*arguments_type == bound_left_expr->Type()) {
+    if(arguments_type->type() == bound_left_expr->Type().type()) {
         for(SizeT idx = 0; idx < argument_count; idx++) {
             ValueExpression* val_expr = static_cast<ValueExpression *>(arguments[idx].get());
             Value val = val_expr->GetValue();
@@ -581,27 +583,29 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
         }
     } else if(CastExpression::CanCast(*arguments_type, bound_left_expr->Type())) {
         //cast
-        BoundCastFunc cast = CastFunction::GetBoundFunc(bound_left_expr->Type(), *arguments_type);
+        BoundCastFunc cast = CastFunction::GetBoundFunc(*arguments_type, bound_left_expr->Type());
 
         SharedPtr<ColumnVector> argument_column_vector = MakeShared<ColumnVector>(arguments_type);
-        argument_column_vector->Initialize(ColumnVectorType::kFlat, argument_count);
+        argument_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
 
         for(SizeT idx = 0; idx < argument_count; idx++) {
             ValueExpression* val_expr = static_cast<ValueExpression *>(arguments[idx].get());
             argument_column_vector->AppendValue(val_expr->GetValue());
         }
 
-        SharedPtr<ColumnVector> cast_column_vector = MakeShared<ColumnVector>(MakeShared<DataType>(in_expression_ptr->Type()));
-        cast_column_vector->Initialize(ColumnVectorType::kFlat, argument_count);
+        SharedPtr<ColumnVector> cast_column_vector = MakeShared<ColumnVector>(MakeShared<DataType>(bound_left_expr->Type()));
+        //will overflow when passing argument_count
+        cast_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
         CastParameters cast_parameters;
         cast.function(argument_column_vector, cast_column_vector, argument_count, cast_parameters);
 
         for(SizeT idx = 0; idx < argument_count; idx++) {
-            in_expression_ptr->TryPut(cast_column_vector->GetValue(idx));
+            Value val = cast_column_vector->GetValue(idx);
+            in_expression_ptr->TryPut(std::move(val));
         }
     } else { 
         Status status = Status::NotSupportedTypeConversion(arguments_type->ToString(), bound_left_expr->Type().ToString());
-        UnrecoverableError(fmt::format("Can't cast from {} to {}", arguments_type->ToString(), bound_left_expr->Type().ToString()));
+        RecoverableError(status);
     } 
 
     return in_expression_ptr;
