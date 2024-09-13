@@ -112,28 +112,32 @@ QueryResult QueryContext::Query(const String &query) {
 
     BaseStatement *base_statement = parsed_result->statements_ptr_->at(0);
 
+    QueryResult query_result = QueryStatement(base_statement);
+    return query_result;
+}
+
+QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
+    QueryResult query_result;
+
     if (InfinityContext::instance().IsAdminRole()) {
         if (base_statement->Type() == StatementType::kAdmin) {
-            AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
-            QueryResult query_result = HandleAdminStatement(admin_statement);
-            return query_result;
+            const AdminStatement *admin_statement = static_cast<const AdminStatement *>(base_statement);
+            return HandleAdminStatement(admin_statement);
         } else {
-            QueryResult query_result;
             query_result.result_table_ = nullptr;
             query_result.status_ = Status::NotSupportInMaintenanceMode();
             return query_result;
         }
     } else {
         if (base_statement->Type() == StatementType::kAdmin) {
-            AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
+            const AdminStatement *admin_statement = static_cast<const AdminStatement *>(base_statement);
 
             switch(admin_statement->admin_type_) {
                 case AdminStmtType::kShowVariable: {
                     String var_name = admin_statement->variable_name_.value();
                     ToLower(var_name);
                     if(var_name == "server_role") {
-                        QueryResult query_result = HandleAdminStatement(admin_statement);
-                        return query_result;
+                        return HandleAdminStatement(admin_statement);
                     }
                     break;
                 }
@@ -141,29 +145,17 @@ QueryResult QueryContext::Query(const String &query) {
                 case AdminStmtType::kShowCurrentNode:
                 case AdminStmtType::kListNodes:
                 case AdminStmtType::kSetRole: {
-                    QueryResult query_result = HandleAdminStatement(admin_statement);
-                    return query_result;
+                    return HandleAdminStatement(admin_statement);
                 }
                 default: {
-                    QueryResult query_result;
-                    query_result.result_table_ = nullptr;
-                    query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
-                    return query_result;
+                    break;
                 }
             }
+
+            query_result.result_table_ = nullptr;
+            query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
+            return query_result;
         }
-    }
-
-    QueryResult query_result = QueryStatement(base_statement);
-    return query_result;
-}
-
-QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
-    QueryResult query_result;
-    if (InfinityContext::instance().IsAdminRole()) {
-        query_result.result_table_ = nullptr;
-        query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
-        return query_result;
     }
 
     Vector<SharedPtr<LogicalNode>> logical_plans{};
