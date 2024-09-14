@@ -23,11 +23,12 @@ class TestInfinity:
         if local_infinity:
             self.uri = common_values.TEST_LOCAL_PATH
             self.infinity_obj = infinity_embedded.connect(self.uri)
+        elif http:
+            self.uri = common_values.TEST_LOCAL_HOST
+            self.infinity_obj = infinity_http()
         else:
             self.uri = common_values.TEST_LOCAL_HOST
             self.infinity_obj = infinity.connect(self.uri)
-        if http:
-            self.infinity_obj = infinity_http()
         assert self.infinity_obj
 
     def teardown(self):

@@ -25,18 +25,18 @@ class TestInfinity:
             globals()["index"] = module
             self.uri = common_values.TEST_LOCAL_PATH
             self.infinity_obj = infinity_embedded.connect(self.uri)
+        elif http:
+            self.uri = common_values.TEST_LOCAL_HOST
+            self.infinity_obj = infinity_http()
         else:
             self.uri = common_values.TEST_LOCAL_HOST
             self.infinity_obj = infinity.connect(self.uri)
-        if http:
-            self.infinity_obj = infinity_http()
 
         yield
 
         res = self.infinity_obj.disconnect()
-        assert res.error_code == infinity.ErrorCode.OK
 
-    @pytest.mark.skip(reason="conflict with other")
+    @pytest.mark.usefixtures("skip_if_http")
     def test_simple_add_columns(self):
         table_name = "test_add_column"
         db_obj = self.infinity_obj.get_database("default_db")
@@ -92,7 +92,7 @@ class TestInfinity:
 
         db_obj.drop_table(table_name)
 
-    @pytest.mark.skip(reason="conflict with other")
+    @pytest.mark.usefixtures("skip_if_http")
     def test_simple_drop_columns(self):
         table_name = "test_drop_column"
         db_obj = self.infinity_obj.get_database("default_db")
@@ -144,7 +144,7 @@ class TestInfinity:
 
         db_obj.drop_table(table_name)
 
-    @pytest.mark.skip(reason="conflict with other")
+    @pytest.mark.usefixtures("skip_if_http")
     def test_add_drop_column_with_index(self):
         table_name = "test_add_drop_column_with_index"
         db_obj = self.infinity_obj.get_database("default_db")

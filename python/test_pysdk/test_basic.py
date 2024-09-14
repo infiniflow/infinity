@@ -36,11 +36,12 @@ class TestInfinity:
             globals()["index"] = module
             self.uri = common_values.TEST_LOCAL_PATH
             self.infinity_obj = infinity_embedded.connect(self.uri)
+        elif http:
+            self.uri = common_values.TEST_LOCAL_HOST
+            self.infinity_obj = infinity_http()
         else:
             self.uri = common_values.TEST_LOCAL_HOST
             self.infinity_obj = infinity.connect(self.uri)
-        if http:
-            self.infinity_obj = infinity_http()
 
     def teardown(self):
         res = self.infinity_obj.disconnect()
