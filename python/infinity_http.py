@@ -25,6 +25,7 @@ class infinity_http:
 
     def disconnect(self):
         print("disconnect")
+        return database_result(error_code=ErrorCode.OK)
 
     def set_up_header(self, param=[], tp={}):
         header = {}

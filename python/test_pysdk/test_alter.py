@@ -35,7 +35,8 @@ class TestInfinity:
         self.suffix = suffix
         yield
 
-        self.infinity_obj.disconnect()
+        res = self.infinity_obj.disconnect()
+        assert res.error_code == infinity.ErrorCode.OK
 
     def test_simple_add_columns(self):
         table_name = "test_add_column" + self.suffix
