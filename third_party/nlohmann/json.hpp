@@ -5697,8 +5697,7 @@ template<typename BasicJsonType, typename EnumType,
 inline void to_json(BasicJsonType& j, EnumType e) noexcept
 {
     using underlying_type = typename std::underlying_type<EnumType>::type;
-    static constexpr value_t integral_value_t = std::is_unsigned<underlying_type>::value ? value_t::number_unsigned : value_t::number_integer;
-    external_constructor<integral_value_t>::construct(j, static_cast<underlying_type>(e));
+    external_constructor<value_t::number_integer>::construct(j, static_cast<underlying_type>(e));
 }
 #endif  // JSON_DISABLE_ENUM_SERIALIZATION
 
@@ -7271,9 +7270,9 @@ class json_sax_dom_callback_parser
     /// stack to model hierarchy of values
     std::vector<BasicJsonType*> ref_stack {};
     /// stack to manage which values to keep
-    std::vector<bool> keep_stack {}; // NOLINT(readability-redundant-member-init)
+    std::vector<bool> keep_stack {};
     /// stack to manage which object keys to keep
-    std::vector<bool> key_keep_stack {}; // NOLINT(readability-redundant-member-init)
+    std::vector<bool> key_keep_stack {};
     /// helper to hold the reference for the next object element
     BasicJsonType* object_element = nullptr;
     /// whether a syntax error occurred
@@ -24150,7 +24149,7 @@ class basic_json // NOLINT(cppcoreguidelines-special-member-functions,hicpp-spec
                 auto it = val.m_data.m_value.object->find(member);
 
                 // context-sensitive error message
-                const auto error_msg = (op == "op") ? "operation" : detail::concat("operation '", op, '\''); // NOLINT(bugprone-unused-local-non-trivial-variable)
+                const auto error_msg = (op == "op") ? "operation" : detail::concat("operation '", op, '\'');
 
                 // check if desired value is present
                 if (JSON_HEDLEY_UNLIKELY(it == val.m_data.m_value.object->end()))

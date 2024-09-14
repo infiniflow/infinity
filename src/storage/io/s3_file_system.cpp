@@ -66,12 +66,6 @@ Pair<UniquePtr<FileHandler>, Status> S3FileSystem::OpenFile(const String &path, 
             file_flags |= O_CREAT;
         } else if (flags & FileFlags::TRUNCATE_CREATE) {
             file_flags |= O_CREAT | O_TRUNC;
-        } else {
-            //if not create, download new file from server
-            if(Exists(path)){
-                DeleteFile(path);
-            }
-            DownloadObject(path);    
         }
 
         if (flags & FileFlags::APPEND_FLAG) {
@@ -82,12 +76,6 @@ Pair<UniquePtr<FileHandler>, Status> S3FileSystem::OpenFile(const String &path, 
             file_flags |= O_DIRECT;
         }
 #endif
-    } else {
-        //if read, download new file from server
-        if(Exists(path)){
-            DeleteFile(path);
-        }
-        DownloadObject(path);
     }
 
     i32 fd = open(path.c_str(), file_flags, 0666);
@@ -124,7 +112,6 @@ void S3FileSystem::Close(FileHandler &file_handler) {
         UnrecoverableError(error_message);
     }
     // LOG_TRACE(fmt::format("[-] CLOSE FILE: {}", file_handler.path_.string()));
-    UploadObject(file_handler.path_);
 }
 
 void S3FileSystem::Rename(const String &old_path, const String &new_path) {
@@ -140,9 +127,6 @@ void S3FileSystem::Rename(const String &old_path, const String &new_path) {
         String error_message = fmt::format("Can't rename file: {}, {}", old_path, strerror(errno));
         UnrecoverableError(error_message);
     }
-    //
-    CopyObject(old_path, new_path);
-    RemoveObject(old_path);
 }
 
 i64 S3FileSystem::Read(FileHandler &file_handler, void *data, u64 nbytes) {
@@ -241,8 +225,6 @@ void S3FileSystem::DeleteFile(const String &file_name) {
         String error_message = fmt::format("Delete file {} exception: {}", file_name, strerror(errno));
         UnrecoverableError(error_message);
     }
-
-    RemoveObject(file_name);
 }
 
 void S3FileSystem::SyncFile(FileHandler &file_handler) {
@@ -283,7 +265,6 @@ void S3FileSystem::AppendFile(const String &dst_path, const String &src_path) {
     dstFile.write(buffer, srcFile.gcount());
     srcFile.close();
     dstFile.close();
-    UploadObject(dst_path);
 }
 
 void S3FileSystem::Truncate(const String &file_name, SizeT length) {
@@ -347,8 +328,6 @@ u64 S3FileSystem::DeleteDirectory(const String &path) {
         UnrecoverableError(error_message);
     }
 
-    RemoveDirectory(path);
-
     std::error_code error_code;
     Path p{path};
     u64 removed_count = std::filesystem::remove_all(p, error_code);
@@ -374,8 +353,6 @@ void S3FileSystem::CleanupDirectory(const String &path) {
         }
         return;
     }
-
-    RemoveDirectory(path);
 
     try {
         std::ranges::for_each(std::filesystem::directory_iterator{path}, [&](const auto &dir_entry) { std::filesystem::remove_all(dir_entry); });
@@ -496,114 +473,6 @@ int S3FileSystem::MunmapFile(const String &file_path) {
         mapped_files_.erase(it);
     }
     return 0;
-}
-
-void S3FileSystem::DownloadObject(const String &file_path){
-    String objectname;
-    std::replace_copy(file_path.begin(), file_path.end(), back_inserter(objectname), '/', '_');
-    // Create S3 client.
-    minio::s3::Client client = GetClient();
-
-    // Create download object arguments.
-    minio::s3::DownloadObjectArgs args;
-    args.bucket = bucket_name;
-    args.object = objectname;
-    args.filename = file_path;
-
-    // Call download object.
-    minio::s3::DownloadObjectResponse resp = client.DownloadObject(args);
-
-    // Handle response.
-    if (resp) {
-        std::cout << objectname<<" is successfully downloaded to "<<file_path
-                << std::endl;
-    } else {
-        UnrecoverableError("unable to download object; "+resp.Error().String());
-    }
-}
-
-void S3FileSystem::UploadObject(const String &file_path){
-    String objectname;
-    std::replace_copy(file_path.begin(), file_path.end(), back_inserter(objectname), '/', '_');
-    // Create S3 client.
-    minio::s3::Client client = GetClient();
-
-    // Create upload object arguments.
-    minio::s3::UploadObjectArgs args;
-    args.bucket = bucket_name;
-    args.object = objectname;
-    args.filename = file_path;
-
-    // Call upload object.
-    minio::s3::UploadObjectResponse resp = client.UploadObject(args);
-
-    // Handle response.
-    if (resp) {
-        std::cout << file_path<<" is successfully uploaded to "<<objectname
-                << std::endl;
-    } else {
-        UnrecoverableError("unable to upload object; "+resp.Error().String());
-    }
-}
-
-void S3FileSystem::RemoveObject(const String &file_path){
-    String objectname;
-    std::replace_copy(file_path.begin(), file_path.end(), back_inserter(objectname), '/', '_');
-    // Create S3 client.
-    minio::s3::Client client = GetClient();
-    // Create remove object arguments.
-    minio::s3::RemoveObjectArgs args;
-    args.bucket = bucket_name;
-    args.object = objectname;
-
-    // Call remove object.
-    minio::s3::RemoveObjectResponse resp = client.RemoveObject(args);
-
-    // Handle response.
-    if (resp) {
-        std::cout << objectname<<" is removed successfully" << std::endl;
-    } else {
-        UnrecoverableError("unable to remove object; "+resp.Error().String());
-    }
-}
-
-void S3FileSystem::RemoveDirectory(const String &dir_path){
-    for (const auto& entry : fs::directory_iterator(dir_path)) {
-        if (fs::is_directory(entry)) {
-            RemoveDirectory(entry.path()); 
-        } else if (fs::is_regular_file(entry)) {
-            RemoveObject(entry.path());
-        }
-    }
-}
-
-void S3FileSystem::CopyObject(const String &src_file_path, const String &dst_file_path){
-    String src_objectname;
-    std::replace_copy(src_file_path.begin(), src_file_path.end(), back_inserter(src_objectname), '/', '_');
-    String dst_objectname;
-    std::replace_copy(dst_file_path.begin(), dst_file_path.end(), back_inserter(dst_objectname), '/', '_');
-    // Create S3 client.
-    minio::s3::Client client = GetClient();
-    // Create copy object arguments.
-    minio::s3::CopyObjectArgs args;
-    args.bucket = bucket_name;
-    args.object = dst_objectname;
-
-    minio::s3::CopySource source;
-    source.bucket = bucket_name;
-    source.object = src_objectname;
-    args.source = source;
-
-    // Call copy object.
-    minio::s3::CopyObjectResponse resp = client.CopyObject(args);
-
-    // Handle response.
-    if (resp) {
-        std::cout << dst_objectname<<" is successfully created from "
-                << src_objectname << std::endl;
-    } else {
-        UnrecoverableError("unable to do copy object; "+resp.Error().String());
-    }
 }
 
 } // namespace infinity

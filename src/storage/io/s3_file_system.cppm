@@ -6,6 +6,7 @@ import file_system;
 import file_system_type;
 import status;
 import infinity_exception;
+import s3_client;
 
 export module s3_file_system;
 
@@ -29,39 +30,8 @@ export struct MmapInfo {
 
 export class S3FileSystem final : public FileSystem {
 public:
-    S3FileSystem(
-        String url = "http://localhost:9000", 
-        bool https = false, 
-        String access_key = "minioadmin", 
-        String secret_key = "minioadmin",
-        String _bucket_name = "infinity") : 
-        FileSystem(FileSystemType::kS3), 
-        base_url(url, https), 
-        provider(access_key, secret_key),
-        bucket_name(_bucket_name) {
-            minio::s3::Client client(base_url, &provider);
-            minio::s3::BucketExistsArgs args;
-            args.bucket = bucket_name;
-            minio::s3::BucketExistsResponse resp = client.BucketExists(args);
-            if (resp) {
-                if (resp.exist) {
-                std::cout << "bucket "<<bucket_name<< "exists" << std::endl;
-                } else {
-                    std::cout << "bucket "<<bucket_name<< "not exists" <<std::endl;
-                    std::cout << "creating bucket "<<bucket_name<< std::endl;
-                    minio::s3::MakeBucketArgs args;
-                    args.bucket = bucket_name;
-                    minio::s3::MakeBucketResponse resp1 = client.MakeBucket(args);
-                    if (resp1) {
-                        std::cout << "bucket "<<bucket_name<< "created" << std::endl;
-                    } else {
-                        UnrecoverableError("unable to create bucket "+bucket_name+"; "+resp1.Error().String());
-                    }
-                }
-            } else {
-                UnrecoverableError("unable to do bucket existence check; "+resp.Error().String());
-            }
-        }
+    S3FileSystem(S3Client& _s3_client) :
+        FileSystem(FileSystemType::kS3), s3_client(_s3_client) {}
 
     ~S3FileSystem() override = default;
 
@@ -118,25 +88,11 @@ public:
 
     int MunmapFile(const String &file_path);
 
-    minio::s3::Client GetClient() { return minio::s3::Client(base_url, &provider); }
-
-    void DownloadObject(const String &file_path);
-
-    void UploadObject(const String &file_path);
-
-    void RemoveObject(const String &file_path);
-
-    void CopyObject(const String &src_path, const String &dst_path);
-
-    void RemoveDirectory(const String &dir_path);
-
 private:
     static std::mutex mtx_;
     static HashMap<String, MmapInfo> mapped_files_;
 
-    minio::s3::BaseUrl base_url;
-    minio::creds::StaticProvider provider;
-    String bucket_name;
+    S3Client& s3_client;
 };
 
 } // namespace infinity

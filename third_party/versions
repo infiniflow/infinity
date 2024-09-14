@@ -4,7 +4,7 @@ magic_enum v0.8.1
 spdlog v1.10.0
 simdjson v3.1.8
 tlx v0.6.1
-nlohmann b36f4c477c40356a0ae1204b567cca3c2a57d201
+nlohmann v3.11.3
 zsv commit-id:5c22aae4363fdcd433079d2a9b48007a7c6fbbdf
 mlas onnxruntime:2c53b4a534a9b64466e435d384c91f0b684ea58a
 cppjieba v5.1.0
