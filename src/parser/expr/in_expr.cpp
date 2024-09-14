@@ -35,10 +35,10 @@ InExpr::~InExpr() {
 std::string InExpr::ToString() const {
     std::stringstream ss;
     ss << left_->ToString();
-    if (not_in_) {
-        ss << "NOT IN (";
-    } else {
+    if (in_) {
         ss << "IN (";
+    } else {
+        ss << "NOT IN (";
     }
     if (arguments_ != nullptr) {
         for (ParsedExpr *expr_ptr : *arguments_) {
