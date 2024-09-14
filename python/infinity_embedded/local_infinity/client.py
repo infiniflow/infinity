@@ -235,3 +235,9 @@ class LocalInfinityClient:
 
     def optimize(self, db_name: str, table_name: str, optimize_opt: WrapOptimizeOptions):
         return self.convert_res(self.client.Optimize(db_name, table_name, optimize_opt))
+    
+    def add_columns(self, db_name: str, table_name: str, column_defs: list[WrapColumnDef]):
+        return self.convert_res(self.client.AddColumns(db_name, table_name, column_defs))
+
+    def drop_columns(self, db_name: str, table_name: str, column_names: list[str]):
+        return self.convert_res(self.client.DropColumns(db_name, table_name, column_names))

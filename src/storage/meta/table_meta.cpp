@@ -223,7 +223,7 @@ void TableMeta::Sort() { table_entry_list_.SortEntryListByTS(); }
 
 void TableMeta::PushBackEntry(const SharedPtr<TableEntry> &new_table_entry) { table_entry_list_.PushBackEntry(new_table_entry); }
 
-void TableMeta::Cleanup() { table_entry_list_.Cleanup(); }
+void TableMeta::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) { table_entry_list_.Cleanup(info_tracer, dropped); }
 
 bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }
 

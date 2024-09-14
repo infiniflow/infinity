@@ -32,6 +32,7 @@ import column_def;
 import logger;
 import internal_types;
 import file_worker_type;
+import persistence_manager;
 
 namespace infinity {
 
@@ -54,13 +55,15 @@ public:
                                        SharedPtr<String> file_name,
                                        SharedPtr<IndexBase> index_base,
                                        SharedPtr<ColumnDef> column_def,
-                                       SizeT row_count)
+                                       SizeT row_count,
+                                       PersistenceManager *persistence_manager)
         : IndexFileWorker(std::move(data_dir),
                           std::move(temp_dir),
                           std::move(file_dir),
                           std::move(file_name),
                           std::move(index_base),
-                          std::move(column_def)),
+                          std::move(column_def),
+                          persistence_manager),
           default_centroid_num_((u32)std::sqrt(row_count)) {}
 
     virtual ~AnnIVFFlatIndexFileWorker() override;

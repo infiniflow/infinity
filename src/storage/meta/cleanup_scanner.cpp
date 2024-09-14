@@ -30,19 +30,29 @@ import infinity_context;
 
 namespace infinity {
 
+String CleanupInfoTracer::GetCleanupInfo() const {
+    String info;
+    info += fmt::format("Cleanup ts: {}\n", cleanup_ts_);
+    for (const auto &path : cleanup_info_) {
+        info += fmt::format("Cleanup: {}\n", path);
+    }
+    return info;
+}
+
 CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr)
     : catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
-void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry) { entries_.emplace_back(std::move(entry)); }
+// dropped is true denotes the data file can be cleaned up, or only metadata can be cleaned up
+void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry, bool dropped) { entries_.emplace_back(std::move(entry), dropped); }
 
 void CleanupScanner::Scan() {
     LOG_DEBUG(fmt::format("CleanupScanner: Start scanning, ts: {}", visible_ts_));
     catalog_->PickCleanup(this);
 }
 
-void CleanupScanner::Cleanup() && {
-    for (auto &entry : entries_) {
-        std::move(*entry).Cleanup();
+void CleanupScanner::Cleanup(CleanupInfoTracer *info_tracer) && {
+    for (auto &[entry, dropped] : entries_) {
+        std::move(*entry).Cleanup(info_tracer, dropped);
     }
     buffer_mgr_->RemoveClean();
 }

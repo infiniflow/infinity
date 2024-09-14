@@ -5,60 +5,37 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { ApiUrl } from '@/lib/constant/api';
-import { request } from '@/lib/utils';
-import { Copy } from 'lucide-react';
 import AddIcon from '/public/add.svg';
 
-import { Button } from '@/components/ui/button';
+import { request } from '@/lib/request';
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import React from 'react';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@radix-ui/react-select';
+import { DatabaseCreatingDialog } from './database-creating-dialog';
 
-export function DialogCloseButton({ children }: React.PropsWithChildren) {
+interface IDatabaseSelectProps {
+  placeholder?: string;
+  options: Array<{ label: string; value: string }>;
+}
+
+export function DatabaseSelect({ placeholder, options }: IDatabaseSelectProps) {
   return (
-    <Dialog>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Share link</DialogTitle>
-          <DialogDescription>
-            Anyone who has this link will be able to view this.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex items-center space-x-2">
-          <div className="grid flex-1 gap-2">
-            {/* <Label htmlFor="link" className="sr-only">
-              Link
-            </Label> */}
-            <Input
-              id="link"
-              defaultValue="https://ui.shadcn.com/docs/installation"
-              readOnly
-            />
-          </div>
-          <Button type="submit" size="sm" className="px-3">
-            <span className="sr-only">Copy</span>
-            <Copy className="h-4 w-4" />
-          </Button>
-        </div>
-        <DialogFooter className="sm:justify-start">
-          <DialogClose asChild>
-            <Button type="button" variant="secondary">
-              Close
-            </Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Select>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map(({ value, label }) => (
+          <SelectItem value={value} key={value}>
+            {label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -83,12 +60,12 @@ export default async function HomePage({
         </Card>
       ))}
       <Card className="w-full max-w-sm">
-        <DialogCloseButton>
+        <DatabaseCreatingDialog>
           <CardHeader>
             <AddIcon className="w-10 h-10"></AddIcon>
             <CardTitle className="text-1xl">Create Database</CardTitle>
           </CardHeader>
-        </DialogCloseButton>
+        </DatabaseCreatingDialog>
       </Card>
     </div>
   );

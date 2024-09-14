@@ -313,16 +313,21 @@ String DBEntry::GetPathNameTail() const {
 
 void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup(scanner); }
 
-void DBEntry::Cleanup() {
+void DBEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     if (this->deleted_) {
         return;
     }
-    table_meta_map_.Cleanup();
+    table_meta_map_.Cleanup(info_tracer, dropped);
 
-    SharedPtr<String> full_db_dir = AbsoluteDir();
-    LOG_DEBUG(fmt::format("Cleaning up db dir: {}", *full_db_dir));
-    CleanupScanner::CleanupDir(*full_db_dir);
-    LOG_DEBUG(fmt::format("Cleaned db dir: {}", *full_db_dir));
+    if (dropped) {
+        SharedPtr<String> full_db_dir = AbsoluteDir();
+        LOG_DEBUG(fmt::format("Cleaning up db dir: {}", *full_db_dir));
+        CleanupScanner::CleanupDir(*full_db_dir);
+        LOG_DEBUG(fmt::format("Cleaned db dir: {}", *full_db_dir));
+        if (info_tracer) {
+            info_tracer->AddCleanupInfo(std::move(*full_db_dir));
+        }
+    }
 }
 
 void DBEntry::MemIndexCommit() {

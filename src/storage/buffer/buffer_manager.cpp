@@ -28,6 +28,7 @@ import infinity_exception;
 import buffer_obj;
 import file_worker_type;
 import var_file_worker;
+import persistence_manager;
 
 namespace infinity {
 
@@ -85,8 +86,8 @@ bool LRUCache::RemoveFromGCQueue(BufferObj *buffer_obj) {
     return false;
 }
 
-BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir, SizeT lru_count)
-    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), memory_limit_(memory_limit), current_memory_size_(0), lru_caches_(lru_count) {}
+BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir, PersistenceManager* persistence_manager, SizeT lru_count)
+    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), memory_limit_(memory_limit), persistence_manager_(persistence_manager), current_memory_size_(0), lru_caches_(lru_count) {}
 
 BufferManager::~BufferManager() = default;
 

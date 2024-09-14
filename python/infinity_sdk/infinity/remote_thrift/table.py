@@ -26,8 +26,14 @@ from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
 from infinity.remote_thrift.types import build_result
-from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
-from infinity.remote_thrift.utils import get_remote_constant_expr_from_python_value
+from infinity.remote_thrift.utils import (
+    traverse_conditions,
+    name_validity_check,
+    select_res_to_polars,
+    check_valid_name,
+    get_remote_constant_expr_from_python_value,
+    get_ordinary_info,
+)
 from infinity.table import ExplainType
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.utils import deprecated_api
@@ -391,6 +397,19 @@ class RemoteTable():
         opt_options.index_name = index_name
         opt_options.opt_params = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
         return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
+    
+    def add_columns(self, column_def_dict: dict):
+        column_defs = []
+        for index, (column_name, column_info) in enumerate(column_def_dict.items()):
+            check_valid_name(column_name, "Column")
+            get_ordinary_info(column_info, column_defs, column_name, index)
+        return self._conn.add_columns(db_name=self._db_name, table_name=self._table_name, column_defs=column_defs)
+
+    def drop_columns(self, column_names: list[str] | str):
+        if isinstance(column_names, str):
+            column_names = [column_names]
+
+        return self._conn.drop_columns(db_name=self._db_name, table_name=self._table_name, column_names=column_names)
 
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
 

@@ -20,7 +20,6 @@ import stl;
 import txn;
 import catalog;
 import catalog_delta_entry;
-import cleanup_scanner;
 import buffer_manager;
 import third_party;
 
@@ -138,12 +137,7 @@ public:
 
     String ToString() const override { return fmt::format("CleanupTask, visible timestamp: {}", visible_ts_); }
 
-    void Execute() {
-        CleanupScanner scanner(catalog_, visible_ts_, buffer_mgr_);
-        scanner.Scan();
-        // FIXME(sys): This is a blocking call, should it be async?
-        std::move(scanner).Cleanup();
-    }
+    void Execute();
 
 private:
     Catalog *const catalog_;

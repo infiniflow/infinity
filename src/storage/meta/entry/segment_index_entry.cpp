@@ -137,7 +137,7 @@ SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID s
     auto *buffer_mgr = txn->buffer_mgr();
 
     // FIXME: estimate index size.
-    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), param, segment_id);
+    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(buffer_mgr, table_index_entry->index_dir(), param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_mgr->AllocateBufferObject(std::move(vector_file_worker[i]));
@@ -169,7 +169,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     String column_name = table_index_entry->index_base()->column_name();
     auto create_index_param =
         SegmentIndexEntry::GetCreateIndexParam(table_index_entry->table_index_def(), segment_row_count, table_entry->GetColumnDefByName(column_name));
-    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), create_index_param.get(), segment_id);
+    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(buffer_manager, table_index_entry->index_dir(), create_index_param.get(), segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
@@ -197,7 +197,7 @@ void SegmentIndexEntry::UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> ne
     next_chunk_id_ = new_entry->next_chunk_id_;
 }
 
-Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id) {
+Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(BufferManager* buffer_mgr, SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id) {
     Vector<UniquePtr<IndexFileWorker>> vector_file_worker;
     // reference file_worker will be invalidated when vector_file_worker is resized
     const auto index_base = param->index_base_;
@@ -232,7 +232,8 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
                                                                              file_name,
                                                                              index_base,
                                                                              column_def,
-                                                                             create_annivfflat_param->row_count_);
+                                                                             create_annivfflat_param->row_count_,
+                                                                             buffer_mgr->persistence_manager());
                     break;
                 }
                 default: {
@@ -260,7 +261,7 @@ String SegmentIndexEntry::IndexFileName(SegmentID segment_id) { return fmt::form
 
 UniquePtr<SegmentIndexEntry>
 SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *param) {
-    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), param, segment_id);
+    auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(buffer_manager, table_index_entry->index_dir(), param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
@@ -879,16 +880,20 @@ bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
-void SegmentIndexEntry::Cleanup() {
+void SegmentIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     for (auto &buffer_ptr : vector_buffer_) {
         if (buffer_ptr.get() == nullptr) {
             String error_message = "vector_buffer should not has nullptr.";
             UnrecoverableError(error_message);
         }
         buffer_ptr.get()->PickForCleanup();
+        if (info_tracer != nullptr) {
+            String file_path = buffer_ptr.get()->GetFilename();
+            info_tracer->AddCleanupInfo(std::move(file_path));
+        }
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
-        chunk_index_entry->Cleanup();
+        chunk_index_entry->Cleanup(info_tracer, dropped);
     }
 }
 

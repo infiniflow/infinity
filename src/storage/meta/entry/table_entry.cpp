@@ -1327,20 +1327,25 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
     }
 }
 
-void TableEntry::Cleanup() {
+void TableEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     if (this->deleted_) {
         return;
     }
     fulltext_column_index_cache_->Invalidate();
     for (auto &[segment_id, segment] : segment_map_) {
-        segment->Cleanup();
+        segment->Cleanup(info_tracer, dropped);
     }
-    index_meta_map_.Cleanup();
+    index_meta_map_.Cleanup(info_tracer);
 
-    String full_table_dir = Path(InfinityContext::instance().config()->DataDir()) / *table_entry_dir_;
-    LOG_DEBUG(fmt::format("Cleaning up dir: {}", full_table_dir));
-    CleanupScanner::CleanupDir(full_table_dir);
-    LOG_DEBUG(fmt::format("Cleaned dir: {}", full_table_dir));
+    if (dropped) {
+        String full_table_dir = Path(InfinityContext::instance().config()->DataDir()) / *table_entry_dir_;
+        LOG_DEBUG(fmt::format("Cleaning up dir: {}", full_table_dir));
+        CleanupScanner::CleanupDir(full_table_dir);
+        LOG_DEBUG(fmt::format("Cleaned dir: {}", full_table_dir));
+        if (info_tracer != nullptr) {
+            info_tracer->AddCleanupInfo(std::move(full_table_dir));
+        }
+    }
 }
 
 IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_->GetIndexReader(txn); }

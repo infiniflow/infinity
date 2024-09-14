@@ -16,7 +16,10 @@ class InfinityRunner:
         self.i = 0
 
     def clear(self):
-        os.system(f"rm -rf {self.data_dir}/data {self.data_dir}/log {self.data_dir}/persistence {self.data_dir}/tmp {self.data_dir}/wal")
+        os.system(
+            f"rm -rf {self.data_dir}/data {self.data_dir}/log {self.data_dir}/persistence {self.data_dir}/tmp {self.data_dir}/wal"
+        )
+        os.system(f"rm -rf restart_test.log.*")
         print(f"clear {self.data_dir}")
 
     def init(self, config_path: str | None = None):
@@ -51,3 +54,19 @@ class InfinityRunner:
                 print(e)
                 time.sleep(0.5)
                 print(f"retry connect {i}")
+
+
+def infinity_runner_decorator_factory(
+    config_path: str | None, uri: str, infinity_runner: InfinityRunner
+):
+    def decorator(f):
+        def wrapper(*args, **kwargs):
+            infinity_runner.init(config_path)
+            infinity_obj = InfinityRunner.connect(uri)
+            f(infinity_obj, *args, **kwargs)
+            infinity_obj.disconnect()
+            infinity_runner.uninit()
+
+        return wrapper
+
+    return decorator

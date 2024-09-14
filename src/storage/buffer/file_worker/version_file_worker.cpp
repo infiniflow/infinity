@@ -22,6 +22,7 @@ import block_version;
 import infinity_exception;
 import logger;
 import third_party;
+import persistence_manager;
 
 namespace infinity {
 
@@ -29,8 +30,9 @@ VersionFileWorker::VersionFileWorker(SharedPtr<String> data_dir,
                                      SharedPtr<String> temp_dir,
                                      SharedPtr<String> file_dir,
                                      SharedPtr<String> file_name,
-                                     SizeT capacity)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), capacity_(capacity) {}
+                                     SizeT capacity,
+                                     PersistenceManager* persistence_manager)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), capacity_(capacity) {}
 
 VersionFileWorker::~VersionFileWorker() {
     if (data_ != nullptr) {

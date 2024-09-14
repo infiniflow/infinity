@@ -198,6 +198,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 
 TEST_F(WalEntryTest, ReadWrite) {
     RemoveDbDirs();
+    infinity::InfinityContext::instance().Init(nullptr);
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("db1", "AAA_db1"));
     entry->cmds_.push_back(MakeShared<WalCmdDropDatabase>("db1"));
@@ -287,6 +288,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     EXPECT_NE(entry2, nullptr);
     EXPECT_EQ(*entry == *entry2, true);
     EXPECT_EQ(ptr_r - buf_beg, exp_size);
+    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_F(WalEntryTest, ReadWriteVFS) {

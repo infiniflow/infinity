@@ -40,9 +40,8 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
     }
 
     LocalFileSystem fs;
-    bool use_persistence_manager = InfinityContext::instance().persistence_manager();
 
-    if(use_persistence_manager && !to_spill) {
+    if(persistence_manager_ != nullptr && !to_spill) {
         String write_dir = *file_dir_;
         String write_path = fmt::format("{}/{}", write_dir, *file_name_);
         String tmp_write_path = Path(*temp_dir_) / StringTransform(write_path, "/", "_");
@@ -66,7 +65,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         }
 
         fs.SyncFile(*file_handler_);
-        obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(write_path, tmp_write_path);
+        obj_addr_ = persistence_manager_->Persist(write_path, tmp_write_path);
         fs.DeleteFile(tmp_write_path);
         return all_save;
     } else {
@@ -108,16 +107,15 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 void FileWorker::ReadFromFile(bool from_spill) {
     LocalFileSystem fs;
     String read_path;
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = !from_spill && pm != nullptr;
+    bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
-        obj_addr_ = pm->GetObjCache(read_path);
+        obj_addr_ = persistence_manager_->GetObjCache(read_path);
         if (!obj_addr_.Valid()) {
             String error_message = fmt::format("Failed to find object for local path {}", read_path);
             UnrecoverableError(error_message);
         }
-        read_path = pm->GetObjPath(obj_addr_.obj_key_);
+        read_path = persistence_manager_->GetObjPath(obj_addr_.obj_key_);
     }
     SizeT file_size = 0;
     u8 flags = FileFlags::READ_FLAG;
@@ -137,7 +135,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
         file_handler_ = nullptr;
         if (use_object_cache && obj_addr_.Valid()) {
             read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
-            pm->PutObjCache(read_path);
+            persistence_manager_->PutObjCache(read_path);
         }
     });
     ReadFromFileImpl(file_size);
@@ -149,7 +147,7 @@ void FileWorker::MoveFile() {
     String src_path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
     String dest_dir = ChooseFileDir(false);
     String dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
-    if (InfinityContext::instance().persistence_manager() == nullptr) {
+    if (persistence_manager_ == nullptr) {
         if (!fs.Exists(src_path)) {
             Status status = Status::FileNotFound(src_path);
             RecoverableError(status);
@@ -162,7 +160,7 @@ void FileWorker::MoveFile() {
         // }
         fs.Rename(src_path, dest_path);
     } else {
-        obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(dest_path, src_path);
+        obj_addr_ = persistence_manager_->Persist(dest_path, src_path);
     }
 }
 
@@ -175,9 +173,9 @@ String FileWorker::ChooseFileDir(bool spill) const {
 }
 
 void FileWorker::CleanupFile() const {
-    if (InfinityContext::instance().persistence_manager() != nullptr) {
+    if (persistence_manager_ != nullptr) {
         String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
-        InfinityContext::instance().persistence_manager()->Cleanup(path);
+        persistence_manager_->Cleanup(path);
         return;
     }
     LocalFileSystem fs;
@@ -186,9 +184,6 @@ void FileWorker::CleanupFile() const {
     if (fs.Exists(path)) {
         fs.DeleteFile(path);
         LOG_INFO(fmt::format("Cleaned file: {}", path));
-    } else {
-        // Now, we cannot check whether a buffer obj has been flushed to disk.
-        LOG_WARN(fmt::format("Cleanup: File {} not found for deletion", path));
     }
 }
 

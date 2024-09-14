@@ -43,6 +43,7 @@ class Txn;
 struct SegmentEntry;
 struct TableEntry;
 class DataBlock;
+class CleanupInfoTracer;
 
 /// class BlockEntry
 export struct BlockEntry : public BaseEntry {
@@ -94,7 +95,7 @@ public:
 
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
-    void Cleanup();
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true);
 
     void Flush(TxnTimeStamp checkpoint_ts);
 

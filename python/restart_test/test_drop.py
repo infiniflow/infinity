@@ -1,6 +1,6 @@
 import infinity
 from common import common_values
-from infinity_runner import InfinityRunner
+from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 import time
 from infinity.errors import ErrorCode
 
@@ -12,38 +12,38 @@ class TestDrop:
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
-        db_obj = infinity_obj.get_database("default_db")
-        table_obj = db_obj.create_table("test_drop", {"c1": {"type": "int"}})
+        @decorator
+        def part1(infinity_obj):
 
-        res = table_obj.insert([{"c1": i} for i in range(10)])
-        assert res.error_code == ErrorCode.OK
-        # wait flush
-        time.sleep(2)
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.create_table("test_drop", {"c1": {"type": "int"}})
 
-        table_obj.delete("c1 < 5")
+            res = table_obj.insert([{"c1": i} for i in range(10)])
+            assert res.error_code == ErrorCode.OK
+            # wait flush
+            time.sleep(2)
 
-        db_obj.drop_table("test_drop")
+            table_obj.delete("c1 < 5")
 
-        # wait for the drop be flushed in delta ckp
-        time.sleep(3)
+            db_obj.drop_table("test_drop")
 
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+            # wait for the drop be flushed in delta ckp
+            time.sleep(3)
+
+        part1()
 
         # replay nothing
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        try:
-            table_obj = db_obj.get_table("test_drop")
-        except Exception as e:
-            assert e.error_code == ErrorCode.TABLE_NOT_EXIST
-        print(table_obj)
+        @decorator
+        def part2(infinity_obj):
 
-        db_obj.drop_table("test_drop")
+            db_obj = infinity_obj.get_database("default_db")
+            try:
+                table_obj = db_obj.get_table("test_drop")
+            except Exception as e:
+                assert e.error_code == ErrorCode.TABLE_NOT_EXIST
 
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+            db_obj.drop_table("test_drop")
+
+        part2()

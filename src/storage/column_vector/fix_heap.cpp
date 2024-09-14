@@ -74,7 +74,8 @@ VectorHeapChunk FixHeapManager::AllocateChunk() {
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                       block_column_entry_->FileDir(),
                                                       block_column_entry_->OutlineFilename(current_chunk_idx_),
-                                                      current_chunk_size_);
+                                                      current_chunk_size_,
+                                                      buffer_mgr_->persistence_manager());
         auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
         block_column_entry_->AppendOutlineBuffer(buffer_obj);
         return VectorHeapChunk(buffer_obj);
@@ -146,7 +147,8 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                       block_column_entry_->FileDir(),
                                                       filename,
-                                                      current_chunk_size_);
+                                                      current_chunk_size_,
+                                                      buffer_mgr_->persistence_manager());
         outline_buffer = buffer_mgr_->GetBufferObject(std::move(file_worker));
 
         if (outline_buffer == nullptr) {

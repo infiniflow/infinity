@@ -90,13 +90,14 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
         total_data_size = (row_capacity + 7) / 8;
     }
 
+    auto *buffer_mgr = txn->buffer_mgr();
     auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                   block_entry->block_dir(),
                                                   block_column_entry->file_name_,
-                                                  total_data_size);
+                                                  total_data_size,
+                                                  buffer_mgr->persistence_manager());
 
-    auto *buffer_mgr = txn->buffer_mgr();
     block_column_entry->buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
 
     return block_column_entry;
@@ -122,7 +123,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                   block_entry->block_dir(),
                                                   column_entry->file_name_,
-                                                  total_data_size);
+                                                  total_data_size,
+                                                  buffer_manager->persistence_manager());
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker), true /*restart*/);
 
@@ -132,7 +134,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                                     MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                     block_entry->block_dir(),
                                                                     column_entry->OutlineFilename(0),
-                                                                    buffer_size);
+                                                                    buffer_size,
+                                                                    buffer_manager->persistence_manager());
         auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker), true /*restart*/);
         column_entry->outline_buffers_.push_back(buffer_obj);
     }
@@ -158,7 +161,8 @@ ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, c
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                       block_entry_->block_dir(),
                                                       this->file_name_,
-                                                      0);
+                                                      0,
+                                                      buffer_mgr->persistence_manager());
         this->buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
 
@@ -260,6 +264,14 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
     }
 }
 
+void BlockColumnEntry::FlushColumn(TxnTimeStamp checkpoint_ts) {
+    if (deleted_) {
+        return;
+    }
+    SizeT row_cnt = block_entry_->row_count(checkpoint_ts);
+    BlockColumnEntry::Flush(this, 0, row_cnt);
+}
+
 void BlockColumnEntry::DropColumn() {
     if (buffer_.get() != nullptr) {
         buffer_.reset();
@@ -270,13 +282,21 @@ void BlockColumnEntry::DropColumn() {
     deleted_ = true;
 }
 
-void BlockColumnEntry::Cleanup() {
+void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer, [[maybe_unused]] bool dropped) {
     if (buffer_.get() != nullptr) {
         buffer_.get()->PickForCleanup();
+        if (info_tracer != nullptr) {
+            String file_path = buffer_.get()->GetFilename();
+            info_tracer->AddCleanupInfo(std::move(file_path));
+        }
     }
     for (auto &outline_buffer : outline_buffers_) {
         if (outline_buffer.get() != nullptr) {
             outline_buffer.get()->PickForCleanup();
+            if (info_tracer != nullptr) {
+                String file_path = outline_buffer.get()->GetFilename();
+                info_tracer->AddCleanupInfo(std::move(file_path));
+            }
         }
     }
 }

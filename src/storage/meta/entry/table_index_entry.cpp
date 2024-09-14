@@ -372,24 +372,29 @@ Status TableIndexEntry::CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID
     return Status::OK();
 }
 
-void TableIndexEntry::Cleanup() {
+void TableIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     if (this->deleted_) {
         return;
     }
     std::unique_lock w_lock(rw_locker_);
     for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
-        segment_index_entry->Cleanup();
+        segment_index_entry->Cleanup(info_tracer, dropped);
     }
 
-    LOG_DEBUG(fmt::format("Cleaning up dir: {}", *index_dir_));
+    if (dropped) {
+        LOG_DEBUG(fmt::format("Cleaning up dir: {}", *index_dir_));
 
-    LocalFileSystem fs;
-    String absolute_index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir_);
-    if (!fs.Exists(absolute_index_dir)) {
-        return;
+        LocalFileSystem fs;
+        String absolute_index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir_);
+        if (!fs.Exists(absolute_index_dir)) {
+            return;
+        }
+        fs.DeleteDirectory(absolute_index_dir);
+        LOG_DEBUG(fmt::format("Cleaned dir: {}", absolute_index_dir));
+        if (info_tracer != nullptr) {
+            info_tracer->AddCleanupInfo(std::move(absolute_index_dir));
+        }
     }
-    fs.DeleteDirectory(absolute_index_dir);
-    LOG_DEBUG(fmt::format("Cleaned dir: {}", absolute_index_dir));
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {

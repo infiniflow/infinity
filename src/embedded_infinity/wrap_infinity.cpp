@@ -301,10 +301,10 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
 
     knn_expr->opt_params_ = new Vector<InitParameter *>();
     for (auto &param : opt_params) {
-        if(param.param_name_ == "index_name") {
+        if (param.param_name_ == "index_name") {
             knn_expr->index_name_ = param.param_value_;
         }
-        if(param.param_name_ == "ignore_index" && param.param_value_ == "true") {
+        if (param.param_name_ == "ignore_index" && param.param_value_ == "true") {
             knn_expr->ignore_index_ = true;
         }
 
@@ -347,7 +347,7 @@ ParsedExpr *WrapFusionExpr::GetParsedExpr(Status &status) {
     fusion_expr->method_ = method;
     fusion_expr->options_ = MakeShared<SearchOptions>(options_text);
     if (has_match_tensor_expr) {
-        fusion_expr->match_tensor_expr_.reset(dynamic_cast<MatchTensorExpr*>(match_tensor_expr.GetParsedExpr(status)));
+        fusion_expr->match_tensor_expr_.reset(dynamic_cast<MatchTensorExpr *>(match_tensor_expr.GetParsedExpr(status)));
     } else {
         fusion_expr->match_tensor_expr_ = nullptr;
     }
@@ -596,13 +596,9 @@ WrapQueryResult WrapQuery(Infinity &instance, const String &query_text) {
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult WrapCreateTable(Infinity &instance,
-                                const String &db_name,
-                                const String &table_name,
-                                Vector<WrapColumnDef> column_defs,
-                                WrapCreateTableOptions create_table_options) {
-    Vector<TableConstraint *> constraints;
-    Vector<ColumnDef *> column_defs_ptr;
+namespace {
+
+Optional<WrapQueryResult> UnwrapColumnDefs(Vector<WrapColumnDef> &column_defs, Vector<ColumnDef *> &column_defs_ptr) {
     for (SizeT i = 0; i < column_defs.size(); ++i) {
         auto &wrap_column_def = column_defs[i];
         SharedPtr<TypeInfo> type_info_ptr = nullptr;
@@ -638,6 +634,22 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
         }
         auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints, default_expr);
         column_defs_ptr.push_back(column_def);
+    }
+    return None;
+}
+
+} // namespace
+
+WrapQueryResult WrapCreateTable(Infinity &instance,
+                                const String &db_name,
+                                const String &table_name,
+                                Vector<WrapColumnDef> column_defs,
+                                WrapCreateTableOptions create_table_options) {
+    Vector<TableConstraint *> constraints;
+    Vector<ColumnDef *> column_defs_ptr;
+    auto res = UnwrapColumnDefs(column_defs, column_defs_ptr);
+    if (res.has_value()) {
+        return res.value();
     }
     CreateTableOptions options;
     options.conflict_type_ = create_table_options.conflict_type_;
@@ -795,27 +807,32 @@ WrapQueryResult WrapImport(Infinity &instance, const String &db_name, const Stri
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult WrapExport(Infinity &instance, const String &db_name, const String &table_name, Vector<String> &columns, const String &path, ExportOptions export_options) {
+WrapQueryResult WrapExport(Infinity &instance,
+                           const String &db_name,
+                           const String &table_name,
+                           Vector<String> &columns,
+                           const String &path,
+                           ExportOptions export_options) {
     Vector<ParsedExpr *> *export_columns = new Vector<ParsedExpr *>();
     export_columns->reserve(columns.size());
 
     for (SizeT i = 0; i < columns.size(); ++i) {
-        auto& column_name = columns[i];
+        auto &column_name = columns[i];
         ToLower(column_name);
-        if(column_name == "_row_id") {
-            FunctionExpr* expr = new FunctionExpr();
+        if (column_name == "_row_id") {
+            FunctionExpr *expr = new FunctionExpr();
             expr->func_name_ = "row_id";
             export_columns->emplace_back(expr);
-        } else if(column_name == "_create_timestamp") {
-            FunctionExpr* expr = new FunctionExpr();
+        } else if (column_name == "_create_timestamp") {
+            FunctionExpr *expr = new FunctionExpr();
             expr->func_name_ = "create_timestamp";
             export_columns->emplace_back(expr);
-        } else if(column_name == "_delete_timestamp") {
-            FunctionExpr* expr = new FunctionExpr();
+        } else if (column_name == "_delete_timestamp") {
+            FunctionExpr *expr = new FunctionExpr();
             expr->func_name_ = "delete_timestamp";
             export_columns->emplace_back(expr);
         } else {
-            ColumnExpr* expr = new ColumnExpr();
+            ColumnExpr *expr = new ColumnExpr();
             expr->names_.emplace_back(column_name);
             export_columns->emplace_back(expr);
         }
@@ -1262,7 +1279,6 @@ WrapQueryResult WrapSearch(Infinity &instance,
     return wrap_query_result;
 }
 
-
 WrapQueryResult WrapExplain(Infinity &instance,
                             const String &db_name,
                             const String &table_name,
@@ -1338,7 +1354,6 @@ WrapQueryResult WrapExplain(Infinity &instance,
     return wrap_query_result;
 }
 
-
 WrapQueryResult WrapShowColumns(Infinity &instance, const String &db_name, const String &table_name) {
     auto query_result = instance.ShowColumns(db_name, table_name);
     if (!query_result.IsOk()) {
@@ -1370,6 +1385,25 @@ WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const St
         options.opt_params_.emplace_back(new InitParameter(std::move(param.param_name_), std::move(param.param_value_)));
     }
     auto query_result = instance.Optimize(db_name, table_name, std::move(options));
+    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+}
+
+WrapQueryResult WrapAddColumns(Infinity &instance, const String &db_name, const String &table_name, Vector<WrapColumnDef> wrapped_column_defs) {
+    Vector<ColumnDef *> column_defs_ptr;
+    auto res = UnwrapColumnDefs(wrapped_column_defs, column_defs_ptr);
+    if (res.has_value()) {
+        return res.value();
+    }
+    Vector<SharedPtr<ColumnDef>> column_defs(column_defs_ptr.size());
+    std::transform(column_defs_ptr.begin(), column_defs_ptr.end(), column_defs.begin(), [](ColumnDef *column_def) {
+        return SharedPtr<ColumnDef>(column_def);
+    });
+    auto query_result = instance.AddColumns(db_name, table_name, std::move(column_defs));
+    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+}
+
+WrapQueryResult WrapDropColumns(Infinity &instance, const String &db_name, const String &table_name, Vector<String> column_names) {
+    auto query_result = instance.DropColumns(db_name, table_name, std::move(column_names));
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

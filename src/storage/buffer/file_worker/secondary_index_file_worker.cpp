@@ -27,6 +27,7 @@ import secondary_index_data;
 import infinity_exception;
 import third_party;
 import file_system;
+import persistence_manager;
 
 namespace infinity {
 
@@ -94,13 +95,15 @@ SecondaryIndexFileWorkerParts::SecondaryIndexFileWorkerParts(SharedPtr<String> d
                                                              SharedPtr<IndexBase> index_base,
                                                              SharedPtr<ColumnDef> column_def,
                                                              u32 row_count,
-                                                             u32 part_id)
+                                                             u32 part_id,
+                                                             PersistenceManager* persistence_manager)
     : IndexFileWorker(std::move(data_dir),
                       std::move(temp_dir),
                       std::move(file_dir),
                       std::move(file_name),
                       std::move(index_base),
-                      column_def),
+                      column_def,
+                      persistence_manager),
       row_count_(row_count), part_id_(part_id) {
     data_pair_size_ = GetSecondaryIndexDataPairSize(column_def_->type());
 }

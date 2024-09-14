@@ -28,7 +28,7 @@ from infinity_embedded.local_infinity.query_builder import Query, InfinityLocalQ
 from infinity_embedded.local_infinity.types import build_result
 from infinity_embedded.local_infinity.utils import traverse_conditions, select_res_to_polars
 from infinity_embedded.local_infinity.utils import get_local_constant_expr_from_python_value
-from infinity_embedded.local_infinity.utils import name_validity_check
+from infinity_embedded.local_infinity.utils import name_validity_check, check_valid_name, get_ordinary_info
 from infinity_embedded.table import ExplainType
 from infinity_embedded.index import InitParameter
 from infinity_embedded.utils import deprecated_api
@@ -375,6 +375,19 @@ class LocalTable():
         opt_options.index_name = index_name
         opt_options.opt_params = [InitParameter(k, v).to_local_type() for k, v in opt_params.items()]
         return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
+
+    def add_columns(self, columns: dict):
+        column_defs = []
+        for index, (column_name, column_info) in enumerate(columns.items()):
+            check_valid_name(column_name, "Column")
+            get_ordinary_info(column_info, column_defs, column_name, index)
+        return self._conn.add_columns(db_name=self._db_name, table_name=self._table_name, column_defs=column_defs)
+
+
+    def drop_columns(self, columns: list[str] | str):
+        if isinstance(columns, str):
+            columns = [columns]
+        return self._conn.drop_columns(db_name=self._db_name, table_name=self._table_name, column_names=columns)
 
     def _execute_query(self, query: Query):
         # execute the query

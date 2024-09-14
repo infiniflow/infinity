@@ -20,6 +20,7 @@ import stl;
 import file_worker;
 import file_worker_type;
 import buffer_obj;
+import persistence_manager;
 
 namespace infinity {
 
@@ -29,7 +30,8 @@ public:
                            SharedPtr<String> temp_dir,
                            SharedPtr<String> file_dir,
                            SharedPtr<String> file_name,
-                           SizeT buffer_size);
+                           SizeT buffer_size,
+                           PersistenceManager* persistence_manager);
 
     virtual ~VarFileWorker() override;
 

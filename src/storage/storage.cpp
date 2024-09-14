@@ -47,6 +47,8 @@ import log_file;
 import query_context;
 import infinity_context;
 import memindex_tracer;
+import cleanup_scanner;
+import persistence_manager;
 
 namespace infinity {
 
@@ -63,6 +65,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
         LOG_WARN(fmt::format("Set unchanged mode"));
         return;
     }
+    cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
     switch (current_mode) {
         case StorageMode::kUnInitialized: {
             if (target_mode != StorageMode::kAdmin) {
@@ -95,12 +98,23 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             }
 
             // Construct buffer manager
+            String persistence_dir = config_ptr_->PersistenceDir();
+            if (!persistence_dir.empty()) {
+                if (persistence_manager_ != nullptr) {
+                    UnrecoverableError("persistence_manager was initialized before.");
+                }
+                i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
+                persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
+            }
+
+            // Construct buffer manager
             if (buffer_mgr_ != nullptr) {
                 UnrecoverableError("Buffer manager was initialized before.");
             }
             buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
                                                     MakeShared<String>(config_ptr_->DataDir()),
                                                     MakeShared<String>(config_ptr_->TempDir()),
+                                                    persistence_manager_.get(),
                                                     config_ptr_->LRUNum());
             buffer_mgr_->Start();
 
