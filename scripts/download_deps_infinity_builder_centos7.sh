@@ -27,7 +27,11 @@ https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
 https://github.com/google/brotli/archive/refs/tags/v1.1.0.tar.gz
 https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
 https://github.com/gperftools/gperftools/releases/download/gperftools-2.15/gperftools-2.15.tar.gz
-https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1w/openssl-1.1.1w.tar.gz
+https://github.com/openssl/openssl/releases/download/openssl-3.4.0-alpha1/openssl-3.4.0-alpha1.tar.gz
+https://curl.se/download/curl-8.4.0.tar.gz
+https://github.com/jpbarrette/curlpp/archive/refs/tags/v0.8.1.tar.gz
+https://github.com/zeux/pugixml/releases/download/v1.14/pugixml-1.14.tar.gz
+https://github.com/benhoyt/inih/archive/refs/tags/r58.tar.gz
 https://dlcdn.apache.org/thrift/0.20.0/thrift-0.20.0.tar.gz
 https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tar.xz
 https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tar.xz

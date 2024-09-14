@@ -141,15 +141,15 @@ RUN --mount=type=bind,source=gperftools-2.15.tar.gz,target=/root/gperftools-2.15
 RUN --mount=type=bind,source=sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz,target=/root/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz \
     cd /tmp && tar xzf /root/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
 
+# Install dependency for openssl install
+RUN yum install perl-IPC-Cmd && yum clean all
+
 # OpenSSL
-# pyhton 3.6+ ssl module requires openssl 1.1.1+
-# "OpenSSL 1.1.x is not fully source compatible with OpenSSL 1.0.2." refers to https://github.com/openssl/openssl/issues/9772.
-# This means installing to /usr/local/lib may break app compilation.
-RUN --mount=type=bind,source=openssl-1.1.1w.tar.gz,target=/root/openssl-1.1.1w.tar.gz  \
-    cd /root && tar xzf openssl-1.1.1w.tar.gz \
-    && cd openssl-1.1.1w && ./config --prefix=/usr/local/openssl --openssldir=/usr/local/openssl shared \
+RUN --mount=type=bind,source=openssl-3.4.0-alpha1.tar.gz,target=/root/openssl-3.4.0-alpha1.tar.gz  \
+    cd /root && tar xzf openssl-3.4.0-alpha1.tar.gz \
+    && cd openssl-3.4.0-alpha1 && ./Configure \
     && make -j 8 && make install \
-    && ldconfig && cd /root && rm -rf openssl-1.1.1w
+    && ldconfig && cd /root && rm -rf openssl-3.4.0-alpha1
 
 # packages need by python optional modules: _dbm _gdbm _lzma _sqlite3 _tkinter _uuid
 # Too old: ncurses-devel sqlite-devel
@@ -200,6 +200,34 @@ RUN --mount=type=bind,source=thrift-0.20.0.tar.gz,target=/root/thrift-0.20.0.tar
     && cd thrift-0.20.0/build && cmake -G Ninja .. && ninja thrift-compiler \
     && cp compiler/cpp/bin/thrift /usr/local/bin/thrift \
     && cd /root && rm -rf thrift-0.20.0
+
+# Install curl 8.4.0
+RUN --mount=type=bind,source=curl-8.4.0.tar.gz,target=/root/curl-8.4.0.tar.gz  \
+    cd /root && tar xzf curl-8.4.0.tar.gz \
+    && cd curl-8.4.0 && ./configure --with-openssl --disable-shared --without-libpsl \
+    && make -j 8 && make install \
+    && cd /root && rm -rf curl-8.4.0
+
+# Install curlpp 0.8.1
+RUN --mount=type=bind,source=v0.8.1.tar.gz,target=/root/v0.8.1.tar.gz  \
+    cd /root && tar xzf v0.8.1.tar.gz \
+    && cd curlpp-0.8.1 && mkdir build && cd build \
+    && cmake .. && cmake --build . && cmake --install . \
+    && cd /root && rm -rf curlpp-0.8.1
+
+# Install pugixml 1.14
+RUN --mount=type=bind,source=pugixml-1.14.tar.gz,target=/root/pugixml-1.14.tar.gz  \
+    cd /root && tar xzf pugixml-1.14.tar.gz \
+    && cd pugixml-1.14 && mkdir build && cd build \
+    && cmake .. && cmake --build . && cmake --install . \
+    && cd /root && rm -rf pugixml-1.14
+
+# Install inih r58
+RUN --mount=type=bind,source=r58.tar.gz,target=/root/r58.tar.gz  \
+    cd /root && tar xzf r58.tar.gz \
+    && cd inih-r58 && pip install meson \
+    && mkdir build && cd build && meson setup --prefix=/usr --buildtype=release .. && ninja && ninja install \
+    && cd /root && rm -rf inih-r58
 
 RUN yum -y install expat-static\
     && yum clean all
