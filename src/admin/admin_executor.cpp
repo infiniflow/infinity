@@ -3951,10 +3951,12 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     switch (admin_server_role) {
         case AdminNodeRole::kAdmin: {
             status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+            LOG_INFO("Start in ADMIN mode");
             break;
         }
         case AdminNodeRole::kStandalone: {
             status = InfinityContext::instance().ChangeRole(NodeRole::kStandalone);
+            LOG_INFO("Start in STANDALONE mode");
             break;
         }
         case AdminNodeRole::kLeader: {
@@ -3980,6 +3982,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 return query_result;
             }
             status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, node_name);
+            LOG_INFO("Start in LEADER mode");
             break;
         }
         case AdminNodeRole::kFollower: {
@@ -4014,6 +4017,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             }
 
             status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, node_name, leader_ip, leader_port);
+            LOG_INFO("Start in FOLLOWER mode");
             break;
         }
         case AdminNodeRole::kLearner: {
@@ -4048,6 +4052,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             }
 
             status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, node_name, leader_ip, leader_port);
+            LOG_INFO("Start in FOLLOWER mode");
             break;
         }
     }
