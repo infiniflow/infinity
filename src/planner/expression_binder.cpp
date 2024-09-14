@@ -56,6 +56,8 @@ import function_set;
 import scalar_function_set;
 import scalar_function;
 import special_function;
+import cast_function;
+import bound_cast_func;
 import status;
 
 import query_context;
@@ -81,6 +83,7 @@ import data_type;
 import expression_type;
 import catalog;
 import table_entry;
+import column_vector;
 
 namespace infinity {
 
@@ -542,18 +545,69 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(argument_count);
 
+    //in operator, all data type shouhld be the same
+    SharedPtr<DataType> arguments_type = nullptr;
+
     for (SizeT idx = 0; idx < argument_count; ++idx) {
+        if (expr.arguments_->at(idx)->type_ != ParsedExprType::kConstant) {
+            Status status = Status::SyntaxError("In expression now only supports constant list!");
+            RecoverableError(status);
+        }
         auto bound_argument_expr = BuildExpression(*expr.arguments_->at(idx), bind_context_ptr, depth, false);
+
+        if(arguments_type != nullptr && bound_argument_expr->Type() != *arguments_type) { 
+            Status status = Status::SyntaxError("Expressions in In expression must be of the same data type!");
+            RecoverableError(status);
+        } else if(arguments_type == nullptr){
+            arguments_type = MakeShared<DataType>(bound_argument_expr->Type());
+        }
+
         arguments.emplace_back(bound_argument_expr);
     }
 
     InType in_type{InType::kIn};
-    if (expr.not_in_) {
-        in_type = InType::kNotIn;
-    } else {
+    if (expr.in_) {
         in_type = InType::kIn;
+    } else {
+        in_type = InType::kNotIn;
     }
+
     SharedPtr<InExpression> in_expression_ptr = MakeShared<InExpression>(in_type, bound_left_expr, arguments);
+
+    //if match
+    if(arguments_type->type() == bound_left_expr->Type().type()) {
+        for(SizeT idx = 0; idx < argument_count; idx++) {
+            ValueExpression* val_expr = static_cast<ValueExpression *>(arguments[idx].get());
+            Value val = val_expr->GetValue();
+            in_expression_ptr->TryPut(std::move(val));
+        }
+    } else if(CastExpression::CanCast(*arguments_type, bound_left_expr->Type())) {
+        //cast
+        BoundCastFunc cast = CastFunction::GetBoundFunc(*arguments_type, bound_left_expr->Type());
+
+        SharedPtr<ColumnVector> argument_column_vector = MakeShared<ColumnVector>(arguments_type);
+        argument_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+
+        for(SizeT idx = 0; idx < argument_count; idx++) {
+            ValueExpression* val_expr = static_cast<ValueExpression *>(arguments[idx].get());
+            argument_column_vector->AppendValue(val_expr->GetValue());
+        }
+
+        SharedPtr<ColumnVector> cast_column_vector = MakeShared<ColumnVector>(MakeShared<DataType>(bound_left_expr->Type()));
+        //will overflow when passing argument_count
+        cast_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+        CastParameters cast_parameters;
+        cast.function(argument_column_vector, cast_column_vector, argument_count, cast_parameters);
+
+        for(SizeT idx = 0; idx < argument_count; idx++) {
+            Value val = cast_column_vector->GetValue(idx);
+            in_expression_ptr->TryPut(std::move(val));
+        }
+    } else { 
+        Status status = Status::NotSupportedTypeConversion(arguments_type->ToString(), bound_left_expr->Type().ToString());
+        RecoverableError(status);
+    } 
+
     return in_expression_ptr;
 }
 
@@ -705,7 +759,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     // Create query embedding
     EmbeddingT query_embedding((ptr_t)parsed_knn_expr.embedding_data_ptr_, false);
 
-    if(parsed_knn_expr.ignore_index_ && !parsed_knn_expr.index_name_.empty()) {
+    if (parsed_knn_expr.ignore_index_ && !parsed_knn_expr.index_name_.empty()) {
         Status status = Status::SyntaxError(fmt::format("Force to use index {} conflicts with Ignore index flag.", parsed_knn_expr.index_name_));
         RecoverableError(std::move(status));
     }

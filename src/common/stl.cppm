@@ -205,7 +205,7 @@ export namespace std {
 
         using std::chrono::high_resolution_clock;
     } // namespace chrono
-
+    
     using std::format;
     using std::cout;
     using std::cerr;
@@ -374,8 +374,8 @@ namespace infinity {
     template<typename S, typename T, typename H = std::hash<S>>
     using MultiHashMap = std::unordered_multimap<S, T, H>;
 
-    template<typename S>
-    using HashSet = std::unordered_set<S>;
+    template<typename S, typename T = std::hash<S>, typename Eq = std::equal_to<S>>
+    using HashSet = std::unordered_set<S, T, Eq>;
 
     template<typename T>
     using MaxHeap = std::priority_queue<T>;
