@@ -151,7 +151,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             // start WalManager after TxnManager since it depends on TxnManager.
             wal_mgr_->Start();
 
-            if (target_mode == StorageMode::kWritable) {
+            if (system_start_ts == 0 && target_mode == StorageMode::kWritable) {
                 CreateDefaultDB();
             }
 
