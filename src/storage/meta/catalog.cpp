@@ -520,18 +520,8 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
     return json_res;
 }
 
-UniquePtr<Catalog> Catalog::NewCatalog(bool create_default_db) {
+UniquePtr<Catalog> Catalog::NewCatalog() {
     auto catalog = MakeUnique<Catalog>();
-    if (create_default_db) {
-        // db current dir is same level as catalog
-        UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(MakeShared<String>("default_db"));
-        SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->db_name(), 0, 0);
-        // TODO commit ts == 0 is true??
-        db_entry->commit_ts_ = 0;
-        db_meta->PushFrontEntry(db_entry);
-
-        catalog->db_meta_map_.AddNewMetaNoLock("default_db", std::move(db_meta));
-    }
     return catalog;
 }
 

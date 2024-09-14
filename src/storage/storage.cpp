@@ -49,6 +49,7 @@ import infinity_context;
 import memindex_tracer;
 import cleanup_scanner;
 import persistence_manager;
+import extra_ddl_info;
 
 namespace infinity {
 
@@ -91,7 +92,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from Admin to Admin");
             }
 
-            if(target_mode == StorageMode::kUnInitialized) {
+            if (target_mode == StorageMode::kUnInitialized) {
                 wal_mgr_.reset();
                 LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
                 break;
@@ -121,6 +122,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             // Must init catalog before txn manager.
             // Replay wal file wrap init catalog
             TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile();
+            if (system_start_ts == 0) {
+                // Init database, need to create default_db
+                LOG_INFO(fmt::format("Init a new catalog"));
+                new_catalog_ = Catalog::NewCatalog();
+            }
 
             BuiltinFunctions builtin_functions(new_catalog_);
             builtin_functions.Init();
@@ -144,6 +150,10 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
             // start WalManager after TxnManager since it depends on TxnManager.
             wal_mgr_->Start();
+
+            if (target_mode == StorageMode::kWritable) {
+                CreateDefaultDB();
+            }
 
             if (memory_index_tracer_ != nullptr) {
                 UnrecoverableError("Memory index tracer was initialized before.");
@@ -221,7 +231,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 wal_mgr_->Stop();
                 wal_mgr_.reset();
-                if(target_mode == StorageMode::kAdmin) {
+                if (target_mode == StorageMode::kAdmin) {
                     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
                     wal_mgr_ = MakeUnique<WalManager>(this,
                                                       config_ptr_->WALDir(),
@@ -255,7 +265,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 periodic_trigger_thread_->Stop();
                 i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
                 i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-//                i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+                //                i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
                 i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
                 i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
                 periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
@@ -291,7 +301,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 wal_mgr_->Stop();
                 wal_mgr_.reset();
-                if(target_mode == StorageMode::kAdmin) {
+                if (target_mode == StorageMode::kAdmin) {
                     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
                     wal_mgr_ = MakeUnique<WalManager>(this,
                                                       config_ptr_->WALDir(),
@@ -335,9 +345,15 @@ void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vect
     new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
-void Storage::InitNewCatalog() {
-    LOG_INFO("Init new catalog");
-    new_catalog_ = Catalog::NewCatalog(true);
+void Storage::CreateDefaultDB() {
+    Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"));
+
+    // Txn1: Create db1, OK
+    Status status = new_txn->CreateDatabase("default_db", ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError("Can't initial 'default_db'");
+    }
+    txn_mgr_->CommitTxn(new_txn);
 }
 
 } // namespace infinity

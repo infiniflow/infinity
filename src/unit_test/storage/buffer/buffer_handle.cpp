@@ -39,7 +39,7 @@ TEST_P(BufferHandleTest, test1) {
     String data_dir(GetFullDataDir());
     auto temp_dir = MakeShared<String>(data_dir + "/spill");
     auto base_dir = MakeShared<String>(GetFullDataDir());
-    auto persistence_dir = MakeShared<String>(data_dir + "persistence_dir");
+    auto persistence_dir = MakeShared<String>(data_dir + "/persistence");
 
     UniquePtr<PersistenceManager> persistence_manager = MakeUnique<PersistenceManager>(*persistence_dir, *base_dir, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager.get());
