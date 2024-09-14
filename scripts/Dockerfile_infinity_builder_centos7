@@ -142,12 +142,12 @@ RUN --mount=type=bind,source=sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.
     cd /tmp && tar xzf /root/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
 
 # Install dependency for openssl install
-RUN yum install perl-IPC-Cmd && yum clean all
+RUN yum -y install perl-IPC-Cmd && yum clean all
 
 # OpenSSL
 RUN --mount=type=bind,source=openssl-3.4.0-alpha1.tar.gz,target=/root/openssl-3.4.0-alpha1.tar.gz  \
     cd /root && tar xzf openssl-3.4.0-alpha1.tar.gz \
-    && cd openssl-3.4.0-alpha1 && ./Configure \
+    && cd openssl-3.4.0-alpha1 && ./config --prefix=/usr/local/openssl --openssldir=/usr/local/openssl shared \
     && make -j 8 && make install \
     && ldconfig && cd /root && rm -rf openssl-3.4.0-alpha1
 
@@ -158,37 +158,20 @@ RUN yum install -y gdbm-devel sqlite-devel xz-devel libffi-devel libuuid-devel b
     && yum clean all
 
 # We need build a wheel for each supported Python minor version. Refers to https://github.com/wjakob/nanobind/pull/561.
-# Install Python 3.10
-RUN --mount=type=bind,source=Python-3.10.14.tar.xz,target=/root/Python-3.10.14.tar.xz  \
-    cd /root && tar xJf Python-3.10.14.tar.xz \
-    && cd Python-3.10.14 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
-    && ldconfig && cd /root && rm -rf Python-3.10.14
+# Install Miniconda
+Run cd /root && mkdir -p ~/miniconda3 && bash /root/Miniconda3-latest-Linux-x86_64.sh -b -u -p ~/miniconda3 \
+&& ~/miniconda3/bin/conda init bash && ~/miniconda3/bin/conda init zsh \
+&& source ~/.bashrc && cd /root
 
-# Install Python 3.11
-RUN --mount=type=bind,source=Python-3.11.9.tar.xz,target=/root/Python-3.11.9.tar.xz  \
-cd /root && tar xJf Python-3.11.9.tar.xz \
-&& cd Python-3.11.9 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
-&& ldconfig && cd /root && rm -rf Python-3.11.9
-
-# Install Python 3.12
-RUN --mount=type=bind,source=Python-3.12.4.tar.xz,target=/root/Python-3.12.4.tar.xz  \
-cd /root && tar xJf Python-3.12.4.tar.xz \
-&& cd Python-3.12.4 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
-&& ldconfig && cd /root && rm -rf Python-3.12.4
+# Create venv
+Run conda create -n venv3.10 python=3.10 && conda create -n venv3.11 python=3.11 && conda create -n venv3.12 python=3.12
 
 RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.pku.edu.cn" && pip3 config set global.extra-index-url "https://mirrors.pku.edu.cn/pypi/web/simple"
 
 # Install tools for building and uploading a python wheel.
-RUN /usr/local/bin/pip3.10 install wheel auditwheel patchelf twine
-RUN /usr/local/bin/pip3.11 install wheel auditwheel patchelf twine
-RUN /usr/local/bin/pip3.12 install wheel auditwheel patchelf twine
-
-# Create a python virtual environment for each python version. Set PATH so that the shell activate a virtual environment automatically when entering a container from this image.
-RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt /usr/local/bin/python3.10 -m venv /usr/local/venv310 && source /usr/local/venv310/bin/activate && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt
-
-RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt /usr/local/bin/python3.11 -m venv /usr/local/venv311 && source /usr/local/venv311/bin/activate && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt
-
-RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt /usr/local/bin/python3.12 -m venv /usr/local/venv312 && source /usr/local/venv312/bin/activate && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt
+Run conda activate venv3.10 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt&& conda deactivate
+Run conda activate venv3.11 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt&& conda deactivate
+Run conda activate venv3.12 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt&& conda deactivate
 
 # https://github.com/llvm/llvm-project/issues/96210
 # https://github.com/llvm/llvm-project/issues/57276

@@ -33,9 +33,7 @@ https://github.com/jpbarrette/curlpp/archive/refs/tags/v0.8.1.tar.gz
 https://github.com/zeux/pugixml/releases/download/v1.14/pugixml-1.14.tar.gz
 https://github.com/benhoyt/inih/archive/refs/tags/r58.tar.gz
 https://dlcdn.apache.org/thrift/0.20.0/thrift-0.20.0.tar.gz
-https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tar.xz
-https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tar.xz
-https://www.python.org/ftp/python/3.12.4/Python-3.12.4.tar.xz"
+https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 
 SAVEIFS=$IFS   # Save current IFS (Internal Field Separator)
 IFS=$'\n'      # Change IFS to newline char
