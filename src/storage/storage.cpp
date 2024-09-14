@@ -121,7 +121,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
             // Must init catalog before txn manager.
             // Replay wal file wrap init catalog
-            TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile();
+            TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(target_mode);
             if (system_start_ts == 0) {
                 // Init database, need to create default_db
                 LOG_INFO(fmt::format("Init a new catalog"));

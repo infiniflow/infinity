@@ -31,13 +31,6 @@ export module storage;
 
 namespace infinity {
 
-export enum class StorageMode {
-    kUnInitialized,
-    kAdmin,
-    kReadable,
-    kWritable,
-};
-
 class CleanupInfoTracer;
 
 export class Storage {

@@ -32,6 +32,13 @@ class TableEntry;
 class Txn;
 struct SegmentEntry;
 
+export enum class StorageMode {
+    kUnInitialized,
+    kAdmin,
+    kReadable,
+    kWritable,
+};
+
 export class WalManager {
 public:
     WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
@@ -63,7 +70,7 @@ public:
 
     String GetWalFilename() const;
 
-    i64 ReplayWalFile();
+    i64 ReplayWalFile(StorageMode targe_storage_mode);
 
     Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> GetCatalogFiles() const;
 
