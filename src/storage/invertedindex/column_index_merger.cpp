@@ -122,7 +122,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             }
         }
 
-        auto [file_handler, status] = fs_.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+        auto [file_handler, status] = fs_.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

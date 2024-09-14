@@ -43,7 +43,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 
     if(persistence_manager_ != nullptr && !to_spill) {
         String write_dir = *file_dir_;
-        String write_path = fmt::format("{}/{}", write_dir, *file_name_);
+        String write_path = Path(*data_dir_) / write_dir / *file_name_;
         String tmp_write_path = Path(*temp_dir_) / StringTransform(write_path, "/", "_");
 
         u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;

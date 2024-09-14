@@ -83,8 +83,8 @@ MemoryIndexer::MemoryIndexer(const String &index_dir, const String &base_name, R
     assert(std::filesystem::path(index_dir).is_absolute());
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
-    Path path = Path(index_dir) / (base_name + ".tmp.merge");
-    spill_full_path_ = path.string();
+    spill_full_path_ = Path(index_dir) / (base_name + ".tmp.merge");
+    spill_full_path_ = Path(InfinityContext::instance().config()->TempDir()) / StringTransform(spill_full_path_, "/", "_");
 }
 
 MemoryIndexer::~MemoryIndexer() {
@@ -284,8 +284,8 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, tmp_dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
 
-    String fst_file = dict_file + ".fst";
-    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
+    String tmp_fst_file = tmp_dict_file + ".fst";
+    std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
 
@@ -306,8 +306,8 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         posting_file_writer->Sync();
         dict_file_writer->Sync();
         fst_builder.Finish();
-        fs.AppendFile(dict_file, fst_file);
-        fs.DeleteFile(fst_file);
+        fs.AppendFile(tmp_dict_file, tmp_fst_file);
+        fs.DeleteFile(tmp_fst_file);
     }
     auto [file_handler, status] = fs.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
     if (!status.ok()) {
@@ -409,8 +409,8 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, tmp_posting_file, 128000);
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, tmp_dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
-    String fst_file = index_prefix + DICT_SUFFIX + ".fst";
-    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
+    String tmp_fst_file = tmp_dict_file + ".fst";
+    std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
 
@@ -481,8 +481,8 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     posting_file_writer->Sync();
     dict_file_writer->Sync();
     fst_builder.Finish();
-    fs.AppendFile(dict_file, fst_file);
-    fs.DeleteFile(fst_file);
+    fs.AppendFile(tmp_dict_file, tmp_fst_file);
+    fs.DeleteFile(tmp_fst_file);
 
     auto [file_handler, status] = fs.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
     if (!status.ok()) {
