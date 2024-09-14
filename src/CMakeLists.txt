@@ -9,6 +9,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAK
 ### Parser
 
 add_subdirectory(parser)
+
 ### Infinity
 
 ### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
@@ -18,46 +19,46 @@ add_subdirectory(parser)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
 if(APPLE)
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA" 
-                RESULT_VARIABLE SUPPORT_FMA
-                OUTPUT_QUIET
-                ERROR_QUIET)
+    execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA"
+            RESULT_VARIABLE SUPPORT_FMA
+            OUTPUT_QUIET
+            ERROR_QUIET)
 
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
-                RESULT_VARIABLE SUPPORT_SSE42
-                OUTPUT_QUIET
-                ERROR_QUIET)
+    execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
+            RESULT_VARIABLE SUPPORT_SSE42
+            OUTPUT_QUIET
+            ERROR_QUIET)
 
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
-                RESULT_VARIABLE SUPPORT_AVX2
-                OUTPUT_QUIET
-                ERROR_QUIET)
+    execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
+            RESULT_VARIABLE SUPPORT_AVX2
+            OUTPUT_QUIET
+            ERROR_QUIET)
 
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
-                RESULT_VARIABLE SUPPORT_AVX512
-                OUTPUT_QUIET
-                ERROR_QUIET)
+    execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
+            RESULT_VARIABLE SUPPORT_AVX512
+            OUTPUT_QUIET
+            ERROR_QUIET)
 else()
-        #Linux
-        execute_process(COMMAND grep -q fma /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_FMA
-                OUTPUT_QUIET
-                ERROR_QUIET)
+    #Linux
+    execute_process(COMMAND grep -q fma /proc/cpuinfo
+            RESULT_VARIABLE SUPPORT_FMA
+            OUTPUT_QUIET
+            ERROR_QUIET)
 
-        execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_SSE42
-                OUTPUT_QUIET
-                ERROR_QUIET)
+    execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
+            RESULT_VARIABLE SUPPORT_SSE42
+            OUTPUT_QUIET
+            ERROR_QUIET)
 
-        execute_process(COMMAND grep -q avx2 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_AVX2
-                OUTPUT_QUIET
-                ERROR_QUIET)
+    execute_process(COMMAND grep -q avx2 /proc/cpuinfo
+            RESULT_VARIABLE SUPPORT_AVX2
+            OUTPUT_QUIET
+            ERROR_QUIET)
 
-        execute_process(COMMAND grep -q avx512 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_AVX512
-                OUTPUT_QUIET
-                ERROR_QUIET)
+    execute_process(COMMAND grep -q avx512 /proc/cpuinfo
+            RESULT_VARIABLE SUPPORT_AVX512
+            OUTPUT_QUIET
+            ERROR_QUIET)
 endif()
 
 
@@ -137,13 +138,13 @@ file(GLOB_RECURSE
         metrics_cpp
         CONFIGURE_DEPENDS
         metrics/*.cpp
-        )
+)
 
 file(GLOB_RECURSE
         metrics_cppm
         CONFIGURE_DEPENDS
         metrics/*.cppm
-        )
+)
 
 file(GLOB_RECURSE
         planner_cpp
@@ -224,8 +225,6 @@ add_library(infinity_core
         ${admin_cpp}
         ${network_cpp}
 )
-message(status " ----------------- ${AWSSDK_LINK_LIBRARIES}")
-#target_link_libraries(infinity_core libaws-cpp-sdk-s3.so libaws-cpp-sdk-core.so)
 
 target_sources(infinity_core
         PUBLIC
@@ -298,12 +297,12 @@ endif ()
 add_executable(infinity
         ${main_cpp}
 
-#        network/http_server.cppm
-#        network/http_server.cpp
-#        network/http/http_search.cppm
-#        network/http/http_search.cpp
-#        network/infinity_thrift_service.cpp
-#        network/infinity_thrift_service.cppm
+        #        network/http_server.cppm
+        #        network/http_server.cpp
+        #        network/http/http_search.cppm
+        #        network/http/http_search.cpp
+        #        network/infinity_thrift_service.cpp
+        #        network/infinity_thrift_service.cppm
 )
 
 #target_sources(infinity
@@ -312,7 +311,7 @@ add_executable(infinity
 #        ${network_cppm}
 #)
 
-add_dependencies(infinity oatpp)
+add_dependencies(infinity oatpp miniocpp)
 
 target_link_libraries(infinity
         infinity_core
@@ -331,7 +330,7 @@ target_link_libraries(infinity
         event.a
         c++.a
         c++abi.a
-#        profiler
+        #        profiler
         oatpp.a
         parquet.a
         arrow.a
@@ -350,64 +349,65 @@ target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thri
 target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 
 if (SKBUILD)
-add_library(embedded_infinity_ext MODULE
-        embedded_infinity_ext.cpp
-        embedded_infinity/wrap_infinity.cpp
-)
+    add_library(embedded_infinity_ext MODULE
+            embedded_infinity_ext.cpp
+            embedded_infinity/wrap_infinity.cpp
+    )
 
-target_sources(embedded_infinity_ext
-        PRIVATE
-        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-        embedded_infinity/wrap_infinity.cppm
-)
+    target_sources(embedded_infinity_ext
+            PRIVATE
+            FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+            embedded_infinity/wrap_infinity.cppm
+    )
 
-nanobind_compile_options(embedded_infinity_ext)
-nanobind_link_options(embedded_infinity_ext)
-set_target_properties(embedded_infinity_ext PROPERTIES LINKER_LANGUAGE CXX)
-set(libname "nanobind-static-abi3")
-nanobind_build_library(${libname})
-nanobind_extension_abi3(embedded_infinity_ext)
-add_dependencies(embedded_infinity_ext oatpp)
+    nanobind_compile_options(embedded_infinity_ext)
+    nanobind_link_options(embedded_infinity_ext)
+    set_target_properties(embedded_infinity_ext PROPERTIES LINKER_LANGUAGE CXX)
+    set(libname "nanobind-static-abi3")
+    nanobind_build_library(${libname})
+    nanobind_extension_abi3(embedded_infinity_ext)
+    add_dependencies(embedded_infinity_ext oatpp miniocpp)
 
-target_link_libraries(embedded_infinity_ext PRIVATE
-        ${libname}
-        infinity_core
-        sql_parser
-        onnxruntime_mlas
-        zsv_parser
-        newpfor
-        fastpfor
-        jma
-        opencc
-        dl
-        lz4.a
-        atomic.a
-        event.a
-        oatpp.a
-        c++.a
-        c++abi.a
-        parquet.a
-        arrow.a
-        thrift.a
-        thriftnb.a
-        snappy.a
-        ${JEMALLOC_STATIC_LIB}
-        ${AWSSDK_LINK_LIBRARIES}
-)
+    target_link_libraries(embedded_infinity_ext PRIVATE
+            ${libname}
+            infinity_core
+            sql_parser
+            onnxruntime_mlas
+            zsv_parser
+            newpfor
+            fastpfor
+            jma
+            opencc
+            dl
+            lz4.a
+            atomic.a
+            event.a
+            oatpp.a
+            c++.a
+            c++abi.a
+            parquet.a
+            arrow.a
+            thrift.a
+            thriftnb.a
+            snappy.a
+            ${JEMALLOC_STATIC_LIB}
+            miniocpp.a
+    )
 
-# WARN: python modules shall not link to static libstdc++!!!
-target_link_options(embedded_infinity_ext PRIVATE -static-libgcc)
-set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    # WARN: python modules shall not link to static libstdc++!!!
+    target_link_options(embedded_infinity_ext PRIVATE -static-libgcc)
+    set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
-target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
-target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
-nanobind_disable_stack_protector(embedded_infinity_ext)
-nanobind_opt_size(embedded_infinity_ext)
-nanobind_strip(embedded_infinity_ext)
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+    nanobind_disable_stack_protector(embedded_infinity_ext)
+    nanobind_opt_size(embedded_infinity_ext)
+    nanobind_strip(embedded_infinity_ext)
 
-install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity_embedded)
+    install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity_embedded)
 endif ()
 
 ### unit test
@@ -506,8 +506,8 @@ add_executable(unit_test
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp)
-find_package(ZLIB QUIET)
+add_dependencies(unit_test oatpp miniocpp)
+
 target_link_libraries(unit_test
         gtest
         gtest_main
@@ -532,19 +532,20 @@ target_link_libraries(unit_test
         thrift.a
         thriftnb.a
         event.a
-        ${AWSSDK_LINK_LIBRARIES}
+        miniocpp.a
 )
 
-target_link_directories(unit_test PUBLIC "/usr/local/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
 
 target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${ut_dependent_cppm}
+        ${network_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
