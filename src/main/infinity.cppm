@@ -159,6 +159,10 @@ public:
 
     QueryResult Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_options = OptimizeOptions{});
 
+    QueryResult AddColumns(const String &db_name, const String &table_name, Vector<SharedPtr<ColumnDef>> column_defs);
+
+    QueryResult DropColumns(const String &db_name, const String &table_name, Vector<String> column_names);
+
 private:
     SharedPtr<BaseSession> session_{};
 };

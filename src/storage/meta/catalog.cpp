@@ -1046,6 +1046,13 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 
     for (auto &op : flush_delta_entry->operations()) {
         switch (op->GetType()) {
+            case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
+                auto *column_entry_op = static_cast<AddColumnEntryOp *>(op.get());
+                LOG_TRACE(fmt::format("Flush column entry: {}", column_entry_op->ToString()));
+                column_entry_op->FlushDataToDisk(max_commit_ts);
+                LOG_TRACE(fmt::format("Flush column entry done"));
+                break;
+            }
             case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
                 auto *block_entry_op = static_cast<AddBlockEntryOp *>(op.get());
                 LOG_TRACE(fmt::format("Flush block entry: {}", block_entry_op->ToString()));

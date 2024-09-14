@@ -5,12 +5,14 @@ time_zone = "utc-8"
 [network]
 [log]
 log_to_stdout = true
+log_level = "trace"
 
 [storage]
 data_dir = "/var/infinity/data"
 optimize_interval = "0s"
 cleanup_interval = "1s"
 compact_interval = "0s"
+persistence_dir = ""
 
 [buffer]
 [wal]

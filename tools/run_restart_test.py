@@ -28,6 +28,8 @@ if __name__ == "__main__":
             # "--capture=tee-sys",
             f"{python_test_dir}/restart_test",
             f"--infinity_path={infinity_path}",
+            "-x",
+            "-s",
             "-m",
             "not slow"
         ]

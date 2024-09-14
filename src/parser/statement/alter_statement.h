@@ -25,20 +25,15 @@ enum class AlterStatementType : uint8_t {
     kRenameTable,
     kAddColumns,
     kDropColumns,
-    kAlterColumn,
-    kRenameColumn,
 };
 
 class AlterStatement : public BaseStatement {
 public:
-    AlterStatement(TableName *table_name, AlterStatementType type) : BaseStatement(StatementType::kAlter), type_(type) {
-        if (table_name->schema_name_ptr_ != nullptr) {
-            schema_name_ = table_name->schema_name_ptr_;
-            free(table_name->schema_name_ptr_);
+    AlterStatement(const char *schema_name, const char *table_name, AlterStatementType type) : BaseStatement(StatementType::kAlter), type_(type) {
+        if (schema_name != nullptr) {
+            schema_name_ = schema_name;
         }
-        table_name_ = table_name->table_name_ptr_;
-        free(table_name->table_name_ptr_);
-        delete table_name;
+        table_name_ = table_name;
     }
 
     ~AlterStatement() = default;
@@ -51,7 +46,8 @@ public:
 
 class RenameTableStatement final : public AlterStatement {
 public:
-    RenameTableStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kRenameTable) {}
+    RenameTableStatement(const char *schema_name, const char *table_name)
+        : AlterStatement(schema_name, table_name, AlterStatementType::kRenameTable) {}
 
     ~RenameTableStatement() = default;
 
@@ -60,59 +56,27 @@ public:
     std::string new_table_name_;
 };
 
-class AddColumnStatement final : public AlterStatement {
+class AddColumnsStatement final : public AlterStatement {
 public:
-    AddColumnStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kAddColumns) {}
+    AddColumnsStatement(const char *schema_name, const char *table_name) : AlterStatement(schema_name, table_name, AlterStatementType::kAddColumns) {}
 
-    ~AddColumnStatement() {
-        if (column_def_ != nullptr) {
-            delete column_def_;
-            column_def_ = nullptr;
-        }
-    }
+    ~AddColumnsStatement() = default;
 
-    std::string ToString() const final { return "AddColumnStatement"; }
+    std::string ToString() const final { return "AddColumnsStatement"; }
 
-    ColumnDef *column_def_{};
+    std::vector<std::shared_ptr<ColumnDef>> column_defs_{};
 };
 
-class DropColumnStatement final : public AlterStatement {
+class DropColumnsStatement final : public AlterStatement {
 public:
-    DropColumnStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kDropColumns) {}
+    DropColumnsStatement(const char *schema_name, const char *table_name)
+        : AlterStatement(schema_name, table_name, AlterStatementType::kDropColumns) {}
 
-    ~DropColumnStatement() = default;
+    ~DropColumnsStatement() = default;
 
-    std::string ToString() const final { return "DropColumnStatement"; }
+    std::string ToString() const final { return "DropColumnsStatement"; }
 
-    std::string column_name_;
-};
-
-class AlterColumnStatement final : public AlterStatement {
-public:
-    AlterColumnStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kAlterColumn) {}
-
-    ~AlterColumnStatement() {
-        if (column_def_ != nullptr) {
-            delete column_def_;
-            column_def_ = nullptr;
-        }
-    }
-
-    std::string ToString() const final { return "AlterColumnStatement"; }
-
-    ColumnDef *column_def_{};
-};
-
-class RenameColumnStatement final : public AlterStatement {
-public:
-    RenameColumnStatement(TableName *table_name) : AlterStatement(table_name, AlterStatementType::kRenameColumn) {}
-
-    ~RenameColumnStatement() {}
-
-    std::string ToString() const final { return "RenameColumnStatement"; }
-
-    std::string column_name_;
-    std::string new_column_name_;
+    std::vector<std::string> column_names_;
 };
 
 } // namespace infinity

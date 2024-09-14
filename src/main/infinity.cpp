@@ -46,6 +46,8 @@ import insert_statement;
 import copy_statement;
 import delete_statement;
 import optimize_statement;
+import alter_statement;
+import statement_common;
 
 import create_schema_info;
 import drop_schema_info;
@@ -1036,13 +1038,13 @@ Infinity::Search(const String &db_name, const String &table_name, SearchExpr *se
 }
 
 QueryResult Infinity::Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_option) {
-    UniquePtr<QueryContext> optimize_context_ptr = MakeUnique<QueryContext>(session_.get());
-    optimize_context_ptr->Init(InfinityContext::instance().config(),
-                               InfinityContext::instance().task_scheduler(),
-                               InfinityContext::instance().storage(),
-                               InfinityContext::instance().resource_manager(),
-                               InfinityContext::instance().session_manager(),
-                               InfinityContext::instance().persistence_manager());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<OptimizeStatement> optimize_statement = MakeUnique<OptimizeStatement>();
 
     optimize_statement->schema_name_ = db_name;
@@ -1061,7 +1063,39 @@ QueryResult Infinity::Optimize(const String &db_name, const String &table_name, 
         }
     }
 
-    QueryResult result = optimize_context_ptr->QueryStatement(optimize_statement.get());
+    QueryResult result = query_context_ptr->QueryStatement(optimize_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AddColumns(const String &db_name, const String &table_name, Vector<SharedPtr<ColumnDef>> column_defs) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto add_columns_statement = MakeUnique<AddColumnsStatement>(db_name.c_str(), table_name.c_str());
+    add_columns_statement->column_defs_ = std::move(column_defs);
+
+    QueryResult result = query_context_ptr->QueryStatement(add_columns_statement.get());
+    return result;
+}
+
+QueryResult Infinity::DropColumns(const String &db_name, const String &table_name, Vector<String> column_names) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto drop_columns_statement = MakeUnique<DropColumnsStatement>(db_name.c_str(), table_name.c_str());
+    drop_columns_statement->column_names_ = std::move(column_names);
+
+    QueryResult result = query_context_ptr->QueryStatement(drop_columns_statement.get());
     return result;
 }
 

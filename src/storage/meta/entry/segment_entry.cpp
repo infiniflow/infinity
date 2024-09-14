@@ -629,17 +629,19 @@ SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u3
     return MakeShared<String>(fmt::format("{}/seg_{}", parent_dir, std::to_string(seg_id)));
 }
 
-void SegmentEntry::Cleanup(CleanupInfoTracer *info_tracer) {
+void SegmentEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     for (auto &block_entry : block_entries_) {
-        block_entry->Cleanup(info_tracer);
+        block_entry->Cleanup(info_tracer, dropped);
     }
 
-    String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_dir_;
-    LOG_DEBUG(fmt::format("Cleaning up segment dir: {}", full_segment_dir));
-    CleanupScanner::CleanupDir(full_segment_dir);
-    LOG_DEBUG(fmt::format("Cleaned segment dir: {}", full_segment_dir));
-    if (info_tracer) {
-        info_tracer->AddCleanupInfo(std::move(full_segment_dir));
+    if (dropped) {
+        String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_dir_;
+        LOG_DEBUG(fmt::format("Cleaning up segment dir: {}", full_segment_dir));
+        CleanupScanner::CleanupDir(full_segment_dir);
+        LOG_DEBUG(fmt::format("Cleaned segment dir: {}", full_segment_dir));
+        if (info_tracer) {
+            info_tracer->AddCleanupInfo(std::move(full_segment_dir));
+        }
     }
 }
 

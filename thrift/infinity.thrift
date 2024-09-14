@@ -594,6 +594,20 @@ struct UpdateRequest {
 5:  i64 session_id,
 }
 
+struct AddColumnsRequest {
+1:  string db_name,
+2:  string table_name,
+3:  list<ColumnDef> column_defs = [],
+4:  i64 session_id,
+}
+
+struct DropColumnsRequest {
+1:  string db_name,
+2:  string table_name,
+3:  list<string> column_names = [],
+4:  i64 session_id,
+}
+
 struct ShowTablesRequest{
 1: i64 session_id,
 2: string db_name,
@@ -714,5 +728,8 @@ CommonResponse DropIndex(1:DropIndexRequest request),
 ShowIndexResponse ShowIndex(1:ShowIndexRequest request),
 
 CommonResponse Optimize(1:OptimizeRequest request),
+
+CommonResponse AddColumns(1:AddColumnsRequest request),
+CommonResponse DropColumns(1:DropColumnsRequest request),
 
 }

@@ -1,6 +1,6 @@
 import os
 import time
-from infinity_runner import InfinityRunner
+from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 import pytest
 from common import common_values
 from infinity.common import ConflictType
@@ -40,46 +40,43 @@ class TestCleanup:
         infinity_runner.clear()
         table_name = "test_cleanup"
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.drop_table(table_name, ConflictType.Ignore)
-        table_obj = db_obj.create_table(table_name, columns, ConflictType.Error)
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, ConflictType.Ignore)
+            table_obj = db_obj.create_table(table_name, columns, ConflictType.Error)
 
-        insert_n = 100
-        data_gen = data_gen_factory(insert_n)
+            insert_n = 100
+            data_gen = data_gen_factory(insert_n)
 
-        for data in data_gen:
-            data_line = {}
-            for column_name, column_data in zip(columns.keys(), data):
-                data_line[column_name] = column_data
-            table_obj.insert([data_line])
+            for data in data_gen:
+                data_line = {}
+                for column_name, column_data in zip(columns.keys(), data):
+                    data_line[column_name] = column_data
+                table_obj.insert([data_line])
 
-        db_obj.drop_table(table_name, ConflictType.Error)
+            db_obj.drop_table(table_name, ConflictType.Error)
 
-        time.sleep(2)  # sleep 2 wait for the data to be cleaned up
+            time.sleep(3)  # sleep 2 wait for the data to be cleaned up
 
-        # check
-        for table_dir in pathlib.Path(data_dir).glob(f"*{table_name}*"):
-            print(f"table_dir: {table_dir}")
-            assert False
+            # check
+            dropped_dirs = pathlib.Path(data_dir).rglob(f"*{table_name}*")
+            assert len(list(dropped_dirs)) == 0
 
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        part1()
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
+        @decorator
+        def part2(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            try:
+                table_obj = db_obj.get_table(table_name)
+                assert False
+            except infinity.InfinityException as e:
+                assert e.error_code == infinity.ErrorCode.TABLE_NOT_EXIST
 
-        db_obj = infinity_obj.get_database("default_db")
-        try:
-            table_obj = db_obj.get_table(table_name)
-            assert False
-        except infinity.InfinityException as e:
-            assert e.error_code == infinity.ErrorCode.TABLE_NOT_EXIST
-
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        part2()
 
     @pytest.mark.parametrize(
         "columns, indexes, data_gen_factory",
@@ -110,55 +107,51 @@ class TestCleanup:
         table_name = "test_cleanup_index"
         index_name = "idx1"
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+        insert_n = 100
 
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.drop_table(table_name, ConflictType.Ignore)
-        table_obj = db_obj.create_table(table_name, columns, ConflictType.Error)
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, ConflictType.Ignore)
+            table_obj = db_obj.create_table(table_name, columns, ConflictType.Error)
 
-        for idx in indexes:
-            res = table_obj.create_index(index_name, idx)
+            for idx in indexes:
+                res = table_obj.create_index(index_name, idx)
+                assert res.error_code == infinity.ErrorCode.OK
+
+            data_gen = data_gen_factory(insert_n)
+
+            for data in data_gen:
+                data_line = {}
+                for column_name, column_data in zip(columns.keys(), data):
+                    data_line[column_name] = column_data
+                table_obj.insert([data_line])
+
+            res = table_obj.drop_index(index_name)
             assert res.error_code == infinity.ErrorCode.OK
 
-        insert_n = 100
-        data_gen = data_gen_factory(insert_n)
+            time.sleep(3)  # sleep 2 wait for the data to be cleaned up
 
-        for data in data_gen:
-            data_line = {}
-            for column_name, column_data in zip(columns.keys(), data):
-                data_line[column_name] = column_data
-            table_obj.insert([data_line])
+            # check
+            dropped_dirs = pathlib.Path(data_dir).rglob(f"*{index_name}*")
+            assert len(list(dropped_dirs)) == 0
 
-        res = table_obj.drop_index(index_name)
-        assert res.error_code == infinity.ErrorCode.OK
+        part1()
 
-        time.sleep(2)  # sleep 2 wait for the data to be cleaned up
+        @decorator
+        def part2(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table(table_name)
+            data_dict, _ = table_obj.output(["count(*)"]).to_result()
+            count_star = data_dict["count(star)"][0]
+            assert count_star == insert_n
 
-        # check
-        for index_dir in pathlib.Path(data_dir).glob(f"*{index_name}*"):
-            print(f"index_dir: {index_dir}")
-            assert False
+            db_obj.drop_table(table_name, ConflictType.Error)
 
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+            time.sleep(3)  # sleep 2 wait for the data to be cleaned up
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
+            dropped_dirs = pathlib.Path(data_dir).rglob(f"*{table_name}*")
+            assert len(list(dropped_dirs)) == 0
 
-        db_obj = infinity_obj.get_database("default_db")
-        table_obj = db_obj.get_table(table_name)
-        data_dict, _ = table_obj.output(["count(*)"]).to_result()
-        count_star = data_dict["count(star)"][0]
-        assert count_star == insert_n
-
-        db_obj.drop_table(table_name, ConflictType.Error)
-
-        time.sleep(2)  # sleep 2 wait for the data to be cleaned up
-
-        for table_dir in pathlib.Path(data_dir).glob(f"*{table_name}*"):
-            print(f"table_dir: {table_dir}")
-            assert False
-
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        part2()

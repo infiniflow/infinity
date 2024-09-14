@@ -9,7 +9,7 @@ log_to_stdout = true
 [storage]
 data_dir = "/var/infinity/data"
 optimize_interval = "0s"
-cleanup_interval = "1s"
+cleanup_interval = "0s"
 compact_interval = "0s"
 
 [buffer]

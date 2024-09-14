@@ -367,6 +367,10 @@ class DeleteRequest;
 
 class UpdateRequest;
 
+class AddColumnsRequest;
+
+class DropColumnsRequest;
+
 class ShowTablesRequest;
 
 class ShowSegmentsRequest;
@@ -4761,6 +4765,134 @@ class UpdateRequest : public virtual ::apache::thrift::TBase {
 void swap(UpdateRequest &a, UpdateRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const UpdateRequest& obj);
+
+typedef struct _AddColumnsRequest__isset {
+  _AddColumnsRequest__isset() : db_name(false), table_name(false), column_defs(true), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool column_defs :1;
+  bool session_id :1;
+} _AddColumnsRequest__isset;
+
+class AddColumnsRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  AddColumnsRequest(const AddColumnsRequest&);
+  AddColumnsRequest& operator=(const AddColumnsRequest&);
+  AddColumnsRequest() noexcept
+                    : db_name(),
+                      table_name(),
+                      session_id(0) {
+
+  }
+
+  virtual ~AddColumnsRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  std::vector<ColumnDef>  column_defs;
+  int64_t session_id;
+
+  _AddColumnsRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_column_defs(const std::vector<ColumnDef> & val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const AddColumnsRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(column_defs == rhs.column_defs))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const AddColumnsRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const AddColumnsRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(AddColumnsRequest &a, AddColumnsRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const AddColumnsRequest& obj);
+
+typedef struct _DropColumnsRequest__isset {
+  _DropColumnsRequest__isset() : db_name(false), table_name(false), column_names(true), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool column_names :1;
+  bool session_id :1;
+} _DropColumnsRequest__isset;
+
+class DropColumnsRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  DropColumnsRequest(const DropColumnsRequest&);
+  DropColumnsRequest& operator=(const DropColumnsRequest&);
+  DropColumnsRequest() noexcept
+                     : db_name(),
+                       table_name(),
+                       session_id(0) {
+
+  }
+
+  virtual ~DropColumnsRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  std::vector<std::string>  column_names;
+  int64_t session_id;
+
+  _DropColumnsRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_column_names(const std::vector<std::string> & val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const DropColumnsRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(column_names == rhs.column_names))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const DropColumnsRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DropColumnsRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(DropColumnsRequest &a, DropColumnsRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const DropColumnsRequest& obj);
 
 typedef struct _ShowTablesRequest__isset {
   _ShowTablesRequest__isset() : session_id(false), db_name(false) {}

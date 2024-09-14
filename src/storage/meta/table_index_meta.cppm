@@ -122,7 +122,7 @@ private:
     EntryList<TableIndexEntry> index_entry_list_{};
 
 public:
-    void Cleanup(CleanupInfoTracer *info_tracer = nullptr) override;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
 

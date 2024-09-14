@@ -42,7 +42,8 @@ String CleanupInfoTracer::GetCleanupInfo() const {
 CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr)
     : catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
-void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry) { entries_.emplace_back(std::move(entry)); }
+// dropped is true denotes the data file can be cleaned up, or only metadata can be cleaned up
+void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry, bool dropped) { entries_.emplace_back(std::move(entry), dropped); }
 
 void CleanupScanner::Scan() {
     LOG_DEBUG(fmt::format("CleanupScanner: Start scanning, ts: {}", visible_ts_));
@@ -50,8 +51,8 @@ void CleanupScanner::Scan() {
 }
 
 void CleanupScanner::Cleanup(CleanupInfoTracer *info_tracer) && {
-    for (auto &entry : entries_) {
-        std::move(*entry).Cleanup(info_tracer);
+    for (auto &[entry, dropped] : entries_) {
+        std::move(*entry).Cleanup(info_tracer, dropped);
     }
     buffer_mgr_->RemoveClean();
 }
