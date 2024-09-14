@@ -50,6 +50,7 @@ import embedding_info;
 import bg_task;
 import physical_import;
 import chunk_index_entry;
+import memory_indexer;
 import wal_manager;
 import internal_types;
 import persistence_manager;
@@ -612,7 +613,8 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
                     auto &segment_index_entry = iter->second;
 
                     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+                    SharedPtr<MemoryIndexer> memory_indexer;
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, txn);
                     for (auto &chunk_index_entry : chunk_index_entries) {
                         auto index_handle = chunk_index_entry->GetIndex();
                     }

@@ -35,7 +35,7 @@ class Txn;
 
 export class ColumnIndexReader {
 public:
-    void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment);
+    void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment, Txn *txn);
 
     UniquePtr<PostingIterator> Lookup(const String &term, bool fetch_position = true);
 
