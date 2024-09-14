@@ -164,14 +164,14 @@ Run cd /root && mkdir -p ~/miniconda3 && bash /root/Miniconda3-latest-Linux-x86_
 && source ~/.bashrc && cd /root
 
 # Create venv
-Run conda create -n venv3.10 python=3.10 && conda create -n venv3.11 python=3.11 && conda create -n venv3.12 python=3.12
+Run conda create -n venv3.10 python=3.10 -y && conda create -n venv3.11 python=3.11 -y && conda create -n venv3.12 python=3.12 -y
 
 RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.pku.edu.cn" && pip3 config set global.extra-index-url "https://mirrors.pku.edu.cn/pypi/web/simple"
 
 # Install tools for building and uploading a python wheel.
-Run conda activate venv3.10 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt&& conda deactivate
-Run conda activate venv3.11 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt&& conda deactivate
-Run conda activate venv3.12 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt&& conda deactivate
+Run conda activate venv3.10 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt && conda deactivate
+Run conda activate venv3.11 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt && conda deactivate
+Run conda activate venv3.12 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt && conda deactivate
 
 # https://github.com/llvm/llvm-project/issues/96210
 # https://github.com/llvm/llvm-project/issues/57276
