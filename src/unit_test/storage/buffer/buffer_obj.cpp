@@ -50,6 +50,7 @@ import embedding_info;
 import bg_task;
 import physical_import;
 import chunk_index_entry;
+import memory_indexer;
 import wal_manager;
 import internal_types;
 import persistence_manager;
