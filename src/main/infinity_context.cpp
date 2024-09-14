@@ -68,12 +68,6 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
 
     session_mgr_ = MakeUnique<SessionManager>();
 
-    String persistence_dir = config_->PersistenceDir();
-    if (!persistence_dir.empty()) {
-        i64 persistence_object_size_limit = config_->PersistenceObjectSizeLimit();
-        persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_->DataDir(), (SizeT)persistence_object_size_limit);
-    }
-
     Status change_result = ChangeRole(NodeRole::kAdmin);
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -325,7 +319,7 @@ void InfinityContext::UnInit() {
     }
 
     storage_.reset();
-    persistence_manager_.reset();
+
     session_mgr_.reset();
     resource_manager_.reset();
     Logger::Shutdown();

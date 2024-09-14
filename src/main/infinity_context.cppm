@@ -40,7 +40,7 @@ public:
 
     [[nodiscard]] inline Storage *storage() noexcept { return storage_.get(); }
 
-    [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return persistence_manager_.get(); }
+    [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return storage_->persistence_manager(); }
 
     [[nodiscard]] inline ResourceManager *resource_manager() noexcept { return resource_manager_.get(); }
 
@@ -75,7 +75,6 @@ private:
     UniquePtr<ResourceManager> resource_manager_{};
     UniquePtr<TaskScheduler> task_scheduler_{};
     UniquePtr<Storage> storage_{};
-    UniquePtr<PersistenceManager> persistence_manager_{};
     UniquePtr<SessionManager> session_mgr_{};
     UniquePtr<ClusterManager> cluster_manager_{};
 

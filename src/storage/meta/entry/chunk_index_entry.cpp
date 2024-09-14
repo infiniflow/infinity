@@ -104,6 +104,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewHnswIndexChunkIndexEntry(ChunkID 
                                                       hnsw_index_file_name,
                                                       index_base,
                                                       column_def,
+                                                      buffer_mgr->persistence_manager(),
                                                       index_size);
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
     }
@@ -125,7 +126,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewFtChunkIndexEntry(SegmentIndexEnt
                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                      index_dir,
                                                      column_length_file_name,
-                                                     row_count * sizeof(u32));
+                                                     row_count * sizeof(u32),
+                                                     buffer_mgr->persistence_manager());
         chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
     return chunk_index_entry;
@@ -151,7 +153,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewSecondaryIndexChunkIndexEntry(Chu
                                                                 secondary_index_file_name,
                                                                 index_base,
                                                                 column_def,
-                                                                row_count);
+                                                                row_count,
+                                                                buffer_mgr->persistence_manager());
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
         const u32 part_cnt = (row_count + 8191) / 8192;
         for (u32 i = 0; i < part_cnt; ++i) {
@@ -163,7 +166,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewSecondaryIndexChunkIndexEntry(Chu
                                                                               index_base,
                                                                               column_def,
                                                                               row_count,
-                                                                              i);
+                                                                              i,
+                                                                              buffer_mgr->persistence_manager());
             BufferObj *part_ptr = buffer_mgr->AllocateBufferObject(std::move(part_file_worker));
             chunk_index_entry->part_buffer_objs_.push_back(part_ptr);
         }
@@ -192,7 +196,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewEMVBIndexChunkIndexEntry(ChunkID 
                                                            emvb_index_file_name,
                                                            index_base,
                                                            column_def,
-                                                           segment_start_offset);
+                                                           segment_start_offset,
+                                                           buffer_mgr->persistence_manager());
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
     }
     return chunk_index_entry;
@@ -219,6 +224,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewBMPIndexChunkIndexEntry(ChunkID c
                                                           bmp_index_file_name,
                                                           index_base,
                                                           column_def,
+                                                          buffer_mgr->persistence_manager(),
                                                           index_size);
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
     }
@@ -247,7 +253,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                           index_dir,
                                                           index_file_name,
                                                           param->index_base_,
-                                                          column_def);
+                                                          column_def,
+                                                          buffer_mgr->persistence_manager());
             chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;
         }
@@ -257,7 +264,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                          MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                          index_dir,
                                                          column_length_file_name,
-                                                         row_count * sizeof(u32));
+                                                         row_count * sizeof(u32),
+                                                         buffer_mgr->persistence_manager());
             chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;
         }
@@ -271,7 +279,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                                     secondary_index_file_name,
                                                                     index_base,
                                                                     column_def,
-                                                                    row_count);
+                                                                    row_count,
+                                                                    buffer_mgr->persistence_manager());
             chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             chunk_index_entry->LoadPartsReader(buffer_mgr);
             break;
@@ -287,7 +296,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                                emvb_index_file_name,
                                                                index_base,
                                                                column_def,
-                                                               segment_start_offset);
+                                                               segment_start_offset,
+                                                               buffer_mgr->persistence_manager());
             chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;
         }
@@ -301,7 +311,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                               index_dir,
                                                               index_file_name,
                                                               index_base,
-                                                              column_def);
+                                                              column_def,
+                                                              buffer_mgr->persistence_manager());
             chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;
         }
@@ -432,7 +443,8 @@ void ChunkIndexEntry::LoadPartsReader(BufferManager *buffer_mgr) {
                                                                           index_base,
                                                                           column_def,
                                                                           row_count_,
-                                                                          i);
+                                                                          i,
+                                                                          buffer_mgr->persistence_manager());
         BufferObj *part_ptr = buffer_mgr->GetBufferObject(std::move(part_file_worker));
         part_buffer_objs_.push_back(part_ptr);
     }

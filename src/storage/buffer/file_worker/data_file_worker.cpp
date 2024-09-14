@@ -22,6 +22,7 @@ import local_file_system;
 import third_party;
 import status;
 import logger;
+import persistence_manager;
 
 namespace infinity {
 
@@ -29,8 +30,9 @@ DataFileWorker::DataFileWorker(SharedPtr<String> data_dir,
                                SharedPtr<String> temp_dir,
                                SharedPtr<String> file_dir,
                                SharedPtr<String> file_name,
-                               SizeT buffer_size)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), buffer_size_(buffer_size) {}
+                               SizeT buffer_size,
+                               PersistenceManager* persistence_manager)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), buffer_size_(buffer_size) {}
 
 DataFileWorker::~DataFileWorker() {
     if (data_ != nullptr) {

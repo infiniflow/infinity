@@ -26,6 +26,7 @@ import bmp_alg;
 import abstract_bmp;
 import local_file_system;
 import file_system_type;
+import persistence_manager;
 
 namespace infinity {
 
@@ -35,8 +36,15 @@ BMPIndexFileWorker::BMPIndexFileWorker(SharedPtr<String> data_dir,
                                        SharedPtr<String> file_name,
                                        SharedPtr<IndexBase> index_base,
                                        SharedPtr<ColumnDef> column_def,
+                                       PersistenceManager *persistence_manager,
                                        SizeT index_size)
-    : IndexFileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), std::move(index_base), std::move(column_def)) {
+    : IndexFileWorker(std::move(data_dir),
+                      std::move(temp_dir),
+                      std::move(file_dir),
+                      std::move(file_name),
+                      std::move(index_base),
+                      std::move(column_def),
+                      persistence_manager) {
     if (index_size == 0) {
         LocalFileSystem fs;
 
