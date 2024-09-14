@@ -49,6 +49,7 @@ import base_table_ref;
 import compact_statement;
 import default_values;
 import chunk_index_entry;
+import memory_indexer;
 import persistence_manager;
 import infinity_context;
 
@@ -352,7 +353,8 @@ Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_
         auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
         for (auto &segment_index_entry : segment_index_entries) {
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+            SharedPtr<MemoryIndexer> memory_indexer;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, this);
             for (auto &chunk_index_intry : chunk_index_entries) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_intry.get());
             }
