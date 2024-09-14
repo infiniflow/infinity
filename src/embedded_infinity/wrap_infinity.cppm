@@ -190,6 +190,7 @@ export struct WrapKnnExpr {
     KnnDistanceType distance_type{KnnDistanceType::kInvalid};
     i64 topn{};
     Vector<InitParameter> opt_params{};
+    SharedPtr<WrapParsedExpr> filter_expr{};
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -198,6 +199,7 @@ export struct WrapMatchExpr {
     String fields;
     String matching_text;
     String options_text;
+    SharedPtr<WrapParsedExpr> filter_expr{};
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -209,6 +211,7 @@ export struct WrapMatchTensorExpr {
     EmbeddingData embedding_data;
     EmbeddingDataType embedding_data_type;
     String options_text;
+    SharedPtr<WrapParsedExpr> filter_expr{};
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -229,6 +232,7 @@ export struct WrapMatchSparseExpr {
     String metric_type;
     i64 topn;
     Vector<InitParameter> opt_params{};
+    SharedPtr<WrapParsedExpr> filter_expr{};
     ParsedExpr *GetParsedExpr(Status &status);
 };
 

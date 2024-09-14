@@ -42,6 +42,16 @@ struct SegmentEntry;
 TableIndexMeta::TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name)
     : index_name_(std::move(index_name)), table_entry_(table_entry) {}
 
+TableIndexMeta::TableIndexMeta(const TableIndexMeta &meta)
+    : index_name_(meta.index_name_), table_entry_(meta.table_entry_) {}
+
+UniquePtr<TableIndexMeta> TableIndexMeta::Clone(TableEntry *table_entry) const {
+    auto ret = UniquePtr<TableIndexMeta>(new TableIndexMeta(*this));
+    ret->table_entry_ = table_entry;
+    ret->index_entry_list_ = index_entry_list_.Clone(ret.get());
+    return ret;
+}
+
 UniquePtr<TableIndexMeta> TableIndexMeta::NewTableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name) {
     auto table_index_meta = MakeUnique<TableIndexMeta>(table_entry, index_name);
     return table_index_meta;
@@ -115,6 +125,14 @@ TableIndexEntry *TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeSta
         UnrecoverableError(status.message());
     }
     return entry;
+}
+
+bool TableIndexMeta::CheckIfIndexColumn(ColumnID column_id, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [index_entry, status] = index_entry_list_.GetEntryNolock(txn_id, begin_ts);
+    if (!status.ok()) {
+        return false;
+    }
+    return index_entry->CheckIfIndexColumn(column_id);
 }
 
 Tuple<SharedPtr<TableIndexInfo>, Status>
@@ -193,7 +211,7 @@ void TableIndexMeta::PushFrontEntry(const SharedPtr<TableIndexEntry>& new_table_
     index_entry_list_.PushFrontEntry(new_table_index_entry);
 }
 
-void TableIndexMeta::Cleanup() { index_entry_list_.Cleanup(); }
+void TableIndexMeta::Cleanup(CleanupInfoTracer *info_tracer) { index_entry_list_.Cleanup(info_tracer); }
 
 bool TableIndexMeta::PickCleanup(CleanupScanner *scanner) { return index_entry_list_.PickCleanup(scanner); }
 

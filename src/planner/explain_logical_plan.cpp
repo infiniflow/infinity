@@ -2061,6 +2061,10 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
             expr_str += ")";
             break;
         }
+        case ExpressionType::kFilterFullText: {
+            expr_str += base_expression->ToString();
+            break;
+        }
         case ExpressionType::kSubQuery:
         case ExpressionType::kCorrelatedColumn:
         default: {

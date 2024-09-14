@@ -25,6 +25,7 @@ import reference_expression;
 import function_expression;
 import value_expression;
 import in_expression;
+import filter_fulltext_expression;
 import column_vector;
 
 namespace infinity {
@@ -54,6 +55,8 @@ public:
     static SharedPtr<ExpressionState> CreateState(const SharedPtr<ValueExpression> &agg_expr);
 
     static SharedPtr<ExpressionState> CreateState(const SharedPtr<InExpression> &in_expr);
+
+    static SharedPtr<ExpressionState> CreateState(const SharedPtr<FilterFulltextExpression> &filter_fulltext_expr);
 
 public:
     void AddChild(const SharedPtr<BaseExpression> &expression);

@@ -98,6 +98,13 @@ private:
         return table_entry_list_.GetEntryNolock(txn_id, begin_ts);
     }
 
+    Status AddEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                    SharedPtr<TableEntry> table_entry,
+                    TransactionID txn_id,
+                    TxnTimeStamp begin_ts,
+                    TxnManager *txn_mgr,
+                    bool add_if_exist = false);
+
     void DeleteEntry(TransactionID txn_id);
 
     // replay
@@ -126,7 +133,7 @@ private:
     EntryList<TableEntry> table_entry_list_{};
 
 public:
-    void Cleanup() override;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr) override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
 

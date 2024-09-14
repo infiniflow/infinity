@@ -27,6 +27,7 @@ import statement_common;
 import infinity_exception;
 import internal_types;
 import persistence_manager;
+import column_def;
 
 namespace infinity {
 
@@ -60,6 +61,13 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     SET_SEGMENT_STATUS_SEALED = 31,
     UPDATE_SEGMENT_BLOOM_FILTER_DATA = 32,
+
+    // -----------------------------
+    // Alter
+    // -----------------------------
+    RENAME_TABLE = 40,
+    ADD_COLUMNS = 41,
+    DROP_COLUMNS = 42,
 
     // -----------------------------
     // Flush
@@ -450,6 +458,54 @@ export struct WalCmdDumpIndex final : public WalCmd {
     SegmentID segment_id_{};
     Vector<WalChunkIndexInfo> chunk_infos_{};
     Vector<ChunkID> deprecate_ids_{};
+};
+
+export struct WalCmdRenameTable : public WalCmd {
+    WalCmdRenameTable(String db_name, String table_name, String new_table_name)
+        : db_name_(db_name), table_name_(table_name), new_table_name_(new_table_name) {}
+
+    WalCommandType GetType() const final { return WalCommandType::RENAME_TABLE; }
+    bool operator==(const WalCmd &other) const final;
+    i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    String db_name_{};
+    String table_name_{};
+    String new_table_name_{};
+};
+
+export struct WalCmdAddColumns : public WalCmd {
+    WalCmdAddColumns(String db_name, String table_name, Vector<SharedPtr<ColumnDef>> column_defs)
+        : db_name_(db_name), table_name_(table_name), column_defs_(std::move(column_defs)) {}
+
+    WalCommandType GetType() const final { return WalCommandType::ADD_COLUMNS; }
+    bool operator==(const WalCmd &other) const final;
+    i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    String db_name_{};
+    String table_name_{};
+    Vector<SharedPtr<ColumnDef>> column_defs_{};
+};
+
+export struct WalCmdDropColumns : public WalCmd {
+    WalCmdDropColumns(String db_name, String table_name, Vector<String> column_names)
+        : db_name_(db_name), table_name_(table_name), column_names_(std::move(column_names)) {}
+
+    WalCommandType GetType() const final { return WalCommandType::DROP_COLUMNS; }
+    bool operator==(const WalCmd &other) const final;
+    i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    String db_name_{};
+    String table_name_{};
+    Vector<String> column_names_{};
 };
 
 export struct WalEntryHeader {

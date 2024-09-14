@@ -18,6 +18,7 @@ import stl;
 import file_worker;
 // import specific_concurrent_queue;
 import default_values;
+import persistence_manager;
 
 export module buffer_manager;
 
@@ -50,6 +51,7 @@ public:
     explicit BufferManager(u64 memory_limit,
                            SharedPtr<String> data_dir,
                            SharedPtr<String> temp_dir,
+                           PersistenceManager* persistence_manager,
                            SizeT lru_count = DEFAULT_BUFFER_MANAGER_LRU_COUNT);
 
     ~BufferManager();
@@ -83,6 +85,9 @@ public:
 
     Vector<BufferObjectInfo> GetBufferObjectsInfo();
 
+    inline PersistenceManager* persistence_manager() const {
+        return persistence_manager_;
+    }
 private:
     friend class BufferObj;
 
@@ -111,7 +116,7 @@ private:
     SharedPtr<String> data_dir_;
     SharedPtr<String> temp_dir_;
     const u64 memory_limit_{};
-
+    PersistenceManager* persistence_manager_;
     Atomic<u64> current_memory_size_{};
 
     std::mutex w_locker_{};

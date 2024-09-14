@@ -33,6 +33,8 @@ import cleanup_scanner;
 import logger;
 import roaring_bitmap;
 import wal_entry;
+import column_def;
+import constant_expr;
 
 namespace infinity {
 
@@ -82,6 +84,12 @@ public:
                           SizeT row_capacity,
                           SizeT column_count,
                           SegmentStatus status);
+
+private:
+    SegmentEntry(const SegmentEntry &other);
+
+public:
+    UniquePtr<SegmentEntry> Clone(TableEntry *table_entry) const;
 
     static SharedPtr<SegmentEntry> NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
@@ -144,9 +152,9 @@ public:
     // `this` called in wal thread, and `block_entry_` is also accessed in flush, so lock is needed
     void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
 
-    FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
+    FastRoughFilter *GetFastRoughFilter() { return fast_rough_filter_.get(); }
 
-    const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
+    const FastRoughFilter *GetFastRoughFilter() const { return fast_rough_filter_.get(); }
 
     void LoadFilterBinaryData(const String &segment_filter_data);
     static String SegmentStatusToString(const SegmentStatus &type);
@@ -256,7 +264,7 @@ private:
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
     // check if a value must not exist in the segment
-    FastRoughFilter fast_rough_filter_;
+    SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
 
     CompactStateData *compact_state_data_{};
     SegmentStatus status_;
@@ -264,9 +272,13 @@ private:
     HashSet<TransactionID> delete_txns_; // current number of delete txn that write this segment
 
 public:
-    void Cleanup() override;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr) override;
 
     void PickCleanup(CleanupScanner *scanner) override;
+
+    void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
+
+    void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
 };
 
 } // namespace infinity

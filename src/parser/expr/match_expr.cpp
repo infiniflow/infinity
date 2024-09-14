@@ -23,8 +23,11 @@ std::string MatchExpr::ToString() const {
     oss << fields_;
     oss << "', '" << matching_text_ << "'";
     oss << ", '" << options_text_ << "'";
+    if (filter_expr_) {
+        oss << ", WHERE " << filter_expr_->ToString();
+    }
     oss << ")";
-    return oss.str();
+    return std::move(oss).str();
 }
 
 } // namespace infinity

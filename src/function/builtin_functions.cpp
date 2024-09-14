@@ -97,7 +97,8 @@ void BuiltinFunctions::RegisterScalarFunction() {
 
     // register comparison operator
     RegisterEqualsFunction(catalog_ptr_);
-    RegisterInEqualsFunction(catalog_ptr_);
+    RegisterInEqualFunction(catalog_ptr_);
+    RegisterInEqualAliasFunction(catalog_ptr_);
     RegisterLessFunction(catalog_ptr_);
     RegisterLessEqualsFunction(catalog_ptr_);
     RegisterGreaterFunction(catalog_ptr_);
@@ -138,6 +139,12 @@ void BuiltinFunctions::RegisterSpecialFunction() {
     auto deletets_function =
         MakeShared<SpecialFunction>("DELETE_TIMESTAMP", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_DELETE, SpecialType::kDeleteTs);
     Catalog::AddSpecialFunction(catalog_ptr_.get(), deletets_function);
+
+    Catalog::AddSpecialFunction(catalog_ptr_.get(),
+                                MakeShared<SpecialFunction>("FILTER_FULLTEXT", DataType(LogicalType::kBoolean), 0, SpecialType::kFilterFullText));
+
+    Catalog::AddSpecialFunction(catalog_ptr_.get(),
+                                MakeShared<SpecialFunction>("FILTER_TEXT", DataType(LogicalType::kBoolean), 0, SpecialType::kFilterFullText));
 }
 
 } // namespace infinity

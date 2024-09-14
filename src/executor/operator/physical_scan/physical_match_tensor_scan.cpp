@@ -130,7 +130,7 @@ ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
 
 void PhysicalMatchTensorScan::CheckColumn() {
     search_column_id_ = src_match_tensor_expr_->column_expr_->binding().column_idx;
-    const ColumnDef *column_def = base_table_ref_->table_entry_ptr_->GetColumnDefByID(search_column_id_);
+    const ColumnDef *column_def = base_table_ref_->table_entry_ptr_->GetColumnDefByIdx(search_column_id_);
     const auto &column_type_ptr = column_def->type();
     if (const auto l_type = column_type_ptr->type(); l_type != LogicalType::kTensor and l_type != LogicalType::kTensorArray) {
         String error_message = fmt::format("Column {} is not a tensor or tensorarray column", column_def->name());
@@ -1132,7 +1132,8 @@ AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpres
                                                                 src_match_tensor_expr.dimension_,
                                                                 EmbeddingT(static_cast<char *>(aligned_ptr), false),
                                                                 src_match_tensor_expr.tensor_basic_embedding_dimension_,
-                                                                src_match_tensor_expr.options_text_);
+                                                                src_match_tensor_expr.options_text_,
+                                                                src_match_tensor_expr.optional_filter_);
     }
     return result;
 }

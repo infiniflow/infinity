@@ -30,13 +30,13 @@ import buffer_handle;
 import default_values;
 import column_def;
 import txn;
+import buffer_obj;
 
 namespace infinity {
 
 class SegmentIndexEntry;
 struct BlockEntry;
 class BufferManager;
-class BufferObj;
 struct SegmentEntry;
 
 // ChunkIndexEntry is an immutable chunk of SegmentIndexEntry. MemIndexer(for fulltext) is the mutable chunk of SegmentIndexEntry.
@@ -47,6 +47,12 @@ public:
     static String EncodeIndex(const ChunkID chunk_id, const String &base_name, const SegmentIndexEntry *segment_index_entry);
 
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
+
+private:
+    ChunkIndexEntry(const ChunkIndexEntry &other);
+
+public:
+    UniquePtr<ChunkIndexEntry> Clone(SegmentIndexEntry *segment_index_entry) const;
 
 public:
     static String IndexFileName(SegmentID segment_id, ChunkID chunk_id);
@@ -116,7 +122,7 @@ public:
     static SharedPtr<ChunkIndexEntry>
     Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry, CreateIndexParam *param, BufferManager *buffer_mgr);
 
-    virtual void Cleanup() override;
+    virtual void Cleanup(CleanupInfoTracer *info_tracer = nullptr) override;
 
     virtual void PickCleanup(CleanupScanner *scanner) override {}
 
@@ -124,7 +130,7 @@ public:
 
     void LoadPartsReader(BufferManager *buffer_mgr);
 
-    BufferObj *GetBufferObj() { return buffer_obj_; }
+    BufferObj *GetBufferObj() { return buffer_obj_.get(); }
 
     void DeprecateChunk(TxnTimeStamp commit_ts);
 
@@ -151,8 +157,8 @@ public:
     Atomic<TxnTimeStamp> deprecate_ts_{UNCOMMIT_TS};
 
 private:
-    BufferObj *buffer_obj_{};
-    Vector<BufferObj *> part_buffer_objs_;
+    BufferPtr buffer_obj_{};
+    Vector<BufferPtr> part_buffer_objs_;
     Atomic<bool> optimizing_{false};
 };
 

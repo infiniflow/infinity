@@ -24,7 +24,7 @@ statement ok
 CREATE INDEX ft_index ON sqllogic_fusion_rerank_maxsim(body) USING FULLTEXT;
 
 query I
-SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim');
+SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '');
 ----
 test22 636.870056
 test55 27.369999
@@ -56,14 +56,14 @@ PROJECT (4)
  - expressions: [title (#0), SCORE (#1)]
 -> FUSION (3)
    - fusion: #FUSION('match_tensor', 'column_name=t,match_method=MaxSim,search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],tensor_data_type=float,topn=2')
-   - output columns: [title, __score, __rowid]
+   - output columns: [__score, __rowid]
   -> MATCH (2)
      - table name: sqllogic_fusion_rerank_maxsim(default_db.sqllogic_fusion_rerank_maxsim)
      - table index: #1
      - match expression: MATCH TEXT ('body', 'off', 'topn=4')
      - filter for secondary index: None
      - filter except secondary index: None
-     - output columns: [title, __score, __rowid]
+     - output columns: [__score, __rowid]
 
 query I
 SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TEXT ('body', 'off', 'topn=4'), FUSION('match_tensor', 'column_name=t;search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]];tensor_data_type=float;match_method=MaxSim;topn=2');
@@ -79,14 +79,14 @@ PROJECT (5)
  - expressions: [title (#0), SCORE (#1)]
 -> FUSION (4)
    - fusion: #FUSION('match_tensor', 'column_name=t,match_method=MaxSim,search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],tensor_data_type=float,topn=2')
-   - output columns: [title, __score, __rowid]
+   - output columns: [__score, __rowid]
   -> MATCH (2)
      - table name: sqllogic_fusion_rerank_maxsim(default_db.sqllogic_fusion_rerank_maxsim)
      - table index: #1
      - match expression: MATCH TEXT ('body', 'off', 'topn=4')
      - filter for secondary index: None
      - filter except secondary index: None
-     - output columns: [title, __score, __rowid]
+     - output columns: [__score, __rowid]
   -> MatchTensorScan (3)
      - table name: sqllogic_fusion_rerank_maxsim(default_db.sqllogic_fusion_rerank_maxsim)
      - table index: #1
@@ -94,7 +94,7 @@ PROJECT (5)
      - Top N: 2
      - filter for secondary index: None
      - filter except secondary index: None
-     - output columns: [title, __score, __rowid]
+     - output columns: [__score, __rowid]
 
 query I
 SELECT title, SCORE() FROM sqllogic_fusion_rerank_maxsim SEARCH MATCH TEXT ('body', 'off', 'topn=4'), MATCH TENSOR (t, [1.0, 0.0, 0.0, 0.0], 'float', 'maxsim', 'topn=2'), FUSION('match_tensor', 'column_name=t;search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]];tensor_data_type=float;match_method=MaxSim;topn=2');
@@ -112,10 +112,10 @@ FRAGMENT (1)
    - expressions: [title (#0), SCORE (#1)]
 -> FUSION (5)
    - fusion: #FUSION('match_tensor', 'column_name=t,match_method=MaxSim,search_tensor=[[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],tensor_data_type=float,topn=2')
-   - output columns: [title, __score, __rowid]
+   - output columns: [__score, __rowid]
 -> FUSION (4)
    - fusion: #FUSION('rrf', '')
-   - output columns: [title, __score, __rowid]: FRAGMENT #2, FRAGMENT #3
+   - output columns: [__score, __rowid]: FRAGMENT #2, FRAGMENT #3
 (empty)
 FRAGMENT (2)
 -> MATCH (2)
@@ -124,7 +124,7 @@ FRAGMENT (2)
    - match expression: MATCH TEXT ('body', 'off', 'topn=4')
    - filter for secondary index: None
    - filter except secondary index: None
-   - output columns: [title, __score, __rowid]
+   - output columns: [__score, __rowid]
 (empty)
 (empty)
 FRAGMENT (3)
@@ -135,7 +135,7 @@ FRAGMENT (3)
    - Top N: 2
    - filter for secondary index: None
    - filter except secondary index: None
-   - output columns: [title, __score, __rowid]
+   - output columns: [__score, __rowid]
 (empty)
 (empty)
 

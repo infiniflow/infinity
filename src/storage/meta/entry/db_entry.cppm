@@ -97,6 +97,8 @@ public:
 
     void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);
 
+    Status AddTable(SharedPtr<TableEntry> table_entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, bool add_if_found = false);
+
     // replay
     void CreateTableReplay(const SharedPtr<String> &table_name,
                            std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
@@ -138,12 +140,12 @@ private:
 private: // TODO: remote it
     std::shared_mutex &GetTableMetaLock() { return table_meta_map_.GetMetaLock(); }
 
-//    HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
+    //    HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
 
 public:
     void PickCleanup(CleanupScanner *scanner) override;
 
-    void Cleanup() override;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr) override;
 
     void MemIndexCommit();
     void MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts);

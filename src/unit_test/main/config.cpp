@@ -38,7 +38,7 @@ TEST_F(ConfigTest, test1) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.3.0");
+    EXPECT_EQ(config.Version(), "0.4.0");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), 8);
     EXPECT_EQ(config.CPULimit(), std::thread::hardware_concurrency());
@@ -75,7 +75,7 @@ TEST_F(ConfigTest, test2) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.3.0");
+    EXPECT_EQ(config.Version(), "0.4.0");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), -8);
 
@@ -89,7 +89,7 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.LogFileName(), "infinity.log");
     EXPECT_EQ(config.LogDir(), "/var/infinity/log");
     EXPECT_EQ(config.LogFilePath(), "/var/infinity/log/infinity.log");
-    EXPECT_EQ(config.LogToStdout(), true);
+    EXPECT_EQ(config.LogToStdout(), false);
     EXPECT_EQ(config.LogFileMaxSize(), 2 * 1024l * 1024l * 1024l);
     EXPECT_EQ(config.LogFileRotateCount(), 3l);
     EXPECT_EQ(config.GetLogLevel(), LogLevel::kTrace);
@@ -182,7 +182,7 @@ TEST_F(ConfigTest, TestValidValues) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.3.0");
+    EXPECT_EQ(config.Version(), "0.4.0");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), -8);
     EXPECT_EQ(config.CPULimit(), 2);

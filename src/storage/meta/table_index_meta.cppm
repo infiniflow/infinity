@@ -43,6 +43,12 @@ public:
 
     explicit TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
 
+private:
+    TableIndexMeta(const TableIndexMeta &meta);
+
+public:
+    UniquePtr<TableIndexMeta> Clone(TableEntry *table_entry) const;
+
     static UniquePtr<TableIndexMeta> NewTableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
 
 public:
@@ -90,6 +96,8 @@ public:
 
     TableIndexEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    bool CheckIfIndexColumn(ColumnID column_id, TransactionID txn_id, TxnTimeStamp begin_ts);
+
     List<SharedPtr<TableIndexEntry>> GetAllEntries() const {
         return index_entry_list_.GetAllEntries();
     }
@@ -114,7 +122,7 @@ private:
     EntryList<TableIndexEntry> index_entry_list_{};
 
 public:
-    void Cleanup() override;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr) override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
 

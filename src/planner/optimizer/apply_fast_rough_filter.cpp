@@ -14,6 +14,7 @@
 
 module;
 
+#include <vector>
 module apply_fast_rough_filter;
 
 import stl;
@@ -25,6 +26,7 @@ import logical_index_scan;
 import logical_knn_scan;
 import logical_match_tensor_scan;
 import logical_match;
+import logical_fusion;
 import query_context;
 import logical_node_visitor;
 import infinity_exception;
@@ -88,6 +90,11 @@ public:
         // visit children after handling current node
         VisitNode(op->left_node());
         VisitNode(op->right_node());
+        if (op->operator_type() == LogicalNodeType::kFusion) {
+            for (auto &fusion = static_cast<LogicalFusion &>(*op); auto &child : fusion.other_children_) {
+                VisitNode(child);
+            }
+        }
     }
 };
 

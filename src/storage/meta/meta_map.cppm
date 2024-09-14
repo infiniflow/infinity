@@ -48,6 +48,18 @@ public:
         std::shared_lock<std::shared_mutex> r_lock_;
     };
 
+    MetaMap() = default;
+
+    template<typename T>
+    MetaMap Clone(T *parent) const {
+        MetaMap new_meta_map;
+        std::shared_lock r_lock(rw_locker_);
+        for (const auto &[name, meta] : meta_map_) {
+            new_meta_map.meta_map_[name] = meta->Clone(parent);
+        }
+        return new_meta_map;
+    }
+
 public:
     void AddNewMetaNoLock(const String& meta_name, UniquePtr<Meta> meta);
 
@@ -68,7 +80,7 @@ public:
 
     void PickCleanup(CleanupScanner *scanner);
 
-    void Cleanup();
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr);
 
     Tuple<Vector<String>, Vector<Meta*>, std::shared_lock<std::shared_mutex>> GetAllMetaGuard() const;
 
@@ -206,9 +218,9 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
 }
 
 template <MetaConcept Meta>
-void MetaMap<Meta>::Cleanup() {
+void MetaMap<Meta>::Cleanup(CleanupInfoTracer *info_tracer) {
     for (auto &[name, meta] : meta_map_) {
-        meta->Cleanup();
+        meta->Cleanup(info_tracer);
     }
 }
 

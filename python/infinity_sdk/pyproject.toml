@@ -1,6 +1,6 @@
 [project]
 name = "infinity-sdk"
-version = "0.3.0"
+version = "0.4.0.dev1"
 requires-python = ">=3.10"
 dependencies = [
     "sqlglot~=11.7.0",
@@ -16,7 +16,7 @@ dependencies = [
     "requests~=2.32.0"
 ]
 description = "infinity"
-#readme = "README.md"
+readme = "README.md"
 
 [build-system]
 requires = ["setuptools", "wheel"]

@@ -79,7 +79,7 @@ public:
 
     void UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> new_entry);
 
-    static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id);
+    static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(BufferManager* buffer_mgr, SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id);
 
     static String IndexFileName(SegmentID segment_id);
 
@@ -105,7 +105,7 @@ public:
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
-    void Cleanup() final;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr) final;
 
     void PickCleanup(CleanupScanner *scanner) final;
 
@@ -261,6 +261,13 @@ public:
 
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer);
+
+    SegmentIndexEntry(const SegmentIndexEntry &other);
+
+public:
+    UniquePtr<SegmentIndexEntry> Clone(TableIndexEntry *table_index_entry) const;
+
+private:
     // Load from disk. Is called by SegmentIndexEntry::Deserialize.
     static UniquePtr<SegmentIndexEntry>
     LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *create_index_param);
@@ -271,9 +278,9 @@ private:
     SharedPtr<String> index_dir_{};
     const SegmentID segment_id_{};
 
-    Vector<BufferObj *> vector_buffer_{}; // size: 1 + GetIndexPartNum().
+    Vector<BufferPtr> vector_buffer_{}; // size: 1 + GetIndexPartNum().
 
-    std::shared_mutex rw_locker_{};
+    mutable std::shared_mutex rw_locker_{};
 
     TxnTimeStamp min_ts_{0}; // Indicate the commit_ts which create this SegmentIndexEntry
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this SegmentIndexEntry

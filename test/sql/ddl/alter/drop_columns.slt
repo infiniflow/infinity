@@ -1,0 +1,38 @@
+statement ok
+DROP TABLE IF EXISTS table1;
+
+statement ok
+CREATE TABLE table1 (column1 INT, column2 INT, column3 VARCHAR);
+
+statement ok
+CREATE INDEX ft_idx ON table1(column3) USING FULLTEXT;
+
+statement ok
+INSERT INTO table1 VALUES (1, 2, 'test');
+
+query I
+SELECT * FROM table1;
+----
+1 2 test
+
+statement error
+ALTER TABLE table1 DROP COLUMN column3;
+
+statement error
+ALTER TABLE table1 DROP COLUMN column4;
+
+statement ok
+ALTER TABLE table1 DROP COLUMN column2;
+
+statement ok
+INSERT INTO table1 VALUES (2, 'test2');
+
+query II
+SELECT * FROM table1;
+----
+1 test
+2 test2
+
+# statement ok
+# DROP TABLE table1;
+

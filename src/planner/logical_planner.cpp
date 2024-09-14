@@ -42,6 +42,7 @@ import txn;
 import table_entry_type;
 import third_party;
 import table_def;
+import logical_alter;
 import logical_create_table;
 import logical_create_collection;
 import logical_create_schema;
@@ -100,42 +101,7 @@ import column_expr;
 import function_expr;
 import catalog;
 import special_function;
-
-namespace {
-
-using namespace infinity;
-
-enum class IdentifierValidationStatus {
-    kOk,
-    kEmpty,
-    kExceedLimit,
-    kInvalidName,
-};
-
-IdentifierValidationStatus IdentifierValidation(const String &identifier) {
-    if (identifier.empty()) {
-        return IdentifierValidationStatus::kEmpty;
-    }
-
-    u64 identifier_len = identifier.length();
-    if (identifier_len >= MAX_IDENTIFIER_NAME_LENGTH) {
-        return IdentifierValidationStatus::kExceedLimit;
-    }
-
-    if (!std::isalpha(identifier[0]) && identifier[0] != '_') {
-        return IdentifierValidationStatus::kInvalidName;
-    }
-    for (SizeT i = 1; i < identifier_len; i++) {
-        char ch = identifier[i];
-        if (!std::isalnum(ch) && ch != '_') {
-            return IdentifierValidationStatus::kInvalidName;
-        }
-    }
-
-    return IdentifierValidationStatus::kOk;
-}
-
-} // namespace
+import utility;
 
 namespace infinity {
 
@@ -184,7 +150,7 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             return BuildExecute(static_cast<const ExecuteStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kAlter: {
-            return BuildAlter(static_cast<const AlterStatement *>(statement), bind_context_ptr);
+            return BuildAlter(const_cast<AlterStatement *>(static_cast<const AlterStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kCommand: {
             return BuildCommand(static_cast<const CommandStatement *>(statement), bind_context_ptr);
@@ -317,7 +283,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                     continue;
                 }
 
-                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                auto column_def = table_entry->GetColumnDefByIdx(column_idx);
                 if (column_def->has_default_value()) {
                     SharedPtr<BaseExpression> value_expr =
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
@@ -350,7 +316,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         } else {
             SizeT table_column_count = table_entry->ColumnCount();
             for (SizeT column_idx = value_list.size(); column_idx < table_column_count; ++column_idx) {
-                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                auto column_def = table_entry->GetColumnDefByIdx(column_idx);
                 if (column_def->has_default_value()) {
                     SharedPtr<BaseExpression> value_expr =
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
@@ -369,7 +335,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
             for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
-                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByID(column_idx)->column_type_;
+                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByIdx(column_idx)->column_type_;
                 DataType value_type = value_list[column_idx]->Type();
                 if (*table_column_type == value_type) {
                     rewrite_value_list[column_idx] = value_list[column_idx];
@@ -1067,7 +1033,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                 RecoverableError(status);
             }
 
-            const ColumnDef *column_def = table_entry->GetColumnDefByID(column_idx_array[0]);
+            const ColumnDef *column_def = table_entry->GetColumnDefByIdx(column_idx_array[0]);
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 Status status = Status::NotSupport(
                     fmt::format("Attempt to export column: {} with type: {} as FVECS file", column_def->name(), column_def->type()->ToString()));
@@ -1127,15 +1093,68 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildAlter(const AlterStatement *, SharedPtr<BindContext> &) {
-    Status status = Status::NotSupport("Alter statement isn't supported.");
-    RecoverableError(status);
+Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    if (statement->schema_name_.empty()) {
+        statement->schema_name_ = query_context_ptr_->schema_name();
+    }
+    Txn *txn = query_context_ptr_->GetTxn();
+    auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    switch (statement->type_) {
+        case AlterStatementType::kRenameTable: {
+            auto *rename_table_statement = static_cast<RenameTableStatement *>(statement);
+            this->logical_plan_ = MakeShared<LogicalRenameTable>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                 table_entry,
+                                                                 std::move(rename_table_statement->new_table_name_));
+            break;
+        }
+        case AlterStatementType::kAddColumns: {
+            auto *add_columns_statement = static_cast<AddColumnStatement *>(statement);
+            ColumnDef *column_def = add_columns_statement->column_def_;
+            if (!column_def->has_default_value()) {
+                RecoverableError(Status::NotSupport("Add column without default value isn't supported."));
+            }
+            bool found = true;
+            try {
+                [[maybe_unused]] i64 column_id = table_entry->GetColumnIdByName(column_def->name());
+            } catch (const RecoverableException &e) {
+                if (e.ErrorCode() != ErrorCode::kColumnNotExist) {
+                    throw;
+                }
+                found = false;
+            }
+            if (found) {
+                RecoverableError(Status::DuplicateColumnName(column_def->name()));
+            }
+            this->logical_plan_ = MakeShared<LogicalAddColumns>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                table_entry,
+                                                                column_def);
+            break;
+        }
+        case AlterStatementType::kDropColumns: {
+            auto *drop_columns_statement = static_cast<DropColumnStatement *>(statement);
+            const String &column_name = drop_columns_statement->column_name_;
+            i64 column_id = table_entry->GetColumnIdByName(column_name);
+            if (table_entry->CheckIfIndexColumn(column_id, txn->TxnID(), txn->BeginTS())) {
+                RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+            }
+            this->logical_plan_ = MakeShared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                 table_entry,
+                                                                 column_name);
+            break;
+        }
+        default: {
+            RecoverableError(Status::NotSupport("Alter statement isn't supported."));
+        }
+    }
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, SharedPtr<BindContext> &bind_context_ptr) {
     Txn *txn = query_context_ptr_->GetTxn();
-    auto *command_statement = (CommandStatement *)statement;
     switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());

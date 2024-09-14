@@ -40,14 +40,17 @@ def fix_python_import_path(filename: str):
 
 def generate_thrift():
     infinity_proj_dir = os.getcwd()
-    python_dir = infinity_proj_dir + "/python/infinity/remote_thrift"
+    python_dir = infinity_proj_dir + "/python/infinity_sdk/infinity/remote_thrift"
     cpp_dir = infinity_proj_dir + "/src/network/infinity_thrift"
-    create_dir([python_dir, cpp_dir])
+    peer_server_cpp_dir = infinity_proj_dir + "/src/network/peer_server_thrift"
+    create_dir([python_dir, cpp_dir, peer_server_cpp_dir])
     infinity_thrift_file = infinity_proj_dir + "/thrift/infinity.thrift"
+    peer_server_file = infinity_proj_dir + "/thrift/peer_server.thrift"
     cmds = [
         "thrift --version",
         f"thrift --out {python_dir} --gen py {infinity_thrift_file}",
         f"thrift -r --out {cpp_dir} --gen cpp:no_skeleton {infinity_thrift_file}",
+        f"thrift -r --out {peer_server_cpp_dir} --gen cpp:no_skeleton {peer_server_file}",
     ]
     for cmd in cmds:
         print(cmd)

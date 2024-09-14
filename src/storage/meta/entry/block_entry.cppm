@@ -33,6 +33,8 @@ import fast_rough_filter;
 import value;
 import buffer_obj;
 import wal_entry;
+import column_def;
+import txn_store;
 
 namespace infinity {
 
@@ -41,6 +43,7 @@ class Txn;
 struct SegmentEntry;
 struct TableEntry;
 class DataBlock;
+class CleanupInfoTracer;
 
 /// class BlockEntry
 export struct BlockEntry : public BaseEntry {
@@ -56,6 +59,12 @@ public:
 public:
     // for iterator unit test
     explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
+
+private:
+    BlockEntry(const BlockEntry &other);
+
+public:
+    UniquePtr<BlockEntry> Clone(SegmentEntry *segment_entry) const;
 
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);
@@ -86,7 +95,7 @@ public:
 
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
-    void Cleanup();
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr);
 
     void Flush(TxnTimeStamp checkpoint_ts);
 
@@ -137,9 +146,9 @@ public:
 
     BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
 
-    FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
+    FastRoughFilter *GetFastRoughFilter() { return fast_rough_filter_.get(); }
 
-    const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
+    const FastRoughFilter *GetFastRoughFilter() const { return fast_rough_filter_.get(); }
 
     SizeT row_count(TxnTimeStamp check_ts) const;
 
@@ -168,6 +177,10 @@ public:
 
     ColumnVector GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
 
+    void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
+
+    void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
+
 public:
     // Setter, Used in import, segment append block, and block append block in compact
     inline void IncreaseRowCount(SizeT increased_row_count) { block_row_count_ += increased_row_count; }
@@ -187,10 +200,10 @@ protected:
     u16 block_row_count_{};
     u16 row_capacity_{};
 
-    BufferObj *version_buffer_object_{};
+    BufferPtr version_buffer_object_{};
 
     // check if a value must not exist in the block
-    FastRoughFilter fast_rough_filter_;
+    SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
 
     TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this BlockEntry
     TxnTimeStamp max_row_ts_{0};           // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
@@ -203,5 +216,6 @@ protected:
 
     // Column data
     Vector<UniquePtr<BlockColumnEntry>> columns_{};
+    Vector<UniquePtr<BlockColumnEntry>> dropped_columns_{};
 };
 } // namespace infinity

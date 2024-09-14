@@ -71,6 +71,12 @@ public:
                     TransactionID txn_id,
                     TxnTimeStamp begin_ts);
 
+private:
+    TableIndexEntry(const TableIndexEntry &other);
+
+public:
+    UniquePtr<TableIndexEntry> Clone(TableIndexMeta *table_index_meta) const;
+
     static SharedPtr<TableIndexEntry> NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                                          bool is_delete,
                                                          const SharedPtr<String> &table_entry_dir,
@@ -144,6 +150,8 @@ public:
 
     void OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
+    bool CheckIfIndexColumn(ColumnID column_id) const;
+
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
 
@@ -152,8 +160,8 @@ private:
     std::shared_mutex segment_update_ts_mutex_{};
     TxnTimeStamp segment_update_ts_{0};
 
-    std::shared_mutex rw_locker_{};
-    TableIndexMeta *const table_index_meta_{};
+    mutable std::shared_mutex rw_locker_{};
+    TableIndexMeta *table_index_meta_{};
     const SharedPtr<IndexBase> index_base_{};
     const SharedPtr<String> index_dir_{};
     SharedPtr<ColumnDef> column_def_{};
@@ -162,7 +170,7 @@ private:
     SharedPtr<SegmentIndexEntry> last_segment_{};
 
 public:
-    void Cleanup() override;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr) override;
 
     void PickCleanup(CleanupScanner *scanner) override;
 

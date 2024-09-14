@@ -25,10 +25,20 @@ import compaction_process;
 import periodic_trigger_thread;
 import log_file;
 import memindex_tracer;
+import persistence_manager;
 
 export module storage;
 
 namespace infinity {
+
+export enum class StorageMode {
+    kUnInitialized,
+    kAdmin,
+    kReadable,
+    kWritable,
+};
+
+class CleanupInfoTracer;
 
 export class Storage {
 public:
@@ -50,11 +60,12 @@ public:
 
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
 
-    void AdminModeInit();
-    void WorkingModeInit();
+    [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
 
-    void AdminModeUnInit();
-    void WorkingModeUnInit();
+    [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return persistence_manager_.get(); }
+
+    StorageMode GetStorageMode() const;
+    void SetStorageMode(StorageMode mode);
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
 
@@ -69,9 +80,14 @@ private:
     UniquePtr<BGMemIndexTracer> memory_index_tracer_{};
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
+    UniquePtr<PersistenceManager> persistence_manager_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
+    UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
+
+    mutable std::mutex mutex_;
+    StorageMode current_storage_mode_{StorageMode::kUnInitialized};
 };
 
 } // namespace infinity

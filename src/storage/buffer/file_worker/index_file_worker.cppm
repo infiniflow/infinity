@@ -21,6 +21,7 @@ import file_worker;
 import stl;
 import column_def;
 import file_worker_type;
+import persistence_manager;
 
 namespace infinity {
 
@@ -44,9 +45,10 @@ public:
                              SharedPtr<String> file_dir,
                              SharedPtr<String> file_name,
                              SharedPtr<IndexBase> index_base,
-                             SharedPtr<ColumnDef> column_def)
-        : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name)), column_def_(std::move(column_def)),
-          index_base_(std::move(index_base)) {}
+                             SharedPtr<ColumnDef> column_def,
+                             PersistenceManager *persistence_manager)
+        : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager),
+          column_def_(std::move(column_def)), index_base_(std::move(index_base)) {}
 
     SizeT GetMemoryCost() const override { return 0; }
 

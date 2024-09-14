@@ -297,12 +297,12 @@ endif ()
 add_executable(infinity
         ${main_cpp}
 
-        #        network/http_server.cppm
-        #        network/http_server.cpp
-        #        network/http/http_search.cppm
-        #        network/http/http_search.cpp
-        #        network/infinity_thrift_service.cpp
-        #        network/infinity_thrift_service.cppm
+#        network/http_server.cppm
+#        network/http_server.cpp
+#        network/http/http_search.cppm
+#        network/http/http_search.cpp
+#        network/infinity_thrift_service.cpp
+#        network/infinity_thrift_service.cppm
 )
 
 #target_sources(infinity
@@ -545,7 +545,6 @@ target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${ut_dependent_cppm}
-        ${network_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

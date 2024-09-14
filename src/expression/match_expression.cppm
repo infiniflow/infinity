@@ -36,6 +36,7 @@ public:
     String fields_;
     String matching_text_;
     String options_text_;
+    SharedPtr<BaseExpression> optional_filter_;
 };
 
 } // namespace infinity

@@ -81,9 +81,27 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
         assert(index_base.get() != nullptr);
         const String &column_name = index_base->column_name();
         column_def_ = table_index_meta->GetTableEntry()->GetColumnDefByName(column_name);
+        if (column_def_.get() == nullptr) {
+            UnrecoverableError(fmt::format("Column {} not found in table {}.", column_name, *table_index_meta->GetTableEntry()->GetTableName()));
+        }
     }
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
+}
+
+TableIndexEntry::TableIndexEntry(const TableIndexEntry &other)
+    : BaseEntry(other), table_index_meta_(other.table_index_meta_), index_base_(other.index_base_), index_dir_(other.index_dir_),
+      column_def_(other.column_def_) {}
+
+UniquePtr<TableIndexEntry> TableIndexEntry::Clone(TableIndexMeta *table_index_meta) const {
+    auto ret = UniquePtr<TableIndexEntry>(new TableIndexEntry(*this));
+    ret->table_index_meta_ = table_index_meta;
+    std::shared_lock lock(rw_locker_);
+    for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+        ret->index_by_segment_.emplace(segment_id, segment_index_entry->Clone(ret.get()));
+    }
+    ret->last_segment_ = ret->index_by_segment_[last_segment_->segment_id()];
+    return ret;
 }
 
 SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
@@ -354,13 +372,13 @@ Status TableIndexEntry::CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID
     return Status::OK();
 }
 
-void TableIndexEntry::Cleanup() {
+void TableIndexEntry::Cleanup(CleanupInfoTracer *info_tracer) {
     if (this->deleted_) {
         return;
     }
     std::unique_lock w_lock(rw_locker_);
     for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
-        segment_index_entry->Cleanup();
+        segment_index_entry->Cleanup(info_tracer);
     }
 
     LOG_DEBUG(fmt::format("Cleaning up dir: {}", *index_dir_));
@@ -372,6 +390,9 @@ void TableIndexEntry::Cleanup() {
     }
     fs.DeleteDirectory(absolute_index_dir);
     LOG_DEBUG(fmt::format("Cleaned dir: {}", absolute_index_dir));
+    if (info_tracer != nullptr) {
+        info_tracer->AddCleanupInfo(std::move(absolute_index_dir));
+    }
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
@@ -450,5 +471,7 @@ void TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<Uniq
         }
     }
 }
+
+bool TableIndexEntry::CheckIfIndexColumn(ColumnID column_id) const { return static_cast<ColumnID>(column_def_->id()) == column_id; }
 
 } // namespace infinity

@@ -57,6 +57,7 @@ import admin_statement;
 import admin_executor;
 import persistence_manager;
 import global_resource_usage;
+import infinity_context;
 
 namespace infinity {
 
@@ -111,48 +112,50 @@ QueryResult QueryContext::Query(const String &query) {
 
     BaseStatement *base_statement = parsed_result->statements_ptr_->at(0);
 
-    if (session_ptr_->MaintenanceMode()) {
-        if (base_statement->Type() == StatementType::kAdmin) {
-            AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
-            QueryResult query_result = HandleAdminStatement(admin_statement);
-            return query_result;
-        } else {
-            QueryResult query_result;
-            query_result.result_table_ = nullptr;
-            query_result.status_ = Status::NotSupportInMaintenanceMode();
-            return query_result;
-        }
-    } else {
-        if (base_statement->Type() == StatementType::kAdmin) {
-            QueryResult query_result;
-            query_result.result_table_ = nullptr;
-            query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
-            return query_result;
-        }
-    }
-    if (base_statement->Type() == StatementType::kAdmin) {
-        if (session_ptr_->MaintenanceMode()) {
-            AdminStatement *admin_statement = static_cast<AdminStatement *>(base_statement);
-            QueryResult query_result = HandleAdminStatement(admin_statement);
-            return query_result;
-        } else {
-            QueryResult query_result;
-            query_result.result_table_ = nullptr;
-            query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
-            return query_result;
-        }
-    }
-
     QueryResult query_result = QueryStatement(base_statement);
     return query_result;
 }
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
     QueryResult query_result;
-    if (session_ptr_->MaintenanceMode()) {
-        query_result.result_table_ = nullptr;
-        query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
-        return query_result;
+
+    if (InfinityContext::instance().IsAdminRole()) {
+        if (base_statement->Type() == StatementType::kAdmin) {
+            const AdminStatement *admin_statement = static_cast<const AdminStatement *>(base_statement);
+            return HandleAdminStatement(admin_statement);
+        } else {
+            query_result.result_table_ = nullptr;
+            query_result.status_ = Status::NotSupportInMaintenanceMode();
+            return query_result;
+        }
+    } else {
+        if (base_statement->Type() == StatementType::kAdmin) {
+            const AdminStatement *admin_statement = static_cast<const AdminStatement *>(base_statement);
+
+            switch(admin_statement->admin_type_) {
+                case AdminStmtType::kShowVariable: {
+                    String var_name = admin_statement->variable_name_.value();
+                    ToLower(var_name);
+                    if(var_name == "server_role") {
+                        return HandleAdminStatement(admin_statement);
+                    }
+                    break;
+                }
+                case AdminStmtType::kShowNode:
+                case AdminStmtType::kShowCurrentNode:
+                case AdminStmtType::kListNodes:
+                case AdminStmtType::kSetRole: {
+                    return HandleAdminStatement(admin_statement);
+                }
+                default: {
+                    break;
+                }
+            }
+
+            query_result.result_table_ = nullptr;
+            query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
+            return query_result;
+        }
     }
 
     Vector<SharedPtr<LogicalNode>> logical_plans{};

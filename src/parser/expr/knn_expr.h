@@ -57,6 +57,8 @@ public:
 
     bool ignore_index_{false};
     std::string index_name_;
+
+    std::unique_ptr<ParsedExpr> filter_expr_;
 };
 
 } // namespace infinity

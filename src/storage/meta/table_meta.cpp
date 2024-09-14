@@ -109,6 +109,27 @@ Tuple<SharedPtr<TableInfo>, Status> TableMeta::GetTableInfo(std::shared_lock<std
     return {table_info, status};
 }
 
+Status TableMeta::AddEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                           SharedPtr<TableEntry> table_entry,
+                           TransactionID txn_id,
+                           TxnTimeStamp begin_ts,
+                           TxnManager *txn_mgr,
+                           bool add_if_found) {
+    auto [table_entry_ptr, status] = table_entry_list_.AddEntry(
+        std::move(r_lock),
+        [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
+            table_entry->txn_id_ = txn_id;
+            table_entry->begin_ts_ = begin_ts;
+            return table_entry;
+        },
+        txn_id,
+        begin_ts,
+        txn_mgr,
+        ConflictType::kError,
+        add_if_found);
+    return status;
+}
+
 void TableMeta::DeleteEntry(TransactionID txn_id) { auto erase_list = table_entry_list_.DeleteEntry(txn_id); }
 
 void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry,
@@ -202,7 +223,7 @@ void TableMeta::Sort() { table_entry_list_.SortEntryListByTS(); }
 
 void TableMeta::PushBackEntry(const SharedPtr<TableEntry> &new_table_entry) { table_entry_list_.PushBackEntry(new_table_entry); }
 
-void TableMeta::Cleanup() { table_entry_list_.Cleanup(); }
+void TableMeta::Cleanup(CleanupInfoTracer *info_tracer) { table_entry_list_.Cleanup(info_tracer); }
 
 bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }
 

@@ -36,7 +36,8 @@ When connecting to Infinity in client-server mode, ensure that the client versio
 | v0.1.1             | v0.1.1             |
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
-| v0.3.0.dev6        | v0.3.0.dev6        |
+| v0.3.0             | v0.3.0             |
+| v0.4.0.dev1        | v0.4.0.dev1        |
 
 If the versions do not match, please update your client or server to ensure compatibility.
 
@@ -720,6 +721,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"chinese"`: Simplified Chinese
       - `"tradition"`: Traditional Chinese
       - `"japanese"`: Japanese
+      - `"korea"`: Korea
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
   - Parameter settings for a secondary index:  
     No parameters are required. For now, use an empty list `[]`.
@@ -807,7 +809,7 @@ table_object.create_index(
 
 #### Create a full-text index
 
-```python {12}
+```python
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_fulltext" with a varchar column "body"
 table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
@@ -823,7 +825,7 @@ table_object.create_index(
 )
 ```
 
-```python {13}
+```python
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_fulltext" with a varchar column "body"
 table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
@@ -838,25 +840,6 @@ table_object.create_index(
                 "ANALYZER": "standard"
             }
         ),
-    None
-)
-```
-
-```python {11-13}
-from infinity.index import IndexInfo, IndexType
-# In the following code snippet, you will see an index built on three columns
-# IMPORTANT: For now, multi-column index works with full-text index ONLY. 
-# Create a table named "test_index_fulltext" with three varchar columns "doctitle", "docdate", and "body"
-table_object = db_object.create_table("test_index_fulltext", {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}}, None)
-# Create a full-text index named "my_index" on three columns "doctitle", "docdate", and "body" with default parameter settings:
-# - "ANALYZER": "standard"
-table_object.create_index(
-    "my_index",
-    [
-        IndexInfo("doctitle", IndexType.FullText),
-        IndexInfo("docdate", IndexType.FullText),
-        IndexInfo("body", IndexType.FullText),
-    ],
     None
 )
 ```

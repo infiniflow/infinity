@@ -31,6 +31,8 @@ import database_detail;
 import status;
 import extra_ddl_info;
 import internal_types;
+import column_def;
+import value;
 
 namespace infinity {
 
@@ -118,6 +120,12 @@ public:
     Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array);
 
     Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
+
+    Status RenameTable(TableEntry *old_table_entry, const String &new_table_name);
+
+    Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values);
+
+    Status DropColumns(TableEntry *table_entry, const Vector<String> &column_names);
 
     Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 

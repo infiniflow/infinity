@@ -39,7 +39,22 @@ enum class AdminStmtType {
     kShowIndex,
     kListIndexSegments,
     kShowIndexSegment,
+    kListConfigs,
+    kListVariables,
+    kShowVariable,
+    kListNodes,
+    kShowNode,
+    kShowCurrentNode,
+    kSetRole,
     kInvalid,
+};
+
+enum class AdminNodeRole {
+    kAdmin,
+    kStandalone,
+    kLeader,
+    kFollower,
+    kLearner
 };
 
 class AdminStatement : public BaseStatement {
@@ -63,6 +78,10 @@ public:
     std::optional<int64_t> index_entry_index_{};
     std::optional<int64_t> log_file_index_{};
     std::optional<int64_t> log_index_in_file_{};
+    std::optional<AdminNodeRole> admin_node_role_{};
+    std::optional<std::string> leader_address_{};
+    std::optional<std::string> variable_name_{};
+    std::optional<std::string> node_name_{};
 };
 
 } // namespace infinity

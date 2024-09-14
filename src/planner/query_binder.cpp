@@ -438,7 +438,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     names_ptr->reserve(column_count);
     columns.reserve(column_count);
     for (SizeT idx = 0; idx < column_count; ++idx) {
-        const ColumnDef *column_def = table_entry->GetColumnDefByID(idx);
+        const ColumnDef *column_def = table_entry->GetColumnDefByIdx(idx);
         types_ptr->emplace_back(column_def->column_type_);
         names_ptr->emplace_back(column_def->name_);
         columns.emplace_back(idx);
@@ -772,7 +772,7 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
 
             // Build select list
             for (SizeT idx = 0; idx < column_count; ++idx) {
-                String column_name = binding->table_collection_entry_ptr_->GetColumnDefByID(idx)->name_;
+                String column_name = binding->table_collection_entry_ptr_->GetColumnDefByIdx(idx)->name_;
                 auto *column_expr = new ColumnExpr();
                 column_expr->names_.emplace_back(table_name);
                 column_expr->names_.emplace_back(column_name);

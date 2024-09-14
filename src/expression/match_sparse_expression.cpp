@@ -42,9 +42,10 @@ MatchSparseExpression::MatchSparseExpression(Vector<SharedPtr<BaseExpression>> s
                                              SparseMetricType metric_type,
                                              SizeT query_n,
                                              SizeT topn,
-                                             const Vector<UniquePtr<InitParameter>> &opt_params)
+                                             const Vector<UniquePtr<InitParameter>> &opt_params,
+                                             SharedPtr<BaseExpression> optional_filter)
     : BaseExpression(ExpressionType::kMatchSparse, std::move(search_column)), metric_type_(metric_type), query_n_(query_n), topn_(topn),
-      opt_params_(opt_params) {
+      opt_params_(opt_params), optional_filter_(std::move(optional_filter)) {
     column_expr_ = static_cast<const ColumnExpression *>(arguments_[0].get());
     this->MakeQuery(query_sparse_expr);
 }
@@ -111,11 +112,12 @@ String MatchSparseExpression::ToString() const {
     }
     String opt_str = ss.str();
 
-    return fmt::format("MATCH SPARSE ({}, [{}], {}, {}) WITH ({})",
+    return fmt::format("MATCH SPARSE ({}, [{}], {}, {}{}) WITH ({})",
                        column_expr_->Name(),
                        sparse_str,
                        MatchSparseExpr::MetricTypeToString(metric_type_),
                        topn_,
+                       optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "",
                        opt_str);
 }
 

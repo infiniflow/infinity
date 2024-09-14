@@ -140,6 +140,15 @@ void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
     table_meta->DeleteEntry(txn_id);
 }
 
+Status
+DBEntry::AddTable(SharedPtr<TableEntry> table_entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, bool add_if_found) {
+    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_entry->GetTableName(), this); };
+    const String &table_name = *table_entry->GetTableName();
+    LOG_TRACE(fmt::format("Adding new table entry: {}", table_name));
+    auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(table_name, std::move(init_table_meta));
+    return table_meta->AddEntry(std::move(r_lock), table_entry, txn_id, begin_ts, txn_mgr, add_if_found);
+}
+
 void DBEntry::CreateTableReplay(const SharedPtr<String> &table_name,
                                 std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
                                 TransactionID txn_id,
@@ -304,16 +313,19 @@ String DBEntry::GetPathNameTail() const {
 
 void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup(scanner); }
 
-void DBEntry::Cleanup() {
+void DBEntry::Cleanup(CleanupInfoTracer *info_tracer) {
     if (this->deleted_) {
         return;
     }
-    table_meta_map_.Cleanup();
+    table_meta_map_.Cleanup(info_tracer);
 
     SharedPtr<String> full_db_dir = AbsoluteDir();
     LOG_DEBUG(fmt::format("Cleaning up db dir: {}", *full_db_dir));
     CleanupScanner::CleanupDir(*full_db_dir);
     LOG_DEBUG(fmt::format("Cleaned db dir: {}", *full_db_dir));
+    if (info_tracer) {
+        info_tracer->AddCleanupInfo(std::move(*full_db_dir));
+    }
 }
 
 void DBEntry::MemIndexCommit() {

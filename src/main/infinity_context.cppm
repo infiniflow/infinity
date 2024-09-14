@@ -26,6 +26,9 @@ import session_manager;
 import persistence_manager;
 import third_party;
 import global_resource_usage;
+import status;
+import cluster_manager;
+import peer_task;
 
 namespace infinity {
 
@@ -37,20 +40,31 @@ public:
 
     [[nodiscard]] inline Storage *storage() noexcept { return storage_.get(); }
 
-    [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return persistence_manager_.get(); }
+    [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return storage_->persistence_manager(); }
 
     [[nodiscard]] inline ResourceManager *resource_manager() noexcept { return resource_manager_.get(); }
 
     [[nodiscard]] inline SessionManager *session_manager() noexcept { return session_mgr_.get(); }
 
+    [[nodiscard]] inline ClusterManager *cluster_manager() noexcept { return cluster_manager_.get(); }
+
     [[nodiscard]] inline ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetHnswBuildThreadPool() { return hnsw_build_thread_pool_; }
-    [[nodiscard]] inline bool &MaintenanceMode() { return maintenance_mode_; }
 
-    void Init(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
+    NodeRole GetServerRole() const;
+    void SetServerRole(NodeRole server_role);
+
+    void Init(const SharedPtr<String> &config_path, bool admin_flag = false, DefaultConfig *default_config = nullptr);
+//    void InitAdminMode(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
+    Status ChangeRole(NodeRole target_role, const String& node_name = {}, String leader_ip = {}, i16 leader_port = {});
+    bool IsAdminRole() const { return GetServerRole() == NodeRole::kAdmin; }
+    bool IsClusterRole() const;
 
     void UnInit();
+
+    void SetIndexThreadPool(SizeT thread_num);
+    void RestoreIndexThreadPoolToDefault();
 
 private:
     friend class Singleton;
@@ -61,8 +75,9 @@ private:
     UniquePtr<ResourceManager> resource_manager_{};
     UniquePtr<TaskScheduler> task_scheduler_{};
     UniquePtr<Storage> storage_{};
-    UniquePtr<PersistenceManager> persistence_manager_{};
     UniquePtr<SessionManager> session_mgr_{};
+    UniquePtr<ClusterManager> cluster_manager_{};
+
     // For fulltext index
     ThreadPool inverting_thread_pool_{4};
     ThreadPool commiting_thread_pool_{2};
@@ -70,8 +85,8 @@ private:
     // For hnsw index
     ThreadPool hnsw_build_thread_pool_{4};
 
-    bool initialized_{false};
-    bool maintenance_mode_{false};
+    mutable std::mutex mutex_;
+    NodeRole current_server_role_{NodeRole::kUnInitialized};
 };
 
 } // namespace infinity

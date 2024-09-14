@@ -248,6 +248,49 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     return Status::OK();
 }
 
+Status Txn::RenameTable(TableEntry *old_table_entry, const String &new_table_name) {
+    UnrecoverableError("Not implemented yet");
+    return Status::OK();
+}
+
+Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+
+    auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_id_, begin_ts);
+    if (!db_status.ok()) {
+        return db_status;
+    }
+    UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
+    TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
+    new_table_entry->AddColumns(column_defs, default_values, txn_table_store);
+    auto add_status = db_entry->AddTable(std::move(new_table_entry), txn_id_, begin_ts, txn_mgr_, true/*add_if_found*/);
+    if (!add_status.ok()) {
+        return add_status;
+    }
+
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdAddColumns>(*table_entry->GetDBName(), *table_entry->GetTableName(), column_defs));
+    return Status::OK();
+}
+
+Status Txn::DropColumns(TableEntry *table_entry, const Vector<String> &column_names) {
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+
+    auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_id_, begin_ts);
+    if (!db_status.ok()) {
+        return db_status;
+    }
+    UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
+    TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
+    new_table_entry->DropColumns(column_names, txn_table_store);
+    auto drop_status = db_entry->AddTable(std::move(new_table_entry), txn_id_, begin_ts, txn_mgr_, true/*add_if_found*/);
+    if (!drop_status.ok()) {
+        return drop_status;
+    }
+
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdDropColumns>(*table_entry->GetDBName(), *table_entry->GetTableName(), column_names));
+    return Status::OK();
+}
+
 Status Txn::DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type) {
     this->CheckTxn(db_name);
 

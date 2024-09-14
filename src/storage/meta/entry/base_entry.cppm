@@ -83,6 +83,8 @@ export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type, bool is_delete, String encode)
         : deleted_(is_delete), entry_type_(entry_type), encode_(MakeUnique<String>(std::move(encode))) {}
 
+    BaseEntry(const BaseEntry &other);
+
     virtual ~BaseEntry() = default;
 
     static inline void Commit(BaseEntry *base_entry, TxnTimeStamp commit_ts) { base_entry->commit_ts_.store(commit_ts); }
@@ -106,29 +108,13 @@ public:
     SharedPtr<String> encode_ptr() const { return encode_; }
 
     // return if this entry is visible to the `txn`
-    virtual bool CheckVisible(Txn *txn) const {
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        if (begin_ts >= commit_ts_ || txn_id_ == txn->TxnID()) {
-            return true;
-        }
-        TxnManager *txn_mgr = txn->txn_mgr();
-        if (txn_mgr == nullptr) { // when replay
-            String error_message = fmt::format("Replay should not reach here. begin_ts: {}, commit_ts_: {} txn_id: {}, txn_id_: {}",
-                                               begin_ts,
-                                               commit_ts_,
-                                               txn->TxnID(),
-                                               txn_id_);
-            UnrecoverableError(error_message);
-        }
-        // Check if the entry is in committing process, because commit_ts of the base_entry is set in the Txn::CommitBottom
-        return txn_mgr->CheckIfCommitting(txn_id_, begin_ts);
-    }
+    virtual bool CheckVisible(Txn *txn) const;
 
 public:
     TransactionID txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     atomic_u64 commit_ts_{UNCOMMIT_TS};
-    const bool deleted_;
+    bool deleted_;
 
     const EntryType entry_type_;
 

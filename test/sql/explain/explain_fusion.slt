@@ -10,17 +10,17 @@ EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH TEXT ('body^5', 'harmful c
 ----
 PROJECT (5)
  - table index: #4
- - expressions: [title (#0)]
+ - expressions: [title (#1)]
 -> FUSION (4)
    - fusion: #FUSION('rrf', '')
-   - output columns: [title, num, __score, __rowid]
+   - output columns: [num, __score, __rowid]
   -> MATCH (2)
      - table name: explain_fusion(default_db.explain_fusion)
      - table index: #1
      - match expression: MATCH TEXT ('body^5', 'harmful chemical', 'topn=3')
      - filter for secondary index: None
-     - filter except secondary index: 10 > CAST(num (#1) AS BigInt)
-     - output columns: [title, num, __score, __rowid]
+     - filter except secondary index: 10 > CAST(num (#0) AS BigInt)
+     - output columns: [num, __score, __rowid]
   -> KNN SCAN (3)
      - table name: explain_fusion(default_db.explain_fusion)
      - table index: #4
@@ -29,11 +29,11 @@ PROJECT (5)
        - dimension: 4
        - distance type: L2
        - query embedding: [0,-10,0,0.7]
-     - filter: 10 > CAST(num (#1) AS BigInt)
-     - output columns: [title, num, __score, __rowid]
+     - filter: 10 > CAST(num (#0) AS BigInt)
+     - output columns: [num, __score, __rowid]
 
 query I
-EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
+EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '') WHERE 10 > num;
 ----
 PROJECT (3)
  - table index: #4
@@ -58,7 +58,7 @@ PROJECT (3)
 #----
 
 #query I
-#EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH VECTOR (vec, [0.0, -10.0, 0.0, 0.7], 'float', 'l2', 3), MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim'), FUSION('rrf') WHERE 10 > num;
+#EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH VECTOR (vec, [0.0, -10.0, 0.0, 0.7], 'float', 'l2', 3), MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', ''), FUSION('rrf') WHERE 10 > num;
 #----
 
 # Cleanup

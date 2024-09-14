@@ -131,8 +131,8 @@ void VarBufferManager::InitBuffer() {
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                              block_column_entry_->block_entry()->block_dir(),
                                                              block_column_entry_->OutlineFilename(0),
-                                                             0
-                                                             /*buffer_size*/);
+                                                             0,/*buffer_size*/
+                                                             buffer_mgr_->persistence_manager());
                 auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
                 block_column_entry_->AppendOutlineBuffer(buffer_obj);
                 buffer_handle_ = buffer_obj->Load();

@@ -23,7 +23,7 @@ statement ok
 CREATE INDEX ft_index ON fusion_rerank_tensor_array_maxsim(body) USING FULLTEXT;
 
 query I
-SELECT title, SCORE() FROM fusion_rerank_tensor_array_maxsim SEARCH MATCH TENSOR (t, [[10000.0, -10.0, 100.0, 1000.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 1000.0, 10.0, -10000.0, 100.0]], 'float', 'maxsim');
+SELECT title, SCORE() FROM fusion_rerank_tensor_array_maxsim SEARCH MATCH TENSOR (t, [[10000.0, -10.0, 100.0, 1000.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 1000.0, 10.0, -10000.0, 100.0]], 'float', 'maxsim', '');
 ----
 test00 10000.000000
 test44 9990.000000

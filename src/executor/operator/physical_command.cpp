@@ -44,6 +44,7 @@ import variables;
 import logger;
 import table_entry;
 import txn;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -115,6 +116,12 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             Status status = Status::InvalidCommand("jemalloc is not enabled");
                             RecoverableError(status);
 #endif
+                        }
+                        case GlobalVariable::kCleanupTrace: {
+                            CleanupInfoTracer *tracer = query_context->storage()->cleanup_info_tracer();
+                            String error_msg = tracer->GetCleanupInfo();
+                            LOG_INFO(std::move(error_msg));
+                            return true;
                         }
                         default: {
                             Status status = Status::InvalidCommand(fmt::format("Global variable: {} is read-only", set_command->var_name()));

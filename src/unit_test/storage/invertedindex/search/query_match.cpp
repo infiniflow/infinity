@@ -227,7 +227,7 @@ void QueryMatchTest::CreateIndex(const String &db_name, const String &table_name
             Vector<SizeT> columns;
 
             for (i64 idx = 0; idx < col_cnt; idx++) {
-                const ColumnDef *column_def = table_entry->GetColumnDefByID(idx);
+                const ColumnDef *column_def = table_entry->GetColumnDefByIdx(idx);
                 types_ptr->emplace_back(column_def->column_type_);
                 names_ptr->emplace_back(column_def->name_);
                 columns.emplace_back(idx);
