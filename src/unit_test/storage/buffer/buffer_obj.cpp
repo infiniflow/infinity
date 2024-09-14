@@ -52,6 +52,8 @@ import physical_import;
 import chunk_index_entry;
 import wal_manager;
 import internal_types;
+import persistence_manager;
+import default_values;
 
 using namespace infinity;
 
@@ -95,19 +97,21 @@ TEST_F(BufferObjTest, test1) {
     String data_dir(GetFullDataDir());
     auto temp_dir = MakeShared<String>(data_dir + "/spill");
     auto base_dir = MakeShared<String>(GetFullDataDir());
+    auto persistence_dir = MakeShared<String>(data_dir + "persistence_dir");
 
-    BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
+    UniquePtr<PersistenceManager> persistence_manager = MakeUnique<PersistenceManager>(*persistence_dir, *base_dir, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+    BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager.get());
 
     SizeT test_size1 = 1024;
     auto file_dir1 = MakeShared<String>("dir1");
     auto test_fname1 = MakeShared<String>("test1");
-    auto file_worker1 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir1, test_fname1, test_size1);
+    auto file_worker1 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir1, test_fname1, test_size1, buffer_manager.persistence_manager());
     auto buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
     SizeT test_size2 = 1024;
     auto file_dir2 = MakeShared<String>("dir2");
     auto test_fname2 = MakeShared<String>("test2");
-    auto file_worker2 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir2, test_fname2, test_size2);
+    auto file_worker2 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir2, test_fname2, test_size2, buffer_manager.persistence_manager());
     auto buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
 
     /// kEphemeral

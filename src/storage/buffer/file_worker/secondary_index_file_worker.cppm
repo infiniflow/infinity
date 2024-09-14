@@ -25,6 +25,7 @@ import infinity_exception;
 import default_values;
 import column_def;
 import file_worker_type;
+import persistence_manager;
 
 namespace infinity {
 
@@ -43,13 +44,15 @@ public:
                                       SharedPtr<String> file_name,
                                       SharedPtr<IndexBase> index_base,
                                       SharedPtr<ColumnDef> column_def,
-                                      u32 row_count)
+                                      u32 row_count,
+                                      PersistenceManager* persistence_manager)
         : IndexFileWorker(std::move(data_dir),
                           std::move(temp_dir),
                           std::move(file_dir),
                           std::move(file_name),
                           std::move(index_base),
-                          std::move(column_def)),
+                          std::move(column_def),
+                          persistence_manager),
           row_count_(row_count) {}
 
     ~SecondaryIndexFileWorker() override;
@@ -78,7 +81,8 @@ public:
                                            SharedPtr<IndexBase> index_base,
                                            SharedPtr<ColumnDef> column_def,
                                            u32 row_count,
-                                           u32 part_id);
+                                           u32 part_id,
+                                           PersistenceManager* persistence_manager);
 
     ~SecondaryIndexFileWorkerParts() override;
 

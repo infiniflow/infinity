@@ -98,12 +98,13 @@ BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, T
         block_entry->columns_.emplace_back(std::move(column_entry));
     }
 
+    auto *buffer_mgr = txn->buffer_mgr();
     auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                              block_entry->block_dir(),
                                                              BlockVersion::FileName(),
-                                                             block_entry->row_capacity_);
-    auto *buffer_mgr = txn->buffer_mgr();
+                                                             block_entry->row_capacity_,
+                                                             buffer_mgr->persistence_manager());
     block_entry->version_buffer_object_ = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
     return block_entry;
 }
@@ -137,7 +138,8 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                              block_entry->block_dir(),
                                                              BlockVersion::FileName(),
-                                                             row_capacity);
+                                                             row_capacity,
+                                                             buffer_mgr->persistence_manager());
     block_entry->version_buffer_object_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
 
     block_entry->checkpoint_ts_ = check_point_ts;

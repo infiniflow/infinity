@@ -26,6 +26,7 @@ import column_def;
 import internal_types;
 import file_worker_type;
 import file_worker;
+import persistence_manager;
 
 namespace infinity {
 
@@ -45,6 +46,7 @@ public:
                             SharedPtr<String> file_name,
                             SharedPtr<IndexBase> index_base,
                             SharedPtr<ColumnDef> column_def,
+                            PersistenceManager* persistence_manager,
                             SizeT index_size = 0);
 
     virtual ~HnswFileWorker() override;
