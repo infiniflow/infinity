@@ -27,6 +27,7 @@ import posting_iterator;
 import index_defines;
 import disk_index_segment_reader;
 import inmem_index_segment_reader;
+import chunk_index_entry;
 import memory_indexer;
 import dict_reader;
 import posting_list_format;
@@ -43,13 +44,15 @@ import default_values;
 import logger;
 
 namespace infinity {
-void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment) {
+void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment, Txn *txn) {
     flag_ = flag;
     index_dir_ = std::move(index_dir);
     index_by_segment_ = std::move(index_by_segment);
     // need to ensure that segment_id is in ascending order
     for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-        auto [chunk_index_entries, memory_indexer] = segment_index_entry->GetFullTextIndexSnapshot();
+        Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+        SharedPtr<MemoryIndexer> memory_indexer;
+        segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, txn);
         // segment_readers
         for (u32 i = 0; i < chunk_index_entries.size(); ++i) {
             SharedPtr<DiskIndexSegmentReader> segment_reader =
@@ -164,7 +167,7 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
                     String index_dir = *(table_index_entry->index_dir());
                     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment =
                         table_index_entry->GetIndexBySegmentSnapshot(table_entry_ptr_, txn);
-                    column_index_reader->Open(flag, std::move(index_dir), std::move(index_by_segment));
+                    column_index_reader->Open(flag, std::move(index_dir), std::move(index_by_segment), txn);
                     (*result.column_index_readers_)[column_id] = std::move(column_index_reader);
                 }
             }

@@ -126,7 +126,7 @@ void ColumnIndexMergerTest::MergeAndCheckIndex(const String& index_dir,
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{0, fake_segment_index_entry_1}};
     ColumnIndexReader reader;
     auto dir = index_dir;
-    reader.Open(flag_, std::move(dir), std::move(index_by_segment));
+    reader.Open(flag_, std::move(dir), std::move(index_by_segment), nullptr);
 
     for (SizeT i = 0; i < expected_postings.size(); ++i) {
         const ExpectedPosting &expected = expected_postings[i];

@@ -144,7 +144,7 @@ TEST_P(MemoryIndexerTest, Insert) {
     fake_segment_index_entry_1->SetMemoryIndexer(std::move(indexer2));
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{0, fake_segment_index_entry_1}};
     ColumnIndexReader reader;
-    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
+    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment), nullptr);
     Check(reader);
 }
 
@@ -160,7 +160,7 @@ TEST_P(MemoryIndexerTest, test2) {
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
 
     ColumnIndexReader reader;
-    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
+    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment), nullptr);
     Check(reader);
 }
 
@@ -174,7 +174,7 @@ TEST_P(MemoryIndexerTest, test3) {
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
 
     ColumnIndexReader reader;
-    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
+    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment), nullptr);
     Pair<u64, float> res = reader.GetTotalDfAndAvgColumnLength();
     ASSERT_EQ(res.first, 0U);
     ASSERT_EQ(res.second, 0.0f);
