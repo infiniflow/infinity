@@ -65,6 +65,7 @@ import txn_manager;
 import wal_manager;
 import logger;
 import chunk_index_entry;
+import memory_indexer;
 import background_process;
 import compaction_process;
 import bg_task;
@@ -1225,7 +1226,8 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
                     break;
                 }
                 case IndexType::kFullText: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetFullTextIndexSnapshot());
+                    SharedPtr<MemoryIndexer> memory_indexer;
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, query_context->GetTxn());
                     break;
                 }
                 case IndexType::kSecondary: {
@@ -1301,8 +1303,8 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
             break;
         }
         case IndexType::kFullText: {
-            auto [chunk_index_entries, _] = segment_index_entry->GetFullTextIndexSnapshot();
-            chunk_indexes = chunk_index_entries;
+            SharedPtr<MemoryIndexer> memory_indexer;
+            segment_index_entry->GetChunkIndexEntries(chunk_indexes, memory_indexer, query_context->GetTxn());
             break;
         }
         case IndexType::kSecondary: {

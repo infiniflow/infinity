@@ -752,15 +752,15 @@ void SegmentIndexEntry::CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<
         old_chunk->DeprecateChunk(commit_ts);
     }
 
-    // std::stringstream ss;
-    // ss << "COMMIT OPTIMIZE: ";
-    // ss << "Segment ID: " << segment_id_ << ". ";
-    // ss << "New index chunk: " << new_chunk->chunk_id_ << ". ";
-    // ss << "Old chunks: ";
-    // for (auto *old_chunk : old_chunks) {
-    //     ss << old_chunk->chunk_id_ << ", ";
-    // }
-    // LOG_INFO(ss.str());
+    std::stringstream ss;
+    ss << "COMMIT OPTIMIZE: ";
+    ss << "Segment ID: " << segment_id_ << ". ";
+    ss << "New index chunk: " << new_chunk->chunk_id_ << ". ";
+    ss << "Old chunks: ";
+    for (auto *old_chunk : old_chunks) {
+        ss << old_chunk->chunk_id_ << ", ";
+    }
+    LOG_INFO(ss.str());
 }
 
 void SegmentIndexEntry::OptIndex(IndexBase *index_base,
