@@ -13,13 +13,13 @@ SELECT * FROM table1;
 1 2
 
 statement error
-ALTER TABLE table1 ADD COLUMN column2 varchar DEFAULT 'default';
+ALTER TABLE table1 ADD COLUMN (column2 varchar DEFAULT 'default');
 
 statement error
-ALTER TABLE table1 ADD COLUMN column3 varchar;
+ALTER TABLE table1 ADD COLUMN (column3 varchar);
 
 statement ok
-ALTER TABLE table1 ADD COLUMN column3 varchar DEFAULT 'default';
+ALTER TABLE table1 ADD COLUMN (column3 varchar DEFAULT 'default');
 
 query II
 SELECT * FROM table1;

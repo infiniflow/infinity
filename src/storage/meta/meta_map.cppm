@@ -80,7 +80,7 @@ public:
 
     void PickCleanup(CleanupScanner *scanner);
 
-    void Cleanup(CleanupInfoTracer *info_tracer = nullptr);
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true);
 
     Tuple<Vector<String>, Vector<Meta*>, std::shared_lock<std::shared_mutex>> GetAllMetaGuard() const;
 
@@ -218,9 +218,9 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
 }
 
 template <MetaConcept Meta>
-void MetaMap<Meta>::Cleanup(CleanupInfoTracer *info_tracer) {
+void MetaMap<Meta>::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     for (auto &[name, meta] : meta_map_) {
-        meta->Cleanup(info_tracer);
+        meta->Cleanup(info_tracer, dropped);
     }
 }
 

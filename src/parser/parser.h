@@ -367,6 +367,7 @@ union SQLSTYPE
     std::vector<infinity::BaseStatement*>* stmt_array;
 
     std::vector<infinity::TableElement*>*  table_element_array_t;
+    std::vector<infinity::ColumnDef*>*     column_def_array_t;
     infinity::TableElement*           table_element_t;
     infinity::ColumnDef*              table_column_t;
     infinity::ColumnType              column_type_t;
@@ -416,7 +417,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 420 "parser.h"
+#line 421 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

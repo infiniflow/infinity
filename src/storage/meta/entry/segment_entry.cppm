@@ -272,7 +272,7 @@ private:
     HashSet<TransactionID> delete_txns_; // current number of delete txn that write this segment
 
 public:
-    void Cleanup(CleanupInfoTracer *info_tracer = nullptr) override;
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     void PickCleanup(CleanupScanner *scanner) override;
 

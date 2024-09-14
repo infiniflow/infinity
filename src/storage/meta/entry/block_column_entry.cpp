@@ -264,6 +264,14 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
     }
 }
 
+void BlockColumnEntry::FlushColumn(TxnTimeStamp checkpoint_ts) {
+    if (deleted_) {
+        return;
+    }
+    SizeT row_cnt = block_entry_->row_count(checkpoint_ts);
+    BlockColumnEntry::Flush(this, 0, row_cnt);
+}
+
 void BlockColumnEntry::DropColumn() {
     if (buffer_.get() != nullptr) {
         buffer_.reset();
@@ -274,7 +282,7 @@ void BlockColumnEntry::DropColumn() {
     deleted_ = true;
 }
 
-void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer) {
+void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer, [[maybe_unused]] bool dropped) {
     if (buffer_.get() != nullptr) {
         buffer_.get()->PickForCleanup();
         if (info_tracer != nullptr) {

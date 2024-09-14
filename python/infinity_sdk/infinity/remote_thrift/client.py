@@ -279,3 +279,11 @@ class ThriftInfinityClient:
     def optimize(self, db_name: str, table_name: str, optimize_opt: ttypes.OptimizeOptions):
         return self.client.Optimize(OptimizeRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
                                                     optimize_options=optimize_opt))
+    
+    def add_columns(self, db_name: str, table_name: str, column_defs: list):
+        return self.client.AddColumns(AddColumnsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                                                        column_defs=column_defs))
+
+    def drop_columns(self, db_name: str, table_name: str, column_names: list):
+        return self.client.DropColumns(DropColumnsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                                                          column_names=column_names))

@@ -59,10 +59,8 @@ public:
 
 export class LogicalAddColumns : public LogicalAlter {
 public:
-    LogicalAddColumns(u64 node_id, TableEntry *table_entry, ColumnDef *column_defs)
-        : LogicalAlter(node_id, table_entry, AlterStatementType::kAddColumns) {
-        column_defs_.push_back(MakeShared<ColumnDef>(*column_defs));
-    }
+    LogicalAddColumns(u64 node_id, TableEntry *table_entry, Vector<SharedPtr<ColumnDef>> column_defs)
+        : LogicalAlter(node_id, table_entry, AlterStatementType::kAddColumns), column_defs_(std::move(column_defs)) {}
 
     String ToString(i64 &space) const final;
 
@@ -74,10 +72,8 @@ public:
 
 export class LogicalDropColumns : public LogicalAlter {
 public:
-    LogicalDropColumns(u64 node_id, TableEntry *table_entry, String column_name)
-        : LogicalAlter(node_id, table_entry, AlterStatementType::kDropColumns) {
-        column_names_.push_back(std::move(column_name));
-    }
+    LogicalDropColumns(u64 node_id, TableEntry *table_entry, Vector<String> column_name)
+        : LogicalAlter(node_id, table_entry, AlterStatementType::kDropColumns), column_names_(std::move(column_name)) {}
 
     String ToString(i64 &space) const final;
 

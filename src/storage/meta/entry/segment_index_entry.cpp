@@ -880,7 +880,7 @@ bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
-void SegmentIndexEntry::Cleanup(CleanupInfoTracer *info_tracer) {
+void SegmentIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     for (auto &buffer_ptr : vector_buffer_) {
         if (buffer_ptr.get() == nullptr) {
             String error_message = "vector_buffer should not has nullptr.";
@@ -893,7 +893,7 @@ void SegmentIndexEntry::Cleanup(CleanupInfoTracer *info_tracer) {
         }
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
-        chunk_index_entry->Cleanup(info_tracer);
+        chunk_index_entry->Cleanup(info_tracer, dropped);
     }
 }
 

@@ -129,6 +129,7 @@ struct SQL_LTYPE {
     std::vector<infinity::BaseStatement*>* stmt_array;
 
     std::vector<infinity::TableElement*>*  table_element_array_t;
+    std::vector<infinity::ColumnDef*>*     column_def_array_t;
     infinity::TableElement*           table_element_t;
     infinity::ColumnDef*              table_column_t;
     infinity::ColumnType              column_type_t;
@@ -219,6 +220,16 @@ struct SQL_LTYPE {
         delete ($$);
     }
 } <table_element_array_t>
+
+%destructor {
+    fprintf(stderr, "destroy column def array\n");
+    if (($$) != nullptr) {
+        for (auto ptr : *($$)) {
+            delete ptr;
+        }
+        delete ($$);
+    }
+} <column_def_array_t>
 
 %destructor {
     fprintf(stderr, "destroy statement array\n");
@@ -451,6 +462,7 @@ struct SQL_LTYPE {
 %type <case_check_array_t>      case_check_array;
 
 %type <table_element_array_t>   table_element_array
+%type <column_def_array_t>      column_def_array
 
 %type <table_name_t>      table_name
 %type <copy_option_array> copy_option_list
@@ -673,6 +685,15 @@ table_element_array : table_element {
     $$->push_back($1);
 }
 | table_element_array ',' table_element {
+    $1->push_back($3);
+    $$ = $1;
+};
+
+column_def_array : table_column {
+    $$ = new std::vector<infinity::ColumnDef*>();
+    $$->push_back($1);
+}
+| column_def_array ',' table_column {
     $1->push_back($3);
     $$ = $1;
 };
@@ -2378,34 +2399,27 @@ admin_statement: ADMIN SHOW CATALOGS {
 }
 
 alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
-    auto *ret = new infinity::RenameTableStatement($3);
+    auto *ret = new infinity::RenameTableStatement($3->schema_name_ptr_, $3->table_name_ptr_);
     $$ = ret;
     ret->new_table_name_ = $6;
     free($6);
 }
-| ALTER TABLE table_name ADD COLUMN table_column {
-    auto *ret = new infinity::AddColumnStatement($3);
+| ALTER TABLE table_name ADD COLUMN '(' column_def_array ')' {
+    auto *ret = new infinity::AddColumnsStatement($3->schema_name_ptr_, $3->table_name_ptr_);
     $$ = ret;
-    ret->column_def_ = $6;
+
+    for (infinity::ColumnDef*& column_def : *$7) {
+        ret->column_defs_.emplace_back(column_def);
+    }
+    delete $7;
 }
-| ALTER TABLE table_name DROP COLUMN IDENTIFIER {
-    auto *ret = new infinity::DropColumnStatement($3);
+| ALTER TABLE table_name DROP COLUMN '(' identifier_array ')' {
+    auto *ret = new infinity::DropColumnsStatement($3->schema_name_ptr_, $3->table_name_ptr_);
     $$ = ret;
-    ret->column_name_ = $6;
-    free($6);
-}
-| ALTER TABLE table_name ALTER COLUMN table_column {
-    auto *ret = new infinity::AlterColumnStatement($3);
-    $$ = ret;
-    ret->column_def_ = $6;
-}
-| ALTER TABLE table_name RENAME COLUMN IDENTIFIER TO IDENTIFIER {
-    auto *ret = new infinity::RenameColumnStatement($3);
-    $$ = ret;
-    ret->column_name_ = $6;
-    free($6);
-    ret->new_column_name_ = $8;
-    free($8);
+    for (std::string &column_name : *$7) {
+        ret->column_names_.emplace_back(std::move(column_name));
+    }
+    free($7);
 }
 
 /*

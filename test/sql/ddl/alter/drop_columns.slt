@@ -16,13 +16,13 @@ SELECT * FROM table1;
 1 2 test
 
 statement error
-ALTER TABLE table1 DROP COLUMN column3;
+ALTER TABLE table1 DROP COLUMN (column3);
 
 statement error
-ALTER TABLE table1 DROP COLUMN column4;
+ALTER TABLE table1 DROP COLUMN (column4);
 
 statement ok
-ALTER TABLE table1 DROP COLUMN column2;
+ALTER TABLE table1 DROP COLUMN (column2);
 
 statement ok
 INSERT INTO table1 VALUES (2, 'test2');
