@@ -51,6 +51,7 @@ import build_fast_rough_filter_task;
 import block_entry;
 import segment_index_entry;
 import chunk_index_entry;
+import memory_indexer;
 import cleanup_scanner;
 import column_index_merger;
 import parsed_expr;
@@ -412,7 +413,8 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
         if (segment_index_entry.get() != nullptr) {
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+            SharedPtr<MemoryIndexer> memory_indexer;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, txn);
             for (auto &chunk_index_entry : chunk_index_entries) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             }
@@ -834,7 +836,8 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
                 segment_index_entry = iter->second;
             }
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+            SharedPtr<MemoryIndexer> memory_indexer;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, nullptr);
 
             // Determine block entries need to insert into MemIndexer
             Vector<AppendRange> append_ranges;
@@ -914,8 +917,9 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
                 for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
                     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+                    SharedPtr<MemoryIndexer> memory_indexer;
                     Vector<ChunkIndexEntry *> old_chunks;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, txn);
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, txn);
                     if (chunk_index_entries.size() <= 1) {
                         continue;
                     }

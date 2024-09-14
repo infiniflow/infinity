@@ -147,7 +147,7 @@ public:
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def);
 
-    void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, Txn *txn = nullptr) {
+    void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, SharedPtr<MemoryIndexer> &memory_indexer, Txn *txn = nullptr) {
         std::shared_lock lock(rw_locker_);
         chunk_index_entries.clear();
         SizeT num = chunk_index_entries_.size();
@@ -162,6 +162,7 @@ public:
                   [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) noexcept {
                       return (lhs->base_rowid_ < rhs->base_rowid_ || (lhs->base_rowid_ == rhs->base_rowid_ && lhs->row_count_ < rhs->row_count_));
                   });
+        memory_indexer = memory_indexer_;
     }
 
     void RemoveChunkIndexEntry(ChunkIndexEntry *chunk_index_entry) {
@@ -180,11 +181,6 @@ public:
     ChunkIndexEntry *RebuildChunkIndexEntries(TxnTableStore *txn_table_store, SegmentEntry *segment_entry);
 
     BaseMemIndex *GetMemIndex() const;
-
-    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<MemoryIndexer>> GetFullTextIndexSnapshot() {
-        std::shared_lock lock(rw_locker_);
-        return {chunk_index_entries_, memory_indexer_};
-    }
 
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<HnswIndexInMem>> GetHnswIndexSnapshot() {
         std::shared_lock lock(rw_locker_);

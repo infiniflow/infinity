@@ -48,6 +48,8 @@ import block_entry;
 import table_index_meta;
 import table_index_entry;
 import segment_index_entry;
+import chunk_index_entry;
+import memory_indexer;
 import config;
 import default_values;
 import infinity_context;
@@ -2762,7 +2764,9 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
 
         {
             // chunk index count
-            auto [chunk_index_entries, memory_indexer] = segment_index_ptr->GetFullTextIndexSnapshot();
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            SharedPtr<MemoryIndexer> memory_indexer;
+            segment_index_ptr->GetChunkIndexEntries(chunk_index_entries, memory_indexer, query_context->GetTxn());
             Value value = Value::MakeBigInt(chunk_index_entries.size());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
