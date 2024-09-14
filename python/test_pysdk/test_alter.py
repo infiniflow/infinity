@@ -19,7 +19,7 @@ from infinity_http import infinity_http
 
 class TestInfinity:
     @pytest.fixture(autouse=True)
-    def setup_and_teardown(self, local_infinity, http):
+    def setup_and_teardown(self, local_infinity, http, suffix):
         if local_infinity:
             module = importlib.import_module("infinity_embedded.index")
             globals()["index"] = module
@@ -32,13 +32,13 @@ class TestInfinity:
             self.uri = common_values.TEST_LOCAL_HOST
             self.infinity_obj = infinity.connect(self.uri)
 
+        self.suffix = suffix
         yield
 
-        res = self.infinity_obj.disconnect()
+        self.infinity_obj.disconnect()
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_simple_add_columns(self):
-        table_name = "test_add_column"
+        table_name = "test_add_column" + self.suffix
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(table_name, ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -92,9 +92,8 @@ class TestInfinity:
 
         db_obj.drop_table(table_name)
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_simple_drop_columns(self):
-        table_name = "test_drop_column"
+        table_name = "test_drop_column" + self.suffix
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(table_name, ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -144,9 +143,8 @@ class TestInfinity:
 
         db_obj.drop_table(table_name)
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_add_drop_column_with_index(self):
-        table_name = "test_add_drop_column_with_index"
+        table_name = "test_add_drop_column_with_index" + self.suffix
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(table_name, ConflictType.Ignore)
         table_obj = db_obj.create_table(

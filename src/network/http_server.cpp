@@ -65,6 +65,160 @@ namespace {
 
 using namespace infinity;
 
+int ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_definitions, nlohmann::json &json_response) {
+    SizeT column_count = fields.size();
+    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+        auto &field_element = fields[column_id];
+
+        if (!field_element.contains("name") && !field_element["name"].is_string()) {
+            infinity::Status status = infinity::Status::InvalidColumnDefinition("Name field is missing or not string");
+            json_response["error_code"] = status.code();
+            json_response["error_message"] = status.message();
+            return 1;
+        }
+        String column_name = field_element["name"];
+
+        if (!field_element.contains("type") && !field_element["type"].is_string()) {
+            infinity::Status status = infinity::Status::InvalidColumnDefinition("Type field is missing or not string");
+            json_response["error_code"] = status.code();
+            json_response["error_message"] = status.message();
+            return 1;
+        }
+        String value_type = field_element["type"];
+        ToLower(value_type);
+
+        std::vector<std::string> tokens;
+        tokens = SplitStrByComma(value_type);
+
+        SharedPtr<DataType> column_type{nullptr};
+        SharedPtr<TypeInfo> type_info{nullptr};
+        try{
+            if (tokens[0] == "vector" || tokens[0] == "multivector" || tokens[0] == "tensor" || tokens[0] == "tensorarray") {
+                int dimension = std::stoi(tokens[1]);
+                String etype = tokens[2];
+                EmbeddingDataType e_data_type;
+                if (etype == "int" || etype == "integer" || etype == "int32") {
+                    e_data_type = EmbeddingDataType::kElemInt32;
+                } else if (etype == "uint8") {
+                    e_data_type = EmbeddingDataType::kElemUInt8;
+                } else if (etype == "int8" || etype == "tinyint") {
+                    e_data_type = EmbeddingDataType::kElemInt8;
+                } else if (etype == "float" || etype == "float32") {
+                    e_data_type = EmbeddingDataType::kElemFloat;
+                } else if (etype == "double" || etype == "float64") {
+                    e_data_type = EmbeddingDataType::kElemDouble;
+                } else if (etype == "float16") {
+                    e_data_type = EmbeddingDataType::kElemFloat16;
+                } else if (etype == "bfloat16") {
+                    e_data_type = EmbeddingDataType::kElemBFloat16;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    return 1;
+                }
+                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+                LogicalType logical_type_v = LogicalType::kInvalid;
+                if (tokens[0] == "vector") {
+                    logical_type_v = LogicalType::kEmbedding;
+                } else if (tokens[0] == "multivector") {
+                    logical_type_v = LogicalType::kMultiVector;
+                } else if (tokens[0] == "tensor") {
+                    logical_type_v = LogicalType::kTensor;
+                } else if (tokens[0] == "tensorarray") {
+                    logical_type_v = LogicalType::kTensorArray;
+                }
+                column_type = std::make_shared<DataType>(logical_type_v, type_info);
+            } else if (tokens[0] == "sparse") {
+                int dimension = std::stoi(tokens[1]);
+                String dtype = tokens[2];
+                String itype = tokens[3];
+                EmbeddingDataType d_data_type;
+                EmbeddingDataType i_data_type;
+                if (dtype == "integer" || dtype == "int" || dtype == "int32") {
+                    d_data_type = EmbeddingDataType::kElemInt32;
+                } else if (dtype == "float" || dtype == "float32") {
+                    d_data_type = EmbeddingDataType::kElemFloat;
+                } else if (dtype == "double" || dtype == "float64") {
+                    d_data_type = EmbeddingDataType::kElemDouble;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(dtype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    return 1;
+                }
+
+                if (itype == "tinyint" || itype == "int8") {
+                    i_data_type = EmbeddingDataType::kElemInt8;
+                } else if (itype == "smallint" || itype == "int16") {
+                    i_data_type = EmbeddingDataType::kElemInt16;
+                } else if (itype == "integer" || itype == "int" || itype == "int32") {
+                    i_data_type = EmbeddingDataType::kElemInt32;
+                } else if (itype == "bigint" || itype == "int64") {
+                    i_data_type = EmbeddingDataType::kElemInt64;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(itype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    return 1;
+                }
+                type_info = SparseInfo::Make(d_data_type, i_data_type, size_t(dimension), SparseStoreType::kSort);
+                column_type = std::make_shared<DataType>(LogicalType::kSparse, type_info);
+            } else if (tokens[0] == "decimal") {
+                type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
+                column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
+            } else if (tokens[0] == "array") {
+                infinity::Status::ParserError("Array isn't implemented here.");
+                type_info = nullptr;
+            } else if (tokens.size() == 1) {
+                column_type = DataType::StringDeserialize(tokens[0]);
+            } else {
+                infinity::Status status = infinity::Status::ParserError("type syntax error");
+                json_response["error_code"] = status.code();
+                json_response["error_message"] = status.message();
+                return 1;
+            }
+        } catch(std::exception &e) {
+            infinity::Status status = infinity::Status::ParserError("type syntax error");
+            json_response["error_code"] = status.code();
+            json_response["error_message"] = status.message();
+            return 1;
+        }
+
+        if (column_type) {
+            std::set<ConstraintType> constraints;
+            if (field_element.contains("constraints"))
+                for (auto &constraint_json : field_element["constraints"]) {
+                    String constraint = constraint_json;
+                    ToLower(constraint);
+                    constraints.insert(StringToConstraintType(constraint));
+                }
+            SharedPtr<ParsedExpr> default_expr{nullptr};
+            if (field_element.contains("default")) {
+                switch (column_type->type()) {
+                    case LogicalType::kSparse: {
+                        default_expr = BuildConstantSparseExprFromJson(field_element["default"],
+                                                                        dynamic_cast<const SparseInfo *>(column_type->type_info().get()));
+                        break;
+                    }
+                    default: {
+                        default_expr = BuildConstantExprFromJson(field_element["default"]);
+                        break;
+                    }
+                }
+            }
+            ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, default_expr);
+            column_definitions.emplace_back(col_def);
+        } else {
+            infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
+            json_response["error_code"] = status.code();
+            json_response["error_message"] = status.message();
+            return 1;
+        }
+    }
+    return 0;
+}
+
 class ListDatabaseHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -264,7 +418,7 @@ public:
         String body_info = request->readBodyToString();
         nlohmann::json body_info_json = nlohmann::json::parse(body_info);
 
-        auto fields = body_info_json["fields"];
+        const auto &fields = body_info_json["fields"];
         auto properties = body_info_json["properties"];
 
         nlohmann::json json_response;
@@ -281,8 +435,6 @@ public:
             return ResponseFactory::createResponse(http_status, json_response.dump());
         }
 
-        SizeT column_count = fields.size();
-
         Vector<ColumnDef *> column_definitions;
         Vector<TableConstraint *> table_constraint;
         DeferFn defer_fn_column_def([&]() {
@@ -295,170 +447,10 @@ public:
                 constraint = nullptr;
             }
         });
-
-        for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-            auto &field_element = fields[column_id];
-
-            if (!field_element.contains("name") && !field_element["name"].is_string()) {
-                infinity::Status status = infinity::Status::InvalidColumnDefinition("Name field is missing or not string");
-                json_response["error_code"] = status.code();
-                json_response["error_message"] = status.message();
-                HTTPStatus http_status;
-                http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
-            }
-            String column_name = field_element["name"];
-
-            if (!field_element.contains("type") && !field_element["type"].is_string()) {
-                infinity::Status status = infinity::Status::InvalidColumnDefinition("Type field is missing or not string");
-                json_response["error_code"] = status.code();
-                json_response["error_message"] = status.message();
-                HTTPStatus http_status;
-                http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
-            }
-            String value_type = field_element["type"];
-            ToLower(value_type);
-
-            std::vector<std::string> tokens;
-            tokens = SplitStrByComma(value_type);
-
-            SharedPtr<DataType> column_type{nullptr};
-            SharedPtr<TypeInfo> type_info{nullptr};
-            try{
-                if (tokens[0] == "vector" || tokens[0] == "multivector" || tokens[0] == "tensor" || tokens[0] == "tensorarray") {
-                    int dimension = std::stoi(tokens[1]);
-                    String etype = tokens[2];
-                    EmbeddingDataType e_data_type;
-                    if (etype == "int" || etype == "integer" || etype == "int32") {
-                        e_data_type = EmbeddingDataType::kElemInt32;
-                    } else if (etype == "uint8") {
-                        e_data_type = EmbeddingDataType::kElemUInt8;
-                    } else if (etype == "int8" || etype == "tinyint") {
-                        e_data_type = EmbeddingDataType::kElemInt8;
-                    } else if (etype == "float" || etype == "float32") {
-                        e_data_type = EmbeddingDataType::kElemFloat;
-                    } else if (etype == "double" || etype == "float64") {
-                        e_data_type = EmbeddingDataType::kElemDouble;
-                    } else if (etype == "float16") {
-                        e_data_type = EmbeddingDataType::kElemFloat16;
-                    } else if (etype == "bfloat16") {
-                        e_data_type = EmbeddingDataType::kElemBFloat16;
-                    } else {
-                        infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
-                        json_response["error_code"] = status.code();
-                        json_response["error_message"] = status.message();
-                        HTTPStatus http_status;
-                        http_status = HTTPStatus::CODE_500;
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
-                    }
-                    type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
-                    LogicalType logical_type_v = LogicalType::kInvalid;
-                    if (tokens[0] == "vector") {
-                        logical_type_v = LogicalType::kEmbedding;
-                    } else if (tokens[0] == "multivector") {
-                        logical_type_v = LogicalType::kMultiVector;
-                    } else if (tokens[0] == "tensor") {
-                        logical_type_v = LogicalType::kTensor;
-                    } else if (tokens[0] == "tensorarray") {
-                        logical_type_v = LogicalType::kTensorArray;
-                    }
-                    column_type = std::make_shared<DataType>(logical_type_v, type_info);
-                } else if (tokens[0] == "sparse") {
-                    int dimension = std::stoi(tokens[1]);
-                    String dtype = tokens[2];
-                    String itype = tokens[3];
-                    EmbeddingDataType d_data_type;
-                    EmbeddingDataType i_data_type;
-                    if (dtype == "integer" || dtype == "int" || dtype == "int32") {
-                        d_data_type = EmbeddingDataType::kElemInt32;
-                    } else if (dtype == "float" || dtype == "float32") {
-                        d_data_type = EmbeddingDataType::kElemFloat;
-                    } else if (dtype == "double" || dtype == "float64") {
-                        d_data_type = EmbeddingDataType::kElemDouble;
-                    } else {
-                        infinity::Status status = infinity::Status::InvalidEmbeddingDataType(dtype);
-                        json_response["error_code"] = status.code();
-                        json_response["error_message"] = status.message();
-                        HTTPStatus http_status;
-                        http_status = HTTPStatus::CODE_500;
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
-                    }
-
-                    if (itype == "tinyint" || itype == "int8") {
-                        i_data_type = EmbeddingDataType::kElemInt8;
-                    } else if (itype == "smallint" || itype == "int16") {
-                        i_data_type = EmbeddingDataType::kElemInt16;
-                    } else if (itype == "integer" || itype == "int" || itype == "int32") {
-                        i_data_type = EmbeddingDataType::kElemInt32;
-                    } else if (itype == "bigint" || itype == "int64") {
-                        i_data_type = EmbeddingDataType::kElemInt64;
-                    } else {
-                        infinity::Status status = infinity::Status::InvalidEmbeddingDataType(itype);
-                        json_response["error_code"] = status.code();
-                        json_response["error_message"] = status.message();
-                        HTTPStatus http_status;
-                        http_status = HTTPStatus::CODE_500;
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
-                    }
-                    type_info = SparseInfo::Make(d_data_type, i_data_type, size_t(dimension), SparseStoreType::kSort);
-                    column_type = std::make_shared<DataType>(LogicalType::kSparse, type_info);
-                } else if (tokens[0] == "decimal") {
-                    type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
-                    column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
-                } else if (tokens[0] == "array") {
-                    infinity::Status::ParserError("Array isn't implemented here.");
-                    type_info = nullptr;
-                } else if (tokens.size() == 1) {
-                    column_type = DataType::StringDeserialize(tokens[0]);
-                } else {
-                    infinity::Status status = infinity::Status::ParserError("type syntax error");
-                    json_response["error_code"] = status.code();
-                    json_response["error_message"] = status.message();
-                    HTTPStatus http_status;
-                    http_status = HTTPStatus::CODE_500;
-                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                }
-            } catch(std::exception &e) {
-                infinity::Status status = infinity::Status::ParserError("type syntax error");
-                json_response["error_code"] = status.code();
-                json_response["error_message"] = status.message();
-                HTTPStatus http_status;
-                http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
-            }
-
-            if (column_type) {
-                std::set<ConstraintType> constraints;
-                for (auto &constraint_json : field_element["constraints"]) {
-                    String constraint = constraint_json;
-                    ToLower(constraint);
-                    constraints.insert(StringToConstraintType(constraint));
-                }
-                SharedPtr<ParsedExpr> default_expr{nullptr};
-                if (field_element.contains("default")) {
-                    switch (column_type->type()) {
-                        case LogicalType::kSparse: {
-                            default_expr = BuildConstantSparseExprFromJson(field_element["default"],
-                                                                           dynamic_cast<const SparseInfo *>(column_type->type_info().get()));
-                            break;
-                        }
-                        default: {
-                            default_expr = BuildConstantExprFromJson(field_element["default"]);
-                            break;
-                        }
-                    }
-                }
-                ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, default_expr);
-                column_definitions.emplace_back(col_def);
-            } else {
-                infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
-                json_response["error_code"] = status.code();
-                json_response["error_message"] = status.message();
-                HTTPStatus http_status;
-                http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
-            }
+        if (int res = ParseColumnDefs(fields, column_definitions, json_response); res) {
+            HTTPStatus http_status;
+            http_status = HTTPStatus::CODE_500;
+            return ResponseFactory::createResponse(http_status, json_response.dump());
         }
 
         CreateTableOptions options;
@@ -2612,6 +2604,89 @@ public:
     }
 };
 
+class AddColumnsHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+
+        String data_body = request->readBodyToString();
+        nlohmann::json json_body = nlohmann::json::parse(data_body);
+
+        nlohmann::json json_response;
+        json_response["error_code"] = 0;
+        HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_200;
+
+        Vector<ColumnDef *> column_def_ptrs;
+        DeferFn defer_free_column_def_ptrs([&]() {
+            for (auto &column_def_ptr : column_def_ptrs) {
+                delete column_def_ptr;
+            }
+        });
+        const nlohmann::json &fields = json_body["fields"];
+        if (int res = ParseColumnDefs(fields, column_def_ptrs, json_response); res) {
+            HTTPStatus http_status;
+            http_status = HTTPStatus::CODE_500;
+            return ResponseFactory::createResponse(http_status, json_response.dump());
+        }
+        Vector<SharedPtr<ColumnDef>> column_defs;
+        for (auto &column_def_ptr : column_def_ptrs) {
+            column_defs.emplace_back(column_def_ptr);
+        }
+        column_def_ptrs.clear();
+
+        const QueryResult result = infinity->AddColumns(database_name, table_name, std::move(column_defs));
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class DropColumnsHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+
+        String data_body = request->readBodyToString();
+        nlohmann::json json_body = nlohmann::json::parse(data_body);
+
+        nlohmann::json json_response;
+        json_response["error_code"] = 0;
+        HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_200;
+
+        Vector<String> column_names;
+        for (const auto &column : json_body["column_names"]) {
+            column_names.emplace_back(column);
+        }
+
+        const QueryResult result = infinity->DropColumns(database_name, table_name, std::move(column_names));
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class ShowSegmentDetailHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -3154,6 +3229,10 @@ void HTTPServer::Start(const String& ip_address, u16 port) {
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<DropIndexHandler>());
     router->route("POST", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<CreateIndexHandler>());
     router->route("PUT", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<OptimizeIndexHandler>());
+
+    // alter
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<AddColumnsHandler>());
+    router->route("DELETE", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<DropColumnsHandler>());
 
     // segment
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}", MakeShared<ShowSegmentDetailHandler>());
