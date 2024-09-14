@@ -1904,7 +1904,7 @@ table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_
 ## add_columns
 
 ```python
-table_object.add_columns(columns_definition)
+table_object.add_columns(column_defs)
 ```
 
 ### Parameters
@@ -1929,7 +1929,7 @@ table_obj.add_columns({"new_column_name1": {"type": "integer", "default": 0}, "n
 # drop_columns
 
 ```python
-table_object.drop_columns(column_defs)
+table_object.drop_columns(column_names)
 ```
 
 ### Parameters
