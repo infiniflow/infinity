@@ -498,8 +498,7 @@ i64 WalManager::ReplayWalFile() {
         // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
     }
     if (wal_list.empty()) {
-        LOG_INFO(fmt::format("No checkpoint found, init a new catalog"));
-        storage_->InitNewCatalog();
+        LOG_INFO(fmt::format("No checkpoint found, terminate replaying WAL"));
         return 0;
     }
 
@@ -596,7 +595,6 @@ i64 WalManager::ReplayWalFile() {
     TxnTimeStamp system_start_ts = last_commit_ts + 1;
     LOG_INFO(fmt::format("System start ts: {}", system_start_ts));
 
-    // start mem index comment thread
     return system_start_ts;
 }
 

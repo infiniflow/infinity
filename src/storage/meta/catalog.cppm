@@ -232,7 +232,7 @@ public:
 
     void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
-    static UniquePtr<Catalog> NewCatalog(bool create_default_db);
+    static UniquePtr<Catalog> NewCatalog();
 
     static UniquePtr<Catalog>
     LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, BufferManager *buffer_mgr);

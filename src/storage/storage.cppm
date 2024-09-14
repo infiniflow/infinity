@@ -69,10 +69,9 @@ public:
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
 
-    void InitNewCatalog();
-
     Config *config() const { return config_ptr_; }
 
+    void CreateDefaultDB();
 private:
     Config *config_ptr_{};
     UniquePtr<Catalog> new_catalog_{};
