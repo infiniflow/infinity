@@ -1904,12 +1904,12 @@ table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_
 ## add_columns
 
 ```python
-table_obj.add_columns({"new_column_name1": {"type": "integer", "default": "0"}, "new_column_name2": {"type": "varchar", "default": ""}})
+table_obj.add_columns({"new_column_name1": {"type": "integer", "default": 0}, "new_column_name2": {"type": "varchar", "default": ""}})
 ```
 
 ### Parameters
 
-#### column_defs: `dict[str, dict[str, str]]`, *Required*
+#### column_defs: `dict[str, dict[str, Any]]`, *Required*
 
 The same as the `column_defs` parameter in the `create_table` method. It is a dictionary where each key is a column name and each value is a dictionary containing the column's information. The default
 value of new columns is required.
