@@ -454,7 +454,6 @@ void ChunkIndexEntry::DeprecateChunk(TxnTimeStamp commit_ts) {
     assert(commit_ts_.load() < commit_ts);
     deprecate_ts_.store(commit_ts);
     LOG_INFO(fmt::format("Deprecate chunk {}, ts: {}", encode(), commit_ts));
-    ResetOptimizing();
 }
 
 BufferHandle ChunkIndexEntry::GetIndexPartAt(u32 i) { return part_buffer_objs_.at(i).get()->Load(); }
@@ -471,16 +470,6 @@ void ChunkIndexEntry::Save() {
     if (buffer_obj_.get()) {
         buffer_obj_.get()->Save();
     }
-}
-
-bool ChunkIndexEntry::TrySetOptimizing() {
-    bool expected = false;
-    return optimizing_.compare_exchange_strong(expected, true);
-}
-
-void ChunkIndexEntry::ResetOptimizing() {
-    bool expected = true;
-    optimizing_.compare_exchange_strong(expected, false);
 }
 
 } // namespace infinity

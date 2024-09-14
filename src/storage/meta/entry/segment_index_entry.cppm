@@ -294,6 +294,14 @@ private:
 
     u64 ft_column_len_sum_{}; // increase only
     u32 ft_column_len_cnt_{}; // increase only
+
+public:
+    bool TrySetOptimizing();
+
+    void ResetOptimizing();
+
+private:
+    Atomic<bool> optimizing_ = false;
 };
 
 } // namespace infinity
