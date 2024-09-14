@@ -44,13 +44,25 @@ public:
     void HeartBeatToLeader();
 
 public:
+    // Used by leader to add non-leader node in register phase
     Status AddNodeInfo(const SharedPtr<NodeInfo>& new_node);
+
+    // Used by leader to remove unregister node
     Status RemoveNode(const String& node_name);
 
-    Status UpdateNodeInfoByHeartBeat(const String& node_name, i64 txn_timestamp, Vector<infinity_peer_server::NodeInfo>& other_nodes, i64& leader_term); // Used by leader;
-    Status UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>>& info_of_nodes); // Use by follower / learner to update all node info.
+    // Used by leader when get HB request
+    Status UpdateNodeInfoByHeartBeat(const String& node_name, i64 txn_timestamp, Vector<infinity_peer_server::NodeInfo>& other_nodes, i64& leader_term);
+
+    // Use by follower / learner to update all node info when get HB response from leader
+    Status UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>>& info_of_nodes);
+
+    // Used by all nodes ADMIN SHOW NODES
     Vector<SharedPtr<NodeInfo>> ListNodes() const;
+
+    // Used by all nodes ADMIN SHOW NODE node_name;
     SharedPtr<NodeInfo> GetNodeInfoPtrByName(const String& node_name) const;
+
+    // Used by all nodes / all mode ADMIN SHOW NODE;
     SharedPtr<NodeInfo> ThisNode() const;
 private:
     TxnManager* txn_manager_{};
