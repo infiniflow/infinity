@@ -118,9 +118,7 @@ void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
 
 void TxnIndexStore::Rollback() {
     for (auto [segment_index_entry, new_chunk, old_chunks] : optimize_data_) {
-        for (auto *old_chunk : old_chunks) {
-            old_chunk->ResetOptimizing();
-        }
+        segment_index_entry->ResetOptimizing();
     }
 }
 

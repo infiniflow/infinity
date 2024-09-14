@@ -67,6 +67,7 @@ import bmp_util;
 import hnsw_util;
 import wal_entry;
 import infinity_context;
+import defer_op;
 
 namespace infinity {
 
@@ -761,6 +762,8 @@ void SegmentIndexEntry::CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<
         ss << old_chunk->chunk_id_ << ", ";
     }
     LOG_INFO(ss.str());
+
+    ResetOptimizing();
 }
 
 void SegmentIndexEntry::OptIndex(IndexBase *index_base,
@@ -955,6 +958,18 @@ void SegmentIndexEntry::ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
 }
 
 ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_table_store, SegmentEntry *segment_entry) {
+    const auto &index_name = *table_index_entry_->GetIndexName();
+    if (!TrySetOptimizing()) {
+        LOG_INFO(fmt::format("Index {} segment {} is optimizing, skip optimize.", index_name, segment_id_));
+    }
+    bool opt_success = false;
+    DeferFn defer_fn([&] {
+        if (!opt_success) {
+            LOG_WARN(fmt::format("Index {} segment {} optimize fail or skip.", index_name, segment_id_));
+            ResetOptimizing();
+        }
+    });
+
     Txn *txn = txn_table_store->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
     const IndexBase *index_base = table_index_entry_->index_base();
@@ -967,7 +982,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     {
         std::shared_lock lock(rw_locker_);
         for (const auto &chunk_index_entry : chunk_index_entries_) {
-            if (chunk_index_entry->CheckVisible(txn) && chunk_index_entry->TrySetOptimizing()) {
+            if (chunk_index_entry->CheckVisible(txn)) {
                 row_count += chunk_index_entry->row_count_;
                 old_chunks.push_back(chunk_index_entry.get());
                 old_ids.push_back(chunk_index_entry->chunk_id_);
@@ -1045,6 +1060,8 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
         }
     }
     ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
+    opt_success = true; // set success after record in txn store
+
     merged_chunk_index_entry->SaveIndexFile();
     AddWalIndexDump(merged_chunk_index_entry.get(), txn, std::move(old_ids));
     return merged_chunk_index_entry.get();
@@ -1236,6 +1253,16 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     segment_index_entry->ft_column_len_cnt_ = index_entry_json["ft_column_len_cnt"];
 
     return segment_index_entry;
+}
+
+bool SegmentIndexEntry::TrySetOptimizing() {
+    bool expected = false;
+    return optimizing_.compare_exchange_strong(expected, true);
+}
+
+void SegmentIndexEntry::ResetOptimizing() {
+    bool expected = true;
+    optimizing_.compare_exchange_strong(expected, false);
 }
 
 } // namespace infinity

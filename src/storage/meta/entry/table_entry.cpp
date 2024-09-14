@@ -59,6 +59,7 @@ import constant_expr;
 import infinity_context;
 import persistence_manager;
 import bg_task;
+import defer_op;
 
 namespace infinity {
 
@@ -915,7 +916,19 @@ void TableEntry::OptimizeIndex(Txn *txn) {
         switch (index_base->index_type_) {
             case IndexType::kFullText: {
                 const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-                for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
+                Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = table_index_entry->GetIndexBySegmentSnapshot(this, txn);
+                for (auto &[segment_id, segment_index_entry] : index_by_segment) {
+                    if (!segment_index_entry->TrySetOptimizing()) {
+                        LOG_INFO(fmt::format("Index {} segment {} is optimizing, skip optimize.", index_name, segment_id));
+                        continue;
+                    }
+                    bool opt_success = false;
+                    DeferFn defer_fn([&] {
+                        if (!opt_success) {
+                            LOG_WARN(fmt::format("Index {} segment {} optimize fail or skip.", index_name, segment_id));
+                            segment_index_entry->ResetOptimizing();
+                        }
+                    });
                     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
                     SharedPtr<MemoryIndexer> memory_indexer;
                     Vector<ChunkIndexEntry *> old_chunks;
@@ -961,6 +974,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                                                                                                                 total_row_count,
                                                                                                                 txn->buffer_mgr());
                     segment_index_entry->ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
+                    opt_success = true; // set success after record in txn store
+
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
                     table_index_entry->UpdateFulltextSegmentTs(ts);
@@ -973,8 +988,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
             case IndexType::kSecondary:
             case IndexType::kBMP: {
                 TxnTimeStamp begin_ts = txn->BeginTS();
-                auto segment_index_guard = table_index_entry->GetSegmentIndexesGuard();
-                for (auto &[segment_id, segment_index_entry] : segment_index_guard.index_by_segment_) {
+                Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = table_index_entry->GetIndexBySegmentSnapshot(this, txn);
+                for (auto &[segment_id, segment_index_entry] : index_by_segment) {
                     SegmentEntry *segment_entry = GetSegmentByID(segment_id, begin_ts).get();
                     if (segment_entry != nullptr) {
                         [[maybe_unused]] auto *merged_chunk_entry = segment_index_entry->RebuildChunkIndexEntries(txn_table_store, segment_entry);
