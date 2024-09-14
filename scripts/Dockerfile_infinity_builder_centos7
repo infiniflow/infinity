@@ -215,7 +215,6 @@ RUN --mount=type=bind,source=r58.tar.gz,target=/root/r58.tar.gz  \
 RUN yum -y install expat-static\
     && yum clean all
 
-ENV PATH="/usr/local/venv310/bin:$PATH"
 
 ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local
 
