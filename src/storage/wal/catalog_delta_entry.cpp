@@ -765,12 +765,12 @@ const String AddBlockEntryOp::ToString() const {
 }
 
 const String AddColumnEntryOp::ToString() const {
-    std::ostringstream oss;
-    oss << fmt::format("AddColumnEntryOp {} outline_infos: [", CatalogDeltaOperation::ToString());
+    std::stringstream sstream;
+    sstream << fmt::format("AddColumnEntryOp {} outline_infos: [", CatalogDeltaOperation::ToString());
     const auto &[outline_buffer_count, last_chunk_offset] = outline_info_;
-    oss << fmt::format("outline_buffer_count: {}, last_chunk_offset: {}", outline_buffer_count, last_chunk_offset);
-    oss << "]";
-    return std::move(oss).str();
+    sstream << fmt::format("outline_buffer_count: {}, last_chunk_offset: {}", outline_buffer_count, last_chunk_offset);
+    sstream << "]";
+    return sstream.str();
 }
 
 const String AddTableIndexEntryOp::ToString() const {
@@ -1027,6 +1027,7 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(const char *&ptr, i32 ma
         UnrecoverableError(error_message);
     }
     {
+        LOG_INFO(fmt::format("Deserialize delta op count: {}", entry->operations_.size()));
         for (const auto &operation : entry->operations_) {
             LOG_INFO(fmt::format("Read delta op: {}", operation->ToString()));
         }

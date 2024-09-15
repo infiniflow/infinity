@@ -476,7 +476,7 @@ String WalManager::GetWalFilename() const { return wal_path_; }
  * @return int64_t The max commit timestamp of the transactions in the wal file.
  *
  */
-i64 WalManager::ReplayWalFile() {
+i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
     LocalFileSystem fs;
 
     Vector<String> wal_list{};
@@ -556,9 +556,21 @@ i64 WalManager::ReplayWalFile() {
     }
 
     if (last_commit_ts == 0) {
-        // once wal is not empty, a checkpoint should always be found.
-        String error_message = "No checkpoint found in wal";
-        UnrecoverableError(error_message);
+        switch(targe_storage_mode) {
+            case StorageMode::kWritable: {
+                // once wal is not empty, a checkpoint should always be found in leader or standalone mode.
+                String error_message = "No checkpoint found in wal";
+                UnrecoverableError(error_message);
+                break;
+            }
+            case StorageMode::kReadable: {
+                return 0;
+            }
+            default: {
+                String error_message = "Unreachable branch";
+                UnrecoverableError(error_message);
+            }
+        }
     }
     LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
     auto catalog_fileinfo = CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_commit_ts);
