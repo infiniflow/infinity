@@ -143,10 +143,6 @@ public:
 
     void Save();
 
-    bool TrySetOptimizing();
-
-    void ResetOptimizing();
-
 public:
     ChunkID chunk_id_;
 
@@ -159,7 +155,6 @@ public:
 private:
     BufferPtr buffer_obj_{};
     Vector<BufferPtr> part_buffer_objs_;
-    Atomic<bool> optimizing_{false};
 };
 
 } // namespace infinity
