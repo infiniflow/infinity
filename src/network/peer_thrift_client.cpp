@@ -31,23 +31,14 @@ PeerClient::~PeerClient() {
     if(running_) {
         UnInit();
     }
+    server_connected_ = false;
 }
 
 Status PeerClient::Init() {
 
-    Status status = Status::OK();
-    try {
-        socket_ = MakeShared<TSocket>(node_info_.ip_address_, node_info_.port_);
-
-        TSocket* socket = static_cast<TSocket*>(socket_.get());
-        socket->setConnTimeout(2000); // 2s to timeout
-        transport_ = MakeShared<TBufferedTransport>(socket_);
-        protocol_ = MakeShared<TBinaryProtocol>(transport_);
-        client_ = MakeUnique<PeerServiceClient>(protocol_);
-        transport_->open();
+    Status status = Reconnect();
+    if(status.ok()) {
         processor_thread_ = MakeShared<Thread>([this] { this->Process(); });
-    } catch (const std::exception& e) {
-        status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
     }
 
     return status;
@@ -64,6 +55,28 @@ Status PeerClient::UnInit() {
     }
     LOG_INFO(fmt::format("Peer client: {} is stopped.", this_node_name_));
     return Status::OK();
+}
+
+Status PeerClient::Reconnect() {
+    Status status = Status::OK();
+    if(server_connected_ == true) {
+        return status;
+    }
+
+    try {
+        socket_ = MakeShared<TSocket>(node_info_.ip_address_, node_info_.port_);
+
+        TSocket* socket = static_cast<TSocket*>(socket_.get());
+        socket->setConnTimeout(2000); // 2s to timeout
+        transport_ = MakeShared<TBufferedTransport>(socket_);
+        protocol_ = MakeShared<TBinaryProtocol>(transport_);
+        client_ = MakeUnique<PeerServiceClient>(protocol_);
+        transport_->open();
+        server_connected_ = true;
+    } catch (const std::exception& e) {
+        status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
+    }
+    return status;
 }
 
 void PeerClient::Send(SharedPtr<PeerTask> peer_task) {
@@ -168,7 +181,24 @@ void PeerClient::HeartBeat(HeartBeatPeerTask* peer_task) {
     request.node_name = peer_task->node_name_;
     request.txn_timestamp = peer_task->txn_ts_;
 
-    client_->HeartBeat(response, request);
+    try {
+        client_->HeartBeat(response, request);
+    } catch (apache::thrift::transport::TTransportException& thrift_exception) {
+        server_connected_ = false;
+        switch(thrift_exception.getType()) {
+            case TTransportExceptionType::END_OF_FILE: {
+                peer_task->error_message_ = thrift_exception.what();
+                peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectLeader);
+                return ;
+            }
+            default: {
+                String error_message = "Heartbeat: error in data transfer to leader";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+
     if(response.error_code != 0) {
         // Error
         peer_task->error_code_ = response.error_code;

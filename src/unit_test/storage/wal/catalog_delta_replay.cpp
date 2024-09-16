@@ -622,8 +622,8 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
 
             txn_mgr->CommitTxn(txn_record3);
             EXPECT_EQ(table_entry->row_count(), 3ul);
-            // TODO: Need to start txn to do the delta check point
-            usleep(100000);
+
+            usleep(100000); // Fix delta catalog can't finish flushing issue.
             WaitFlushDeltaOp(storage);
         }
         {

@@ -246,6 +246,8 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 buffer_mgr_->Stop();
                 buffer_mgr_.reset();
+
+                persistence_manager_.reset();
             }
 
             if (target_mode == StorageMode::kWritable) {
@@ -316,6 +318,8 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 buffer_mgr_->Stop();
                 buffer_mgr_.reset();
+
+                persistence_manager_.reset();
             }
 
             if (target_mode == StorageMode::kReadable) {

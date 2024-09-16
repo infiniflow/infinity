@@ -69,17 +69,21 @@ private:
     mutable std::mutex mutex_;
 
     SharedPtr<NodeInfo> leader_node_; // Used by follower / learner
-    Vector<SharedPtr<NodeInfo>> other_nodes_; // Used by leader and follower/learner
     SharedPtr<NodeInfo> this_node_; // Used by leader and follower/learner
 
-    SharedPtr<PeerClient> peer_client_{}; // Used by follower and learner;
+    Map<String, SharedPtr<NodeInfo>> other_node_map_; // Used by leader and follower/learner
+//    Vector<SharedPtr<NodeInfo>> other_nodes_; // Used by leader and follower/learner
 
-    Map<String, SharedPtr<PeerClient>> follower_clients_{}; // Used by leader;
+    // Leader clients to followers and learners
+    Map<String, SharedPtr<PeerClient>> reader_client_map_{}; // Used by leader;
+
+    SharedPtr<PeerClient> peer_client_{}; // Used by follower and learner;
 
     SharedPtr<Thread> hb_periodic_thread_{};
     std::mutex hb_mutex_;
     std::condition_variable hb_cv_;
     Atomic<bool> hb_running_{false};
+
 };
 
 }

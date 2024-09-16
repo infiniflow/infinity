@@ -51,9 +51,13 @@ public:
 
     Status Init();
     Status UnInit();
+
+    Status Reconnect();
     void Send(SharedPtr<PeerTask> task);
 
+    bool ServerConnected() const {return server_connected_; }
 private:
+
     void Process();
     void Register(RegisterPeerTask* peer_task);
     void Unregister(UnregisterPeerTask* peer_task);
@@ -68,9 +72,10 @@ private:
     SharedPtr<TTransport> transport_{};
     SharedPtr<TProtocol> protocol_{};
     UniquePtr<PeerServiceClient> client_{};
+    Atomic<bool> server_connected_{false};
+
     Atomic<bool> running_{false};
     BlockingQueue<SharedPtr<PeerTask>> peer_task_queue_{};
-
     SharedPtr<Thread> processor_thread_{};
     Atomic<u64> peer_task_count_{};
 };

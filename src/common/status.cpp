@@ -568,6 +568,11 @@ Status Status::DuplicateNode(const String& node_info) {
     return Status(ErrorCode::kDuplicateNode, MakeUnique<String>(fmt::format("Duplicate node: {}", node_info)));
 }
 
+Status Status::CantConnectLeader(const String& leader_info) {
+    return Status(ErrorCode::kCantConnectLeader, MakeUnique<String>(fmt::format("Can't connect leader: {}", leader_info)));
+}
+
+// meta
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 
 Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUnique<String>("Not found entry")); }

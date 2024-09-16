@@ -27,7 +27,7 @@ import peer_server_thrift_types;
 namespace infinity {
 
 ClusterManager::~ClusterManager() {
-    other_nodes_.clear();
+    other_node_map_.clear();
     this_node_.reset();
     if (peer_client_.get() != nullptr) {
         peer_client_->UnInit();
@@ -206,7 +206,7 @@ Status ClusterManager::UnInit() {
         }
     }
 
-    other_nodes_.clear();
+    other_node_map_.clear();
     this_node_.reset();
     if (peer_client_.get() != nullptr) {
         peer_client_->UnInit();
@@ -217,15 +217,26 @@ Status ClusterManager::UnInit() {
 }
 
 void ClusterManager::HeartBeatToLeader() {
+    // Heartbeat interval
     auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval_);
-
     while (true) {
         std::unique_lock hb_lock(this->hb_mutex_);
         this->hb_cv_.wait_for(hb_lock, hb_interval, [&] { return !this->hb_running_; });
         if (!hb_running_) {
+            // UnInit cluster manager will set hb_running_ false;
             break;
         }
 
+        if(!peer_client_->ServerConnected()) {
+            // If peer_client was disconnected, try to reconnect to server.
+            Status connect_status = peer_client_->Reconnect();
+            if(!connect_status.ok()) {
+                LOG_ERROR(connect_status.message());
+                continue;
+            }
+        }
+
+        // Update latest update time
         auto hb_now = std::chrono::system_clock::now();
         auto hb_time_since_epoch = hb_now.time_since_epoch();
         this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
@@ -236,23 +247,27 @@ void ClusterManager::HeartBeatToLeader() {
         hb_task->Wait();
 
         if (hb_task->error_code_ != 0) {
-            LOG_ERROR(fmt::format("Can't connect to leader: {} ,{}:{}, error: {}",
+            LOG_ERROR(fmt::format("Can't connect to leader: {}, {}:{}, error: {}",
                                   leader_node_->node_name_,
                                   leader_node_->ip_address_,
                                   leader_node_->port_,
                                   hb_task->error_message_));
             leader_node_->node_status_ = NodeStatus::kTimeout;
+
             continue;
         }
 
+        // Prepare the update time of leader
         hb_now = std::chrono::system_clock::now();
         hb_time_since_epoch = hb_now.time_since_epoch();
+
         std::unique_lock<std::mutex> cluster_manager_lock(mutex_);
         // Update leader info
         leader_node_->node_status_ = NodeStatus::kAlive;
-
         leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
         leader_node_->leader_term_ = hb_task->leader_term_;
+
+        // Update heartbeat sending count
         ++ this_node_->heartbeat_count_;
 
         // Update the non-leader node info from leader
@@ -271,47 +286,35 @@ void ClusterManager::HeartBeatToLeader() {
 // }
 
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
+    // Only used by Leader on follower/learner registration.
     std::unique_lock<std::mutex> lock(mutex_);
-    if (this_node_->node_role_ == NodeRole::kLeader) {
-        // Add by register
-        bool found = false;
-        for (const SharedPtr<NodeInfo> &other_node : other_nodes_) {
-            if (other_node->node_name_ == node_info->node_name_) {
-                // Found the node, duplicate node
-                found = true;
-                break;
-            }
-        }
-        if (found) {
-            return Status::DuplicateNode(node_info->node_name_);
-        }
-        other_nodes_.emplace_back(node_info);
-    } else {
+    if(this_node_->node_role_ != NodeRole::kLeader) {
         String error_message = "Invalid node role.";
         UnrecoverableError(error_message);
     }
+
+    // Add by register
+    auto iter = other_node_map_.find(node_info->node_name_);
+    if(iter == other_node_map_.end()) {
+        // Not find, so add the node
+        other_node_map_.emplace(node_info->node_name_, node_info);
+    } else {
+        // Duplicated node
+        return Status::DuplicateNode(node_info->node_name_);
+    }
+
     return Status::OK();
 }
 
 Status ClusterManager::RemoveNode(const String& node_name) {
+    // Only used in leader mode.
     std::unique_lock<std::mutex> lock(mutex_);
-    u64 found_count = 0;
-    std::erase_if(other_nodes_, [&](const SharedPtr<NodeInfo>& node) {
-        if(node_name == node->node_name_) {
-            ++ found_count;
-            return true;
-        }
-        return false;
-    });
 
-    if(found_count == 0) {
+    auto iter = other_node_map_.find(node_name);
+    if(iter == other_node_map_.end()) {
         return Status::NotExistNode(fmt::format("Attempt to remove non-exist node: {}", node_name));
-    } else if(found_count == 1) {
-        return Status::OK();
     } else {
-        String error_message = fmt::format("Attemtp to remove multiple({}) node with name: {}", found_count, node_name);
-        LOG_ERROR(error_message);
-        return Status::DuplicateNode(error_message);
+        other_node_map_.erase(node_name);
     }
 
     return Status::OK();
@@ -320,101 +323,146 @@ Status ClusterManager::RemoveNode(const String& node_name) {
 Status ClusterManager::UpdateNodeInfoByHeartBeat(const String& node_name, i64 txn_timestamp, Vector<infinity_peer_server::NodeInfo>& other_nodes, i64& leader_term) {
     // Used by leader
     std::unique_lock<std::mutex> lock(mutex_);
-    if (this_node_->node_role_ == NodeRole::kLeader) {
-        other_nodes.reserve(other_nodes_.size());
-        leader_term = this_node_->leader_term_;
-        for (const SharedPtr<NodeInfo> &other_node : other_nodes_) {
-            if (other_node->node_name_ == node_name) {
-                // Found the node, just update the timestamp
-                other_node->txn_timestamp_ = txn_timestamp;
-                auto now = std::chrono::system_clock::now();
-                auto time_since_epoch = now.time_since_epoch();
-                other_node->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
-                ++ other_node->heartbeat_count_;
-            } else {
-                infinity_peer_server::NodeInfo thrift_node_info;
-                thrift_node_info.node_name = other_node->node_name_;
-                thrift_node_info.node_ip = other_node->ip_address_;
-                thrift_node_info.node_port = other_node->port_;
-                thrift_node_info.txn_timestamp = other_node->txn_timestamp_;
-                thrift_node_info.hb_count = other_node->heartbeat_count_;
-                switch(other_node->node_role_) {
-                    case NodeRole::kLeader: {
-                        thrift_node_info.node_type = infinity_peer_server::NodeType::kLeader;
-                        break;
-                    }
-                    case NodeRole::kFollower: {
-                        thrift_node_info.node_type = infinity_peer_server::NodeType::kFollower;
-                        break;
-                    }
-                    case NodeRole::kLearner: {
-                        thrift_node_info.node_type = infinity_peer_server::NodeType::kLearner;
-                        break;
-                    }
-                    default: {
-                        String error_message = fmt::format("Invalid node role of node: {}", other_node->node_name_);
-                        return Status::InvalidNodeRole(ToString(other_node->node_role_));
-                    }
-                }
-                switch(other_node->node_status_) {
-                    case NodeStatus::kAlive: {
-                        thrift_node_info.node_status = infinity_peer_server::NodeStatus::kAlive;
-                        break;
-                    }
-                    case NodeStatus::kTimeout: {
-                        thrift_node_info.node_status = infinity_peer_server::NodeStatus::kTimeout;
-                        break;
-                    }
-                    default: {
-                        String error_message = fmt::format("Invalid node status of node: {}", other_node->node_name_);
-                        return Status::InvalidNodeStatus(error_message);
-                    }
-                }
-
-                other_nodes.emplace_back(thrift_node_info);
-            }
-        }
-    } else {
+    if(this_node_->node_role_ != NodeRole::kLeader) {
         String error_message = "Invalid node role.";
         UnrecoverableError(error_message);
+    }
+
+    other_nodes.reserve(other_node_map_.size());
+    leader_term = this_node_->leader_term_;
+    for (const auto& node_info_pair : other_node_map_) {
+        NodeInfo* other_node = node_info_pair.second.get();
+        if (other_node->node_name_ == node_name) {
+            // Found the node, just update the timestamp
+            other_node->txn_timestamp_ = txn_timestamp;
+            auto now = std::chrono::system_clock::now();
+            auto time_since_epoch = now.time_since_epoch();
+            other_node->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+            ++other_node->heartbeat_count_;
+        } else {
+            infinity_peer_server::NodeInfo thrift_node_info;
+            thrift_node_info.node_name = other_node->node_name_;
+            thrift_node_info.node_ip = other_node->ip_address_;
+            thrift_node_info.node_port = other_node->port_;
+            thrift_node_info.txn_timestamp = other_node->txn_timestamp_;
+            thrift_node_info.hb_count = other_node->heartbeat_count_;
+            switch (other_node->node_role_) {
+                case NodeRole::kLeader: {
+                    thrift_node_info.node_type = infinity_peer_server::NodeType::kLeader;
+                    break;
+                }
+                case NodeRole::kFollower: {
+                    thrift_node_info.node_type = infinity_peer_server::NodeType::kFollower;
+                    break;
+                }
+                case NodeRole::kLearner: {
+                    thrift_node_info.node_type = infinity_peer_server::NodeType::kLearner;
+                    break;
+                }
+                default: {
+                    String error_message = fmt::format("Invalid node role of node: {}", other_node->node_name_);
+                    return Status::InvalidNodeRole(ToString(other_node->node_role_));
+                }
+            }
+            switch (other_node->node_status_) {
+                case NodeStatus::kAlive: {
+                    thrift_node_info.node_status = infinity_peer_server::NodeStatus::kAlive;
+                    break;
+                }
+                case NodeStatus::kTimeout: {
+                    thrift_node_info.node_status = infinity_peer_server::NodeStatus::kTimeout;
+                    break;
+                }
+                default: {
+                    String error_message = fmt::format("Invalid node status of node: {}", other_node->node_name_);
+                    return Status::InvalidNodeStatus(error_message);
+                }
+            }
+
+            other_nodes.emplace_back(thrift_node_info);
+        }
     }
     return Status::OK();
 }
 
 Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &info_of_nodes) {
+    // Only follower and learner will use this function.
+    HashMap<String, bool> exist_node_name_map;
+    exist_node_name_map.reserve(other_node_map_.size());
+    for(const auto& node_pair: other_node_map_) {
+        exist_node_name_map.emplace(node_pair.first, false);
+    }
+
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+
     for(const SharedPtr<NodeInfo>& node_info: info_of_nodes) {
-        bool found = false;
-        for(const SharedPtr<NodeInfo>& other_node_ptr: other_nodes_) {
-            if(node_info->node_name_ == other_node_ptr->node_name_) {
-                found = true;
-                other_node_ptr->txn_timestamp_ = node_info->txn_timestamp_;
-                other_node_ptr->ip_address_ = node_info->ip_address_;
-                other_node_ptr->port_ = node_info->port_;
-                other_node_ptr->node_role_ = node_info->node_role_;
-                other_node_ptr->node_status_ = node_info->node_status_;
-            }
-        }
-        if(!found) {
-            other_nodes_.emplace_back(node_info);
+        auto iter = other_node_map_.find(node_info->node_name_);
+        if(iter == other_node_map_.end()) {
+            node_info->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+            other_node_map_.emplace(node_info->node_name_, node_info);
+        } else {
+            iter->second->txn_timestamp_ = node_info->txn_timestamp_;
+            iter->second->ip_address_ = node_info->ip_address_;
+            iter->second->port_ = node_info->port_;
+            iter->second->node_role_ = node_info->node_role_;
+            iter->second->node_status_ = node_info->node_status_;
+            iter->second->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+
+            exist_node_name_map[node_info->node_name_] = true;
         }
     }
+
+    for(const auto& exist_node_pair: exist_node_name_map) {
+        if(!exist_node_pair.second) {
+            other_node_map_.erase(exist_node_pair.first);
+        }
+    }
+
     return Status::OK();
 }
 Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
+    // ADMIN SHOW NODES;
     std::unique_lock<std::mutex> lock(mutex_);
-    Vector<SharedPtr<NodeInfo>> result = other_nodes_;
+    Vector<SharedPtr<NodeInfo>> result;
+    result.reserve(other_node_map_.size() + 2);
     result.emplace_back(this_node_);
     if (this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
         result.emplace_back(leader_node_);
+    }
+    for (const auto& node_info_pair : other_node_map_) {
+        result.emplace_back(node_info_pair.second);
     }
 
     return result;
 }
 SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);
-    return nullptr;
+    if(this_node_->node_role_ == NodeRole::kAdmin or this_node_->node_role_ == NodeRole::kStandalone) {
+        String error_message = "Error node role type";
+        UnrecoverableError(error_message);
+    }
+
+    if(this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
+        if(node_name == leader_node_->node_name_) {
+            // Show leader
+            return leader_node_;
+        }
+    }
+
+    if(node_name == this_node_->node_name_) {
+        // Show this node
+        return this_node_;
+    }
+
+    auto iter = other_node_map_.find(node_name);
+    if(iter == other_node_map_.end()) {
+        return nullptr;
+    }
+    return iter->second;
 }
 SharedPtr<NodeInfo> ClusterManager::ThisNode() const {
+    // ADMIN SHOW NODE;
     std::unique_lock<std::mutex> lock(mutex_);
     return this->this_node_;
 }

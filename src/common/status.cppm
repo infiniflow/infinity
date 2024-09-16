@@ -173,6 +173,7 @@ export enum class ErrorCode : long {
     kCantConnectServer = 7018,
     kNotExistNode = 7019,
     kDuplicateNode = 7020,
+    kCantConnectLeader = 7021,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -334,6 +335,7 @@ public:
     static Status CantConnectServer(const String& ip, i64 port, const String& reason);
     static Status NotExistNode(const String& node_info);
     static Status DuplicateNode(const String& node_info);
+    static Status CantConnectLeader(const String& leader_info);
 
     // meta
     static Status InvalidEntry();
