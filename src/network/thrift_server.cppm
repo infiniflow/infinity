@@ -42,6 +42,8 @@ public:
 
 private:
     UniquePtr<apache::thrift::server::TThreadedServer> server{nullptr};
+
+    atomic_bool started_{false};
 };
 
 export class PoolThriftServer {
@@ -52,6 +54,8 @@ public:
 
 private:
     UniquePtr<apache::thrift::server::TServer> server{nullptr};
+
+    atomic_bool started_{false};
 };
 
 export class NonBlockPoolThriftServer {
@@ -64,6 +68,8 @@ private:
     //    UniquePtr<TServer> server{nullptr};
     SharedPtr<InfinityThriftService> service_handler_{};
     SharedPtr<apache::thrift::concurrency::Thread> server_thread_{};
+
+    atomic_bool started_{false};
 };
 
 } // namespace infinity

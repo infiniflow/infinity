@@ -28,6 +28,7 @@ public:
 private:
     SharedPtr<HttpRouter> router_{};
     SharedPtr<WebServer> server_{};
+    atomic_bool started_{false};
 };
 
 }

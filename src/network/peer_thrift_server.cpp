@@ -77,8 +77,19 @@ void PoolPeerThriftServer::Init(const String& server_address, i32 port_no, i32 p
                                       threadManager);
 }
 
-void PoolPeerThriftServer::Start() { server->serve(); }
+void PoolPeerThriftServer::Start() {
+    if(started_) {
+        return ;
+    }
+    started_ = true;
+    server->serve();
+}
 
-void PoolPeerThriftServer::Shutdown() { server->stop(); }
+void PoolPeerThriftServer::Shutdown() {
+    if(started_) {
+        server->stop();
+        started_ = false;
+    }
+}
 
 } // namespace infinity

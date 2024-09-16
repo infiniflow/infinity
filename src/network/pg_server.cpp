@@ -32,11 +32,11 @@ import logger;
 namespace infinity {
 
 void PGServer::Run() {
-    if (initialized_) {
+    if (started_) {
         return;
     }
 
-    initialized_ = true;
+    started_ = true;
 
     u16 pg_port = InfinityContext::instance().config()->PostgresPort();
     const String &pg_listen_addr = InfinityContext::instance().config()->ServerAddress();
@@ -59,7 +59,7 @@ void PGServer::Run() {
 
 void PGServer::Shutdown() {
 
-    initialized_ = false;
+    started_ = false;
 
     while (running_connection_count_ > 0) {
         // Running connection exists.
@@ -76,7 +76,7 @@ void PGServer::CreateConnection() {
 }
 
 void PGServer::StartConnection(SharedPtr<Connection> &connection) {
-    Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_, initialized = bool(this->initialized_)]() mutable {
+    Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_, initialized = bool(this->started_)]() mutable {
         if(initialized) {
             ++num_running_connections;
             try {

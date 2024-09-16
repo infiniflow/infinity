@@ -34,7 +34,7 @@ private:
 
     void StartConnection(SharedPtr<Connection> &connection);
 
-    atomic_bool initialized_{false};
+    atomic_bool started_{false};
     atomic_u64 running_connection_count_{0};
     boost::asio::io_service io_service_{};
     UniquePtr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
