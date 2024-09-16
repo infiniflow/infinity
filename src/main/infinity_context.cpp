@@ -364,8 +364,6 @@ void InfinityContext::StartThriftServers() {
     if(current_server_role_ != NodeRole::kAdmin) {
         if(start_servers_func_) {
             start_servers_func_();
-        } else {
-            UnrecoverableError("start server functions are not set.");
         }
     }
 }
