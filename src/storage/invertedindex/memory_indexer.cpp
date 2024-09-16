@@ -65,6 +65,7 @@ import defer_op;
 import blocking_queue;
 import segment_index_entry;
 import persistence_manager;
+import utility;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -82,8 +83,8 @@ MemoryIndexer::MemoryIndexer(const String &index_dir, const String &base_name, R
     assert(std::filesystem::path(index_dir).is_absolute());
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
-    Path path = Path(index_dir) / (base_name + ".tmp.merge");
-    spill_full_path_ = path.string();
+    spill_full_path_ = Path(index_dir) / (base_name + ".tmp.merge");
+    spill_full_path_ = Path(InfinityContext::instance().config()->TempDir()) / StringTransform(spill_full_path_, "/", "_");
 }
 
 MemoryIndexer::~MemoryIndexer() {
@@ -261,25 +262,30 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     while (GetInflightTasks() > 0) {
         CommitSync(100);
     }
-    Path path = Path(index_dir_) / base_name_;
-    String index_prefix = path.string();
+
     LocalFileSystem fs;
-    String posting_file = index_prefix + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : "");
-    String dict_file = index_prefix + DICT_SUFFIX + (spill ? SPILL_SUFFIX : "");
+    String posting_file = Path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));
+    String dict_file = Path(index_dir_) / (base_name_ + DICT_SUFFIX + (spill ? SPILL_SUFFIX : ""));
+    String column_length_file = Path(index_dir_) / (base_name_ + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : ""));
+    String tmp_posting_file(posting_file);
+    String tmp_dict_file(dict_file);
+    String tmp_column_length_file(column_length_file);
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr && !spill;
     if (use_object_cache) {
-        pm->ObjCreateRefCount(posting_file);
-        pm->ObjCreateRefCount(dict_file);
+        Path tmp_dir = Path(InfinityContext::instance().config()->TempDir());
+        tmp_posting_file = tmp_dir / StringTransform(tmp_posting_file, "/", "_");
+        tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
+        tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
     }
 
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, tmp_posting_file, 128000);
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, tmp_dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
 
-    String fst_file = dict_file + ".fst";
-    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
+    String tmp_fst_file = tmp_dict_file + ".fst";
+    std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
 
@@ -300,26 +306,10 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         posting_file_writer->Sync();
         dict_file_writer->Sync();
         fst_builder.Finish();
-        fs.AppendFile(dict_file, fst_file);
-        fs.DeleteFile(fst_file);
+        fs.AppendFile(tmp_dict_file, tmp_fst_file);
+        fs.DeleteFile(tmp_fst_file);
     }
-
-    String column_length_file = index_prefix + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : "");
-    if (use_object_cache) {
-        pm->ObjCreateRefCount(column_length_file);
-    }
-    DeferFn defer_fn([&]() {
-        if (!use_object_cache) {
-            return;
-        }
-        pm->PutObjCache(posting_file);
-        pm->PutObjCache(dict_file);
-        pm->PutObjCache(column_length_file);
-        std::filesystem::remove(posting_file);
-        std::filesystem::remove(dict_file);
-        std::filesystem::remove(column_length_file);
-    });
-    auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    auto [file_handler, status] = fs.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -327,6 +317,11 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     Vector<u32> &column_length_array = column_lengths_.UnsafeVec();
     fs.Write(*file_handler, &column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
     fs.Close(*file_handler);
+    if (use_object_cache) {
+        pm->Persist(posting_file, tmp_posting_file, false);
+        pm->Persist(dict_file, tmp_dict_file, false);
+        pm->Persist(column_length_file, tmp_column_length_file, false);
+    }
 
     is_spilled_ = spill;
     Reset();
@@ -396,18 +391,26 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     String index_prefix = path.string();
     LocalFileSystem fs;
 
-    bool use_object_cache = InfinityContext::instance().persistence_manager() != nullptr;
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
     String posting_file = index_prefix + POSTING_SUFFIX;
     String dict_file = index_prefix + DICT_SUFFIX;
+    String column_length_file = index_prefix + LENGTH_SUFFIX;
+    String tmp_posting_file(posting_file);
+    String tmp_dict_file(dict_file);
+    String tmp_column_length_file(column_length_file);
+
     if (use_object_cache) {
-        InfinityContext::instance().persistence_manager()->ObjCreateRefCount(posting_file);
-        InfinityContext::instance().persistence_manager()->ObjCreateRefCount(dict_file);
+        Path tmp_dir = Path(InfinityContext::instance().config()->TempDir());
+        tmp_posting_file = tmp_dir / StringTransform(tmp_posting_file, "/", "_");
+        tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
+        tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
     }
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, tmp_posting_file, 128000);
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, tmp_dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
-    String fst_file = index_prefix + DICT_SUFFIX + ".fst";
-    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
+    String tmp_fst_file = tmp_dict_file + ".fst";
+    std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
 
@@ -478,27 +481,10 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     posting_file_writer->Sync();
     dict_file_writer->Sync();
     fst_builder.Finish();
-    fs.AppendFile(dict_file, fst_file);
-    fs.DeleteFile(fst_file);
+    fs.AppendFile(tmp_dict_file, tmp_fst_file);
+    fs.DeleteFile(tmp_fst_file);
 
-    String column_length_file = index_prefix + LENGTH_SUFFIX;
-
-    if (use_object_cache) {
-        InfinityContext::instance().persistence_manager()->ObjCreateRefCount(column_length_file);
-    }
-    DeferFn defer_fn([&]() {
-        if (!use_object_cache) {
-            return;
-        }
-        InfinityContext::instance().persistence_manager()->PutObjCache(posting_file);
-        InfinityContext::instance().persistence_manager()->PutObjCache(dict_file);
-        InfinityContext::instance().persistence_manager()->PutObjCache(column_length_file);
-        std::filesystem::remove(posting_file);
-        std::filesystem::remove(dict_file);
-        std::filesystem::remove(column_length_file);
-    });
-
-    auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    auto [file_handler, status] = fs.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -506,6 +492,11 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     Vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
     fs.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
     fs.Close(*file_handler);
+    if (use_object_cache) {
+        pm->Persist(posting_file, tmp_posting_file, false);
+        pm->Persist(dict_file, tmp_dict_file, false);
+        pm->Persist(column_length_file, tmp_column_length_file, false);
+    }
 }
 
 void MemoryIndexer::OfflineDump() {

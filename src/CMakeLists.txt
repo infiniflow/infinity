@@ -528,6 +528,8 @@ target_link_libraries(unit_test
         event.a
 )
 
+add_dependencies(unit_test oatpp)
+
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
