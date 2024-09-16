@@ -52,7 +52,10 @@ struct UnregisterResponse {
 
 struct HeartBeatRequest {
 1: string node_name,
-2: i64 txn_timestamp,
+2: NodeType node_type,
+3: string node_ip,
+4: i64 node_port,
+5: i64 txn_timestamp,
 }
 
 struct HeartBeatResponse {

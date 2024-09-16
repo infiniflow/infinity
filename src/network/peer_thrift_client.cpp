@@ -179,6 +179,22 @@ void PeerClient::HeartBeat(HeartBeatPeerTask* peer_task) {
     HeartBeatRequest request;
     HeartBeatResponse response;
     request.node_name = peer_task->node_name_;
+    switch(peer_task->node_role_) {
+        case NodeRole::kFollower: {
+            request.node_type = NodeType::type::kFollower;
+            break;
+        }
+        case NodeRole::kLearner: {
+            request.node_type = NodeType::type::kLearner;
+            break;
+        }
+        default: {
+            String error_message = fmt::format("Only follower and learner can send register message to leader");
+            UnrecoverableError(error_message);
+        }
+    }
+    request.node_ip = peer_task->node_ip_;
+    request.node_port = peer_task->node_port_;
     request.txn_timestamp = peer_task->txn_ts_;
 
     try {

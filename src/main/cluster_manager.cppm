@@ -51,7 +51,7 @@ public:
     Status RemoveNode(const String& node_name);
 
     // Used by leader when get HB request
-    Status UpdateNodeInfoByHeartBeat(const String& node_name, i64 txn_timestamp, Vector<infinity_peer_server::NodeInfo>& other_nodes, i64& leader_term);
+    Status UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo>& non_leader_node, Vector<infinity_peer_server::NodeInfo>& other_nodes, i64& leader_term);
 
     // Use by follower / learner to update all node info when get HB response from leader
     Status UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>>& info_of_nodes);

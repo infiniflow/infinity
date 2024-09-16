@@ -115,6 +115,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     hb_periodic_thread_ = MakeShared<Thread>([this] { this->HeartBeatToLeader(); });
     return status;
 }
+
 Status ClusterManager::InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port) {
     std::unique_lock<std::mutex> lock(mutex_);
     if (this_node_.get() != nullptr) {
@@ -242,7 +243,11 @@ void ClusterManager::HeartBeatToLeader() {
         this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
 
         // Send heartbeat
-        SharedPtr<HeartBeatPeerTask> hb_task = MakeShared<HeartBeatPeerTask>(this_node_->node_name_, txn_manager_->CurrentTS());
+        SharedPtr<HeartBeatPeerTask> hb_task = MakeShared<HeartBeatPeerTask>(this_node_->node_name_,
+                                                                             this_node_->node_role_,
+                                                                             this_node_->ip_address_,
+                                                                             this_node_->port_,
+                                                                             txn_manager_->CurrentTS());
         peer_client_->Send(hb_task);
         hb_task->Wait();
 
@@ -320,7 +325,9 @@ Status ClusterManager::RemoveNode(const String& node_name) {
     return Status::OK();
 }
 
-Status ClusterManager::UpdateNodeInfoByHeartBeat(const String& node_name, i64 txn_timestamp, Vector<infinity_peer_server::NodeInfo>& other_nodes, i64& leader_term) {
+Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo>& non_leader_node,
+                                                 Vector<infinity_peer_server::NodeInfo>& other_nodes,
+                                                 i64& leader_term) {
     // Used by leader
     std::unique_lock<std::mutex> lock(mutex_);
     if(this_node_->node_role_ != NodeRole::kLeader) {
@@ -330,15 +337,17 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const String& node_name, i64 tx
 
     other_nodes.reserve(other_node_map_.size());
     leader_term = this_node_->leader_term_;
+    bool non_leader_node_found{false};
     for (const auto& node_info_pair : other_node_map_) {
         NodeInfo* other_node = node_info_pair.second.get();
-        if (other_node->node_name_ == node_name) {
+        if (other_node->node_name_ == non_leader_node->node_name_) {
             // Found the node, just update the timestamp
-            other_node->txn_timestamp_ = txn_timestamp;
+            other_node->txn_timestamp_ = non_leader_node->txn_timestamp_;
             auto now = std::chrono::system_clock::now();
             auto time_since_epoch = now.time_since_epoch();
             other_node->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
             ++other_node->heartbeat_count_;
+            non_leader_node_found = true;
         } else {
             infinity_peer_server::NodeInfo thrift_node_info;
             thrift_node_info.node_name = other_node->node_name_;
@@ -381,6 +390,10 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const String& node_name, i64 tx
 
             other_nodes.emplace_back(thrift_node_info);
         }
+    }
+
+    if(!non_leader_node_found) {
+        other_node_map_.emplace(non_leader_node->node_name_, non_leader_node);
     }
     return Status::OK();
 }

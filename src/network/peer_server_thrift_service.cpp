@@ -94,8 +94,37 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
     LOG_TRACE("Get HeartBeat request");
     NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
     if (leader_node->node_role_ == NodeRole::kLeader) {
-        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeInfoByHeartBeat(request.node_name,
-                                                                                                 request.txn_timestamp,
+        SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
+        non_leader_node_info->node_name_ = request.node_name;
+        switch (request.node_type) {
+            case infinity_peer_server::NodeType::kLeader: {
+                non_leader_node_info->node_role_ = NodeRole::kLeader;
+                break;
+            }
+            case infinity_peer_server::NodeType::kFollower: {
+                non_leader_node_info->node_role_ = NodeRole::kFollower;
+                break;
+            }
+            case infinity_peer_server::NodeType::kLearner: {
+                non_leader_node_info->node_role_ = NodeRole::kLearner;
+                break;
+            }
+            default: {
+                String error_message = "Invalid node type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+        non_leader_node_info->ip_address_ = request.node_ip;
+        non_leader_node_info->port_ = request.node_port;
+        non_leader_node_info->node_status_ = NodeStatus::kAlive;
+        non_leader_node_info->txn_timestamp_ = request.txn_timestamp;
+
+        auto now = std::chrono::system_clock::now();
+        auto time_since_epoch = now.time_since_epoch();
+        non_leader_node_info->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+
+        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeInfoByHeartBeat(non_leader_node_info,
                                                                                                  response.other_nodes,
                                                                                                  response.leader_term);
     } else {
