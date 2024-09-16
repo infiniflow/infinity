@@ -295,6 +295,8 @@ bool InfinityContext::IsClusterRole() const {
 }
 
 void InfinityContext::UnInit() {
+    StopThriftServers();
+
     NodeRole current_role = GetServerRole();
 
     switch (current_role) {
@@ -376,8 +378,8 @@ void InfinityContext::StopThriftServers() {
     if(current_server_role_ != NodeRole::kAdmin) {
         if (stop_servers_func_) {
             stop_servers_func_();
-        } else {
-            UnrecoverableError("stop server functions are not set.");
+            start_servers_func_ = nullptr;
+            stop_servers_func_ = nullptr;
         }
     }
 }

@@ -4056,7 +4056,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             }
 
             status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, node_name, leader_ip, leader_port);
-            LOG_INFO("Start in FOLLOWER mode");
+            LOG_INFO("Start in LEARNER mode");
             break;
         }
     }
