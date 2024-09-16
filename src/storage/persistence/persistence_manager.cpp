@@ -610,20 +610,16 @@ void AddrSerializer::Initialize(PersistenceManager *persistence_manager, const V
     }
     for (const String &path : path) {
         paths_.push_back(path);
-<<<<<<< HEAD
-        ObjAddr obj_addr = persistence_manager->GetObjFromLocalPath(path);
-=======
-        ObjAddr obj_addr = pm->GetObjCache(path);
->>>>>>> upstream/main
+        ObjAddr obj_addr = persistence_manager->GetObjCache(path);
         obj_addrs_.push_back(obj_addr);
         if (!obj_addr.Valid()) {
             // In ImportWal, version file is not flushed here, set before write wal
-            ObjStat invaild_stat;
-            obj_stats_.push_back(invaild_stat);
+            ObjStat invalid_stat;
+            obj_stats_.push_back(invalid_stat);
         } else {
             ObjStat obj_stat = persistence_manager->GetObjStatByObjAddr(obj_addr);
             obj_stats_.push_back(obj_stat);
-            pm->PutObjCache(path);
+            persistence_manager->PutObjCache(path);
         }
     }
 }
@@ -645,7 +641,7 @@ void AddrSerializer::InitializeValid(PersistenceManager *persistence_manager) {
         } else {
             ObjStat obj_stat = persistence_manager->GetObjStatByObjAddr(obj_addr);
             obj_stats_[i] = obj_stat;
-            pm->PutObjCache(paths_[i]);
+            persistence_manager->PutObjCache(paths_[i]);
         }
     }
 }
