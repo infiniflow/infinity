@@ -3,6 +3,6 @@ FROM debian:stable-slim
 # https://docs.docker.com/reference/dockerfile/#copy
 # If <src> is a directory, the entire contents of the directory are copied, including filesystem metadata.
 # The directory itself isn't copied, only its contents.
-COPY cmake-build-release/src/infinity /usr/bin
+COPY cmake-build-reldeb/src/infinity /usr/bin
 
 ENTRYPOINT ["/usr/bin/infinity"]

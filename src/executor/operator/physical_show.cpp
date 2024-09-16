@@ -1084,7 +1084,13 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         ++column_id;
         {
             const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
-            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(table_dir));
+            u64 index_dir_size = 0;
+            if (InfinityContext::instance().persistence_manager() == nullptr) {
+                index_dir_size = LocalFileSystem::GetFolderSizeByPath(table_dir);
+            } else {
+                // TODO: calculate the sum of object parts which's has the prefix table_dir
+            }
+            const auto &index_size = Utility::FormatByteSize(index_dir_size);
             Value value = Value::MakeVarchar(index_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

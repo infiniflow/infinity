@@ -24,6 +24,7 @@ import third_party;
 import logger;
 import local_file_system;
 import default_values;
+import infinity_context;
 
 namespace infinity {
 
@@ -51,12 +52,20 @@ SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &
         initialized = true;
         srand(std::time(nullptr));
     }
+
+    bool use_persistence_manager = InfinityContext::instance().persistence_manager();
+    bool created = false;
     do {
         rand = RandomString(DEFAULT_RANDOM_NAME_LEN);
         result = fmt::format("{}_{}", rand, name);
         temp = LocalFileSystem::ConcatenateFilePath(parent_dir, result);
         ++cnt;
-    } while (!fs.CreateDirectoryNoExp(temp));
+        if(!use_persistence_manager) {
+            created = fs.CreateDirectoryNoExp(temp);
+        } else {
+            created = true;
+        }
+    } while (!created);
     LOG_DEBUG(fmt::format("Created directory {} in {} times", temp, cnt));
     return MakeShared<String>(std::move(result));
 }

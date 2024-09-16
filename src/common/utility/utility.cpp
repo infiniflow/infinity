@@ -114,4 +114,14 @@ bool ParseIPPort(const String &str, String &ip, i64 &port) {
     }
 }
 
+String StringTransform(const String &source, const String &from, const String &to) {
+    String ret(source);
+    size_t start_pos = 0;
+    while ((start_pos = ret.find(from, start_pos)) != String::npos) {
+        ret.replace(start_pos, from.length(), to);
+        start_pos += to.length();
+    }
+    return ret;
+}
+
 } // namespace infinity
