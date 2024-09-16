@@ -240,10 +240,10 @@ auto main(int argc, char **argv) -> int {
     InfinityContext::instance().AddThriftServerFn(start_thrift_servers, stop_thrift_servers);
     InfinityContext::instance().StartThriftServers();
 
-
     pg_thread = infinity::Thread([&]() { pg_server.Run(); });
 
-    http_server_thread = infinity::Thread([&]() { http_server.Start(InfinityContext::instance().config()->ServerAddress(), InfinityContext::instance().config()->HTTPPort()); });
+    http_server_thread = infinity::Thread(
+        [&]() { http_server.Start(InfinityContext::instance().config()->ServerAddress(), InfinityContext::instance().config()->HTTPPort()); });
 
     shutdown_thread = infinity::Thread([&]() { ShutdownServer(); });
 

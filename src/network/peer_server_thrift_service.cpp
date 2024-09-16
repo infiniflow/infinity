@@ -90,6 +90,7 @@ void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterRespons
     }
     return;
 }
+
 void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse &response, const infinity_peer_server::HeartBeatRequest &request) {
     LOG_TRACE("Get HeartBeat request");
     NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
@@ -133,14 +134,17 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
     }
     return;
 }
+
 void PeerServerThriftService::SyncLog(infinity_peer_server::SyncLogResponse &response, const infinity_peer_server::SyncLogRequest &request) {
     LOG_INFO("Get SyncLog request");
     return;
 }
+
 void PeerServerThriftService::ChangeRole(infinity_peer_server::ChangeRoleResponse &response, const infinity_peer_server::ChangeRoleRequest &request) {
     LOG_INFO("Get ChangeRole request");
     return;
 }
+
 void PeerServerThriftService::NewLeader(infinity_peer_server::NewLeaderResponse &response, const infinity_peer_server::NewLeaderRequest &request) {
     LOG_INFO("Get NewLeader request");
     return;

@@ -195,13 +195,13 @@ Status ClusterManager::UnInit() {
     }
 
     std::unique_lock<std::mutex> lock(mutex_);
-    if(this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
-        if(leader_node_->node_status_ == NodeStatus::kAlive) {
+    if (this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
+        if (leader_node_->node_status_ == NodeStatus::kAlive) {
             // Leader is alive, need to unregister
             SharedPtr<UnregisterPeerTask> unregister_task = MakeShared<UnregisterPeerTask>(this_node_->node_name_);
             peer_client_->Send(unregister_task);
             unregister_task->Wait();
-            if(unregister_task->error_code_ != 0) {
+            if (unregister_task->error_code_ != 0) {
                 LOG_ERROR(fmt::format("Fail to unregister from leader: {}", unregister_task->error_message_));
             }
         }
@@ -228,10 +228,10 @@ void ClusterManager::HeartBeatToLeader() {
             break;
         }
 
-        if(!peer_client_->ServerConnected()) {
+        if (!peer_client_->ServerConnected()) {
             // If peer_client was disconnected, try to reconnect to server.
             Status connect_status = peer_client_->Reconnect();
-            if(!connect_status.ok()) {
+            if (!connect_status.ok()) {
                 LOG_ERROR(connect_status.message());
                 continue;
             }
@@ -273,12 +273,12 @@ void ClusterManager::HeartBeatToLeader() {
         leader_node_->leader_term_ = hb_task->leader_term_;
 
         // Update heartbeat sending count
-        ++ this_node_->heartbeat_count_;
+        ++this_node_->heartbeat_count_;
 
         // Update the non-leader node info from leader
         UpdateNodeInfoNoLock(hb_task->other_nodes_);
     }
-    return ;
+    return;
 }
 
 // Status ClusterManager::Register(SharedPtr<NodeInfo> server_node) {
@@ -293,14 +293,14 @@ void ClusterManager::HeartBeatToLeader() {
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     // Only used by Leader on follower/learner registration.
     std::unique_lock<std::mutex> lock(mutex_);
-    if(this_node_->node_role_ != NodeRole::kLeader) {
+    if (this_node_->node_role_ != NodeRole::kLeader) {
         String error_message = "Invalid node role.";
         UnrecoverableError(error_message);
     }
 
     // Add by register
     auto iter = other_node_map_.find(node_info->node_name_);
-    if(iter == other_node_map_.end()) {
+    if (iter == other_node_map_.end()) {
         // Not find, so add the node
         other_node_map_.emplace(node_info->node_name_, node_info);
     } else {
@@ -311,12 +311,12 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     return Status::OK();
 }
 
-Status ClusterManager::RemoveNode(const String& node_name) {
+Status ClusterManager::RemoveNode(const String &node_name) {
     // Only used in leader mode.
     std::unique_lock<std::mutex> lock(mutex_);
 
     auto iter = other_node_map_.find(node_name);
-    if(iter == other_node_map_.end()) {
+    if (iter == other_node_map_.end()) {
         return Status::NotExistNode(fmt::format("Attempt to remove non-exist node: {}", node_name));
     } else {
         other_node_map_.erase(node_name);
@@ -325,12 +325,12 @@ Status ClusterManager::RemoveNode(const String& node_name) {
     return Status::OK();
 }
 
-Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo>& non_leader_node,
-                                                 Vector<infinity_peer_server::NodeInfo>& other_nodes,
-                                                 i64& leader_term) {
+Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_leader_node,
+                                                 Vector<infinity_peer_server::NodeInfo> &other_nodes,
+                                                 i64 &leader_term) {
     // Used by leader
     std::unique_lock<std::mutex> lock(mutex_);
-    if(this_node_->node_role_ != NodeRole::kLeader) {
+    if (this_node_->node_role_ != NodeRole::kLeader) {
         String error_message = "Invalid node role.";
         UnrecoverableError(error_message);
     }
@@ -338,8 +338,8 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo>& non_
     other_nodes.reserve(other_node_map_.size());
     leader_term = this_node_->leader_term_;
     bool non_leader_node_found{false};
-    for (const auto& node_info_pair : other_node_map_) {
-        NodeInfo* other_node = node_info_pair.second.get();
+    for (const auto &node_info_pair : other_node_map_) {
+        NodeInfo *other_node = node_info_pair.second.get();
         if (other_node->node_name_ == non_leader_node->node_name_) {
             // Found the node, just update the timestamp
             other_node->txn_timestamp_ = non_leader_node->txn_timestamp_;
@@ -392,7 +392,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo>& non_
         }
     }
 
-    if(!non_leader_node_found) {
+    if (!non_leader_node_found) {
         other_node_map_.emplace(non_leader_node->node_name_, non_leader_node);
     }
     return Status::OK();
@@ -402,16 +402,16 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
     // Only follower and learner will use this function.
     HashMap<String, bool> exist_node_name_map;
     exist_node_name_map.reserve(other_node_map_.size());
-    for(const auto& node_pair: other_node_map_) {
+    for (const auto &node_pair : other_node_map_) {
         exist_node_name_map.emplace(node_pair.first, false);
     }
 
     auto now = std::chrono::system_clock::now();
     auto time_since_epoch = now.time_since_epoch();
 
-    for(const SharedPtr<NodeInfo>& node_info: info_of_nodes) {
+    for (const SharedPtr<NodeInfo> &node_info : info_of_nodes) {
         auto iter = other_node_map_.find(node_info->node_name_);
-        if(iter == other_node_map_.end()) {
+        if (iter == other_node_map_.end()) {
             node_info->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
             other_node_map_.emplace(node_info->node_name_, node_info);
         } else {
@@ -426,8 +426,8 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
         }
     }
 
-    for(const auto& exist_node_pair: exist_node_name_map) {
-        if(!exist_node_pair.second) {
+    for (const auto &exist_node_pair : exist_node_name_map) {
+        if (!exist_node_pair.second) {
             other_node_map_.erase(exist_node_pair.first);
         }
     }
@@ -443,7 +443,7 @@ Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
     if (this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
         result.emplace_back(leader_node_);
     }
-    for (const auto& node_info_pair : other_node_map_) {
+    for (const auto &node_info_pair : other_node_map_) {
         result.emplace_back(node_info_pair.second);
     }
 
@@ -451,25 +451,25 @@ Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
 }
 SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);
-    if(this_node_->node_role_ == NodeRole::kAdmin or this_node_->node_role_ == NodeRole::kStandalone) {
+    if (this_node_->node_role_ == NodeRole::kAdmin or this_node_->node_role_ == NodeRole::kStandalone) {
         String error_message = "Error node role type";
         UnrecoverableError(error_message);
     }
 
-    if(this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
-        if(node_name == leader_node_->node_name_) {
+    if (this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
+        if (node_name == leader_node_->node_name_) {
             // Show leader
             return leader_node_;
         }
     }
 
-    if(node_name == this_node_->node_name_) {
+    if (node_name == this_node_->node_name_) {
         // Show this node
         return this_node_;
     }
 
     auto iter = other_node_map_.find(node_name);
-    if(iter == other_node_map_.end()) {
+    if (iter == other_node_map_.end()) {
         return nullptr;
     }
     return iter->second;

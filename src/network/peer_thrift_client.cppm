@@ -32,22 +32,22 @@ using namespace infinity_peer_server;
 
 export class PeerClient {
 public:
-    PeerClient(const String& ip_addr, i64 port, const String& node_name = {}) : this_node_name_(node_name) {
+    PeerClient(const String &ip_addr, i64 port, const String &node_name = {}) : this_node_name_(node_name) {
         node_info_.ip_address_ = ip_addr;
         node_info_.port_ = port;
     }
     ~PeerClient();
 
-//    void SetPeerNode(NodeRole role, const String& node_name, i64 update_ts) {
-//        node_info_.node_name_ = node_name;
-//        node_info_.last_update_ts_ = update_ts;
-//        node_info_.node_status_ = NodeStatus::kAlive;
-//        node_info_.node_role_ = role;
-//    }
-//
-//    String PeerNodeName() const {
-//        return node_info_.node_name_;
-//    }
+    //    void SetPeerNode(NodeRole role, const String& node_name, i64 update_ts) {
+    //        node_info_.node_name_ = node_name;
+    //        node_info_.last_update_ts_ = update_ts;
+    //        node_info_.node_status_ = NodeStatus::kAlive;
+    //        node_info_.node_role_ = role;
+    //    }
+    //
+    //    String PeerNodeName() const {
+    //        return node_info_.node_name_;
+    //    }
 
     Status Init();
     Status UnInit();
@@ -55,13 +55,13 @@ public:
     Status Reconnect();
     void Send(SharedPtr<PeerTask> task);
 
-    bool ServerConnected() const {return server_connected_; }
-private:
+    bool ServerConnected() const { return server_connected_; }
 
+private:
     void Process();
-    void Register(RegisterPeerTask* peer_task);
-    void Unregister(UnregisterPeerTask* peer_task);
-    void HeartBeat(HeartBeatPeerTask* peer_task);
+    void Register(RegisterPeerTask *peer_task);
+    void Unregister(UnregisterPeerTask *peer_task);
+    void HeartBeat(HeartBeatPeerTask *peer_task);
 
 private:
     String this_node_name_;
