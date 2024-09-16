@@ -210,6 +210,8 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
 
                     task_scheduler_->UnInit();
                     task_scheduler_.reset();
+
+                    StopThriftServers();
                     break;
                 }
                 default: {
@@ -235,6 +237,8 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
 
                     task_scheduler_->UnInit();
                     task_scheduler_.reset();
+
+                    StopThriftServers();
                     break;
                 }
                 case NodeRole::kStandalone: {
@@ -277,6 +281,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String& node_name
         }
     }
     SetServerRole(target_role);
+    StartThriftServers();
     return Status::OK();
 }
 
@@ -342,6 +347,39 @@ void InfinityContext::RestoreIndexThreadPoolToDefault() {
     inverting_thread_pool_.resize(4);
     commiting_thread_pool_.resize(2);
     hnsw_build_thread_pool_.resize(4);
+}
+
+void InfinityContext::AddThriftServerFn(std::function<void()> start_func, std::function<void()> stop_func) {
+    start_servers_func_ = start_func;
+    stop_servers_func_ = stop_func;
+}
+
+void InfinityContext::StartThriftServers() {
+    if(current_server_role_ == NodeRole::kUnInitialized) {
+        UnrecoverableError("Invalid node role");
+    }
+
+    if(current_server_role_ != NodeRole::kAdmin) {
+        if(start_servers_func_) {
+            start_servers_func_();
+        } else {
+            UnrecoverableError("start server functions are not set.");
+        }
+    }
+}
+
+void InfinityContext::StopThriftServers() {
+    if(current_server_role_ == NodeRole::kUnInitialized) {
+        UnrecoverableError("Invalid node role");
+    }
+
+    if(current_server_role_ != NodeRole::kAdmin) {
+        if (stop_servers_func_) {
+            stop_servers_func_();
+        } else {
+            UnrecoverableError("stop server functions are not set.");
+        }
+    }
 }
 
 } // namespace infinity
