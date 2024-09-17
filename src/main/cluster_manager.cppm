@@ -40,6 +40,11 @@ public:
 public:
     void HeartBeatToLeader();
 
+private:
+    Status RegisterToLeaderNoLock();
+    Status UnregisterFromLeaderNoLock();
+    Status ConnectToServerNoLock(const String &server_ip, i64 server_port);
+
 public:
     // Used by leader to add non-leader node in register phase
     Status AddNodeInfo(const SharedPtr<NodeInfo> &new_node);
@@ -76,7 +81,9 @@ private:
     // Leader clients to followers and learners
     Map<String, SharedPtr<PeerClient>> reader_client_map_{}; // Used by leader;
 
-    SharedPtr<PeerClient> peer_client_{}; // Used by follower and learner;
+    SharedPtr<PeerClient> peer_client_{}; // Used by follower and learner to connect leader server;
+
+    Map<String, SharedPtr<PeerClient>> follower_clients_{}; // Used by leader to connect follower / learner server;
 
     SharedPtr<Thread> hb_periodic_thread_{};
     std::mutex hb_mutex_;

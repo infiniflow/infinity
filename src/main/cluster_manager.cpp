@@ -76,39 +76,15 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     leader_node_->ip_address_ = leader_ip;
     leader_node_->port_ = leader_port;
 
-    peer_client_ = MakeShared<PeerClient>(leader_ip, leader_port);
-    Status client_status = peer_client_->Init();
+    Status client_status = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
     if (!client_status.ok()) {
         return client_status;
     }
 
     // Register to leader;
-    SharedPtr<RegisterPeerTask> register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
-                                                                                  this_node_->node_role_,
-                                                                                  this_node_->ip_address_,
-                                                                                  this_node_->port_,
-                                                                                  txn_manager_->CurrentTS());
-    peer_client_->Send(register_peer_task);
-    register_peer_task->Wait();
-
-    Status status = Status::OK();
-    if (register_peer_task->error_code_ != 0) {
-        status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
-        status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
+    Status status = RegisterToLeaderNoLock();
+    if(!status.ok()) {
         return status;
-    }
-
-    now = std::chrono::system_clock::now();
-    time_since_epoch = now.time_since_epoch();
-    leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
-    leader_node_->node_name_ = register_peer_task->leader_name_;
-    leader_node_->node_status_ = NodeStatus::kAlive;
-    //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
-    // Start HB thread.
-    if (register_peer_task->heartbeat_interval_ == 0) {
-        leader_node_->heartbeat_interval_ = 1000; // 1000 ms by default
-    } else {
-        leader_node_->heartbeat_interval_ = register_peer_task->heartbeat_interval_;
     }
 
     this->hb_running_ = true;
@@ -138,43 +114,15 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     leader_node_->ip_address_ = leader_ip;
     leader_node_->port_ = leader_port;
 
-    peer_client_ = MakeShared<PeerClient>(leader_ip, leader_port);
-    Status client_status = peer_client_->Init();
+    Status client_status = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
     if (!client_status.ok()) {
         return client_status;
     }
 
     // Register to leader;
-    SharedPtr<RegisterPeerTask> register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
-                                                                                  this_node_->node_role_,
-                                                                                  this_node_->ip_address_,
-                                                                                  this_node_->port_,
-                                                                                  txn_manager_->CurrentTS());
-    peer_client_->Send(register_peer_task);
-    register_peer_task->Wait();
-
-    Status status = Status::OK();
-    if (register_peer_task->error_code_ != 0) {
-        status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
-        status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
+    Status status = RegisterToLeaderNoLock();
+    if(!status.ok()) {
         return status;
-    }
-    // Update this node info
-    this_node_->node_status_ = NodeStatus::kAlive;
-
-    now = std::chrono::system_clock::now();
-    time_since_epoch = now.time_since_epoch();
-    leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
-    leader_node_->node_name_ = register_peer_task->leader_name_;
-    leader_node_->node_status_ = NodeStatus::kAlive;
-
-    //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
-    // Start HB thread.
-
-    if (register_peer_task->heartbeat_interval_ == 0) {
-        leader_node_->heartbeat_interval_ = 1000; // 1000 ms by default
-    } else {
-        leader_node_->heartbeat_interval_ = register_peer_task->heartbeat_interval_;
     }
 
     this->hb_running_ = true;
@@ -195,17 +143,7 @@ Status ClusterManager::UnInit() {
     }
 
     std::unique_lock<std::mutex> lock(mutex_);
-    if (this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
-        if (leader_node_->node_status_ == NodeStatus::kAlive) {
-            // Leader is alive, need to unregister
-            SharedPtr<UnregisterPeerTask> unregister_task = MakeShared<UnregisterPeerTask>(this_node_->node_name_);
-            peer_client_->Send(unregister_task);
-            unregister_task->Wait();
-            if (unregister_task->error_code_ != 0) {
-                LOG_ERROR(fmt::format("Fail to unregister from leader: {}", unregister_task->error_message_));
-            }
-        }
-    }
+    Status status = UnregisterFromLeaderNoLock();
 
     other_node_map_.clear();
     this_node_.reset();
@@ -281,14 +219,61 @@ void ClusterManager::HeartBeatToLeader() {
     return;
 }
 
-// Status ClusterManager::Register(SharedPtr<NodeInfo> server_node) {
-//     std::unique_lock<std::mutex> lock(mutex_);
-//     return Status::OK();
-// }
-// Status ClusterManager::Unregister(const String &node_name) {
-//     std::unique_lock<std::mutex> lock(mutex_);
-//     return Status::OK();
-// }
+Status ClusterManager::RegisterToLeaderNoLock() {
+    // Register to leader;
+    SharedPtr<RegisterPeerTask> register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
+                                                                                  this_node_->node_role_,
+                                                                                  this_node_->ip_address_,
+                                                                                  this_node_->port_,
+                                                                                  txn_manager_->CurrentTS());
+    peer_client_->Send(register_peer_task);
+    register_peer_task->Wait();
+
+    Status status = Status::OK();
+    if (register_peer_task->error_code_ != 0) {
+        status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
+        status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
+        return status;
+    }
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+    leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+    leader_node_->node_name_ = register_peer_task->leader_name_;
+    leader_node_->node_status_ = NodeStatus::kAlive;
+    //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
+    // Start HB thread.
+    if (register_peer_task->heartbeat_interval_ == 0) {
+        leader_node_->heartbeat_interval_ = 1000; // 1000 ms by default
+    } else {
+        leader_node_->heartbeat_interval_ = register_peer_task->heartbeat_interval_;
+    }
+
+    return status;
+}
+
+Status ClusterManager::UnregisterFromLeaderNoLock() {
+    Status status = Status::OK();
+    if(this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
+        if(leader_node_->node_status_ == NodeStatus::kAlive) {
+            // Leader is alive, need to unregister
+            SharedPtr<UnregisterPeerTask> unregister_task = MakeShared<UnregisterPeerTask>(this_node_->node_name_);
+            peer_client_->Send(unregister_task);
+            unregister_task->Wait();
+            if(unregister_task->error_code_ != 0) {
+                LOG_ERROR(fmt::format("Fail to unregister from leader: {}", unregister_task->error_message_));
+                status.code_ = static_cast<ErrorCode>(unregister_task->error_code_);
+                status.msg_ = MakeUnique<String>(unregister_task->error_message_);
+            }
+        }
+    }
+    return status;
+}
+
+Status ClusterManager::ConnectToServerNoLock(const String &server_ip, i64 server_port) {
+    peer_client_ = MakeShared<PeerClient>(server_ip, server_port);
+    Status client_status = peer_client_->Init();
+    return client_status;
+}
 
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     // Only used by Leader on follower/learner registration.
@@ -449,8 +434,10 @@ Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
 
     return result;
 }
+
 SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);
+
     if (this_node_->node_role_ == NodeRole::kAdmin or this_node_->node_role_ == NodeRole::kStandalone) {
         String error_message = "Error node role type";
         UnrecoverableError(error_message);
@@ -474,6 +461,7 @@ SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name
     }
     return iter->second;
 }
+
 SharedPtr<NodeInfo> ClusterManager::ThisNode() const {
     // ADMIN SHOW NODE;
     std::unique_lock<std::mutex> lock(mutex_);

@@ -2352,7 +2352,7 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListNodes;
 }
-| ADMIN SHOW NODE IDENTIFIER {
+| ADMIN SHOW NODE STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowNode;
      $$->node_name_ = $4;
