@@ -282,7 +282,12 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
     }
     SetServerRole(target_role);
     StartThriftServers();
-    return Status::OK();
+
+    Status status = Status::OK();
+    if(target_role == NodeRole::kFollower or target_role == NodeRole::kLearner) {
+        status = cluster_manager_->RegisterToLeader();
+    }
+    return status;
 }
 
 bool InfinityContext::IsClusterRole() const {

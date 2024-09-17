@@ -38,6 +38,7 @@ public:
     Status UnInit();
 
 public:
+    Status RegisterToLeader();
     void HeartBeatToLeader();
 
 private:
@@ -55,6 +56,15 @@ public:
     // Used by leader when get HB request
     Status
     UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_leader_node, Vector<infinity_peer_server::NodeInfo> &other_nodes, i64 &leader_term);
+
+    // Used by leader to notify leader to synchronize logs to the follower and learner, during registration
+    Status SyncLogsToFollowerAndLearner(const SharedPtr<NodeInfo> &non_leader_node);
+
+    // Used by leader to notify to synchronize logs to follower, during txn bottom phase
+    Status SyncLogsToFollower();
+
+    // Used by leader to notify to asynchronize logs to learner, after txn;
+    Status AsyncLogsToLearner();
 
     // Use by follower / learner to update all node info when get HB response from leader
     Status UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &info_of_nodes);

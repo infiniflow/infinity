@@ -60,7 +60,8 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         auto time_since_epoch = now.time_since_epoch();
         non_leader_node_info->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
         Status status = InfinityContext::instance().cluster_manager()->AddNodeInfo(non_leader_node_info);
-        if(status.ok()) {
+        if (status.ok()) {
+            LOG_INFO(fmt::format("Node: {} registered as {}.", request.node_name, infinity_peer_server::to_string(request.node_type)));
             response.leader_name = leader_node->node_name_;
             response.leader_term = leader_node->leader_term_;
             response.heart_beat_interval = leader_node->heartbeat_interval_;
@@ -85,6 +86,7 @@ void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterRespons
             response.error_code = static_cast<i64>(status.code_);
             response.error_message = status.message();
         }
+        LOG_INFO(fmt::format("Node: {} unregistered from leader.", request.node_name));
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
         response.error_message = fmt::format("Attempt to unregister from a non-leader node: {}", ToString(leader_node->node_role_));
@@ -129,7 +131,7 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeInfoByHeartBeat(non_leader_node_info,
                                                                                                  response.other_nodes,
                                                                                                  response.leader_term);
-        if(!status.ok()) {
+        if (!status.ok()) {
             response.error_code = static_cast<i64>(status.code());
             response.error_message = status.message();
         }

@@ -82,15 +82,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
         return client_status;
     }
 
-    // Register to leader;
-    Status status = RegisterToLeaderNoLock();
-    if (!status.ok()) {
-        return status;
-    }
-
-    this->hb_running_ = true;
-    hb_periodic_thread_ = MakeShared<Thread>([this] { this->HeartBeatToLeader(); });
-    return status;
+    return client_status;
 }
 
 Status ClusterManager::InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port) {
@@ -121,15 +113,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
         return client_status;
     }
 
-    // Register to leader;
-    Status status = RegisterToLeaderNoLock();
-    if (!status.ok()) {
-        return status;
-    }
-
-    this->hb_running_ = true;
-    hb_periodic_thread_ = MakeShared<Thread>([this] { this->HeartBeatToLeader(); });
-    return status;
+    return client_status;
 }
 
 Status ClusterManager::UnInit() {
@@ -155,6 +139,19 @@ Status ClusterManager::UnInit() {
     client_to_leader_.reset();
 
     return Status::OK();
+}
+
+Status ClusterManager::RegisterToLeader() {
+    // Register to leader;
+    std::unique_lock<std::mutex> lock(mutex_);
+    Status status = RegisterToLeaderNoLock();
+    if (!status.ok()) {
+        return status;
+    }
+
+    this->hb_running_ = true;
+    hb_periodic_thread_ = MakeShared<Thread>([this] { this->HeartBeatToLeader(); });
+    return status;
 }
 
 void ClusterManager::HeartBeatToLeader() {
@@ -307,6 +304,9 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     reader_client_map_.emplace(node_info->node_name_, client_to_follower);
 
     // Check leader WAL and get the diff log
+    LOG_TRACE("Leader will check the log diff");
+    LOG_TRACE(fmt::format("Leader will send the diff logs to {} synchronously", node_info->node_name_));
+
     return Status::OK();
 }
 
