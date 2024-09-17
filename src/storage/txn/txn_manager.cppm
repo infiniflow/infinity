@@ -104,6 +104,8 @@ public:
 
     u64 total_rollbacked_txn_count() const { return total_rollbacked_txn_count_; }
 
+    WalManager *wal_manager() const { return wal_mgr_; }
+
 private:
     void FinishTxn(Txn *txn);
 
@@ -121,13 +123,13 @@ private:
     WalManager *wal_mgr_;
 
     Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
-    HashSet<Txn *> finishing_txns_; // the txns in committing stage, can use flat_map
-    Deque<Txn *> finished_txns_;  // the txns that committed_ts
+    HashSet<Txn *> finishing_txns_;     // the txns in committing stage, can use flat_map
+    Deque<Txn *> finished_txns_;        // the txns that committed_ts
 
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 
-    Atomic<TxnTimeStamp> start_ts_{}; // The next txn ts
-    TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS;     // cur ckp begin ts, 0 if no ckp is happening
+    Atomic<TxnTimeStamp> start_ts_{};         // The next txn ts
+    TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // cur ckp begin ts, 0 if no ckp is happening
 
     // For stop the txn manager
     atomic_bool is_running_{false};

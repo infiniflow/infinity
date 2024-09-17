@@ -77,7 +77,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     leader_node_->port_ = leader_port;
 
     Status client_status = Status::OK();
-    std::tie(client_to_leader_, client_status)  = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
+    std::tie(client_to_leader_, client_status) = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
     if (!client_status.ok()) {
         return client_status;
     }
@@ -116,7 +116,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     leader_node_->port_ = leader_port;
 
     Status client_status = Status::OK();
-    std::tie(client_to_leader_, client_status)  = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
+    std::tie(client_to_leader_, client_status) = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
     if (!client_status.ok()) {
         return client_status;
     }
@@ -274,7 +274,7 @@ Status ClusterManager::UnregisterFromLeaderNoLock() {
 Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const String &server_ip, i64 server_port) {
     SharedPtr<PeerClient> client = MakeShared<PeerClient>(server_ip, server_port);
     Status client_status = client->Init();
-    if(!client_status.ok()) {
+    if (!client_status.ok()) {
         return {nullptr, client_status};
     }
     return {client, client_status};
@@ -299,7 +299,14 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     }
 
     // Connect to follower/learner server.
+    auto [client_to_follower, client_status] = ClusterManager::ConnectToServerNoLock(node_info->ip_address_, node_info->port_);
+    if (!client_status.ok()) {
+        return client_status;
+    }
 
+    reader_client_map_.emplace(node_info->node_name_, client_to_follower);
+
+    // Check leader WAL and get the diff log
     return Status::OK();
 }
 
@@ -333,6 +340,13 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
     for (const auto &node_info_pair : other_node_map_) {
         NodeInfo *other_node = node_info_pair.second.get();
         if (other_node->node_name_ == non_leader_node->node_name_) {
+            if (other_node->ip_address_ != non_leader_node->ip_address_ or other_node->port_ != non_leader_node->port_) {
+                String error_message = fmt::format("Node {}, IP address: {} or port: {} is changed.",
+                                                   other_node->node_name_,
+                                                   other_node->ip_address_,
+                                                   other_node->port_);
+                return Status::NodeInfoUpdated(ToString(other_node->node_role_));
+            }
             // Found the node, just update the timestamp
             other_node->txn_timestamp_ = non_leader_node->txn_timestamp_;
             auto now = std::chrono::system_clock::now();
@@ -445,9 +459,8 @@ Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
 SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);
 
-    if (this_node_->node_role_ == NodeRole::kAdmin
-        or this_node_->node_role_ == NodeRole::kStandalone
-        or this_node_->node_role_ == NodeRole::kUnInitialized) {
+    if (this_node_->node_role_ == NodeRole::kAdmin or this_node_->node_role_ == NodeRole::kStandalone or
+        this_node_->node_role_ == NodeRole::kUnInitialized) {
         String error_message = "Error node role type";
         UnrecoverableError(error_message);
     }
