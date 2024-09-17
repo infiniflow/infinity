@@ -76,8 +76,8 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     leader_node_->ip_address_ = leader_ip;
     leader_node_->port_ = leader_port;
 
-    peer_client_ = MakeShared<PeerClient>(leader_ip, leader_port);
-    Status client_status = peer_client_->Init();
+    Status client_status = Status::OK();
+    std::tie(peer_client_, client_status) = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
     if (!client_status.ok()) {
         return client_status;
     }
@@ -114,8 +114,8 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     leader_node_->ip_address_ = leader_ip;
     leader_node_->port_ = leader_port;
 
-    peer_client_ = MakeShared<PeerClient>(leader_ip, leader_port);
-    Status client_status = peer_client_->Init();
+    Status client_status = Status::OK();
+    std::tie(peer_client_, client_status) = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
     if (!client_status.ok()) {
         return client_status;
     }
@@ -251,9 +251,14 @@ Status ClusterManager::UnregisterFromLeaderNoLock() {
     return status;
 }
 
-Status ClusterManager::ConnectToServerNoLock(const String &server_ip, i64 server_port) {
-    Status status = Status::OK();
-    return status;
+Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const String &server_ip, i64 server_port) {
+    peer_client_ = MakeShared<PeerClient>(server_ip, server_port);
+    Status client_status = peer_client_->Init();
+    if (!client_status.ok()) {
+        return {nullptr, client_status};
+    }
+
+    return {peer_client_, client_status};
 }
 
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
@@ -396,10 +401,44 @@ Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
 
     return result;
 }
+
 SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);
+    switch(this_node_->node_role_) {
+        case NodeRole::kLeader: {
+            if(this_node_->node_name_ == node_name) {
+                return this_node_;
+            }
+            for(const auto& other_node: other_nodes_) {
+                if(other_node->node_name_ == node_name) {
+                    return other_node;
+                }
+            }
+            break;
+        }
+        case NodeRole::kLearner:
+        case NodeRole::kFollower: {
+            if(this_node_->node_name_ == node_name) {
+                return this_node_;
+            }
+            if(leader_node_->node_name_ == node_name) {
+                return leader_node_;
+            }
+            for(const auto& other_node: other_nodes_) {
+                if(other_node->node_name_ == node_name) {
+                    return other_node;
+                }
+            }
+            break;
+        }
+        default: {
+            String error_message = fmt::format("Can't get node info on role: {}", ToString(this_node_->node_role_));
+            UnrecoverableError(error_message);
+        }
+    }
     return nullptr;
 }
+
 SharedPtr<NodeInfo> ClusterManager::ThisNode() const {
     std::unique_lock<std::mutex> lock(mutex_);
     return this->this_node_;
