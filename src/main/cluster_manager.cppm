@@ -46,7 +46,7 @@ public:
 private:
     Status RegisterToLeaderNoLock();
     Status UnregisterFromLeaderNoLock();
-    Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &server_ip, i64 server_port);
+    Status ConnectToServerNoLock(const String &server_ip, i64 server_port);
 
 public:
     Status AddNodeInfo(const SharedPtr<NodeInfo>& new_node);
@@ -65,9 +65,9 @@ private:
     Vector<SharedPtr<NodeInfo>> other_nodes_; // Used by leader and follower/learner
     SharedPtr<NodeInfo> this_node_; // Used by leader and follower/learner
 
-    SharedPtr<PeerClient> peer_client_{}; // Used by follower and learner;
+    SharedPtr<PeerClient> peer_client_{}; // Used by follower and learner to connect leader server;
 
-    Map<String, SharedPtr<PeerClient>> follower_clients_{}; // Used by leader;
+    Map<String, SharedPtr<PeerClient>> follower_clients_{}; // Used by leader to connect follower / learner server;
 
     SharedPtr<Thread> hb_periodic_thread_{};
     std::mutex hb_mutex_;
