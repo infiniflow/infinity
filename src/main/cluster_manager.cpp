@@ -76,7 +76,8 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     leader_node_->ip_address_ = leader_ip;
     leader_node_->port_ = leader_port;
 
-    Status client_status = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
+    Status client_status = Status::OK();
+    std::tie(client_to_leader_, client_status)  = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
     if (!client_status.ok()) {
         return client_status;
     }
@@ -114,7 +115,8 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     leader_node_->ip_address_ = leader_ip;
     leader_node_->port_ = leader_port;
 
-    Status client_status = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
+    Status client_status = Status::OK();
+    std::tie(client_to_leader_, client_status)  = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
     if (!client_status.ok()) {
         return client_status;
     }
@@ -269,10 +271,13 @@ Status ClusterManager::UnregisterFromLeaderNoLock() {
     return status;
 }
 
-Status ClusterManager::ConnectToServerNoLock(const String &server_ip, i64 server_port) {
-    client_to_leader_ = MakeShared<PeerClient>(server_ip, server_port);
-    Status client_status = client_to_leader_->Init();
-    return client_status;
+Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const String &server_ip, i64 server_port) {
+    SharedPtr<PeerClient> client = MakeShared<PeerClient>(server_ip, server_port);
+    Status client_status = client->Init();
+    if(!client_status.ok()) {
+        return {nullptr, client_status};
+    }
+    return {client, client_status};
 }
 
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {

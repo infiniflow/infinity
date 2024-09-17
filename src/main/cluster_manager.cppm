@@ -43,7 +43,7 @@ public:
 private:
     Status RegisterToLeaderNoLock();
     Status UnregisterFromLeaderNoLock();
-    Status ConnectToServerNoLock(const String &server_ip, i64 server_port);
+    Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &server_ip, i64 server_port);
 
 public:
     // Used by leader to add non-leader node in register phase
