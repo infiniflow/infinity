@@ -24,6 +24,7 @@ import infinity_context;
 import peer_task;
 import status;
 import infinity_exception;
+import cluster_manager;
 
 namespace infinity {
 
@@ -36,10 +37,6 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
         non_leader_node_info->node_name_ = request.node_name;
         switch (request.node_type) {
-            case infinity_peer_server::NodeType::kLeader: {
-                non_leader_node_info->node_role_ = NodeRole::kLeader;
-                break;
-            }
             case infinity_peer_server::NodeType::kFollower: {
                 non_leader_node_info->node_role_ = NodeRole::kFollower;
                 break;
@@ -49,7 +46,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
                 break;
             }
             default: {
-                String error_message = "Invalid node type";
+                String error_message = fmt::format("Invalid node type: {}", infinity_peer_server::to_string(request.node_type));
                 LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
