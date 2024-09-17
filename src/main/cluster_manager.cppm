@@ -81,9 +81,9 @@ private:
     // Leader clients to followers and learners
     Map<String, SharedPtr<PeerClient>> reader_client_map_{}; // Used by leader;
 
-    SharedPtr<PeerClient> peer_client_{}; // Used by follower and learner to connect leader server;
+    SharedPtr<PeerClient> client_to_leader_{}; // Used by follower and learner to connect leader server;
 
-    Map<String, SharedPtr<PeerClient>> follower_clients_{}; // Used by leader to connect follower / learner server;
+    Map<String, SharedPtr<PeerClient>> clients_to_follower_{}; // Used by leader to connect follower / learner server;
 
     SharedPtr<Thread> hb_periodic_thread_{};
     std::mutex hb_mutex_;

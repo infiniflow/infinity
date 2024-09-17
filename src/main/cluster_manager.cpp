@@ -29,10 +29,10 @@ namespace infinity {
 ClusterManager::~ClusterManager() {
     other_node_map_.clear();
     this_node_.reset();
-    if (peer_client_.get() != nullptr) {
-        peer_client_->UnInit();
+    if (client_to_leader_.get() != nullptr) {
+        client_to_leader_->UnInit();
     }
-    peer_client_.reset();
+    client_to_leader_.reset();
 }
 
 Status ClusterManager::InitAsLeader(const String &node_name) {
@@ -147,10 +147,10 @@ Status ClusterManager::UnInit() {
 
     other_node_map_.clear();
     this_node_.reset();
-    if (peer_client_.get() != nullptr) {
-        peer_client_->UnInit();
+    if (client_to_leader_.get() != nullptr) {
+        client_to_leader_->UnInit();
     }
-    peer_client_.reset();
+    client_to_leader_.reset();
 
     return Status::OK();
 }
@@ -166,9 +166,9 @@ void ClusterManager::HeartBeatToLeader() {
             break;
         }
 
-        if (!peer_client_->ServerConnected()) {
+        if (!client_to_leader_->ServerConnected()) {
             // If peer_client was disconnected, try to reconnect to server.
-            Status connect_status = peer_client_->Reconnect();
+            Status connect_status = client_to_leader_->Reconnect();
             if (!connect_status.ok()) {
                 LOG_ERROR(connect_status.message());
                 continue;
@@ -186,7 +186,7 @@ void ClusterManager::HeartBeatToLeader() {
                                                                              this_node_->ip_address_,
                                                                              this_node_->port_,
                                                                              txn_manager_->CurrentTS());
-        peer_client_->Send(hb_task);
+        client_to_leader_->Send(hb_task);
         hb_task->Wait();
 
         if (hb_task->error_code_ != 0) {
@@ -226,7 +226,7 @@ Status ClusterManager::RegisterToLeaderNoLock() {
                                                                                   this_node_->ip_address_,
                                                                                   this_node_->port_,
                                                                                   txn_manager_->CurrentTS());
-    peer_client_->Send(register_peer_task);
+    client_to_leader_->Send(register_peer_task);
     register_peer_task->Wait();
 
     Status status = Status::OK();
@@ -240,7 +240,7 @@ Status ClusterManager::RegisterToLeaderNoLock() {
     leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
     leader_node_->node_name_ = register_peer_task->leader_name_;
     leader_node_->node_status_ = NodeStatus::kAlive;
-    //    peer_client_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
+    //    client_to_leader_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
     // Start HB thread.
     if (register_peer_task->heartbeat_interval_ == 0) {
         leader_node_->heartbeat_interval_ = 1000; // 1000 ms by default
@@ -257,7 +257,7 @@ Status ClusterManager::UnregisterFromLeaderNoLock() {
         if (leader_node_->node_status_ == NodeStatus::kAlive) {
             // Leader is alive, need to unregister
             SharedPtr<UnregisterPeerTask> unregister_task = MakeShared<UnregisterPeerTask>(this_node_->node_name_);
-            peer_client_->Send(unregister_task);
+            client_to_leader_->Send(unregister_task);
             unregister_task->Wait();
             if (unregister_task->error_code_ != 0) {
                 LOG_ERROR(fmt::format("Fail to unregister from leader: {}", unregister_task->error_message_));
@@ -270,8 +270,8 @@ Status ClusterManager::UnregisterFromLeaderNoLock() {
 }
 
 Status ClusterManager::ConnectToServerNoLock(const String &server_ip, i64 server_port) {
-    peer_client_ = MakeShared<PeerClient>(server_ip, server_port);
-    Status client_status = peer_client_->Init();
+    client_to_leader_ = MakeShared<PeerClient>(server_ip, server_port);
+    Status client_status = client_to_leader_->Init();
     return client_status;
 }
 
@@ -292,6 +292,8 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
         // Duplicated node
         return Status::DuplicateNode(node_info->node_name_);
     }
+
+    // Connect to follower/learner server.
 
     return Status::OK();
 }
