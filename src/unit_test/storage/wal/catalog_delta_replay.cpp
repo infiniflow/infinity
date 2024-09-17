@@ -680,7 +680,6 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
 }
 
 TEST_P(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
-    infinity::InfinityContext::instance().UnInit();
     String table_name = "tb1";
     config_path = nullptr;
     RemoveDbDirs();

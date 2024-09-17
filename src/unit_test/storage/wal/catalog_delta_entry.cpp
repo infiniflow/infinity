@@ -166,7 +166,7 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             EXPECT_EQ(op1, op2);
         }
     }
-    infinity::InfinityContext::instance().UnInit();
+//    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_P(CatalogDeltaEntryTest, MergeEntries) {
@@ -374,12 +374,9 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
     global_catalog_delta_entry->ReplayDeltaEntry(std::move(local_catalog_delta_entry));
     // check ops
     EXPECT_EQ(global_catalog_delta_entry->OpSize(), 5u);
-
-    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_P(CatalogDeltaEntryTest, ComplicateMergeEntries) {
-    infinity::InfinityContext::instance().UnInit();
     auto db_name = MakeShared<String>("db_test");
     auto db_dir = MakeShared<String>("data");
     auto table_name = MakeShared<String>("table_test");
