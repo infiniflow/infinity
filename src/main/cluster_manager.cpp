@@ -83,7 +83,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
 
     // Register to leader;
     Status status = RegisterToLeaderNoLock();
-    if(!status.ok()) {
+    if (!status.ok()) {
         return status;
     }
 
@@ -121,7 +121,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
 
     // Register to leader;
     Status status = RegisterToLeaderNoLock();
-    if(!status.ok()) {
+    if (!status.ok()) {
         return status;
     }
 
@@ -253,13 +253,13 @@ Status ClusterManager::RegisterToLeaderNoLock() {
 
 Status ClusterManager::UnregisterFromLeaderNoLock() {
     Status status = Status::OK();
-    if(this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
-        if(leader_node_->node_status_ == NodeStatus::kAlive) {
+    if (this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
+        if (leader_node_->node_status_ == NodeStatus::kAlive) {
             // Leader is alive, need to unregister
             SharedPtr<UnregisterPeerTask> unregister_task = MakeShared<UnregisterPeerTask>(this_node_->node_name_);
             peer_client_->Send(unregister_task);
             unregister_task->Wait();
-            if(unregister_task->error_code_ != 0) {
+            if (unregister_task->error_code_ != 0) {
                 LOG_ERROR(fmt::format("Fail to unregister from leader: {}", unregister_task->error_message_));
                 status.code_ = static_cast<ErrorCode>(unregister_task->error_code_);
                 status.msg_ = MakeUnique<String>(unregister_task->error_message_);
@@ -438,7 +438,9 @@ Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
 SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);
 
-    if (this_node_->node_role_ == NodeRole::kAdmin or this_node_->node_role_ == NodeRole::kStandalone) {
+    if (this_node_->node_role_ == NodeRole::kAdmin
+        or this_node_->node_role_ == NodeRole::kStandalone
+        or this_node_->node_role_ == NodeRole::kUnInitialized) {
         String error_message = "Error node role type";
         UnrecoverableError(error_message);
     }
