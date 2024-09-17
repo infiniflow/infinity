@@ -43,6 +43,11 @@ public:
 public:
     void HeartBeatToLeader();
 
+private:
+    Status RegisterToLeaderNoLock();
+    Status UnregisterFromLeaderNoLock();
+    Status ConnectToServerNoLock(const String &server_ip, i64 server_port);
+
 public:
     Status AddNodeInfo(const SharedPtr<NodeInfo>& new_node);
     Status RemoveNode(const String& node_name);
