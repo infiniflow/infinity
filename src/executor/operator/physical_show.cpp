@@ -4278,7 +4278,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option description
-                    Value value = Value::MakeVarchar("Global rollbacked transaction count");
+                    Value value = Value::MakeVarchar("Global rolled back transaction count");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }

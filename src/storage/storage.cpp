@@ -177,6 +177,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true);
                 bg_processor_->Submit(force_ckp_task);
                 force_ckp_task->Wait();
+                txn->SetReaderAllowed(true);
                 txn_mgr_->CommitTxn(txn);
             }
 
@@ -351,7 +352,7 @@ void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vect
 
 void Storage::CreateDefaultDB() {
     Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"));
-
+    new_txn->SetReaderAllowed(true);
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase("default_db", ConflictType::kError);
     if (!status.ok()) {

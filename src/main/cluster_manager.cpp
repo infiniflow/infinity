@@ -24,6 +24,7 @@ import logger;
 import infinity_exception;
 import peer_server_thrift_types;
 import wal_manager;
+import wal_entry;
 
 namespace infinity {
 
@@ -479,6 +480,17 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
 
     return Status::OK();
 }
+
+Status ClusterManager::ApplySyncedLog(const Vector<String>& synced_logs) {
+    for(auto& log_str: synced_logs) {
+        const i32 entry_size = log_str.size();
+        const char *ptr = log_str.data();
+        SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
+        LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
+    }
+    return Status::OK();
+}
+
 Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
     // ADMIN SHOW NODES;
     std::unique_lock<std::mutex> lock(mutex_);

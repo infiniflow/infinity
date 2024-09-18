@@ -596,4 +596,9 @@ Status Status::InvalidNodeStatus(const String &message) { return Status(ErrorCod
 
 Status Status::NodeInfoUpdated(const String &message) { return Status(ErrorCode::kNodeInfoUpdated, MakeUnique<String>(message)); }
 
+Status Status::NodeNameMismatch(const String &actual_node_name, const String &expected_node_name) {
+    return Status(ErrorCode::kNodeNameMismatch,
+                  MakeUnique<String>(fmt::format("Expect node name: {}, actual node name: {}", expected_node_name, actual_node_name)));
+}
+
 } // namespace infinity
