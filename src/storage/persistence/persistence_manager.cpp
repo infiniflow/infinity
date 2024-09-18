@@ -336,7 +336,11 @@ void PersistenceManager::PutObjCache(const String &file_path) {
         return;
     }
 
-    assert(oit->second.ref_count_ > 0);
+    if(oit->second.ref_count_ == 0) {
+        String error_message = fmt::format("File_path: {} object, 0 reference count", local_path);
+        UnrecoverableError(error_message);
+    }
+
     oit->second.ref_count_--;
 }
 
