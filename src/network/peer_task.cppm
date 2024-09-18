@@ -56,7 +56,7 @@ export struct NodeInfo {
     u64 last_update_ts_{};
     i64 leader_term_{};
     i64 heartbeat_interval_{}; // provide by leader and used by follower and learner;
-    u64 heartbeat_count_{}; // given by leader to calculate how many heartbeat received on this node.
+    u64 heartbeat_count_{};    // given by leader to calculate how many heartbeat received on this node.
     // u64 update_interval_{}; // seconds
     // String from_{}; // Which node the information comes from.
 };
@@ -84,11 +84,10 @@ public:
         cv_.notify_one();
     }
 
-    [[nodiscard]] PeerTaskType Type() const {
-        return type_;
-    }
+    [[nodiscard]] PeerTaskType Type() const { return type_; }
 
     virtual String ToString() const = 0;
+
 protected:
     PeerTaskType type_{PeerTaskType::kInvalid};
     mutable std::mutex mutex_{};
@@ -128,8 +127,7 @@ public:
 
 export class UnregisterPeerTask final : public PeerTask {
 public:
-    UnregisterPeerTask(String node_name)
-        : PeerTask(PeerTaskType::kUnregister), node_name_(std::move(node_name)) {}
+    UnregisterPeerTask(String node_name) : PeerTask(PeerTaskType::kUnregister), node_name_(std::move(node_name)) {}
 
     String ToString() const final;
 
@@ -142,12 +140,16 @@ public:
 
 export class HeartBeatPeerTask final : public PeerTask {
 public:
-    HeartBeatPeerTask(String node_name, i64 txn_ts)
-        : PeerTask(PeerTaskType::kHeartBeat), node_name_(std::move(node_name)), txn_ts_(txn_ts) {}
+    HeartBeatPeerTask(String node_name, NodeRole node_role, String node_ip, i64 node_port, i64 txn_ts)
+        : PeerTask(PeerTaskType::kHeartBeat), node_name_(std::move(node_name)), node_role_(node_role), node_ip_(std::move(node_ip)),
+          node_port_(node_port), txn_ts_(txn_ts) {}
 
     String ToString() const final;
 
     String node_name_{};
+    NodeRole node_role_{};
+    String node_ip_{};
+    i64 node_port_{};
     i64 txn_ts_{};
 
     // response
@@ -155,6 +157,20 @@ public:
     String error_message_{};
     i64 leader_term_{};
     Vector<SharedPtr<NodeInfo>> other_nodes_{};
+};
+
+export class SyncLogTask final : public PeerTask {
+public:
+    SyncLogTask(const String& node_name, const Vector<SharedPtr<String>>& log_strings) : PeerTask(PeerTaskType::kLogSync), node_name_(node_name), log_strings_(log_strings) {}
+
+    String ToString() const final;
+
+    String node_name_;
+    Vector<SharedPtr<String>> log_strings_;
+
+    // response
+    i64 error_code_{};
+    String error_message_{};
 };
 
 } // namespace infinity

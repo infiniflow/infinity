@@ -565,10 +565,13 @@ Vector<SharedPtr<WalEntry>> AdminExecutor::GetAllCheckpointEntries(QueryContext 
         std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) { return a.max_commit_ts_ > b.max_commit_ts_; });
     }
     Vector<String> wal_list;
+    wal_list.reserve(wal_infos.size() + 1);
     if (temp_wal_info.has_value()) {
+        LOG_TRACE(fmt::format("Get checkpoint entry from file: {}", temp_wal_info->path_));
         wal_list.push_back(temp_wal_info->path_);
     }
     for (const auto &wal_info : wal_infos) {
+        LOG_TRACE(fmt::format("Get checkpoint entry from file: {}", wal_info.path_));
         wal_list.push_back(wal_info.path_);
     }
 
@@ -583,7 +586,6 @@ Vector<SharedPtr<WalEntry>> AdminExecutor::GetAllCheckpointEntries(QueryContext 
         for (auto &entry_cmd : wal_entry_ptr->cmds_) {
             if (entry_cmd->GetType() == WalCommandType::CHECKPOINT) {
                 checkpoint_entries.push_back(wal_entry_ptr);
-                break;
             }
         }
     }
@@ -4056,7 +4058,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             }
 
             status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, node_name, leader_ip, leader_port);
-            LOG_INFO("Start in FOLLOWER mode");
+            LOG_INFO("Start in LEARNER mode");
             break;
         }
     }

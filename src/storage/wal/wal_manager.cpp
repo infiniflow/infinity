@@ -151,6 +151,107 @@ void WalManager::PutEntries(Vector<WalEntry *> wal_entries) {
 
 TxnTimeStamp WalManager::GetCheckpointedTS() { return last_ckp_ts_ == UNCOMMIT_TS ? 0 : last_ckp_ts_; }
 
+Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
+
+    LocalFileSystem fs;
+    Vector<SharedPtr<String>> log_strings;
+
+    Vector<String> wal_list{};
+    {
+        auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
+        if (wal_infos.size() > 1) {
+            std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
+                return a.max_commit_ts_ > b.max_commit_ts_;
+            });
+        }
+        if (temp_wal_info.has_value()) {
+            wal_list.push_back(temp_wal_info->path_);
+            LOG_INFO(fmt::format("Find temp wal file: {}", temp_wal_info->path_));
+        }
+        for (const auto &wal_info : wal_infos) {
+            wal_list.push_back(wal_info.path_);
+            LOG_INFO(fmt::format("Find wal file: {}", wal_info.path_));
+        }
+        // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
+    }
+    if (wal_list.empty()) {
+        LOG_INFO(fmt::format("No checkpoint found, terminate replaying WAL"));
+        return log_strings;
+    }
+
+    Vector<SharedPtr<WalEntry>> log_entries;
+
+    TxnTimeStamp max_commit_ts = 0; // the max commit ts that has be checkpointed
+    String catalog_dir = "";
+
+    {
+        // if no checkpoint, max_commit_ts is 0
+        WalListIterator iterator(wal_list);
+        // phase 1: find the max commit ts and catalog path
+        LOG_INFO("Replay phase 1: find the max commit ts and catalog path");
+        while (iterator.HasNext()) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                String error_message = "Found unexpected bad wal entry";
+                UnrecoverableError(error_message);
+            }
+
+            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
+                max_commit_ts = checkpoint_cmd->max_commit_ts_;
+                std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
+                catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
+                break;
+            }
+            log_entries.push_back(wal_entry);
+        }
+        LOG_INFO(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
+
+        // phase 2: by the max commit ts, find the entries to replay
+        LOG_INFO("Get all wal entries after CKP and start timestamp");
+        while (iterator.HasNext()) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                String error_message = "Found unexpected bad wal entry";
+                UnrecoverableError(error_message);
+                // TODO: clean the wal entries, disk break will reach this place.
+                // replay_entries.clear();
+                break;
+            }
+            LOG_TRACE(wal_entry->ToString());
+
+            if (wal_entry->commit_ts_ >= max_commit_ts and wal_entry->commit_ts_ > start_timestamp) {
+                log_entries.push_back(wal_entry);
+            } else {
+                break;
+            }
+        }
+    }
+
+
+    log_strings.reserve(log_entries.size());
+
+    for(const auto& log_entry: log_entries) {
+
+        i32 exp_size = log_entry->GetSizeInBytes();
+
+        // Serialize the log entry
+        SharedPtr<String> buf_ptr;
+        buf_ptr->resize(exp_size);
+        char *ptr = buf_ptr->data();
+        log_entry->WriteAdv(ptr);
+        i32 act_size = ptr - buf_ptr->data();
+        if (exp_size != act_size) {
+            String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}", exp_size, act_size, log_entry->ToString());
+            UnrecoverableError(error_message);
+        }
+
+        log_strings.emplace_back(buf_ptr);
+    }
+
+    return log_strings;
+}
+
 // Flush is scheduled regularly. It collects a batch of transactions, sync
 // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
 // ~10s. So it's necessary to sync for a batch of transactions, and to

@@ -39,4 +39,5 @@ export using infinity_peer_server::ChangeRoleRequest;
 export using infinity_peer_server::ChangeRoleResponse;
 export using infinity_peer_server::NewLeaderRequest;
 export using infinity_peer_server::NewLeaderResponse;
+export using infinity_peer_server::to_string;
 }

@@ -199,15 +199,22 @@ void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr, SharedPtr
     SharedPtr<ColumnVector> &left_state_output = left_state->OutputColumnVector();
     Execute(left_expression, left_state, left_state_output);
     
-    SizeT left_result_count = left_state_output->Size();
+    //in expression evaluates to a constant
+    if(left_state->OutputColumnVector()->vector_type() == ColumnVectorType::kConstant) {
+        bool in_result = expr->Exists(left_state_output->GetValue(0));
+        for(SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
+            output_column_vector->buffer_->SetCompactBit(idx, in_result);
+        }
+        return;
+    }
     if(expr->in_type() == InType::kIn) {
-        for(SizeT idx = 0; idx < left_result_count; idx++) {
+        for(SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, expr->Exists(left_state_output->GetValue(idx)));
         }
         return;
     }
     if (expr->in_type() == InType::kNotIn) {
-        for(SizeT idx = 0; idx < left_result_count; idx++) {
+        for(SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, !expr->Exists(left_state_output->GetValue(idx)));
         }
         return;

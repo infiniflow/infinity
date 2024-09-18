@@ -852,6 +852,18 @@ void HeartBeatRequest::__set_node_name(const std::string& val) {
   this->node_name = val;
 }
 
+void HeartBeatRequest::__set_node_type(const NodeType::type val) {
+  this->node_type = val;
+}
+
+void HeartBeatRequest::__set_node_ip(const std::string& val) {
+  this->node_ip = val;
+}
+
+void HeartBeatRequest::__set_node_port(const int64_t val) {
+  this->node_port = val;
+}
+
 void HeartBeatRequest::__set_txn_timestamp(const int64_t val) {
   this->txn_timestamp = val;
 }
@@ -892,6 +904,32 @@ uint32_t HeartBeatRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
         }
         break;
       case 2:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          int32_t ecast13;
+          xfer += iprot->readI32(ecast13);
+          this->node_type = static_cast<NodeType::type>(ecast13);
+          this->__isset.node_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->node_ip);
+          this->__isset.node_ip = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->node_port);
+          this->__isset.node_port = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->txn_timestamp);
           this->__isset.txn_timestamp = true;
@@ -920,7 +958,19 @@ uint32_t HeartBeatRequest::write(::apache::thrift::protocol::TProtocol* oprot) c
   xfer += oprot->writeString(this->node_name);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("txn_timestamp", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeFieldBegin("node_type", ::apache::thrift::protocol::T_I32, 2);
+  xfer += oprot->writeI32(static_cast<int32_t>(this->node_type));
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("node_ip", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->node_ip);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("node_port", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeI64(this->node_port);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("txn_timestamp", ::apache::thrift::protocol::T_I64, 5);
   xfer += oprot->writeI64(this->txn_timestamp);
   xfer += oprot->writeFieldEnd();
 
@@ -932,25 +982,37 @@ uint32_t HeartBeatRequest::write(::apache::thrift::protocol::TProtocol* oprot) c
 void swap(HeartBeatRequest &a, HeartBeatRequest &b) {
   using ::std::swap;
   swap(a.node_name, b.node_name);
+  swap(a.node_type, b.node_type);
+  swap(a.node_ip, b.node_ip);
+  swap(a.node_port, b.node_port);
   swap(a.txn_timestamp, b.txn_timestamp);
   swap(a.__isset, b.__isset);
 }
 
-HeartBeatRequest::HeartBeatRequest(const HeartBeatRequest& other13) {
-  node_name = other13.node_name;
-  txn_timestamp = other13.txn_timestamp;
-  __isset = other13.__isset;
-}
-HeartBeatRequest& HeartBeatRequest::operator=(const HeartBeatRequest& other14) {
+HeartBeatRequest::HeartBeatRequest(const HeartBeatRequest& other14) {
   node_name = other14.node_name;
+  node_type = other14.node_type;
+  node_ip = other14.node_ip;
+  node_port = other14.node_port;
   txn_timestamp = other14.txn_timestamp;
   __isset = other14.__isset;
+}
+HeartBeatRequest& HeartBeatRequest::operator=(const HeartBeatRequest& other15) {
+  node_name = other15.node_name;
+  node_type = other15.node_type;
+  node_ip = other15.node_ip;
+  node_port = other15.node_port;
+  txn_timestamp = other15.txn_timestamp;
+  __isset = other15.__isset;
   return *this;
 }
 void HeartBeatRequest::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "HeartBeatRequest(";
   out << "node_name=" << to_string(node_name);
+  out << ", " << "node_type=" << to_string(node_type);
+  out << ", " << "node_ip=" << to_string(node_ip);
+  out << ", " << "node_port=" << to_string(node_port);
   out << ", " << "txn_timestamp=" << to_string(txn_timestamp);
   out << ")";
 }
@@ -1031,14 +1093,14 @@ uint32_t HeartBeatResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->other_nodes.clear();
-            uint32_t _size15;
-            ::apache::thrift::protocol::TType _etype18;
-            xfer += iprot->readListBegin(_etype18, _size15);
-            this->other_nodes.resize(_size15);
-            uint32_t _i19;
-            for (_i19 = 0; _i19 < _size15; ++_i19)
+            uint32_t _size16;
+            ::apache::thrift::protocol::TType _etype19;
+            xfer += iprot->readListBegin(_etype19, _size16);
+            this->other_nodes.resize(_size16);
+            uint32_t _i20;
+            for (_i20 = 0; _i20 < _size16; ++_i20)
             {
-              xfer += this->other_nodes[_i19].read(iprot);
+              xfer += this->other_nodes[_i20].read(iprot);
             }
             xfer += iprot->readListEnd();
           }
@@ -1079,10 +1141,10 @@ uint32_t HeartBeatResponse::write(::apache::thrift::protocol::TProtocol* oprot) 
   xfer += oprot->writeFieldBegin("other_nodes", ::apache::thrift::protocol::T_LIST, 4);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->other_nodes.size()));
-    std::vector<NodeInfo> ::const_iterator _iter20;
-    for (_iter20 = this->other_nodes.begin(); _iter20 != this->other_nodes.end(); ++_iter20)
+    std::vector<NodeInfo> ::const_iterator _iter21;
+    for (_iter21 = this->other_nodes.begin(); _iter21 != this->other_nodes.end(); ++_iter21)
     {
-      xfer += (*_iter20).write(oprot);
+      xfer += (*_iter21).write(oprot);
     }
     xfer += oprot->writeListEnd();
   }
@@ -1102,19 +1164,19 @@ void swap(HeartBeatResponse &a, HeartBeatResponse &b) {
   swap(a.__isset, b.__isset);
 }
 
-HeartBeatResponse::HeartBeatResponse(const HeartBeatResponse& other21) {
-  error_code = other21.error_code;
-  error_message = other21.error_message;
-  leader_term = other21.leader_term;
-  other_nodes = other21.other_nodes;
-  __isset = other21.__isset;
-}
-HeartBeatResponse& HeartBeatResponse::operator=(const HeartBeatResponse& other22) {
+HeartBeatResponse::HeartBeatResponse(const HeartBeatResponse& other22) {
   error_code = other22.error_code;
   error_message = other22.error_message;
   leader_term = other22.leader_term;
   other_nodes = other22.other_nodes;
   __isset = other22.__isset;
+}
+HeartBeatResponse& HeartBeatResponse::operator=(const HeartBeatResponse& other23) {
+  error_code = other23.error_code;
+  error_message = other23.error_message;
+  leader_term = other23.leader_term;
+  other_nodes = other23.other_nodes;
+  __isset = other23.__isset;
   return *this;
 }
 void HeartBeatResponse::printTo(std::ostream& out) const {
@@ -1179,14 +1241,14 @@ uint32_t SyncLogRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->log_entries.clear();
-            uint32_t _size23;
-            ::apache::thrift::protocol::TType _etype26;
-            xfer += iprot->readListBegin(_etype26, _size23);
-            this->log_entries.resize(_size23);
-            uint32_t _i27;
-            for (_i27 = 0; _i27 < _size23; ++_i27)
+            uint32_t _size24;
+            ::apache::thrift::protocol::TType _etype27;
+            xfer += iprot->readListBegin(_etype27, _size24);
+            this->log_entries.resize(_size24);
+            uint32_t _i28;
+            for (_i28 = 0; _i28 < _size24; ++_i28)
             {
-              xfer += iprot->readBinary(this->log_entries[_i27]);
+              xfer += iprot->readBinary(this->log_entries[_i28]);
             }
             xfer += iprot->readListEnd();
           }
@@ -1219,10 +1281,10 @@ uint32_t SyncLogRequest::write(::apache::thrift::protocol::TProtocol* oprot) con
   xfer += oprot->writeFieldBegin("log_entries", ::apache::thrift::protocol::T_LIST, 2);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->log_entries.size()));
-    std::vector<std::string> ::const_iterator _iter28;
-    for (_iter28 = this->log_entries.begin(); _iter28 != this->log_entries.end(); ++_iter28)
+    std::vector<std::string> ::const_iterator _iter29;
+    for (_iter29 = this->log_entries.begin(); _iter29 != this->log_entries.end(); ++_iter29)
     {
-      xfer += oprot->writeBinary((*_iter28));
+      xfer += oprot->writeBinary((*_iter29));
     }
     xfer += oprot->writeListEnd();
   }
@@ -1240,15 +1302,15 @@ void swap(SyncLogRequest &a, SyncLogRequest &b) {
   swap(a.__isset, b.__isset);
 }
 
-SyncLogRequest::SyncLogRequest(const SyncLogRequest& other29) {
-  node_name = other29.node_name;
-  log_entries = other29.log_entries;
-  __isset = other29.__isset;
-}
-SyncLogRequest& SyncLogRequest::operator=(const SyncLogRequest& other30) {
+SyncLogRequest::SyncLogRequest(const SyncLogRequest& other30) {
   node_name = other30.node_name;
   log_entries = other30.log_entries;
   __isset = other30.__isset;
+}
+SyncLogRequest& SyncLogRequest::operator=(const SyncLogRequest& other31) {
+  node_name = other31.node_name;
+  log_entries = other31.log_entries;
+  __isset = other31.__isset;
   return *this;
 }
 void SyncLogRequest::printTo(std::ostream& out) const {
@@ -1369,17 +1431,17 @@ void swap(SyncLogResponse &a, SyncLogResponse &b) {
   swap(a.__isset, b.__isset);
 }
 
-SyncLogResponse::SyncLogResponse(const SyncLogResponse& other31) {
-  error_code = other31.error_code;
-  error_message = other31.error_message;
-  txn_timestamp = other31.txn_timestamp;
-  __isset = other31.__isset;
-}
-SyncLogResponse& SyncLogResponse::operator=(const SyncLogResponse& other32) {
+SyncLogResponse::SyncLogResponse(const SyncLogResponse& other32) {
   error_code = other32.error_code;
   error_message = other32.error_message;
   txn_timestamp = other32.txn_timestamp;
   __isset = other32.__isset;
+}
+SyncLogResponse& SyncLogResponse::operator=(const SyncLogResponse& other33) {
+  error_code = other33.error_code;
+  error_message = other33.error_message;
+  txn_timestamp = other33.txn_timestamp;
+  __isset = other33.__isset;
   return *this;
 }
 void SyncLogResponse::printTo(std::ostream& out) const {
@@ -1441,9 +1503,9 @@ uint32_t ChangeRoleRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 2:
         if (ftype == ::apache::thrift::protocol::T_I32) {
-          int32_t ecast33;
-          xfer += iprot->readI32(ecast33);
-          this->node_type = static_cast<NodeType::type>(ecast33);
+          int32_t ecast34;
+          xfer += iprot->readI32(ecast34);
+          this->node_type = static_cast<NodeType::type>(ecast34);
           this->__isset.node_type = true;
         } else {
           xfer += iprot->skip(ftype);
@@ -1486,15 +1548,15 @@ void swap(ChangeRoleRequest &a, ChangeRoleRequest &b) {
   swap(a.__isset, b.__isset);
 }
 
-ChangeRoleRequest::ChangeRoleRequest(const ChangeRoleRequest& other34) {
-  node_name = other34.node_name;
-  node_type = other34.node_type;
-  __isset = other34.__isset;
-}
-ChangeRoleRequest& ChangeRoleRequest::operator=(const ChangeRoleRequest& other35) {
+ChangeRoleRequest::ChangeRoleRequest(const ChangeRoleRequest& other35) {
   node_name = other35.node_name;
   node_type = other35.node_type;
   __isset = other35.__isset;
+}
+ChangeRoleRequest& ChangeRoleRequest::operator=(const ChangeRoleRequest& other36) {
+  node_name = other36.node_name;
+  node_type = other36.node_type;
+  __isset = other36.__isset;
   return *this;
 }
 void ChangeRoleRequest::printTo(std::ostream& out) const {
@@ -1581,13 +1643,13 @@ void swap(ChangeRoleResponse &a, ChangeRoleResponse &b) {
   swap(a.__isset, b.__isset);
 }
 
-ChangeRoleResponse::ChangeRoleResponse(const ChangeRoleResponse& other36) {
-  node_name = other36.node_name;
-  __isset = other36.__isset;
-}
-ChangeRoleResponse& ChangeRoleResponse::operator=(const ChangeRoleResponse& other37) {
+ChangeRoleResponse::ChangeRoleResponse(const ChangeRoleResponse& other37) {
   node_name = other37.node_name;
   __isset = other37.__isset;
+}
+ChangeRoleResponse& ChangeRoleResponse::operator=(const ChangeRoleResponse& other38) {
+  node_name = other38.node_name;
+  __isset = other38.__isset;
   return *this;
 }
 void ChangeRoleResponse::printTo(std::ostream& out) const {
@@ -1675,9 +1737,9 @@ uint32_t NewLeaderRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 4:
         if (ftype == ::apache::thrift::protocol::T_I32) {
-          int32_t ecast38;
-          xfer += iprot->readI32(ecast38);
-          this->new_node_type = static_cast<NodeType::type>(ecast38);
+          int32_t ecast39;
+          xfer += iprot->readI32(ecast39);
+          this->new_node_type = static_cast<NodeType::type>(ecast39);
           this->__isset.new_node_type = true;
         } else {
           xfer += iprot->skip(ftype);
@@ -1743,21 +1805,21 @@ void swap(NewLeaderRequest &a, NewLeaderRequest &b) {
   swap(a.__isset, b.__isset);
 }
 
-NewLeaderRequest::NewLeaderRequest(const NewLeaderRequest& other39) {
-  node_name = other39.node_name;
-  node_ip = other39.node_ip;
-  node_port = other39.node_port;
-  new_node_type = other39.new_node_type;
-  new_leader_term = other39.new_leader_term;
-  __isset = other39.__isset;
-}
-NewLeaderRequest& NewLeaderRequest::operator=(const NewLeaderRequest& other40) {
+NewLeaderRequest::NewLeaderRequest(const NewLeaderRequest& other40) {
   node_name = other40.node_name;
   node_ip = other40.node_ip;
   node_port = other40.node_port;
   new_node_type = other40.new_node_type;
   new_leader_term = other40.new_leader_term;
   __isset = other40.__isset;
+}
+NewLeaderRequest& NewLeaderRequest::operator=(const NewLeaderRequest& other41) {
+  node_name = other41.node_name;
+  node_ip = other41.node_ip;
+  node_port = other41.node_port;
+  new_node_type = other41.new_node_type;
+  new_leader_term = other41.new_leader_term;
+  __isset = other41.__isset;
   return *this;
 }
 void NewLeaderRequest::printTo(std::ostream& out) const {
@@ -1847,13 +1909,13 @@ void swap(NewLeaderResponse &a, NewLeaderResponse &b) {
   swap(a.__isset, b.__isset);
 }
 
-NewLeaderResponse::NewLeaderResponse(const NewLeaderResponse& other41) {
-  node_name = other41.node_name;
-  __isset = other41.__isset;
-}
-NewLeaderResponse& NewLeaderResponse::operator=(const NewLeaderResponse& other42) {
+NewLeaderResponse::NewLeaderResponse(const NewLeaderResponse& other42) {
   node_name = other42.node_name;
   __isset = other42.__isset;
+}
+NewLeaderResponse& NewLeaderResponse::operator=(const NewLeaderResponse& other43) {
+  node_name = other43.node_name;
+  __isset = other43.__isset;
   return *this;
 }
 void NewLeaderResponse::printTo(std::ostream& out) const {

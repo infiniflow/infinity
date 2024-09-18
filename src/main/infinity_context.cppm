@@ -66,6 +66,9 @@ public:
     void SetIndexThreadPool(SizeT thread_num);
     void RestoreIndexThreadPoolToDefault();
 
+    void AddThriftServerFn(std::function<void()> start_func, std::function<void()> stop_func);
+    void StartThriftServers();
+    void StopThriftServers();
 private:
     friend class Singleton;
 
@@ -87,6 +90,9 @@ private:
 
     mutable std::mutex mutex_;
     NodeRole current_server_role_{NodeRole::kUnInitialized};
+
+    std::function<void()> start_servers_func_{};
+    std::function<void()> stop_servers_func_{};
 };
 
 } // namespace infinity

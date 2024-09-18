@@ -29,6 +29,7 @@ public:
 
 private:
     UniquePtr<apache::thrift::server::TServer> server{nullptr};
+    atomic_bool started_{false};
 };
 
 } // namespace infinity

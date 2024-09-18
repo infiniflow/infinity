@@ -43,7 +43,8 @@ export namespace apache {
             using apache::thrift::transport::TServerSocket;
             using apache::thrift::transport::TBufferedTransport;
             using apache::thrift::transport::TBufferedTransportFactory;
-
+            using apache::thrift::transport::TTransportException;
+            using TTransportExceptionType = apache::thrift::transport::TTransportException::TTransportExceptionType;
         }
 
         namespace protocol {
