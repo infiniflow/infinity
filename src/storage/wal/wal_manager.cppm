@@ -78,8 +78,9 @@ public:
 
     void ReplayWalEntry(const WalEntry &entry);
 
-
     TxnTimeStamp GetCheckpointedTS();
+
+    Vector<SharedPtr<String>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
 
 private:
     // Checkpoint Helper

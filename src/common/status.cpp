@@ -557,17 +557,22 @@ Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
 }
 
-Status Status::CantConnectServer(const String& ip, i64 port, const String& reason) {
+Status Status::CantConnectServer(const String &ip, i64 port, const String &reason) {
     return Status(ErrorCode::kCantConnectServer, MakeUnique<String>(fmt::format("Can't connect server: {}:{}, {}", ip, port, reason)));
 }
 
-Status Status::NotExistNode(const String& node_info) {
+Status Status::NotExistNode(const String &node_info) {
     return Status(ErrorCode::kNotExistNode, MakeUnique<String>(fmt::format("Node doesn't exist: {}", node_info)));
 }
-Status Status::DuplicateNode(const String& node_info) {
+Status Status::DuplicateNode(const String &node_info) {
     return Status(ErrorCode::kDuplicateNode, MakeUnique<String>(fmt::format("Duplicate node: {}", node_info)));
 }
 
+Status Status::CantConnectLeader(const String &leader_info) {
+    return Status(ErrorCode::kCantConnectLeader, MakeUnique<String>(fmt::format("Can't connect leader: {}", leader_info)));
+}
+
+// meta
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 
 Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUnique<String>("Not found entry")); }
@@ -588,5 +593,7 @@ Status Status::WrongCheckpointType(const String &expect_type, const String &actu
 Status Status::InvalidNodeRole(const String &message) { return Status(ErrorCode::kInvalidNodeRole, MakeUnique<String>(message)); }
 
 Status Status::InvalidNodeStatus(const String &message) { return Status(ErrorCode::kInvalidNodeStatus, MakeUnique<String>(message)); }
+
+Status Status::NodeInfoUpdated(const String &message) { return Status(ErrorCode::kNodeInfoUpdated, MakeUnique<String>(message)); }
 
 } // namespace infinity

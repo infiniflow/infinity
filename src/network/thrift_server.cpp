@@ -75,9 +75,20 @@ void ThreadedThriftServer::Init(const String& server_address, i32 port_no) {
                                          binary_protocol_factory);
 }
 
-void ThreadedThriftServer::Start() { server->serve(); }
+void ThreadedThriftServer::Start() {
+    if(started_) {
+        return ;
+    }
+    started_ = true;
+    server->serve();
+}
 
-void ThreadedThriftServer::Shutdown() { server->stop(); }
+void ThreadedThriftServer::Shutdown() {
+    if(started_) {
+        server->stop();
+        started_ = false;
+    }
+}
 
 void PoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_size) {
 
@@ -103,9 +114,20 @@ void PoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_
                                       threadManager);
 }
 
-void PoolThriftServer::Start() { server->serve(); }
+void PoolThriftServer::Start() {
+    if(started_) {
+        return ;
+    }
+    started_ = true;
+    server->serve();
+}
 
-void PoolThriftServer::Shutdown() { server->stop(); }
+void PoolThriftServer::Shutdown() {
+    if(started_) {
+        server->stop();
+        started_ = false;
+    }
+}
 
 void NonBlockPoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_size) {
 
@@ -136,8 +158,19 @@ void NonBlockPoolThriftServer::Init(const String& server_address, i32 port_no, i
     //                                           threadManager);
 }
 
-void NonBlockPoolThriftServer::Start() { server_thread_->start(); }
+void NonBlockPoolThriftServer::Start() {
+    if(started_) {
+        return ;
+    }
+    started_ = true;
+    server_thread_->start();
+}
 
-void NonBlockPoolThriftServer::Shutdown() { server_thread_->join(); }
+void NonBlockPoolThriftServer::Shutdown() {
+    if(started_) {
+        server_thread_->join();
+        started_ = false;
+    }
+}
 
 } // namespace infinity

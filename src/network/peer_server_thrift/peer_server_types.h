@@ -409,8 +409,11 @@ void swap(UnregisterResponse &a, UnregisterResponse &b);
 std::ostream& operator<<(std::ostream& out, const UnregisterResponse& obj);
 
 typedef struct _HeartBeatRequest__isset {
-  _HeartBeatRequest__isset() : node_name(false), txn_timestamp(false) {}
+  _HeartBeatRequest__isset() : node_name(false), node_type(false), node_ip(false), node_port(false), txn_timestamp(false) {}
   bool node_name :1;
+  bool node_type :1;
+  bool node_ip :1;
+  bool node_port :1;
   bool txn_timestamp :1;
 } _HeartBeatRequest__isset;
 
@@ -421,22 +424,44 @@ class HeartBeatRequest : public virtual ::apache::thrift::TBase {
   HeartBeatRequest& operator=(const HeartBeatRequest&);
   HeartBeatRequest() noexcept
                    : node_name(),
+                     node_type(static_cast<NodeType::type>(0)),
+                     node_ip(),
+                     node_port(0),
                      txn_timestamp(0) {
   }
 
   virtual ~HeartBeatRequest() noexcept;
   std::string node_name;
+  /**
+   * 
+   * @see NodeType
+   */
+  NodeType::type node_type;
+  std::string node_ip;
+  int64_t node_port;
   int64_t txn_timestamp;
 
   _HeartBeatRequest__isset __isset;
 
   void __set_node_name(const std::string& val);
 
+  void __set_node_type(const NodeType::type val);
+
+  void __set_node_ip(const std::string& val);
+
+  void __set_node_port(const int64_t val);
+
   void __set_txn_timestamp(const int64_t val);
 
   bool operator == (const HeartBeatRequest & rhs) const
   {
     if (!(node_name == rhs.node_name))
+      return false;
+    if (!(node_type == rhs.node_type))
+      return false;
+    if (!(node_ip == rhs.node_ip))
+      return false;
+    if (!(node_port == rhs.node_port))
       return false;
     if (!(txn_timestamp == rhs.txn_timestamp))
       return false;

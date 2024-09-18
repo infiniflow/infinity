@@ -94,4 +94,9 @@ String HeartBeatPeerTask::ToString() const {
     return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, txn_ts_);
 }
 
+String SyncLogTask::ToString() const {
+    return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, log_strings_.size());
+}
+
+
 } // namespace infinity

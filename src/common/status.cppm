@@ -173,6 +173,7 @@ export enum class ErrorCode : long {
     kCantConnectServer = 7018,
     kNotExistNode = 7019,
     kDuplicateNode = 7020,
+    kCantConnectLeader = 7021,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -182,7 +183,8 @@ export enum class ErrorCode : long {
     kNoWALEntryFound = 8005,
     kWrongCheckpointType = 8006,
     kInvalidNodeRole = 8007,
-    kInvalidNodeStatus = 8008
+    kInvalidNodeStatus = 8008,
+    kNodeInfoUpdated = 8009
 };
 
 export class Status {
@@ -334,6 +336,7 @@ public:
     static Status CantConnectServer(const String& ip, i64 port, const String& reason);
     static Status NotExistNode(const String& node_info);
     static Status DuplicateNode(const String& node_info);
+    static Status CantConnectLeader(const String& leader_info);
 
     // meta
     static Status InvalidEntry();
@@ -344,6 +347,7 @@ public:
     static Status WrongCheckpointType(const String &expect_type, const String &actual_type);
     static Status InvalidNodeRole(const String &message);
     static Status InvalidNodeStatus(const String &message);
+    static Status NodeInfoUpdated(const String &message);
 
 public:
     Status() = default;

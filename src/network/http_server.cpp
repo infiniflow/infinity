@@ -3117,6 +3117,9 @@ public:
 namespace infinity {
 
 void HTTPServer::Start(const String& ip_address, u16 port) {
+    if(started_) {
+        return ;
+    }
 
     WebEnvironment::init();
 
@@ -3187,13 +3190,17 @@ void HTTPServer::Start(const String& ip_address, u16 port) {
 
     fmt::print("HTTP server listen on {}: {}\n", ip_address, port);
 
+    started_ = true;
+
     server_->run();
 }
 
 void HTTPServer::Shutdown() {
-
-    server_->stop();
-    WebEnvironment::destroy();
+    if(started_) {
+        server_->stop();
+        WebEnvironment::destroy();
+        started_ = false;
+    }
 }
 
 } // namespace infinity
