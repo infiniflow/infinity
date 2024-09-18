@@ -80,6 +80,8 @@ public:
 
     inline bool IsDelimiter() { return is_delimiter_; }
 
+    inline SizeT GetInputCursor() const { return input_cursor_; }
+
     bool Tokenize(const String &input_string, TermList &special_terms, TermList &prim_terms);
 
     /// \brief tokenize the input text, remove the space chars, output raw term list

@@ -50,6 +50,7 @@
 *_BASE_*
 *_LOCAL_*
 *_REMOTE_*
+.DS_Store
 
 # build directory of Gradle, CMake etc
 build*/
