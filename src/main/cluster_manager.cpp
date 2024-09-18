@@ -481,7 +481,7 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
     return Status::OK();
 }
 
-Status ClusterManager::ApplySyncedLog(const Vector<String>& synced_logs) {
+Status ClusterManager::ApplySyncedLogNolock(const Vector<String>& synced_logs) {
     for(auto& log_str: synced_logs) {
         const i32 entry_size = log_str.size();
         const char *ptr = log_str.data();

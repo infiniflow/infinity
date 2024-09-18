@@ -144,21 +144,10 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
 
 void PeerServerThriftService::SyncLog(infinity_peer_server::SyncLogResponse &response, const infinity_peer_server::SyncLogRequest &request) {
     LOG_INFO("Get SyncLog request");
-    NodeInfo *this_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
-    if(this_node->node_name_ != request.node_name) {
-        response.error_code = static_cast<i64>(ErrorCode::kNodeNameMismatch);
-        response.error_message = fmt::format("Expected node name: {}, actual node name: {}", request.node_name, this_node->node_name_);
-        return ;
-    }
-    if (this_node->node_role_ == NodeRole::kFollower or this_node->node_role_ == NodeRole::kLearner) {
-        Status status = InfinityContext::instance().cluster_manager()->ApplySyncedLog(request.log_entries);
-        if (!status.ok()) {
-            response.error_code = static_cast<i64>(status.code());
-            response.error_message = status.message();
-        }
-    } else {
-        response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = fmt::format("Only follower and learner can be applied logs, this node role: {}", ToString(this_node->node_role_));
+    Status status = InfinityContext::instance().cluster_manager()->ApplySyncedLogNolock(request.log_entries);
+    if (!status.ok()) {
+        response.error_code = static_cast<i64>(status.code());
+        response.error_message = status.message();
     }
     return;
 }

@@ -116,7 +116,8 @@ void PeerClient::Process() {
                 }
                 case PeerTaskType::kLogSync: {
                     LOG_TRACE(peer_task->ToString());
-
+                    SyncLogTask* sync_log_task = static_cast<SyncLogTask*>(peer_task.get());
+                    SyncLogs(sync_log_task);
                     break;
                 }
                 default: {
@@ -275,6 +276,24 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
             }
             peer_task->other_nodes_.emplace_back(node_info);
         }
+    }
+}
+
+void PeerClient::SyncLogs(SyncLogTask *peer_task) {
+    SyncLogRequest request;
+    SyncLogResponse response;
+    request.node_name = peer_task->node_name_;
+    SizeT log_count = peer_task->log_strings_.size();
+    request.log_entries.reserve(log_count);
+    for(SizeT i = 0; i < log_count; ++ i) {
+        request.log_entries.emplace_back(*peer_task->log_strings_[i]);
+    }
+
+    client_->SyncLog(response, request);
+    if (response.error_code != 0) {
+        // Error
+        peer_task->error_code_ = response.error_code;
+        peer_task->error_message_ = response.error_message;
     }
 }
 
