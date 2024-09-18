@@ -54,7 +54,7 @@ public:
     CleanupPeriodicTrigger(i64 interval, BGTaskProcessor *bg_processor, Catalog *catalog, TxnManager *txn_mgr)
         : PeriodicTrigger(interval), bg_processor_(bg_processor), catalog_(catalog), txn_mgr_(txn_mgr) {}
 
-    SharedPtr<CleanupTask> CreateCleanupTask();
+    SharedPtr<CleanupTask> CreateCleanupTask(TxnTimeStamp visible_ts = 0);
 
     virtual void Trigger() override;
 
