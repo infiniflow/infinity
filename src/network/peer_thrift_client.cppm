@@ -50,6 +50,7 @@ public:
     Status UnInit();
 
     Status Reconnect();
+    Status Disconnect();
     void Send(SharedPtr<PeerTask> task);
 
     bool ServerConnected() const { return server_connected_; }

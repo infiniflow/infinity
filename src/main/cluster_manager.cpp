@@ -338,6 +338,14 @@ Status ClusterManager::RemoveNode(const String &node_name) {
         other_node_map_.erase(node_name);
     }
 
+    auto client_iter = reader_client_map_.find(node_name);
+    if(client_iter == reader_client_map_.end()) {
+        return Status::NotExistNode(fmt::format("Attempt to disconnect from non-exist node: {}", node_name));
+    } else {
+        client_iter->second->UnInit();
+        reader_client_map_.erase(node_name);
+    }
+
     return Status::OK();
 }
 

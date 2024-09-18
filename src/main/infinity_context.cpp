@@ -367,8 +367,9 @@ void InfinityContext::StartThriftServers() {
     }
 
     if (current_server_role_ != NodeRole::kAdmin) {
-        if (start_servers_func_) {
+        if (start_servers_func_ and !start_server_) {
             start_servers_func_();
+            start_server_ = true;
         }
     }
 }
@@ -379,10 +380,12 @@ void InfinityContext::StopThriftServers() {
     }
 
     if (current_server_role_ != NodeRole::kAdmin) {
-        if (stop_servers_func_) {
+        if (stop_servers_func_ && start_server_) {
             stop_servers_func_();
-            start_servers_func_ = nullptr;
-            stop_servers_func_ = nullptr;
+            start_server_ = false;
+            // Not set to nullptr, to enable restart the server.
+            // start_servers_func_ = nullptr;
+            // stop_servers_func_ = nullptr;
         }
     }
 }

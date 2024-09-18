@@ -53,8 +53,9 @@ Status PeerClient::UnInit() {
         terminate_task->Wait();
         processor_thread_->join();
     }
+
     LOG_INFO(fmt::format("Peer client: {} is stopped.", this_node_name_));
-    return Status::OK();
+    return Disconnect();
 }
 
 Status PeerClient::Reconnect() {
@@ -73,6 +74,25 @@ Status PeerClient::Reconnect() {
         client_ = MakeUnique<PeerServiceClient>(protocol_);
         transport_->open();
         server_connected_ = true;
+    } catch (const std::exception &e) {
+        status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
+    }
+    return status;
+}
+
+Status PeerClient::Disconnect() {
+    Status status = Status::OK();
+    if(server_connected_ == false) {
+        return status;
+    }
+
+    try {
+        socket_->close();
+        transport_->close();
+        protocol_.reset();
+        client_.reset();
+        transport_->close();
+        server_connected_ = false;
     } catch (const std::exception &e) {
         status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
     }
