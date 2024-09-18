@@ -29,8 +29,8 @@ protected:
 };
 
 void PersistenceManagerTest::CheckObjData(const String& local_file_path, const String& data) {
-    String obj_path = pm_->GetObjCache(local_file_path);
-    auto obj_addr = pm_->GetObjFromLocalPath(local_file_path);
+    auto obj_addr = pm_->GetObjCache(local_file_path);
+    String obj_path = pm_->GetObjPath(obj_addr.obj_key_);
     fs::path obj_fp(obj_path);
     ASSERT_TRUE(fs::exists(obj_fp));
     ASSERT_EQ(obj_addr.part_size_, data.size());
@@ -56,7 +56,7 @@ TEST_F(PersistenceManagerTest, PersistFileBasic) {
     String persist_str = "Persistence Manager Test";
     out_file << persist_str;
     out_file.close();
-    ObjAddr obj_addr = pm_->Persist(file_path);
+    ObjAddr obj_addr = pm_->Persist(file_path, file_path);
     ASSERT_TRUE(obj_addr.Valid());
     ASSERT_EQ(obj_addr.part_size_, persist_str.size());
     pm_->CurrentObjFinalize();
@@ -78,7 +78,7 @@ TEST_F(PersistenceManagerTest, PersistMultiFile) {
         file_paths.push_back(file_path);
         persist_strs.push_back(persist_str);
 
-        ObjAddr obj_addr = pm_->Persist(file_path);
+        ObjAddr obj_addr = pm_->Persist(file_path, file_path);
         ASSERT_TRUE(obj_addr.Valid());
         ASSERT_EQ(obj_addr.part_size_, persist_str.size());
         obj_addrs.push_back(obj_addr);
@@ -109,7 +109,7 @@ TEST_F(PersistenceManagerTest, PersistFileMultiThread) {
         persist_strs.push_back(persist_str);
 
         threads.emplace_back([this, file_path, persist_str, &obj_addrs, &obj_mutex]() {
-            ObjAddr obj_addr = pm_->Persist(file_path);
+            ObjAddr obj_addr = pm_->Persist(file_path, file_path);
             ASSERT_TRUE(obj_addr.Valid());
             ASSERT_EQ(obj_addr.part_size_, persist_str.size());
             std::unique_lock<std::mutex> lock(obj_mutex);
@@ -144,7 +144,7 @@ TEST_F(PersistenceManagerTest, CleanupBasic) {
         file_paths.push_back(file_path);
         persist_strs.push_back(persist_str);
 
-        ObjAddr obj_addr = pm_->Persist(file_path);
+        ObjAddr obj_addr = pm_->Persist(file_path, file_path);
         ASSERT_TRUE(obj_addr.Valid());
         ASSERT_EQ(obj_addr.part_size_, persist_str.size());
         obj_addrs.push_back(obj_addr);

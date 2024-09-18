@@ -622,7 +622,17 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
 
             txn_mgr->CommitTxn(txn_record3);
             EXPECT_EQ(table_entry->row_count(), 3ul);
+            // TODO: Need to start txn to do the delta check point
+            usleep(100000);
             WaitFlushDeltaOp(storage);
+        }
+        {
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+            auto [table_entry, table_status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(table_status.ok());
+
+            EXPECT_EQ(table_entry->row_count(), 3ul);
+            txn_mgr->CommitTxn(txn);
         }
         infinity::InfinityContext::instance().UnInit();
     }

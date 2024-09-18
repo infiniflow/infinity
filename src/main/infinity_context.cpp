@@ -31,6 +31,7 @@ import variables;
 // import python_instance;
 import status;
 import infinity_exception;
+import wal_manager;
 
 namespace infinity {
 

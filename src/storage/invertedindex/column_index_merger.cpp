@@ -30,6 +30,7 @@ import logger;
 import persistence_manager;
 import infinity_context;
 import defer_op;
+import utility;
 
 namespace infinity {
 ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag) : index_dir_(index_dir), flag_(flag) {}
@@ -50,31 +51,26 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     String posting_file = index_prefix + POSTING_SUFFIX;
     String column_length_file = index_prefix + LENGTH_SUFFIX;
 
+    String tmp_dict_file(dict_file);
+    String tmp_posting_file(posting_file);
+    String tmp_column_length_file(column_length_file);
+    String tmp_fst_file(fst_file);
+
     // handle persistence obj_addrs
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ObjCreateRefCount(dict_file);
-        pm->ObjCreateRefCount(posting_file);
-        pm->ObjCreateRefCount(column_length_file);
+        Path temp_dir = Path(InfinityContext::instance().config()->TempDir());
+        tmp_dict_file = temp_dir / StringTransform(tmp_dict_file, "/", "_");
+        tmp_posting_file = temp_dir / StringTransform(tmp_posting_file, "/", "_");
+        tmp_column_length_file = temp_dir / StringTransform(tmp_column_length_file, "/", "_");
+        tmp_fst_file = temp_dir / StringTransform(tmp_fst_file, "/", "_");
     }
 
-    DeferFn defer_fn([&]() {
-        if (!use_object_cache) {
-            return;
-        }
-        pm->PutObjCache(posting_file);
-        pm->PutObjCache(dict_file);
-        pm->PutObjCache(column_length_file);
-        std::filesystem::remove(posting_file);
-        std::filesystem::remove(dict_file);
-        std::filesystem::remove(column_length_file);
-    });
-
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs_, dict_file, 1024);
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs_, tmp_dict_file, 1024);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
-    posting_file_writer_ = MakeShared<FileWriter>(fs_, posting_file, 1024);
-    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
+    posting_file_writer_ = MakeShared<FileWriter>(fs_, tmp_posting_file, 1024);
+    std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
 
@@ -100,7 +96,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             u32 id_offset = base_row_id - merge_base_rowid;
 
             if (use_object_cache) {
-                column_len_file = pm->GetObjCache(column_len_file);
+                column_len_file = pm->GetObjPath(pm->GetObjCache(column_len_file).obj_key_);
             }
 
             auto [file_handler, status] = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
@@ -126,7 +122,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             }
         }
 
-        auto [file_handler, status] = fs_.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+        auto [file_handler, status] = fs_.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -148,8 +144,13 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     dict_file_writer->Sync();
     posting_file_writer_->Sync();
     fst_builder.Finish();
-    fs_.AppendFile(dict_file, fst_file);
-    fs_.DeleteFile(fst_file);
+    fs_.AppendFile(tmp_dict_file, tmp_fst_file);
+    fs_.DeleteFile(tmp_fst_file);
+    if (use_object_cache) {
+        pm->Persist(dict_file, tmp_dict_file, false);
+        pm->Persist(posting_file, tmp_posting_file, false);
+        pm->Persist(column_length_file, tmp_column_length_file, false);
+    }
 }
 
 void ColumnIndexMerger::MergeTerm(const String &term,

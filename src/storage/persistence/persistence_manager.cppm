@@ -78,30 +78,16 @@ public:
 
     ~PersistenceManager();
 
-    /**
-     * For composed objects
-     */
     // Create new object or append to current object, and returns the location.
-    ObjAddr Persist(const String &file_path);
-
-    // Create new object or append to current object, and returns the location.
-    ObjAddr Persist(const char *data, SizeT len);
+    // file_path is the key of local_path_obj_ and may not exist. tmp_file_path is the file which contains the data to be persisted.
+    // tmp_file_path will be deleted after its data be persisted.
+    ObjAddr Persist(const String &file_path, const String &tmp_file_path, bool try_compose = true);
 
     // Force finalize current object. Subsequent append on the finalized object is forbidden.
     void CurrentObjFinalize(bool validate = false);
 
-    /**
-     * For dedicated objects
-     */
-    ObjAddr ObjCreateRefCount(const String &file_path);
-
-    /**
-     * For composed and dedicated objects
-     */
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
-    String GetObjCache(const String &local_path);
-
-    ObjAddr GetObjFromLocalPath(const String &file_path);
+    ObjAddr GetObjCache(const String &local_path);
 
     void PutObjCache(const String &file_path);
 
@@ -110,6 +96,7 @@ public:
     /**
      * Utils
      */
+    String GetObjPath(const String &obj_key) { return std::filesystem::path(workspace_).append(obj_key).string(); }
     nlohmann::json Serialize();
 
     void Deserialize(const nlohmann::json &obj);
@@ -125,7 +112,7 @@ private:
 
     // Append file to the current object.
     // It finalize current object if new size exceeds the size limit.
-    void CurrentObjAppendNoLock(const String &file_path, SizeT file_size);
+    void CurrentObjAppendNoLock(const String &tmp_file_path, SizeT file_size);
 
     // Finalize current object.
     void CurrentObjFinalizeNoLock();

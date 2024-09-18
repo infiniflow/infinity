@@ -4,6 +4,8 @@ time_zone = "utc-8"
 
 [network]
 [log]
+log_to_stdout            = true
+log_level               = "info"
 
 [storage]
 data_dir = "/var/infinity/data"

@@ -152,9 +152,9 @@ PersistenceManager::~PersistenceManager() {
     assert(sum_ref_count == 0);
 }
 
-ObjAddr PersistenceManager::Persist(const String &file_path) {
+ObjAddr PersistenceManager::Persist(const String &file_path, const String &tmp_file_path, bool try_compose) {
     std::error_code ec;
-    fs::path src_fp = file_path;
+    fs::path src_fp = tmp_file_path;
 
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
@@ -185,13 +185,13 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
         String error_message = fmt::format("Persist skipped empty local path {}.", file_path);
         LOG_WARN(error_message);
         return ObjAddr();
-    } else if (src_size >= object_size_limit_) {
+    } else if (!try_compose || src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         fs::path dst_fp = workspace_;
         dst_fp.append(obj_key);
-        bool ok = fs::copy_file(src_fp, dst_fp, fs::copy_options::overwrite_existing, ec);
-        if (!ok) {
-            String error_message = fmt::format("Failed to copy file {}.", file_path);
+        fs::rename(src_fp, dst_fp, ec);
+        if (ec) {
+            String error_message = fmt::format("Failed to rename {} to {}.", src_fp.string(), dst_fp.string());
             UnrecoverableError(error_message);
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
@@ -212,7 +212,12 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
             CurrentObjFinalizeNoLock();
         }
         ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
-        CurrentObjAppendNoLock(file_path, src_size);
+        CurrentObjAppendNoLock(tmp_file_path, src_size);
+        fs::remove(tmp_file_path, ec);
+        if (ec) {
+            String error_message = fmt::format("Failed to remove {}.", tmp_file_path);
+            UnrecoverableError(error_message);
+        }
 
         local_path_obj_[local_path] = obj_addr;
         LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
@@ -220,60 +225,6 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
                               obj_addr.obj_key_,
                               obj_addr.part_offset_,
                               obj_addr.part_size_));
-        return obj_addr;
-    }
-}
-
-ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size) {
-    fs::path dst_fp = workspace_;
-    if (src_size == 0) {
-        String error_message = fmt::format("Persist skipped empty data.");
-        LOG_WARN(error_message);
-        return ObjAddr();
-    } else if (src_size >= object_size_limit_) {
-        String obj_key = ObjCreate();
-        dst_fp.append(obj_key);
-        std::ofstream outFile(dst_fp, std::ios::app);
-        if (!outFile.is_open()) {
-            String error_message = fmt::format("Failed to open file {}.", dst_fp.string());
-            UnrecoverableError(error_message);
-        }
-        outFile.write(data, src_size);
-        outFile.close();
-        ObjAddr obj_addr(obj_key, 0, src_size);
-        std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(src_size, 1, 0));
-        LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
-        return obj_addr;
-    } else {
-        dst_fp.append(current_object_key_);
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (int(src_size) > CurrentObjRoomNoLock()) {
-            CurrentObjFinalizeNoLock();
-        }
-        ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
-        std::ofstream outFile(dst_fp, std::ios::app);
-        if (!outFile.is_open()) {
-            String error_message = fmt::format("Failed to open file {}.", dst_fp.string());
-            UnrecoverableError(error_message);
-        }
-        outFile.write(data, src_size);
-        current_object_size_ += src_size;
-        current_object_parts_++;
-        if (current_object_size_ >= object_size_limit_) {
-            if (current_object_parts_ > 1) {
-                // Add footer to composed object -- format version 1
-                const u32 compose_format = 1;
-                outFile.write((char *)&compose_format, sizeof(u32));
-            }
-
-            objects_.emplace(current_object_key_, ObjStat(src_size, current_object_parts_, 0));
-            LOG_TRACE(fmt::format("Persist added composed object {}", current_object_key_));
-            current_object_key_ = ObjCreate();
-            current_object_size_ = 0;
-            current_object_parts_ = 0;
-        }
-        outFile.close();
         return obj_addr;
     }
 }
@@ -345,7 +296,7 @@ void PersistenceManager::CurrentObjFinalizeNoLock() {
     }
 }
 
-String PersistenceManager::GetObjCache(const String &file_path) {
+ObjAddr PersistenceManager::GetObjCache(const String &file_path) {
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         String error_message = fmt::format("Failed to find local path of {}", local_path);
@@ -357,26 +308,11 @@ String PersistenceManager::GetObjCache(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("GetObjCache Failed to find object for local path {}", local_path);
         LOG_WARN(error_message);
-        return "";
+        return ObjAddr();
     }
     auto oit = objects_.find(it->second.obj_key_);
     if (oit != objects_.end()) {
         oit->second.ref_count_++;
-    }
-    return fs::path(workspace_).append(it->second.obj_key_).string();
-}
-
-ObjAddr PersistenceManager::GetObjFromLocalPath(const String &file_path) {
-    String local_path = RemovePrefix(file_path);
-    if (local_path.empty()) {
-        String error_message = fmt::format("Failed to find local path of {}", local_path);
-        UnrecoverableError(error_message);
-    }
-
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = local_path_obj_.find(local_path);
-    if (it == local_path_obj_.end()) {
-        return ObjAddr();
     }
     return it->second;
 }
@@ -394,6 +330,7 @@ void PersistenceManager::PutObjCache(const String &file_path) {
         String error_message = fmt::format("Failed to find file_path: {} stored object", local_path);
         UnrecoverableError(error_message);
     }
+    assert(it->second.part_size_ != 0);
     auto oit = objects_.find(it->second.obj_key_);
     if (oit == objects_.end()) {
         return;
@@ -401,72 +338,18 @@ void PersistenceManager::PutObjCache(const String &file_path) {
 
     assert(oit->second.ref_count_ > 0);
     oit->second.ref_count_--;
-    if (it->second.part_size_ == 0 && it->second.part_offset_ == 0) {
-        assert(oit->second.ref_count_ == 0);
-        // For large files linked, fill in the file size when putting to ensure obj valid
-        // There's no footer in dedicated objects.
-        String obj_full_path = fs::path(workspace_).append(it->second.obj_key_).string();
-        oit->second.obj_size_ = fs::file_size(obj_full_path);
-        oit->second.parts_ = 1;
-        it->second.part_size_ = oit->second.obj_size_;
-
-        if (oit->second.obj_size_ == 0) {
-            // Avoid to persist empty objects.
-            objects_.erase(oit);
-            local_path_obj_.erase(it);
-            String error_message = fmt::format("PutObjCache skipped empty local path {}", file_path);
-            LOG_WARN(error_message);
-        }
-    }
 }
 
 String PersistenceManager::ObjCreate() { return UUID().to_string(); }
 
-ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
-    String obj_key = ObjCreate();
-    ObjAddr obj_addr = ObjAddr(obj_key, 0, 0);
-    {
-        std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(0, 1, 1));
-        LOG_TRACE(fmt::format("ObjCreateRefCount added dedicated {}, path: {}", obj_key, file_path));
-    }
-
-    fs::path src_fp = workspace_;
-    fs::path dst_fp = file_path;
-    src_fp.append(obj_key);
-    try {
-        if (fs::exists(dst_fp)) {
-            fs::remove(dst_fp);
-        }
-        fs::create_symlink(src_fp, dst_fp);
-    } catch (const fs::filesystem_error &e) {
-        String error_message = fmt::format("Failed to link file {}.", file_path);
-        UnrecoverableError(error_message);
-    }
-    std::lock_guard<std::mutex> lock(mtx_);
-    String local_path = RemovePrefix(file_path);
-    if (local_path.empty()) {
-        String error_message = fmt::format("Failed to find local path of {}", local_path);
-        UnrecoverableError(error_message);
-    }
-    local_path_obj_[local_path] = obj_addr;
-    LOG_TRACE(fmt::format("ObjCreateRefCount local path {} to dedicated ObjAddr ({}, {}, {})",
-                          local_path,
-                          obj_addr.obj_key_,
-                          obj_addr.part_offset_,
-                          obj_addr.part_size_));
-    return obj_addr;
-}
-
 int PersistenceManager::CurrentObjRoomNoLock() { return int(object_size_limit_) - int(current_object_size_); }
 
-void PersistenceManager::CurrentObjAppendNoLock(const String &file_path, SizeT file_size) {
-    fs::path src_fp = file_path;
-    fs::path dst_fp = workspace_;
-    dst_fp.append(current_object_key_);
+void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, SizeT file_size) {
+    fs::path src_fp = tmp_file_path;
+    fs::path dst_fp = Path(workspace_) / current_object_key_;
     std::ifstream srcFile(src_fp, std::ios::binary);
     if (!srcFile.is_open()) {
-        String error_message = fmt::format("Failed to open source file {}", file_path);
+        String error_message = fmt::format("Failed to open source file {}", tmp_file_path);
         UnrecoverableError(error_message);
     }
     std::ofstream dstFile(dst_fp, std::ios::binary | std::ios::app);
@@ -727,7 +610,7 @@ void AddrSerializer::Initialize(PersistenceManager *pm, const Vector<String> &pa
     }
     for (const String &path : path) {
         paths_.push_back(path);
-        ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
+        ObjAddr obj_addr = pm->GetObjCache(path);
         obj_addrs_.push_back(obj_addr);
         if (!obj_addr.Valid()) {
             // In ImportWal, version file is not flushed here, set before write wal
@@ -736,6 +619,7 @@ void AddrSerializer::Initialize(PersistenceManager *pm, const Vector<String> &pa
         } else {
             ObjStat obj_stat = pm->GetObjStatByObjAddr(obj_addr);
             obj_stats_.push_back(obj_stat);
+            pm->PutObjCache(path);
         }
     }
 }
@@ -748,13 +632,14 @@ void AddrSerializer::InitializeValid(PersistenceManager *pm) {
         if (obj_addrs_[i].Valid()) {
             continue;
         }
-        ObjAddr obj_addr = pm->GetObjFromLocalPath(paths_[i]);
+        ObjAddr obj_addr = pm->GetObjCache(paths_[i]);
         obj_addrs_[i] = obj_addr;
         if (!obj_addr.Valid()) {
             UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
         } else {
             ObjStat obj_stat = pm->GetObjStatByObjAddr(obj_addr);
             obj_stats_[i] = obj_stat;
+            pm->PutObjCache(paths_[i]);
         }
     }
 }
