@@ -67,6 +67,10 @@ public:
     // Used by leader to notify to asynchronize logs to learner, after txn;
     Status AsyncLogsToLearner();
 
+    // Used by leader to control the number of follower
+    Status SetFollowerNumber(SizeT new_follower_number);
+    SizeT GetFollowerNumber() const;
+
     // Use by follower / learner to update all node info when get HB response from leader
     Status UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &info_of_nodes);
 
@@ -100,6 +104,8 @@ private:
     std::mutex hb_mutex_;
     std::condition_variable hb_cv_;
     Atomic<bool> hb_running_{false};
+
+    Atomic<SizeT> follower_count_{1};
 };
 
 } // namespace infinity

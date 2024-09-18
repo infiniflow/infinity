@@ -78,6 +78,7 @@ import memindex_tracer;
 import persistence_manager;
 import global_resource_usage;
 import infinity_context;
+import peer_task;
 
 namespace infinity {
 
@@ -3944,7 +3945,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kCPUUsage: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+                MakeShared<ColumnDef>(0, double_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -3978,6 +3979,30 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
+        }
+        case GlobalVariable::kFollowerNum: {
+            if (InfinityContext::instance().cluster_manager()->ThisNode()->node_role_ == NodeRole::kLeader) {
+                Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                    MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+                };
+
+                SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
+                output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+                Vector<SharedPtr<DataType>> output_column_types{
+                    integer_type,
+                };
+
+                output_block_ptr->Init(output_column_types);
+
+                i64 follower_number = InfinityContext::instance().cluster_manager()->GetFollowerNumber();
+                Value value = Value::MakeBigInt(follower_number);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            } else {
+                operator_state->status_ = Status::NotSupport(fmt::format("follower_number isn't supported in non-leader node of cluster deployment"));
+                RecoverableError(operator_state->status_);
+            }
             break;
         }
         default: {
@@ -4484,6 +4509,30 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     Value value = Value::MakeVarchar("Use jemalloc to profile Infinity");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
+            case GlobalVariable::kFollowerNum: {
+                if(InfinityContext::instance().cluster_manager()->ThisNode()->node_role_ == NodeRole::kLeader) {
+                    {
+                        // option name
+                        Value value = Value::MakeVarchar(var_name);
+                        ValueExpression value_expr(value);
+                        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    }
+                    {
+                        // option value
+                        SizeT follower_count = InfinityContext::instance().cluster_manager()->GetFollowerNumber();
+                        Value value = Value::MakeBigInt(follower_count);
+                        ValueExpression value_expr(value);
+                        value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                    }
+                    {
+                        // option description
+                        Value value = Value::MakeVarchar("Follower number for Infinity cluster");
+                        ValueExpression value_expr(value);
+                        value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                    }
                 }
                 break;
             }

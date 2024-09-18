@@ -443,6 +443,20 @@ Status ClusterManager::AsyncLogsToLearner() {
     return Status::OK();
 }
 
+Status ClusterManager::SetFollowerNumber(SizeT new_follower_number) {
+    if(new_follower_number > 5) {
+        return Status::NotSupport("Attempt to set follower count larger than 5.");
+    }
+
+    // Check current follower count, if new count is less, leader will downgrade some followers to learner
+    follower_count_ = new_follower_number;
+    return Status::OK();
+}
+
+SizeT ClusterManager::GetFollowerNumber() const {
+    return follower_count_;
+}
+
 Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &info_of_nodes) {
     // Only follower and learner will use this function.
     HashMap<String, bool> exist_node_name_map;

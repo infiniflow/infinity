@@ -44,6 +44,7 @@ void VarUtil::InitVariablesMap() {
     global_name_map_[CPU_USAGE_VAR_NAME.data()] = GlobalVariable::kCPUUsage;
     global_name_map_["jeprof"] = GlobalVariable::kJeProf;
     global_name_map_["cleanup_trace"] = GlobalVariable::kCleanupTrace;
+    global_name_map_[FOLLOWER_NUMBER.data()] = GlobalVariable::kFollowerNum;
 
     session_name_map_[QUERY_COUNT_VAR_NAME.data()] = SessionVariable::kQueryCount;
     session_name_map_[TOTAL_COMMIT_COUNT_VAR_NAME.data()] = SessionVariable::kTotalCommitCount;
