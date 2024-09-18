@@ -23,6 +23,7 @@ import infinity_context;
 import logger;
 import infinity_exception;
 import peer_server_thrift_types;
+import wal_manager;
 
 namespace infinity {
 
@@ -277,6 +278,23 @@ Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const
     return {client, client_status};
 }
 
+Status ClusterManager::SendLogs(const String &node_name, const SharedPtr<PeerClient> &peer_client, const Vector<SharedPtr<String>> &logs, bool synchronize) {
+    SharedPtr<SyncLogTask> sync_log_task = MakeShared<SyncLogTask>(node_name, logs);
+    peer_client->Send(sync_log_task);
+
+    if(synchronize) {
+        sync_log_task->Wait();
+    }
+
+    Status status = Status::OK();
+    if (sync_log_task->error_code_ != 0) {
+        LOG_ERROR(fmt::format("Fail to send log follower: {}, error message: {}", node_name, sync_log_task->error_message_));
+        status.code_ = static_cast<ErrorCode>(sync_log_task->error_code_);
+        status.msg_ = MakeUnique<String>(sync_log_task->error_message_);
+    }
+    return status;
+}
+
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     // Only used by Leader on follower/learner registration.
     std::unique_lock<std::mutex> lock(mutex_);
@@ -303,9 +321,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
 
     reader_client_map_.emplace(node_info->node_name_, client_to_follower);
 
-    // Check leader WAL and get the diff log
-    LOG_TRACE("Leader will check the log diff");
-    LOG_TRACE(fmt::format("Leader will send the diff logs to {} synchronously", node_info->node_name_));
+    SyncLogsOnRegistration(node_info, client_to_follower);
 
     return Status::OK();
 }
@@ -401,6 +417,29 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
     if (!non_leader_node_found) {
         other_node_map_.emplace(non_leader_node->node_name_, non_leader_node);
     }
+    return Status::OK();
+}
+
+Status ClusterManager::SyncLogsOnRegistration(const SharedPtr<NodeInfo> &non_leader_node, const SharedPtr<PeerClient> &peer_client) {
+    // Used by leader on registration phase
+
+    // Check leader WAL and get the diff log
+    LOG_TRACE("Leader will get the log diff");
+    WalManager *wal_manager = txn_manager_->wal_manager();
+    Vector<SharedPtr<String>> wal_strings = wal_manager->GetDiffWalEntryString(non_leader_node->txn_timestamp_);
+
+    // Leader will send the WALs
+    LOG_TRACE(fmt::format("Leader will send the diff logs count: {} to {} synchronously", wal_strings.size(), non_leader_node->node_name_));
+    return SendLogs(non_leader_node->node_name_, peer_client, wal_strings, true);
+}
+
+Status ClusterManager::SyncLogsToFollower() {
+    // Used by leader to sync logs when get HB from follower
+    return Status::OK();
+}
+
+Status ClusterManager::AsyncLogsToLearner() {
+    // Used by leader to async logs when get HB from learner
     return Status::OK();
 }
 

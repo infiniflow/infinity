@@ -114,6 +114,11 @@ void PeerClient::Process() {
                     HeartBeat(heartbeat_peer_task);
                     break;
                 }
+                case PeerTaskType::kLogSync: {
+                    LOG_TRACE(peer_task->ToString());
+
+                    break;
+                }
                 default: {
                     String error_message = fmt::format("Invalid peer task type");
                     UnrecoverableError(error_message);

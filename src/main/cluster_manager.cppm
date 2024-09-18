@@ -45,6 +45,7 @@ private:
     Status RegisterToLeaderNoLock();
     Status UnregisterFromLeaderNoLock();
     Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &server_ip, i64 server_port);
+    Status SendLogs(const String &node_name, const SharedPtr<PeerClient>& peer_client, const Vector<SharedPtr<String>>& logs, bool synchronize);
 
 public:
     // Used by leader to add non-leader node in register phase
@@ -58,7 +59,7 @@ public:
     UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_leader_node, Vector<infinity_peer_server::NodeInfo> &other_nodes, i64 &leader_term);
 
     // Used by leader to notify leader to synchronize logs to the follower and learner, during registration
-    Status SyncLogsToFollowerAndLearner(const SharedPtr<NodeInfo> &non_leader_node);
+    Status SyncLogsOnRegistration(const SharedPtr<NodeInfo> &non_leader_node, const SharedPtr<PeerClient>& peer_client);
 
     // Used by leader to notify to synchronize logs to follower, during txn bottom phase
     Status SyncLogsToFollower();

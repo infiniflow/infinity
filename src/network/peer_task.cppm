@@ -159,4 +159,18 @@ public:
     Vector<SharedPtr<NodeInfo>> other_nodes_{};
 };
 
+export class SyncLogTask final : public PeerTask {
+public:
+    SyncLogTask(const String& node_name, const Vector<SharedPtr<String>>& log_strings) : PeerTask(PeerTaskType::kLogSync), node_name_(node_name), log_strings_(log_strings) {}
+
+    String ToString() const final;
+
+    String node_name_;
+    Vector<SharedPtr<String>> log_strings_;
+
+    // response
+    i64 error_code_{};
+    String error_message_{};
+};
+
 } // namespace infinity

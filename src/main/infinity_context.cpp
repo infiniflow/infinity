@@ -375,7 +375,7 @@ void InfinityContext::StartThriftServers() {
 
 void InfinityContext::StopThriftServers() {
     if (current_server_role_ == NodeRole::kUnInitialized) {
-        UnrecoverableError("Invalid node role");
+        return ;
     }
 
     if (current_server_role_ != NodeRole::kAdmin) {

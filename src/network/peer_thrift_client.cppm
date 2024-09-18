@@ -45,9 +45,6 @@ public:
     //        node_info_.node_role_ = role;
     //    }
     //
-    //    String PeerNodeName() const {
-    //        return node_info_.node_name_;
-    //    }
 
     Status Init();
     Status UnInit();
