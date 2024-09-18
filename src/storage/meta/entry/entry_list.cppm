@@ -460,7 +460,6 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntryReplay(std::function<SharedPtr<
             return {entry_ptr, Status::OK()};
         }
         case FindResult::kFound: {
-            entry_list_.pop_front();
             SharedPtr<Entry> entry = init_func(txn_id, begin_ts);
             auto *entry_ptr = entry.get();
             entry_list_.push_front(std::move(entry));

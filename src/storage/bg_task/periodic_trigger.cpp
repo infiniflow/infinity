@@ -41,10 +41,12 @@ bool PeriodicTrigger::Check() {
     return true;
 }
 
-SharedPtr<CleanupTask> CleanupPeriodicTrigger::CreateCleanupTask() {
+SharedPtr<CleanupTask> CleanupPeriodicTrigger::CreateCleanupTask(TxnTimeStamp visible_ts) {
     LOG_DEBUG(fmt::format("Trigger cleanup task, after {} seconds", duration_));
     std::lock_guard lck(mtx_);
-    TxnTimeStamp visible_ts = txn_mgr_->GetCleanupScanTS();
+    if (visible_ts == 0) {
+        visible_ts = txn_mgr_->GetCleanupScanTS() + 1;
+    }
     if (visible_ts == last_visible_ts_) {
         LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
         return nullptr;

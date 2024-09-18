@@ -149,7 +149,7 @@ void WalManager::PutEntries(Vector<WalEntry *> wal_entries) {
     wait_flush_.EnqueueBulk(wal_entries);
 }
 
-TxnTimeStamp WalManager::GetCheckpointedTS() { return last_ckp_ts_ == UNCOMMIT_TS ? 0 : last_ckp_ts_ + 1; }
+TxnTimeStamp WalManager::GetCheckpointedTS() { return last_ckp_ts_ == UNCOMMIT_TS ? 0 : last_ckp_ts_; }
 
 Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
 
@@ -294,7 +294,10 @@ void WalManager::Flush() {
             entry->WriteAdv(ptr);
             i32 act_size = ptr - buf.data();
             if (exp_size != act_size) {
-                String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}", exp_size, act_size, entry->ToString());
+                String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
+                                                   exp_size,
+                                                   act_size,
+                                                   entry->ToString());
                 UnrecoverableError(error_message);
             }
             ofs_.write(buf.data(), ptr - buf.data());
@@ -657,7 +660,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
     }
 
     if (last_commit_ts == 0) {
-        switch(targe_storage_mode) {
+        switch (targe_storage_mode) {
             case StorageMode::kWritable: {
                 // once wal is not empty, a checkpoint should always be found in leader or standalone mode.
                 String error_message = "No checkpoint found in wal";
@@ -1229,13 +1232,20 @@ void WalManager::WalCmdRenameTableReplay(WalCmdRenameTable &cmd, TransactionID t
 }
 
 void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    auto [db_entry, db_status] = storage_->catalog()->GetDatabase(cmd.db_name_, txn_id, commit_ts);
+    if (!db_status.ok()) {
+        String error_message = fmt::format("Wal Replay: Get database failed {}", db_status.message());
+        UnrecoverableError(error_message);
+    }
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
         UnrecoverableError(error_message);
     }
+
+    SharedPtr<TableEntry> new_table_entry = table_entry->Clone();
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
-    auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
+    auto *txn_table_store = fake_txn->GetTxnTableStore(table_entry);
     Vector<Value> default_values;
     ExpressionBinder tmp_binder(nullptr);
     for (const auto &column_def : cmd.column_defs_) {
@@ -1249,18 +1259,37 @@ void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn
 
         default_values.push_back(value_expr->GetValue());
     }
-    table_entry->AddColumns(cmd.column_defs_, default_values, txn_store);
+    new_table_entry->AddColumns(cmd.column_defs_, default_values, txn_table_store);
+    new_table_entry->commit_ts_ = commit_ts;
+    db_entry->CreateTableReplay(
+        table_entry->GetTableName(),
+        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) { return new_table_entry; },
+        txn_id,
+        commit_ts);
 }
 
 void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    auto [db_entry, db_status] = storage_->catalog()->GetDatabase(cmd.db_name_, txn_id, commit_ts);
+    if (!db_status.ok()) {
+        String error_message = fmt::format("Wal Replay: Get database failed {}", db_status.message());
+        UnrecoverableError(error_message);
+    }
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
         UnrecoverableError(error_message);
     }
+
+    SharedPtr<TableEntry> new_table_entry = table_entry->Clone();
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
-    auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
-    table_entry->DropColumns(cmd.column_names_, txn_store);
+    auto *txn_table_store = fake_txn->GetTxnTableStore(table_entry);
+    new_table_entry->DropColumns(cmd.column_names_, txn_table_store);
+    new_table_entry->commit_ts_ = commit_ts;
+    db_entry->CreateTableReplay(
+        table_entry->GetTableName(),
+        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) { return new_table_entry; },
+        txn_id,
+        commit_ts);
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

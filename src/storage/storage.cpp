@@ -172,12 +172,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
                 compact_processor_->Start();
-
-                auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
-                auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true);
-                bg_processor_->Submit(force_ckp_task);
-                force_ckp_task->Wait();
-                txn_mgr_->CommitTxn(txn);
             }
 
             if (periodic_trigger_thread_ != nullptr) {
@@ -205,6 +199,14 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             periodic_trigger_thread_->cleanup_trigger_ =
                 MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
             bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+
+            if (target_mode == StorageMode::kWritable) {
+                auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
+                auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
+                bg_processor_->Submit(force_ckp_task);
+                force_ckp_task->Wait();
+                txn_mgr_->CommitTxn(txn);
+            }
 
             periodic_trigger_thread_->Start();
             break;
@@ -257,12 +259,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
                 compact_processor_->Start();
-
-                auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
-                auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true);
-                bg_processor_->Submit(force_ckp_task);
-                force_ckp_task->Wait();
-                txn_mgr_->CommitTxn(txn);
 
                 periodic_trigger_thread_->Stop();
                 i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
