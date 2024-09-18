@@ -118,12 +118,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             RecoverableError(status);
 #endif
                         }
-                        case GlobalVariable::kCleanupTrace: {
-                            CleanupInfoTracer *tracer = query_context->storage()->cleanup_info_tracer();
-                            String error_msg = tracer->GetCleanupInfo();
-                            LOG_INFO(std::move(error_msg));
-                            return true;
-                        }
                         case GlobalVariable::kFollowerNum: {
                             i64 value_int = set_command->value_int();
                             if(value_int < 0) {

@@ -79,6 +79,7 @@ import persistence_manager;
 import global_resource_usage;
 import infinity_context;
 import peer_task;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -4005,6 +4006,12 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             }
             break;
         }
+        case GlobalVariable::kCleanupTrace: {
+            CleanupInfoTracer *tracer = query_context->storage()->cleanup_info_tracer();
+            String error_msg = tracer->GetCleanupInfo();
+            LOG_INFO(std::move(error_msg));
+            break;
+        }
         default: {
             operator_state->status_ = Status::NoSysVar(object_name_);
             RecoverableError(operator_state->status_);
@@ -4523,7 +4530,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     {
                         // option value
                         SizeT follower_count = InfinityContext::instance().cluster_manager()->GetFollowerNumber();
-                        Value value = Value::MakeBigInt(follower_count);
+                        Value value = Value::MakeVarchar(std::to_string(follower_count));
                         ValueExpression value_expr(value);
                         value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                     }
@@ -4534,6 +4541,12 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                         value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                     }
                 }
+                break;
+            }
+            case GlobalVariable::kCleanupTrace: {
+                CleanupInfoTracer *tracer = query_context->storage()->cleanup_info_tracer();
+                String error_msg = tracer->GetCleanupInfo();
+                LOG_INFO(std::move(error_msg));
                 break;
             }
             default: {
