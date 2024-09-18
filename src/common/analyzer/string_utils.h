@@ -71,7 +71,7 @@ inline void ToLower(const char *data, size_t len, char *out, size_t out_limit) {
     (*end) = '\0';
 }
 
-inline std::string ToLower(std::string const &s) {
+inline std::string ToLowerString(std::string const &s) {
     std::string result = s;
     char *begin = result.data();
     char *end = result.data() + s.size();
