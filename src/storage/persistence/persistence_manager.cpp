@@ -330,13 +330,17 @@ void PersistenceManager::PutObjCache(const String &file_path) {
         String error_message = fmt::format("Failed to find file_path: {} stored object", local_path);
         UnrecoverableError(error_message);
     }
-    assert(it->second.part_size_ != 0);
+    if (it->second.part_size_ == 0) {
+        UnrecoverableError(fmt::format("PutObjCache object {} part size is 0", it->second.obj_key_));
+    }
     auto oit = objects_.find(it->second.obj_key_);
     if (oit == objects_.end()) {
         return;
     }
 
-    assert(oit->second.ref_count_ > 0);
+    if (oit->second.ref_count_ <= 0) {
+        UnrecoverableError(fmt::format("PutObjCache object {} ref count is {}", it->second.obj_key_, oit->second.ref_count_));
+    }
     oit->second.ref_count_--;
 }
 
