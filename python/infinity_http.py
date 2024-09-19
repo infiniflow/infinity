@@ -25,6 +25,7 @@ class infinity_http:
 
     def disconnect(self):
         print("disconnect")
+        return database_result(error_code=ErrorCode.OK)
 
     def set_up_header(self, param=[], tp={}):
         header = {}
@@ -100,6 +101,14 @@ class infinity_http:
 
         logging.debug("----------------------------------------------")
         return
+
+    def get_database_result(self, resp, expect={}):
+        try:
+            self.raise_exception(resp, expect)
+            return database_result(error_code=ErrorCode.OK)
+        except InfinityException as e:
+            print(e)
+            return database_result(error_code=e.error_code)
 
     # database
     def create_database(self, db_name, opt=ConflictType.Error):
@@ -506,6 +515,28 @@ class infinity_http:
                 else:
                     message = message + res[k] + "\n"
         return message
+
+    def add_columns(self, columns_definition = {}):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
+        h = self.set_up_header(["accept", "content-type"])
+        fields = []
+        for col in columns_definition:
+            tmp = {"name": col}
+            for param_name in columns_definition[col]:
+                tmp[param_name.lower()] = columns_definition[col][param_name]
+            fields.append(tmp)
+        d = self.set_up_data([], {"fields": fields})
+        r = self.request(url, "put", h, d)
+        return self.get_database_result(r)
+
+    def drop_columns(self, column_name: list[str] | str):
+        if isinstance(column_name, str):
+            column_name = [column_name]
+        url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data([], {"column_names": column_name})
+        r = self.request(url, "delete", h, d)
+        return self.get_database_result(r)
 
     def output(
         self,

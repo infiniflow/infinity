@@ -43,7 +43,7 @@ protected:
         if (DoNext()) {
             token_ = tokenizer_.GetToken();
             len_ = tokenizer_.GetLength();
-            offset_ = local_offset_;
+            offset_ = get_char_offset_ ? tokenizer_.GetInputCursor() : local_offset_;
             local_offset_++;
             is_index_ = true;
             return true;

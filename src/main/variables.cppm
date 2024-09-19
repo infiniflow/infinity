@@ -45,6 +45,7 @@ export enum class GlobalVariable {
     kCPUUsage,                  // global
     kJeProf,                    // global
     kCleanupTrace,              // global
+    kFollowerNum,               // global
     kInvalid,
 };
 

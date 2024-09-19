@@ -128,6 +128,8 @@ TEST_F(StandardAnalyzerTest, test5) {
 TEST_F(StandardAnalyzerTest, test6) {
     StandardAnalyzer analyzer;
     analyzer.InitStemmer(STEM_LANG_ENGLISH);
+    analyzer.SetExtractEngStem(true);
+    analyzer.SetCharOffset(true);
     TermList term_list;
     Vector<String> queries = {
         R"#({{Redirect|Anarchist|the fictional character|Anarchist (comics)}} {{Redirect|Anarchists}} {{Anarchism sidebar}} {{Libertarianism sidebar}}  '''Anarchism''' is generally defined as the [[political philosophy]] which holds the [[state (polity)|state]] to be undesirable, unnecessary, and harmful,<ref name="definition"> {{Cite journal|last=Malatesta|first=Errico|title=Towards Anarchism|journal=MAN!|publisher=International Group of San Francisco|location=Los Angeles|oclc=3930443|url=http://www.marxists.org/archive/malatesta/1930s/xx/toanarchy.htm|authorlink=Errico Malatesta}} {{Cite journal|url=http://www.theglobeandmail.com/servlet/story/RTGAM.20070514.wxlanarchist14/BNStory/lifeWork/home/ |title=Working for The Man |journal=[[The Globe and Mail]] |accessdate=2008-04-14 |last=Agrell |first=Siri |date=2007-05-14}} {{cite web|url=http://www.britannica.com/eb/article-9117285|title=Anarchism|year=2006|work=Encyclopædia Britannica|publisher=Encyclopædia Britannica Premium Service|accessdate=2006-08-29| archiveurl=)#",
@@ -139,10 +141,10 @@ TEST_F(StandardAnalyzerTest, test6) {
     for (auto &query : queries) {
         TermList term_list;
         analyzer.Analyze(query, term_list);
-//        std::cout << "Text #" << query << "# parsed as:" << std::endl;
-//        for (unsigned i = 0; i < term_list.size(); ++i) {
-//            std::cout << "\t" << i << "#" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "#";
-//        }
-//        std::cout << std::endl;
+        // std::cout << "Text #" << query << "# parsed as:" << std::endl;
+        // for (unsigned i = 0; i < term_list.size(); ++i) {
+        //     std::cout << "\t" << i << "#" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "#";
+        // }
+        // std::cout << std::endl;
     }
 }

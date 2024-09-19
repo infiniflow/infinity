@@ -45,6 +45,7 @@ import logger;
 import table_entry;
 import txn;
 import cleanup_scanner;
+import infinity_context;
 
 namespace infinity {
 
@@ -117,10 +118,16 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             RecoverableError(status);
 #endif
                         }
-                        case GlobalVariable::kCleanupTrace: {
-                            CleanupInfoTracer *tracer = query_context->storage()->cleanup_info_tracer();
-                            String error_msg = tracer->GetCleanupInfo();
-                            LOG_INFO(std::move(error_msg));
+                        case GlobalVariable::kFollowerNum: {
+                            i64 value_int = set_command->value_int();
+                            if(value_int < 0) {
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set global variable: {} value as {}, which should >= 0", set_command->var_name(), value_int));
+                                RecoverableError(status);
+                            }
+                            Status status = InfinityContext::instance().cluster_manager()->SetFollowerNumber(value_int);
+                            if(!status.ok()) {
+                                RecoverableError(status);
+                            }
                             return true;
                         }
                         default: {

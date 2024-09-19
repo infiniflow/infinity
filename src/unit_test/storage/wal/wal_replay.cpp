@@ -774,8 +774,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 
             for (u64 i = 0; i < test_segment_n; ++i) {
                 auto segment = table_entry->GetSegmentByID(i, begin_ts);
-                EXPECT_NE(segment, nullptr);
-                EXPECT_EQ(segment->status(), SegmentStatus::kDeprecated);
+                EXPECT_EQ(segment, nullptr);
             }
             auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);

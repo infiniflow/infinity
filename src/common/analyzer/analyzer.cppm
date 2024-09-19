@@ -41,6 +41,8 @@ public:
         convert_to_placeholder_ = convert_to_placeholder;
     }
 
+    void SetCharOffset(bool set) { get_char_offset_ = set; }
+
     int Analyze(const Term &input, TermList &output) {
         void *array[2] = {&output, this};
         return AnalyzeImpl(input, &array, &Analyzer::AppendTermList);
@@ -84,5 +86,7 @@ protected:
     /// symbol in the result.
     /// Be effect only when extract_special_char_ is set.
     bool convert_to_placeholder_;
+
+    bool get_char_offset_{false};
 };
 } // namespace infinity

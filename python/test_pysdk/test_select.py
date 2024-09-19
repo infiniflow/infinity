@@ -33,12 +33,13 @@ def setup_class(request, local_infinity, http):
         globals()['ConflictType'] = func
         uri = common_values.TEST_LOCAL_PATH
         request.cls.infinity_obj = infinity_embedded.connect(uri)
+    elif http:
+        uri = common_values.TEST_LOCAL_HOST
+        request.cls.infinity_obj = infinity_http()
     else:
         uri = common_values.TEST_LOCAL_HOST
         request.cls.infinity_obj = infinity.connect(uri)
     request.cls.uri = uri
-    if http:
-        request.cls.infinity_obj = infinity_http()
     yield
     request.cls.infinity_obj.disconnect()
 

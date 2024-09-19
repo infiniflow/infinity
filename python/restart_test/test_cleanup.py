@@ -39,6 +39,7 @@ class TestCleanup:
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
         table_name = "test_cleanup"
+        table_name2 = "test2_cleanup"
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
@@ -46,7 +47,9 @@ class TestCleanup:
         def part1(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table(table_name, ConflictType.Ignore)
+            db_obj.drop_table(table_name2, ConflictType.Ignore)
             table_obj = db_obj.create_table(table_name, columns, ConflictType.Error)
+            table_obj2 = db_obj.create_table(table_name2, columns, ConflictType.Error)
 
             insert_n = 100
             data_gen = data_gen_factory(insert_n)
@@ -56,6 +59,7 @@ class TestCleanup:
                 for column_name, column_data in zip(columns.keys(), data):
                     data_line[column_name] = column_data
                 table_obj.insert([data_line])
+                table_obj2.insert([data_line])
 
             db_obj.drop_table(table_name, ConflictType.Error)
 
@@ -65,16 +69,14 @@ class TestCleanup:
             dropped_dirs = pathlib.Path(data_dir).rglob(f"*{table_name}*")
             assert len(list(dropped_dirs)) == 0
 
+            db_obj.drop_table(table_name2, ConflictType.Error)
+
         part1()
 
         @decorator
         def part2(infinity_obj):
-            db_obj = infinity_obj.get_database("default_db")
-            try:
-                table_obj = db_obj.get_table(table_name)
-                assert False
-            except infinity.InfinityException as e:
-                assert e.error_code == infinity.ErrorCode.TABLE_NOT_EXIST
+            dropped_dirs = pathlib.Path(data_dir).rglob(f"*{table_name2}*")
+            assert len(list(dropped_dirs)) == 0
 
         part2()
 
@@ -101,7 +103,7 @@ class TestCleanup:
         data_gen_factory,
     ):
         config = "test/data/config/restart_test/test_cleanup/1.toml"
-        data_dir = "var/infinity/data"
+        data_dir = "/var/infinity/data"
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
         table_name = "test_cleanup_index"
