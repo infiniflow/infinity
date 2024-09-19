@@ -320,7 +320,7 @@ ObjAddr PersistenceManager::GetObjCache(const String &file_path) {
 void PersistenceManager::PutObjCache(const String &file_path) {
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
-        String error_message = fmt::format("Failed to find local path of {}", local_path);
+        String error_message = fmt::format("Failed to find file path of {}", file_path);
         UnrecoverableError(error_message);
     }
 

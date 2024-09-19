@@ -106,9 +106,8 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 
 void FileWorker::ReadFromFile(bool from_spill) {
     LocalFileSystem fs;
-    String read_path;
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
-    read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+    String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
         obj_addr_ = persistence_manager_->GetObjCache(read_path);
         if (!obj_addr_.Valid()) {
@@ -134,7 +133,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
         file_handler_->Close();
         file_handler_ = nullptr;
         if (use_object_cache && obj_addr_.Valid()) {
-            read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+            String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
             persistence_manager_->PutObjCache(read_path);
         }
     });
