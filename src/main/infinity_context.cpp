@@ -286,6 +286,8 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
     Status status = Status::OK();
     if(target_role == NodeRole::kFollower or target_role == NodeRole::kLearner) {
         status = cluster_manager_->RegisterToLeader();
+    } else if (target_role == NodeRole::kLeader) {
+        cluster_manager_->CheckHeartBeat();
     }
     return status;
 }
