@@ -137,7 +137,7 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = fmt::format("Attempt to unregister from a non-leader node: {}", ToString(leader_node->node_role_));
+        response.error_message = fmt::format("Attempt to heatbeat from a non-leader node: {}", ToString(leader_node->node_role_));
     }
     return;
 }

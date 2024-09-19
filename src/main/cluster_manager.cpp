@@ -219,6 +219,39 @@ void ClusterManager::HeartBeatToLeader() {
     return;
 }
 
+void ClusterManager::CheckHeartBeat() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (this_node_->node_role_ != NodeRole::kLeader) {
+        String error_message = "Invalid node role.";
+        UnrecoverableError(error_message);
+    }
+    hb_periodic_thread_ = MakeShared<Thread>([this] { this->CheckHeartBeatInner(); });
+}
+
+void ClusterManager::CheckHeartBeatInner() {
+    auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval_);
+    while (true) {
+        std::unique_lock hb_lock(this->hb_mutex_);
+        this->hb_cv_.wait_for(hb_lock, hb_interval, [&] { return !this->hb_running_; });
+        if (!hb_running_) {
+            // UnInit cluster manager will set hb_running_ false;
+            break;
+        }
+
+        auto now = std::chrono::system_clock::now();
+        auto time_since_epoch = now.time_since_epoch();
+        this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+
+        for (auto &[node_name, node_info] : other_node_map_) {
+            if (node_info->node_status_ == NodeStatus::kAlive) {
+                if (node_info->last_update_ts_ + 2 * leader_node_->heartbeat_interval_ < this_node_->last_update_ts_) {
+                    node_info->node_status_ = NodeStatus::kTimeout;
+                }
+            }
+        }
+    }
+}
+
 Status ClusterManager::RegisterToLeaderNoLock() {
     // Register to leader;
     SharedPtr<RegisterPeerTask> register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
