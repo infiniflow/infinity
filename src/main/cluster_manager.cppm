@@ -40,8 +40,10 @@ public:
 public:
     Status RegisterToLeader();
     void HeartBeatToLeader();
+    void CheckHeartBeat();
 
 private:
+    void CheckHeartBeatInner();
     Status RegisterToLeaderNoLock();
     Status UnregisterFromLeaderNoLock();
     Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &server_ip, i64 server_port);
