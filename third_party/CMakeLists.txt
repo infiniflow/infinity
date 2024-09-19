@@ -77,3 +77,5 @@ add_subdirectory(ijma)
 add_subdirectory(opencc)
 
 add_subdirectory(minio-cpp)
+add_subdirectory(curlpp)
+add_subdirectory(pugixml)

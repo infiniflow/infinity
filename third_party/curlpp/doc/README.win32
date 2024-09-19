@@ -1,0 +1,238 @@
+Read the README file first.
+
+As of version 0.6.0 curlpp has been built and run on win32.
+
+Information contained in this file does not apply to cygwin builds.
+
+curlpp has been tested on 
+Microsoft Visual C++ 7.1 (2003), (by Giuseppe "Cowo" Corbelli)
+Microsoft Visual C++ 8.0 (2005), (by Andrei Korostelev)
+Microsoft Visual C++ 9.0 (2008), (by Piotr Dobrogost)
+but any modern C++ compiler should do the job.
+
+BUILDING CURLPP WITH MSVC
+-------------------------
+
+BUILDING CURLPP
+
+You can build curlpp in three different ways
+
+A. from within MS Visual Studio IDE
+B. using msbuild tool and solution files
+C. using namke and makefile
+
+
+A. and B.
+
+	In case of A. and B. first you have to create solution files for your version of MS Visual Studio.
+	To do this use win32\create-vc-solution.bat	batch file with one of the following parameters:
+	7.1, for Visual Studio 2003
+	8, for Visual Studio 2005
+	9, for Visual Studio 2008
+	This batch file needs sed to be run successfully. You can download sed for win32 platform here
+	http://gnuwin32.sourceforge.net/packages/sed.htm
+    
+
+A. Building from within IDE
+
+    Choosing configuration
+
+        Choose configuration you would like to build. What configuration you want depens on three aspects.
+        1. Weather you want to build dynamic library (dll) or static library (lib). 
+           Choose configuration with DynamicLib or StaticLib prefix.
+        2. Weather you want to build debug or release version of the library.
+           Choose configuration with Debug or Release infix.
+        3. Weather you want static runtime library (RTL) to be used by curlpp or dynamic one.
+           Choose configuration with StaticRTL or DynamicRTL suffix.
+       
+        Names' suffixes of output .lib and .dll files depend on the all three choices.
+
+        MTd - dynamic, debug, static RTL
+        MT -  dynamic, release, static RTL
+        MDd - dynamic, debug, dynamic RTL
+        MD -  dynamic, release, dynamic RTL
+		
+        staticMTd - static, debug, static RTL
+        staticMT -  static, release, static RTL
+        staticMDd - static, debug, dynamic RTL
+        staticMD -  static, release, dynamic RTL
+
+        We will refer to these suffixes and types of libraries as "build category" further in this document.
+
+    Setting include directory
+    
+        If you are building curlpp using the original directory structure then you don't need to set value of user macro 
+        CURLPP_INCLUDE_PATH (by default ".\include"). If however you modified the original directory structure you have
+        to set value of this macro to the path, where you have curlpp source files.
+		
+	Setting output directory
+	
+		The output files will be placed in a directory set in CURLPP_LIB_PATH user macro (by default ".out\lib").
+
+		
+B. Building using msbuild
+
+    Open a command prompt and change folder to the root of curlpp tree.
+
+    set LIBCURL_PATH=/where/curl/is/installed
+    set OPENSSL_PATH=/where/openssl/is/installed (only if you have libcurl with ssl support and ssl installed)
+    msbuild curlpp.sln /t:Rebuild /p:Configuration=<Configuration>
+        where <Configuration> is one of
+        - DynamicLibDebugDynamicRTL
+        - DynamicLibDebugStaticRTL
+        - DynamicLibReleaseDynamicRTL
+        - DynamicLibReleaseStaticRTL
+        - StaticLibDebugDynamicRTL
+        - StaticLibDebugStaticRTL
+        - StaticLibReleaseDynamicRTL
+        - StaticLibReleaseStaticRTL
+        
+    Output files will be placed in a directory set in CURLPP_LIB_PATH.
+    
+    Any of DynamicLib* configurations will build a .dll library file and a .lib library import file.
+    Any of StaticLib* configurations will build the .lib static (inline) library.
+	Any of *Debug* configurations will in addition build a .pdb Program Database file.
+
+	
+C. Building using nmake
+
+	Open a command prompt and change folder to the root of curlpp tree.
+	Run nmake /f makefile with the following parameters
+	BUILD_CFG=[dynamic|static]-[debug|release]
+	RTLIB_CFG=[dynamic|static]-[debug|release]
+	LIBCURL_CFG=[dynamic|static]-[debug|release]
+
+	All options are optional.
+	Default for BUILD_CFG is dynamic-release.
+	Default for others is the value of BUILD_CFG.
+	Edit the LIBCURL_PATH or set LIBCURL_PATH envvar!
+
+
+NOTES
+    
+    Linking with libcurl
+    
+    All versions of this library need libcurl (c library) include files to compile and lib file to link successfully.
+    To build curlpp you first have to set value of LIBCURL_PATH user macro to your installation of libcurl.
+    This macro is used in the project file for VC9 to find include and lib files of libcurl.
+    Steps to set user macro. Select View/Property Manager, double-click curlpp property sheet, go to
+    Common Properties/User Macros/, double-click name of macro you want to modify, modify it and click OK.
+    Filename of libcurl's lib file should be in the form libcurlX.lib where X denotes build category chosen for curlpp.
+    (see Linking with RTL)
+    If it has different name you have to change .lib filename in
+    Project properties\Librarian\Additional Dependencies (when building static library)
+    or
+    Project properties\Linker\Input\Additional Dependencies (when building dynamic library).
+    
+
+    Linking with static libcurl
+    
+    If you are not going to use libcurl as a dll and you would like to include it into your library/executable by
+    linking to static version of libcurl you have to define preprocessor symbol CURL_STATICLIB. You can do it in
+    Project/Properties/C/C++/Preprocessor/Preprocessor Definitions.
+    By default all StaticLib* configurations define this symbol. If for some reason you would like to build static
+    curlpp library which links do dynamic libcurl library you have to remove CURL_STATICLIB define.
+
+    
+    Linking with RTL
+    
+    You have to link with libcurl which uses RTL in the same way as you are going to use RTL in curlpp lib.
+    Refering to build categories defined earlier in section "Choosing configuration" both libcurl and curlpp
+    must have the same build category.
+    If you are going to use dynamic RTL in curlpp (MD[x]), use libcurl which also uses dynamic RTL (MD[x]).
+    If you are going to use static RTL in curlpp (MT[x]), use libcurl which also uses static RTL (MT[x]).
+    You can use debug build of libcurl (MDd or MTd) in the release build of curlpp (MD or MT) and
+    you can use release build of libcurl (MD or MT) in the debug build of curlpp (MDd or MTd).
+    However you shouldn't do this.
+
+	Building self-contained version of the library
+	
+	curlpp is mostly a template library. For this reason during build of it, only non template entities are placed in the
+	.lib and .dll files. Most of the library's features used in your application causes code generation during compilation
+	of _your project_ and the code is placed in your executable. This is often not desirable. If you want to build 
+	the curlpp as self-contained library (one which has all code called by clients in its .lib and .dll files) you can
+	define preprocesor symbol CURL_SELF_CONTAINED. In this case curlpp uses explicit template instantiation (all such
+	instantiantions are placed in separte .ins files) to force generating code into .lib and .dll files. You have to
+	define this preprocesor symbol during build of your application to avoid including templates' definitions as they
+	are not needed in this phase. If you get linker errors connected with curlpp features when using self-contained 
+	version of the library it's because there are some missing explicit instantiantions. Please let us know if it happens.
+
+    
+    Using curlpp in .NET applications 
+    
+    If you are going to use curlpp library in a .NET project you have to use dynamic RTL.
+    This is because all .NET applications must use dynamic RTL and if your application uses curlpp,
+    the library itself has to use dynamic RTL as well.
+
+    
+    Additional dependencies
+    
+    To build examples (and your project as well) you need the following Windows lib files to link successfully
+    WSock32.lib, Wldap32.lib
+    These files comes with WindowsSDK. Macro $(WIN_SDK_DIR) (by default $(WindowsSdkDir)) is used in the properties
+	sheet file curlpp.examples.VC9.vsprops by VC9 solution to find these libraries.
+
+    
+    Linking with OpenSSL
+    
+    If you have libcurl compiled with OpenSSL support and want to have support for OpenSSL in curlpp as well
+    you have to set value of OPENSSL_PATH user macro to your installation of OpenSSL before building curlpp.
+    This variable is used in the project file for VC9 to find include and lib files of OpenSSL.
+    Steps to set user macro. Select View/Property Manager, double-click curlpp property sheet, go to
+    Common Properties/User Macros/, double-click name of macro you want to modify, modify it and click OK.
+    You have to link with OpenSSL which uses RTL in the same way as you are going to use RTL in curlpp lib.
+    Refering to build categories defined earlier in section "Choosing configuration" both OpenSSL and curlpp
+    must have the same build category.
+    Filenames of OpenSSL lib files should be in the form libeay32X.lib and ssleay32X.lib, where X denotes
+    build category chosen for curlpp. You have to add both this filenames to
+    Project properties\Librarian\Additional Dependencies (when building static library)
+    or
+    Project properties\Linker\Input\Additional Dependencies (when building dynamic library).
+
+    If you need OpenSSL for Windows platform take a look at http://www.slproweb.com/products/Win32OpenSSL.html
+    If you installed OpenSSL downloaded from the above link you'll find .lib files of all four build categories
+    in the /lib/vc directory.
+    
+    
+    Building with support for Boost
+    
+    curlpp has ability to use some features from the Boost library. If you want to build curlpp with support for Boost
+    you have to set value of BOOST_PATH user macro to your installation of Boost before building curlpp.
+    This variable is used in the project file for VC9 to find include files of Boost.
+    You also have to define preprocessor symbol HAVE_BOOST. You can do it in
+    Project/Properties/C/C++/Preprocessor/Preprocessor Definitions.
+	
+
+    Project propery sheets
+    
+    All user macros like LIBCURL_PATH, OPENSSL_PATH, BOOST_PATH, CURLPP_INCLUDE_PATH, CURLPP_LIB_PATH, WIN_SDK_DIR,
+	CURLPP_EXAMPLES_OUT_DIR, etc. 
+	are defined in project property sheet files named 
+	curlpp.common.vsprops   - options and macros used during build of library itself and during build of examples
+	curlpp.lib.vsprops      - options and macros used during build of library itself
+	curlpp.examples.vsprops - options and macros used during build of examples
+	
+
+	Compiler warnings
+	
+	There are a few kinds of compiler warnings which we haven't managed to remove.
+	
+	warning C4251: class X needs to have dll-interface to be used by clients of class Y
+	warning C4275: non dll-interface class X used as base for dll-interface class Y
+	warning C4512: X : assignment operator could not be generated
+	warning C4661: methodX : no suitable definition provided for explicit template instantiation request
+
+	
+BUILDING CURLPP EXAMPLES
+
+Your can either build the examples from MS Visual Studio IDE or from the command line from within examples folder:
+
+    nmake -f Makefile.msvc all
+      or    
+    nmake -f Makefile.msvc exampleXY
+      to build example XY
+
+
+Giuseppe "Cowo" Corbelli, cowo at lugbs dot linux dot it
+Andrei Korostelev, andrei at korostelev dot net
+Piotr Dobrogost, pd.curlpp.org (November 2008 - March 2009)

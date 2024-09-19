@@ -1,0 +1,91 @@
+#! /bin/sh
+#
+# The idea to this kind of setup info script was stolen from numerous
+# other packages, such as neon, libxml and gnome.
+#
+# $Id: curlpp-config.in,v 1.4 2004/10/05 01:48:40 jpbl Exp $
+#
+prefix=@prefix@
+includedir=@includedir@
+
+usage()
+{
+    cat <<EOF
+Usage: curlpp-config [OPTION]
+
+Available values for OPTION include:
+
+  --cc        compiler
+  --cflags    pre-processor and compiler flags
+  --feature   newline separated list of enabled features
+  --help      display this help and exit
+  --libs      library linking information
+  --prefix    curl install prefix
+  --version   output version information
+  --vernum    output the version information as a number (hexadecimal)
+EOF
+
+    exit $1
+}
+
+if test $# -eq 0; then
+    usage 1
+fi
+
+while test $# -gt 0; do
+    case "$1" in
+    # this deals with options in the style
+    # --option=value and extracts the value part
+    # [not currently used]
+    -*=*) value=`echo "$1" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+    *) value= ;;
+    esac
+
+    case "$1" in
+    --cc)
+	echo @CC@
+	;;
+
+    --prefix)
+	echo $prefix
+	;;
+
+    --feature)
+	curl-config --feature
+        ;;
+
+    --version)
+	echo libcurlpp @CURLPP_VERSION@
+	exit 0
+	;;
+
+    --vernum)
+	echo @CURLPP_VERSION_NUM@
+	exit 0
+	;;
+
+    --help)
+	usage 0
+	;;
+
+    --cflags)
+       	echo -I@includedir@ @CURLPP_CXXFLAGS@ `curl-config --cflags`
+       	;;
+
+    --libs)
+       	echo -L@libdir@ @LDFLAGS@ @LIBS@ `curl-config --libs` -lcurlpp
+       	;;
+    --static-libs)
+       	echo @libdir_static@/libcurlpp.@libext@ @LDFLAGS@ @LIBS@ `curl-config --static-libs`
+        ;;
+
+    *)
+        echo "unknown option: $1"
+	usage
+	exit 1
+	;;
+    esac
+    shift
+done
+
+exit 0

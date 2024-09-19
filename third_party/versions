@@ -17,3 +17,5 @@ eigen v3.4.0
 snappy v1.1.10
 croaring 4.1.2
 minio 40824d0872861b06965a032a714a8f4f9097fb32
+curlpp  0.8.1
+pugixml 1.14

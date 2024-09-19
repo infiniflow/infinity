@@ -1,0 +1,5 @@
+[requires]
+libcurl/7.50.3@lasote/stable
+
+[generators]
+cmake

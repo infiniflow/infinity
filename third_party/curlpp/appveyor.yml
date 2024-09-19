@@ -1,0 +1,45 @@
+version: '0.7.4.{build}'
+
+environment:
+    matrix:
+      - PRJ_GEN: "Visual Studio 11 2012 Win64"
+        BDIR: msvc2012
+        PRJ_CFG: Release
+        PRJ_GEN_VERSION: 11
+      - PRJ_GEN: "Visual Studio 12 2013 Win64"
+        BDIR: msvc2013
+        PRJ_CFG: Release
+        PRJ_GEN_VERSION: 12
+      - PRJ_GEN: "Visual Studio 14 2015 Win64"
+        BDIR: msvc2015
+        PRJ_CFG: Release
+        PRJ_GEN_VERSION: 14
+      - PRJ_GEN: "Visual Studio 11 2012 Win64"
+        BDIR: msvc2012
+        PRJ_CFG: Debug
+        PRJ_GEN_VERSION: 11
+      - PRJ_GEN: "Visual Studio 12 2013 Win64"
+        BDIR: msvc2013
+        PRJ_CFG: Debug
+        PRJ_GEN_VERSION: 12
+      - PRJ_GEN: "Visual Studio 14 2015 Win64"
+        BDIR: msvc2015
+        PRJ_CFG: Debug
+        PRJ_GEN_VERSION: 14
+
+install:
+      - cmd: echo "Downloading conan..."
+      - cmd: set PATH=%PATH%;%PYTHON%/Scripts/
+      - cmd: pip.exe install conan
+      - cmd: conan user # Create the conan data directory
+      - cmd: conan --version
+
+build_script:
+    - mkdir build.%BDIR%
+    - IF %PRJ_GEN_VERSION% == 11 call "C:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\Tools\vsvars32.bat"
+    - conan install --build=missing -s compiler="Visual Studio" -s compiler.version=%PRJ_GEN_VERSION% -s build_type=%PRJ_CFG% .
+    - cd build.%BDIR%
+    - cmake .. -G"%PRJ_GEN%"
+    - cmake --build . --config %PRJ_CFG% --clean-first
+
+
