@@ -109,10 +109,7 @@ jobs:
         if: ${{ !cancelled() && failure() }}
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
-          if [ ! -f /var/infinity/log/infinity.log ]; then
-            echo "Error: /var/infinity/log/infinity.log not found"
-          fi
-          (cat debug.log 2>/dev/null; cat /var/infinity/log/infinity.log 2>/dev/null) || true
+          python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --output_path=debug.log
 
       - name: Start infinity debug version with vfs off
         if: ${{ !cancelled() && !failure() }}
@@ -139,10 +136,7 @@ jobs:
         if: ${{ !cancelled() && failure() }}
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
-          if [ ! -f /var/infinity/log/infinity.log ]; then
-            echo "Error: /var/infinity/log/infinity.log not found"
-          fi
-          (cat vfs_debug.log 2>/dev/null; cat /var/infinity/log/infinity.log 2>/dev/null) || true
+          python scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --output_path=vfs_debug.log
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -256,10 +250,7 @@ jobs:
         if: ${{ !cancelled() && failure() }} # always run this step even if previous steps failed
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
         run: |
-          if [ ! -f /var/infinity/log/infinity.log ]; then
-            echo "Error: /var/infinity/log/infinity.log not found"
-          fi
-          (cat release.log 2>/dev/null; cat /var/infinity/log/infinity.log 2>/dev/null) || true
+          python scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --output_path=release.log
 
       - name: Start infinity release version with vfs off
         if: ${{ !cancelled() && !failure() }}
@@ -286,10 +277,7 @@ jobs:
         if: ${{ !cancelled() && failure() }} # always run this step even if previous steps failed
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
-          if [ ! -f /var/infinity/log/infinity.log ]; then
-            echo "Error: /var/infinity/log/infinity.log not found"
-          fi
-          (cat vfs_release.log 2>/dev/null; cat /var/infinity/log/infinity.log 2>/dev/null) || true
+          python scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --output_path=vfs_release.log
     
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}

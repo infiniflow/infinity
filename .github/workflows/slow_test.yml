@@ -78,10 +78,7 @@ jobs:
       - name: Collect infinity release output
         if: ${{ !cancelled()  && failure() }} # always run this step even if previous steps failed
         run: |
-          if [ ! -f /var/infinity/log/infinity.log ]; then
-            echo "Error: /var/infinity/log/infinity.log not found"
-          fi
-          (cat release.log 2>/dev/null; cat /var/infinity/log/infinity.log 2>/dev/null) || true
+          python scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --output_path=release.log
 
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}
