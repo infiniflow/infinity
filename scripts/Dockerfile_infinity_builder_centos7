@@ -172,7 +172,8 @@ RUN ~/miniconda3/bin/conda init bash && source ~/.bashrc \
     && pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.pku.edu.cn" && pip3 config set global.extra-index-url "https://mirrors.pku.edu.cn/pypi/web/simple"
 
 # Install tools for building and uploading a python wheel.
-RUN ~/miniconda3/bin/conda init bash && source ~/.bashrc \
+RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt \
+    ~/miniconda3/bin/conda init bash && source ~/.bashrc \
     && conda activate venv3.10 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt && conda deactivate
 
 # https://github.com/llvm/llvm-project/issues/96210
