@@ -172,16 +172,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
                 compact_processor_->Start();
-<<<<<<< HEAD
-
-                auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
-                auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true);
-                bg_processor_->Submit(force_ckp_task);
-                force_ckp_task->Wait();
-                txn->SetReaderAllowed(true);
-                txn_mgr_->CommitTxn(txn);
-=======
->>>>>>> upstream/main
             }
 
             if (periodic_trigger_thread_ != nullptr) {
