@@ -147,7 +147,7 @@ RUN yum -y install perl-IPC-Cmd && yum clean all
 # OpenSSL
 RUN --mount=type=bind,source=openssl-3.4.0-alpha1.tar.gz,target=/root/openssl-3.4.0-alpha1.tar.gz  \
     cd /root && tar xzf openssl-3.4.0-alpha1.tar.gz \
-    && cd openssl-3.4.0-alpha1 && ./config --prefix=/usr/local/openssl --openssldir=/usr/local/openssl shared \
+    && cd openssl-3.4.0-alpha1 && ./config \
     && make -j 8 && make install \
     && ldconfig && cd /root && rm -rf openssl-3.4.0-alpha1
 
