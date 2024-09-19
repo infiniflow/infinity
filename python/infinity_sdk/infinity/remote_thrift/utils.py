@@ -49,7 +49,7 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
         parsed_expr.type = parser_expr_type
 
         return parsed_expr
-    elif isinstance(cons, exp.Not):
+    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.In) == False:
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
         function_expr.function_name = "not"
@@ -181,6 +181,37 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             arguments=arguments
         )
         expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+        parsed_expr = ttypes.ParsedExpr(type=expr_type)
+        return parsed_expr
+    # in
+    elif isinstance(cons, exp.In):
+        left_operand = parse_expr(cons.args['this'])
+        arguments = []
+        for arg in cons.args['expressions'] :
+            if arg :
+                arguments.append(parse_expr(arg))
+        in_expr = ttypes.InExpr(
+            left_operand = left_operand,
+            arguments = arguments,
+            in_type = True
+        )
+        expr_type = ttypes.ParsedExprType(in_expr=in_expr)
+        parsed_expr = ttypes.ParsedExpr(type=expr_type)
+        return parsed_expr
+    # not in
+    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.In):
+        raw_in = cons.this
+        left_operand = parse_expr(raw_in.args['this'])
+        arguments = []
+        for arg in raw_in.args['expressions'] :
+            if arg :
+                arguments.append(parse_expr(arg))
+        in_expr = ttypes.InExpr(
+            left_operand = left_operand,
+            arguments = arguments,
+            in_type = False
+        )
+        expr_type = ttypes.ParsedExprType(in_expr=in_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
         return parsed_expr
     else:

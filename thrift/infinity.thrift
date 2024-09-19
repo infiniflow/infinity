@@ -123,6 +123,7 @@ union ParsedExprType {
 8: MatchExpr  & match_expr,
 9: FusionExpr & fusion_expr,
 10: SearchExpr & search_expr,
+11 : InExpr & in_expr,
 }
 
 struct ParsedExpr {
@@ -248,6 +249,12 @@ struct UpdateExpr {
 struct OrderByExpr {
 1: ParsedExpr expr,
 2: bool asc,
+}
+
+struct InExpr {
+1: ParsedExpr left_operand,
+2: list<ParsedExpr> arguments,
+3: bool in_type,
 }
 
 struct ColumnDef {

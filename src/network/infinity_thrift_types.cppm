@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module ;
+module;
 
 #include "infinity_thrift/InfinityService.h"
 
@@ -73,6 +73,7 @@ export using infinity_thrift_rpc::ElementType;
 export using infinity_thrift_rpc::IndexType;
 export using infinity_thrift_rpc::ConstantExpr;
 export using infinity_thrift_rpc::ColumnExpr;
+export using infinity_thrift_rpc::InExpr;
 export using infinity_thrift_rpc::FunctionExpr;
 export using infinity_thrift_rpc::KnnExpr;
 export using infinity_thrift_rpc::MatchSparseExpr;
@@ -100,7 +101,4 @@ export using infinity_thrift_rpc::InfinityServiceProcessorFactory;
 export using infinity_thrift_rpc::InfinityServiceProcessor;
 export using infinity_thrift_rpc::OptimizeOptions;
 export using infinity_thrift_rpc::InitParameter;
-}
-
-
-
+} // namespace infinity_thrift_rpc
