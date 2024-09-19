@@ -78,7 +78,7 @@ jobs:
       - name: Collect infinity release output
         if: ${{ !cancelled()  && failure() }} # always run this step even if previous steps failed
         run: |
-          python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=release.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
+          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=release.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
 
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}

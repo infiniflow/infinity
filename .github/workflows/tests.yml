@@ -109,7 +109,7 @@ jobs:
         if: ${{ !cancelled() && failure() }}
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
-          python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=debug.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
+          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=debug.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
 
       - name: Start infinity debug version with vfs off
         if: ${{ !cancelled() && !failure() }}
@@ -136,7 +136,7 @@ jobs:
         if: ${{ !cancelled() && failure() }}
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
-          python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=vfs_debug.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
+          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=vfs_debug.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -250,7 +250,7 @@ jobs:
         if: ${{ !cancelled() && failure() }} # always run this step even if previous steps failed
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
         run: |
-          python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=release.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
+          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=release.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
 
       - name: Start infinity release version with vfs off
         if: ${{ !cancelled() && !failure() }}
@@ -277,7 +277,7 @@ jobs:
         if: ${{ !cancelled() && failure() }} # always run this step even if previous steps failed
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
-          python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=vfs_release.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
+          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=vfs_release.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
     
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
