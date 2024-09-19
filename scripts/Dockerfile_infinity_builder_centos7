@@ -159,19 +159,21 @@ RUN yum install -y gdbm-devel sqlite-devel xz-devel libffi-devel libuuid-devel b
 
 # We need build a wheel for each supported Python minor version. Refers to https://github.com/wjakob/nanobind/pull/561.
 # Install Miniconda
-Run cd /root && mkdir -p ~/miniconda3 && bash /root/Miniconda3-latest-Linux-x86_64.sh -b -u -p ~/miniconda3 \
-&& ~/miniconda3/bin/conda init bash && ~/miniconda3/bin/conda init zsh \
-&& source ~/.bashrc && cd /root
+RUN --mount=type=bind,source=Miniconda3-latest-Linux-x86_64.sh,target=/root/Miniconda3-latest-Linux-x86_64.sh \
+    cd /root && mkdir -p ~/miniconda3 && bash /root/Miniconda3-latest-Linux-x86_64.sh -b -u -p ~/miniconda3 \
+    && ~/miniconda3/bin/conda init bash && ~/miniconda3/bin/conda init zsh \
+    && source ~/.bashrc && cd /root
 
 # Create venv
-Run conda create -n venv3.10 python=3.10 -y && conda create -n venv3.11 python=3.11 -y && conda create -n venv3.12 python=3.12 -y
+Run ~/miniconda3/bin/conda init bash && source ~/.bashrc \
+    && conda create -n venv3.10 python=3.10 -y && conda create -n venv3.11 python=3.11 -y && conda create -n venv3.12 python=3.12 -y
 
-RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.pku.edu.cn" && pip3 config set global.extra-index-url "https://mirrors.pku.edu.cn/pypi/web/simple"
+RUN ~/miniconda3/bin/conda init bash && source ~/.bashrc \
+    && pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.pku.edu.cn" && pip3 config set global.extra-index-url "https://mirrors.pku.edu.cn/pypi/web/simple"
 
 # Install tools for building and uploading a python wheel.
-Run conda activate venv3.10 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt && conda deactivate
-Run conda activate venv3.11 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt && conda deactivate
-Run conda activate venv3.12 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt && conda deactivate
+RUN ~/miniconda3/bin/conda init bash && source ~/.bashrc \
+    && conda activate venv3.10 && pip3 install wheel auditwheel patchelf twine && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt && conda deactivate
 
 # https://github.com/llvm/llvm-project/issues/96210
 # https://github.com/llvm/llvm-project/issues/57276
@@ -187,30 +189,9 @@ RUN --mount=type=bind,source=thrift-0.20.0.tar.gz,target=/root/thrift-0.20.0.tar
 # Install curl 8.4.0
 RUN --mount=type=bind,source=curl-8.4.0.tar.gz,target=/root/curl-8.4.0.tar.gz  \
     cd /root && tar xzf curl-8.4.0.tar.gz \
-    && cd curl-8.4.0 && ./configure --with-openssl --disable-shared --without-libpsl \
+    && cd curl-8.4.0 && ./configure --with-openssl --without-libpsl \
     && make -j 8 && make install \
     && cd /root && rm -rf curl-8.4.0
-
-# Install curlpp 0.8.1
-RUN --mount=type=bind,source=v0.8.1.tar.gz,target=/root/v0.8.1.tar.gz  \
-    cd /root && tar xzf v0.8.1.tar.gz \
-    && cd curlpp-0.8.1 && mkdir build && cd build \
-    && cmake .. && cmake --build . && cmake --install . \
-    && cd /root && rm -rf curlpp-0.8.1
-
-# Install pugixml 1.14
-RUN --mount=type=bind,source=pugixml-1.14.tar.gz,target=/root/pugixml-1.14.tar.gz  \
-    cd /root && tar xzf pugixml-1.14.tar.gz \
-    && cd pugixml-1.14 && mkdir build && cd build \
-    && cmake .. && cmake --build . && cmake --install . \
-    && cd /root && rm -rf pugixml-1.14
-
-# Install inih r58
-RUN --mount=type=bind,source=r58.tar.gz,target=/root/r58.tar.gz  \
-    cd /root && tar xzf r58.tar.gz \
-    && cd inih-r58 && pip install meson \
-    && mkdir build && cd build && meson setup --prefix=/usr --buildtype=release .. && ninja && ninja install \
-    && cd /root && rm -rf inih-r58
 
 RUN yum -y install expat-static\
     && yum clean all

@@ -276,6 +276,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/minio-cpp/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp/include")
 
 if (NOT SUPPORT_FMA EQUAL 0)
     message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -507,7 +508,7 @@ add_executable(unit_test
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
+add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih)
 
 target_link_libraries(unit_test
         gtest

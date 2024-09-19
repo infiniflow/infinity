@@ -123,6 +123,9 @@ target_include_directories(miniocpp PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_include_directories(miniocpp PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
+target_include_directories(miniocpp PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp/include")
+target_include_directories(miniocpp PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pugixml/src/")
+target_include_directories(miniocpp PUBLIC "${CMAKE_SOURCE_DIR}/third_party/inih/cpp/")
 target_link_libraries(miniocpp PUBLIC ${MINIO_CPP_LIBS})
 set_target_properties(miniocpp PROPERTIES VERSION "${MINIO_CPP_VERSION_STRING}")
 set_target_properties(miniocpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
