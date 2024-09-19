@@ -507,7 +507,7 @@ add_executable(unit_test
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp miniocpp)
+add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih)
 
 target_link_libraries(unit_test
         gtest
@@ -534,6 +534,10 @@ target_link_libraries(unit_test
         thriftnb.a
         event.a
         miniocpp.a
+        pugixml-static
+        curlpp_static
+        crypto.a
+        inih.a
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -541,6 +545,9 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 target_sources(unit_test
         PRIVATE

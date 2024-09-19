@@ -1,0 +1,8 @@
+// CFG(section, name, default)
+
+CFG(protocol, version, "0")
+
+CFG(user, name, "Fatty Lumpkin")
+CFG(user, email, "fatty@lumpkin.com")
+
+#undef CFG

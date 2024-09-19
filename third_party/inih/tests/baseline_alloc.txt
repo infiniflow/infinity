@@ -1,0 +1,7 @@
+ini_malloc(12)
+... [section]
+... foo=bar;
+ini_realloc(24)
+... bazz=buzz quxx;
+ini_free()
+basic: e=0

@@ -1,0 +1,22 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Run Diff Tests
+      run: |
+        cd tests
+        ./unittest.sh
+        cd ../examples
+        ./cpptest.sh
+        git diff --exit-code
