@@ -202,7 +202,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
             if (target_mode == StorageMode::kWritable) {
                 auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
-                auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true);
+                auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
                 bg_processor_->Submit(force_ckp_task);
                 force_ckp_task->Wait();
                 txn->SetReaderAllowed(true);
