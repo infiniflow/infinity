@@ -47,7 +47,7 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/conanbuildinfo.cmake)
 endif()
 
 # extra (pkg-config-related files)
-add_subdirectory(extras)
+#add_subdirectory(extras)
 
 #########################################################################################
 # Look for dependencies
