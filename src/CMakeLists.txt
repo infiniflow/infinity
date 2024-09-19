@@ -507,7 +507,7 @@ add_executable(unit_test
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih)
+add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
 
 target_link_libraries(unit_test
         gtest
@@ -548,6 +548,7 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 
 target_sources(unit_test
