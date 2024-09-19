@@ -538,6 +538,7 @@ target_link_libraries(unit_test
         curlpp_static
         crypto.a
         inih.a
+        curl.so
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")

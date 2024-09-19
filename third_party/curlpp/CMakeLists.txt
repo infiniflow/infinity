@@ -77,10 +77,6 @@ include_directories(
 # Define Targets
 
 # If building on windows, install path will be in build/winbuild
-if(CMAKE_SYSTEM MATCHES "Windows")
-   set(CMAKE_INSTALL_PREFIX "winbuild")
-endif()
-
 file(GLOB_RECURSE HeaderFileList "${CMAKE_CURRENT_SOURCE_DIR}/include/*")
 file(GLOB_RECURSE SourceFileList "${CMAKE_CURRENT_SOURCE_DIR}/src/*")
 add_library(${PROJECT_NAME} SHARED ${HeaderFileList} ${SourceFileList})
@@ -100,7 +96,7 @@ SET_TARGET_PROPERTIES(${PROJECT_NAME}_static PROPERTIES OUTPUT_NAME ${PROJECT_NA
 # This conflicts with the "curlpp.lib" import library corresponding to "curlpp.dll",
 # so we add a "lib" prefix (which is default on other platforms anyway):
 SET_TARGET_PROPERTIES(${PROJECT_NAME}_static PROPERTIES PREFIX "lib")
-target_link_libraries(${PROJECT_NAME}_static ${CURL_LIBRARIES} ${CONAN_LIBS})
+#target_link_libraries(${PROJECT_NAME}_static ${CURL_LIBRARIES} ${CONAN_LIBS})
 
 # install headers
 install(DIRECTORY include/utilspp/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/utilspp")
