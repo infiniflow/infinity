@@ -556,6 +556,7 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixm
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(unit_test PUBLIC "/usr/local/openssl30/lib64")
 
 target_sources(unit_test
         PRIVATE

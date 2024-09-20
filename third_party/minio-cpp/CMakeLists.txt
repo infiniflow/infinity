@@ -128,6 +128,7 @@ target_include_directories(miniocpp PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl
 target_include_directories(miniocpp PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pugixml/src")
 target_include_directories(miniocpp PUBLIC "${CMAKE_SOURCE_DIR}/third_party/inih")
 target_include_directories(miniocpp PUBLIC "${CMAKE_SOURCE_DIR}/third_party/inih/cpp")
+target_include_directories(miniocpp PUBLIC "/usr/local/openssl30/include")
 target_link_libraries(miniocpp PUBLIC ${MINIO_CPP_LIBS})
 set_target_properties(miniocpp PROPERTIES VERSION "${MINIO_CPP_VERSION_STRING}")
 set_target_properties(miniocpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
