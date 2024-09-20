@@ -29,9 +29,13 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.index")
+        globals()["index"] = module
         module = importlib.import_module("infinity_embedded.common")
         func = getattr(module, 'ConflictType')
         globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
         uri = common_values.TEST_LOCAL_PATH
         request.cls.infinity_obj = infinity_embedded.connect(uri)
     elif http:
