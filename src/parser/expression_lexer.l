@@ -32,6 +32,7 @@ AND             { return AND; }
 AS              { return AS; }
 BETWEEN         { return BETWEEN; }
 FALSE           { return FALSE; }
+IN              { return IN; }
 IS              { return IS; }
 LIKE            { return LIKE; }
 NOT             { return NOT; }
