@@ -181,7 +181,7 @@ void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeS
                 // Save index file.
                 segment_index_entry->SaveIndexFile();
             }
-            segment_index_entry->Commit(commit_ts);
+            segment_index_entry->CommitIndex(commit_ts);
         }
         if (!Committed()) {
             commit_ts_.store(commit_ts);
@@ -319,12 +319,20 @@ SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *seg
     segment_index_entry->PopulateEntirely(segment_entry, txn, config);
     std::unique_lock w_lock(rw_locker_);
     index_by_segment_.emplace(segment_id, segment_index_entry);
+
+    TxnStore *txn_store = txn->txn_store();
+    TxnTableStore *txn_table_store = txn_store->GetTxnTableStore(table_index_meta()->GetTableEntry());
+    txn_table_store->AddSegmentIndexesStore(this, {segment_index_entry.get()});
+
     return segment_index_entry;
 }
 
 Tuple<Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     TableEntry *table_entry = table_ref->table_entry_ptr_;
+    TxnStore *txn_store = txn->txn_store();
+    TxnTableStore *txn_table_store = txn_store->GetTxnTableStore(table_entry);
+
     auto &block_index = table_ref->block_index_;
     if (table_ref->index_index_.get() == nullptr) {
         table_ref->index_index_ = MakeShared<IndexIndex>();
@@ -346,6 +354,7 @@ TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prep
         if (unsealed_id == segment_id) {
             last_segment_ = segment_index_entry;
         }
+        txn_table_store->AddSegmentIndexesStore(this, {segment_index_entry.get()});
     }
     return {segment_index_entries, Status::OK()};
 }

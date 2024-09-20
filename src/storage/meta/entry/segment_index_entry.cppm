@@ -105,6 +105,8 @@ public:
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
+    void CommitIndex(TxnTimeStamp commit_ts);
+
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) final;
 
     void PickCleanup(CleanupScanner *scanner) final;
