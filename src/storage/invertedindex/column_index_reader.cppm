@@ -82,6 +82,8 @@ public:
     // User shall call this function only once when all transactions using `GetIndexReader()` have finished.
     void Invalidate();
 
+    void InvalidateColumn(u64 column_id, const String &column_name);
+
 private:
     std::mutex mutex_;
     TableEntry *table_entry_ptr_ = nullptr;
