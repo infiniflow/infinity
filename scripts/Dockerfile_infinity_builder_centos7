@@ -134,7 +134,7 @@ RUN --mount=type=bind,source=jemalloc-5.3.0.tar.bz2,target=/root/jemalloc-5.3.0.
 # Install gperftools-2.15
 RUN --mount=type=bind,source=gperftools-2.15.tar.gz,target=/root/gperftools-2.15.tar.gz  \
     cd /root && tar xzf gperftools-2.15.tar.gz \
-    && cd gperftools-2.15 && ./configure && make -j 8 && make install \
+    && cd gperftools-2.15 && ./configure && make -j && make install \
     && ldconfig && cd /root && rm -rf gperftools-2.15
 
 # download https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.20.2/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz
@@ -147,8 +147,8 @@ RUN --mount=type=bind,source=sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.
 # This means installing to /usr/local/lib may break app compilation.
 RUN --mount=type=bind,source=openssl-1.1.1w.tar.gz,target=/root/openssl-1.1.1w.tar.gz  \
     cd /root && tar xzf openssl-1.1.1w.tar.gz \
-    && cd openssl-1.1.1w && ./config --prefix=/usr/local/openssl --openssldir=/usr/local/openssl shared \
-    && make -j 8 && make install \
+    && cd openssl-1.1.1w && ./config --prefix=/usr/local/openssl11 --openssldir=/usr/local/openssl11 shared \
+    && make -j && make install \
     && ldconfig && cd /root && rm -rf openssl-1.1.1w
 
 # packages need by python optional modules: _dbm _gdbm _lzma _sqlite3 _tkinter _uuid
@@ -161,27 +161,25 @@ RUN yum install -y gdbm-devel sqlite-devel xz-devel libffi-devel libuuid-devel b
 # Install Python 3.10
 RUN --mount=type=bind,source=Python-3.10.14.tar.xz,target=/root/Python-3.10.14.tar.xz  \
     cd /root && tar xJf Python-3.10.14.tar.xz \
-    && cd Python-3.10.14 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
+    && cd Python-3.10.14 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
     && ldconfig && cd /root && rm -rf Python-3.10.14
 
 # Install Python 3.11
 RUN --mount=type=bind,source=Python-3.11.9.tar.xz,target=/root/Python-3.11.9.tar.xz  \
 cd /root && tar xJf Python-3.11.9.tar.xz \
-&& cd Python-3.11.9 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
+&& cd Python-3.11.9 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
 && ldconfig && cd /root && rm -rf Python-3.11.9
 
 # Install Python 3.12
 RUN --mount=type=bind,source=Python-3.12.4.tar.xz,target=/root/Python-3.12.4.tar.xz  \
 cd /root && tar xJf Python-3.12.4.tar.xz \
-&& cd Python-3.12.4 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
+&& cd Python-3.12.4 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
 && ldconfig && cd /root && rm -rf Python-3.12.4
 
-RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.pku.edu.cn" && pip3 config set global.extra-index-url "https://mirrors.pku.edu.cn/pypi/web/simple"
+RUN /usr/local/bin/pip3.10 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && /usr/local/bin/pip3.10 config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.pku.edu.cn" && /usr/local/bin/pip3.10 config set global.extra-index-url "https://mirrors.pku.edu.cn/pypi/web/simple"
 
 # Install tools for building and uploading a python wheel.
 RUN /usr/local/bin/pip3.10 install wheel auditwheel patchelf twine
-RUN /usr/local/bin/pip3.11 install wheel auditwheel patchelf twine
-RUN /usr/local/bin/pip3.12 install wheel auditwheel patchelf twine
 
 # Create a python virtual environment for each python version. Set PATH so that the shell activate a virtual environment automatically when entering a container from this image.
 RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt /usr/local/bin/python3.10 -m venv /usr/local/venv310 && source /usr/local/venv310/bin/activate && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt
@@ -201,8 +199,14 @@ RUN --mount=type=bind,source=thrift-0.20.0.tar.gz,target=/root/thrift-0.20.0.tar
     && cp compiler/cpp/bin/thrift /usr/local/bin/thrift \
     && cd /root && rm -rf thrift-0.20.0
 
-RUN yum -y install expat-static\
+RUN yum -y install expat-static perl-core \
     && yum clean all
+
+RUN --mount=type=bind,source=openssl-3.0.15.tar.gz,target=/root/openssl-3.0.15.tar.gz  \
+    cd /root && tar xzf openssl-3.0.15.tar.gz \
+    && cd openssl-3.0.15 && ./config --prefix=/usr/local/openssl30 --openssldir=/usr/local/openssl30 shared zlib \
+    && make -j && make install \
+    && ldconfig && cd /root && rm -rf openssl-3.0.15
 
 ENV PATH="/usr/local/venv310/bin:$PATH"
 
