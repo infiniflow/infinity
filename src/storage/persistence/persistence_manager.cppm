@@ -141,6 +141,7 @@ private:
     String current_object_key_;
     SizeT current_object_size_;
     SizeT current_object_parts_;
+    SizeT current_object_ref_count_;
 
     friend struct AddrSerializer;
 };

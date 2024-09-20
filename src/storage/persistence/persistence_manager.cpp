@@ -172,7 +172,6 @@ ObjAddr PersistenceManager::Persist(const String &file_path, const String &tmp_f
                                   it->second.obj_key_,
                                   it->second.part_offset_,
                                   it->second.part_size_));
-            local_path_obj_.erase(it);
         }
     }
 
@@ -184,6 +183,8 @@ ObjAddr PersistenceManager::Persist(const String &file_path, const String &tmp_f
     if (src_size == 0) {
         String error_message = fmt::format("Persist skipped empty local path {}.", file_path);
         LOG_WARN(error_message);
+        std::lock_guard<std::mutex> lock(mtx_);
+        local_path_obj_.erase(local_path);
         return ObjAddr();
     } else if (!try_compose || src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
@@ -288,11 +289,12 @@ void PersistenceManager::CurrentObjFinalizeNoLock() {
             outFile.close();
         }
 
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, 0));
+        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_));
         LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
         current_object_parts_ = 0;
+        current_object_ref_count_ = 0;
     }
 }
 
@@ -313,6 +315,13 @@ ObjAddr PersistenceManager::GetObjCache(const String &file_path) {
     auto oit = objects_.find(it->second.obj_key_);
     if (oit != objects_.end()) {
         oit->second.ref_count_++;
+    } else {
+        if (it->second.obj_key_ != current_object_key_) {
+            String error_message = fmt::format("GetObjCache object {} not found", it->second.obj_key_);
+            UnrecoverableError(error_message);
+            return ObjAddr();
+        }
+        current_object_ref_count_++;
     }
     return it->second;
 }
@@ -335,6 +344,14 @@ void PersistenceManager::PutObjCache(const String &file_path) {
     }
     auto oit = objects_.find(it->second.obj_key_);
     if (oit == objects_.end()) {
+        if (it->second.obj_key_ != current_object_key_) {
+            UnrecoverableError(fmt::format("PutObjCache object {} not found", it->second.obj_key_));
+            return;
+        }
+        if (current_object_ref_count_ <= 0) {
+            UnrecoverableError(fmt::format("PutObjCache object {} ref count is {}", it->second.obj_key_, current_object_ref_count_));
+        }
+        current_object_ref_count_--;
         return;
     }
 
@@ -370,17 +387,8 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
     current_object_size_ += file_size;
     current_object_parts_++;
     if (current_object_size_ >= object_size_limit_) {
-        if (current_object_parts_ > 1) {
-            // Add footer to composed object -- format version 1
-            const u32 compose_format = 1;
-            dstFile.write((char *)&compose_format, sizeof(u32));
-        }
-
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, 0));
-        LOG_TRACE(fmt::format("CurrentObjAppendNoLock added composed object {}", current_object_key_));
-        current_object_key_ = ObjCreate();
-        current_object_size_ = 0;
-        current_object_parts_ = 0;
+        UnrecoverableError(
+            fmt::format("CurrentObjAppendNoLock object {} size {} exceeds limit {}", current_object_key_, current_object_size_, object_size_limit_));
     }
     dstFile.close();
 }
