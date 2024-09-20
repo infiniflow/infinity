@@ -183,27 +183,27 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
                                       .astype({'c2': dtype('int32')}))
 
-        res = table_obj.output("*").filter("c1 in (1, 2, 3)").to_df()
+        res = table_obj.output(["*"]).filter("c1 in (1, 2, 3)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3),
                                                          'c2': (1, 2, 3)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
-        res = table_obj.output("*").filter("c1 in (1, 2, 3) and c2 in (1, 2, 3)").to_df()
+        res = table_obj.output(["*"]).filter("c1 in (1, 2, 3) and c2 in (1, 2, 3)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3),
                                                          'c2': (1, 2, 3)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
-        res = table_obj.output("*").filter("c1 not in (1, 2, 3)").to_df()
+        res = table_obj.output(["*"]).filter("c1 not in (1, 2, 3)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, -8, -7, -6, 7, 8, 9),
                                                          'c2': (-3, -2, -1, 0, -8, -7, -6, 7, 8, 9)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
-        res = table_obj.output("*").filter("(c2 + 1) in (8, 9, 10)").to_df()
+        res = table_obj.output(["*"]).filter("(c2 + 1) in (8, 9, 10)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (7, 8, 9),
                                                          'c2': (7, 8, 9)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
-        # res = table_obj.output("*").filter("(-c1) in (1, 2, 3)").to_df()
+        # res = table_obj.output(["*"]).filter("(-c1) in (1, 2, 3)").to_df()
         # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1),
         #                                                  'c2': (-3, -2, -1)})
         #                               .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
