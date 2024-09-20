@@ -55,6 +55,7 @@ class InfinityServiceIf {
   virtual void Optimize(CommonResponse& _return, const OptimizeRequest& request) = 0;
   virtual void AddColumns(CommonResponse& _return, const AddColumnsRequest& request) = 0;
   virtual void DropColumns(CommonResponse& _return, const DropColumnsRequest& request) = 0;
+  virtual void Cleanup(CommonResponse& _return, const CommonRequest& request) = 0;
 };
 
 class InfinityServiceIfFactory {
@@ -181,6 +182,9 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void DropColumns(CommonResponse& /* _return */, const DropColumnsRequest& /* request */) override {
+    return;
+  }
+  void Cleanup(CommonResponse& /* _return */, const CommonRequest& /* request */) override {
     return;
   }
 };
@@ -3617,6 +3621,110 @@ class InfinityService_DropColumns_presult {
 
 };
 
+typedef struct _InfinityService_Cleanup_args__isset {
+  _InfinityService_Cleanup_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_Cleanup_args__isset;
+
+class InfinityService_Cleanup_args {
+ public:
+
+  InfinityService_Cleanup_args(const InfinityService_Cleanup_args&) noexcept;
+  InfinityService_Cleanup_args& operator=(const InfinityService_Cleanup_args&) noexcept;
+  InfinityService_Cleanup_args() noexcept {
+  }
+
+  virtual ~InfinityService_Cleanup_args() noexcept;
+  CommonRequest request;
+
+  _InfinityService_Cleanup_args__isset __isset;
+
+  void __set_request(const CommonRequest& val);
+
+  bool operator == (const InfinityService_Cleanup_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Cleanup_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Cleanup_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_Cleanup_pargs {
+ public:
+
+
+  virtual ~InfinityService_Cleanup_pargs() noexcept;
+  const CommonRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Cleanup_result__isset {
+  _InfinityService_Cleanup_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Cleanup_result__isset;
+
+class InfinityService_Cleanup_result {
+ public:
+
+  InfinityService_Cleanup_result(const InfinityService_Cleanup_result&);
+  InfinityService_Cleanup_result& operator=(const InfinityService_Cleanup_result&);
+  InfinityService_Cleanup_result() noexcept {
+  }
+
+  virtual ~InfinityService_Cleanup_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_Cleanup_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_Cleanup_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Cleanup_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Cleanup_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Cleanup_presult__isset {
+  _InfinityService_Cleanup_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Cleanup_presult__isset;
+
+class InfinityService_Cleanup_presult {
+ public:
+
+
+  virtual ~InfinityService_Cleanup_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_Cleanup_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 class InfinityServiceClient : virtual public InfinityServiceIf {
  public:
   InfinityServiceClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) {
@@ -3741,6 +3849,9 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void DropColumns(CommonResponse& _return, const DropColumnsRequest& request) override;
   void send_DropColumns(const DropColumnsRequest& request);
   void recv_DropColumns(CommonResponse& _return);
+  void Cleanup(CommonResponse& _return, const CommonRequest& request) override;
+  void send_Cleanup(const CommonRequest& request);
+  void recv_Cleanup(CommonResponse& _return);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
@@ -3789,6 +3900,7 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_Optimize(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_AddColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_DropColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_Cleanup(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   InfinityServiceProcessor(::std::shared_ptr<InfinityServiceIf> iface) :
     iface_(iface) {
@@ -3825,6 +3937,7 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["Optimize"] = &InfinityServiceProcessor::process_Optimize;
     processMap_["AddColumns"] = &InfinityServiceProcessor::process_AddColumns;
     processMap_["DropColumns"] = &InfinityServiceProcessor::process_DropColumns;
+    processMap_["Cleanup"] = &InfinityServiceProcessor::process_Cleanup;
   }
 
   virtual ~InfinityServiceProcessor() {}
@@ -4183,6 +4296,16 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
     return;
   }
 
+  void Cleanup(CommonResponse& _return, const CommonRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->Cleanup(_return, request);
+    }
+    ifaces_[i]->Cleanup(_return, request);
+    return;
+  }
+
 };
 
 // The 'concurrent' client is a thread safe client that correctly handles
@@ -4314,6 +4437,9 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void DropColumns(CommonResponse& _return, const DropColumnsRequest& request) override;
   int32_t send_DropColumns(const DropColumnsRequest& request);
   void recv_DropColumns(CommonResponse& _return, const int32_t seqid);
+  void Cleanup(CommonResponse& _return, const CommonRequest& request) override;
+  int32_t send_Cleanup(const CommonRequest& request);
+  void recv_Cleanup(CommonResponse& _return, const int32_t seqid);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;

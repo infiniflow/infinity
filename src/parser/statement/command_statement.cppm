@@ -32,4 +32,5 @@ export using infinity::CheckTable;
 export using infinity::ExportCmd;
 export using infinity::LockCmd;
 export using infinity::UnlockCmd;
+export using infinity::CleanupCmd;
 }

@@ -91,6 +91,13 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
+    def cleanup(self):
+        res = self._client.cleanup()
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
     def disconnect(self):
         res = self._client.disconnect()
         if res.error_code == ErrorCode.OK:

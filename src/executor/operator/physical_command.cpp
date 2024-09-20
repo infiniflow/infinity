@@ -46,6 +46,9 @@ import table_entry;
 import txn;
 import cleanup_scanner;
 import infinity_context;
+import periodic_trigger;
+import bg_task;
+import wal_manager;
 
 namespace infinity {
 
@@ -297,6 +300,24 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 RecoverableError(status);
             }
             table_entry->SetUnlock();
+            break;
+        }
+        case CommandType::kCleanup: {
+            {
+                Txn *txn = query_context->GetTxn();
+                auto checkpoint_task = MakeShared<ForceCheckpointTask>(txn, false /*is_full_checkpoint*/);
+                WalManager *wal_manager = query_context->storage()->wal_manager();
+                wal_manager->Checkpoint(checkpoint_task.get());
+            }
+            {
+                CleanupPeriodicTrigger *cleanup_trigger = query_context->storage()->bg_processor()->cleanup_trigger();
+                SharedPtr<CleanupTask> cleanup_task = cleanup_trigger->CreateCleanupTask();
+                if (cleanup_task.get() != nullptr) {
+                    cleanup_task->Execute();
+                } else {
+                    LOG_DEBUG("Skip cleanup");
+                }
+            }
             break;
         }
         default: {
