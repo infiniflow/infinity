@@ -188,10 +188,10 @@ class TestInfinity:
                                                          'c2': (1, 2, 3)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
-        # res = table_obj.output("*").filter("c1 in (1, 2, 3) and c2 in (1, 2, 3)").to_df()
-        # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3),
-                                                         # 'c2': (1, 2, 3)})
-                                      # .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+        res = table_obj.output("*").filter("c1 in (1, 2, 3) and c2 in (1, 2, 3)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3),
+                                                         'c2': (1, 2, 3)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
         res = table_obj.output("*").filter("c1 not in (1, 2, 3)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, -8, -7, -6, 7, 8, 9),
