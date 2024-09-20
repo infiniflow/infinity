@@ -8,6 +8,8 @@ server_address           = "0.0.0.0"
 [log]
 log_filename             = "infinity.log"
 log_dir                  = "/var/infinity/log"
+log_to_stdout            = true
+log_level               = "trace"
 
 [storage]
 persistence_dir          = "/var/infinity/persistence"
