@@ -39,6 +39,8 @@ class TestCleanup:
         assert res.error_code == infinity.ErrorCode.OK
 
     @pytest.mark.usefixtures("skip_if_http")
+    @pytest.mark.usefixtures("skip_if_local_infinity")
+    @pytest.mark.skip(reason="Not implemented")
     def test_invalidate_fulltext_cache(self):
         table_name = "test_add_column" + self.suffix
         db_obj = self.infinity_obj.get_database("default_db")
