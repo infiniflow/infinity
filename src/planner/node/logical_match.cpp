@@ -116,19 +116,19 @@ String LogicalMatch::ToString(i64 &space) const {
         ss << filter_str << '\n';
         if (common_query_filter_) {
             ss << String(space, ' ');
-            ss << " - filter for secondary index: ";
-            if (common_query_filter_->secondary_index_filter_qualified_) {
+            ss << " - filter with index: ";
+            if (common_query_filter_->index_filter_) {
                 String filter_str;
-                ExplainLogicalPlan::Explain(common_query_filter_->secondary_index_filter_qualified_.get(), filter_str);
+                ExplainLogicalPlan::Explain(common_query_filter_->index_filter_.get(), filter_str);
                 ss << filter_str << '\n';
             } else {
                 ss << "None\n";
             }
             ss << String(space, ' ');
-            ss << " - filter except secondary index: ";
-            if (common_query_filter_->filter_leftover_) {
+            ss << " - filter without index: ";
+            if (common_query_filter_->leftover_filter_) {
                 String filter_str;
-                ExplainLogicalPlan::Explain(common_query_filter_->filter_leftover_.get(), filter_str);
+                ExplainLogicalPlan::Explain(common_query_filter_->leftover_filter_.get(), filter_str);
                 ss << filter_str << '\n';
             } else {
                 ss << "None\n";

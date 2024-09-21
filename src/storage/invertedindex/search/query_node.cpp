@@ -402,7 +402,7 @@ std::unique_ptr<QueryNode> AndNotQueryNode::InnerGetNewOptimizedQueryTree() {
 
 // create search iterator
 std::unique_ptr<DocIterator>
-TermQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, EarlyTermAlgo /*early_term_algo*/) const {
+TermQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo /*early_term_algo*/) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader) {
@@ -428,7 +428,7 @@ TermQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_re
 }
 
 std::unique_ptr<DocIterator>
-PhraseQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, EarlyTermAlgo /*early_term_algo*/) const {
+PhraseQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo /*early_term_algo*/) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader) {
@@ -457,7 +457,7 @@ PhraseQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_
 }
 
 std::unique_ptr<DocIterator>
-AndQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
+AndQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     for (auto &child : children_) {
@@ -476,7 +476,7 @@ AndQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_rea
 }
 
 std::unique_ptr<DocIterator>
-AndNotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
+AndNotQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     // check if the first child is a valid query
@@ -500,7 +500,7 @@ AndNotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_
 }
 
 std::unique_ptr<DocIterator>
-OrQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
+OrQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     bool all_are_term = true;
@@ -528,7 +528,7 @@ OrQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_read
 }
 
 std::unique_ptr<DocIterator>
-NotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
+NotQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
     String error_message = "NOT query node should be optimized into AND_NOT query node";
     UnrecoverableError(error_message);
     return nullptr;

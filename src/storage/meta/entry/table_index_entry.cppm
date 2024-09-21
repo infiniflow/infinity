@@ -110,7 +110,7 @@ public:
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
 
-    SegmentIndexesGuard GetSegmentIndexesGuard() { return {index_by_segment_, std::shared_lock(rw_locker_)}; }
+    SegmentIndexesGuard GetSegmentIndexesGuard() const { return {index_by_segment_, std::shared_lock(rw_locker_)}; }
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot(const TableEntry *table_entry, Txn *txn);
     const SharedPtr<String> &index_dir() const { return index_dir_; }

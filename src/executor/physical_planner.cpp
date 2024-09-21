@@ -905,9 +905,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const SharedPtr<Logi
     SharedPtr<LogicalIndexScan> logical_index_scan = static_pointer_cast<LogicalIndexScan>(logical_operator);
     return MakeUnique<PhysicalIndexScan>(logical_operator->node_id(),
                                          logical_index_scan->base_table_ref_,
-                                         logical_index_scan->index_filter_qualified_,
-                                         std::move(logical_index_scan->column_index_map_),
-                                         std::move(logical_index_scan->filter_execute_command_),
+                                         logical_index_scan->index_filter_,
+                                         std::move(logical_index_scan->index_filter_evaluator_),
                                          std::move(logical_index_scan->fast_rough_filter_evaluator_),
                                          logical_operator->load_metas(),
                                          logical_operator->GetOutputNames(),

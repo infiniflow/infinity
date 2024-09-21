@@ -24,7 +24,7 @@ import base_table_ref;
 import segment_index_entry;
 import base_expression;
 import default_values;
-import secondary_index_scan_execute_expression;
+import filter_expression_push_down;
 import data_type;
 import table_entry;
 import table_index_entry;
@@ -36,9 +36,8 @@ export class LogicalIndexScan : public LogicalNode {
 public:
     explicit LogicalIndexScan(u64 node_id,
                               SharedPtr<BaseTableRef> &&base_table_ref,
-                              SharedPtr<BaseExpression> &&index_filter_qualified,
-                              HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
-                              Vector<FilterExecuteElem> &&filter_execute_command,
+                              SharedPtr<BaseExpression> &&index_filter,
+                              UniquePtr<IndexFilterEvaluator> &&index_filter_evaluator,
                               UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                               bool add_row_id = true);
 
@@ -60,11 +59,8 @@ public:
 
     SharedPtr<BaseTableRef> base_table_ref_{};
 
-    // filter expression is constructed with fundamental expression "[cast] x compare (value expression)" and conjunction "and", "or" and "not"
-    SharedPtr<BaseExpression> index_filter_qualified_;
-    HashMap<ColumnID, TableIndexEntry *> column_index_map_;
-    // Commands used in PhysicalIndexScan::ExecuteInternal()
-    Vector<FilterExecuteElem> filter_execute_command_;
+    SharedPtr<BaseExpression> index_filter_;
+    UniquePtr<IndexFilterEvaluator> index_filter_evaluator_;
 
     UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
 

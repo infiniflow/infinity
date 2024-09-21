@@ -31,8 +31,8 @@ PROJECT (3)
    - table index: #1
    - MatchTensor expression: MATCH TENSOR (t, [[0,-10,0,0.7],[9.2,45.6,-55.8,3.5]], MAX_SIM)
    - Top N: 10
-   - filter for secondary index: None
-   - filter except secondary index: 10 > CAST(num (#0) AS BigInt)
+   - index filter: None
+   - leftover filter: 10 > CAST(num (#0) AS BigInt)
    - output columns: [num, title, __score, __rowid]
 
 # default top 10
@@ -132,8 +132,8 @@ PROJECT (3)
      - table index: #1
      - MatchTensor expression: MATCH TENSOR (t, [[0,-10,0,0.7],[9.2,45.6,-55.8,3.5]], MAX_SIM)
      - Top N: 10
-     - filter for secondary index: None
-     - filter except secondary index: 10 > CAST(num (#0) AS BigInt)
+     - index filter: None
+     - leftover filter: 10 > CAST(num (#0) AS BigInt)
      - output columns: [num, title, __score, __rowid]
 
 # default top 10
