@@ -15,7 +15,7 @@
 module;
 
 #include <vector>
-module secondary_index_scan_builder;
+module index_scan_builder;
 
 import stl;
 import logical_node;
@@ -38,9 +38,9 @@ import filter_expression_push_down;
 namespace infinity {
 
 // Different from LogicalNodeVisitor, this visitor accepts shared_ptr<LogicalNode> as input.
-class BuildSecondaryIndexScan {
+class BuildIndexScan {
 public:
-    explicit BuildSecondaryIndexScan(QueryContext *query_context_ptr) : query_context_(query_context_ptr) {}
+    explicit BuildIndexScan(QueryContext *query_context_ptr) : query_context_(query_context_ptr) {}
 
     void VisitNode(SharedPtr<LogicalNode> &op) {
         if (!op) {
@@ -60,14 +60,10 @@ public:
                     auto &base_table_ref_ptr = table_scan.base_table_ref_;
                     auto &fast_rough_filter_evaluator = table_scan.fast_rough_filter_evaluator_;
                     // check if the filter can be pushed down to the table scan
-                    IndexScanFilterExpressionPushDownResult index_scan_solve_result =
+                    auto [index_filter, leftover_filter, index_filter_evaluator] =
                         FilterExpressionPushDown::PushDownToIndexScan(query_context_, *base_table_ref_ptr, filter_expression);
-                    auto &column_index_map = index_scan_solve_result.column_index_map_;
-                    auto &v_qualified = index_scan_solve_result.index_filter_qualified_;
-                    auto &s_leftover = index_scan_solve_result.extra_leftover_filter_;
-                    auto &filter_execute_command = index_scan_solve_result.filter_execute_command_;
                     // 1. check if the filter can be pushed down to the table scan
-                    if (!v_qualified) {
+                    if (!index_filter) {
                         // no qualified index filter condition, keep the table scan
                         LOG_TRACE("BuildSecondaryIndexScan: No qualified index scan filter. Keep the table scan.");
                     } else {
@@ -75,18 +71,17 @@ public:
                         // replace logical table scan with logical index scan
                         auto index_scan = MakeShared<LogicalIndexScan>(query_context_->GetNextNodeID(),
                                                                        std::move(base_table_ref_ptr),
-                                                                       std::move(v_qualified),
-                                                                       std::move(column_index_map),
-                                                                       std::move(filter_execute_command),
+                                                                       std::move(index_filter),
+                                                                       std::move(index_filter_evaluator),
                                                                        std::move(fast_rough_filter_evaluator),
                                                                        true);
                         op->set_left_node(std::move(index_scan));
                         LOG_TRACE("BuildSecondaryIndexScan: Push down the qualified index scan filter. Replace table scan with index scan.");
                     }
                     // 2. check the remaining filter expression
-                    if (s_leftover) {
+                    if (leftover_filter) {
                         // Keep the filter node.
-                        filter_expression = std::move(s_leftover);
+                        filter_expression = std::move(leftover_filter);
                     } else {
                         // Remove the filter node. Need to get parent node
                         SharedPtr<LogicalNode> scan = std::move(op->left_node());
@@ -99,12 +94,12 @@ public:
             case LogicalNodeType::kMatchSparseScan:
             case LogicalNodeType::kMatchTensorScan: {
                 auto &match_base = static_cast<LogicalMatchScanBase &>(*op);
-                match_base.common_query_filter_->TryApplySecondaryIndexFilterOptimizer(query_context_);
+                match_base.common_query_filter_->TryApplyIndexFilterOptimizer(query_context_);
                 break;
             }
             case LogicalNodeType::kMatch: {
                 auto &match = static_cast<LogicalMatch &>(*op);
-                match.common_query_filter_->TryApplySecondaryIndexFilterOptimizer(query_context_);
+                match.common_query_filter_->TryApplyIndexFilterOptimizer(query_context_);
                 break;
             }
             default: {
@@ -125,8 +120,8 @@ private:
     QueryContext *query_context_ = nullptr;
 };
 
-void SecondaryIndexScanBuilder::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) {
-    BuildSecondaryIndexScan visitor(query_context_ptr);
+void IndexScanBuilder::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) {
+    BuildIndexScan visitor(query_context_ptr);
     visitor.VisitNode(logical_plan);
 }
 

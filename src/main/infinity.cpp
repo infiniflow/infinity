@@ -1099,4 +1099,21 @@ QueryResult Infinity::DropColumns(const String &db_name, const String &table_nam
     return result;
 }
 
+QueryResult Infinity::Cleanup() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto command_statement = MakeUnique<CommandStatement>();
+
+    command_statement->command_info_ = MakeUnique<CleanupCmd>();
+
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    return result;
+}
+
 } // namespace infinity

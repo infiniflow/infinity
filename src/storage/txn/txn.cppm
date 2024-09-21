@@ -237,6 +237,9 @@ public:
         return allowed_in_reader_;
     }
 
+
+    TxnStore *txn_store() { return &txn_store_; }
+
 private:
     void CheckTxnStatus();
 

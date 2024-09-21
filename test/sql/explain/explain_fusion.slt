@@ -18,8 +18,8 @@ PROJECT (5)
      - table name: explain_fusion(default_db.explain_fusion)
      - table index: #1
      - match expression: MATCH TEXT ('body^5', 'harmful chemical', 'topn=3')
-     - filter for secondary index: None
-     - filter except secondary index: 10 > CAST(num (#0) AS BigInt)
+     - index filter: None
+     - leftover filter: 10 > CAST(num (#0) AS BigInt)
      - output columns: [num, __score, __rowid]
   -> KNN SCAN (3)
      - table name: explain_fusion(default_db.explain_fusion)
@@ -49,9 +49,54 @@ PROJECT (3)
      - table index: #1
      - MatchTensor expression: MATCH TENSOR (t, [[0,-10,0,0.7],[9.2,45.6,-55.8,3.5]], MAX_SIM)
      - Top N: 10
-     - filter for secondary index: None
-     - filter except secondary index: 10 > CAST(num (#0) AS BigInt)
+     - index filter: None
+     - leftover filter: 10 > CAST(num (#0) AS BigInt)
      - output columns: [num, title, __score, __rowid]
+
+statement ok
+CREATE INDEX iiiii on explain_fusion(num);
+
+query I
+EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '') WHERE 10 > num;
+----
+PROJECT (3)
+ - table index: #4
+ - expressions: [title (#0)]
+-> MERGE MatchTensor (5)
+   - table name: explain_fusion(default_db.explain_fusion)
+   - table index: #1
+   - MatchTensor expression: MATCH TENSOR (t, [[0,-10,0,0.7],[9.2,45.6,-55.8,3.5]], MAX_SIM)
+   - Top N: 10
+   - output columns: [title, __score, __rowid]
+  -> MatchTensorScan (2)
+     - table name: explain_fusion(default_db.explain_fusion)
+     - table index: #1
+     - MatchTensor expression: MATCH TENSOR (t, [[0,-10,0,0.7],[9.2,45.6,-55.8,3.5]], MAX_SIM)
+     - Top N: 10
+     - index filter: 10 > CAST(num (#1.2) AS BigInt)
+     - leftover filter: None
+     - output columns: [title, __score, __rowid]
+
+query I
+EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', '', WHERE 10 > num);
+----
+PROJECT (3)
+ - table index: #4
+ - expressions: [title (#0)]
+-> MERGE MatchTensor (5)
+   - table name: explain_fusion(default_db.explain_fusion)
+   - table index: #1
+   - MatchTensor expression: MATCH TENSOR (t, [[0,-10,0,0.7],[9.2,45.6,-55.8,3.5]], MAX_SIM, WHERE (10 > num))
+   - Top N: 10
+   - output columns: [title, __score, __rowid]
+  -> MatchTensorScan (2)
+     - table name: explain_fusion(default_db.explain_fusion)
+     - table index: #1
+     - MatchTensor expression: MATCH TENSOR (t, [[0,-10,0,0.7],[9.2,45.6,-55.8,3.5]], MAX_SIM, WHERE (10 > num))
+     - Top N: 10
+     - index filter: 10 > CAST(num (#1.2) AS BigInt)
+     - leftover filter: None
+     - output columns: [title, __score, __rowid]
 
 #query I
 #EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', 'topn=10'), FUSION('rrf') WHERE 10 > num;

@@ -91,7 +91,7 @@ struct MockQueryNode : public TermQueryNode {
     }
 
     void PushDownWeight(float factor) final { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, IndexReader &, EarlyTermAlgo early_term_algo) const final {
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, const IndexReader &, EarlyTermAlgo early_term_algo) const override {
         return MakeUnique<MockVectorDocIterator>(std::move(doc_ids_), term_, column_);
     }
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final {
