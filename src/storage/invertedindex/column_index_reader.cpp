@@ -195,4 +195,15 @@ void TableIndexReaderCache::Invalidate() {
     column2analyzer_.reset();
 }
 
+void TableIndexReaderCache::InvalidateColumn(u64 column_id, const String &column_name) {
+    std::scoped_lock lock(mutex_);
+    cache_column_ts_.erase(column_id);
+    if (cache_column_readers_.get() != nullptr) {
+        cache_column_readers_->erase(column_id);
+    }
+    if (column2analyzer_.get() != nullptr) {
+        column2analyzer_->erase(column_name);
+    }
+}
+
 } // namespace infinity

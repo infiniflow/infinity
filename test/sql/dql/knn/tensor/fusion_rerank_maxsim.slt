@@ -61,8 +61,8 @@ PROJECT (4)
      - table name: sqllogic_fusion_rerank_maxsim(default_db.sqllogic_fusion_rerank_maxsim)
      - table index: #1
      - match expression: MATCH TEXT ('body', 'off', 'topn=4')
-     - filter for secondary index: None
-     - filter except secondary index: None
+     - index filter: None
+     - leftover filter: None
      - output columns: [__score, __rowid]
 
 query I
@@ -84,16 +84,16 @@ PROJECT (5)
      - table name: sqllogic_fusion_rerank_maxsim(default_db.sqllogic_fusion_rerank_maxsim)
      - table index: #1
      - match expression: MATCH TEXT ('body', 'off', 'topn=4')
-     - filter for secondary index: None
-     - filter except secondary index: None
+     - index filter: None
+     - leftover filter: None
      - output columns: [__score, __rowid]
   -> MatchTensorScan (3)
      - table name: sqllogic_fusion_rerank_maxsim(default_db.sqllogic_fusion_rerank_maxsim)
      - table index: #1
      - MatchTensor expression: MATCH TENSOR (t, [[1,0,0,0]], MAX_SIM, 'topn=2')
      - Top N: 2
-     - filter for secondary index: None
-     - filter except secondary index: None
+     - index filter: None
+     - leftover filter: None
      - output columns: [__score, __rowid]
 
 query I
@@ -122,8 +122,8 @@ FRAGMENT (2)
    - table name: sqllogic_fusion_rerank_maxsim(default_db.sqllogic_fusion_rerank_maxsim)
    - table index: #1
    - match expression: MATCH TEXT ('body', 'off', 'topn=4')
-   - filter for secondary index: None
-   - filter except secondary index: None
+   - index filter: None
+   - leftover filter: None
    - output columns: [__score, __rowid]
 (empty)
 (empty)
@@ -133,8 +133,8 @@ FRAGMENT (3)
    - table index: #1
    - MatchTensor expression: MATCH TENSOR (t, [[1,0,0,0]], MAX_SIM, 'topn=2')
    - Top N: 2
-   - filter for secondary index: None
-   - filter except secondary index: None
+   - index filter: None
+   - leftover filter: None
    - output columns: [__score, __rowid]
 (empty)
 (empty)

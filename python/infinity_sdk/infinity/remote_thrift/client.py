@@ -288,3 +288,6 @@ class ThriftInfinityClient:
     def drop_columns(self, db_name: str, table_name: str, column_names: list):
         return self.client.DropColumns(DropColumnsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
                                                           column_names=column_names))
+
+    def cleanup(self):
+        return self.client.Cleanup(CommonRequest(session_id=self.session_id))

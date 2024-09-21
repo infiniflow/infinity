@@ -264,6 +264,7 @@ export namespace std {
 
     using std::exception;
     using std::unordered_set;
+    using std::array;
 
     using std::distance;
     using std::back_inserter;

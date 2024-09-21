@@ -30,6 +30,7 @@ enum class CommandType {
     kCheckTable,
     kLockTable,
     kUnlockTable,
+    kCleanup
 };
 
 class CommandInfo {
@@ -214,6 +215,15 @@ public:
 private:
     std::string db_name_;
     std::string table_name_;
+};
+
+class CleanupCmd final : public CommandInfo {
+public:
+    explicit CleanupCmd() : CommandInfo(CommandType::kCleanup) {}
+
+    ~CleanupCmd() final = default;
+
+    [[nodiscard]] std::string ToString() const final;
 };
 
 class CommandStatement final : public BaseStatement {

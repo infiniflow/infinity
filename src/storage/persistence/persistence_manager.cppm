@@ -89,6 +89,8 @@ public:
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
     ObjAddr GetObjCache(const String &local_path);
 
+    ObjAddr GetObjCacheWithoutCnt(const String &local_path);
+
     void PutObjCache(const String &file_path);
 
     void Cleanup(const String &file_path);
@@ -118,7 +120,7 @@ private:
     void CurrentObjFinalizeNoLock();
 
     // Cleanup
-    void CleanupNoLock(const ObjAddr &object_addr);
+    void CleanupNoLock(const ObjAddr &object_addr, bool check_ref_count = false);
 
     String RemovePrefix(const String &path);
 
@@ -139,8 +141,9 @@ private:
     HashMap<String, ObjAddr> local_path_obj_; // local_file_path -> ObjAddr
     // Current unsealed object key
     String current_object_key_;
-    SizeT current_object_size_;
-    SizeT current_object_parts_;
+    SizeT current_object_size_ = 0;
+    SizeT current_object_parts_ = 0;
+    SizeT current_object_ref_count_ = 0;
 
     friend struct AddrSerializer;
 };

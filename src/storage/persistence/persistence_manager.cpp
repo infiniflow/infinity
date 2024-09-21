@@ -130,6 +130,7 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
     current_object_key_ = ObjCreate();
     current_object_size_ = 0;
     current_object_parts_ = 0;
+    current_object_ref_count_ = 0;
 
     if (local_data_dir_.empty() || local_data_dir_.back() != '/') {
         local_data_dir_ += '/';
@@ -172,7 +173,6 @@ ObjAddr PersistenceManager::Persist(const String &file_path, const String &tmp_f
                                   it->second.obj_key_,
                                   it->second.part_offset_,
                                   it->second.part_size_));
-            local_path_obj_.erase(it);
         }
     }
 
@@ -184,6 +184,8 @@ ObjAddr PersistenceManager::Persist(const String &file_path, const String &tmp_f
     if (src_size == 0) {
         String error_message = fmt::format("Persist skipped empty local path {}.", file_path);
         LOG_WARN(error_message);
+        std::lock_guard<std::mutex> lock(mtx_);
+        local_path_obj_.erase(local_path);
         return ObjAddr();
     } else if (!try_compose || src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
@@ -288,11 +290,12 @@ void PersistenceManager::CurrentObjFinalizeNoLock() {
             outFile.close();
         }
 
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, 0));
+        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_));
         LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
         current_object_parts_ = 0;
+        current_object_ref_count_ = 0;
     }
 }
 
@@ -313,6 +316,32 @@ ObjAddr PersistenceManager::GetObjCache(const String &file_path) {
     auto oit = objects_.find(it->second.obj_key_);
     if (oit != objects_.end()) {
         oit->second.ref_count_++;
+        LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, oit->second.ref_count_));
+    } else {
+        if (it->second.obj_key_ != current_object_key_) {
+            String error_message = fmt::format("GetObjCache object {} not found", it->second.obj_key_);
+            UnrecoverableError(error_message);
+            return ObjAddr();
+        }
+        current_object_ref_count_++;
+        LOG_TRACE(fmt::format("GetObjCache current object {} ref count {}", it->second.obj_key_, current_object_ref_count_));
+    }
+    return it->second;
+}
+
+ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const String &local_path) {
+    String lock_path = RemovePrefix(local_path);
+    if (lock_path.empty()) {
+        String error_message = fmt::format("Failed to find local path of {}", local_path);
+        UnrecoverableError(error_message);
+    }
+
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = local_path_obj_.find(lock_path);
+    if (it == local_path_obj_.end()) {
+        String error_message = fmt::format("GetObjCacheWithoutCnt Failed to find object for local path {}", lock_path);
+        LOG_WARN(error_message);
+        return ObjAddr();
     }
     return it->second;
 }
@@ -335,6 +364,15 @@ void PersistenceManager::PutObjCache(const String &file_path) {
     }
     auto oit = objects_.find(it->second.obj_key_);
     if (oit == objects_.end()) {
+        if (it->second.obj_key_ != current_object_key_) {
+            UnrecoverableError(fmt::format("PutObjCache object {} not found", it->second.obj_key_));
+            return;
+        }
+        if (current_object_ref_count_ <= 0) {
+            UnrecoverableError(fmt::format("PutObjCache object {} ref count is {}", it->second.obj_key_, current_object_ref_count_));
+        }
+        current_object_ref_count_--;
+        LOG_TRACE(fmt::format("PutObjCache current object {} ref count {}", it->second.obj_key_, current_object_ref_count_));
         return;
     }
 
@@ -342,6 +380,7 @@ void PersistenceManager::PutObjCache(const String &file_path) {
         UnrecoverableError(fmt::format("PutObjCache object {} ref count is {}", it->second.obj_key_, oit->second.ref_count_));
     }
     oit->second.ref_count_--;
+    LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", it->second.obj_key_, oit->second.ref_count_));
 }
 
 String PersistenceManager::ObjCreate() { return UUID().to_string(); }
@@ -370,22 +409,13 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
     current_object_size_ += file_size;
     current_object_parts_++;
     if (current_object_size_ >= object_size_limit_) {
-        if (current_object_parts_ > 1) {
-            // Add footer to composed object -- format version 1
-            const u32 compose_format = 1;
-            dstFile.write((char *)&compose_format, sizeof(u32));
-        }
-
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, 0));
-        LOG_TRACE(fmt::format("CurrentObjAppendNoLock added composed object {}", current_object_key_));
-        current_object_key_ = ObjCreate();
-        current_object_size_ = 0;
-        current_object_parts_ = 0;
+        UnrecoverableError(
+            fmt::format("CurrentObjAppendNoLock object {} size {} exceeds limit {}", current_object_key_, current_object_size_, object_size_limit_));
     }
     dstFile.close();
 }
 
-void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
+void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, bool check_ref_count) {
     auto it = objects_.find(object_addr.obj_key_);
     if (it == objects_.end()) {
         if (object_addr.obj_key_ == current_object_key_) {
@@ -396,6 +426,13 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
             String error_message = fmt::format("CleanupNoLock Failed to find object {}", object_addr.obj_key_);
             UnrecoverableError(error_message);
             return;
+        }
+    }
+    if (check_ref_count) {
+        const ObjStat &stat = it->second;
+        if (stat.ref_count_ > 0) {
+            String error_message = fmt::format("CleanupNoLock object {} ref count is {}", object_addr.obj_key_, stat.ref_count_);
+            UnrecoverableError(error_message);
         }
     }
     Range orig_range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
@@ -536,7 +573,7 @@ void PersistenceManager::Cleanup(const String &file_path) {
         LOG_WARN(error_message);
         return;
     }
-    CleanupNoLock(it->second);
+    CleanupNoLock(it->second, true);
     LOG_TRACE(fmt::format("Deleted mapping from local path {} to ObjAddr({}, {}, {})",
                           local_path,
                           it->second.obj_key_,
@@ -614,7 +651,7 @@ void AddrSerializer::Initialize(PersistenceManager *persistence_manager, const V
     }
     for (const String &path : path) {
         paths_.push_back(path);
-        ObjAddr obj_addr = persistence_manager->GetObjCache(path);
+        ObjAddr obj_addr = persistence_manager->GetObjCacheWithoutCnt(path);
         obj_addrs_.push_back(obj_addr);
         if (!obj_addr.Valid()) {
             // In ImportWal, version file is not flushed here, set before write wal
@@ -623,7 +660,6 @@ void AddrSerializer::Initialize(PersistenceManager *persistence_manager, const V
         } else {
             ObjStat obj_stat = persistence_manager->GetObjStatByObjAddr(obj_addr);
             obj_stats_.push_back(obj_stat);
-            persistence_manager->PutObjCache(path);
         }
     }
 }
@@ -637,7 +673,7 @@ void AddrSerializer::InitializeValid(PersistenceManager *persistence_manager) {
             continue;
         }
 
-        ObjAddr obj_addr = persistence_manager->GetObjCache(paths_[i]);
+        ObjAddr obj_addr = persistence_manager->GetObjCacheWithoutCnt(paths_[i]);
 
         obj_addrs_[i] = obj_addr;
         if (!obj_addr.Valid()) {
@@ -645,7 +681,6 @@ void AddrSerializer::InitializeValid(PersistenceManager *persistence_manager) {
         } else {
             ObjStat obj_stat = persistence_manager->GetObjStatByObjAddr(obj_addr);
             obj_stats_[i] = obj_stat;
-            persistence_manager->PutObjCache(paths_[i]);
         }
     }
 }

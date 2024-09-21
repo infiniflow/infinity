@@ -732,4 +732,6 @@ CommonResponse Optimize(1:OptimizeRequest request),
 CommonResponse AddColumns(1:AddColumnsRequest request),
 CommonResponse DropColumns(1:DropColumnsRequest request),
 
+CommonResponse Cleanup(1:CommonRequest request),
+
 }

@@ -35,6 +35,8 @@ struct OptionalAllTrueFlag<true> {
 template <>
 struct OptionalAllTrueFlag<false> {};
 
+export using RoaringForwardIterator = roaring::RoaringSetBitForwardIterator;
+
 template <bool init_all_true>
 struct RoaringBitmap {
     static SharedPtr<RoaringBitmap> MakeSharedAllTrue(u32 count)
@@ -52,6 +54,24 @@ struct RoaringBitmap {
     RoaringBitmap() = default;
 
     explicit RoaringBitmap(const u32 count) : count_(count) {}
+
+    RoaringForwardIterator Begin() const {
+        if constexpr (init_all_true) {
+            if (all_true_flag_.value) {
+                UnrecoverableError("Should not call Begin() for all_true bitmask.");
+            }
+        }
+        return roaring_.begin();
+    }
+
+    RoaringForwardIterator &End() const {
+        if constexpr (init_all_true) {
+            if (all_true_flag_.value) {
+                UnrecoverableError("Should not call End() for all_true bitmask.");
+            }
+        }
+        return roaring_.end();
+    }
 
     [[nodiscard]] inline auto count() const { return count_; }
 

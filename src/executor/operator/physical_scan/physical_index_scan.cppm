@@ -32,12 +32,12 @@ import base_table_ref;
 import value;
 import knn_filter;
 import secondary_index_data;
-import secondary_index_scan_execute_expression;
 import table_index_entry;
 import segment_index_entry;
 import fast_rough_filter;
 import global_block_id;
 import roaring_bitmap;
+import filter_expression_push_down;
 
 namespace infinity {
 
@@ -53,9 +53,8 @@ export class PhysicalIndexScan final : public PhysicalScanBase {
 public:
     explicit PhysicalIndexScan(u64 id,
                                SharedPtr<BaseTableRef> base_table_ref,
-                               SharedPtr<BaseExpression> index_filter_qualified,
-                               HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
-                               Vector<FilterExecuteElem> &&filter_execute_command,
+                               SharedPtr<BaseExpression> index_filter,
+                               UniquePtr<IndexFilterEvaluator> &&index_filter_evaluator,
                                UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                                SharedPtr<Vector<LoadMeta>> load_metas,
                                SharedPtr<Vector<String>> output_names,
@@ -92,17 +91,15 @@ public:
 
     inline auto *TableEntry() const { return base_table_ref_->table_entry_ptr_; }
 
-    inline auto &FilterExpression() const { return index_filter_qualified_; }
+    inline auto &FilterExpression() const { return index_filter_; }
 
 private:
     void ExecuteInternal(QueryContext *query_context, IndexScanOperatorState *index_scan_operator_state) const;
 
 private:
     // input from optimizer
-    SharedPtr<BaseExpression> index_filter_qualified_{};
-    HashMap<ColumnID, TableIndexEntry *> column_index_map_{};
-    // Commands used in ExecuteInternal()
-    Vector<FilterExecuteElem> filter_execute_command_{};
+    SharedPtr<BaseExpression> index_filter_{};
+    UniquePtr<IndexFilterEvaluator> index_filter_evaluator_{};
 
     UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
 
@@ -111,11 +108,5 @@ private:
     bool add_row_id_{};
     mutable Vector<SizeT> column_ids_{};
 };
-
-export Bitmask SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_execute_command,
-                                         const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
-                                         SegmentID segment_id,
-                                         u32 segment_row_count,
-                                         Txn *txn);
 
 } // namespace infinity

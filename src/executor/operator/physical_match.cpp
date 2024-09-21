@@ -79,7 +79,7 @@ public:
 
     bool Next(RowID doc_id) override {
         bool ok = false;
-        while (1) {
+        while (true) {
             ok = query_iterator_->Next(doc_id);
             if (!ok) {
                 break;
@@ -91,7 +91,7 @@ public:
                 doc_id_ = doc_id;
                 return true;
             }
-            doc_id++;
+            ++doc_id;
         }
         doc_id_ = INVALID_ROWID;
         return false;
@@ -103,10 +103,10 @@ public:
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
         os << prefix;
         os << (is_final ? "└──" : "├──");
-        os << "FilterIterator (fake_doc_freq: " << common_query_filter_->filter_result_count_ << ") (secondary_index_filter: ";
+        os << "FilterIterator (fake_doc_freq: " << common_query_filter_->filter_result_count_ << ") (filter expression: ";
         String filter_str;
-        if (common_query_filter_->secondary_index_filter_qualified_.get()) {
-            ExplainLogicalPlan::Explain(common_query_filter_->secondary_index_filter_qualified_.get(), filter_str);
+        if (common_query_filter_->original_filter_.get()) {
+            ExplainLogicalPlan::Explain(common_query_filter_->original_filter_.get(), filter_str);
         } else {
             filter_str = "None";
         }
@@ -128,7 +128,7 @@ struct FilterQueryNode final : public QueryNode {
     CommonQueryFilter *common_query_filter_;
     const SizeT filter_result_count_ = common_query_filter_->filter_result_count_;
     const Map<SegmentID, Bitmask> *filter_result_ptr_ = &common_query_filter_->filter_result_;
-    const BaseExpression *secondary_index_filter_ = common_query_filter_->secondary_index_filter_qualified_.get();
+    const BaseExpression *filter_expression = common_query_filter_->original_filter_.get();
 
     explicit FilterQueryNode(CommonQueryFilter *common_query_filter, UniquePtr<QueryNode> &&query_tree)
         : QueryNode(QueryNodeType::FILTER), query_tree_(std::move(query_tree)), common_query_filter_(common_query_filter) {}
@@ -141,7 +141,7 @@ struct FilterQueryNode final : public QueryNode {
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
 
     std::unique_ptr<DocIterator>
-    CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override {
+    CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override {
         assert(common_query_filter_ != nullptr);
         if (!common_query_filter_->AlwaysTrue() && common_query_filter_->filter_result_count_ == 0)
             return nullptr;
@@ -157,10 +157,10 @@ struct FilterQueryNode final : public QueryNode {
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override {
         os << prefix;
         os << (is_final ? "└──" : "├──");
-        os << "Filter (secondary_index_filter: ";
+        os << "Filter (expression: ";
         String filter_str;
-        if (secondary_index_filter_) {
-            ExplainLogicalPlan::Explain(secondary_index_filter_, filter_str);
+        if (filter_expression) {
+            ExplainLogicalPlan::Explain(filter_expression, filter_str);
         } else {
             filter_str = "None";
         }

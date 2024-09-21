@@ -831,7 +831,7 @@ void ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node, Shared
     // filter expression
     String filter_str = String(intent_size, ' ');
     filter_str += " - filter: ";
-    Explain(index_scan_node->index_filter_qualified_.get(), filter_str);
+    Explain(index_scan_node->index_filter_.get(), filter_str);
     result->emplace_back(MakeShared<String>(filter_str));
 
     // Output columns

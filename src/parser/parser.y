@@ -2403,6 +2403,9 @@ alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
     $$ = ret;
     ret->new_table_name_ = $6;
     free($6);
+    free($3->schema_name_ptr_);
+    free($3->table_name_ptr_);
+    delete $3;
 }
 | ALTER TABLE table_name ADD COLUMN '(' column_def_array ')' {
     auto *ret = new infinity::AddColumnsStatement($3->schema_name_ptr_, $3->table_name_ptr_);
@@ -2412,6 +2415,9 @@ alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
         ret->column_defs_.emplace_back(column_def);
     }
     delete $7;
+    free($3->schema_name_ptr_);
+    free($3->table_name_ptr_);
+    delete $3;
 }
 | ALTER TABLE table_name DROP COLUMN '(' identifier_array ')' {
     auto *ret = new infinity::DropColumnsStatement($3->schema_name_ptr_, $3->table_name_ptr_);
@@ -2419,7 +2425,10 @@ alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
     for (std::string &column_name : *$7) {
         ret->column_names_.emplace_back(std::move(column_name));
     }
-    free($7);
+    delete $7;
+    free($3->schema_name_ptr_);
+    free($3->table_name_ptr_);
+    delete $3;
 }
 
 /*
