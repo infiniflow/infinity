@@ -16,9 +16,9 @@ module;
 export module common_query_filter;
 import stl;
 import roaring_bitmap;
-import secondary_index_scan_execute_expression;
 import internal_types;
 import default_values;
+import filter_expression_push_down;
 
 namespace infinity {
 class FastRoughFilterEvaluator;
@@ -37,13 +37,16 @@ export struct CommonQueryFilter {
     // 1. minmax and bloom filter
     bool finish_build_fast_rough_filter_ = false;
     UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
+
     // 2. filter for datablocks
-    SharedPtr<BaseExpression> filter_leftover_;
-    // 3. secondary index filter
-    bool finish_build_secondary_index_filter_ = false;
-    SharedPtr<BaseExpression> secondary_index_filter_qualified_;
-    HashMap<ColumnID, TableIndexEntry *> secondary_index_column_index_map_;
-    Vector<FilterExecuteElem> filter_execute_command_;
+    SharedPtr<BaseExpression> leftover_filter_;
+
+    // 3. index filter, including:
+    // 3.1. secondary index (evaluated once for one segment)
+    // 3.2. fulltext index (can perform forward iterate)
+    bool finish_build_index_filter_ = false;
+    SharedPtr<BaseExpression> index_filter_;
+    UniquePtr<IndexFilterEvaluator> index_filter_evaluator_;
 
     // result will not be populated if always_true_ be true
     atomic_flag finish_build_;
@@ -58,6 +61,7 @@ export struct CommonQueryFilter {
     u32 begin_task_num_ = 0;
     atomic_u32 end_task_num_ = 0;
 
+public:
     CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, TxnTimeStamp begin_ts);
 
     // 1. try to finish building the filter
@@ -89,20 +93,23 @@ export struct CommonQueryFilter {
     }
 
     void TryApplyFastRoughFilterOptimizer();
-    void TryApplySecondaryIndexFilterOptimizer(QueryContext *query_context);
+    void TryApplyIndexFilterOptimizer(QueryContext *query_context);
 
     // result will not be populated if always_true_ be true
-    bool AlwaysTrue() const { return always_true_; };
+    bool AlwaysTrue() const { return always_true_; }
 
     // Check if given doc pass filter. Requires doc_id be in ascending order.
     bool PassFilter(RowID doc_id);
 
 private:
+    RowID EqualOrLarger(RowID doc_id);
+
     void BuildFilter(u32 task_id, Txn *txn);
 
     // for PassFilter
     SegmentID current_segment_id_ = INVALID_SEGMENT_ID;
     const Bitmask *doc_id_bitmask_ = nullptr;
+    UniquePtr<RoaringForwardIterator> current_roaring_iterator_;
     bool always_true_ = false;
 };
 

@@ -44,6 +44,8 @@ public:
         return task_text_;
     }
 
+    CleanupPeriodicTrigger *cleanup_trigger() const { return cleanup_trigger_.get(); }
+
 private:
     void Process();
 

@@ -20,7 +20,7 @@ import logical_explain;
 import column_remapper;
 import column_pruner;
 import lazy_load;
-import secondary_index_scan_builder;
+import index_scan_builder;
 import apply_fast_rough_filter;
 import explain_logical_plan;
 import optimizer_rule;
@@ -38,7 +38,7 @@ namespace infinity {
 Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
     // TODO: need an equivalent expression optimizer
     AddRule(MakeUnique<ApplyFastRoughFilter>());      // put it before SecondaryIndexScanBuilder
-    AddRule(MakeUnique<SecondaryIndexScanBuilder>()); // put it before ColumnPruner
+    AddRule(MakeUnique<IndexScanBuilder>()); // put it before ColumnPruner, necessary for filter_fulltext and index_scan
     AddRule(MakeUnique<ColumnPruner>());
     AddRule(MakeUnique<LazyLoad>());
     AddRule(MakeUnique<ColumnRemapper>());

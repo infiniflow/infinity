@@ -2383,8 +2383,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     // filter expression
     if (const CommonQueryFilter *filter = match_node->common_query_filter(); filter) {
         {
-            String filter_str = String(intent_size, ' ') + " - filter for secondary index: ";
-            if (const auto *filter_expr = filter->secondary_index_filter_qualified_.get(); filter_expr) {
+            String filter_str = String(intent_size, ' ') + " - index filter: ";
+            if (const auto *filter_expr = filter->index_filter_.get(); filter_expr) {
                 ExplainLogicalPlan::Explain(filter_expr, filter_str);
             } else {
                 filter_str += "None";
@@ -2392,8 +2392,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
             result->emplace_back(MakeShared<String>(filter_str));
         }
         {
-            String filter_str = String(intent_size, ' ') + " - filter except secondary index: ";
-            if (const auto *filter_expr = filter->filter_leftover_.get(); filter_expr) {
+            String filter_str = String(intent_size, ' ') + " - leftover filter: ";
+            if (const auto *filter_expr = filter->leftover_filter_.get(); filter_expr) {
                 ExplainLogicalPlan::Explain(filter_expr, filter_str);
             } else {
                 filter_str += "None";
@@ -2452,8 +2452,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatchTensorScan *match_tensor_no
     // filter expression
     if (const CommonQueryFilter *filter = match_tensor_node->common_query_filter(); filter) {
         {
-            String filter_str = String(intent_size, ' ') + " - filter for secondary index: ";
-            if (const auto *filter_expr = filter->secondary_index_filter_qualified_.get(); filter_expr) {
+            String filter_str = String(intent_size, ' ') + " - index filter: ";
+            if (const auto *filter_expr = filter->index_filter_.get(); filter_expr) {
                 ExplainLogicalPlan::Explain(filter_expr, filter_str);
             } else {
                 filter_str += "None";
@@ -2461,8 +2461,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatchTensorScan *match_tensor_no
             result->emplace_back(MakeShared<String>(filter_str));
         }
         {
-            String filter_str = String(intent_size, ' ') + " - filter except secondary index: ";
-            if (const auto *filter_expr = filter->filter_leftover_.get(); filter_expr) {
+            String filter_str = String(intent_size, ' ') + " - leftover filter: ";
+            if (const auto *filter_expr = filter->leftover_filter_.get(); filter_expr) {
                 ExplainLogicalPlan::Explain(filter_expr, filter_str);
             } else {
                 filter_str += "None";

@@ -246,6 +246,7 @@ void ClusterManager::CheckHeartBeatInner() {
             if (node_info->node_status_ == NodeStatus::kAlive) {
                 if (node_info->last_update_ts_ + 2 * leader_node_->heartbeat_interval_ < this_node_->last_update_ts_) {
                     node_info->node_status_ = NodeStatus::kTimeout;
+                    LOG_INFO(fmt::format("Node {} is timeout", node_name));
                 }
             }
         }
