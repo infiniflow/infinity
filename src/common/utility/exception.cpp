@@ -62,7 +62,6 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
     if (storage != nullptr) {
         CleanupInfoTracer *cleanup_tracer = storage->cleanup_info_tracer();
         String error_msg = cleanup_tracer->GetCleanupInfo();
-        std::cout << error_msg << std::endl;
         LOG_ERROR(std::move(error_msg));
     }
 

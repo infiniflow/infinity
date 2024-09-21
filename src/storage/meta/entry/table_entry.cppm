@@ -281,6 +281,8 @@ public:
         return fulltext_column_index_cache_->UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
 
+    void InvalidateFullTextIndexCache(TableIndexEntry *table_index_entry);
+
 private:
     TableMeta *table_meta_{};
 

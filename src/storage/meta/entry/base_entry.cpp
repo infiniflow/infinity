@@ -26,6 +26,11 @@ BaseEntry::BaseEntry(const BaseEntry &other) : deleted_(other.deleted_), entry_t
 
 bool BaseEntry::CheckVisible(Txn *txn) const {
     TxnTimeStamp begin_ts = txn->BeginTS();
+    if (txn_id_ == 0) {
+        // could not check if the entry is visible accurately. log a warning and return true
+        LOG_WARN(fmt::format("Entry {} txn id is not set, commit_ts", *encode_, commit_ts_));
+        return begin_ts >= commit_ts_;
+    }
     if (begin_ts >= commit_ts_ || txn_id_ == txn->TxnID()) {
         return true;
     }
@@ -39,11 +44,6 @@ bool BaseEntry::CheckVisible(Txn *txn) const {
         UnrecoverableError(error_message);
     }
     // Check if the entry is in committing process, because commit_ts of the base_entry is set in the Txn::CommitBottom
-    if (txn_id_ == 0) {
-        // could not check if the entry is visible accurately. log a warning and return true
-        LOG_WARN(fmt::format("Entry {} txn id is not set", *encode_));
-        return true;
-    }
     return txn_mgr->CheckIfCommitting(txn_id_, begin_ts);
 }
 
