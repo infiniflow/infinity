@@ -85,6 +85,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[16] = String("0.3.0.dev7");
     client_version_map_[17] = String("0.3.0");
     client_version_map_[18] = String("0.4.0.dev1");
+    client_version_map_[19] = String("0.4.0.dev2");
 }
 
 Pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
