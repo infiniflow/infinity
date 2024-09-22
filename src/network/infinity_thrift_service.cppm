@@ -57,7 +57,7 @@ struct ClientVersions {
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
 private:
     static constexpr std::string_view ErrorMsgHeader = "[THRIFT ERROR]";
-    static constexpr i64 current_version_index_{18}; // 0.4.0.dev1
+    static constexpr i64 current_version_index_{19}; // 0.4.0.dev2
 
     static std::mutex infinity_session_map_mutex_;
     static HashMap<u64, SharedPtr<Infinity>> infinity_session_map_;
