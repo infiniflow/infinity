@@ -736,9 +736,9 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"ANALYZER"`: *Optional*
       - `"standard"`: (Default) The standard analyzer, segmented by token, lowercase processing, and provides stemming output. Use `-` to specify the languages stemmer. `English` is the default stemmer: `"standard-english"` and `"standard"` are the same stemmer setting. Supported language stemmers include: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`, `Russian`, `Spanish`, `Swedish`, and `Turkish`.
       - `"chinese"`: Simplified Chinese
-      - `"tradition"`: Traditional Chinese
+      - `"traditional"`: Traditional Chinese
       - `"japanese"`: Japanese
-      - `"korea"`: Korean
+      - `"korean"`: Korean
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
   - Parameter settings for a secondary index:  
     No parameters are required. For now, use an empty list `[]`.
