@@ -166,6 +166,8 @@ struct FilterQueryNode final : public QueryNode {
         }
         os << filter_str << ") (filter_result_count: " << filter_result_count_ << ")\n";
     }
+
+    void GetQueryTerms(std::vector<std::string> &terms) const override {}
 };
 
 void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
