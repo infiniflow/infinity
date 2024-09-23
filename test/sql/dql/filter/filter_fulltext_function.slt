@@ -65,8 +65,59 @@ SELECT * FROM ft_in_filter WHERE filter_fulltext('doc', 'first OR second') AND (
 ----
 1 first text
 
+query I
+SELECT * FROM ft_in_filter WHERE filter_text('doc', 'second') OR num > 2;
+----
+2 second text multiple
+3 third text many words
+
+query I
+EXPLAIN SELECT * FROM ft_in_filter WHERE filter_text('doc', 'second') OR num > 2;
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [num (#0), doc (#1)]
+-> FILTER (3)
+   - filter: FILTER_FULLTEXT('doc', 'second') OR (CAST(num (#0) AS BigInt) > 2)
+   - output columns: [num, __rowid]
+  -> TABLE SCAN (2)
+     - table name: ft_in_filter(default_db.ft_in_filter)
+     - table index: #1
+     - output_columns: [num, __rowid]
+
+query I
+SELECT * FROM ft_in_filter SEARCH MATCH TEXT('doc', 'first second third', WHERE filter_text('doc', 'second') OR num > 2);
+----
+2 second text multiple
+3 third text many words
+
+query I
+SELECT filter_text('doc', 'second'), (filter_text('doc', 'second') OR num > 2) FROM ft_in_filter;
+----
+false false
+true true
+false true
+
 statement ok
 CREATE INDEX iii ON ft_in_filter(num);
+
+query I
+EXPLAIN SELECT * FROM ft_in_filter WHERE filter_text('doc', 'second') OR num > 2;
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [num (#0), doc (#1)]
+-> INDEX SCAN (6)
+   - table name: ft_in_filter(default_db.ft_in_filter)
+   - table index: #1
+   - filter: FILTER_FULLTEXT('doc', 'second') OR (CAST(num (#1.0) AS BigInt) > 2)
+   - output_columns: [__rowid]
+
+query I
+SELECT * FROM ft_in_filter WHERE filter_text('doc', 'second') OR num > 2;
+----
+2 second text multiple
+3 third text many words
 
 query I
 EXPLAIN SELECT * FROM ft_in_filter WHERE filter_fulltext('doc', 'first OR second') AND (num < 2 OR num > 2);
