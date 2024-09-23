@@ -655,11 +655,10 @@ class TestInfinity:
                 "filter_text('doc', 'first') or num >= 2").to_df())
             pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
                 "filter_fulltext('doc', 'second') or (num < 2 or num > 2)").to_df())
-            pd.testing.assert_frame_equal(pd.DataFrame({"FILTER_FULLTEXT('doc', 'second')": (False, True, False),
-                                                        "(FILTER_FULLTEXT('doc', 'second') OR (num > 2))": (
-                                                        False, True, True)}),
-                                          table_obj.output(["filter_text('doc', 'second')",
-                                                            "filter_text('doc', 'second') or num > 2"]).to_df())
+            pd.testing.assert_frame_equal(pd.DataFrame({
+                "(FILTER_FULLTEXT('doc', 'second') OR (num > 2))": (False, True, True),
+                "FILTER_FULLTEXT('doc', 'second')": (False, True, False)}),
+                table_obj.output(["filter_text('doc', 'second') or num > 2", "filter_text('doc', 'second')"]).to_df())
 
         test_func()
         table_obj.create_index("my_sc_index", index.IndexInfo("num", index.IndexType.Secondary), ConflictType.Error)
