@@ -193,30 +193,36 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
     output_column_vector = input_data_block_->column_vectors[column_index];
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr, SharedPtr<ExpressionState> &state, SharedPtr<ColumnVector> &output_column_vector) {
+void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr,
+                                  SharedPtr<ExpressionState> &state,
+                                  SharedPtr<ColumnVector> &output_column_vector) {
     SharedPtr<BaseExpression> &left_expression = expr->left_operand();
     SharedPtr<ExpressionState> &left_state = state->Children()[0];
     SharedPtr<ColumnVector> &left_state_output = left_state->OutputColumnVector();
     Execute(left_expression, left_state, left_state_output);
-    
-    //in expression evaluates to a constant
-    if(left_state->OutputColumnVector()->vector_type() == ColumnVectorType::kConstant) {
-        bool in_result = expr->Exists(left_state_output->GetValue(0));
-        for(SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
+
+    // in expression evaluates to a constant
+    if (left_state->OutputColumnVector()->vector_type() == ColumnVectorType::kConstant) {
+        bool in_result =
+            (expr->in_type() == InType::kIn) ? expr->Exists(left_state_output->GetValue(0)) : !expr->Exists(left_state_output->GetValue(0));
+        for (SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, in_result);
         }
+        output_column_vector->Finalize(input_data_block_->row_count());
         return;
     }
-    if(expr->in_type() == InType::kIn) {
-        for(SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
+    if (expr->in_type() == InType::kIn) {
+        for (SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, expr->Exists(left_state_output->GetValue(idx)));
         }
+        output_column_vector->Finalize(input_data_block_->row_count());
         return;
     }
     if (expr->in_type() == InType::kNotIn) {
-        for(SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
+        for (SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, !expr->Exists(left_state_output->GetValue(idx)));
         }
+        output_column_vector->Finalize(input_data_block_->row_count());
         return;
     }
 }
