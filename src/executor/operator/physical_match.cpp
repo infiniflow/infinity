@@ -66,6 +66,7 @@ import analyzer_pool;
 import roaring_bitmap;
 import segment_entry;
 import knn_filter;
+import highlighter;
 
 namespace infinity {
 
@@ -166,6 +167,8 @@ struct FilterQueryNode final : public QueryNode {
         }
         os << filter_str << ") (filter_result_count: " << filter_result_count_ << ")\n";
     }
+
+    void GetQueryTerms(std::vector<std::string> &terms) const override { query_tree_->GetQueryTerms(terms); }
 };
 
 void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
@@ -383,6 +386,11 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         u32 block_capacity = DEFAULT_BLOCK_CAPACITY;
         u32 output_block_row_id = 0;
         DataBlock *output_block_ptr = output_data_blocks.back().get();
+        bool highlight = false;
+        Vector<String> query;
+        if (highlight)
+            full_text_query_context.optimized_query_tree_->GetQueryTerms(query);
+
         for (u32 output_id = 0; output_id < result_count; ++output_id) {
             if (output_block_row_id == block_capacity) {
                 output_block_ptr->Finalize();
@@ -398,10 +406,45 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
             const BlockEntry *block_entry = base_table_ref_->block_index_->GetBlockEntry(segment_id, block_id);
             assert(block_entry != nullptr);
             SizeT column_id = 0;
+
             for (; column_id < column_n; ++column_id) {
                 BlockColumnEntry *block_column_ptr = block_entry->GetColumnBlockEntry(column_ids[column_id]);
                 ColumnVector column_vector = block_column_ptr->GetConstColumnVector(query_context->storage()->buffer_manager());
-                output_block_ptr->column_vectors[column_id]->AppendWith(column_vector, block_offset, 1);
+                if (highlight) {
+                    const Map<String, String> &column2analyzer = index_reader_.GetColumn2Analyzer();
+                    String analyzer_name = "standard";
+                    const String &field_name = (*base_table_ref_->column_names_)[column_id];
+                    if (!field_name.empty()) {
+                        if (auto it = column2analyzer.find(field_name); it != column2analyzer.end()) {
+                            analyzer_name = it->second;
+                        }
+                    }
+                    ColumnVector output_vector(column_vector.data_type());
+                    output_vector.Initialize(ColumnVectorType::kFlat, column_vector.Size());
+                    if (analyzer_name.find("standard") != std::string::npos) {
+                        auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
+                        if (!status.ok()) {
+                            RecoverableError(status);
+                        }
+                        analyzer->SetCharOffset(true);
+                        for (SizeT i = 0; i < column_vector.Size(); ++i) {
+                            String raw_content = column_vector.GetValue(i).GetVarchar();
+                            String output;
+                            Highlighter::instance().GetHighlightWithStemmer(query, raw_content, output, analyzer.get());
+                            output_vector.AppendValue(Value::MakeVarchar(output));
+                        }
+                    } else {
+                        for (SizeT i = 0; i < column_vector.Size(); ++i) {
+                            String raw_content = column_vector.GetValue(i).GetVarchar();
+                            String output;
+                            Highlighter::instance().GetHighlightWithoutStemmer(query, raw_content, output);
+                            output_vector.AppendValue(Value::MakeVarchar(output));
+                        }
+                    }
+                    output_block_ptr->column_vectors[column_id]->AppendWith(output_vector, block_offset, 1);
+                } else {
+                    output_block_ptr->column_vectors[column_id]->AppendWith(column_vector, block_offset, 1);
+                }
             }
             Value v = Value::MakeFloat(score_result[output_id]);
             output_block_ptr->column_vectors[column_id++]->AppendValue(v);

@@ -27,7 +27,7 @@ import stemmer;
 import chinese_analyzer;
 import traditional_chinese_analyzer;
 import japanese_analyzer;
-import korea_analyzer;
+import korean_analyzer;
 import standard_analyzer;
 import ngram_analyzer;
 import logger;
@@ -151,8 +151,8 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             }
             return {MakeUnique<JapaneseAnalyzer>(*reinterpret_cast<JapaneseAnalyzer *>(prototype)), Status::OK()};
         }
-        case Str2Int(KOREA.data()): {
-            Analyzer *prototype = cache_[KOREA].get();
+        case Str2Int(KOREAN.data()): {
+            Analyzer *prototype = cache_[KOREAN].get();
             if (prototype == nullptr) {
                 String path;
                 Config *config = InfinityContext::instance().config();
@@ -162,15 +162,15 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 } else {
                     path = config->ResourcePath();
                 }
-                UniquePtr<KoreaAnalyzer> analyzer = MakeUnique<KoreaAnalyzer>(std::move(path));
+                UniquePtr<KoreanAnalyzer> analyzer = MakeUnique<KoreanAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
                     return {nullptr, load_status};
                 }
                 prototype = analyzer.get();
-                cache_[KOREA] = std::move(analyzer);
+                cache_[KOREAN] = std::move(analyzer);
             }
-            return {MakeUnique<KoreaAnalyzer>(*reinterpret_cast<KoreaAnalyzer *>(prototype)), Status::OK()};
+            return {MakeUnique<KoreanAnalyzer>(*reinterpret_cast<KoreanAnalyzer *>(prototype)), Status::OK()};
         }
         case Str2Int(STANDARD.data()): {
             UniquePtr<StandardAnalyzer> analyzer = MakeUnique<StandardAnalyzer>();

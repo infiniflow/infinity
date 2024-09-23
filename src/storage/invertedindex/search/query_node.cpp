@@ -575,6 +575,8 @@ void TermQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool 
     os << '\n';
 }
 
+void TermQueryNode::GetQueryTerms(std::vector<std::string> &terms) const { terms.push_back(term_); }
+
 void PhraseQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
@@ -590,6 +592,12 @@ void PhraseQueryNode::PrintTree(std::ostream &os, const std::string &prefix, boo
     os << '\n';
 }
 
+void PhraseQueryNode::GetQueryTerms(std::vector<std::string> &terms) const {
+    for (auto term : terms_) {
+        terms.push_back(term);
+    }
+}
+
 void MultiQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
@@ -602,6 +610,12 @@ void MultiQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool
         children_[i]->PrintTree(os, next_prefix, false);
     }
     children_.back()->PrintTree(os, next_prefix, true);
+}
+
+void MultiQueryNode::GetQueryTerms(std::vector<std::string> &terms) const {
+    for (u32 i = 0; i < children_.size(); ++i) {
+        children_[i]->GetQueryTerms(terms);
+    }
 }
 
 } // namespace infinity
