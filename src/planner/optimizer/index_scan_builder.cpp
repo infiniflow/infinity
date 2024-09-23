@@ -27,6 +27,7 @@ import logical_knn_scan;
 import logical_match;
 import logical_match_tensor_scan;
 import logical_match_scan_base;
+import logical_project;
 import logical_fusion;
 import query_context;
 import logical_node_visitor;
@@ -34,6 +35,8 @@ import infinity_exception;
 import logger;
 import third_party;
 import filter_expression_push_down;
+import base_table_ref;
+import lazy_load;
 
 namespace infinity {
 
@@ -61,7 +64,7 @@ public:
                     auto &fast_rough_filter_evaluator = table_scan.fast_rough_filter_evaluator_;
                     // check if the filter can be pushed down to the table scan
                     auto [index_filter, leftover_filter, index_filter_evaluator] =
-                        FilterExpressionPushDown::PushDownToIndexScan(query_context_, *base_table_ref_ptr, filter_expression);
+                        FilterExpressionPushDown::PushDownToIndexScan(query_context_, base_table_ref_ptr.get(), filter_expression);
                     // 1. check if the filter can be pushed down to the table scan
                     if (!index_filter) {
                         // no qualified index filter condition, keep the table scan
@@ -114,10 +117,19 @@ public:
                 VisitNode(child);
             }
         }
+        // handle filter_fulltext expression for projection
+        if (const auto scan_ref = GetScanTableRef(*op); scan_ref.has_value()) {
+            scan_table_ref_ptr_ = scan_ref.value();
+        }
+        if (op->operator_type() == LogicalNodeType::kProjection) {
+            const auto &proj = static_cast<LogicalProject &>(*op);
+            FilterExpressionPushDown::BuildFilterFulltextExpression(query_context_, scan_table_ref_ptr_, proj.expressions_);
+        }
     }
 
 private:
     QueryContext *query_context_ = nullptr;
+    const BaseTableRef *scan_table_ref_ptr_ = nullptr;
 };
 
 void IndexScanBuilder::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) {
