@@ -65,7 +65,8 @@ class ThriftInfinityClient:
         # version: 0.3.0.dev7, client_version: 16
         # version: 0.3.0.dev8 and 0.3.0, client_version: 17
         # version: 0.4.0.dev1, client_version: 18
-        res = self.client.Connect(ConnectRequest(client_version=18)) # 0.4.0.dev1
+        # version: 0.4.0.dev2, client_version: 19
+        res = self.client.Connect(ConnectRequest(client_version=19)) # 0.4.0.dev2
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
@@ -287,3 +288,6 @@ class ThriftInfinityClient:
     def drop_columns(self, db_name: str, table_name: str, column_names: list):
         return self.client.DropColumns(DropColumnsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
                                                           column_names=column_names))
+
+    def cleanup(self):
+        return self.client.Cleanup(CommonRequest(session_id=self.session_id))

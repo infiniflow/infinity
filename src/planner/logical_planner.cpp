@@ -1227,6 +1227,11 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             this->logical_plan_ = logical_command;
             break;
         }
+        case CommandType::kCleanup: {
+            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+            this->logical_plan_ = logical_command;
+            break;
+        }
         default: {
             String error_message = "Invalid command type.";
             UnrecoverableError(error_message);

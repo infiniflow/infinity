@@ -44,7 +44,7 @@ template <typename T>
 concept ConvertToOrderedI64 = IsAnyOf<T, DateTimeT, TimestampT>;
 
 template <typename T>
-concept ConvertToHashU64 = IsAnyOf<T, VarcharT, String>;
+concept ConvertToHashU64 = IsAnyOf<T, VarcharT, std::string_view>;
 
 template <typename ValueT>
 struct ConvertToOrdered {
@@ -99,33 +99,45 @@ ConvertToOrderedType<RawValueType> ConvertToOrderedKeyValue(RawValueType value) 
 
 // for VarcharT
 export template <>
-ConvertToOrderedType<String> ConvertToOrderedKeyValue(String value) {
-    return std::hash<String>{}(value);
+ConvertToOrderedType<std::string_view> ConvertToOrderedKeyValue(std::string_view value) {
+    return std::hash<std::string_view>{}(value);
 }
 
-template <typename T>
-LogicalType GetLogicalType = LogicalType::kInvalid;
+export template <typename T>
+constexpr LogicalType GetLogicalType = LogicalType::kInvalid;
 
 template <>
-LogicalType GetLogicalType<FloatT> = LogicalType::kFloat;
+constexpr LogicalType GetLogicalType<TinyIntT> = LogicalType::kTinyInt;
 
 template <>
-LogicalType GetLogicalType<DoubleT> = LogicalType::kDouble;
+constexpr LogicalType GetLogicalType<SmallIntT> = LogicalType::kSmallInt;
 
 template <>
-LogicalType GetLogicalType<TinyIntT> = LogicalType::kTinyInt;
+constexpr LogicalType GetLogicalType<IntegerT> = LogicalType::kInteger;
 
 template <>
-LogicalType GetLogicalType<SmallIntT> = LogicalType::kSmallInt;
+constexpr LogicalType GetLogicalType<BigIntT> = LogicalType::kBigInt;
 
 template <>
-LogicalType GetLogicalType<IntegerT> = LogicalType::kInteger;
+constexpr LogicalType GetLogicalType<FloatT> = LogicalType::kFloat;
 
 template <>
-LogicalType GetLogicalType<BigIntT> = LogicalType::kBigInt;
+constexpr LogicalType GetLogicalType<DoubleT> = LogicalType::kDouble;
 
 template <>
-LogicalType GetLogicalType<VarcharT> = LogicalType::kVarchar;
+constexpr LogicalType GetLogicalType<DateT> = LogicalType::kDate;
+
+template <>
+constexpr LogicalType GetLogicalType<TimeT> = LogicalType::kTime;
+
+template <>
+constexpr LogicalType GetLogicalType<DateTimeT> = LogicalType::kDateTime;
+
+template <>
+constexpr LogicalType GetLogicalType<TimestampT> = LogicalType::kTimestamp;
+
+template <>
+constexpr LogicalType GetLogicalType<VarcharT> = LogicalType::kVarchar;
 
 export class SecondaryIndexData {
 protected:

@@ -1,0 +1,139 @@
+
+statement ok
+DROP TABLE IF EXISTS ft_in_filter;
+
+statement ok
+CREATE TABLE ft_in_filter(num int, doc varchar);
+
+# copy data from csv file
+statement ok
+COPY ft_in_filter FROM '/var/infinity/test_data/fulltext_delete.csv' WITH ( DELIMITER '\t', FORMAT CSV );
+
+statement ok
+CREATE INDEX ft_index ON ft_in_filter(doc) USING FULLTEXT;
+
+query I
+SELECT * FROM ft_in_filter;
+----
+1 first text
+2 second text multiple
+3 third text many words
+
+# error option: topn
+statement error
+SELECT * FROM ft_in_filter WHERE filter_fulltext('doc', 'text', 'topn=33');
+
+query I
+SELECT * FROM ft_in_filter WHERE filter_fulltext('doc', 'second', 'block_max=false');
+----
+2 second text multiple
+
+query I
+SELECT * FROM ft_in_filter WHERE filter_text('doc', 'second', 'block_max=false');
+----
+2 second text multiple
+
+query I
+EXPLAIN SELECT * FROM ft_in_filter WHERE filter_fulltext('doc', 'second', 'block_max=false');
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [num (#0), doc (#1)]
+-> INDEX SCAN (6)
+   - table name: ft_in_filter(default_db.ft_in_filter)
+   - table index: #1
+   - filter: FILTER_FULLTEXT('doc', 'second', 'block_max=false')
+   - output_columns: [__rowid]
+
+query I
+EXPLAIN SELECT * FROM ft_in_filter WHERE filter_fulltext('doc', 'first OR second') AND (num < 2 OR num > 2);
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [num (#0), doc (#1)]
+-> FILTER (3)
+   - filter: (CAST(num (#0) AS BigInt) < 2) OR (CAST(num (#0) AS BigInt) > 2)
+   - output columns: [num, __rowid]
+  -> INDEX SCAN (6)
+     - table name: ft_in_filter(default_db.ft_in_filter)
+     - table index: #1
+     - filter: FILTER_FULLTEXT('doc', 'first OR second')
+     - output_columns: [__rowid]
+
+query I
+SELECT * FROM ft_in_filter WHERE filter_fulltext('doc', 'first OR second') AND (num < 2 OR num > 2);
+----
+1 first text
+
+statement ok
+CREATE INDEX iii ON ft_in_filter(num);
+
+query I
+EXPLAIN SELECT * FROM ft_in_filter WHERE filter_fulltext('doc', 'first OR second') AND (num < 2 OR num > 2);
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [num (#0), doc (#1)]
+-> INDEX SCAN (6)
+   - table name: ft_in_filter(default_db.ft_in_filter)
+   - table index: #1
+   - filter: FILTER_FULLTEXT('doc', 'first OR second') AND ((CAST(num (#1.0) AS BigInt) < 2) OR (CAST(num (#1.0) AS BigInt) > 2))
+   - output_columns: [__rowid]
+
+query I
+SELECT * FROM ft_in_filter WHERE filter_fulltext('doc', 'first OR second') AND (num < 2 OR num > 2);
+----
+1 first text
+
+query I
+SELECT * FROM ft_in_filter WHERE (filter_text('doc', 'first') OR filter_fulltext('doc', 'second'));
+----
+1 first text
+2 second text multiple
+
+query I
+SELECT * FROM ft_in_filter WHERE (filter_text('doc', 'first') OR filter_fulltext('doc', 'second')) AND (num < 2 OR num > 2);
+----
+1 first text
+
+query I
+EXPLAIN SELECT * FROM ft_in_filter WHERE (filter_text('doc', 'first') OR filter_fulltext('doc', 'second'));
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [num (#0), doc (#1)]
+-> INDEX SCAN (6)
+   - table name: ft_in_filter(default_db.ft_in_filter)
+   - table index: #1
+   - filter: FILTER_FULLTEXT('doc', 'first') OR FILTER_FULLTEXT('doc', 'second')
+   - output_columns: [__rowid]
+
+query I
+EXPLAIN SELECT * FROM ft_in_filter WHERE (filter_text('doc', 'first') OR filter_fulltext('doc', 'second')) AND (num < 2 OR num > 2);
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [num (#0), doc (#1)]
+-> INDEX SCAN (6)
+   - table name: ft_in_filter(default_db.ft_in_filter)
+   - table index: #1
+   - filter: (FILTER_FULLTEXT('doc', 'first') OR FILTER_FULLTEXT('doc', 'second')) AND ((CAST(num (#1.0) AS BigInt) < 2) OR (CAST(num (#1.0) AS BigInt) > 2))
+   - output_columns: [__rowid]
+
+query I
+SELECT * FROM ft_in_filter WHERE filter_text('doc', 'first') OR num >= 2;
+----
+1 first text
+2 second text multiple
+3 third text many words
+
+query I
+SELECT * FROM ft_in_filter WHERE filter_text('doc', 'second') OR num < 2 OR num > 2;
+----
+1 first text
+2 second text multiple
+3 third text many words
+
+# Clean up
+statement ok
+DROP TABLE ft_in_filter;

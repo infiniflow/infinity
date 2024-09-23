@@ -163,6 +163,8 @@ public:
 
     QueryResult DropColumns(const String &db_name, const String &table_name, Vector<String> column_names);
 
+    QueryResult Cleanup();
+
 private:
     SharedPtr<BaseSession> session_{};
 };

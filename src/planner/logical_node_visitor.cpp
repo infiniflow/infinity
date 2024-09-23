@@ -151,15 +151,15 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         case LogicalNodeType::kMatchTensorScan:
         case LogicalNodeType::kMatchSparseScan: {
             auto &node = static_cast<LogicalMatchScanBase &>(op);
-            if (node.common_query_filter_ and node.common_query_filter_->filter_leftover_) {
-                VisitExpression(node.common_query_filter_->filter_leftover_);
+            if (node.common_query_filter_ and node.common_query_filter_->leftover_filter_) {
+                VisitExpression(node.common_query_filter_->leftover_filter_);
             }
             break;
         }
         case LogicalNodeType::kMatch: {
             auto &node = (LogicalMatch &)op;
-            if (node.common_query_filter_ and node.common_query_filter_->filter_leftover_) {
-                VisitExpression(node.common_query_filter_->filter_leftover_);
+            if (node.common_query_filter_ and node.common_query_filter_->leftover_filter_) {
+                VisitExpression(node.common_query_filter_->leftover_filter_);
             }
             break;
         }

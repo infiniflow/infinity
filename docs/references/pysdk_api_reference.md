@@ -37,7 +37,7 @@ When connecting to Infinity in client-server mode, ensure that the client versio
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
 | v0.3.0             | v0.3.0             |
-| v0.4.0.dev1        | v0.4.0.dev1        |
+| v0.4.0.dev2        | v0.4.0.dev2        |
 
 If the versions do not match, please update your client or server to ensure compatibility.
 

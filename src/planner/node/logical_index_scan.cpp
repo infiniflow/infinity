@@ -36,14 +36,12 @@ namespace infinity {
 
 LogicalIndexScan::LogicalIndexScan(u64 node_id,
                                    SharedPtr<BaseTableRef> &&base_table_ref,
-                                   SharedPtr<BaseExpression> &&index_filter_qualified,
-                                   HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
-                                   Vector<FilterExecuteElem> &&filter_execute_command,
+                                   SharedPtr<BaseExpression> &&index_filter,
+                                   UniquePtr<IndexFilterEvaluator> &&index_filter_evaluator,
                                    UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                                    bool add_row_id)
-    : LogicalNode(node_id, LogicalNodeType::kIndexScan), base_table_ref_(std::move(base_table_ref)),
-      index_filter_qualified_(std::move(index_filter_qualified)), column_index_map_(std::move(column_index_map)),
-      filter_execute_command_(std::move(filter_execute_command)), fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)),
+    : LogicalNode(node_id, LogicalNodeType::kIndexScan), base_table_ref_(std::move(base_table_ref)), index_filter_(std::move(index_filter)),
+      index_filter_evaluator_(std::move(index_filter_evaluator)), fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)),
       add_row_id_(add_row_id) {}
 
 Vector<ColumnBinding> LogicalIndexScan::GetColumnBindings() const {
@@ -86,7 +84,7 @@ String LogicalIndexScan::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
     ss << String(space, ' ') << arrow_str << "IndexScan: " << *base_table_ref_->table_entry_ptr_->GetTableName();
-    ss << ", filter expression: " << index_filter_qualified_->Name();
+    ss << ", filter expression: " << index_filter_->Name();
     space += arrow_str.size();
 
     return ss.str();

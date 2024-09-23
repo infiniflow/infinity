@@ -883,6 +883,13 @@ bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
+void SegmentIndexEntry::CommitIndex(TxnTimeStamp commit_ts) {
+    this->Commit(commit_ts);
+    for (auto &chunk_index_entry : chunk_index_entries_) {
+        chunk_index_entry->Commit(commit_ts);
+    }
+}
+
 void SegmentIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     for (auto &buffer_ptr : vector_buffer_) {
         if (buffer_ptr.get() == nullptr) {

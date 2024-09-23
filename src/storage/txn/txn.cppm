@@ -228,6 +228,8 @@ public:
 
     void AddWriteTxnNum(TableEntry *table_entry);
 
+    TxnStore *txn_store() { return &txn_store_; }
+
 private:
     void CheckTxnStatus();
 

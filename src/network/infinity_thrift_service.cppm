@@ -57,7 +57,7 @@ struct ClientVersions {
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
 private:
     static constexpr std::string_view ErrorMsgHeader = "[THRIFT ERROR]";
-    static constexpr i64 current_version_index_{18}; // 0.4.0.dev1
+    static constexpr i64 current_version_index_{19}; // 0.4.0.dev2
 
     static std::mutex infinity_session_map_mutex_;
     static HashMap<u64, SharedPtr<Infinity>> infinity_session_map_;
@@ -100,6 +100,8 @@ public:
     void AddColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::AddColumnsRequest &request) final;
 
     void DropColumns(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropColumnsRequest &request) final;
+
+    void Cleanup(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) final;
 
     void ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response, const infinity_thrift_rpc::ListDatabaseRequest &request) final;
 

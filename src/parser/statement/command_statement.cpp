@@ -23,5 +23,6 @@ std::string CheckTable::ToString() const { return "Check Table Command"; }
 std::string CommandStatement::ToString() const { return command_info_->ToString(); }
 std::string LockCmd::ToString() const { return "Lock Command"; }
 std::string UnlockCmd::ToString() const { return "Unlock Command"; }
+std::string CleanupCmd::ToString() const { return "Cleanup Command"; }
 
 } // namespace infinity

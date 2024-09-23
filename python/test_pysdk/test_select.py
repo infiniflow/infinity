@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 from common import common_values
 import infinity
+import infinity.index as index
 import infinity_embedded
 from numpy import dtype
 from infinity.errors import ErrorCode
@@ -28,9 +29,13 @@ def http(request):
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
     if local_infinity:
+        module = importlib.import_module("infinity_embedded.index")
+        globals()["index"] = module
         module = importlib.import_module("infinity_embedded.common")
         func = getattr(module, 'ConflictType')
         globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
         uri = common_values.TEST_LOCAL_PATH
         request.cls.infinity_obj = infinity_embedded.connect(uri)
     elif http:
@@ -596,4 +601,29 @@ class TestInfinity:
 
         res = db_obj.drop_table(
             "test_invalid_filter_expression"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def test_filter_fulltext(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_filter_fulltext" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_filter_fulltext" + suffix,
+                                        {"num": {"type": "int"}, "doc": {"type": "varchar"}}, ConflictType.Error)
+        table_obj.insert([{"num": 1, "doc": "first text"}, {"num": 2, "doc": "second text multiple"},
+                          {"num": 3, "doc": "third text many words"}])
+        table_obj.create_index("my_ft_index", index.IndexInfo("doc", index.IndexType.FullText), ConflictType.Error)
+        table_obj.create_index("my_sc_index", index.IndexInfo("num", index.IndexType.Secondary), ConflictType.Error)
+        expect_result = pd.DataFrame({'num': (1,), "doc": "first text"}).astype({'num': dtype('int32')})
+        res = table_obj.output(["*"]).filter("filter_text('doc', 'first OR second') and (num < 2 or num > 2)").to_df()
+        pd.testing.assert_frame_equal(res, expect_result)
+        res = table_obj.output(["*"]).filter(
+            "(filter_text('doc', 'first') or filter_fulltext('doc', 'second')) and (num < 2 or num > 2)").to_df()
+        pd.testing.assert_frame_equal(res, expect_result)
+        expect_result = pd.DataFrame(
+            {'num': (1, 2, 3), "doc": ("first text", "second text multiple", "third text many words")}).astype(
+            {'num': dtype('int32')})
+        res = table_obj.output(["*"]).filter("filter_text('doc', 'first') or num >= 2").to_df()
+        pd.testing.assert_frame_equal(res, expect_result)
+        res = table_obj.output(["*"]).filter("filter_fulltext('doc', 'second') or (num < 2 or num > 2)").to_df()
+        pd.testing.assert_frame_equal(res, expect_result)
+        res = db_obj.drop_table("test_filter_fulltext" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

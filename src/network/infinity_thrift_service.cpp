@@ -85,6 +85,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[16] = String("0.3.0.dev7");
     client_version_map_[17] = String("0.3.0");
     client_version_map_[18] = String("0.4.0.dev1");
+    client_version_map_[19] = String("0.4.0.dev2");
 }
 
 Pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -873,6 +874,16 @@ void InfinityThriftService::DropColumns(infinity_thrift_rpc::CommonResponse &res
         return;
     }
     auto result = infinity->DropColumns(request.db_name, request.table_name, std::move(column_names));
+    ProcessQueryResult(response, result);
+}
+
+void InfinityThriftService::Cleanup(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+    auto result = infinity->Cleanup();
     ProcessQueryResult(response, result);
 }
 
