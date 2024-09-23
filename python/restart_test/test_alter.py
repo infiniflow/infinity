@@ -176,7 +176,7 @@ class TestAlter:
             res = table_obj.drop_columns(["c2"])
             assert res.error_code == ErrorCode.OK
 
-            time.sleep(4)  # wait for the data to be cleaned up
+            infinity_obj.cleanup()
 
             dropped_column_dirs = pathlib.Path(data_dir).rglob("1.col*")
             # find the column file with the column idx = 1
