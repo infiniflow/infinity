@@ -22,7 +22,7 @@
 
 ### Run the embedded Infinity test
 
-1. Install infinity-sdk from PYPI or compiled from source code.
+1. Install infinity-embedded-sdk from PYPI or compiled from source code.
 2. run 'python3 ./tools/run_pysdk_local_infinity_test.py'
 
 ### Run Infinity server test

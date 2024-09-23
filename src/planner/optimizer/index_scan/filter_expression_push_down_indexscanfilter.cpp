@@ -227,18 +227,21 @@ class IndexScanFilterExpressionPushDownMethod {
     using Enum = ExpressionIndexScanInfo::Enum;
     // for index
     QueryContext *query_context_;
-    // const BaseTableRef &base_table_ref_;
-    TableEntry *table_entry_ptr_;
+    const BaseTableRef *base_table_ref_ptr_;
+    TableEntry *table_entry_ptr_ = nullptr;
     ScalarFunctionSet *and_scalar_function_set_ptr_ = nullptr;
     ExpressionIndexScanInfo tree_info_;
 
 public:
-    IndexScanFilterExpressionPushDownMethod(QueryContext *query_context, const BaseTableRef &base_table_ref)
-        : query_context_(query_context), table_entry_ptr_(base_table_ref.table_entry_ptr_) {
+    IndexScanFilterExpressionPushDownMethod(QueryContext *query_context, const BaseTableRef *base_table_ref_ptr)
+        : query_context_(query_context), base_table_ref_ptr_(base_table_ref_ptr) {
         const auto and_function_set_ptr = Catalog::GetFunctionSetByName(query_context_->storage()->catalog(), "AND");
         and_scalar_function_set_ptr_ = static_cast<ScalarFunctionSet *>(and_function_set_ptr.get());
         // prepare secondary index info
-        tree_info_.InitColumnIndexEntries(table_entry_ptr_, query_context_->GetTxn());
+        if (base_table_ref_ptr_) {
+            table_entry_ptr_ = base_table_ref_ptr_->table_entry_ptr_;
+            tree_info_.InitColumnIndexEntries(table_entry_ptr_, query_context_->GetTxn());
+        }
     }
 
     IndexScanFilterExpressionPushDownResult SolveForIndexScan(const SharedPtr<BaseExpression> &expression) const {
@@ -262,7 +265,36 @@ public:
         } else {
             result.index_filter_evaluator_ = MakeUnique<IndexFilterEvaluatorAllTrue>();
         }
+        if (result.leftover_filter_) {
+            // build IndexFilterEvaluator for FilterFulltextExpression
+            BuildIndexFilterEvaluatorForLeftoverFilterFulltextExpression(result.leftover_filter_);
+        }
         return result;
+    }
+
+    inline void BuildIndexFilterEvaluatorForLeftoverFilterFulltextExpression(const SharedPtr<BaseExpression> &leftover_filter) const {
+        if (!leftover_filter) {
+            return;
+        }
+        switch (leftover_filter->type()) {
+            case ExpressionType::kFilterFullText: {
+                auto *filter_fulltext_expression = static_cast<FilterFulltextExpression *>(leftover_filter.get());
+                filter_fulltext_expression->txn_ = query_context_->GetTxn();
+                filter_fulltext_expression->block_index_ = base_table_ref_ptr_->block_index_;
+                TreeT fake_tree;
+                fake_tree.src_ptr = &leftover_filter;
+                fake_tree.info = Enum::kFilterFulltextExpr;
+                filter_fulltext_expression->filter_fulltext_evaluator_ = BuildIndexFilterEvaluator(fake_tree);
+                OptimizeFulltextTree(filter_fulltext_expression->filter_fulltext_evaluator_.get());
+                break;
+            }
+            default: {
+                for (const auto &child_expression : leftover_filter->arguments()) {
+                    BuildIndexFilterEvaluatorForLeftoverFilterFulltextExpression(child_expression);
+                }
+                break;
+            }
+        }
     }
 
 private:
@@ -597,10 +629,19 @@ private:
 };
 
 IndexScanFilterExpressionPushDownResult FilterExpressionPushDown::PushDownToIndexScan(QueryContext *query_context,
-                                                                                      const BaseTableRef &base_table_ref,
+                                                                                      const BaseTableRef *base_table_ref_ptr,
                                                                                       const SharedPtr<BaseExpression> &expression) {
-    IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref);
+    IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref_ptr);
     return filter_expression_push_down_method.SolveForIndexScan(expression);
+}
+
+void FilterExpressionPushDown::BuildFilterFulltextExpression(QueryContext *query_context,
+                                                             const BaseTableRef *base_table_ref_ptr,
+                                                             const Vector<SharedPtr<BaseExpression>> &expressions) {
+    IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref_ptr);
+    for (const auto &expr : expressions) {
+        filter_expression_push_down_method.BuildIndexFilterEvaluatorForLeftoverFilterFulltextExpression(expr);
+    }
 }
 
 } // namespace infinity

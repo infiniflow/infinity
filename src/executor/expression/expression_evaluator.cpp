@@ -36,6 +36,9 @@ import infinity_exception;
 import expression_type;
 import bound_cast_func;
 import logger;
+import logical_type;
+import internal_types;
+import roaring_bitmap;
 
 namespace infinity {
 
@@ -230,9 +233,38 @@ void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr,
 void ExpressionEvaluator::Execute(const SharedPtr<FilterFulltextExpression> &expr,
                                   SharedPtr<ExpressionState> &,
                                   SharedPtr<ColumnVector> &output_column_vector) {
-    LOG_ERROR("FilterFulltextExpression is not implemented yet. Now output all true.");
-    auto write_ptr = reinterpret_cast<u8 *>(output_column_vector->buffer_->GetDataMut());
-    std::fill_n(write_ptr, 8192 / 8, static_cast<u8>(-1));
+    if (input_data_block_->column_vectors.empty()) {
+        UnrecoverableError("Input data block is empty");
+    }
+    const auto *expect_rowid_col = input_data_block_->column_vectors.back().get();
+    if (expect_rowid_col->data_type()->type() != LogicalType::kRowID) {
+        UnrecoverableError("Input data type last column is not rowid");
+    }
+    const auto *rowid_ptr = reinterpret_cast<const RowID *>(expect_rowid_col->data());
+    for (BlockOffset idx = 0; idx < input_data_block_->row_count(); ++idx) {
+        const RowID row_id = rowid_ptr[idx];
+        const SegmentID segment_id = row_id.segment_id_;
+        const SegmentOffset segment_row_count = expr->block_index_->segment_block_index_.at(segment_id).segment_offset_;
+        const Bitmask *segment_filter_result_ptr = nullptr;
+        {
+            std::shared_lock lock(expr->rw_mutex_);
+            if (const auto it = expr->segment_results_.find(segment_id); it != expr->segment_results_.end()) {
+                segment_filter_result_ptr = &(it->second);
+            }
+        }
+        if (!segment_filter_result_ptr) [[unlikely]] {
+            std::unique_lock lock(expr->rw_mutex_);
+            if (const auto it = expr->segment_results_.find(segment_id); it != expr->segment_results_.end()) {
+                segment_filter_result_ptr = &(it->second);
+            } else {
+                auto &bitmap_ref = expr->segment_results_[segment_id];
+                bitmap_ref = expr->filter_fulltext_evaluator_->Evaluate(segment_id, segment_row_count, expr->txn_);
+                segment_filter_result_ptr = &bitmap_ref;
+            }
+        }
+        const auto row_result = segment_filter_result_ptr->IsTrue(row_id.segment_offset_);
+        output_column_vector->buffer_->SetCompactBit(idx, row_result);
+    }
     output_column_vector->Finalize(input_data_block_->row_count());
 }
 

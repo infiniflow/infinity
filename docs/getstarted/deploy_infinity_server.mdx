@@ -16,7 +16,7 @@ This document provides guidance on deploying the Infinity database. In general, 
 ## Import Infinity as a Python module
 
 :::caution IMPORTANT
-This approach allows you to embed Infinity as a module in a Python application. To deploy Infinity with the client and server as separate processes, follow the instructions in [Deploy Infinity using Docker](#deploy-infinity-using-docker) or [Deploy Infinity using binary](#deploy-infinity-using-binary).
+This approach allows you to call Infinity as an embedded Python module. To deploy Infinity with the client and server as separate processes, follow the instructions in [Deploy Infinity using Docker](#deploy-infinity-using-docker) or [Deploy Infinity using binary](#deploy-infinity-using-binary).
 :::
 
 ### Prerequisites
@@ -30,15 +30,15 @@ This approach allows you to embed Infinity as a module in a Python application. 
 ### Install Infinity as a module
 
 ```
-pip install infinity-sdk==0.4.0.dev2
+pip install infinity-embedded-sdk==0.4.0.dev2
 ```
 
 ### Create an Infinity object
 
 ```python
-import infinity
+import infinity_embedded
 
-infinity_obj = infinity.connect("/path/to/save/to")
+infinity_obj = infinity_embedded.connect("absolute/path/to/save/to")
 ```
 
 :::note
@@ -101,12 +101,20 @@ If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using 
 pip install infinity-sdk==0.4.0.dev2
 ```
 
-### Connect to Infinity Server 
+### Connect to Infinity Server and run a dense vector search
 
 ```python
 import infinity
 
 infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+db_object = infinity_object.get_database("default_db")
+table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
+table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+res = table_object.output(["*"])
+                  .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
+                  .to_pl()
+print(res)
 ```
 
 :::note
@@ -155,14 +163,6 @@ sudo dpkg -i infinity-0.4.0.dev2-x86_64.deb
 ```
 
 ```bash
-sudo chown -R $USER /var/infinity
-```
-
-```bash 
-ulimit -n 500000
-```
-
-```bash
 sudo systemctl start infinity
 ```
 
@@ -175,12 +175,20 @@ sudo systemctl start infinity
 pip install infinity-sdk==0.4.0.dev2
 ```
 
-### Connect to Infinity Server 
+### Connect to Infinity Server and run a dense vector search
 
 ```python
 import infinity
 
 infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+db_object = infinity_object.get_database("default_db")
+table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
+table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+res = table_object.output(["*"])
+                  .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
+                  .to_pl()
+print(res)
 ```
 
 :::note

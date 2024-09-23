@@ -28,6 +28,7 @@ import optimizer_rule;
 import load_meta;
 import internal_types;
 import data_type;
+import base_table_ref;
 
 namespace infinity {
 
@@ -88,5 +89,7 @@ private:
     RefencecColumnCollection collector{};
     CleanScan cleaner_{};
 };
+
+export Optional<BaseTableRef *> GetScanTableRef(LogicalNode &op);
 
 } // namespace infinity
