@@ -169,6 +169,8 @@ private:
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
     SharedPtr<SegmentIndexEntry> last_segment_{};
 
+    TableEntry *table_entry_{}; // this is set when pick cleanup
+
 public:
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
