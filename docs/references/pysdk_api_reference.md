@@ -7,6 +7,14 @@ slug: /python_api_reference
 ## connect
 
 ```python
+# Connect to the local directory and get an Infinity object
+infinity_embedded.connect(uri)
+```
+
+Or
+
+```python
+# Connect to the Infinity server and get an Infinity object
 infinity.connect(uri)
 ```
 
@@ -22,15 +30,15 @@ You must have an Infinity object ready to perform database-specific operations.
 
 The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
-- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is imported as an embedded Python module.
+- `"/absolute/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is imported as an embedded Python module.
 - `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
   - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
   - `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
 
-:::tip NOTE
-- When setting `uri` as `"/path/to/save/to"`, ensure you:
+:::danger NOTE
+- When setting `uri` as `"/absolute/path/to/save/to"`, ensure you:
   - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.2.1_OR_HIGHER>`
-  - Import the `infinity_embedded` module: `import infinity_embedded as infinity`.
+  - Import the `infinity_embedded` module: `import infinity_embedded`.
 - When setting `uri` as `NetworkAddress`, ensure you:
   - Install the Infinity SDK: `pip install infinity==<VERSION>`
   - Import the `infinity` module: `import infinity`.
@@ -78,8 +86,8 @@ This allows for bug fixes without requiring changes to the configuration file.
 From v0.2.1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.2.1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
 ```python
-import infinity_embedded as infinity
-infinity_object = infinity.connect("/absolute/path/to/save/to")
+import infinity_embedded
+infinity_object = infinity_embedded.connect("/absolute/path/to/save/to")
 ```
 
 #### Connect to Infinity in client-server mode
@@ -89,7 +97,7 @@ If you have deployed Infinity as a separate server and installed the Infinity cl
 ```python
 import infinity
 # If Infinity is deployed on the local machine, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
-infinity_object = infinity.connect(infinity.NetworkAddress("192.168.1.101", 23817)) 
+infinity_object = infinity_embedded.connect(infinity.NetworkAddress("192.168.1.101", 23817)) 
 ```
 
 ---

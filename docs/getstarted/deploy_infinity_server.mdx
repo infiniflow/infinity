@@ -16,7 +16,7 @@ This document provides guidance on deploying the Infinity database. In general, 
 ## Import Infinity as a Python module
 
 :::caution IMPORTANT
-This approach allows you to embed Infinity as a module in a Python application. To deploy Infinity with the client and server as separate processes, follow the instructions in [Deploy Infinity using Docker](#deploy-infinity-using-docker) or [Deploy Infinity using binary](#deploy-infinity-using-binary).
+This approach allows you to call Infinity as an embedded Python module. To deploy Infinity with the client and server as separate processes, follow the instructions in [Deploy Infinity using Docker](#deploy-infinity-using-docker) or [Deploy Infinity using binary](#deploy-infinity-using-binary).
 :::
 
 ### Prerequisites
@@ -30,15 +30,15 @@ This approach allows you to embed Infinity as a module in a Python application. 
 ### Install Infinity as a module
 
 ```
-pip install infinity-sdk==0.4.0.dev2
+pip install infinity-embedded-sdk==0.4.0.dev2
 ```
 
 ### Create an Infinity object
 
 ```python
-import infinity
+import infinity_embedded
 
-infinity_obj = infinity.connect("/path/to/save/to")
+infinity_obj = infinity_embedded.connect("absolute/path/to/save/to")
 ```
 
 :::note
