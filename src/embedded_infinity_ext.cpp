@@ -192,6 +192,13 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("opt_params", &WrapMatchSparseExpr::opt_params)
         .def_rw("filter_expr", &WrapMatchSparseExpr::filter_expr);
 
+    // Bind WrapInExpr
+    nb::class_<WrapInExpr>(m, "WrapInExpr")
+        .def(nb::init<>())
+        .def_rw("left", &WrapInExpr::left)
+        .def_rw("arguments", &WrapInExpr::arguments)
+        .def_rw("in_type", &WrapInExpr::in);
+
     // Bind WrapSearchExpr
     nb::class_<WrapSearchExpr>(m, "WrapSearchExpr")
         .def(nb::init<>())
@@ -212,7 +219,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("match_sparse_expr", &WrapParsedExpr::match_sparse_expr)
         .def_rw("match_tensor_expr", &WrapParsedExpr::match_tensor_expr)
         .def_rw("fusion_expr", &WrapParsedExpr::fusion_expr)
-        .def_rw("search_expr", &WrapParsedExpr::search_expr);
+        .def_rw("search_expr", &WrapParsedExpr::search_expr)
+        .def_rw("in_expr", &WrapParsedExpr::in_expr);
 
     // infinity
     nb::class_<Infinity>(m, "Infinity")

@@ -103,6 +103,11 @@ class TestInfinity:
             - select c2 from test_select where (not(c2 < -8 or -4 < c1) or not(c1 < 0 or 5 <= c2)) and not((c2 <= 0 or c1 > 1) and (c1 <= -8 or c2 >= -6))
                 - -7
                 - 1
+            - select * from test_select where (c1 in (1, 2, 3))
+            - select * from test_select where (c1 in (1, 2, 3) and c2 in (1, 2, 3))
+            - select * from test_select where (c1 not in (1, 2, 3))
+            - select * from test_select where ((c2 + 1) in (8, 9, 10))
+            - select * from test_select where ((-c1) in (1, 2, 3))
         4. drop tables
             - 'test_select'
         expect: all operations successfully
@@ -182,6 +187,31 @@ class TestInfinity:
             "(not(c2 < -8 or -4 < c1) or not(c1 < 0 or 5 <= c2)) and not((c2 <= 0 or c1 > 1) and (c1 <= -8 or c2 >= -6))").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
                                       .astype({'c2': dtype('int32')}))
+
+        res = table_obj.output(["*"]).filter("c1 in (1, 2, 3)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3),
+                                                         'c2': (1, 2, 3)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = table_obj.output(["*"]).filter("c1 in (1, 2, 3) and c2 in (1, 2, 3)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3),
+                                                         'c2': (1, 2, 3)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = table_obj.output(["*"]).filter("c1 not in (1, 2, 3)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, -8, -7, -6, 7, 8, 9),
+                                                         'c2': (-3, -2, -1, 0, -8, -7, -6, 7, 8, 9)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = table_obj.output(["*"]).filter("(c2 + 1) in (8, 9, 10)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (7, 8, 9),
+                                                         'c2': (7, 8, 9)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        # res = table_obj.output(["*"]).filter("(-c1) in (1, 2, 3)").to_df()
+        # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1),
+        #                                                  'c2': (-3, -2, -1)})
+        #                               .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
         res = db_obj.drop_table("test_select"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
