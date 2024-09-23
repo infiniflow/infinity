@@ -30,7 +30,7 @@ ExprParser::ExprParser() {
 
 ExprParser::~ExprParser() { expressionlex_destroy(scanner_); }
 
-void ExprParser::Parse(const std::string &expr_text, ExpressionParserResult* result) {
+void ExprParser::Parse(const std::string &expr_text, ExpressionParserResult *result) {
 
     state_ = expression_scan_string(expr_text.c_str(), scanner_);
 

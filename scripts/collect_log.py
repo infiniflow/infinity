@@ -37,15 +37,27 @@ if not os.path.isdir(output_dir):
 random_name = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
 print(f"Random log file name: {random_name}")
 
+show_lines = 1000
+
 if not os.path.isfile(stdout_path):
     print("Error: stdout file not found")
 else:
     shutil.copy(stdout_path, f"{output_dir}/{random_name}_.log")
+    print(f"Last {show_lines} lines from {stdout_path}:")
+    with open(stdout_path, "r") as f:
+        lines = f.readlines()
+        for line in lines[-show_lines:]:
+            print(line.strip())
 
 if not os.path.isfile(log_path):
     print("Error: /var/infinity/log/infinity.log not found")
 else:
     shutil.copy(log_path, f"{output_dir}/{random_name}.log")
+    print(f"Last {show_lines} lines from {log_path}:")
+    with open(log_path, "r") as f:
+        lines = f.readlines()
+        for line in lines[-show_lines:]:
+            print(line.strip())
 
 if not os.path.isfile(executable_path):
     print("Error: Executable file not found")

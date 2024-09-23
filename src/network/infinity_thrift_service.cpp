@@ -42,6 +42,7 @@ import data_type;
 import status;
 import embedding_info;
 import sparse_info;
+import in_expr;
 import constant_expr;
 import column_expr;
 import function_expr;
@@ -1869,7 +1870,7 @@ MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &stat
 
     auto *column_expr = static_cast<ParsedExpr *>(GetColumnExprFromProto(expr.column_expr));
     DeferFn defer_fn2([&] {
-        if(column_expr != nullptr) {
+        if (column_expr != nullptr) {
             delete column_expr;
             column_expr = nullptr;
         }
@@ -1879,7 +1880,7 @@ MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &stat
 
     auto *constant_expr = GetConstantFromProto(status, expr.query_sparse_expr);
     DeferFn defer_fn3([&] {
-        if(constant_expr != nullptr) {
+        if (constant_expr != nullptr) {
             delete constant_expr;
             constant_expr = nullptr;
         }
@@ -1983,6 +1984,24 @@ FusionExpr *InfinityThriftService::GetFusionExprFromProto(const infinity_thrift_
     return fusion_expr.release();
 }
 
+InExpr *InfinityThriftService::GetInExprFromProto(Status &status, const infinity_thrift_rpc::InExpr &in_expr) {
+    auto parsed_expr = MakeUnique<InExpr>();
+    parsed_expr->left_ = GetParsedExprFromProto(status, in_expr.left_operand);
+    if (!status.ok()) {
+        return nullptr;
+    }
+    parsed_expr->arguments_ = new Vector<ParsedExpr *>();
+    parsed_expr->arguments_->reserve(in_expr.arguments.size());
+    for (auto &arg : in_expr.arguments) {
+        parsed_expr->arguments_->emplace_back(GetParsedExprFromProto(status, arg));
+        if (!status.ok()) {
+            return nullptr;
+        }
+    }
+    parsed_expr->in_ = in_expr.in_type;
+    return parsed_expr.release();
+}
+
 ParsedExpr *InfinityThriftService::GetParsedExprFromProto(Status &status, const infinity_thrift_rpc::ParsedExpr &expr) {
     if (expr.type.__isset.column_expr == true) {
         auto parsed_expr = GetColumnExprFromProto(*expr.type.column_expr);
@@ -2001,6 +2020,9 @@ ParsedExpr *InfinityThriftService::GetParsedExprFromProto(Status &status, const 
         return parsed_expr;
     } else if (expr.type.__isset.fusion_expr == true) {
         auto parsed_expr = GetFusionExprFromProto(*expr.type.fusion_expr);
+        return parsed_expr;
+    } else if (expr.type.__isset.in_expr == true) {
+        auto parsed_expr = GetInExprFromProto(status, *expr.type.in_expr);
         return parsed_expr;
     } else {
         status = Status::InvalidParsedExprType();

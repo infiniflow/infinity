@@ -60,11 +60,11 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 Infinity, also available as a Python module, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
 
    ```bash
-   pip install infinity-sdk==0.4.0.dev2
+   pip install infinity-embedded-sdk==0.4.0.dev2
    ```
 
    ```python
-   import infinity
+   import infinity-embedded as infinity
 
    # Connect to infinity
    infinity_obj = infinity.connect("/path/to/save/to")

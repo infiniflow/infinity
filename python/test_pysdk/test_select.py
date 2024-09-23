@@ -103,6 +103,11 @@ class TestInfinity:
             - select c2 from test_select where (not(c2 < -8 or -4 < c1) or not(c1 < 0 or 5 <= c2)) and not((c2 <= 0 or c1 > 1) and (c1 <= -8 or c2 >= -6))
                 - -7
                 - 1
+            - select * from test_select where (c1 in (1, 2, 3))
+            - select * from test_select where (c1 in (1, 2, 3) and c2 in (1, 2, 3))
+            - select * from test_select where (c1 not in (1, 2, 3))
+            - select * from test_select where ((c2 + 1) in (8, 9, 10))
+            - select * from test_select where ((-c1) in (1, 2, 3))
         4. drop tables
             - 'test_select'
         expect: all operations successfully
@@ -182,6 +187,31 @@ class TestInfinity:
             "(not(c2 < -8 or -4 < c1) or not(c1 < 0 or 5 <= c2)) and not((c2 <= 0 or c1 > 1) and (c1 <= -8 or c2 >= -6))").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
                                       .astype({'c2': dtype('int32')}))
+
+        res = table_obj.output(["*"]).filter("c1 in (1, 2, 3)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3),
+                                                         'c2': (1, 2, 3)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = table_obj.output(["*"]).filter("c1 in (1, 2, 3) and c2 in (1, 2, 3)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3),
+                                                         'c2': (1, 2, 3)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = table_obj.output(["*"]).filter("c1 not in (1, 2, 3)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, -8, -7, -6, 7, 8, 9),
+                                                         'c2': (-3, -2, -1, 0, -8, -7, -6, 7, 8, 9)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = table_obj.output(["*"]).filter("(c2 + 1) in (8, 9, 10)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (7, 8, 9),
+                                                         'c2': (7, 8, 9)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        # res = table_obj.output(["*"]).filter("(-c1) in (1, 2, 3)").to_df()
+        # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1),
+        #                                                  'c2': (-3, -2, -1)})
+        #                               .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
         res = db_obj.drop_table("test_select"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -611,19 +641,27 @@ class TestInfinity:
         table_obj.insert([{"num": 1, "doc": "first text"}, {"num": 2, "doc": "second text multiple"},
                           {"num": 3, "doc": "third text many words"}])
         table_obj.create_index("my_ft_index", index.IndexInfo("doc", index.IndexType.FullText), ConflictType.Error)
+
+        def test_func():
+            expect_result = pd.DataFrame({'num': (1,), "doc": "first text"}).astype({'num': dtype('int32')})
+            pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
+                "filter_text('doc', 'first OR second') and (num < 2 or num > 2)").to_df())
+            pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
+                "(filter_text('doc', 'first') or filter_fulltext('doc', 'second')) and (num < 2 or num > 2)").to_df())
+            expect_result = pd.DataFrame(
+                {'num': (1, 2, 3), "doc": ("first text", "second text multiple", "third text many words")}).astype(
+                {'num': dtype('int32')})
+            pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
+                "filter_text('doc', 'first') or num >= 2").to_df())
+            pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
+                "filter_fulltext('doc', 'second') or (num < 2 or num > 2)").to_df())
+            pd.testing.assert_frame_equal(pd.DataFrame({
+                "(FILTER_FULLTEXT('doc', 'second') OR (num > 2))": (False, True, True),
+                "FILTER_FULLTEXT('doc', 'second')": (False, True, False)}),
+                table_obj.output(["filter_text('doc', 'second') or num > 2", "filter_text('doc', 'second')"]).to_df())
+
+        test_func()
         table_obj.create_index("my_sc_index", index.IndexInfo("num", index.IndexType.Secondary), ConflictType.Error)
-        expect_result = pd.DataFrame({'num': (1,), "doc": "first text"}).astype({'num': dtype('int32')})
-        res = table_obj.output(["*"]).filter("filter_text('doc', 'first OR second') and (num < 2 or num > 2)").to_df()
-        pd.testing.assert_frame_equal(res, expect_result)
-        res = table_obj.output(["*"]).filter(
-            "(filter_text('doc', 'first') or filter_fulltext('doc', 'second')) and (num < 2 or num > 2)").to_df()
-        pd.testing.assert_frame_equal(res, expect_result)
-        expect_result = pd.DataFrame(
-            {'num': (1, 2, 3), "doc": ("first text", "second text multiple", "third text many words")}).astype(
-            {'num': dtype('int32')})
-        res = table_obj.output(["*"]).filter("filter_text('doc', 'first') or num >= 2").to_df()
-        pd.testing.assert_frame_equal(res, expect_result)
-        res = table_obj.output(["*"]).filter("filter_fulltext('doc', 'second') or (num < 2 or num > 2)").to_df()
-        pd.testing.assert_frame_equal(res, expect_result)
+        test_func()
         res = db_obj.drop_table("test_filter_fulltext" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
