@@ -228,6 +228,16 @@ public:
 
     void AddWriteTxnNum(TableEntry *table_entry);
 
+    // Some transaction need to pass the txn access right check in txn commit phase;
+    void SetReaderAllowed(bool allowed) {
+        allowed_in_reader_ = allowed;
+    }
+
+    bool IsReaderAllowed() const {
+        return allowed_in_reader_;
+    }
+
+
     TxnStore *txn_store() { return &txn_store_; }
 
 private:
@@ -263,6 +273,9 @@ private:
 
     // String
     SharedPtr<String> txn_text_{nullptr};
+
+    // ADMIN command which allowed in follower and learner
+    bool allowed_in_reader_{false};
 };
 
 } // namespace infinity

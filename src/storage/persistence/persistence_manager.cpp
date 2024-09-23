@@ -379,6 +379,7 @@ void PersistenceManager::PutObjCache(const String &file_path) {
     if (oit->second.ref_count_ <= 0) {
         UnrecoverableError(fmt::format("PutObjCache object {} ref count is {}", it->second.obj_key_, oit->second.ref_count_));
     }
+
     oit->second.ref_count_--;
     LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", it->second.obj_key_, oit->second.ref_count_));
 }
