@@ -451,24 +451,18 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
 
 ParsedExpr *WrapInExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
-
-    auto in_expr = new InExpr();
-    Vector<ParsedExpr *> *in_arguments = new Vector<ParsedExpr *>();
-    in_arguments->reserve(arguments.size());
+    auto in_expr = MakeUnique<InExpr>();
+    in_expr->arguments_ = new Vector<ParsedExpr *>();
+    in_expr->arguments_->reserve(arguments.size());
     for (SizeT i = 0; i < arguments.size(); ++i) {
-        in_arguments->emplace_back(arguments[i]->GetParsedExpr(status));
+        in_expr->arguments_->emplace_back(arguments[i]->GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
-            delete in_expr;
-            delete in_arguments;
-            in_expr = nullptr;
             return nullptr;
         }
     }
-
     in_expr->left_ = left->GetParsedExpr(status);
     in_expr->in_ = in;
-    in_expr->arguments_ = in_arguments;
-    return in_expr;
+    return in_expr.release();
 }
 
 ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
