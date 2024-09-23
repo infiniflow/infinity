@@ -91,13 +91,16 @@ set(TMP_DATA_PATH ${CMAKE_SOURCE_DIR}/tmp)
 
 # You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
 option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    message(STATUS "Disable jemalloc in Debug mode")
+    set(ENABLE_JEMALLOC OFF)
+endif()
+
 if(ENABLE_JEMALLOC)
     find_package(jemalloc REQUIRED)
     set(JEMALLOC_STATIC_LIB "jemalloc_pic.a")
-    if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-        set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
-        set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
-    endif ()
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
 endif ()
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -138,6 +141,7 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     message(STATUS "Code Coverage = ${CODE_COVERAGE}")
 
     if(NOT ENABLE_JEMALLOC)
+        message(STATUS "Enable AddressSanitizer")
 
         set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
         add_compile_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
@@ -151,7 +155,8 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
         #    add_compile_options("-fsanitize=thread")
         #    add_link_options("-fsanitize=thread")
-
+    else()
+        message(STATUS "Disable AddressSanitizer because jemalloc")
     endif()
 
     set(CMAKE_DEBUG_POSTFIX "")

@@ -293,8 +293,8 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
     TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
     TxnTimeStamp res = std::min(first_uncommitted_begin_ts, checkpointed_ts);
     LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", res, checkpointed_ts));
-    for (auto *txn : finished_txns_) {
-        res = std::min(res, txn->BeginTS());
+    if (!finished_txns_.empty()) {
+        res = std::min(res, finished_txns_.top()->CommitTS());
     }
     for (auto *txn : finishing_txns_) {
         res = std::min(res, txn->BeginTS());
@@ -318,10 +318,10 @@ void TxnManager::FinishTxn(Txn *txn) {
     auto state = txn->GetTxnState();
     if (state == TxnState::kCommitting) {
         txn->SetTxnCommitted();
-        finished_txns_.emplace_back(txn);
+        finished_txns_.emplace(txn);
     } else if (state == TxnState::kRollbacking) {
         txn->SetTxnRollbacked();
-        finished_txns_.emplace_back(txn);
+        finished_txns_.emplace(txn);
     } else {
         String error_message = fmt::format("Invalid transaction status: {}", ToString(state));
         UnrecoverableError(error_message);
@@ -335,13 +335,13 @@ void TxnManager::FinishTxn(Txn *txn) {
         max_commit_ts = std::max(max_commit_ts, finishing_txn->CommitTS());
     }
     while (!finished_txns_.empty()) {
-        auto *finished_txn = finished_txns_.front();
+        auto *finished_txn = finished_txns_.top();
         if (finished_txn->CommitTS() < max_commit_ts) {
             break;
         }
         auto finished_txn_id = finished_txn->TxnID();
         // LOG_INFO(fmt::format("Txn: {} is finished. committed ts: {}", finished_txn_id, finished_txn->CommittedTS()));
-        finished_txns_.pop_front();
+        finished_txns_.pop();
         SizeT remove_n = txn_map_.erase(finished_txn_id);
         if (remove_n == 0) {
             String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);
