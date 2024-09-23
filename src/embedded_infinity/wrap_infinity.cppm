@@ -154,6 +154,15 @@ export struct WrapColumnExpr {
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
+export struct WrapInExpr {
+    WrapInExpr() = default;
+    SharedPtr<WrapParsedExpr> left;
+    Vector<SharedPtr<WrapParsedExpr>> arguments;
+    bool in{true};
+
+    ParsedExpr *GetParsedExpr(Status &status);
+};
+
 export struct WrapFunctionExpr {
     WrapFunctionExpr() = default;
     String func_name{};
@@ -257,6 +266,7 @@ export struct WrapParsedExpr {
     WrapMatchExpr match_expr;
     WrapFusionExpr fusion_expr;
     WrapSearchExpr search_expr;
+    WrapInExpr in_expr;
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -357,8 +367,12 @@ WrapInsert(Infinity &instance, const String &db_name, const String &table_name, 
 export WrapQueryResult
 WrapImport(Infinity &instance, const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
 
-export WrapQueryResult
-WrapExport(Infinity &instance, const String &db_name, const String &table_name, Vector<String> &columns, const String &path, ExportOptions export_options);
+export WrapQueryResult WrapExport(Infinity &instance,
+                                  const String &db_name,
+                                  const String &table_name,
+                                  Vector<String> &columns,
+                                  const String &path,
+                                  ExportOptions export_options);
 
 export WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr *filter);
 

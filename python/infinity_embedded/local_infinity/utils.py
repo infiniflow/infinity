@@ -24,7 +24,7 @@ from infinity_embedded.errors import ErrorCode
 from infinity_embedded.common import InfinityException, SparseVector
 from infinity_embedded.local_infinity.types import build_result, logic_type_to_dtype
 from infinity_embedded.utils import binary_exp_to_paser_exp
-from infinity_embedded.embedded_infinity_ext import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapConstantExpr, ParsedExprType, LiteralType
+from infinity_embedded.embedded_infinity_ext import WrapInExpr, WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapConstantExpr, ParsedExprType, LiteralType
 from infinity_embedded.embedded_infinity_ext import WrapEmbeddingType, WrapColumnDef, WrapDataType, LogicalType, EmbeddingDataType, WrapSparseType, ConstraintType
 
 
@@ -48,7 +48,7 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.function_expr = function_expr
 
         return parsed_expr
-    elif isinstance(cons, exp.Not):
+    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.In) == False:
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()
         function_expr.func_name = "not"
@@ -155,6 +155,43 @@ def traverse_conditions(cons, fn=None):
         parsed_expr = WrapParsedExpr()
         parsed_expr.type = ParsedExprType.kFunction
         parsed_expr.function_expr = func_expr
+        return parsed_expr
+    # in
+    elif isinstance(cons, exp.In):
+        left_operand = parse_expr(cons.args['this'])
+        arguments = []
+        for arg in cons.args['expressions'] :
+            if arg :
+                arguments.append(parse_expr(arg))
+
+        in_expr = WrapInExpr()
+        in_expr.left = left_operand
+        in_expr.arguments = arguments
+        in_expr.in_type = True
+
+        parsed_expr = WrapParsedExpr()
+        parsed_expr.type = ParsedExprType.kIn
+        parsed_expr.in_expr = in_expr
+
+        return parsed_expr
+    # not in
+    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.In):
+        raw_in = cons.this
+        left_operand = parse_expr(raw_in.args['this'])
+        arguments = []
+        for arg in raw_in.args['expressions'] :
+            if arg :
+                arguments.append(parse_expr(arg))
+        
+        in_expr = WrapInExpr()
+        in_expr.left = left_operand
+        in_expr.arguments = arguments
+        in_expr.in_type = False
+
+        parsed_expr = WrapParsedExpr()
+        parsed_expr.type = ParsedExprType.kIn
+        parsed_expr.in_expr = in_expr
+
         return parsed_expr
     else:
         raise Exception(f"unknown condition type: {cons}")
