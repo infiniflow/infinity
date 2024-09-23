@@ -29,6 +29,7 @@ import value;
 import data_type;
 import type_info;
 import logical_type;
+import in_expr;
 import constant_expr;
 import column_expr;
 import function_expr;
@@ -448,6 +449,28 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
     return search_expr;
 }
 
+ParsedExpr *WrapInExpr::GetParsedExpr(Status &status) {
+    status.code_ = ErrorCode::kOk;
+
+    auto in_expr = new InExpr();
+    Vector<ParsedExpr *> *in_arguments = new Vector<ParsedExpr *>();
+    in_arguments->reserve(arguments.size());
+    for (SizeT i = 0; i < arguments.size(); ++i) {
+        in_arguments->emplace_back(arguments[i]->GetParsedExpr(status));
+        if (status.code_ != ErrorCode::kOk) {
+            delete in_expr;
+            delete in_arguments;
+            in_expr = nullptr;
+            return nullptr;
+        }
+    }
+
+    in_expr->left_ = left->GetParsedExpr(status);
+    in_expr->in_ = in;
+    in_expr->arguments_ = in_arguments;
+    return in_expr;
+}
+
 ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
     switch (type) {
@@ -471,6 +494,8 @@ ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
             return fusion_expr.GetParsedExpr(status);
         case ParsedExprType::kSearch:
             return search_expr.GetParsedExpr(status);
+        case ParsedExprType::kIn:
+            return in_expr.GetParsedExpr(status);
         default:
             status = Status::InvalidParsedExprType();
     }

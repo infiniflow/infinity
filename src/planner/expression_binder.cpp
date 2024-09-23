@@ -545,7 +545,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(argument_count);
 
-    //in operator, all data type shouhld be the same
+    // in operator, all data type shouhld be the same
     SharedPtr<DataType> arguments_type = nullptr;
 
     for (SizeT idx = 0; idx < argument_count; ++idx) {
@@ -555,10 +555,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
         }
         auto bound_argument_expr = BuildExpression(*expr.arguments_->at(idx), bind_context_ptr, depth, false);
 
-        if(arguments_type != nullptr && bound_argument_expr->Type() != *arguments_type) { 
+        if (arguments_type != nullptr && bound_argument_expr->Type() != *arguments_type) {
             Status status = Status::SyntaxError("Expressions in In expression must be of the same data type!");
             RecoverableError(status);
-        } else if(arguments_type == nullptr){
+        } else if (arguments_type == nullptr) {
             arguments_type = MakeShared<DataType>(bound_argument_expr->Type());
         }
 
@@ -574,39 +574,39 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
 
     SharedPtr<InExpression> in_expression_ptr = MakeShared<InExpression>(in_type, bound_left_expr, arguments);
 
-    //if match
-    if(arguments_type->type() == bound_left_expr->Type().type()) {
-        for(SizeT idx = 0; idx < argument_count; idx++) {
-            ValueExpression* val_expr = static_cast<ValueExpression *>(arguments[idx].get());
+    // if match
+    if (arguments_type->type() == bound_left_expr->Type().type()) {
+        for (SizeT idx = 0; idx < argument_count; idx++) {
+            ValueExpression *val_expr = static_cast<ValueExpression *>(arguments[idx].get());
             Value val = val_expr->GetValue();
             in_expression_ptr->TryPut(std::move(val));
         }
-    } else if(CastExpression::CanCast(*arguments_type, bound_left_expr->Type())) {
-        //cast
+    } else if (CastExpression::CanCast(*arguments_type, bound_left_expr->Type())) {
+        // cast
         BoundCastFunc cast = CastFunction::GetBoundFunc(*arguments_type, bound_left_expr->Type());
 
         SharedPtr<ColumnVector> argument_column_vector = MakeShared<ColumnVector>(arguments_type);
         argument_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
 
-        for(SizeT idx = 0; idx < argument_count; idx++) {
-            ValueExpression* val_expr = static_cast<ValueExpression *>(arguments[idx].get());
+        for (SizeT idx = 0; idx < argument_count; idx++) {
+            ValueExpression *val_expr = static_cast<ValueExpression *>(arguments[idx].get());
             argument_column_vector->AppendValue(val_expr->GetValue());
         }
 
         SharedPtr<ColumnVector> cast_column_vector = MakeShared<ColumnVector>(MakeShared<DataType>(bound_left_expr->Type()));
-        //will overflow when passing argument_count
+        // will overflow when passing argument_count
         cast_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
         CastParameters cast_parameters;
         cast.function(argument_column_vector, cast_column_vector, argument_count, cast_parameters);
 
-        for(SizeT idx = 0; idx < argument_count; idx++) {
+        for (SizeT idx = 0; idx < argument_count; idx++) {
             Value val = cast_column_vector->GetValue(idx);
             in_expression_ptr->TryPut(std::move(val));
         }
-    } else { 
+    } else {
         Status status = Status::NotSupportedTypeConversion(arguments_type->ToString(), bound_left_expr->Type().ToString());
         RecoverableError(status);
-    } 
+    }
 
     return in_expression_ptr;
 }
@@ -786,7 +786,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTextExpr(const MatchExpr &
     match_text->optional_filter_ = BuildSearchSubExprOptionalFilter(this, expr.filter_expr_.get(), bind_context_ptr, depth);
     return match_text;
 }
-
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     // Bind query column
