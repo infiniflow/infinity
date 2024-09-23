@@ -386,7 +386,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         u32 block_capacity = DEFAULT_BLOCK_CAPACITY;
         u32 output_block_row_id = 0;
         DataBlock *output_block_ptr = output_data_blocks.back().get();
-        bool highlight = true;
+        bool highlight = false;
         Vector<String> query;
         if (highlight)
             full_text_query_context.optimized_query_tree_->GetQueryTerms(query);
