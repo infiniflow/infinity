@@ -2029,21 +2029,18 @@ FusionExpr *InfinityThriftService::GetFusionExprFromProto(const infinity_thrift_
 
 InExpr *InfinityThriftService::GetInExprFromProto(Status &status, const infinity_thrift_rpc::InExpr &in_expr) {
     auto parsed_expr = MakeUnique<InExpr>();
-
-    ParsedExpr *left_operand = GetParsedExprFromProto(status, in_expr.left_operand);
-
-    auto arguments = MakeUnique<Vector<ParsedExpr *>>();
-    arguments->reserve(in_expr.arguments.size());
+    parsed_expr->left_ = GetParsedExprFromProto(status, in_expr.left_operand);
+    if (!status.ok()) {
+        return nullptr;
+    }
+    parsed_expr->arguments_ = new Vector<ParsedExpr *>();
+    parsed_expr->arguments_->reserve(in_expr.arguments.size());
     for (auto &arg : in_expr.arguments) {
-        arguments->emplace_back(GetParsedExprFromProto(status, arg));
+        parsed_expr->arguments_->emplace_back(GetParsedExprFromProto(status, arg));
         if (!status.ok()) {
-            parsed_expr.reset();
             return nullptr;
         }
     }
-
-    parsed_expr->left_ = left_operand;
-    parsed_expr->arguments_ = arguments.release();
     parsed_expr->in_ = in_expr.in_type;
     return parsed_expr.release();
 }
