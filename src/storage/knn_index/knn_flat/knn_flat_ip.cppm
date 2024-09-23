@@ -16,10 +16,10 @@ module;
 
 #include <functional>
 
-export module knn_flat_ip;
+export module deprecated_knn_flat_ip;
 
 import stl;
-import knn_distance;
+import deprecated_knn_distance;
 import logger;
 import knn_result_handler;
 import infinity_exception;

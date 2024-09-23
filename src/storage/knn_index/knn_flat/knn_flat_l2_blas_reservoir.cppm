@@ -14,11 +14,11 @@
 
 module;
 
-export module knn_flat_l2_blas_reservoir;
+export module deprecated_knn_flat_l2_blas_reservoir;
 
 import stl;
 import knn_result_handler;
-import knn_distance;
+import deprecated_knn_distance;
 import mlas_matrix_multiply;
 import roaring_bitmap;
 

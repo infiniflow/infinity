@@ -22,7 +22,7 @@ import global_resource_usage;
 import third_party;
 import logger;
 
-import knn_flat_l2_blas_reservoir;
+import deprecated_knn_flat_l2_blas_reservoir;
 import infinity_context;
 import knn_expr;
 import internal_types;
