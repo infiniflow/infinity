@@ -22,10 +22,15 @@ You must have an Infinity object ready to perform database-specific operations.
 
 The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
-- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is imported as a Python module.
+- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is imported as an embedded Python module.
 - `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
   - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
   - `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
+
+:::tip NOTE
+- When setting `uri` as `"/path/to/save/to"`, make sure you `import infinity_embedded as infinity`.
+- When setting `uri` as `NetworkAddress`, make sure you `import infinity`.
+:::
 
 :::caution IMPORTANT
 When connecting to Infinity in client-server mode, ensure that the client version *exactly* matches the server version. For example:
@@ -717,11 +722,11 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
   - Parameter settings for a full-text index:
     - `"ANALYZER"`: *Optional*
-      - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs. Use `-` to specify stemmer for languages, `English` is the default stemmer: `"standard-english"` and `"standard"` have the same stemmer setting. Supported language stemmer includes: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`,`Russian`,`Spanish`,`Swedish`,`Turkish`.
+      - `"standard"`: (Default) The standard analyzer, segmented by token, lowercase processing, and provides stemming output. Use `-` to specify the languages stemmer. `English` is the default stemmer: `"standard-english"` and `"standard"` are the same stemmer setting. Supported language stemmers include: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`, `Russian`, `Spanish`, `Swedish`, and `Turkish`.
       - `"chinese"`: Simplified Chinese
       - `"tradition"`: Traditional Chinese
       - `"japanese"`: Japanese
-      - `"korea"`: Korea
+      - `"korea"`: Korean
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
   - Parameter settings for a secondary index:  
     No parameters are required. For now, use an empty list `[]`.
