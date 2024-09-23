@@ -83,7 +83,7 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 #### Connect to the local directory of Infinity
 
-From v0.2.1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
+From v0.4.0.dev1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
 ```python
 import infinity_embedded
