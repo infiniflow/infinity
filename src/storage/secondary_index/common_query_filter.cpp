@@ -128,7 +128,15 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
         auto filter_state = ExpressionState::CreateState(leftover_filter_);
         auto db_for_filter_p = MakeUnique<DataBlock>();
         auto db_for_filter = db_for_filter_p.get();
-        db_for_filter->Init(*(base_table_ref_->column_types_));
+        Vector<SharedPtr<DataType>> read_column_types = *(base_table_ref_->column_types_);
+        Vector<SizeT> column_ids = base_table_ref_->column_ids_;
+        {
+            if (read_column_types.empty() || read_column_types.back()->type() != LogicalType::kRowID) {
+                read_column_types.push_back(MakeShared<DataType>(LogicalType::kRowID));
+                column_ids.push_back(COLUMN_IDENTIFIER_ROW_ID);
+            }
+        }
+        db_for_filter->Init(read_column_types);
         auto bool_column = ColumnVector::Make(MakeShared<infinity::DataType>(LogicalType::kBoolean));
         // filter and build bitmask, if filter_expression_ != nullptr
         ExpressionEvaluator expr_evaluator;
@@ -138,7 +146,7 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
             const auto block_row_count = block_entry->row_count();
             const auto row_count = std::min<SizeT>(segment_row_count - segment_row_count_read, block_row_count);
             db_for_filter->Reset(row_count);
-            ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
+            ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, column_ids);
             bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
             expr_evaluator.Init(db_for_filter);
             expr_evaluator.Execute(leftover_filter_, filter_state, bool_column);
@@ -179,7 +187,7 @@ void CommonQueryFilter::TryApplyIndexFilterOptimizer(QueryContext *query_context
     }
     finish_build_index_filter_ = true;
     IndexScanFilterExpressionPushDownResult index_scan_solve_result =
-        FilterExpressionPushDown::PushDownToIndexScan(query_context, *base_table_ref_, original_filter_);
+        FilterExpressionPushDown::PushDownToIndexScan(query_context, base_table_ref_.get(), original_filter_);
     index_filter_ = std::move(index_scan_solve_result.index_filter_);
     leftover_filter_ = std::move(index_scan_solve_result.leftover_filter_);
     index_filter_evaluator_ = std::move(index_scan_solve_result.index_filter_evaluator_);

@@ -13,18 +13,18 @@ slug: /
 
 ## Install Infinity locally using pip
 
-Infinity, also available as a Python module, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
+Infinity, also available as an embedded Python module, eliminates the need for a separate back-end server and all the communication settings. Using `pip install infinity-embedded-sdk` and `import infinity_embedded`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
 
-1. Install Infinity as a Python module:
+1. Install Infinity as an embedded Python module:
    ```bash
-   pip install infinity-sdk==0.4.0.dev2
+   pip install infinity-embedded-sdk==0.4.0.dev2
    ```
 2. Use Infinity to conduct a KNN search:
    ```python
-   import infinity
+   import infinity_embedded
 
    # Connect to infinity
-   infinity_object = infinity.connect("/path/to/save/to")
+   infinity_object = infinity_embedded.connect("/absolute/path/to/save/to")
    db_object = infinity_object.get_database("default_db")
    table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
    table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
