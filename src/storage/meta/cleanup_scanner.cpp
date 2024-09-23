@@ -52,7 +52,8 @@ void CleanupScanner::Scan() {
 
 void CleanupScanner::Cleanup(CleanupInfoTracer *info_tracer) && {
     for (auto &[entry, dropped] : entries_) {
-        std::move(*entry).Cleanup(info_tracer, dropped);
+        entry->Cleanup(info_tracer, dropped);
+        entry.reset();
     }
     buffer_mgr_->RemoveClean();
 }

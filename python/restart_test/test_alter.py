@@ -176,14 +176,14 @@ class TestAlter:
             res = table_obj.drop_columns(["c2"])
             assert res.error_code == ErrorCode.OK
 
-            time.sleep(4)  # wait for the data to be cleaned up
+            infinity_obj.cleanup()
 
-            dropped_column_dirs = pathlib.Path(data_dir).rglob("1.col*")
+            dropped_column_dirs = pathlib.Path(data_dir).rglob("1.col")
             # find the column file with the column idx = 1
             assert len(list(dropped_column_dirs)) == 0
 
             # contain "0.col" or "2.col"
-            column_dirs = pathlib.Path(data_dir).rglob("*[02].col")
+            column_dirs = pathlib.Path(data_dir).rglob("[02].col")
             assert len(list(column_dirs)) == 2
 
             res = table_obj.drop_columns(["c3"])
@@ -194,9 +194,8 @@ class TestAlter:
         @decorator
         def part2(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
-            table_obj = db_obj.get_table(table_name)
 
-            dropped_column_dirs = pathlib.Path(data_dir).rglob("2.col*")
+            dropped_column_dirs = pathlib.Path(data_dir).rglob("2.col")
             assert len(list(dropped_column_dirs)) == 0
 
             db_obj.drop_table(table_name)
