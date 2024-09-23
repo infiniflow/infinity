@@ -34,7 +34,7 @@ public:
 
 public:
     static constexpr std::string_view CHINESE = "chinese";
-    static constexpr std::string_view TRADITIONALCHINESE = "tradition";
+    static constexpr std::string_view TRADITIONALCHINESE = "traditional";
     static constexpr std::string_view JAPANESE = "japanese";
     static constexpr std::string_view KOREAN = "korean";
     static constexpr std::string_view STANDARD = "standard";
