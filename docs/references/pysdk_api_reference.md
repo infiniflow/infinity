@@ -28,8 +28,12 @@ The `uri` here can be either a local directory in `str` format or a `NetworkAddr
   - `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
 
 :::tip NOTE
-- When setting `uri` as `"/path/to/save/to"`, make sure you `import infinity_embedded as infinity`.
-- When setting `uri` as `NetworkAddress`, make sure you `import infinity`.
+- When setting `uri` as `"/path/to/save/to"`, ensure you:
+  - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.2.1_OR_HIGHER>`
+  - Import the `infinity_embedded` module: `import infinity_embedded as infinity`.
+- When setting `uri` as `NetworkAddress`, ensure you:
+  - Install the Infinity SDK: `pip install infinity==<VERSION>`
+  - Import the `infinity` module: `import infinity`.
 :::
 
 :::caution IMPORTANT
@@ -71,16 +75,16 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 #### Connect to the local directory of Infinity
 
-From v0.2.1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed Infinity via `pip install infinity-sdk==<v0.2.1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
+From v0.2.1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.2.1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
 ```python
-import infinity
-infinity_object = infinity.connect("/path/to/save/to")
+import infinity_embedded as infinity
+infinity_object = infinity.connect("/absolute/path/to/save/to")
 ```
 
 #### Connect to Infinity in client-server mode
 
-If you have deployed Infinity as a separate server, connect to it via its IP address. If your Infinity is running on your local machine, you can also use `infinity.common.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet.
+If you have deployed Infinity as a separate server and installed the Infinity client via `pip install infinity==<VERSION>`, you can connect to it via its IP address. If your Infinity is running on your local machine, you can also use `infinity.common.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet.
 
 ```python
 import infinity
