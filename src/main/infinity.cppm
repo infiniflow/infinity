@@ -141,7 +141,8 @@ public:
 
     QueryResult Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
 
-    QueryResult Export(const String &db_name, const String &table_name, Vector<ParsedExpr *> *columns, const String &path, ExportOptions export_options);
+    QueryResult
+    Export(const String &db_name, const String &table_name, Vector<ParsedExpr *> *columns, const String &path, ExportOptions export_options);
 
     QueryResult Delete(const String &db_name, const String &table_name, ParsedExpr *filter);
 
@@ -152,10 +153,17 @@ public:
                         ExplainType explain_type,
                         SearchExpr *search_expr,
                         ParsedExpr *filter,
+                        ParsedExpr *limit,
+                        ParsedExpr *offset,
                         Vector<ParsedExpr *> *output_columns);
 
-    QueryResult
-    Search(const String &db_name, const String &table_name, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
+    QueryResult Search(const String &db_name,
+                       const String &table_name,
+                       SearchExpr *search_expr,
+                       ParsedExpr *filter,
+                       ParsedExpr *limit,
+                       ParsedExpr *offset,
+                       Vector<ParsedExpr *> *output_columns);
 
     QueryResult Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_options = OptimizeOptions{});
 

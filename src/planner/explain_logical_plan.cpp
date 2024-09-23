@@ -2299,6 +2299,14 @@ void ExplainLogicalPlan::Explain(const LogicalMatch *match_node, SharedPtr<Vecto
     }
 }
 
+void ExplainLogicalPlan::Explain(const LogicalMatchSparseScan *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    IStringStream iss(match_node->ToString(intent_size));
+    String line;
+    while (std::getline(iss, line)) {
+        result->emplace_back(MakeShared<String>(std::move(line)));
+    }
+}
+
 void ExplainLogicalPlan::Explain(const LogicalMatchTensorScan *match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     IStringStream iss(match_tensor_node->ToString(intent_size));
     String line;

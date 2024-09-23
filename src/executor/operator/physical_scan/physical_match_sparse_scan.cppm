@@ -59,6 +59,10 @@ public:
 
     Vector<SharedPtr<Vector<SegmentID>>> PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> &block_groups, i64 parallel_count);
 
+    u64 table_index() const {
+        return table_index_;
+    }
+
 private:
     template <typename DataType>
     void ExecuteInner(QueryContext *query_context,

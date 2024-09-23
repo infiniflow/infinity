@@ -529,7 +529,7 @@ if(_enabled_ssl_options_count GREATER 1)
 elseif(_enabled_ssl_options_count EQUAL 0)
   set(CURL_DISABLE_HSTS ON)
 endif()
-message(status "++++++${_enabled_ssl_options_count}")
+
 if(CURL_USE_SCHANNEL)
   set(_ssl_enabled ON)
   set(USE_SCHANNEL ON)  # Windows native SSL/TLS support
