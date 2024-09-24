@@ -27,6 +27,8 @@ import status;
 import logger;
 import third_party;
 import infinity_context;
+import table_entry;
+import table_index_entry;
 
 namespace infinity {
 
@@ -43,7 +45,19 @@ CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, Buffer
     : catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
 // dropped is true denotes the data file can be cleaned up, or only metadata can be cleaned up
-void CleanupScanner::AddEntry(SharedPtr<BaseEntry> entry, bool dropped) { entries_.emplace_back(std::move(entry), dropped); }
+void CleanupScanner::AddEntry(SharedPtr<BaseEntry> entry, bool dropped) {
+    switch (entry->entry_type_) {
+        case EntryType::kTableIndex: {
+            auto *table_index_entry = static_cast<TableIndexEntry *>(entry.get());
+            TableEntry *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+            table_entry->InvalidateFullTextIndexCache(table_index_entry);
+            break;
+        }
+        default: {
+        }
+    }
+    entries_.emplace_back(std::move(entry), dropped);
+}
 
 void CleanupScanner::Scan() {
     LOG_DEBUG(fmt::format("CleanupScanner: Start scanning, ts: {}", visible_ts_));
