@@ -8,8 +8,8 @@ slug: /
 ## Prerequisites
 
 - CPU: x86_64 with AVX2 support.
-- OS: Linux with glibc version 2.17 or higher.
-- Python: Python 3.10+ or higher.
+- OS: Linux with glibc 2.17+.
+- Python: Python 3.10+.
 
 ## Install embedded Infinity using pip
 
@@ -41,11 +41,11 @@ The Infinity-embedded SDK allows you to embed Infinity into Python applications,
 
 ## Deploy Infinity in client-server mode
 
-For scenarios where you prefer running Infinity with the server and client as separate processes, see [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server).
+If you wish to deploy Infinity with the server and client as separate processes, see the [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
 
 ## Build from Source
 
-If you wish to build Infinity from source for customization or development purposes, see the [Build from Source](https://infiniflow.org/docs/dev/build_from_source) guide.
+If you wish to build Infinity from source, see the [Build from Source](https://infiniflow.org/docs/dev/build_from_source) guide.
 
 ### Try our Python examples
 
