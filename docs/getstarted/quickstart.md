@@ -8,7 +8,9 @@ slug: /
 ## Prerequisites
 
 - CPU: x86_64 with AVX2 support.
-- OS: Linux with glibc 2.17+.
+- OS:
+  - Linux with glibc 2.17+.
+  - Windows 10+ with WSL/WSL2.
 - Python: Python 3.10+.
 
 ## Install embedded Infinity using pip
