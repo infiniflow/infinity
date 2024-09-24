@@ -76,6 +76,8 @@ public:
     // Use by follower / learner to update all node info when get HB response from leader
     Status UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &info_of_nodes);
 
+    Status ApplySyncedLogNolock(const Vector<String>& synced_logs);
+
     // Used by all nodes ADMIN SHOW NODES
     Vector<SharedPtr<NodeInfo>> ListNodes() const;
 

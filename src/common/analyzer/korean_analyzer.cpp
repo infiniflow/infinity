@@ -31,14 +31,14 @@ import logger;
 import status;
 import ijma;
 
-module korea_analyzer;
+module korean_analyzer;
 
 namespace fs = std::filesystem;
 
 namespace infinity {
 static const String KNOWLEDGE_PATH = "mecab/ko-dic";
 
-KoreaAnalyzer::KoreaAnalyzer(const String &base_path) {
+KoreanAnalyzer::KoreanAnalyzer(const String &base_path) {
     cjk_ = true;
     own_mecab_ = true;
     fs::path root(base_path);
@@ -46,23 +46,23 @@ KoreaAnalyzer::KoreaAnalyzer(const String &base_path) {
     knowledge_path_ = "-d " + knowledge_path.string();
 }
 
-KoreaAnalyzer::KoreaAnalyzer(const KoreaAnalyzer &other) {
+KoreanAnalyzer::KoreanAnalyzer(const KoreanAnalyzer &other) {
     cjk_ = true;
     knowledge_path_ = other.knowledge_path_;
     own_mecab_ = false;
     SetCaseSensitive(false);
 }
 
-KoreaAnalyzer::~KoreaAnalyzer() {
+KoreanAnalyzer::~KoreanAnalyzer() {
     if (own_mecab_)
         delete mecab_;
 }
 
-Status KoreaAnalyzer::Load() {
+Status KoreanAnalyzer::Load() {
     try {
         mecab_ = new jma::MeCab(knowledge_path_);
     } catch (std::logic_error) {
-        return Status::InvalidAnalyzerFile("Failed to load Korea analyzer");
+        return Status::InvalidAnalyzerFile("Failed to load Korean analyzer");
     }
 
     SetCaseSensitive(false);

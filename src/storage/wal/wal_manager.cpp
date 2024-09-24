@@ -236,7 +236,7 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
         i32 exp_size = log_entry->GetSizeInBytes();
 
         // Serialize the log entry
-        SharedPtr<String> buf_ptr;
+        SharedPtr<String> buf_ptr = MakeShared<String>();
         buf_ptr->resize(exp_size);
         char *ptr = buf_ptr->data();
         log_entry->WriteAdv(ptr);
