@@ -1307,6 +1307,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
     filter = nullptr;
     limit = nullptr;
     offset = nullptr;
+    output_columns = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }
