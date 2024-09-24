@@ -564,25 +564,49 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         }
     }
 
-    // TODO:
-    //    ParsedExpr *offset;
-    // offset = new ParsedExpr();
+    // Limit
+    ParsedExpr *limit = nullptr;
+    DeferFn defer_fn7([&]() {
+        if (limit != nullptr) {
+            delete limit;
+            limit = nullptr;
+        }
+    });
+    if (request.__isset.limit_expr == true) {
+        limit = GetParsedExprFromProto(parsed_expr_status, request.limit_expr);
+        if (!parsed_expr_status.ok()) {
+            ProcessStatus(response, parsed_expr_status);
+            return;
+        }
+    }
 
-    // limit
-    //        ParsedExpr *limit = nullptr;
-    //        if (request.__isset.limit_expr == true) {
-    //            limit = GetParsedExprFromProto(request.limit_expr);
-    //        }
+    // Offset
+    ParsedExpr *offset = nullptr;
+    DeferFn defer_fn8([&]() {
+        if (offset != nullptr) {
+            delete offset;
+            offset = nullptr;
+        }
+    });
+    if (request.__isset.offset_expr == true) {
+        offset = GetParsedExprFromProto(parsed_expr_status, request.offset_expr);
+        if (!parsed_expr_status.ok()) {
+            ProcessStatus(response, parsed_expr_status);
+            return;
+        }
+    }
 
     // auto end2 = std::chrono::steady_clock::now();
     // phase_2_duration_ += end2 - start2;
     //
     // auto start3 = std::chrono::steady_clock::now();
 
-    const QueryResult result = infinity->Search(request.db_name, request.table_name, search_expr, filter, output_columns);
+    const QueryResult result = infinity->Search(request.db_name, request.table_name, search_expr, filter, limit, offset, output_columns);
     output_columns = nullptr;
     filter = nullptr;
     search_expr = nullptr;
+    limit = nullptr;
+    offset = nullptr;
     // auto end3 = std::chrono::steady_clock::now();
     //
     // phase_3_duration_ += end3 - start3;
@@ -635,21 +659,21 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
     Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
     output_columns->reserve(request.select_list.size());
+    DeferFn defer_fn1([&]() {
+        if (output_columns != nullptr) {
+            for (auto &expr_ptr : *output_columns) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
+            delete output_columns;
+            output_columns = nullptr;
+        }
+    });
 
     Status parsed_expr_status;
     for (auto &expr : request.select_list) {
         auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
         if (!parsed_expr_status.ok()) {
-
-            if (output_columns != nullptr) {
-                for (auto &expr_ptr : *output_columns) {
-                    delete expr_ptr;
-                    expr_ptr = nullptr;
-                }
-                delete output_columns;
-                output_columns = nullptr;
-            }
-
             if (parsed_expr != nullptr) {
                 delete parsed_expr;
                 parsed_expr = nullptr;
@@ -663,43 +687,44 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
     // search expr
     SearchExpr *search_expr = nullptr;
+    DeferFn defer_fn5([&]() {
+        if (search_expr != nullptr) {
+            delete search_expr;
+            search_expr = nullptr;
+        }
+    });
     if (request.__isset.search_expr) {
         auto search_expr_list = new Vector<ParsedExpr *>();
+        DeferFn defer_fn2([&]() {
+            if (search_expr_list != nullptr) {
+                for (auto &expr_ptr : *search_expr_list) {
+                    delete expr_ptr;
+                    expr_ptr = nullptr;
+                }
+                delete search_expr_list;
+                search_expr_list = nullptr;
+            }
+        });
+
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
         SizeT total_expr_count = match_expr_count + fusion_expr_count;
         search_expr_list->reserve(total_expr_count);
         for (SizeT idx = 0; idx < match_expr_count; ++idx) {
             Status status;
-            auto match_expr = GetGenericMatchExprFromProto(status, request.search_expr.match_exprs[idx]);
-            if (!status.ok()) {
-                if (output_columns != nullptr) {
-                    for (auto &expr_ptr : *output_columns) {
-                        delete expr_ptr;
-                        expr_ptr = nullptr;
-                    }
-                    delete output_columns;
-                    output_columns = nullptr;
-                }
-
-                if (search_expr_list != nullptr) {
-                    for (auto &expr_ptr : *search_expr_list) {
-                        delete expr_ptr;
-                        expr_ptr = nullptr;
-                    }
-                    delete search_expr_list;
-                    search_expr_list = nullptr;
-                }
-
+            ParsedExpr *match_expr = GetGenericMatchExprFromProto(status, request.search_expr.match_exprs[idx]);
+            DeferFn defer_fn3([&]() {
                 if (match_expr != nullptr) {
                     delete match_expr;
                     match_expr = nullptr;
                 }
-
+            });
+            if (!status.ok()) {
                 ProcessStatus(response, status);
                 return;
             }
             search_expr_list->emplace_back(match_expr);
+            match_expr = nullptr;
         }
 
         for (SizeT idx = 0; idx < fusion_expr_count; ++idx) {
@@ -709,6 +734,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
         search_expr = new SearchExpr();
         search_expr->SetExprs(search_expr_list);
+        search_expr_list = nullptr;
     }
 
     // filter
@@ -716,16 +742,6 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     if (request.__isset.where_expr == true) {
         filter = GetParsedExprFromProto(parsed_expr_status, request.where_expr);
         if (!parsed_expr_status.ok()) {
-
-            if (output_columns != nullptr) {
-                for (auto &expr_ptr : *output_columns) {
-                    delete expr_ptr;
-                    expr_ptr = nullptr;
-                }
-                delete output_columns;
-                output_columns = nullptr;
-            }
-
             if (search_expr != nullptr) {
                 delete search_expr;
                 search_expr = nullptr;
@@ -741,19 +757,46 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
         }
     }
 
-    // TODO:
-    //    ParsedExpr *offset;
-    // offset = new ParsedExpr();
+    // Limit
+    ParsedExpr *limit = nullptr;
+    DeferFn defer_fn7([&]() {
+        if (limit != nullptr) {
+            delete limit;
+            limit = nullptr;
+        }
+    });
+    if (request.__isset.limit_expr == true) {
+        limit = GetParsedExprFromProto(parsed_expr_status, request.limit_expr);
+        if (!parsed_expr_status.ok()) {
+            ProcessStatus(response, parsed_expr_status);
+            return;
+        }
+    }
 
-    // limit
-    //        ParsedExpr *limit = nullptr;
-    //        if (request.__isset.limit_expr == true) {
-    //            limit = GetParsedExprFromProto(request.limit_expr);
-    //        }
+    // Offset
+    ParsedExpr *offset = nullptr;
+    DeferFn defer_fn8([&]() {
+        if (offset != nullptr) {
+            delete offset;
+            offset = nullptr;
+        }
+    });
+    if (request.__isset.offset_expr == true) {
+        offset = GetParsedExprFromProto(parsed_expr_status, request.offset_expr);
+        if (!parsed_expr_status.ok()) {
+            ProcessStatus(response, parsed_expr_status);
+            return;
+        }
+    }
 
     // Explain type
     auto explain_type = GetExplainTypeFromProto(request.explain_type);
-    const QueryResult result = infinity->Explain(request.db_name, request.table_name, explain_type, search_expr, filter, output_columns);
+    const QueryResult result = infinity->Explain(request.db_name, request.table_name, explain_type, search_expr, filter, limit, offset, output_columns);
+    output_columns = nullptr;
+    search_expr = nullptr;
+    filter = nullptr;
+    limit = nullptr;
+    offset = nullptr;
 
     if (result.IsOk()) {
         auto &columns = response.column_fields;

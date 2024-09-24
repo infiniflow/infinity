@@ -2422,6 +2422,35 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     }
 }
 
+void ExplainPhysicalPlan::Explain(const PhysicalMatchSparseScan *match_sparse_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> MatchSparseScan ";
+    } else {
+        explain_header_str = "MatchSparseScan ";
+    }
+    explain_header_str += "(" + std::to_string(match_sparse_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(explain_header_str));
+
+    // Table index
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(match_sparse_node->table_index());
+    result->emplace_back(MakeShared<String>(table_index));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = match_sparse_node->GetOutputNames()->size();
+    if (column_count == 0) {
+        String error_message = "No column in match sparse node.";
+        UnrecoverableError(error_message);
+    }
+    for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += match_sparse_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += match_sparse_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+}
+
 void ExplainPhysicalPlan::Explain(const PhysicalMatchTensorScan *match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {

@@ -65,9 +65,7 @@ namespace infinity {
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
 
-void Infinity::Hello() {
-    fmt::print("hello infinity\n");
-}
+void Infinity::Hello() { fmt::print("hello infinity\n"); }
 
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
@@ -107,7 +105,7 @@ SharedPtr<Infinity> Infinity::RemoteConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
     SharedPtr<RemoteSession> remote_session = session_mgr->CreateRemoteSession();
-    if(remote_session == nullptr) {
+    if (remote_session == nullptr) {
         return nullptr;
     }
     infinity_ptr->session_ = std::move(remote_session);
@@ -428,13 +426,13 @@ QueryResult Infinity::CreateTable(const String &db_name,
     ToLower(create_table_info->table_name_);
 
     create_table_info->column_defs_ = std::move(column_defs);
-    for(ColumnDef* column_def_ptr: create_table_info->column_defs_) {
+    for (ColumnDef *column_def_ptr : create_table_info->column_defs_) {
         ToLower(column_def_ptr->name_);
     }
     create_table_info->constraints_ = std::move(constraints);
     create_table_info->conflict_type_ = create_table_options.conflict_type_;
     create_table_info->properties_ = std::move(create_table_options.properties_);
-    for(InitParameter* parameter_ptr: create_table_info->properties_) {
+    for (InitParameter *parameter_ptr : create_table_info->properties_) {
         ToLower(parameter_ptr->param_name_);
         ToLower(parameter_ptr->param_value_);
     }
@@ -603,7 +601,7 @@ QueryResult Infinity::CreateIndex(const String &db_name,
     ToLower(create_index_info->index_name_);
 
     ToLower(index_info_ptr->column_name_);
-    for(InitParameter* init_param_ptr: *index_info_ptr->index_param_list_) {
+    for (InitParameter *init_param_ptr : *index_info_ptr->index_param_list_) {
         ToLower(init_param_ptr->param_name_);
         ToLower(init_param_ptr->param_value_);
     }
@@ -665,7 +663,6 @@ QueryResult Infinity::ShowIndex(const String &db_name, const String &table_name,
     ToLower(index_name_internal);
 
     show_statement->index_name_ = index_name_internal;
-
 
     show_statement->show_type_ = ShowStmtType::kIndex;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
@@ -854,7 +851,7 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
     ToLower(insert_statement->table_name_);
 
     insert_statement->columns_ = columns;
-    for(String& column_name: *insert_statement->columns_) {
+    for (String &column_name : *insert_statement->columns_) {
         ToLower(column_name);
     }
     insert_statement->values_ = values;
@@ -890,7 +887,8 @@ QueryResult Infinity::Import(const String &db_name, const String &table_name, co
     return result;
 }
 
-QueryResult Infinity::Export(const String &db_name, const String &table_name, Vector<ParsedExpr *> *columns, const String &path, ExportOptions export_options) {
+QueryResult
+Infinity::Export(const String &db_name, const String &table_name, Vector<ParsedExpr *> *columns, const String &path, ExportOptions export_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -960,7 +958,7 @@ QueryResult Infinity::Update(const String &db_name, const String &table_name, Pa
     // TODO: to lower expression identifier string
     update_statement->where_expr_ = filter;
     update_statement->update_expr_array_ = update_list;
-    for(UpdateExpr* update_expr_ptr: *update_statement->update_expr_array_) {
+    for (UpdateExpr *update_expr_ptr : *update_statement->update_expr_array_) {
         ToLower(update_expr_ptr->column_name);
     }
     QueryResult result = query_context_ptr->QueryStatement(update_statement.get());
@@ -972,6 +970,8 @@ QueryResult Infinity::Explain(const String &db_name,
                               ExplainType explain_type,
                               SearchExpr *search_expr,
                               ParsedExpr *filter,
+                              ParsedExpr *limit,
+                              ParsedExpr *offset,
                               Vector<ParsedExpr *> *output_columns) {
 
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
@@ -1000,6 +1000,8 @@ QueryResult Infinity::Explain(const String &db_name,
     select_statement->select_list_ = output_columns;
     select_statement->where_expr_ = filter;
     select_statement->search_expr_ = search_expr;
+    select_statement->limit_expr_ = limit;
+    select_statement->offset_expr_ = offset;
 
     explain_statment->statement_ = select_statement;
 
@@ -1007,8 +1009,13 @@ QueryResult Infinity::Explain(const String &db_name,
     return result;
 }
 
-QueryResult
-Infinity::Search(const String &db_name, const String &table_name, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns) {
+QueryResult Infinity::Search(const String &db_name,
+                             const String &table_name,
+                             SearchExpr *search_expr,
+                             ParsedExpr *filter,
+                             ParsedExpr *limit,
+                             ParsedExpr *offset,
+                             Vector<ParsedExpr *> *output_columns) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -1032,6 +1039,8 @@ Infinity::Search(const String &db_name, const String &table_name, SearchExpr *se
     select_statement->select_list_ = output_columns;
     select_statement->where_expr_ = filter;
     select_statement->search_expr_ = search_expr;
+    select_statement->limit_expr_ = limit;
+    select_statement->offset_expr_ = offset;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     return result;
