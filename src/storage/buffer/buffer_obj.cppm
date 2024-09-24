@@ -155,46 +155,31 @@ private:
     u32 id_;
 
     friend class BufferPtr;
-    SharedPtr<u32> ptr_rc_ = MakeShared<u32>(0);
+    u32 ptr_rc_ = 0;
 };
 
 export class BufferPtr {
 public:
     BufferPtr() : buffer_obj_(nullptr) {}
 
-    ~BufferPtr() {
-        if (buffer_obj_ != nullptr && *ptr_rc_ > 0) {
-            --*ptr_rc_;
-        }
-    }
+    ~BufferPtr();
 
-    BufferPtr(BufferObj *buffer_obj) : buffer_obj_(buffer_obj), ptr_rc_(buffer_obj->ptr_rc_) { ++*buffer_obj_->ptr_rc_; }
+    BufferPtr(BufferObj *buffer_obj);
 
-    BufferPtr(const BufferPtr &other) : buffer_obj_(other.buffer_obj_), ptr_rc_(other.ptr_rc_) { ++*buffer_obj_->ptr_rc_; }
-    BufferPtr &operator=(const BufferPtr &other) {
-        if (this != &other) {
-            if (buffer_obj_ != nullptr) {
-                --*ptr_rc_;
-            }
-            buffer_obj_ = other.buffer_obj_;
-            ptr_rc_ = other.ptr_rc_;
-            ++*buffer_obj_->ptr_rc_;
-        }
-        return *this;
-    }
+    BufferPtr(const BufferPtr &other);
+
+    BufferPtr(BufferPtr &&other);
+
+    BufferPtr &operator=(const BufferPtr &other);
+
+    BufferPtr &operator=(BufferPtr &&other);
 
     BufferObj *get() const { return buffer_obj_; }
 
-    void reset() {
-        if (buffer_obj_ != nullptr) {
-            --*ptr_rc_;
-            buffer_obj_ = nullptr;
-        }
-    }
+    void reset();
 
 private:
     BufferObj *buffer_obj_;
-    SharedPtr<u32> ptr_rc_;
 };
 
 } // namespace infinity

@@ -115,10 +115,6 @@ public:
     bool InCheckpointProcess(TxnTimeStamp commit_ts);
 
 private:
-    struct TxnCmp {
-        bool operator()(Txn *lhs, Txn *rhs) const { return lhs->CommitTS() > rhs->CommitTS(); }
-    };
-
     Catalog *catalog_{};
     mutable std::mutex locker_{};
     BufferManager *buffer_mgr_{};
@@ -128,7 +124,7 @@ private:
 
     Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
     HashSet<Txn *> finishing_txns_;     // the txns in committing stage, can use flat_map
-    Heap<Txn *, TxnCmp> finished_txns_;        // the txns that committed_ts
+    List<Txn *> finished_txns_;        // the txns that committed_ts
 
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 

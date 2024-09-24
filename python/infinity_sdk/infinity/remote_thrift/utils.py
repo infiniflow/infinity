@@ -142,23 +142,13 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
         for value in cons.hashable_args:
             return traverse_conditions(value)
     elif isinstance(cons, exp.Neg):
-        parsed_expr = ttypes.ParsedExpr()
-        if isinstance(cons.hashable_args[0], exp.Literal):
-            constant_expr = ttypes.ConstantExpr()
-            if cons.hashable_args[0].is_int:
-                constant_expr.literal_type = ttypes.LiteralType.Int64
-                constant_expr.i64_value = -int(cons.hashable_args[0].output_name)
-            elif cons.hashable_args[0].is_number:
-                constant_expr.literal_type = ttypes.LiteralType.Double
-                constant_expr.f64_value = -float(cons.hashable_args[0].output_name)
-            else:
-                raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown literal type: {cons}")
-
-            parser_expr_type = ttypes.ParsedExprType()
-            parser_expr_type.constant_expr = constant_expr
-            parsed_expr.type = parser_expr_type
-
-            return parsed_expr
+        func_expr = ttypes.FunctionExpr(
+            function_name='-',
+            arguments=[parse_expr(cons.hashable_args[0])]
+        )
+        expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+        parsed_expr = ttypes.ParsedExpr(type=expr_type)
+        return parsed_expr
     elif isinstance(cons, exp.Anonymous):
         arguments = []
         for arg in cons.args['expressions']:

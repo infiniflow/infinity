@@ -665,3 +665,13 @@ class TestInfinity:
         test_func()
         res = db_obj.drop_table("test_filter_fulltext" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    def test_neg_func(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_neg_func" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_neg_func" + suffix, {"num": {"type": "float64"}}, ConflictType.Error)
+        table_obj.insert([{"num": 1.0}, {"num": 2.0}, {"num": 3.0}])
+        pd.testing.assert_frame_equal(table_obj.output(["-abs(num) - 1"]).filter("-abs(num) >= -2").to_df(),
+                                      pd.DataFrame({"(-(ABS(num)) - 1)": (-2.0, -3.0)}))
+        res = db_obj.drop_table("test_neg_func" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
