@@ -262,6 +262,8 @@ private:
     SegmentIndexEntry(const SegmentIndexEntry &other);
 
 public:
+    ~SegmentIndexEntry() override;
+
     UniquePtr<SegmentIndexEntry> Clone(TableIndexEntry *table_index_entry) const;
 
 private:
@@ -275,7 +277,7 @@ private:
     SharedPtr<String> index_dir_{};
     const SegmentID segment_id_{};
 
-    Vector<BufferPtr> vector_buffer_{}; // size: 1 + GetIndexPartNum().
+    Vector<BufferObj *> vector_buffer_{}; // size: 1 + GetIndexPartNum().
 
     mutable std::shared_mutex rw_locker_{};
 

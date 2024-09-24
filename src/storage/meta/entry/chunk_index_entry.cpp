@@ -69,10 +69,23 @@ ChunkIndexEntry::ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_in
     : BaseEntry(EntryType::kChunkIndex, false, ChunkIndexEntry::EncodeIndex(chunk_id, base_name, segment_index_entry)), chunk_id_(chunk_id),
       segment_index_entry_(segment_index_entry), base_name_(base_name), base_rowid_(base_rowid), row_count_(row_count) {};
 
+ChunkIndexEntry::~ChunkIndexEntry() {
+    if (buffer_obj_ != nullptr) {
+        buffer_obj_->SubObjRc();
+    }
+    for (auto *part_buffer_obj : part_buffer_objs_) {
+        if (part_buffer_obj != nullptr) {
+            part_buffer_obj->SubObjRc();
+        }
+    }
+}
+
 ChunkIndexEntry::ChunkIndexEntry(const ChunkIndexEntry &other)
     : BaseEntry(other), chunk_id_(other.chunk_id_), segment_index_entry_(other.segment_index_entry_), base_name_(other.base_name_),
       base_rowid_(other.base_rowid_), row_count_(other.row_count_), deprecate_ts_(other.deprecate_ts_.load()), buffer_obj_(other.buffer_obj_),
-      part_buffer_objs_(other.part_buffer_objs_) {}
+      part_buffer_objs_(other.part_buffer_objs_) {
+    buffer_obj_->AddObjRc();
+}
 
 UniquePtr<ChunkIndexEntry> ChunkIndexEntry::Clone(SegmentIndexEntry *segment_index_entry) const {
     auto ret = UniquePtr<ChunkIndexEntry>(new ChunkIndexEntry(*this));
@@ -328,7 +341,7 @@ u64 ChunkIndexEntry::GetColumnLengthSum() const {
     assert(segment_index_entry_->table_index_entry()->index_base()->index_type_ == IndexType::kFullText);
     // Read the length from buffer object and sum up
     u64 column_length_sum = 0UL;
-    BufferHandle buffer_handle = buffer_obj_.get()->Load();
+    BufferHandle buffer_handle = buffer_obj_->Load();
     const u32 *column_lengths = (const u32 *)buffer_handle.GetData();
     for (SizeT i = 0; i < row_count_; i++) {
         column_length_sum += column_lengths[i];
@@ -336,7 +349,7 @@ u64 ChunkIndexEntry::GetColumnLengthSum() const {
     return column_length_sum;
 }
 
-BufferHandle ChunkIndexEntry::GetIndex() { return buffer_obj_.get()->Load(); }
+BufferHandle ChunkIndexEntry::GetIndex() { return buffer_obj_->Load(); }
 
 nlohmann::json ChunkIndexEntry::Serialize() {
     nlohmann::json index_entry_json;
@@ -364,16 +377,16 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
 }
 
 void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
-    if (buffer_obj_.get() != nullptr) {
-        buffer_obj_.get()->PickForCleanup();
+    if (buffer_obj_ != nullptr) {
+        buffer_obj_->PickForCleanup();
         if (info_tracer) {
-            info_tracer->AddCleanupInfo(buffer_obj_.get()->GetFilename());
+            info_tracer->AddCleanupInfo(buffer_obj_->GetFilename());
         }
     }
     for (auto &part_buffer_obj : part_buffer_objs_) {
-        part_buffer_obj.get()->PickForCleanup();
+        part_buffer_obj->PickForCleanup();
         if (info_tracer) {
-            info_tracer->AddCleanupInfo(part_buffer_obj.get()->GetFilename());
+            info_tracer->AddCleanupInfo(part_buffer_obj->GetFilename());
         }
     }
     if (!dropped) {
@@ -415,12 +428,12 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
 }
 
 void ChunkIndexEntry::SaveIndexFile() {
-    if (buffer_obj_.get() == nullptr) {
+    if (buffer_obj_ == nullptr) {
         return;
     }
-    buffer_obj_.get()->Save();
-    for (auto &part_buffer_obj : part_buffer_objs_) {
-        part_buffer_obj.get()->Save();
+    buffer_obj_->Save();
+    for (auto *part_buffer_obj : part_buffer_objs_) {
+        part_buffer_obj->Save();
     }
 }
 
@@ -455,7 +468,7 @@ void ChunkIndexEntry::DeprecateChunk(TxnTimeStamp commit_ts) {
     LOG_INFO(fmt::format("Deprecate chunk {}, ts: {}", encode(), commit_ts));
 }
 
-BufferHandle ChunkIndexEntry::GetIndexPartAt(u32 i) { return part_buffer_objs_.at(i).get()->Load(); }
+BufferHandle ChunkIndexEntry::GetIndexPartAt(u32 i) { return part_buffer_objs_.at(i)->Load(); }
 
 bool ChunkIndexEntry::CheckVisible(Txn *txn) const {
     if (txn == nullptr) {
@@ -466,8 +479,8 @@ bool ChunkIndexEntry::CheckVisible(Txn *txn) const {
 }
 
 void ChunkIndexEntry::Save() {
-    if (buffer_obj_.get()) {
-        buffer_obj_.get()->Save();
+    if (buffer_obj_) {
+        buffer_obj_->Save();
     }
 }
 

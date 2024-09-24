@@ -117,6 +117,14 @@ SegmentIndexEntry::SegmentIndexEntry(const SegmentIndexEntry &other)
     ft_column_len_cnt_ = other.ft_column_len_cnt_;
 }
 
+SegmentIndexEntry::~SegmentIndexEntry() {
+    for (auto *buffer : vector_buffer_) {
+        if (buffer != nullptr) {
+            buffer->SubObjRc();
+        }
+    }
+}
+
 UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Clone(TableIndexEntry *table_index_entry) const {
     auto ret = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(*this));
     std::shared_lock lock(rw_locker_);
@@ -272,9 +280,9 @@ SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segmen
     return res;
 }
 
-BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0].get()->Load(); }
+BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
 
-BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1].get()->Load(); }
+BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1]->Load(); }
 
 void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                        u32 row_offset,
@@ -891,14 +899,14 @@ void SegmentIndexEntry::CommitIndex(TxnTimeStamp commit_ts) {
 }
 
 void SegmentIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
-    for (auto &buffer_ptr : vector_buffer_) {
-        if (buffer_ptr.get() == nullptr) {
+    for (auto *buffer_ptr : vector_buffer_) {
+        if (buffer_ptr == nullptr) {
             String error_message = "vector_buffer should not has nullptr.";
             UnrecoverableError(error_message);
         }
-        buffer_ptr.get()->PickForCleanup();
+        buffer_ptr->PickForCleanup();
         if (info_tracer != nullptr) {
-            String file_path = buffer_ptr.get()->GetFilename();
+            String file_path = buffer_ptr->GetFilename();
             info_tracer->AddCleanupInfo(std::move(file_path));
         }
     }
@@ -1083,8 +1091,8 @@ void SegmentIndexEntry::SaveIndexFile() {
     String &index_name = *table_index_entry_->index_dir();
     u64 segment_id = this->segment_id_;
     LOG_TRACE(fmt::format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
-    for (auto &buffer_ptr : vector_buffer_) {
-        buffer_ptr.get()->Save();
+    for (auto *buffer_ptr : vector_buffer_) {
+        buffer_ptr->Save();
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->SaveIndexFile();

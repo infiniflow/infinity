@@ -47,6 +47,8 @@ public:
 
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
 
+    ~ChunkIndexEntry() override;
+
 private:
     ChunkIndexEntry(const ChunkIndexEntry &other);
 
@@ -129,7 +131,7 @@ public:
 
     void LoadPartsReader(BufferManager *buffer_mgr);
 
-    BufferObj *GetBufferObj() { return buffer_obj_.get(); }
+    BufferObj *GetBufferObj() { return buffer_obj_; }
 
     void DeprecateChunk(TxnTimeStamp commit_ts);
 
@@ -152,8 +154,8 @@ public:
     Atomic<TxnTimeStamp> deprecate_ts_{UNCOMMIT_TS};
 
 private:
-    BufferPtr buffer_obj_{};
-    Vector<BufferPtr> part_buffer_objs_;
+    BufferObj *buffer_obj_{};
+    Vector<BufferObj *> part_buffer_objs_;
 };
 
 } // namespace infinity

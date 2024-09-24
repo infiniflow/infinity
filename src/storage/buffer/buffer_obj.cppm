@@ -138,6 +138,10 @@ public:
     u64 rc() const { return rc_; }
     u32 id() const { return id_; }
 
+    void AddObjRc() { obj_rc_++; }
+
+    void SubObjRc();
+
     // check the invalid state, only used in tests.
     void CheckState() const;
 
@@ -154,32 +158,7 @@ protected:
 private:
     u32 id_;
 
-    friend class BufferPtr;
-    u32 ptr_rc_ = 0;
-};
-
-export class BufferPtr {
-public:
-    BufferPtr() : buffer_obj_(nullptr) {}
-
-    ~BufferPtr();
-
-    BufferPtr(BufferObj *buffer_obj);
-
-    BufferPtr(const BufferPtr &other);
-
-    BufferPtr(BufferPtr &&other);
-
-    BufferPtr &operator=(const BufferPtr &other);
-
-    BufferPtr &operator=(BufferPtr &&other);
-
-    BufferObj *get() const { return buffer_obj_; }
-
-    void reset();
-
-private:
-    BufferObj *buffer_obj_;
+    u32 obj_rc_ = 1;
 };
 
 } // namespace infinity

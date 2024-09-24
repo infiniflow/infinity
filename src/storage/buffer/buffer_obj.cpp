@@ -159,7 +159,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
 
 void BufferObj::PickForCleanup() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (ptr_rc_ > 1) {
+    if (obj_rc_ > 1) {
         return;
     }
     switch (status_) {
@@ -257,6 +257,13 @@ bool BufferObj::AddBufferSize(SizeT add_size) {
     return free_success;
 }
 
+void BufferObj::SubObjRc() {
+    if (obj_rc_ == 0) {
+        UnrecoverableError(fmt::format("SubObjRc: obj_rc_ is 0, buffer: {}", GetFilename()));
+    }
+    obj_rc_--;
+}
+
 void BufferObj::CheckState() const {
     std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
@@ -294,51 +301,6 @@ void BufferObj::CheckState() const {
                 UnrecoverableError(error_message);
             }
         }
-    }
-}
-
-BufferPtr::~BufferPtr() {
-    if (buffer_obj_ != nullptr && buffer_obj_->ptr_rc_ > 0) {
-        --buffer_obj_->ptr_rc_;
-    }
-}
-
-BufferPtr::BufferPtr(BufferObj *buffer_obj) : buffer_obj_(buffer_obj) {
-    ++buffer_obj_->ptr_rc_;
-}
-
-BufferPtr::BufferPtr(const BufferPtr &other) : buffer_obj_(other.buffer_obj_) { ++buffer_obj_->ptr_rc_; }
-
-BufferPtr::BufferPtr(BufferPtr &&other) : buffer_obj_(other.buffer_obj_) { other.buffer_obj_ = nullptr; }
-
-BufferPtr &BufferPtr::operator=(const BufferPtr &other) {
-    if (this != &other) {
-        if (buffer_obj_ != nullptr) {
-            --buffer_obj_->ptr_rc_;
-        }
-        buffer_obj_ = other.buffer_obj_;
-        if (buffer_obj_ != nullptr) {
-            ++buffer_obj_->ptr_rc_;
-        }
-    }
-    return *this;
-}
-
-BufferPtr &BufferPtr::operator=(BufferPtr &&other) {
-    if (this != &other) {
-        if (buffer_obj_ != nullptr) {
-            --buffer_obj_->ptr_rc_;
-        }
-        buffer_obj_ = other.buffer_obj_;
-        other.buffer_obj_ = nullptr;
-    }
-    return *this;
-}
-
-void BufferPtr::reset() {
-    if (buffer_obj_ != nullptr) {
-        --buffer_obj_->ptr_rc_;
-        buffer_obj_ = nullptr;
     }
 }
 

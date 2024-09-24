@@ -60,6 +60,8 @@ public:
     // for iterator unit test
     explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
 
+    ~BlockEntry() override;
+
 private:
     BlockEntry(const BlockEntry &other);
 
@@ -95,7 +97,7 @@ public:
 
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
-    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true);
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     void Flush(TxnTimeStamp checkpoint_ts);
 
@@ -200,7 +202,7 @@ protected:
     u16 block_row_count_{};
     u16 row_capacity_{};
 
-    BufferPtr version_buffer_object_{};
+    BufferObj *version_buffer_object_{};
 
     // check if a value must not exist in the block
     SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
