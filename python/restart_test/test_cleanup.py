@@ -63,7 +63,7 @@ class TestCleanup:
 
             db_obj.drop_table(table_name, ConflictType.Error)
 
-            time.sleep(3)  # sleep 2 wait for the data to be cleaned up
+            infinity_obj.cleanup()
 
             # check
             dropped_dirs = pathlib.Path(data_dir).rglob(f"*{table_name}*")
@@ -133,7 +133,7 @@ class TestCleanup:
             res = table_obj.drop_index(index_name)
             assert res.error_code == infinity.ErrorCode.OK
 
-            time.sleep(3)  # sleep 2 wait for the data to be cleaned up
+            infinity_obj.cleanup()
 
             # check
             dropped_dirs = pathlib.Path(data_dir).rglob(f"*{index_name}*")
@@ -151,7 +151,7 @@ class TestCleanup:
 
             db_obj.drop_table(table_name, ConflictType.Error)
 
-            time.sleep(3)  # sleep 2 wait for the data to be cleaned up
+            infinity_obj.cleanup()
 
             dropped_dirs = pathlib.Path(data_dir).rglob(f"*{table_name}*")
             assert len(list(dropped_dirs)) == 0
