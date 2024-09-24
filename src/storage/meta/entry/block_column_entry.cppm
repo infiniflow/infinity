@@ -29,13 +29,13 @@ import internal_types;
 import base_entry;
 import column_def;
 import value;
+import cleanup_scanner;
 
 namespace infinity {
 
 struct BlockEntry;
 struct TableEntry;
 struct SegmentEntry;
-class CleanupInfoTracer;
 
 export struct BlockColumnEntry : public BaseEntry {
 public:
@@ -122,7 +122,7 @@ public:
 
     void FlushColumn(TxnTimeStamp checkpoint_ts);
 
-    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true);
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     void DropColumn();
 

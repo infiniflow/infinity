@@ -28,7 +28,6 @@ import index_file_worker;
 import status;
 import index_base;
 import column_def;
-import meta_entry_interface;
 import cleanup_scanner;
 import chunk_index_entry;
 import memory_indexer;
@@ -56,7 +55,7 @@ export struct PopulateEntireConfig {
     bool check_ts_;
 };
 
-export class SegmentIndexEntry : public BaseEntry, public EntryInterface {
+export class SegmentIndexEntry : public BaseEntry {
 public:
     static Vector<std::string_view> DecodeIndex(std::string_view encode);
 

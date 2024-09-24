@@ -43,7 +43,7 @@ CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, Buffer
     : catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
 // dropped is true denotes the data file can be cleaned up, or only metadata can be cleaned up
-void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry, bool dropped) { entries_.emplace_back(std::move(entry), dropped); }
+void CleanupScanner::AddEntry(SharedPtr<BaseEntry> entry, bool dropped) { entries_.emplace_back(std::move(entry), dropped); }
 
 void CleanupScanner::Scan() {
     LOG_DEBUG(fmt::format("CleanupScanner: Start scanning, ts: {}", visible_ts_));

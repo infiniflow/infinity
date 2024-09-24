@@ -29,7 +29,6 @@ import base_entry;
 import table_entry;
 import entry_list;
 import meta_info;
-import meta_entry_interface;
 import cleanup_scanner;
 
 namespace infinity {
@@ -38,7 +37,7 @@ class DBEntry;
 class TxnManager;
 class Txn;
 
-export struct TableMeta : public MetaInterface {
+export struct TableMeta : public BaseMeta {
     using EntryT = TableEntry;
 
     friend class DBEntry;

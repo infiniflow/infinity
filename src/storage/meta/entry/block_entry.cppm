@@ -35,6 +35,7 @@ import buffer_obj;
 import wal_entry;
 import column_def;
 import txn_store;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -43,7 +44,6 @@ class Txn;
 struct SegmentEntry;
 struct TableEntry;
 class DataBlock;
-class CleanupInfoTracer;
 
 /// class BlockEntry
 export struct BlockEntry : public BaseEntry {

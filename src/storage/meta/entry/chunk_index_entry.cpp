@@ -22,7 +22,6 @@ module chunk_index_entry;
 import stl;
 import third_party;
 import base_entry;
-import meta_entry_interface;
 import cleanup_scanner;
 import segment_index_entry;
 import table_index_entry;

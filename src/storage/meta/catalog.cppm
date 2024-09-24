@@ -40,7 +40,6 @@ import db_meta;
 import meta_map;
 import base_entry;
 import column_def;
-import meta_entry_interface;
 import cleanup_scanner;
 import log_file;
 
