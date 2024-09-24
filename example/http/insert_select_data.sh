@@ -49,7 +49,7 @@ curl --request POST \
     } '
 
 # insert 4 rows into 'tbl1'
-echo -e '\n-- insert 4 rows into tbl1'
+echo -e '\n\n-- insert 4 rows into tbl1'
 curl --request POST \
      --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
      --header 'accept: application/json' \
@@ -91,7 +91,7 @@ curl --request POST \
      ] '
 
 # show all rows of 'tbl1'
-echo -e '\n-- select all rows of tbl1'
+echo -e '\n\n-- select all rows of tbl1'
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
      --header 'accept: application/json' \
@@ -104,10 +104,30 @@ curl --request GET \
          ]
      } '
 
+
+# select num and year of 'tbl1' where num > 1 and year < 2023
+echo -e '\n\n-- select num and year of tbl1 where num > 1 and year < 2023 offset 1 limit 1'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "num",
+             "year"
+         ],
+         "filter": "num > 1 and year < 2024",
+         "offset": "1",
+         "limit": "1"
+     } '
+
 # drop tbl1
-echo -e '\n-- drop tbl1'
+echo -e '\n\n-- drop tbl1'
 curl --request DELETE \
      --url http://localhost:23820/databases/default_db/tables/tbl1 \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' {"drop_option": "error"} '
+echo -e '\n'
