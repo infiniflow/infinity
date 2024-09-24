@@ -901,7 +901,6 @@ void SegmentIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
             String file_path = buffer_ptr.get()->GetFilename();
             info_tracer->AddCleanupInfo(std::move(file_path));
         }
-        buffer_ptr.reset();
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->Cleanup(info_tracer, dropped);
