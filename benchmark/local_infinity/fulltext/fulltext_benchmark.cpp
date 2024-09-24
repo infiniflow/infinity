@@ -255,7 +255,7 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
             output_columns->emplace_back(select_rowid_expr);
             output_columns->emplace_back(select_score_expr);
         }
-        infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
+        infinity->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns);
         /*
         auto result = infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
         {
