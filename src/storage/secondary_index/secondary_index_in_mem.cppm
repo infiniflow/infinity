@@ -33,8 +33,8 @@ public:
     virtual ~SecondaryIndexInMem() = default;
     virtual u32 GetRowCount() const = 0;
     virtual void Insert(u16 block_id, BlockColumnEntry *block_column_entry, BufferManager *buffer_manager, u32 row_offset, u32 row_count) = 0;
-    virtual SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) = 0;
-    virtual Pair<u32, Bitmask> RangeQuery(const void *input) = 0;
+    virtual SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const = 0;
+    virtual Pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
 
     static SharedPtr<SecondaryIndexInMem> NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, RowID begin_row_id, u32 max_size = 5 << 20);
 };
