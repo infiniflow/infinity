@@ -289,6 +289,7 @@ void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer, [[maybe_unused]] 
             String file_path = buffer_.get()->GetFilename();
             info_tracer->AddCleanupInfo(std::move(file_path));
         }
+        buffer_.reset();
     }
     for (auto &outline_buffer : outline_buffers_) {
         if (outline_buffer.get() != nullptr) {
@@ -297,6 +298,7 @@ void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer, [[maybe_unused]] 
                 String file_path = outline_buffer.get()->GetFilename();
                 info_tracer->AddCleanupInfo(std::move(file_path));
             }
+            outline_buffer.reset();
         }
     }
 }

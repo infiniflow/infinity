@@ -486,6 +486,7 @@ void BlockEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
         String version_path = version_buffer_object_.get()->GetFilename();
         info_tracer->AddCleanupInfo(std::move(version_path));
     }
+    version_buffer_object_.reset();
 
     if (dropped) {
         String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_dir_;

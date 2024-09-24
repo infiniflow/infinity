@@ -369,12 +369,14 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
         if (info_tracer) {
             info_tracer->AddCleanupInfo(buffer_obj_.get()->GetFilename());
         }
+        buffer_obj_.reset();
     }
     for (auto &part_buffer_obj : part_buffer_objs_) {
         part_buffer_obj.get()->PickForCleanup();
         if (info_tracer) {
             info_tracer->AddCleanupInfo(part_buffer_obj.get()->GetFilename());
         }
+        part_buffer_obj.reset();
     }
     if (!dropped) {
         return;
