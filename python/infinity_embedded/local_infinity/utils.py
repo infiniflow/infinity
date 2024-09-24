@@ -112,22 +112,13 @@ def traverse_conditions(cons, fn=None):
             return traverse_conditions(value)
 
     elif isinstance(cons, exp.Neg):
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = '-'
+        func_expr.arguments = [parse_expr(cons.hashable_args[0])]
         parsed_expr = WrapParsedExpr()
-        if isinstance(cons.hashable_args[0], exp.Literal):
-            constant_expr = WrapConstantExpr()
-            if cons.hashable_args[0].is_int:
-                constant_expr.literal_type = LiteralType.kInteger
-                constant_expr.i64_value = -int(cons.hashable_args[0].output_name)
-            elif cons.hashable_args[0].is_number:
-                constant_expr.literal_type = LiteralType.kDouble
-                constant_expr.f64_value = -float(cons.hashable_args[0].output_name)
-            else:
-                raise Exception(f"unknown literal type: {cons}")
-
-            parsed_expr.type = ParsedExprType.kConstant
-            parsed_expr.constant_expr = constant_expr
-
-            return parsed_expr
+        parsed_expr.type = ParsedExprType.kFunction
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
     elif isinstance(cons, exp.Anonymous):
         arguments = []
         for arg in cons.args['expressions']:

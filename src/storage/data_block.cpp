@@ -220,21 +220,18 @@ void DataBlock::Finalize() {
     if (finalized) {
         return;
     }
-    bool first_flat_column_vector = false;
+    bool have_flat_column_vector = false;
     SizeT row_count = 0;
     for (SizeT idx = 0; idx < column_count_; ++idx) {
-        if (column_vectors[idx]->vector_type() == ColumnVectorType::kConstant) {
-            continue;
-        } else {
-            if (first_flat_column_vector) {
-                if (row_count != column_vectors[idx]->Size()) {
-                    String error_message = "Column vectors in same data block have different size.";
-                    UnrecoverableError(error_message);
-                }
-            } else {
-                first_flat_column_vector = true;
+        if (column_vectors[idx]->vector_type() != ColumnVectorType::kConstant) {
+            const SizeT current_row_count = column_vectors[idx]->Size();
+            if (have_flat_column_vector && row_count != current_row_count) {
+                UnrecoverableError("Column vectors in same data block have different size.");
             }
-            row_count = column_vectors[idx]->Size();
+            have_flat_column_vector = true;
+            row_count = current_row_count;
+        } else if (!have_flat_column_vector) {
+            row_count = 1;
         }
     }
     row_count_ = row_count;
