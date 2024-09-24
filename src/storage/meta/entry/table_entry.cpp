@@ -1219,6 +1219,11 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
     SegmentID unsealed_id = table_entry_json["unsealed_id"];
     SegmentID next_segment_id = table_entry_json["next_segment_id"];
+
+    if(!table_entry_json.contains("next_column_id")) {
+        String error_message = "No 'next_column_id in table entry of catalog file, maybe your catalog is generated before 0.4.0.'";
+        UnrecoverableError(error_message);
+    }
     ColumnID next_column_id = table_entry_json["next_column_id"];
 
     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted,
