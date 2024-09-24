@@ -85,7 +85,7 @@ TEST_F(InfinityTableTest, test1) {
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
 
-            QueryResult explain_ast = infinity->Explain(db_name, table_name, ExplainType::kAst, nullptr, nullptr, output_columns);
+            QueryResult explain_ast = infinity->Explain(db_name, table_name, ExplainType::kAst, nullptr, nullptr, nullptr, nullptr, output_columns);
             EXPECT_TRUE(explain_ast.IsOk());
 //            fmt::print("AST: {}\n", explain_ast.ToString());
         }
@@ -96,7 +96,7 @@ TEST_F(InfinityTableTest, test1) {
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
 
-            QueryResult explain_unopt = infinity->Explain(db_name, table_name, ExplainType::kUnOpt, nullptr, nullptr, output_columns);
+            QueryResult explain_unopt = infinity->Explain(db_name, table_name, ExplainType::kUnOpt, nullptr, nullptr, nullptr, nullptr, output_columns);
             EXPECT_TRUE(explain_unopt.IsOk());
 //            fmt::print("Unoptimized logical plan: {}\n", explain_unopt.ToString());
         }
@@ -107,7 +107,7 @@ TEST_F(InfinityTableTest, test1) {
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
 
-            QueryResult explain_opt = infinity->Explain(db_name, table_name, ExplainType::kOpt, nullptr, nullptr, output_columns);
+            QueryResult explain_opt = infinity->Explain(db_name, table_name, ExplainType::kOpt, nullptr, nullptr, nullptr, nullptr, output_columns);
             EXPECT_TRUE(explain_opt.IsOk());
 //            fmt::print("Optimized logical plan: {}\n", explain_opt.ToString());
         }
@@ -118,7 +118,7 @@ TEST_F(InfinityTableTest, test1) {
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
 
-            QueryResult explain_phy = infinity->Explain(db_name, table_name, ExplainType::kPhysical, nullptr, nullptr, output_columns);
+            QueryResult explain_phy = infinity->Explain(db_name, table_name, ExplainType::kPhysical, nullptr, nullptr, nullptr, nullptr, output_columns);
             EXPECT_TRUE(explain_phy.IsOk());
 //            fmt::print("Physical plan: {}\n", explain_phy.ToString());
         }
@@ -129,7 +129,7 @@ TEST_F(InfinityTableTest, test1) {
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
 
-            QueryResult explain_fragment = infinity->Explain(db_name, table_name, ExplainType::kFragment, nullptr, nullptr, output_columns);
+            QueryResult explain_fragment = infinity->Explain(db_name, table_name, ExplainType::kFragment, nullptr, nullptr, nullptr, nullptr, output_columns);
             EXPECT_TRUE(explain_fragment.IsOk());
 //            fmt::print("Fragment: {}\n", explain_fragment.ToString());
         }
@@ -140,7 +140,7 @@ TEST_F(InfinityTableTest, test1) {
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
 
-            QueryResult explain_pipeline = infinity->Explain(db_name, table_name, ExplainType::kPipeline, nullptr, nullptr, output_columns);
+            QueryResult explain_pipeline = infinity->Explain(db_name, table_name, ExplainType::kPipeline, nullptr, nullptr, nullptr, nullptr, output_columns);
             EXPECT_TRUE(explain_pipeline.IsOk());
 //            fmt::print("Pipeline: {}\n", explain_pipeline.ToString());
         }

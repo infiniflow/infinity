@@ -59,6 +59,8 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             response["error_message"] = "HTTP Body isn't json object";
         }
         UniquePtr<ParsedExpr> filter{};
+        UniquePtr<ParsedExpr> limit{};
+        UniquePtr<ParsedExpr> offset{};
         UniquePtr<SearchExpr> search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
         DeferFn defer_fn([&]() {
@@ -101,6 +103,28 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 if (!filter) {
                     return;
                 }
+            } else if (IsEqual(key, "limit")) {
+
+                if (limit) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one limit field.";
+                    return;
+                }
+                limit = ParseFilter(elem.value(), http_status, response);
+                if (!limit) {
+                    return;
+                }
+            } else if (IsEqual(key, "offset")) {
+
+                if (offset) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one offset field.";
+                    return;
+                }
+                offset = ParseFilter(elem.value(), http_status, response);
+                if (!offset) {
+                    return;
+                }
             } else if (IsEqual(key, "search")) {
                 if (search_expr) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
@@ -118,7 +142,8 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             }
         }
 
-        const QueryResult result = infinity_ptr->Search(db_name, table_name, search_expr.release(), filter.release(), output_columns);
+        const QueryResult result =
+            infinity_ptr->Search(db_name, table_name, search_expr.release(), filter.release(), limit.release(), offset.release(), output_columns);
 
         output_columns = nullptr;
         if (result.IsOk()) {
@@ -168,6 +193,8 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
             response["error_message"] = "HTTP Body isn't json object";
         }
         UniquePtr<ParsedExpr> filter{};
+        UniquePtr<ParsedExpr> limit{};
+        UniquePtr<ParsedExpr> offset{};
         UniquePtr<SearchExpr> search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
         DeferFn defer_fn([&]() {
@@ -179,7 +206,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                 output_columns = nullptr;
             }
         });
-        ExplainType explain_type  = ExplainType::kInvalid;
+        ExplainType explain_type = ExplainType::kInvalid;
         for (const auto &elem : input_json.items()) {
             String key = elem.key();
             ToLower(key);
@@ -209,6 +236,28 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                 }
                 filter = ParseFilter(elem.value(), http_status, response);
                 if (filter == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "limit")) {
+
+                if (limit) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one limit field.";
+                    return;
+                }
+                limit = ParseFilter(elem.value(), http_status, response);
+                if (!limit) {
+                    return;
+                }
+            } else if (IsEqual(key, "offset")) {
+
+                if (offset) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one offset field.";
+                    return;
+                }
+                offset = ParseFilter(elem.value(), http_status, response);
+                if (!offset) {
                     return;
                 }
             } else if (IsEqual(key, "search")) {
@@ -247,7 +296,14 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
             }
         }
 
-        const QueryResult result = infinity_ptr->Explain(db_name, table_name, explain_type, search_expr.release(), filter.release(), output_columns);
+        const QueryResult result = infinity_ptr->Explain(db_name,
+                                                         table_name,
+                                                         explain_type,
+                                                         search_expr.release(),
+                                                         filter.release(),
+                                                         limit.release(),
+                                                         offset.release(),
+                                                         output_columns);
 
         output_columns = nullptr;
         if (result.IsOk()) {
@@ -325,15 +381,15 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
             return nullptr;
         }
 
-        if(output_expr_str == "_row_id" or output_expr_str == "_similarity" or output_expr_str == "_distance" or output_expr_str == "_score") {
+        if (output_expr_str == "_row_id" or output_expr_str == "_similarity" or output_expr_str == "_distance" or output_expr_str == "_score") {
             auto parsed_expr = new FunctionExpr();
-            if(output_expr_str == "_row_id") {
+            if (output_expr_str == "_row_id") {
                 parsed_expr->func_name_ = "row_id";
-            } else if(output_expr_str == "_similarity") {
+            } else if (output_expr_str == "_similarity") {
                 parsed_expr->func_name_ = "similarity";
-            } else if(output_expr_str == "_distance") {
+            } else if (output_expr_str == "_distance") {
                 parsed_expr->func_name_ = "distance";
-            } else if(output_expr_str == "_score") {
+            } else if (output_expr_str == "_score") {
                 parsed_expr->func_name_ = "score";
             }
             output_columns->emplace_back(parsed_expr);
