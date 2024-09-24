@@ -14,7 +14,7 @@
 
 module;
 
-export module korea_analyzer;
+export module korean_analyzer;
 
 import stl;
 import ijma;
@@ -24,13 +24,13 @@ import status;
 
 namespace infinity {
 
-export class KoreaAnalyzer : public CommonLanguageAnalyzer {
+export class KoreanAnalyzer : public CommonLanguageAnalyzer {
 public:
-    KoreaAnalyzer(const String &path);
+    KoreanAnalyzer(const String &path);
 
-    KoreaAnalyzer(const KoreaAnalyzer &other);
+    KoreanAnalyzer(const KoreanAnalyzer &other);
 
-    ~KoreaAnalyzer();
+    ~KoreanAnalyzer();
 
     Status Load();
 

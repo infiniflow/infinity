@@ -53,8 +53,9 @@ Status PeerClient::UnInit() {
         terminate_task->Wait();
         processor_thread_->join();
     }
+
     LOG_INFO(fmt::format("Peer client: {} is stopped.", this_node_name_));
-    return Status::OK();
+    return Disconnect();
 }
 
 Status PeerClient::Reconnect() {
@@ -73,6 +74,25 @@ Status PeerClient::Reconnect() {
         client_ = MakeUnique<PeerServiceClient>(protocol_);
         transport_->open();
         server_connected_ = true;
+    } catch (const std::exception &e) {
+        status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
+    }
+    return status;
+}
+
+Status PeerClient::Disconnect() {
+    Status status = Status::OK();
+    if(server_connected_ == false) {
+        return status;
+    }
+
+    try {
+        socket_->close();
+        transport_->close();
+        protocol_.reset();
+        client_.reset();
+        transport_->close();
+        server_connected_ = false;
     } catch (const std::exception &e) {
         status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
     }
@@ -116,7 +136,8 @@ void PeerClient::Process() {
                 }
                 case PeerTaskType::kLogSync: {
                     LOG_TRACE(peer_task->ToString());
-
+                    SyncLogTask* sync_log_task = static_cast<SyncLogTask*>(peer_task.get());
+                    SyncLogs(sync_log_task);
                     break;
                 }
                 default: {
@@ -155,7 +176,26 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
     request.txn_timestamp = peer_task->txn_ts_;
 
     RegisterResponse response;
-    client_->Register(response, request);
+
+    try {
+        client_->Register(response, request);
+    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+        server_connected_ = false;
+        switch (thrift_exception.getType()) {
+            case TTransportExceptionType::END_OF_FILE: {
+                peer_task->error_message_ = thrift_exception.what();
+                peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectLeader);
+                return;
+            }
+            default: {
+                String error_message = "Register to the leader";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+
+
     if (response.error_code != 0) {
         // Error
         peer_task->error_code_ = response.error_code;
@@ -172,7 +212,24 @@ void PeerClient::Unregister(UnregisterPeerTask *peer_task) {
     UnregisterResponse response;
     request.node_name = peer_task->node_name_;
 
-    client_->Unregister(response, request);
+    try {
+        client_->Unregister(response, request);
+    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+        server_connected_ = false;
+        switch (thrift_exception.getType()) {
+            case TTransportExceptionType::END_OF_FILE: {
+                peer_task->error_message_ = thrift_exception.what();
+                peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectLeader);
+                return;
+            }
+            default: {
+                String error_message = "Unregister from the leader";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+
     if (response.error_code != 0) {
         // Error
         peer_task->error_code_ = response.error_code;
@@ -275,6 +332,41 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
             }
             peer_task->other_nodes_.emplace_back(node_info);
         }
+    }
+}
+
+void PeerClient::SyncLogs(SyncLogTask *peer_task) {
+    SyncLogRequest request;
+    SyncLogResponse response;
+    request.node_name = peer_task->node_name_;
+    SizeT log_count = peer_task->log_strings_.size();
+    request.log_entries.reserve(log_count);
+    for(SizeT i = 0; i < log_count; ++ i) {
+        request.log_entries.emplace_back(*peer_task->log_strings_[i]);
+    }
+
+    try {
+        client_->SyncLog(response, request);
+    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+        server_connected_ = false;
+        switch (thrift_exception.getType()) {
+            case TTransportExceptionType::END_OF_FILE: {
+                peer_task->error_message_ = thrift_exception.what();
+                peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
+                return;
+            }
+            default: {
+                String error_message = "Synlog: error in data transfer to follower or learner";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+
+    if (response.error_code != 0) {
+        // Error
+        peer_task->error_code_ = response.error_code;
+        peer_task->error_message_ = response.error_message;
     }
 }
 

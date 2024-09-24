@@ -1376,8 +1376,8 @@ IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_colum
 void TableEntry::InvalidateFullTextIndexCache(TableIndexEntry *table_index_entry) {
     const IndexBase *index_base = table_index_entry->index_base();
     String index_name = *table_index_entry->GetIndexName();
-    LOG_DEBUG(fmt::format("Invalidate fulltext index cache: {}", index_name));
     String column_name = index_base->column_name();
+    LOG_DEBUG(fmt::format("Invalidate fulltext index cache: {}, column_name: {}, table_name: {}", index_name, column_name, *table_name_));
     ColumnID column_id = GetColumnIdByName(column_name);
     fulltext_column_index_cache_->InvalidateColumn(column_id, column_name);
 }

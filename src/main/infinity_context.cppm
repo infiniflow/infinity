@@ -93,6 +93,7 @@ private:
 
     std::function<void()> start_servers_func_{};
     std::function<void()> stop_servers_func_{};
+    atomic_bool start_server_{false};
 };
 
 } // namespace infinity

@@ -184,7 +184,8 @@ export enum class ErrorCode : long {
     kWrongCheckpointType = 8006,
     kInvalidNodeRole = 8007,
     kInvalidNodeStatus = 8008,
-    kNodeInfoUpdated = 8009
+    kNodeInfoUpdated = 8009,
+    kNodeNameMismatch = 8010
 };
 
 export class Status {
@@ -348,6 +349,7 @@ public:
     static Status InvalidNodeRole(const String &message);
     static Status InvalidNodeStatus(const String &message);
     static Status NodeInfoUpdated(const String &message);
+    static Status NodeNameMismatch(const String &actual_node_name, const String &expected_node_name);
 
 public:
     Status() = default;
