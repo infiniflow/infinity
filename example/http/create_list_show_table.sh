@@ -75,6 +75,12 @@ curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1 \
      --header 'accept: application/json'
 
+# show table tb1 columns
+echo -e '\n-- show tbl1 columns'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/columns \
+     --header 'accept: application/json'
+
 # drop tbl1
 echo -e '\n-- drop tbl1'
 curl --request DELETE \
