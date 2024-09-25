@@ -28,6 +28,7 @@ export class ObjectFile : public AbstractFileHandle {
 public:
     ObjectFile(VirtualFileSystem *file_system, FSType type) : AbstractFileHandle(file_system, type) {}
     ~ObjectFile() override = default;
+    Status Open(const String &path, FileAccessMode access_mode) override;
     Status Close() override;
     Status Append(const char *buffer) override;
     Status Append(const String &buffer) override;

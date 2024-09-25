@@ -21,6 +21,7 @@ import virtual_file_system_type;
 import status;
 import virtual_file_system;
 import object_file;
+import abstract_file_handle;
 
 namespace infinity {
 
@@ -28,6 +29,7 @@ export class MinioFile final : public ObjectFile {
 public:
     MinioFile(VirtualFileSystem *file_system) : ObjectFile(file_system, FSType::kMinio) {}
     ~MinioFile() final = default;
+    Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
     Status Append(const char *buffer) final;
     Status Append(const String &buffer) final;

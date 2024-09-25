@@ -28,6 +28,7 @@ export class LocalFile final : public AbstractFileHandle {
 public:
     LocalFile(VirtualFileSystem *file_system) : AbstractFileHandle(file_system, FSType::kLocal) {}
     ~LocalFile() final = default;
+    Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
     Status Append(const char *buffer) final;
     Status Append(const String &buffer) final;

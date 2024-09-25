@@ -30,6 +30,7 @@ export class AbstractFileHandle {
 public:
     AbstractFileHandle(VirtualFileSystem *file_system, FSType fs_type) : file_system_(file_system), fs_type_(fs_type) {}
     virtual ~AbstractFileHandle() = 0;
+    virtual Status Open(const String &path, FileAccessMode access_mode) = 0;
     virtual Status Close() = 0;
     virtual Status Append(const char *buffer) = 0;
     virtual Status Append(const String &buffer) = 0;
