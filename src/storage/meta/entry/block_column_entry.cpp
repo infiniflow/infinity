@@ -59,26 +59,22 @@ BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID colum
     : BaseEntry(EntryType::kBlockColumn, false, BlockColumnEntry::EncodeIndex(column_id, block_entry)), block_entry_(block_entry),
       column_id_(column_id) {}
 
-BlockColumnEntry::~BlockColumnEntry() {
-    if (buffer_ != nullptr) {
-        buffer_->SubObjRc();
-    }
-    for (auto *outline_buffer : outline_buffers_) {
-        outline_buffer->SubObjRc();
-    }
-}
+BlockColumnEntry::~BlockColumnEntry() {}
 
 BlockColumnEntry::BlockColumnEntry(const BlockColumnEntry &other)
     : BaseEntry(other), block_entry_(other.block_entry_), column_id_(other.column_id_), column_type_(other.column_type_), buffer_(other.buffer_),
       file_name_(other.file_name_) {
     std::shared_lock lock(other.mutex_);
-    buffer_->AddObjRc();
     outline_buffers_ = other.outline_buffers_;
     last_chunk_offset_ = other.last_chunk_offset_;
 }
 
 UniquePtr<BlockColumnEntry> BlockColumnEntry::Clone(BlockEntry *block_entry) const {
     auto ret = UniquePtr<BlockColumnEntry>(new BlockColumnEntry(*this));
+    buffer_->AddObjRc();
+    for (auto *outline_buffer : outline_buffers_) {
+        outline_buffer->AddObjRc();
+    }
     ret->block_entry_ = block_entry;
     return ret;
 }
@@ -282,7 +278,13 @@ void BlockColumnEntry::FlushColumn(TxnTimeStamp checkpoint_ts) {
     BlockColumnEntry::Flush(this, 0, row_cnt);
 }
 
-void BlockColumnEntry::DropColumn() { deleted_ = true; }
+void BlockColumnEntry::DropColumn() { 
+    buffer_->SubObjRc();
+    for (auto *outline_buffer : outline_buffers_) {
+        outline_buffer->SubObjRc();
+    }
+    deleted_ = true;
+}
 
 void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer, [[maybe_unused]] bool dropped) {
     if (buffer_ != nullptr) {

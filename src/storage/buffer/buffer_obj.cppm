@@ -138,7 +138,7 @@ public:
     u64 rc() const { return rc_; }
     u32 id() const { return id_; }
 
-    void AddObjRc() { obj_rc_++; }
+    void AddObjRc();
 
     void SubObjRc();
 

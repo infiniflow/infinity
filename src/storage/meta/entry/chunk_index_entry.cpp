@@ -69,7 +69,15 @@ ChunkIndexEntry::ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_in
     : BaseEntry(EntryType::kChunkIndex, false, ChunkIndexEntry::EncodeIndex(chunk_id, base_name, segment_index_entry)), chunk_id_(chunk_id),
       segment_index_entry_(segment_index_entry), base_name_(base_name), base_rowid_(base_rowid), row_count_(row_count) {};
 
-ChunkIndexEntry::~ChunkIndexEntry() {
+ChunkIndexEntry::~ChunkIndexEntry() {}
+
+ChunkIndexEntry::ChunkIndexEntry(const ChunkIndexEntry &other)
+    : BaseEntry(other), chunk_id_(other.chunk_id_), segment_index_entry_(other.segment_index_entry_), base_name_(other.base_name_),
+      base_rowid_(other.base_rowid_), row_count_(other.row_count_), deprecate_ts_(other.deprecate_ts_.load()), buffer_obj_(other.buffer_obj_),
+      part_buffer_objs_(other.part_buffer_objs_) {}
+
+UniquePtr<ChunkIndexEntry> ChunkIndexEntry::Clone(SegmentIndexEntry *segment_index_entry) const {
+    auto ret = UniquePtr<ChunkIndexEntry>(new ChunkIndexEntry(*this));
     if (buffer_obj_ != nullptr) {
         buffer_obj_->SubObjRc();
     }
@@ -78,17 +86,6 @@ ChunkIndexEntry::~ChunkIndexEntry() {
             part_buffer_obj->SubObjRc();
         }
     }
-}
-
-ChunkIndexEntry::ChunkIndexEntry(const ChunkIndexEntry &other)
-    : BaseEntry(other), chunk_id_(other.chunk_id_), segment_index_entry_(other.segment_index_entry_), base_name_(other.base_name_),
-      base_rowid_(other.base_rowid_), row_count_(other.row_count_), deprecate_ts_(other.deprecate_ts_.load()), buffer_obj_(other.buffer_obj_),
-      part_buffer_objs_(other.part_buffer_objs_) {
-    buffer_obj_->AddObjRc();
-}
-
-UniquePtr<ChunkIndexEntry> ChunkIndexEntry::Clone(SegmentIndexEntry *segment_index_entry) const {
-    auto ret = UniquePtr<ChunkIndexEntry>(new ChunkIndexEntry(*this));
     ret->segment_index_entry_ = segment_index_entry;
     return ret;
 }

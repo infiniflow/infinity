@@ -117,16 +117,15 @@ SegmentIndexEntry::SegmentIndexEntry(const SegmentIndexEntry &other)
     ft_column_len_cnt_ = other.ft_column_len_cnt_;
 }
 
-SegmentIndexEntry::~SegmentIndexEntry() {
+SegmentIndexEntry::~SegmentIndexEntry() = default;
+
+UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Clone(TableIndexEntry *table_index_entry) const {
+    auto ret = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(*this));
     for (auto *buffer : vector_buffer_) {
         if (buffer != nullptr) {
             buffer->SubObjRc();
         }
     }
-}
-
-UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Clone(TableIndexEntry *table_index_entry) const {
-    auto ret = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(*this));
     std::shared_lock lock(rw_locker_);
     for (const auto &chunk_index_entry : chunk_index_entries_) {
         ret->chunk_index_entries_.emplace_back(chunk_index_entry->Clone(ret.get()));

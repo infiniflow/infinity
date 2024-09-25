@@ -62,17 +62,12 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnT
     : BaseEntry(EntryType::kBlock, false, BlockEntry::EncodeIndex(block_id, segment_entry)), segment_entry_(segment_entry), block_id_(block_id),
       block_row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE), checkpoint_ts_(checkpoint_ts) {}
 
-BlockEntry::~BlockEntry() {
-    if (version_buffer_object_ != nullptr) {
-        version_buffer_object_->SubObjRc();
-    }
-}
+BlockEntry::~BlockEntry() = default;
 
 BlockEntry::BlockEntry(const BlockEntry &other)
     : BaseEntry(other), segment_entry_(other.segment_entry_), block_id_(other.block_id_), block_dir_(other.block_dir_),
       row_capacity_(other.row_capacity_), version_buffer_object_(other.version_buffer_object_) {
     std::shared_lock lock(other.rw_locker_);
-    version_buffer_object_->AddObjRc();
     block_row_count_ = other.block_row_count_;
     fast_rough_filter_ = other.fast_rough_filter_;
     min_row_ts_ = other.min_row_ts_;
@@ -84,6 +79,7 @@ BlockEntry::BlockEntry(const BlockEntry &other)
 
 UniquePtr<BlockEntry> BlockEntry::Clone(SegmentEntry *segment_entry) const {
     auto ret = UniquePtr<BlockEntry>(new BlockEntry(*this));
+    version_buffer_object_->AddObjRc();
     ret->segment_entry_ = segment_entry;
     for (auto &column : columns_) {
         ret->columns_.emplace_back(column->Clone(ret.get()));
