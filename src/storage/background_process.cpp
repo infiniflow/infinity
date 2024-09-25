@@ -72,7 +72,7 @@ void BGTaskProcessor::Process() {
                 case BGTaskType::kForceCheckpoint: {
                     LOG_DEBUG("Force checkpoint in background");
                     ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
-                    if (cleanup_trigger_.get() != nullptr) {
+                    if (cleanup_trigger_.get() != nullptr && force_ckp_task->is_full_checkpoint_) {
                         LOG_INFO("Do cleanup before force checkpoint");
                         auto cleanup_task = cleanup_trigger_->CreateCleanupTask(force_ckp_task->cleanup_ts_);
                         if (cleanup_task.get() != nullptr) {

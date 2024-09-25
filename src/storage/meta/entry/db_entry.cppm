@@ -29,7 +29,6 @@ import extra_ddl_info;
 import column_def;
 import meta_map;
 import random;
-import meta_entry_interface;
 import cleanup_scanner;
 
 namespace infinity {
@@ -38,7 +37,7 @@ class TxnManager;
 class Txn;
 class DBMeta;
 
-export class DBEntry final : public BaseEntry, public EntryInterface {
+export class DBEntry final : public BaseEntry {
     friend struct Catalog;
 
 public:

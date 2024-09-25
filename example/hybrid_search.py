@@ -102,8 +102,8 @@ try:
         .filter("year < 2024")
         .fusion(
             method="match_tensor", topn=3,
-            fusion_params={"field": "tensor", "data_type": "float",
-                           "data": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}
+            fusion_params={"field": "tensor", "element_type": "float",
+                           "query_tensor": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}
         )
         .to_pl()
         # .explain(explain_type=infinity.table.ExplainType.UnOpt)

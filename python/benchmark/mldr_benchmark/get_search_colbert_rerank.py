@@ -42,7 +42,7 @@ def apply_colbert_rerank(result_table, rerank_tensor, max_hits: int, rerank_opti
     colbert_rerank_column_names = {'colbert': 'colbert_col', 'colbert_bit': 'colbert_bit_col'}
     query_column_name = colbert_rerank_column_names[rerank_option]
     return result_table.fusion(method='match_tensor', topn=max_hits,
-                               fusion_params={"field": query_column_name, "data": rerank_tensor, "data_type": "float"})
+                               fusion_params={"field": query_column_name, "query_tensor": rerank_tensor, "element_type": "float"})
 
 
 def powerset_above_2(s: list):

@@ -64,7 +64,7 @@ curl --request POST \
     } '
 
 # create HNSW index on dense vector column: 'dense_column'
-echo -e '\n-- create table index: hnsw_index'
+echo -e '\n\n-- create table index: hnsw_index'
 curl --request POST \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/hnsw_index \
      --header 'accept: application/json' \
@@ -85,8 +85,30 @@ curl --request POST \
           "create_option": "ignore_if_exists"
      } '
 
+
+echo -e '\n\n-- create table index: hnsw_index on multi_vector column'
+curl --request POST \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/multi_vector_hnsw_index \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+          "fields":
+          [
+              "multivector_column"
+          ],
+          "index":
+          {
+              "type": "Hnsw",
+              "M": "16",
+              "ef_construction": "50",
+              "metric": "l2"
+          },
+          "create_option": "ignore_if_exists"
+     } '
+
 # create Full-text index on varchar column: 'fulltext_column'
-echo -e '\n-- create table index: fulltext_index'
+echo -e '\n\n-- create table index: fulltext_index'
 curl --request POST \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/fulltext_index \
      --header 'accept: application/json' \
@@ -106,7 +128,7 @@ curl --request POST \
      } '
 
 # create secondary index on varchar column: 'name'
-echo -e '\n-- create table index: secondary_index'
+echo -e '\n\n-- create table index: secondary_index'
 curl --request POST \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/secondary_index \
      --header 'accept: application/json' \
@@ -125,7 +147,7 @@ curl --request POST \
      } '
 
 # create sparse vector index on sparse vector column: 'sparse_column'
-echo -e '\n-- create table index: bmp_index'
+echo -e '\n\n-- create table index: bmp_index'
 curl --request POST \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/bmp_index \
      --header 'accept: application/json' \
@@ -146,45 +168,59 @@ curl --request POST \
 
 
 # list table indexes
-echo -e '\n-- list table indexes: hnsw_index, sparse_index, fulltext_index, bmp_index should be included'
+echo -e '\n\n-- list table indexes: hnsw_index, sparse_index, fulltext_index, bmp_index should be included'
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes \
      --header 'accept: application/json'
 
 # show table tbl1 hnsw_index
-echo -e '\n-- show tbl1 hnsw_index'
+echo -e '\n\n-- show tbl1 hnsw_index'
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/hnsw_index \
      --header 'accept: application/json'
 
+# show table tbl1 hnsw_index
+echo -e '\n\n-- show tbl1 multi_vector_hnsw_index'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/multi_vector_hnsw_index \
+     --header 'accept: application/json'
+
 # show table tbl1 fulltext_index
-echo -e '\n-- show tbl1 fulltext_index'
+echo -e '\n\n-- show tbl1 fulltext_index'
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/fulltext_index \
      --header 'accept: application/json'
 
 # show table tbl1 secondary_index
-echo -e '\n-- show tbl1 secondary_index'
+echo -e '\n\n-- show tbl1 secondary_index'
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/secondary_index \
      --header 'accept: application/json'
 
 # show table tbl1 bmp_index
-echo -e '\n-- show tbl1 bmp_index'
+echo -e '\n\n-- show tbl1 bmp_index'
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/bmp_index \
      --header 'accept: application/json'
 
 # drop tbl1 hnsw_index
-echo -e '\n-- drop tbl1 hnsw_index'
+echo -e '\n\n-- drop tbl1 hnsw_index'
 curl --request DELETE \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/hnsw_index \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' {"drop_option": "ignore_if_not_exists"} '
 
+# drop tbl1 hnsw_index
+echo -e '\n\n-- drop tbl1 multi_vector_hnsw_index'
+curl --request DELETE \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/multi_vector_hnsw_index \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' {"drop_option": "ignore_if_not_exists"} '
+
 # drop tbl1 fulltext_index
-echo -e '\n-- drop tbl1 fulltext_index'
+echo -e '\n\n-- drop tbl1 fulltext_index'
 curl --request DELETE \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/fulltext_index \
      --header 'accept: application/json' \
@@ -192,7 +228,7 @@ curl --request DELETE \
      --data ' {"drop_option": "ignore_if_not_exists"} '
 
 # drop tbl1 secondary_index
-echo -e '\n-- drop tbl1 secondary_index'
+echo -e '\n\n-- drop tbl1 secondary_index'
 curl --request DELETE \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/secondary_index \
      --header 'accept: application/json' \
@@ -200,7 +236,7 @@ curl --request DELETE \
      --data ' {"drop_option": "ignore_if_not_exists"} '
 
 # drop tbl1 bmp_index
-echo -e '\n-- drop tbl1 bmp_index'
+echo -e '\n\n-- drop tbl1 bmp_index'
 curl --request DELETE \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes/bmp_index \
      --header 'accept: application/json' \
@@ -208,13 +244,13 @@ curl --request DELETE \
      --data ' {"drop_option": "ignore_if_not_exists"} '
 
 # list table indexes
-echo -e '\n-- no indexes'
+echo -e '\n\n-- no indexes'
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/indexes \
      --header 'accept: application/json'
 
 # drop tbl1
-echo -e '\n-- drop tbl1'
+echo -e '\n\n-- drop tbl1'
 curl --request DELETE \
      --url http://localhost:23820/databases/default_db/tables/tbl1 \
      --header 'accept: application/json' \

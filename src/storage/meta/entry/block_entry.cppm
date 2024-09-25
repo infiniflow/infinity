@@ -35,6 +35,7 @@ import buffer_obj;
 import wal_entry;
 import column_def;
 import txn_store;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -43,7 +44,6 @@ class Txn;
 struct SegmentEntry;
 struct TableEntry;
 class DataBlock;
-class CleanupInfoTracer;
 
 /// class BlockEntry
 export struct BlockEntry : public BaseEntry {
@@ -59,6 +59,8 @@ public:
 public:
     // for iterator unit test
     explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
+
+    ~BlockEntry() override;
 
 private:
     BlockEntry(const BlockEntry &other);
@@ -95,7 +97,7 @@ public:
 
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
-    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true);
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     void Flush(TxnTimeStamp checkpoint_ts);
 
@@ -200,7 +202,7 @@ protected:
     u16 block_row_count_{};
     u16 row_capacity_{};
 
-    BufferPtr version_buffer_object_{};
+    BufferObj *version_buffer_object_{};
 
     // check if a value must not exist in the block
     SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
