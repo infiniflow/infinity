@@ -28,7 +28,6 @@ import index_file_worker;
 import status;
 import index_base;
 import column_def;
-import meta_entry_interface;
 import cleanup_scanner;
 import chunk_index_entry;
 import memory_indexer;
@@ -56,7 +55,7 @@ export struct PopulateEntireConfig {
     bool check_ts_;
 };
 
-export class SegmentIndexEntry : public BaseEntry, public EntryInterface {
+export class SegmentIndexEntry : public BaseEntry {
 public:
     static Vector<std::string_view> DecodeIndex(std::string_view encode);
 
@@ -263,6 +262,8 @@ private:
     SegmentIndexEntry(const SegmentIndexEntry &other);
 
 public:
+    ~SegmentIndexEntry() override;
+
     UniquePtr<SegmentIndexEntry> Clone(TableIndexEntry *table_index_entry) const;
 
 private:
@@ -276,7 +277,7 @@ private:
     SharedPtr<String> index_dir_{};
     const SegmentID segment_id_{};
 
-    Vector<BufferPtr> vector_buffer_{}; // size: 1 + GetIndexPartNum().
+    Vector<BufferObj *> vector_buffer_{}; // size: 1 + GetIndexPartNum().
 
     mutable std::shared_mutex rw_locker_{};
 

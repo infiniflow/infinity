@@ -24,6 +24,7 @@ namespace infinity {
 class Catalog;
 class EntryInterface;
 class MetaInterface;
+class BaseEntry;
 
 export class CleanupInfoTracer {
 public:
@@ -52,7 +53,7 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr) &&;
 
-    void AddEntry(SharedPtr<EntryInterface> entry, bool dropped = true);
+    void AddEntry(SharedPtr<BaseEntry> entry, bool dropped = true);
 
     TxnTimeStamp visible_ts() const { return visible_ts_; }
 
@@ -65,7 +66,7 @@ private:
 
     BufferManager *buffer_mgr_;
     
-    Vector<Pair<SharedPtr<EntryInterface>, bool>> entries_;
+    Vector<Pair<SharedPtr<BaseEntry>, bool>> entries_;
 };
 
 } // namespace infinity

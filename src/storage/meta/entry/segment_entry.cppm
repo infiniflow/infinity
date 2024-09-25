@@ -28,7 +28,6 @@ import txn;
 import txn_manager;
 import fast_rough_filter;
 import value;
-import meta_entry_interface;
 import cleanup_scanner;
 import logger;
 import roaring_bitmap;
@@ -67,7 +66,7 @@ export String ToString(SegmentStatus segment_status) {
     }
 }
 
-export struct SegmentEntry : public BaseEntry, public EntryInterface {
+export struct SegmentEntry : public BaseEntry {
 public:
     friend class BlockEntryIter;
     friend struct TableEntry;

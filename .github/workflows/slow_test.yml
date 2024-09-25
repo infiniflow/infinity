@@ -57,15 +57,16 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          # store the log in "/var/infinity/log/infinity.log" and set log level "trace"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_continuous_conf.toml > release.log 2>&1" &
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_continuous_conf.toml > release.log 2> release_error.log" &
 
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version continously
         if: ${{ !cancelled() && !failure() }}
+        id: run_py_tests
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel_continuous.py" && sleep 1s
 
       - name: Stop infinity release
         if: ${{ !cancelled() }}
+        id: stop_py_tests
         run: |
           pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
@@ -76,9 +77,10 @@ jobs:
           fi
 
       - name: Collect infinity release output
-        if: ${{ !cancelled()  && failure() }} # always run this step even if previous steps failed
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=release.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log
+          failure="${{ steps.run_py_tests.outcome == 'failure' || steps.stop_py_tests.outcome == 'failure' }}"
+          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}
