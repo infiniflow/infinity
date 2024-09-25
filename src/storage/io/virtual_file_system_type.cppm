@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module virtual_file_system_type;
+
+import stl;
 
 namespace infinity {
 
@@ -57,6 +57,44 @@ export FSType String2FSType(const String &fs_type) {
         return FSType::kNFS;
     } else {
         return FSType::kInvalid;
+    }
+}
+
+export String ToString(FSType fs_type) {
+    switch (fs_type) {
+        case FSType::kLocal: {
+            return "local";
+        }
+        case FSType::kMinio: {
+            return "minio";
+        }
+        case FSType::kAwsS3: {
+            return "aws s3";
+        }
+        case FSType::kAzureBlob: {
+            return "azure blob";
+        }
+        case FSType::kGCS: {
+            return "google cloud storage";
+        }
+        case FSType::kOSS: {
+            return "aliyun object storage service";
+        }
+        case FSType::kCOS: {
+            return "tencent cloud object storage";
+        }
+        case FSType::kOBS: {
+            return "huawei object storage service";
+        }
+        case FSType::kHDFS: {
+            return "hadoop file system";
+        }
+        case FSType::kNFS: {
+            return "network file system";
+        }
+        default: {
+            return "invalid";
+        }
     }
 }
 

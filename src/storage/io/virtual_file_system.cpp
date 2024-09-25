@@ -20,48 +20,9 @@ module virtual_file_system;
 
 import stl;
 import third_party;
+import virtual_file_system_type;
 
 namespace infinity {
-
-String ToString(FSType fs_type) {
-    switch (fs_type) {
-        case FSType::kLocal: {
-            return "local";
-        }
-        case FSType::kMinio: {
-            return "minio";
-        }
-        case FSType::kAwsS3: {
-            return "aws s3";
-        }
-        case FSType::kAzureBlob: {
-            return "azure blob";
-        }
-        case FSType::kGCS: {
-            return "google cloud storage";
-        }
-        case FSType::kOSS: {
-            return "aliyun object storage service";
-        }
-        case FSType::kCOS: {
-            return "tencent cloud object storage";
-        }
-        case FSType::kOBS: {
-            return "huawei object storage service";
-        }
-        case FSType::kHDFS: {
-            return "hadoop file system";
-        }
-        case FSType::kNFS: {
-            return "network file system";
-        }
-        default: {
-            return "invalid";
-        }
-    }
-}
-
-AbstractFileHandle::~AbstractFileHandle() = default;
 
 Status VirtualFileSystem::Init(FSType fs_type, Map<String, String> &config) {
     // Init remote filesystem and local disk cache
