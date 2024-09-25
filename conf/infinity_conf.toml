@@ -30,6 +30,7 @@ data_dir                = "/var/infinity/data"
 optimize_interval        = "10s"
 cleanup_interval         = "60s"
 compact_interval         = "120s"
+filesystem_type          = "local"
 
 # dump memory index entry when it reachs the capacity
 mem_index_capacity       = 1048576

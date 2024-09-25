@@ -20,23 +20,11 @@ import stl;
 import file_system_type;
 import status;
 import third_party;
+import virtual_file_system_type;
 
 namespace infinity {
 
 export class VirtualFileSystem;
-
-export enum class FSType {
-    kLocal,
-    kMinio,
-    kAwsS3,
-    kAzureBlob, // Azure object store
-    kGCS,       // Google cloud storage
-    kOSS,       // Aliyun OSS
-    kCOS,       // Tencent object store
-    kOBS,       // Huawei object store
-    kHDFS,
-    kNFS,
-};
 
 //export enum class FileType {
 //    kLocal,
