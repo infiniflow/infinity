@@ -257,6 +257,53 @@ curl --request GET \
          ]
      } '
 
+echo -e '\n\n-- hybrid search'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "num", "body", "vec", "sparse_column", "year", "tensor", "score()"
+         ],
+         "search":
+         [
+             {
+                 "match_method": "dense",
+                 "fields": "vec",
+                 "query_vector": [5.0, 2.8, 2.7, 3.1],
+                 "element_type": "float",
+                 "metric_type": "cosine",
+                 "topn": 3
+             },
+             {
+                 "match_method": "sparse",
+                 "fields": "sparse_column",
+                 "query_vector": {"0":1.0, "20":2.0, "80": 3.0},
+                 "metric_type": "ip",
+                 "topn": 3
+             },
+             {
+                 "match_method": "text",
+                 "fields": "body",
+                 "matching_text": "bloom",
+                 "topn": 10,
+                 "params":
+                 {
+                     "default_fields": "body",
+                     "operator": "or"
+                 }
+             },
+             {
+                 "fusion_method": "match_tensor",
+                 "topn": 3,
+                 "params":{"field": "tensor", "element_type": "float", "query_tensor": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}
+             }
+         ],
+         "filter": "year < 2024"
+     } '
 
 # drop tbl1
 echo -e '\n\n-- drop tbl1'

@@ -1024,8 +1024,8 @@ class TestInfinity:
                .match_text('body', 'off', 4)
                .match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 2)
                .fusion(method='rrf', topn=10)
-               .fusion(method='match_tensor', topn=2, fusion_params={'field': 't', 'data_type': 'float',
-                                                                     'data': [[0.0, -10.0, 0.0, 0.7],
+               .fusion(method='match_tensor', topn=2, fusion_params={'field': 't', 'element_type': 'float',
+                                                                     'query_tensor': [[0.0, -10.0, 0.0, 0.7],
                                                                               [9.2, 45.6, -55.8, 3.5]]})
                .to_pl())
         print(res)

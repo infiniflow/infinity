@@ -161,8 +161,8 @@ class InfinityHelperForColBERT:
         query_result = self.colbert_test_table.output(output_columns).match_text(self.inner_col_txt, query_str,
                                                                                  first_stage_top_n).fusion(
             method='match_tensor', topn=final_top_n,
-            fusion_params={"field": target_col_name, "data": query_tensor.numpy(force=True),
-                           "data_type": "float"}).to_pl()
+            fusion_params={"field": target_col_name, "query_tensor": query_tensor.numpy(force=True),
+                           "element_type": "float"}).to_pl()
         print(query_result)
         return query_result
 

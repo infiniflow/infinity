@@ -597,12 +597,12 @@ class infinity_http:
     def fusion(self, method: str, topn: int, fusion_params: Optional[dict] = None):
         tmp_fusion_expr = {"fusion_method": method, "topn": topn}
         if method == "match_tensor":
-            tmp_new_params = {"fields": fusion_params["field"], "query_tensor": fusion_params["data"],
-                              "element_type": fusion_params["data_type"]}
+            tmp_new_params = {"fields": fusion_params["field"], "query_tensor": fusion_params["query_tensor"],
+                              "element_type": fusion_params["element_type"]}
             # handle left params
             fusion_params.pop("field")
-            fusion_params.pop("data")
-            fusion_params.pop("data_type")
+            fusion_params.pop("query_tensor")
+            fusion_params.pop("element_type")
             tmp_new_params.update(fusion_params)
             tmp_fusion_expr["params"] = tmp_new_params
         else:
