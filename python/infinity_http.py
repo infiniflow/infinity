@@ -561,7 +561,7 @@ class infinity_http:
 
     def match_tensor(self, column_name: str, query_data, query_data_type: str, topn: int,
                      extra_option: Optional[dict] = None):
-        tmp_match_tensor = {"match_method": "tensor", "fields": column_name, "query_tensor": query_data,
+        tmp_match_tensor = {"match_method": "tensor", "field": column_name, "query_tensor": query_data,
                             "element_type": query_data_type, "topn": topn}
         if extra_option is not None:
             tmp_match_tensor["params"] = extra_option
