@@ -14,12 +14,12 @@
 
 module;
 
-export module knn_flat_ip_reservoir;
+export module deprecated_knn_flat_ip_reservoir;
 
 import stl;
 import knn_result_handler;
 import roaring_bitmap;
-import knn_distance;
+import deprecated_knn_distance;
 import logger;
 
 import infinity_exception;

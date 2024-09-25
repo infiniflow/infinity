@@ -111,11 +111,12 @@ public:
 
     AbstractBMP &get_ref() { return bmp_; }
 
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const ;
 
 private:
     RowID begin_row_id_ = {};
     AbstractBMP bmp_ = nullptr;
+    mutable bool own_memory_ = true;
 };
 
 } // namespace infinity

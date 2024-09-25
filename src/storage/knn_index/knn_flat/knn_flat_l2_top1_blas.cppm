@@ -14,11 +14,11 @@
 
 module;
 
-export module knn_flat_l2_top1_blas;
+export module deprecated_knn_flat_l2_top1_blas;
 
 import stl;
 import knn_result_handler;
-import knn_distance;
+import deprecated_knn_distance;
 import logger;
 
 import infinity_exception;

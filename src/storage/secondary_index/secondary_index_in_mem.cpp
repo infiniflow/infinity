@@ -41,7 +41,7 @@ class SecondaryIndexInMemT final : public SecondaryIndexInMem {
     using KeyType = ConvertToOrderedType<RawValueType>;
     const RowID begin_row_id_;
     const u32 max_size_;
-    std::shared_mutex map_mutex_;
+    mutable std::shared_mutex map_mutex_;
     MultiMap<KeyType, u32> in_mem_secondary_index_;
 
 public:
@@ -51,7 +51,7 @@ public:
         MemIndexInserterIter<RawValueType> iter(block_id * DEFAULT_BLOCK_CAPACITY, block_column_entry, buffer_manager, row_offset, row_count);
         InsertInner(iter);
     }
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) override {
+    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const override {
         std::shared_lock lock(map_mutex_);
         u32 row_count = GetRowCount();
         auto new_chunk_index_entry = segment_index_entry->CreateSecondaryIndexChunkIndexEntry(begin_row_id_, row_count, buffer_mgr);
@@ -60,7 +60,7 @@ public:
         data_ptr->InsertData(&in_mem_secondary_index_, new_chunk_index_entry);
         return new_chunk_index_entry;
     }
-    Pair<u32, Bitmask> RangeQuery(const void *input) override {
+    Pair<u32, Bitmask> RangeQuery(const void *input) const override {
         const auto &[segment_row_count, b, e] = *static_cast<const std::tuple<u32, KeyType, KeyType> *>(input);
         return RangeQueryInner(segment_row_count, b, e);
     }
@@ -86,7 +86,7 @@ private:
         }
     }
 
-    Pair<u32, Bitmask> RangeQueryInner(const u32 segment_row_count, const KeyType b, const KeyType e) {
+    Pair<u32, Bitmask> RangeQueryInner(const u32 segment_row_count, const KeyType b, const KeyType e) const {
         std::shared_lock lock(map_mutex_);
         const auto begin = in_mem_secondary_index_.lower_bound(b);
         const auto end = in_mem_secondary_index_.upper_bound(e);

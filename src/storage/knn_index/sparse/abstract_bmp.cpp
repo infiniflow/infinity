@@ -24,6 +24,7 @@ import block_column_iter;
 import sparse_util;
 import segment_iter;
 import segment_entry;
+import infinity_exception;
 
 namespace infinity {
 
@@ -42,6 +43,7 @@ BMPIndexInMem::BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, co
             }
         },
         bmp_);
+    own_memory_ = true;
 }
 
 AbstractBMP BMPIndexInMem::InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
@@ -62,6 +64,9 @@ AbstractBMP BMPIndexInMem::InitAbstractIndex(const IndexBase *index_base, const 
 }
 
 BMPIndexInMem::~BMPIndexInMem() {
+    if (!own_memory_) {
+        return;
+    }
     std::visit(
         [](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -128,7 +133,10 @@ void BMPIndexInMem::AddDocs(const SegmentEntry *segment_entry, BufferManager *bu
         bmp_);
 }
 
-SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) {
+SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const {
+    if (!own_memory_) {
+        UnrecoverableError("BMPIndexInMem::Dump() called with own_memory_ = false.");
+    }
     SizeT row_count = 0;
     SizeT index_size = 0;
     std::visit(
@@ -147,7 +155,7 @@ SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_
     BufferHandle handle = new_chunk_index_entry->GetIndex();
     auto *data_ptr = static_cast<AbstractBMP *>(handle.GetDataMut());
     *data_ptr = bmp_;
-    bmp_ = nullptr;
+    own_memory_ = false;
     return new_chunk_index_entry;
 }
 

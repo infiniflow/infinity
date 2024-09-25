@@ -14,8 +14,8 @@
 
 module;
 
-#include "type/complex/row_id.h"
 #include <cassert>
+#include <vector>
 
 module chunk_index_entry;
 
@@ -42,6 +42,7 @@ import secondary_index_file_worker;
 import emvb_index_file_worker;
 import bmp_index_file_worker;
 import column_def;
+import internal_types;
 import infinity_context;
 import persistence_manager;
 
@@ -103,14 +104,14 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewHnswIndexChunkIndexEntry(ChunkID 
     const auto &index_dir = segment_index_entry->index_dir();
     assert(index_dir.get() != nullptr);
     if (buffer_mgr != nullptr) {
-        SegmentID segment_id = segment_index_entry->segment_id();
+        const SegmentID segment_id = segment_index_entry->segment_id();
         auto hnsw_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
         const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
         const auto &column_def = segment_index_entry->table_index_entry()->column_def();
         auto file_worker = MakeUnique<HnswFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                       index_dir,
-                                                      hnsw_index_file_name,
+                                                      std::move(hnsw_index_file_name),
                                                       index_base,
                                                       column_def,
                                                       buffer_mgr->persistence_manager(),
@@ -126,7 +127,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewFtChunkIndexEntry(SegmentIndexEnt
                                                                  RowID base_rowid,
                                                                  u32 row_count,
                                                                  BufferManager *buffer_mgr) {
-    auto chunk_index_entry = SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(chunk_id, segment_index_entry, base_name, base_rowid, row_count));
+    auto chunk_index_entry = MakeShared<ChunkIndexEntry>(chunk_id, segment_index_entry, base_name, base_rowid, row_count);
     const auto &index_dir = segment_index_entry->index_dir();
     assert(index_dir.get() != nullptr);
     if (buffer_mgr != nullptr) {
@@ -134,7 +135,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewFtChunkIndexEntry(SegmentIndexEnt
         auto file_worker = MakeUnique<RawFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                      index_dir,
-                                                     column_length_file_name,
+                                                     std::move(column_length_file_name),
                                                      row_count * sizeof(u32),
                                                      buffer_mgr->persistence_manager());
         chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
@@ -202,7 +203,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewEMVBIndexChunkIndexEntry(ChunkID 
         auto file_worker = MakeUnique<EMVBIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                            MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                            index_dir,
-                                                           emvb_index_file_name,
+                                                           std::move(emvb_index_file_name),
                                                            index_base,
                                                            column_def,
                                                            segment_start_offset,
@@ -223,14 +224,14 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewBMPIndexChunkIndexEntry(ChunkID c
     const auto &index_dir = segment_index_entry->index_dir();
     assert(index_dir.get() != nullptr);
     if (buffer_mgr != nullptr) {
-        SegmentID segment_id = segment_index_entry->segment_id();
+        const SegmentID segment_id = segment_index_entry->segment_id();
         auto bmp_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
         const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
         const auto &column_def = segment_index_entry->table_index_entry()->column_def();
         auto file_worker = MakeUnique<BMPIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                           MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                           index_dir,
-                                                          bmp_index_file_name,
+                                                          std::move(bmp_index_file_name),
                                                           index_base,
                                                           column_def,
                                                           buffer_mgr->persistence_manager(),
@@ -249,18 +250,17 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                                      TxnTimeStamp commit_ts,
                                                                      TxnTimeStamp deprecate_ts,
                                                                      BufferManager *buffer_mgr) {
-    auto chunk_index_entry = SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(chunk_id, segment_index_entry, base_name, base_rowid, row_count));
+    auto chunk_index_entry = MakeShared<ChunkIndexEntry>(chunk_id, segment_index_entry, base_name, base_rowid, row_count);
     const auto &column_def = segment_index_entry->table_index_entry()->column_def();
     const auto &index_dir = segment_index_entry->index_dir();
     switch (param->index_base_->index_type_) {
         case IndexType::kHnsw: {
-            SegmentID segment_id = segment_index_entry->segment_id();
-
-            auto index_file_name = MakeShared<String>(ChunkIndexEntry::IndexFileName(segment_id, chunk_id));
+            const SegmentID segment_id = segment_index_entry->segment_id();
+            auto index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
             auto file_worker = MakeUnique<HnswFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                           MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                           index_dir,
-                                                          index_file_name,
+                                                          std::move(index_file_name),
                                                           param->index_base_,
                                                           column_def,
                                                           buffer_mgr->persistence_manager());
@@ -272,20 +272,20 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
             auto file_worker = MakeUnique<RawFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                          MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                          index_dir,
-                                                         column_length_file_name,
+                                                         std::move(column_length_file_name),
                                                          row_count * sizeof(u32),
                                                          buffer_mgr->persistence_manager());
             chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;
         }
         case IndexType::kSecondary: {
-            SegmentID segment_id = segment_index_entry->segment_id();
+            const SegmentID segment_id = segment_index_entry->segment_id();
             auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
             const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
             auto file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                     MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                     index_dir,
-                                                                    secondary_index_file_name,
+                                                                    std::move(secondary_index_file_name),
                                                                     index_base,
                                                                     column_def,
                                                                     row_count,
@@ -295,14 +295,14 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
             break;
         }
         case IndexType::kEMVB: {
-            SegmentID segment_id = segment_index_entry->segment_id();
+            const SegmentID segment_id = segment_index_entry->segment_id();
             auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
             const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
             const auto segment_start_offset = base_rowid.segment_offset_;
             auto file_worker = MakeUnique<EMVBIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                index_dir,
-                                                               emvb_index_file_name,
+                                                               std::move(emvb_index_file_name),
                                                                index_base,
                                                                column_def,
                                                                segment_start_offset,
@@ -312,13 +312,12 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
         }
         case IndexType::kBMP: {
             const auto &index_base = param->index_base_;
-            SegmentID segment_id = segment_index_entry->segment_id();
-
-            auto index_file_name = MakeShared<String>(ChunkIndexEntry::IndexFileName(segment_id, chunk_id));
+            const SegmentID segment_id = segment_index_entry->segment_id();
+            auto index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
             auto file_worker = MakeUnique<BMPIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                               MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                               index_dir,
-                                                              index_file_name,
+                                                              std::move(index_file_name),
                                                               index_base,
                                                               column_def,
                                                               buffer_mgr->persistence_manager());
@@ -326,7 +325,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("Unsupported index type: {}", (u8)param->index_base_->index_type_));
+            UnrecoverableError(fmt::format("Unsupported index type: {}", param->index_base_->ToString()));
         }
     }
     chunk_index_entry->commit_ts_ = commit_ts;

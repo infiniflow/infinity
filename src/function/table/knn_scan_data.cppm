@@ -20,7 +20,6 @@ import stl;
 import table_function;
 
 import global_block_id;
-import knn_distance; // delete this
 import block_index;
 import block_column_entry;
 import segment_index_entry;
