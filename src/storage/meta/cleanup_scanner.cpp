@@ -65,7 +65,9 @@ void CleanupScanner::Scan() {
 }
 
 void CleanupScanner::Cleanup(CleanupInfoTracer *info_tracer) && {
+    LOG_DEBUG(fmt::format("CleanupScanner cleanup {} entries", entries_.size()));
     for (auto &[entry, dropped] : entries_) {
+        LOG_DEBUG(fmt::format("CleanupScanner cleanup entry: {}", entry->encode()));
         entry->Cleanup(info_tracer, dropped);
         entry.reset();
     }

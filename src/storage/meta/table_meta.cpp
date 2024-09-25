@@ -225,6 +225,9 @@ void TableMeta::PushBackEntry(const SharedPtr<TableEntry> &new_table_entry) { ta
 
 void TableMeta::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) { table_entry_list_.Cleanup(info_tracer, dropped); }
 
-bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }
+bool TableMeta::PickCleanup(CleanupScanner *scanner) { 
+    LOG_DEBUG(fmt::format("Pick cleanup for table: {}, entry_list size: {}", *table_name_, table_entry_list_.size()));
+    return table_entry_list_.PickCleanup(scanner);
+}
 
 } // namespace infinity

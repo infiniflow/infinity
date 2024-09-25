@@ -69,6 +69,9 @@ class TestCleanup:
             dropped_dirs = pathlib.Path(data_dir).rglob(f"*{table_name}*")
             assert len(list(dropped_dirs)) == 0
 
+            dropped_dirs = pathlib.Path(data_dir).rglob(f"*{table_name2}*")
+            assert len(list(dropped_dirs)) == 1
+
             db_obj.drop_table(table_name2, ConflictType.Error)
 
         part1()
@@ -108,6 +111,7 @@ class TestCleanup:
         infinity_runner.clear()
         table_name = "test_cleanup_index"
         index_name = "idx1"
+        index_name2 = "idx2"
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
         insert_n = 100
@@ -120,6 +124,9 @@ class TestCleanup:
 
             for idx in indexes:
                 res = table_obj.create_index(index_name, idx)
+                assert res.error_code == infinity.ErrorCode.OK
+
+                res = table_obj.create_index(index_name2, idx)
                 assert res.error_code == infinity.ErrorCode.OK
 
             data_gen = data_gen_factory(insert_n)
@@ -139,10 +146,18 @@ class TestCleanup:
             dropped_dirs = pathlib.Path(data_dir).rglob(f"*{index_name}*")
             assert len(list(dropped_dirs)) == 0
 
+            dropped_dirs = pathlib.Path(data_dir).rglob(f"*{index_name2}*")
+            assert len(list(dropped_dirs)) == 1
+
+            res = table_obj.drop_index(index_name2)
+
         part1()
 
         @decorator
         def part2(infinity_obj):
+            dropped_dirs = pathlib.Path(data_dir).rglob(f"*{index_name2}")
+            assert len(list(dropped_dirs)) == 0
+
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
             data_dict, _ = table_obj.output(["count(*)"]).to_result()
