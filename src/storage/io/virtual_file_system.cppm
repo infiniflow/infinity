@@ -19,14 +19,13 @@ export module virtual_file_system;
 import stl;
 import file_system_type;
 import status;
-import singleton;
 
 namespace infinity {
 
 export class VirtualFileSystem;
 
 export enum class FSType {
-    kPosix,
+    kLocal,
     kMinio,
     kAwsS3,
     kAzureBlob, // Azure object store
@@ -48,8 +47,18 @@ public:
     virtual Tuple<SizeT, Status> Read(char *buffer) = 0;
     virtual Tuple<SizeT, Status> Read(String &buffer) = 0;
     virtual SizeT FileSize() = 0;
+
 protected:
-    VirtualFileSystem* file_system_{};
+    VirtualFileSystem *file_system_{};
+};
+
+export class LocalFile : public AbstractFileHandle {
+    Status Close() override;
+    Status Append(const char *buffer) override;
+    Status Append(const String &buffer) override;
+    Tuple<SizeT, Status> Read(char *buffer) override;
+    Tuple<SizeT, Status> Read(String &buffer) override;
+    SizeT FileSize() override;
 };
 
 export class ObjectFile : public AbstractFileHandle {
@@ -66,6 +75,7 @@ public:
     explicit LocalDiskCache(u64 disk_capacity_limit, SharedPtr<String> temp_dir, SizeT lru_count);
 
     ~LocalDiskCache();
+
 private:
     SharedPtr<String> temp_dir_{};
 };
@@ -73,12 +83,13 @@ private:
 class VirtualFileSystem {
     // Factory class to generate different type of file handle
 public:
-    Status Init(FSType fs_type, Map<String, String>& config);
+    Status Init(FSType fs_type, Map<String, String> &config);
     Status UnInit();
     UniquePtr<AbstractFileHandle> BuildFileHandle(const String &path, FileAccessMode access_mode) const;
-    LocalDiskCache* GetLocalDiskCache() const;
+    LocalDiskCache *GetLocalDiskCache() const;
 
 private:
+    FSType fs_type_{FSType::kLocal};
     UniquePtr<LocalDiskCache> local_disk_cache_{};
 };
 

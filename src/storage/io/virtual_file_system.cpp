@@ -14,11 +14,47 @@
 
 module;
 
-import stl;
-
 module virtual_file_system;
 
+import stl;
+import third_party;
+
 namespace infinity {
+
+String ToString(FSType fs_type) {
+    switch (fs_type) {
+        case FSType::kLocal: {
+            return "local";
+        }
+        case FSType::kMinio: {
+            return "minio";
+        }
+        case FSType::kAwsS3: {
+            return "aws s3";
+        }
+        case FSType::kAzureBlob: {
+            return "azure blob";
+        }
+        case FSType::kGCS: {
+            return "google cloud storage";
+        }
+        case FSType::kOSS: {
+            return "aliyun object storage service";
+        }
+        case FSType::kCOS: {
+            return "tencent cloud object storage";
+        }
+        case FSType::kOBS: {
+            return "huawei object storage service";
+        }
+        case FSType::kHDFS: {
+            return "hadoop file system";
+        }
+        case FSType::kNFS: {
+            return "network file system";
+        }
+    }
+}
 
 LocalDiskCache::LocalDiskCache(u64 disk_capacity_limit, SharedPtr<String> temp_dir, SizeT lru_count) {
 
@@ -28,6 +64,18 @@ LocalDiskCache::~LocalDiskCache() = default;
 
 Status VirtualFileSystem::Init(FSType fs_type, Map<String, String>& config) {
     // Init remote filesystem and local disk cache
+    switch(fs_type) {
+        case FSType::kLocal: {
+            fs_type_ = fs_type;
+            if(config.empty()) {
+                return Status::InvalidConfig("Local filesystem wont't access any config");
+            }
+            break;
+        }
+        default: {
+            return Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(fs_type)));
+        }
+    }
     return Status::OK();
 }
 
