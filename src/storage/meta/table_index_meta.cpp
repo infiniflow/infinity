@@ -213,7 +213,10 @@ void TableIndexMeta::PushFrontEntry(const SharedPtr<TableIndexEntry>& new_table_
 
 void TableIndexMeta::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) { index_entry_list_.Cleanup(info_tracer, dropped); }
 
-bool TableIndexMeta::PickCleanup(CleanupScanner *scanner) { return index_entry_list_.PickCleanup(scanner); }
+bool TableIndexMeta::PickCleanup(CleanupScanner *scanner) {
+    LOG_DEBUG(fmt::format("Pick cleanup for table index: {}, entry_list size: {}", *index_name_, index_entry_list_.size()));
+    return index_entry_list_.PickCleanup(scanner);
+}
 
 void TableIndexMeta::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {
     index_entry_list_.Iterate([&](auto *table_index_entry) { table_index_entry->PickCleanupBySegments(sorted_segment_ids, scanner); },

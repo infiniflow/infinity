@@ -534,15 +534,12 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
     auto catalog = Catalog::LoadFromFile(full_ckp_info, buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
-    TxnTimeStamp max_commit_ts = 0;
-
     for (const auto &delta_ckp_info : delta_ckp_infos) {
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", delta_ckp_info.path_));
-        auto catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_info);
-        max_commit_ts = std::max(max_commit_ts, catalog_delta_entry->commit_ts());
-        catalog->ReplayDeltaEntry(std::move(catalog_delta_entry));
+        UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_info);
+
+        catalog->LoadFromEntryDelta(std::move(catalog_delta_entry), buffer_mgr);
     }
-    catalog->LoadFromEntryDelta(max_commit_ts, buffer_mgr);
 
     LOG_TRACE(fmt::format("Catalog Delta Op is done"));
 
@@ -576,9 +573,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
     return catalog_delta_entry;
 }
 
-void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr) {
-    auto delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
-
+void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, BufferManager *buffer_mgr) {
     Vector<UniquePtr<CatalogDeltaOperation>> &delta_ops = delta_entry->operations();
     auto *pm = InfinityContext::instance().persistence_manager();
     for (auto &op : delta_ops) {
@@ -1107,8 +1102,6 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 }
 
 void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry)); }
-
-void Catalog::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->ReplayDeltaEntry(std::move(delta_entry)); }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
 

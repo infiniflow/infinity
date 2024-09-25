@@ -655,6 +655,7 @@ Status TableEntry::CommitWrite(TransactionID txn_id,
                                TxnTimeStamp commit_ts,
                                const HashMap<SegmentID, TxnSegmentStore> &segment_stores,
                                const DeleteState *delete_state) {
+    std::unique_lock w_lock(rw_locker_);
     for (const auto &[segment_id, segment_store] : segment_stores) {
         auto *segment_entry = segment_store.segment_entry_;
         segment_entry->CommitSegment(txn_id, commit_ts, segment_store, delete_state);

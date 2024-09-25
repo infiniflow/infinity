@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <concepts>
 
 export module base_entry;
 
@@ -26,6 +27,7 @@ import infinity_exception;
 import third_party;
 import txn_state;
 import logger;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -91,6 +93,10 @@ export struct BaseEntry {
 
     static inline bool Committed(BaseEntry *base_entry) { return base_entry->commit_ts_ != UNCOMMIT_TS; }
 
+    virtual void Cleanup(CleanupInfoTracer *info_tracer, bool dropped) = 0;
+
+    virtual void PickCleanup(CleanupScanner *scanner) {};
+
 public:
     // Reserved
     inline void Commit(TxnTimeStamp commit_ts) {
@@ -121,5 +127,22 @@ public:
 private:
     SharedPtr<String> encode_;
 };
+
+export class BaseMeta {
+public:
+    virtual ~BaseMeta() = default;
+
+    virtual bool PickCleanup(CleanupScanner *scanner) = 0;
+
+    virtual void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) = 0;
+
+    virtual bool Empty() = 0;
+};
+
+export template <typename Meta>
+concept MetaConcept = std::derived_from<Meta, BaseMeta>;
+
+export template <typename Entry>
+concept EntryConcept = std::derived_from<Entry, BaseEntry>;
 
 } // namespace infinity

@@ -303,17 +303,19 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case CommandType::kCleanup: {
+            auto *bg_process = query_context->storage()->bg_processor();
             {
                 Txn *txn = query_context->GetTxn();
                 auto checkpoint_task = MakeShared<ForceCheckpointTask>(txn, false /*is_full_checkpoint*/);
-                WalManager *wal_manager = query_context->storage()->wal_manager();
-                wal_manager->Checkpoint(checkpoint_task.get());
+                bg_process->Submit(checkpoint_task);
+                checkpoint_task->Wait();
             }
             {
                 CleanupPeriodicTrigger *cleanup_trigger = query_context->storage()->bg_processor()->cleanup_trigger();
                 SharedPtr<CleanupTask> cleanup_task = cleanup_trigger->CreateCleanupTask();
                 if (cleanup_task.get() != nullptr) {
-                    cleanup_task->Execute();
+                    bg_process->Submit(cleanup_task);
+                    cleanup_task->Wait();
                 } else {
                     LOG_DEBUG("Skip cleanup");
                 }
