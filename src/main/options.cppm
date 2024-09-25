@@ -151,10 +151,10 @@ export enum class GlobalOptionIndex : i8 {
     kPeerServerIP = 35,
     kPeerServerPort = 36,
     kPeerServerConnectionPoolSize = 37,
-    kFileSystemType = 38,
-    kRemoteFSHost = 39,
-    kRemoteFSPort = 40,
-    kRemoteFSBucket = 41,
+    kStorageType = 38,
+    kObjectStorageHost = 39,
+    kObjectStoragePort = 40,
+    kObjectStorageBucket = 41,
 
     kInvalid = -1,
 };

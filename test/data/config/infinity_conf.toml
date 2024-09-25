@@ -24,7 +24,7 @@ log_level               = "trace"
 persistence_dir         = "/var/infinity/persistence"
 file_system_type        = "minio"
 
-[storage.remote_fs]
+[storage.object_storage]
 host                    = "0.0.0.0"
 port                    = 9000
 bucket_name             = "infinity"

@@ -96,9 +96,9 @@ public:
     i64 MemIndexCapacity();
 
     String FileSystemType();
-    String RemoteFSHost();
-    i64 RemoteFSPort();
-    String RemoteFSBucket();
+    String ObjectStorageHost();
+    i64 ObjectStoragePort();
+    String ObjectStorageBucket();
 
     // Persistence
     String PersistenceDir();

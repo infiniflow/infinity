@@ -17,16 +17,16 @@ module;
 export module object_file;
 
 import stl;
-import virtual_file_system_type;
+import virtual_storage_system_type;
 import status;
 import abstract_file_handle;
-import virtual_file_system;
+import virtual_storage_system;
 
 namespace infinity {
 
 export class ObjectFile : public AbstractFileHandle {
 public:
-    ObjectFile(VirtualFileSystem *file_system, FSType type) : AbstractFileHandle(file_system, type) {}
+    ObjectFile(VirtualStorageSystem *storage_system, StorageType type) : AbstractFileHandle(storage_system, type) {}
     ~ObjectFile() override = default;
     Status Open(const String &path, FileAccessMode access_mode) override;
     Status Close() override;

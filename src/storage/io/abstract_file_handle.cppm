@@ -17,34 +17,34 @@ module;
 export module abstract_file_handle;
 
 import stl;
-import virtual_file_system_type;
+import virtual_storage_system_type;
 import status;
 
 namespace infinity {
 
-class VirtualFileSystem;
+class VirtualStorageSystem;
 
 export enum class FileAccessMode { kWrite, kRead, kMmapRead, kInvalid };
 
 export class AbstractFileHandle {
 public:
-    AbstractFileHandle(VirtualFileSystem *file_system, FSType fs_type) : file_system_(file_system), fs_type_(fs_type) {}
-    virtual ~AbstractFileHandle() = 0;
-    virtual Status Open(const String &path, FileAccessMode access_mode) = 0;
-    virtual Status Close() = 0;
-    virtual Status Append(const char *buffer) = 0;
-    virtual Status Append(const String &buffer) = 0;
-    virtual Tuple<SizeT, Status> Read(char *buffer) = 0;
-    virtual Tuple<SizeT, Status> Read(String &buffer) = 0;
-    virtual Tuple<char *, SizeT, Status> MmapRead(const String &name) = 0;
-    virtual Status Unmmap(const String &name) = 0;
-    virtual SizeT FileSize() = 0;
+    AbstractFileHandle(VirtualStorageSystem *storage_system, StorageType storage_type)
+        : storage_system_(storage_system), storage_type_(storage_type) {};
+    virtual ~AbstractFileHandle() = default;
+    virtual Status Open(const String &path, FileAccessMode access_mode) { return Status::NotSupport("In abstract class"); };
+    virtual Status Close() { return Status::NotSupport("In abstract class"); }
+    virtual Status Append(const char *buffer) { return Status::NotSupport("In abstract class"); }
+    virtual Status Append(const String &buffer) { return Status::NotSupport("In abstract class"); }
+    virtual Tuple<SizeT, Status> Read(char *buffer) { return {0, Status::NotSupport("In abstract class")}; }
+    virtual Tuple<SizeT, Status> Read(String &buffer) { return {0, Status::NotSupport("In abstract class")}; }
+    virtual SizeT FileSize() { return 0; }
+    virtual Tuple<char *, SizeT, Status> MmapRead(const String &name) { return {nullptr, 0, Status::NotSupport("In abstract class")}; }
+    virtual Status Unmmap(const String &name) { return Status::NotSupport("In abstract class"); }
 
 protected:
-    VirtualFileSystem *file_system_{};
-    FSType fs_type_{FSType::kLocal};
+    VirtualStorageSystem *storage_system_{};
+    StorageType storage_type_{StorageType::kLocal};
     atomic_bool open_{false};
 };
 
-}
-
+} // namespace infinity

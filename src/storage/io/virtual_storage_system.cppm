@@ -14,12 +14,12 @@
 
 module;
 
-export module virtual_file_system;
+export module virtual_storage_system;
 
 import stl;
 import status;
 import third_party;
-import virtual_file_system_type;
+import virtual_storage_system_type;
 import abstract_file_handle;
 
 namespace infinity {
@@ -34,16 +34,16 @@ private:
     SharedPtr<String> cache_dir_{};
 };
 
-export class VirtualFileSystem {
+export class VirtualStorageSystem {
     // Factory class to generate different type of file handle
 public:
-    Status Init(FSType fs_type, Map<String, String> &config);
+    Status Init(StorageType storage_type, Map<String, String> &config);
     Status UnInit();
     UniquePtr<AbstractFileHandle> BuildFileHandle(const String &path, FileAccessMode access_mode) const;
     LocalDiskCache *GetLocalDiskCache() const;
 
 private:
-    FSType fs_type_{FSType::kLocal};
+    StorageType storage_type_{StorageType::kLocal};
     UniquePtr<LocalDiskCache> local_disk_cache_{};
 
     // Using by minio

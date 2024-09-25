@@ -16,25 +16,25 @@ module;
 
 #include <string>
 
-module virtual_file_system;
+module virtual_storage_system;
 
 import stl;
 import third_party;
-import virtual_file_system_type;
+import virtual_storage_system_type;
 
 namespace infinity {
 
-Status VirtualFileSystem::Init(FSType fs_type, Map<String, String> &config) {
+Status VirtualStorageSystem::Init(StorageType storage_type, Map<String, String> &config) {
     // Init remote filesystem and local disk cache
-    fs_type_ = fs_type;
-    switch (fs_type) {
-        case FSType::kLocal: {
+    storage_type_ = storage_type;
+    switch (storage_type) {
+        case StorageType::kLocal: {
             if (!config.empty()) {
                 return Status::InvalidConfig("Local filesystem won't access any config");
             }
             break;
         }
-        case FSType::kMinio: {
+        case StorageType::kMinio: {
             auto iter = config.find("url");
             if (iter == config.end()) {
                 return Status::InvalidConfig("Missing MINIO 'URL'");
@@ -94,13 +94,13 @@ Status VirtualFileSystem::Init(FSType fs_type, Map<String, String> &config) {
             break;
         }
         default: {
-            return Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(fs_type)));
+            return Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type)));
         }
     }
     return Status::OK();
 }
 
-Status VirtualFileSystem::UnInit() {
+Status VirtualStorageSystem::UnInit() {
     minio_client_.reset();
     minio_provider_.reset();
     minio_base_url_.reset();
@@ -108,11 +108,11 @@ Status VirtualFileSystem::UnInit() {
     return Status::OK();
 }
 
-UniquePtr<AbstractFileHandle> VirtualFileSystem::BuildFileHandle(const String &path, FileAccessMode access_mode) const {
+UniquePtr<AbstractFileHandle> VirtualStorageSystem::BuildFileHandle(const String &path, FileAccessMode access_mode) const {
     // Open the file according to the path and access_mode
     return nullptr;
 }
 
-LocalDiskCache *VirtualFileSystem::GetLocalDiskCache() const { return local_disk_cache_.get(); }
+LocalDiskCache *VirtualStorageSystem::GetLocalDiskCache() const { return local_disk_cache_.get(); }
 
 } // namespace infinity

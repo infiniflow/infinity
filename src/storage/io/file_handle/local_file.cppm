@@ -17,16 +17,16 @@ module;
 export module local_file;
 
 import stl;
-import virtual_file_system_type;
+import virtual_storage_system_type;
 import status;
 import abstract_file_handle;
-import virtual_file_system;
+import virtual_storage_system;
 
 namespace infinity {
 
 export class LocalFile final : public AbstractFileHandle {
 public:
-    LocalFile(VirtualFileSystem *file_system) : AbstractFileHandle(file_system, FSType::kLocal) {}
+    LocalFile(VirtualStorageSystem *storage_system) : AbstractFileHandle(storage_system, StorageType::kLocal) {};
     ~LocalFile() final = default;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
@@ -39,4 +39,4 @@ public:
     Status Unmmap(const String &name) final;
 };
 
-}
+} // namespace infinity
