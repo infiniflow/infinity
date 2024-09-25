@@ -1584,6 +1584,21 @@ SharedPtr<DataType> InfinityThriftService::GetColumnTypeFromProto(const infinity
             auto sparse_info = SparseInfo::Make(embedding_type, index_type, type.physical_type.sparse_type.dimension, SparseStoreType::kSort);
             return MakeShared<infinity::DataType>(infinity::LogicalType::kSparse, sparse_info);
         }
+        case infinity_thrift_rpc::LogicType::Date: {
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kDate);
+        }
+        case infinity_thrift_rpc::LogicType::Time: {
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kTime);
+        }
+        case infinity_thrift_rpc::LogicType::DateTime: {
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kDateTime);
+        }
+        case infinity_thrift_rpc::LogicType::Timestamp: {
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kTimestamp);
+        }
+        case infinity_thrift_rpc::LogicType::Interval: {
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kInterval);
+        }
         case infinity_thrift_rpc::LogicType::Invalid: {
             return MakeShared<infinity::DataType>(infinity::LogicalType::kInvalid);
         }
@@ -2172,6 +2187,16 @@ infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColu
             return infinity_thrift_rpc::ColumnType::ColumnRowID;
         case LogicalType::kSparse:
             return infinity_thrift_rpc::ColumnType::ColumnSparse;
+        case LogicalType::kDate:
+            return infinity_thrift_rpc::ColumnType::ColumnDate;
+        case LogicalType::kTime:
+            return infinity_thrift_rpc::ColumnType::ColumnTime;
+        case LogicalType::kDateTime:
+            return infinity_thrift_rpc::ColumnType::ColumnDateTime;
+        case LogicalType::kTimestamp:
+            return infinity_thrift_rpc::ColumnType::ColumnTimestamp;
+        case LogicalType::kInterval:
+            return infinity_thrift_rpc::ColumnType::ColumnInterval;
         default: {
             String error_message = fmt::format("Invalid logical data type: {}", data_type->ToString());
             UnrecoverableError(error_message);
@@ -2284,6 +2309,31 @@ UniquePtr<infinity_thrift_rpc::DataType> InfinityThriftService::DataTypeToProtoD
             infinity_thrift_rpc::PhysicalType physical_type;
             physical_type.__set_sparse_type(sparse_type);
             data_type_proto->__set_physical_type(physical_type);
+            return data_type_proto;
+        }
+        case LogicalType::kTime: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Time);
+            return data_type_proto;
+        }
+        case LogicalType::kDate: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Date);
+            return data_type_proto;
+        }
+        case LogicalType::kDateTime: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::DateTime);
+            return data_type_proto;
+        }
+        case LogicalType::kTimestamp: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Timestamp);
+            return data_type_proto;
+        }
+        case LogicalType::kInterval: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Interval);
             return data_type_proto;
         }
         default: {
@@ -2424,11 +2474,29 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
             HandleRowIDType(output_column_field, row_count, column_vector);
             break;
         }
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kDateTime:
+        case LogicalType::kTimestamp:
+        case LogicalType::kInterval: {
+            HandleTimeRelatedTypes(output_column_field, row_count, column_vector);
+            break;
+        }
         default: {
             return Status::InvalidDataType();
         }
     }
     return Status::OK();
+}
+
+void InfinityThriftService::HandleTimeRelatedTypes(infinity_thrift_rpc::ColumnField &output_column_field,
+                                                   SizeT row_count,
+                                                   const SharedPtr<ColumnVector> &column_vector) {
+    auto size = column_vector->data_type()->Size() * row_count;
+    String dst;
+    dst.resize(size);
+    std::memcpy(dst.data(), column_vector->data(), size);
+    output_column_field.column_vectors.emplace_back(std::move(dst));
 }
 
 void InfinityThriftService::HandleBoolType(infinity_thrift_rpc::ColumnField &output_column_field,

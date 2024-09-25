@@ -21,6 +21,11 @@ Tensor,
 TensorArray,
 Sparse,
 MultiVector,
+Date,
+Time,
+DateTime,
+Timestamp,
+Interval,
 Invalid
 }
 
@@ -296,6 +301,11 @@ ColumnTensorArray,
 ColumnSparse,
 ColumnMultiVector,
 ColumnRowID,
+ColumnDate,
+ColumnTime,
+ColumnDateTime,
+ColumnTimestamp,
+ColumnInterval,
 ColumnInvalid,
 }
 
