@@ -800,7 +800,7 @@ UniquePtr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(const nlohmann::json &js
     String extra_params{};
     // must have: "match_method", "fields", "query_tensor", "element_type", "topn"
     // may have: "params"
-    constexpr std::array possible_keys{"match_method", "fields", "query_tensor", "element_type", "topn", "params"};
+    constexpr std::array possible_keys{"match_method", "field", "query_tensor", "element_type", "topn", "params"};
     std::set<String> possible_keys_set(possible_keys.begin(), possible_keys.end());
     for (auto &field_json_obj : json_object.items()) {
         String key = field_json_obj.key();
@@ -818,7 +818,7 @@ UniquePtr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(const nlohmann::json &js
                 response["error_message"] = fmt::format("MatchTensor expression match_method should be tensor, but got: {}", match_method);
                 return nullptr;
             }
-        } else if (IsEqual(key, "fields")) {
+        } else if (IsEqual(key, "field")) {
             auto column_str = field_json_obj.value().get<String>();
             auto column_expr = MakeUnique<ColumnExpr>();
             column_expr->names_.push_back(std::move(column_str));
