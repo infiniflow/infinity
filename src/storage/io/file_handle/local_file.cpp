@@ -20,6 +20,12 @@ import status;
 
 namespace infinity {
 
+LocalFile::~LocalFile() = default;
+
+Status LocalFile::Open(const String &path, FileAccessMode access_mode) {
+    return Status::OK();
+}
+
 Status LocalFile::Close() {
     return Status::OK();
 }

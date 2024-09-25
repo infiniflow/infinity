@@ -26,8 +26,8 @@ namespace infinity {
 
 export class LocalFile final : public AbstractFileHandle {
 public:
-    LocalFile(VirtualStorageSystem *storage_system) : AbstractFileHandle(storage_system, StorageType::kLocal) {};
-    ~LocalFile() final = default;
+    explicit LocalFile(VirtualStorageSystem *storage_system) : AbstractFileHandle(storage_system, StorageType::kLocal) {};
+    ~LocalFile() final;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
     Status Append(const char *buffer) final;

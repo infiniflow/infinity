@@ -28,7 +28,7 @@ export enum class FileAccessMode { kWrite, kRead, kMmapRead, kInvalid };
 
 export class AbstractFileHandle {
 public:
-    AbstractFileHandle(VirtualStorageSystem *storage_system, StorageType storage_type)
+    explicit AbstractFileHandle(VirtualStorageSystem *storage_system, StorageType storage_type)
         : storage_system_(storage_system), storage_type_(storage_type) {};
     virtual ~AbstractFileHandle() = default;
     virtual Status Open(const String &path, FileAccessMode access_mode) { return Status::NotSupport("In abstract class"); };
@@ -37,7 +37,7 @@ public:
     virtual Status Append(const String &buffer) { return Status::NotSupport("In abstract class"); }
     virtual Tuple<SizeT, Status> Read(char *buffer) { return {0, Status::NotSupport("In abstract class")}; }
     virtual Tuple<SizeT, Status> Read(String &buffer) { return {0, Status::NotSupport("In abstract class")}; }
-    virtual SizeT FileSize() { return 0; }
+    virtual SizeT FileSize() = 0;
     virtual Tuple<char *, SizeT, Status> MmapRead(const String &name) { return {nullptr, 0, Status::NotSupport("In abstract class")}; }
     virtual Status Unmmap(const String &name) { return Status::NotSupport("In abstract class"); }
 
