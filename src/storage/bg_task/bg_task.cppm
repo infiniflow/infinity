@@ -131,7 +131,7 @@ export class CleanupTask final : public BGTask {
 public:
     // Try clean up is async task?
     CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr)
-        : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
+        : BGTask(BGTaskType::kCleanup, false), catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
 public:
     ~CleanupTask() override = default;

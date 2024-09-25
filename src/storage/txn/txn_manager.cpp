@@ -292,13 +292,13 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
     }
     TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
     TxnTimeStamp res = std::min(first_uncommitted_begin_ts, checkpointed_ts);
-    LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", res, checkpointed_ts));
     for (auto *txn : finished_txns_) {
         res = std::min(res, txn->CommitTS());
     }
     for (auto *txn : finishing_txns_) {
         res = std::min(res, txn->BeginTS());
     }
+    LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", res, checkpointed_ts));
     return res;
 }
 
