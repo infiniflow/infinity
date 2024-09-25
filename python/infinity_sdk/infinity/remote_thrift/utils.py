@@ -559,6 +559,16 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.physical_type = ttypes.VarcharType()
                     case "bool":
                         proto_column_type.logic_type = ttypes.LogicType.Boolean
+                    case "date":
+                        proto_column_type.logic_type = ttypes.LogicType.Date
+                    case "time":
+                        proto_column_type.logic_type = ttypes.LogicType.Time
+                    case "datetime":
+                        proto_column_type.logic_type = ttypes.LogicType.DateTime
+                    case "timestamp":
+                        proto_column_type.logic_type = ttypes.LogicType.Timestamp
+                    case "interval":
+                        proto_column_type.logic_type = ttypes.LogicType.Interval
                     case _:
                         raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
                 proto_column_def.data_type = proto_column_type
