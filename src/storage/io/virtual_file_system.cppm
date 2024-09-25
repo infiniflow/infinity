@@ -26,24 +26,18 @@ namespace infinity {
 
 export class VirtualFileSystem;
 
-//export enum class FileType {
-//    kLocal,
-//    kMmap,
-//    kObject
-//};
-
 export enum class FileAccessMode { kWrite, kRead, kMmapRead, kInvalid };
 
 export class AbstractFileHandle {
 public:
-    AbstractFileHandle(VirtualFileSystem* file_system, FSType fs_type): file_system_(file_system), fs_type_(fs_type) {}
+    AbstractFileHandle(VirtualFileSystem *file_system, FSType fs_type) : file_system_(file_system), fs_type_(fs_type) {}
     virtual ~AbstractFileHandle() = 0;
     virtual Status Close() = 0;
     virtual Status Append(const char *buffer) = 0;
     virtual Status Append(const String &buffer) = 0;
     virtual Tuple<SizeT, Status> Read(char *buffer) = 0;
     virtual Tuple<SizeT, Status> Read(String &buffer) = 0;
-    virtual Tuple<char*, SizeT, Status> MmapRead(const String &name) = 0;
+    virtual Tuple<char *, SizeT, Status> MmapRead(const String &name) = 0;
     virtual Status Unmmap(const String &name) = 0;
     virtual SizeT FileSize() = 0;
 
@@ -55,7 +49,7 @@ protected:
 
 export class LocalFile final : public AbstractFileHandle {
 public:
-    LocalFile(VirtualFileSystem* file_system) : AbstractFileHandle(file_system, FSType::kLocal) {}
+    LocalFile(VirtualFileSystem *file_system) : AbstractFileHandle(file_system, FSType::kLocal) {}
     ~LocalFile() final = default;
     Status Close() final;
     Status Append(const char *buffer) final;
@@ -63,13 +57,13 @@ public:
     Tuple<SizeT, Status> Read(char *buffer) final;
     Tuple<SizeT, Status> Read(String &buffer) final;
     SizeT FileSize() final;
-    Tuple<char*, SizeT, Status> MmapRead(const String &name) final;
+    Tuple<char *, SizeT, Status> MmapRead(const String &name) final;
     Status Unmmap(const String &name) final;
 };
 
 export class ObjectFile : public AbstractFileHandle {
 public:
-    ObjectFile(VirtualFileSystem* file_system, FSType type) : AbstractFileHandle(file_system, type) {}
+    ObjectFile(VirtualFileSystem *file_system, FSType type) : AbstractFileHandle(file_system, type) {}
     ~ObjectFile() override = default;
     Status Close() override;
     Status Append(const char *buffer) override;
@@ -77,13 +71,13 @@ public:
     Tuple<SizeT, Status> Read(char *buffer) override;
     Tuple<SizeT, Status> Read(String &buffer) override;
     SizeT FileSize() override;
-    Tuple<char*, SizeT, Status> MmapRead(const String &name) final;
+    Tuple<char *, SizeT, Status> MmapRead(const String &name) final;
     Status Unmmap(const String &name) final;
 };
 
 export class MinioFile final : public ObjectFile {
 public:
-    MinioFile(VirtualFileSystem* file_system) : ObjectFile(file_system, FSType::kMinio) {}
+    MinioFile(VirtualFileSystem *file_system) : ObjectFile(file_system, FSType::kMinio) {}
     ~MinioFile() final = default;
     Status Close() final;
     Status Append(const char *buffer) final;
@@ -95,12 +89,12 @@ public:
 
 export class LocalDiskCache {
 public:
-    explicit LocalDiskCache(u64 disk_capacity_limit, SharedPtr<String> temp_dir, SizeT lru_count);
+    LocalDiskCache(u64 disk_capacity_limit, SharedPtr<String> cache_dir, SizeT lru_count) : cache_dir_(std::move(cache_dir)) {}
 
-    ~LocalDiskCache();
+    ~LocalDiskCache() = default;
 
 private:
-    SharedPtr<String> temp_dir_{};
+    SharedPtr<String> cache_dir_{};
 };
 
 class VirtualFileSystem {
@@ -115,10 +109,10 @@ private:
     FSType fs_type_{FSType::kLocal};
     UniquePtr<LocalDiskCache> local_disk_cache_{};
 
+    // Using by minio
     UniquePtr<minio::s3::BaseUrl> minio_base_url_{};
     UniquePtr<minio::creds::StaticProvider> minio_provider_{};
     UniquePtr<minio::s3::Client> minio_client_{};
-
 };
 
 } // namespace infinity
