@@ -62,6 +62,8 @@ LocalDiskCache::LocalDiskCache(u64 disk_capacity_limit, SharedPtr<String> temp_d
 
 LocalDiskCache::~LocalDiskCache() = default;
 
+AbstractFileHandle::~AbstractFileHandle() = default;
+
 Status VirtualFileSystem::Init(FSType fs_type, Map<String, String>& config) {
     // Init remote filesystem and local disk cache
     switch(fs_type) {
