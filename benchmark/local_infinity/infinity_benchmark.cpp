@@ -217,7 +217,8 @@ int main() {
                         col2->names_.emplace_back("col2");
                         output_columns->emplace_back(col2);
 
-                        __attribute__((unused)) auto ignored = infinity->Search("default_db", "benchmark_test", nullptr, nullptr, output_columns);
+                        [[maybe_unused]] auto ignored =
+                            infinity->Search("default_db", "benchmark_test", nullptr, nullptr, nullptr, nullptr, output_columns);
                     });
                 results.push_back(fmt::format("-> Select QPS: {}", total_times / tims_costing_second));
             }

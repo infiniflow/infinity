@@ -277,13 +277,13 @@ struct AnnIVFFlatIndexData {
         loaded_ = true;
     }
 
-    static UniquePtr<AnnIVFFlatIndexData<CentroidsDataType, VectorDataType>> LoadIndexInner(FileHandler &file_handler) {
-        auto index_data = MakeUnique<AnnIVFFlatIndexData<CentroidsDataType, VectorDataType>>(MetricType::kInvalid, 0, 0);
+    static UniquePtr<AnnIVFFlatIndexData> LoadIndexInner(FileHandler &file_handler) {
+        auto index_data = MakeUnique<AnnIVFFlatIndexData>(MetricType::kInvalid, 0, 0);
         index_data->ReadIndexInner(file_handler);
         return index_data;
     }
 
-    static UniquePtr<AnnIVFFlatIndexData<CentroidsDataType, VectorDataType>> LoadIndex(const String &file_path, UniquePtr<FileSystem> fs) {
+    static UniquePtr<AnnIVFFlatIndexData> LoadIndex(const String &file_path, UniquePtr<FileSystem> fs) {
         u8 file_flags = FileFlags::READ_FLAG;
         auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
         if(!status.ok()) {

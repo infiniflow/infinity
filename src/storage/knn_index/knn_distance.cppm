@@ -14,7 +14,7 @@
 
 module;
 
-export module knn_distance;
+export module deprecated_knn_distance;
 
 import stl;
 import knn_expr;

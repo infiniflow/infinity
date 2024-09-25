@@ -291,6 +291,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
     auto *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
     SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
 
+    std::lock_guard lck_m(mem_index_locker_);
     switch (index_base->index_type_) {
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
@@ -319,7 +320,6 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             break;
         }
         case IndexType::kHnsw: {
-            std::lock_guard lck(mem_index_locker_);
             if (memory_hnsw_index_.get() == nullptr) {
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_hnsw_index_ = HnswIndexInMem::Make(begin_row_id, index_base.get(), column_def.get(), this, true /*trace*/);
@@ -395,19 +395,17 @@ void SegmentIndexEntry::MemIndexWaitInflightTasks() {
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *dump_size) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();
+    std::lock_guard lck_m(mem_index_locker_);
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
-            {
-                std::lock_guard lck(mem_index_locker_);
-                if (memory_hnsw_index_.get() == nullptr) {
-                    break;
-                }
-                chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_manager_, dump_size);
-                std::unique_lock lck2(rw_locker_);
-                chunk_index_entries_.push_back(chunk_index_entry);
-                memory_hnsw_index_.reset();
+            if (memory_hnsw_index_.get() == nullptr) {
+                break;
             }
+            chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_manager_, dump_size);
             chunk_index_entry->SaveIndexFile();
+            std::unique_lock lck2(rw_locker_);
+            chunk_index_entries_.push_back(chunk_index_entry);
+            memory_hnsw_index_.reset();
             break;
         }
         case IndexType::kFullText: {
@@ -427,9 +425,9 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             if (memory_secondary_index_.get() == nullptr) {
                 break;
             }
-            std::unique_lock lck(rw_locker_);
             chunk_index_entry = memory_secondary_index_->Dump(this, buffer_manager_);
             chunk_index_entry->SaveIndexFile();
+            std::unique_lock lck(rw_locker_);
             chunk_index_entries_.push_back(chunk_index_entry);
             memory_secondary_index_.reset();
             break;
@@ -449,9 +447,9 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             if (memory_bmp_index_.get() == nullptr) {
                 return nullptr;
             }
-            std::unique_lock lck(rw_locker_);
             chunk_index_entry = memory_bmp_index_->Dump(this, buffer_manager_);
             chunk_index_entry->SaveIndexFile();
+            std::unique_lock lck(rw_locker_);
             chunk_index_entries_.push_back(chunk_index_entry);
             memory_bmp_index_.reset();
             break;

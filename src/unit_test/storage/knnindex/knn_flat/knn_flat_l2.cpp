@@ -22,7 +22,7 @@ import global_resource_usage;
 import third_party;
 import logger;
 
-import knn_flat_l2;
+import deprecated_knn_flat_l2;
 import infinity_context;
 import roaring_bitmap;
 import knn_expr;
