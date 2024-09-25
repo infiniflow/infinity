@@ -53,7 +53,8 @@ class TestCleanup:
         )
         table_obj.insert([{"c1": "text1", "c2": "text2"}])
 
-        table_obj.create_index("idx1", index.IndexInfo("c1", index.IndexType.FullText))
+        drop_index_name = "idx1_todrop"
+        table_obj.create_index(drop_index_name, index.IndexInfo("c1", index.IndexType.FullText))
         table_obj.create_index("idx2", index.IndexInfo("c2", index.IndexType.FullText))
 
         res = (
@@ -62,10 +63,10 @@ class TestCleanup:
             .to_result()
         )
 
-        table_obj.drop_index("idx1")
+        table_obj.drop_index(drop_index_name)
 
         self.infinity_obj.cleanup()
-        dropped_index_dirs = pathlib.Path("/var/infinity/data").rglob("*idx1*")
+        dropped_index_dirs = pathlib.Path("/var/infinity/data").rglob(f"*{drop_index_name}*")
         assert len(list(dropped_index_dirs)) == 0
 
         db_obj.drop_table(table_name)
