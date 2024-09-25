@@ -25,7 +25,7 @@ class InfinityRunner:
     def init(self, config_path: str | None = None):
         if config_path is None:
             config_path = self.default_config_path
-        cmd = f"{self.infinity_path} --config={config_path} > restart_test.log.{self.i} 2>&1 &"
+        cmd = f"{self.infinity_path} --config={config_path} > restart_test.log.{self.i} 2>&1"
 
         pids = [proc.pid for proc in psutil.process_iter(['pid', 'name']) if "infinity" in proc.info['name']]
         if len(pids) > 0:
@@ -45,6 +45,8 @@ class InfinityRunner:
         pids = []
         for child in psutil.Process(self.process.pid).children(recursive=True):
             pids.append(child.pid)
+        if len(pids) == 0:
+            raise Exception("Cannot find infinity process.")
         ret = os.system(f"bash {self.script_path} {timeout} {' '.join(map(str, pids))}")
         if ret != 0:
             raise Exception("An error occurred.")
