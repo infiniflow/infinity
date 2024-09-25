@@ -58,8 +58,10 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(config.LogFileRotateCount(), 8l);
     EXPECT_EQ(config.GetLogLevel(), LogLevel::kInfo);
 
+    // Storage
     EXPECT_EQ(config.DataDir(), "/var/infinity/data");
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
+    EXPECT_EQ(config.FileSystemType, "local");
 
     // buffer
     EXPECT_EQ(config.BufferManagerSize(), 8 * 1024l * 1024l * 1024l);
@@ -94,8 +96,13 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.LogFileRotateCount(), 3l);
     EXPECT_EQ(config.GetLogLevel(), LogLevel::kTrace);
 
+    // Storage
     EXPECT_EQ(config.DataDir(), "/var/infinity/data");
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
+    EXPECT_EQ(config.FileSystemType(), "minio");
+    EXPECT_EQ(config.RemoteFSHost(), "0.0.0.0");
+    EXPECT_EQ(config.RemoteFSPort(), 9000);
+    EXPECT_EQ(config.RemoteFSBucket(), "infinity");
 
     // buffer
     EXPECT_EQ(config.BufferManagerSize(), 3 * 1024l * 1024l * 1024l);

@@ -53,6 +53,9 @@ String ToString(FSType fs_type) {
         case FSType::kNFS: {
             return "network file system";
         }
+        default: {
+            return "invalid";
+        }
     }
 }
 

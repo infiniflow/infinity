@@ -191,6 +191,9 @@ export {
     constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "100MB"; // 100MB
     constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 100 * 1024lu * 1024lu;  // 100MB
 
+    constexpr std::string_view DEFAULT_FILESYSTEM_TYPE = "local";
+    constexpr std::string_view DEFAULT_REMOTE_FS_BUCKET = "infinity";
+
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";
     constexpr std::string_view SERVER_MODE_OPTION_NAME = "server_mode";
@@ -222,6 +225,11 @@ export {
 
     constexpr std::string_view PERSISTENCE_DIR_OPTION_NAME = "persistence_dir";
     constexpr std::string_view PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME = "persistence_object_size_limit";
+
+    constexpr std::string_view FILESYSTEM_TYPE_NAME = "filesystem_type";
+    constexpr std::string_view REMOTE_FS_HOST_NAME = "host";
+    constexpr std::string_view REMOTE_FS_PORT_NAME = "port";
+    constexpr std::string_view REMOTE_FS_BUCKET_NAME = "bucket_name";
 
     constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
     constexpr std::string_view LRU_NUM_OPTION_NAME = "lru_num";

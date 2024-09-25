@@ -95,6 +95,11 @@ public:
 
     i64 MemIndexCapacity();
 
+    String FileSystemType();
+    String RemoteFSHost();
+    i64 RemoteFSPort();
+    String RemoteFSBucket();
+
     // Persistence
     String PersistenceDir();
     i64 PersistenceObjectSizeLimit();
