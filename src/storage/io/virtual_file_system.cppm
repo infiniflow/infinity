@@ -19,6 +19,7 @@ export module virtual_file_system;
 import stl;
 import file_system_type;
 import status;
+import third_party;
 
 namespace infinity {
 
@@ -125,6 +126,11 @@ public:
 private:
     FSType fs_type_{FSType::kLocal};
     UniquePtr<LocalDiskCache> local_disk_cache_{};
+
+    UniquePtr<minio::s3::BaseUrl> minio_base_url_{};
+    UniquePtr<minio::creds::StaticProvider> minio_provider_{};
+    UniquePtr<minio::s3::Client> minio_client_{};
+
 };
 
 } // namespace infinity
