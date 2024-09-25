@@ -157,3 +157,43 @@ class TestCleanup:
             assert len(list(dropped_dirs)) == 0
 
         part2()
+
+    def test_invalidate_fulltext_cache(self, infinity_runner: InfinityRunner):
+        table_name = "test_invalid_fulltext_cache"
+        config = "test/data/config/restart_test/test_cleanup/1.toml"
+        uri = common_values.TEST_LOCAL_HOST
+        infinity_runner.clear()
+
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, ConflictType.Ignore)
+            table_obj = db_obj.create_table(
+                table_name,
+                {
+                    "c1": {"type": "varchar"},
+                    "c2": {"type": "varchar"},
+                },
+            )
+            table_obj.insert([{"c1": "text1", "c2": "text2"}])
+
+            drop_index_name = "idx1_todrop"
+            table_obj.create_index(drop_index_name, index.IndexInfo("c1", index.IndexType.FullText))
+            table_obj.create_index("idx2", index.IndexInfo("c2", index.IndexType.FullText))
+
+            res = (
+                table_obj.output(["c1"])
+                .match_text(fields="c1", matching_text="text1", topn=1)
+                .to_result()
+            )
+
+            table_obj.drop_index(drop_index_name)
+
+            infinity_obj.cleanup()
+            dropped_index_dirs = pathlib.Path("/var/infinity/data").rglob(f"*{drop_index_name}*")
+            assert len(list(dropped_index_dirs)) == 0
+
+            db_obj.drop_table(table_name)
+
+        part1()
