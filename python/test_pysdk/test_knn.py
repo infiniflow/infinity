@@ -1325,7 +1325,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("table_params", [
-        "vector,100,float,int8",
+        "vector,100,float",
         "sparse,0,float,int8",
         "sparse,100,int,int8",
         "sparse,100,float,float",

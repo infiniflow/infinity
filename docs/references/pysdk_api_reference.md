@@ -35,7 +35,7 @@ The `uri` here can be either a local directory in `str` format or a `NetworkAddr
   - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
   - `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
 
-:::danger NOTE
+:::tip IMPORTANT
 - When setting `uri` as `"/absolute/path/to/save/to"`, ensure you:
   - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.4.0.dev1_OR_HIGHER>`
   - Import the `infinity_embedded` module: `import infinity_embedded`.
@@ -97,7 +97,7 @@ If you have deployed Infinity as a separate server and installed the Infinity cl
 ```python
 import infinity
 # If Infinity is deployed on the local machine, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
-infinity_object = infinity_embedded.connect(infinity.NetworkAddress("192.168.1.101", 23817)) 
+infinity_object = infinity.connect(infinity.NetworkAddress("192.168.1.101", 23817)) 
 ```
 
 ---
