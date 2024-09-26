@@ -227,6 +227,7 @@ export {
     constexpr std::string_view PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME = "persistence_object_size_limit";
 
     constexpr std::string_view STORAGE_TYPE_NAME = "storage_type";
+    constexpr std::string_view OBJECT_STORAGE_NAME = "object_storage";
     constexpr std::string_view OBJECT_STORAGE_HOST_NAME = "host";
     constexpr std::string_view OBJECT_STORAGE_PORT_NAME = "port";
     constexpr std::string_view OBJECT_STORAGE_BUCKET_NAME = "bucket_name";

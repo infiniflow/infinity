@@ -345,6 +345,14 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME, persistence_object_size_limit, std::numeric_limits<i64>::max(), 0);
         global_options_.AddOption(std::move(persistence_object_size_limit_option));
 
+        String fs_type = String(DEFAULT_STORAGE_TYPE);
+        UniquePtr<StringOption> fs_type_option = MakeUnique<StringOption>(STORAGE_TYPE_NAME, fs_type);
+        status = global_options_.AddOption(std::move(fs_type_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Cleanup Interval
         i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
         UniquePtr<IntegerOption> cleanup_interval_option =
@@ -1365,6 +1373,81 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kObjectStorage: {
+                            auto object_storage_config = config_toml["storage.object_storage"];
+                            auto object_storage_config_table = object_storage_config.as_table();
+                            for (auto &elem : *object_storage_config_table) {
+                                String var_name = String(elem.first);
+                                GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
+                                if(option_index == GlobalOptionIndex::kInvalid) {
+                                    return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage.object_storage' field", var_name));
+                                }
+                                switch (option_index) {
+                                    case GlobalOptionIndex::kObjectStorageHost: {
+                                        String object_storage_host_str;
+                                        if (elem.second.is_string()) {
+                                            Optional<String> str_optional = elem.second.value<std::string>();
+                                            if (!str_optional.has_value()) {
+                                                return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
+                                            }
+                                            object_storage_host_str = *str_optional;
+                                        } else {
+                                            return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
+                                        }
+                                        auto object_storage_host_option = MakeUnique<StringOption>(OBJECT_STORAGE_HOST_NAME, object_storage_host_str);
+                                        global_options_.AddOption(std::move(object_storage_host_option));
+                                        break;
+                                    }
+                                    case GlobalOptionIndex::kObjectStoragePort: {
+                                        i64 object_storage_port = 0;
+                                        if(elem.second.is_integer()) {
+                                            auto int_option = elem.second.value<i64>();
+                                            if (!int_option.has_value()) {
+                                                return Status::InvalidConfig("'port' field in [storage.object_storage] isn't integer.");
+                                            }
+                                            object_storage_port = int_option.value();
+                                        } else {
+                                            return Status::InvalidConfig("'port' field in [storage.object_storage] isn't integer.");
+                                        }
+                                        UniquePtr<IntegerOption> object_storage_port_option = MakeUnique<IntegerOption>(OBJECT_STORAGE_PORT_NAME, object_storage_port, 65535, 0);
+                                        if (!object_storage_port_option->Validate()) {
+                                            return Status::InvalidConfig(fmt::format("Invalid remote fs port: {}", object_storage_port));
+                                        }
+                                        global_options_.AddOption(std::move(object_storage_port_option));
+                                        break;
+                                    }
+                                    case GlobalOptionIndex::kObjectStorageBucket: {
+                                        String object_storage_bucket = String(DEFAULT_OBJECT_STORAGE_BUCKET);
+                                        if (elem.second.is_string()) {
+                                            object_storage_bucket = elem.second.value_or(object_storage_bucket);
+                                        } else {
+                                            return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
+                                        }
+                                        auto remote_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_NAME, object_storage_bucket);
+                                        global_options_.AddOption(std::move(remote_bucket_option));
+                                        break;
+                                    }
+                                    default: {
+                                        return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage.object_storage' field", var_name));
+                                    }
+                                }
+                            }
+                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageHost) == nullptr) {
+                                return Status::InvalidConfig("No 'host' field in [storage.object_storage]");
+                            }
+                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStoragePort) == nullptr) {
+                                return Status::InvalidConfig("No 'port' field in [storage.object_storage]");
+                            }
+                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageBucket) == nullptr) {
+                                String object_storage_bucket = String(DEFAULT_OBJECT_STORAGE_BUCKET);
+                                UniquePtr<StringOption> remote_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_NAME, object_storage_bucket);
+                                Status status = global_options_.AddOption(std::move(remote_bucket_option));
+                                if (!status.ok()) {
+                                    UnrecoverableError(status.message());
+                                }
+                            }
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage' field", var_name));
                         }
@@ -1446,96 +1529,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     Status status = global_options_.AddOption(std::move(storage_type_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
-                    }
-                } else {
-                    auto *storage_type_option = static_cast<StringOption *>(base_option);
-                    StorageType storage_type = String2StorageType(storage_type_option->value_);
-                    switch (storage_type) {
-                        case StorageType::kLocal: {
-                            break;
-                        }
-                        case StorageType::kInvalid: {
-                            return Status::InvalidConfig("Invalid file system type.");
-                        }
-                        default: {
-                            // remote
-                            if (config_toml.contains("storage.object_storage")) {
-                                auto object_storage_config = config_toml["storage.object_storage"];
-                                auto object_storage_config_table = object_storage_config.as_table();
-                                for (auto &elem : *object_storage_config_table) {
-                                    String var_name = String(elem.first);
-                                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
-                                    if(option_index == GlobalOptionIndex::kInvalid) {
-                                        return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage.object_storage' field", var_name));
-                                    }
-                                    switch (option_index) {
-                                        case GlobalOptionIndex::kObjectStorageHost: {
-                                            String object_storage_host_str;
-                                            if (elem.second.is_string()) {
-                                                Optional<String> str_optional = elem.second.value<std::string>();
-                                                if (!str_optional.has_value()) {
-                                                    return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
-                                                }
-                                                object_storage_host_str = *str_optional;
-                                            } else {
-                                                return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
-                                            }
-                                            auto object_storage_host_option = MakeUnique<StringOption>(OBJECT_STORAGE_HOST_NAME, object_storage_host_str);
-                                            global_options_.AddOption(std::move(object_storage_host_option));
-                                            break;
-                                        }
-                                        case GlobalOptionIndex::kObjectStoragePort: {
-                                            i64 object_storage_port = 0;
-                                            if(elem.second.is_integer()) {
-                                                auto int_option = elem.second.value<i64>();
-                                                if (!int_option.has_value()) {
-                                                    return Status::InvalidConfig("'port' field in [storage.object_storage] isn't integer.");
-                                                }
-                                                object_storage_port = int_option.value();
-                                            } else {
-                                                return Status::InvalidConfig("'port' field in [storage.object_storage] isn't integer.");
-                                            }
-                                            UniquePtr<IntegerOption> object_storage_port_option = MakeUnique<IntegerOption>(OBJECT_STORAGE_PORT_NAME, object_storage_port, 65535, 0);
-                                            if (!object_storage_port_option->Validate()) {
-                                                return Status::InvalidConfig(fmt::format("Invalid remote fs port: {}", object_storage_port));
-                                            }
-                                            global_options_.AddOption(std::move(object_storage_port_option));
-                                            break;
-                                        }
-                                        case GlobalOptionIndex::kObjectStorageBucket: {
-                                            String object_storage_bucket = String(DEFAULT_OBJECT_STORAGE_BUCKET);
-                                            if (elem.second.is_string()) {
-                                                object_storage_bucket = elem.second.value_or(object_storage_bucket);
-                                            } else {
-                                                return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
-                                            }
-                                            auto remote_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_NAME, object_storage_bucket);
-                                            global_options_.AddOption(std::move(remote_bucket_option));
-                                            break;
-                                        }
-                                        default: {
-                                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage.object_storage' field", var_name));
-                                        }
-                                    }
-                                }
-                                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageHost) == nullptr) {
-                                    return Status::InvalidConfig("No 'host' field in [storage.object_storage]");
-                                }
-                                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStoragePort) == nullptr) {
-                                    return Status::InvalidConfig("No 'port' field in [storage.object_storage]");
-                                }
-                                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageBucket) == nullptr) {
-                                    String object_storage_bucket = String(DEFAULT_OBJECT_STORAGE_BUCKET);
-                                    UniquePtr<StringOption> remote_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_NAME, object_storage_bucket);
-                                    Status status = global_options_.AddOption(std::move(remote_bucket_option));
-                                    if (!status.ok()) {
-                                        UnrecoverableError(status.message());
-                                    }
-                                }
-                            } else {
-                                return Status::InvalidConfig("No 'storage.object_storage' section in configure file.");
-                            }
-                        }
                     }
                 }
 

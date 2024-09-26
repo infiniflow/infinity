@@ -22,7 +22,7 @@ log_level               = "trace"
 
 [storage]
 persistence_dir         = "/var/infinity/persistence"
-file_system_type        = "minio"
+filesystem_type        = "minio"
 
 [storage.object_storage]
 host                    = "0.0.0.0"
