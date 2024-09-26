@@ -42,6 +42,9 @@ public:
     UniquePtr<AbstractFileHandle> BuildFileHandle(const String &path, FileAccessMode access_mode) const;
     LocalDiskCache *GetLocalDiskCache() const;
 
+    minio::s3::Client* GetMinioClient() const {
+        return minio_client_.get();
+    }
 private:
     StorageType storage_type_{StorageType::kLocal};
     UniquePtr<LocalDiskCache> local_disk_cache_{};

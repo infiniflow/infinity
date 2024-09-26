@@ -17,45 +17,31 @@ module;
 module local_file;
 
 import status;
+import virtual_storage_system;
 
 namespace infinity {
 
+LocalFile::LocalFile(VirtualStorageSystem *storage_system, const String &path, FileAccessMode access_mode)
+    : AbstractFileHandle(storage_system, StorageType::kLocal, path, access_mode) {}
+
 LocalFile::~LocalFile() = default;
 
-Status LocalFile::Open(const String &path, FileAccessMode access_mode) {
-    return Status::OK();
-}
+Status LocalFile::Open(const String &path, FileAccessMode access_mode) { return Status::OK(); }
 
-Status LocalFile::Close() {
-    return Status::OK();
-}
+Status LocalFile::Close() { return Status::OK(); }
 
-Status LocalFile::Append(const char *buffer) {
-    return Status::OK();
-}
+Status LocalFile::Append(const char *buffer) { return Status::OK(); }
 
-Status LocalFile::Append(const String &buffer) {
-    return Status::OK();
-}
+Status LocalFile::Append(const String &buffer) { return Status::OK(); }
 
-Tuple<SizeT, Status> LocalFile::Read(char *buffer) {
-    return {0, Status::OK()};
-}
+Tuple<SizeT, Status> LocalFile::Read(char *buffer) { return {0, Status::OK()}; }
 
-Tuple<SizeT, Status> LocalFile::Read(String &buffer) {
-    return {0, Status::OK()};
-}
+Tuple<SizeT, Status> LocalFile::Read(String &buffer) { return {0, Status::OK()}; }
 
-SizeT LocalFile::FileSize() {
-    return 0;
-}
+SizeT LocalFile::FileSize() { return 0; }
 
-Tuple<char *, SizeT, Status> LocalFile::MmapRead(const String &name) {
-    return {nullptr, 0, Status::OK()};
-}
+Tuple<char *, SizeT, Status> LocalFile::MmapRead(const String &name) { return {nullptr, 0, Status::OK()}; }
 
-Status LocalFile::Unmmap(const String &name) {
-    return Status::OK();
-}
+Status LocalFile::Unmmap(const String &name) { return Status::OK(); }
 
-}
+} // namespace infinity

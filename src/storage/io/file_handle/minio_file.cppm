@@ -19,16 +19,17 @@ export module minio_file;
 import stl;
 import virtual_storage_system_type;
 import status;
-import virtual_storage_system;
 import object_file;
 import abstract_file_handle;
 
 namespace infinity {
 
+class VirtualStorageSystem;
+
 export class MinioFile final : public ObjectFile {
 public:
-    MinioFile(VirtualStorageSystem *storage_system) : ObjectFile(storage_system, StorageType::kMinio) {}
-    ~MinioFile() final = default;
+    MinioFile(VirtualStorageSystem *storage_system, const String &path, FileAccessMode access_mode);
+    ~MinioFile() final;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
     Status Append(const char *buffer) final;
@@ -36,6 +37,8 @@ public:
     Tuple<SizeT, Status> Read(char *buffer) final;
     Tuple<SizeT, Status> Read(String &buffer) final;
     SizeT FileSize() final;
+    Tuple<char *, SizeT, Status> MmapRead(const String &name) final;
+    Status Unmmap(const String &name) final;
 };
 
-}
+} // namespace infinity

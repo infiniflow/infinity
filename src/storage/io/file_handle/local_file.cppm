@@ -20,13 +20,14 @@ import stl;
 import virtual_storage_system_type;
 import status;
 import abstract_file_handle;
-import virtual_storage_system;
 
 namespace infinity {
 
+class VirtualStorageSystem;
+
 export class LocalFile final : public AbstractFileHandle {
 public:
-    explicit LocalFile(VirtualStorageSystem *storage_system) : AbstractFileHandle(storage_system, StorageType::kLocal) {};
+    explicit LocalFile(VirtualStorageSystem *storage_system, const String &path, FileAccessMode access_mode);
     ~LocalFile() final;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
