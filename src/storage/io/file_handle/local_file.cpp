@@ -14,10 +14,18 @@
 
 module;
 
+#include <fcntl.h>
+#include <unistd.h>
+#include <cerrno>
+#include <cstring>
+#include <sys/stat.h>
+
 module local_file;
 
+import third_party;
 import status;
 import virtual_storage;
+import infinity_exception;
 
 namespace infinity {
 
@@ -25,24 +33,108 @@ LocalFile::LocalFile(VirtualStorage *storage_system) : AbstractFileHandle(storag
 
 LocalFile::~LocalFile() = default;
 
-Status LocalFile::Open(const String &path, FileAccessMode access_mode) { return Status::OK(); }
+Status LocalFile::Open(const String &path, FileAccessMode access_mode) {
+    if(!path_.empty()) {
+        return Status::FileIsOpen(path);
+    }
+    path_ = path;
+    access_mode_ = access_mode;
+    switch (access_mode_) {
+        case FileAccessMode::kRead: {
+            fd_ = open(path.c_str(), O_RDONLY, 0666);
+            open_ = true;
+            break;
+        }
+        case FileAccessMode::kWrite: {
+            break;
+        }
+        case FileAccessMode::kMmapRead: {
+            break;
+        }
+        case FileAccessMode::kInvalid: {
+            break;
+        }
+    }
+    return Status::OK();
+}
 
-Status LocalFile::Close() { return Status::OK(); }
+Status LocalFile::Close() {
+    if(access_mode_ == FileAccessMode::kWrite) {
+        if(!sync_) {
+            Status status = Sync();
+            if(!status.ok()) {
+                return status;
+            }
+        }
+    }
+    if(open_) {
+        close(fd_);
+        fd_ = -1;
+        open_ = false;
+    }
+    return Status::OK();
+}
 
 Status LocalFile::Append(const char *buffer, u64 nbytes) { return Status::OK(); }
 
 Status LocalFile::Append(const String &buffer, u64 nbytes) { return Status::OK(); }
 
-Tuple<SizeT, Status> LocalFile::Read(char *buffer, u64 nbytes) { return {0, Status::OK()}; }
+Tuple<SizeT, Status> LocalFile::Read(char *buffer, u64 nbytes) {
 
-Tuple<SizeT, Status> LocalFile::Read(String &buffer, u64 nbytes) { return {0, Status::OK()}; }
+    i64 read_n = 0;
+    while (read_n < (i64)nbytes) {
+        SizeT a = nbytes - read_n;
+        i64 read_count = read(fd_, (char *)buffer + read_n, a);
+        if (read_count == 0) {
+            break;
+        }
+        if (read_count == -1) {
+            String error_message = fmt::format("Can't read file: {}: {}", path_, strerror(errno));
+            UnrecoverableError(error_message);
+        }
+        read_n += read_count;
+    }
+    return {read_n, Status::OK()};
+}
 
-SizeT LocalFile::FileSize() { return 0; }
+Tuple<SizeT, Status> LocalFile::Read(String &buffer, u64 nbytes) {
+    i64 read_n = 0;
+    while (read_n < (i64)nbytes) {
+        SizeT a = nbytes - read_n;
+        i64 read_count = read(fd_, buffer.data() + read_n, a);
+        if (read_count == 0) {
+            break;
+        }
+        if (read_count == -1) {
+            String error_message = fmt::format("Can't read file: {}: {}", path_, strerror(errno));
+            UnrecoverableError(error_message);
+        }
+        read_n += read_count;
+    }
+    return {read_n, Status::OK()};
+}
+
+SizeT LocalFile::FileSize() {
+    struct stat s {};
+    if (fstat(fd_, &s) == -1) {
+        return -1;
+    }
+    return s.st_size;
+}
 
 Tuple<char *, SizeT, Status> LocalFile::MmapRead(const String &name) { return {nullptr, 0, Status::OK()}; }
 
 Status LocalFile::Unmmap(const String &name) { return Status::OK(); }
 
-Status LocalFile::Sync() { return Status::OK(); }
+Status LocalFile::Sync() {
+    if(access_mode_ != FileAccessMode::kWrite) {
+        return Status::InvalidCommand("Non-write access mode, shouldn't call Sync()");
+    }
+    if(!sync_) {
+        sync_ = true;
+        fsync(fd_);
+    }
+    return Status::OK();
+}
 
 } // namespace infinity

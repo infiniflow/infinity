@@ -47,6 +47,7 @@ protected:
     atomic_bool open_{false};
     String path_;
     FileAccessMode access_mode_;
+    atomic_bool sync_{false};
 };
 
 } // namespace infinity
