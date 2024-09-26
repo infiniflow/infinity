@@ -226,11 +226,11 @@ export {
     constexpr std::string_view PERSISTENCE_DIR_OPTION_NAME = "persistence_dir";
     constexpr std::string_view PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME = "persistence_object_size_limit";
 
-    constexpr std::string_view STORAGE_TYPE_NAME = "storage_type";
-    constexpr std::string_view OBJECT_STORAGE_NAME = "object_storage";
-    constexpr std::string_view OBJECT_STORAGE_HOST_NAME = "host";
-    constexpr std::string_view OBJECT_STORAGE_PORT_NAME = "port";
-    constexpr std::string_view OBJECT_STORAGE_BUCKET_NAME = "bucket_name";
+    constexpr std::string_view STORAGE_TYPE_OPTION_NAME = "storage_type";
+    constexpr std::string_view OBJECT_STORAGE_OPTION_NAME = "object_storage";
+    constexpr std::string_view OBJECT_STORAGE_HOST_OPTION_NAME = "host";
+    constexpr std::string_view OBJECT_STORAGE_PORT_OPTION_NAME = "port";
+    constexpr std::string_view OBJECT_STORAGE_BUCKET_OPTION_NAME = "bucket_name";
 
     constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
     constexpr std::string_view LRU_NUM_OPTION_NAME = "lru_num";

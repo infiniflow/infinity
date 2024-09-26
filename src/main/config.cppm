@@ -20,6 +20,7 @@ import third_party;
 import options;
 import status;
 import command_statement;
+import virtual_storage_system_type;
 
 namespace infinity {
 
@@ -95,7 +96,7 @@ public:
 
     i64 MemIndexCapacity();
 
-    String FileSystemType();
+    StorageType StorageType();
     String ObjectStorageHost();
     i64 ObjectStoragePort();
     String ObjectStorageBucket();

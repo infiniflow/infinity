@@ -341,12 +341,23 @@ target_link_libraries(infinity
         snappy.a
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
+        pugixml-static
+        curlpp_static
+        inih.a
+        libcurl_static
+        ssl.a
+        crypto.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(infinity PUBLIC "/usr/local/openssl30/lib64")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -396,6 +407,12 @@ if (SKBUILD)
             snappy.a
             ${JEMALLOC_STATIC_LIB}
             miniocpp.a
+            pugixml-static
+            curlpp_static
+            inih.a
+            libcurl_static
+            ssl.a
+            crypto.a
     )
 
     # WARN: python modules shall not link to static libstdc++!!!
@@ -407,6 +424,11 @@ if (SKBUILD)
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+    target_link_directories(embedded_infinity_ext PUBLIC "/usr/local/openssl30/lib64")
     nanobind_disable_stack_protector(embedded_infinity_ext)
     nanobind_opt_size(embedded_infinity_ext)
     nanobind_strip(embedded_infinity_ext)
