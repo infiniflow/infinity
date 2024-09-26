@@ -60,8 +60,9 @@ TEST_F(LocalFileTest, test1) {
     local_file_handle->Sync();
     local_file_handle->Close();
 
-    //    local_file_system.DeleteFile(path);
-    //    EXPECT_FALSE(local_file_system.Exists(path));
+    EXPECT_TRUE(virtual_storage.Exists(path));
+    virtual_storage.DeleteFile(path);
+    EXPECT_FALSE(virtual_storage.Exists(path));
 
     virtual_storage.UnInit();
 }

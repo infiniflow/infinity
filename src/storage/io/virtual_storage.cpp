@@ -24,6 +24,7 @@ import virtual_storage_type;
 import logger;
 import local_file;
 import minio_file;
+import infinity_exception;
 
 namespace infinity {
 
@@ -133,11 +134,46 @@ Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorage::BuildFileHandle() {
 
 LocalDiskCache *VirtualStorage::GetLocalDiskCache() const { return local_disk_cache_.get(); }
 
-Status VirtualStorage::DeleteFile(const String &path) { return Status::OK(); }
+Status VirtualStorage::DeleteFile(const String &file_name) {
+    if (!std::filesystem::path(file_name).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", file_name);
+        UnrecoverableError(error_message);
+    }
+    std::error_code error_code;
+    Path p{file_name};
+    bool is_deleted = std::filesystem::remove(p, error_code);
+    if (error_code.value() == 0) {
+        if (!is_deleted) {
+            String error_message = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
+            LOG_WARN(error_message);
+            Status status = Status::IOError(error_message);
+            return status;
+        }
+    } else {
+        String error_message = fmt::format("Delete file {} exception: {}", file_name, strerror(errno));
+        UnrecoverableError(error_message);
+    }
+    return Status::OK();
+}
 
 Status VirtualStorage::Rename(const String &old_path, const String &new_path) { return Status::OK(); }
 
-Status VirtualStorage::Exists(const String &path) { return Status::OK(); }
+bool VirtualStorage::Exists(const String &path) {
+    if (!std::filesystem::path(path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", path);
+        UnrecoverableError(error_message);
+    }
+    std::error_code error_code;
+    Path p{path};
+    bool is_exists = std::filesystem::exists(p, error_code);
+    if (error_code.value() == 0) {
+        return is_exists;
+    } else {
+        String error_message = fmt::format("{} exists exception: {}", path, strerror(errno));
+        UnrecoverableError(error_message);
+    }
+    return false;
+}
 
 Tuple<Vector<String>, Status> VirtualStorage::ListDirectory(const String &path) {
     Vector<String> result;
@@ -147,8 +183,9 @@ Tuple<Vector<String>, Status> VirtualStorage::ListDirectory(const String &path) 
 bool VirtualStorage::IsRegularFile(const String &path) { return false; }
 
 // For local disk filesystem, such as temp file, disk cache and WAL
-Status VirtualStorage::CreateLocalDirectory(const String &path) { return Status::OK(); }
-Status VirtualStorage::DeleteLocalDirectory(const String &path) { return Status::OK(); }
+Status VirtualStorage::DeleteLocalFile(const String &path) { return Status::OK(); }
+Status VirtualStorage::MakeLocalDirectory(const String &path) { return Status::OK(); }
+Status VirtualStorage::RemoveLocalDirectory(const String &path) { return Status::OK(); }
 Status VirtualStorage::CleanupLocalDirectory(const String &path) { return Status::OK(); }
 
 } // namespace infinity
