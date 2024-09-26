@@ -31,10 +31,10 @@ public:
     ~LocalFile() final;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
-    Status Append(const char *buffer) final;
-    Status Append(const String &buffer) final;
-    Tuple<SizeT, Status> Read(char *buffer) final;
-    Tuple<SizeT, Status> Read(String &buffer) final;
+    Status Append(const char *buffer, u64 nbytes) final;
+    Status Append(const String &buffer, u64 nbytes) final;
+    Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) final;
+    Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) final;
     SizeT FileSize() final;
     Tuple<char *, SizeT, Status> MmapRead(const String &name) final;
     Status Unmmap(const String &name) final;

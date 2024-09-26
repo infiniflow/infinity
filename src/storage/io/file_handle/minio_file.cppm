@@ -25,6 +25,11 @@ import abstract_file_handle;
 namespace infinity {
 
 class VirtualStorageSystem;
+struct MinoMmapInfo {
+    char *data_ptr_{};
+    SizeT data_len_{};
+    SizeT rc_{};
+};
 
 export class MinioFile final : public ObjectFile {
 public:
@@ -32,10 +37,10 @@ public:
     ~MinioFile() final;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
-    Status Append(const char *buffer) final;
-    Status Append(const String &buffer) final;
-    Tuple<SizeT, Status> Read(char *buffer) final;
-    Tuple<SizeT, Status> Read(String &buffer) final;
+    Status Append(const char *buffer, u64 nbytes) final;
+    Status Append(const String &buffer, u64 nbytes) final;
+    Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) final;
+    Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) final;
     SizeT FileSize() final;
     Tuple<char *, SizeT, Status> MmapRead(const String &name) final;
     Status Unmmap(const String &name) final;
@@ -43,6 +48,7 @@ public:
 private:
     i32 fd_{-1};
     static std::mutex mtx_;
+    static HashMap<String, MinoMmapInfo> mapped_files_;
 };
 
 } // namespace infinity
