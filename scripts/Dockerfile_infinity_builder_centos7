@@ -224,6 +224,8 @@ RUN git clone --single-branch --depth=1 https://github.com/adrian-thurston/ragel
 
 ENV PATH="/usr/local/venv310/bin:/usr/local/ragel/bin:$PATH"
 
+ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local
+
 RUN git clone --single-branch --depth=1 https://github.com/VectorCamp/vectorscan.git \
     && cd vectorscan \
     && mkdir build \
@@ -231,7 +233,5 @@ RUN git clone --single-branch --depth=1 https://github.com/VectorCamp/vectorscan
     && cmake -DCMAKE_BUILD_TYPE=Release -DFAT_RUNTIME=On ..  \
     && make -j 12 install \
     && rm -rf ../../vectorscan
-
-ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
