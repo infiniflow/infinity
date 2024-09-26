@@ -30,6 +30,8 @@ public:
 
     ~LocalDiskCache() = default;
 
+    String GetCacheDir() const { return *cache_dir_; }
+
 private:
     SharedPtr<String> cache_dir_{};
 };
@@ -41,6 +43,7 @@ public:
     Status UnInit();
     UniquePtr<AbstractFileHandle> BuildFileHandle(const String &path, FileAccessMode access_mode) const;
     LocalDiskCache *GetLocalDiskCache() const;
+    minio::s3::Client *GetMinioClient() const { return minio_client_.get();}
 
 private:
     StorageType storage_type_{StorageType::kLocal};

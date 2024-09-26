@@ -36,6 +36,9 @@ public:
     Tuple<SizeT, Status> Read(char *buffer) final;
     Tuple<SizeT, Status> Read(String &buffer) final;
     SizeT FileSize() final;
+
+public:
+    i32 fd_{-1};
 };
 
 }
