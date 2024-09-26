@@ -39,7 +39,7 @@ export class VirtualStorageSystem {
 public:
     Status Init(StorageType storage_type, Map<String, String> &config);
     Status UnInit();
-    UniquePtr<AbstractFileHandle> BuildFileHandle(const String &path, FileAccessMode access_mode) const;
+    Tuple<UniquePtr<AbstractFileHandle>, Status> BuildFileHandle(const String &path, FileAccessMode access_mode);
     LocalDiskCache *GetLocalDiskCache() const;
 
     minio::s3::Client* GetMinioClient() const {

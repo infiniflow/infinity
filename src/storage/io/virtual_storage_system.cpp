@@ -21,6 +21,8 @@ module virtual_storage_system;
 import stl;
 import third_party;
 import virtual_storage_system_type;
+import logger;
+import local_file;
 
 namespace infinity {
 
@@ -108,9 +110,25 @@ Status VirtualStorageSystem::UnInit() {
     return Status::OK();
 }
 
-UniquePtr<AbstractFileHandle> VirtualStorageSystem::BuildFileHandle(const String &path, FileAccessMode access_mode) const {
+Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorageSystem::BuildFileHandle(const String &path, FileAccessMode access_mode) {
     // Open the file according to the path and access_mode
-    return nullptr;
+    switch (storage_type_) {
+        case StorageType::kLocal: {
+            UniquePtr<LocalFile> local_file = MakeUnique<LocalFile>(this, path, access_mode);
+            return {std::move(local_file), Status::OK()};
+        }
+        case StorageType::kMinio: {
+            Status status = Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
+            LOG_ERROR(status.message());
+            return {nullptr, status};
+        }
+        default: {
+            Status status = Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
+            LOG_ERROR(status.message());
+            return {nullptr, status};
+        }
+    }
+    return {nullptr, Status::OK()};
 }
 
 LocalDiskCache *VirtualStorageSystem::GetLocalDiskCache() const { return local_disk_cache_.get(); }
