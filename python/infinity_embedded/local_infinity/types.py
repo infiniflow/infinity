@@ -259,7 +259,10 @@ def parse_time_bytes(column_vector):
     parsed_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
     time_list = []
     for value in parsed_list:
-        time_list.append(timedelta(seconds=value))
+        hours = (value // 3600) % 24
+        minutes = (value % 3600) // 60
+        seconds = value % 60
+        time_list.append(time(hour=hours, minute=minutes, second=seconds))
     return time_list
 
 def parse_datetime_bytes(column_vector):

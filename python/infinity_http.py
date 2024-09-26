@@ -15,6 +15,7 @@ import pandas as pd
 import polars as pl
 import pyarrow as pa
 from infinity.table import ExplainType
+from datetime import date, time, datetime
 
 
 class infinity_http:
@@ -403,6 +404,12 @@ class infinity_http:
                                 value[key][idx] = value[key][idx].tolist()
                     if isinstance(value[key], SparseVector):
                         value[key] = value[key].to_dict()
+                    if isinstance(value[key], datetime):
+                        value[key] = value[key].strftime("%Y-%m-%d %H:%M:%S")
+                    if isinstance(value[key], date):
+                        value[key] = value[key].strftime("%Y-%m-%d")
+                    if isinstance(value[key], time):
+                        value[key] = value[key].strftime("%H:%M:%S")
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])

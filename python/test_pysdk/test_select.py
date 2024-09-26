@@ -17,6 +17,7 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 from common.utils import copy_data
+from datetime import date, time, datetime
 
 @pytest.fixture(scope="class")
 def local_infinity(request):
@@ -238,6 +239,22 @@ class TestInfinity:
                 "c1": {"type": "date"},
                 "c2": {"type": "time"},
                 "c3" : {"type": "datetime"}}, ConflictType.Error)
+
+        assert table_obj is not None
+
+        d = date(2024, 9, 23)
+        t = time(20, 45, 11)
+        dt = datetime(2024, 9, 23, 20, 45, 11)
+        res = table_obj.insert(
+            {"c1" : d, "c2" : t, "c3" : dt}
+        )
+        assert res.error_code == ErrorCode.OK
+ 
+        res = table_obj.output(["*"]).to_pl()
+        assert res.item(0, 0) == d and res.item(0, 1) == t and res.item(0, 2) == dt
+
+        res = db_obj.drop_table("test_select_datetime"+suffix, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
 
     def test_select_aggregate(self, suffix):
         """
