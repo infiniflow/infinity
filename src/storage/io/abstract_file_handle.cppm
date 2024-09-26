@@ -28,10 +28,9 @@ export enum class FileAccessMode { kWrite, kRead, kMmapRead, kInvalid };
 
 export class AbstractFileHandle {
 public:
-    explicit AbstractFileHandle(VirtualStorageSystem *storage_system, StorageType storage_type)
-        : storage_system_(storage_system), storage_type_(storage_type) {};
-    virtual ~AbstractFileHandle() = default;
-    virtual Status Open(const String &path, FileAccessMode access_mode) { return Status::NotSupport("In abstract class"); };
+    explicit AbstractFileHandle(VirtualStorageSystem *storage_system, StorageType storage_type, const String &path, FileAccessMode access_mode);
+    virtual ~AbstractFileHandle();
+    virtual Status Open(const String &path, FileAccessMode access_mode);
     virtual Status Close() { return Status::NotSupport("In abstract class"); }
     virtual Status Append(const char *buffer) { return Status::NotSupport("In abstract class"); }
     virtual Status Append(const String &buffer) { return Status::NotSupport("In abstract class"); }
@@ -45,6 +44,8 @@ protected:
     VirtualStorageSystem *storage_system_{};
     StorageType storage_type_{StorageType::kLocal};
     atomic_bool open_{false};
+    const String &path_;
+    FileAccessMode access_mode_;
 };
 
 } // namespace infinity

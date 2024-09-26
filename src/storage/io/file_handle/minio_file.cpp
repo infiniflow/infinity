@@ -17,12 +17,16 @@ module;
 module minio_file;
 
 import status;
-import stl;
-import infinity_context;
+import virtual_storage_system;
 
 namespace infinity {
 
-Status MinioFile::Open(const String &path, FileAccessMode access_mode){
+MinioFile::MinioFile(VirtualStorageSystem *storage_system, const String &path, FileAccessMode access_mode)
+    : ObjectFile(storage_system, StorageType::kMinio, path, access_mode) {}
+
+MinioFile::~MinioFile() = default;
+
+Status MinioFile::Open(const String &path, FileAccessMode access_mode) {
     String bucket_name = InfinityContext::instance().config()->ObjectStorageBucket();
 
     if (!std::filesystem::path(path).is_absolute()) {
@@ -39,4 +43,20 @@ Status MinioFile::Open(const String &path, FileAccessMode access_mode){
     return Status::OK();
 }
 
-}
+Status MinioFile::Close() { return Status::OK(); }
+
+Status MinioFile::Append(const char *buffer) { return Status::OK(); }
+
+Status MinioFile::Append(const String &buffer) { return Status::OK(); }
+
+Tuple<SizeT, Status> MinioFile::Read(char *buffer) { return {0, Status::OK()}; }
+
+Tuple<SizeT, Status> MinioFile::Read(String &buffer) { return {0, Status::OK()}; }
+
+SizeT MinioFile::FileSize() { return 0; }
+
+Tuple<char *, SizeT, Status> MinioFile::MmapRead(const String &name) { return {nullptr, 0, Status::OK()}; }
+
+Status MinioFile::Unmmap(const String &name) { return Status::OK(); }
+
+} 

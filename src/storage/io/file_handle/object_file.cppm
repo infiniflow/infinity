@@ -20,14 +20,15 @@ import stl;
 import virtual_storage_system_type;
 import status;
 import abstract_file_handle;
-import virtual_storage_system;
 
 namespace infinity {
 
+class VirtualStorageSystem;
+
 export class ObjectFile : public AbstractFileHandle {
 public:
-    ObjectFile(VirtualStorageSystem *storage_system, StorageType type) : AbstractFileHandle(storage_system, type) {}
-    ~ObjectFile() override = default;
+    ObjectFile(VirtualStorageSystem *storage_system, StorageType type, const String& path, FileAccessMode access_mode);
+    ~ObjectFile() override;
     Status Open(const String &path, FileAccessMode access_mode) override;
     Status Close() override;
     Status Append(const char *buffer) override;
@@ -35,8 +36,8 @@ public:
     Tuple<SizeT, Status> Read(char *buffer) override;
     Tuple<SizeT, Status> Read(String &buffer) override;
     SizeT FileSize() override;
-    Tuple<char *, SizeT, Status> MmapRead(const String &name) final;
-    Status Unmmap(const String &name) final;
+    Tuple<char *, SizeT, Status> MmapRead(const String &name) override;
+    Status Unmmap(const String &name) override;
 };
 
 }
