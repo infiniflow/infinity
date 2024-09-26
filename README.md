@@ -57,22 +57,29 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ## 🎮 Get Started
 
-Infinity, also available as a Python module, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
+The Infinity-embedded SDK allows you to embed Infinity into Python applications, eliminates the need for a separate back-end server. By using `pip install infinity-embedded-sdk` and `import infinity_embedded`, you can quickly develop a local AI application in Python, leveraging the fastest and most powerful RAG database in the world:
 
+1. Install the Infinity-embedded SDK:
    ```bash
    pip install infinity-embedded-sdk==0.4.0.dev2
    ```
-
+2. Use Infinity to conduct a dense vector search:
    ```python
-   import infinity-embedded as infinity
+   import infinity_embedded
 
    # Connect to infinity
-   infinity_obj = infinity.connect("/path/to/save/to")
-   db = infinity_obj.get_database("default_db")
-   table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
-   table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-   table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
-   res = table.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
+   infinity_object = infinity_embedded.connect("/absolute/path/to/save/to")
+   # Retrieve a database object named default_db
+   db_object = infinity_object.get_database("default_db")
+   # Create a table with an integer column, a varchar column, and a dense vector column
+   table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
+   # Insert two rows into the table
+   table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+   table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+   # Conduct a dense vector search
+   res = table_object.output(["*"])
+                     .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
+                     .to_pl()
    print(res)
    ```
 
