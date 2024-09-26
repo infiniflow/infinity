@@ -59,11 +59,11 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(PERSISTENCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kPersistenceDir;
     name2index_[String(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kPersistenceObjectSizeLimit;
 
-    name2index_[String(FILESYSTEM_TYPE_NAME)] = GlobalOptionIndex::kFileSystemType;
-    name2index_[String(REMOTE_FS_NAME)] = GlobalOptionIndex::kRemoteFS;
-    name2index_[String(REMOTE_FS_HOST_NAME)] = GlobalOptionIndex::kRemoteFSHost;
-    name2index_[String(REMOTE_FS_PORT_NAME)] = GlobalOptionIndex::kRemoteFSPort;
-    name2index_[String(REMOTE_FS_BUCKET_NAME)] = GlobalOptionIndex::kRemoteFSBucket;
+    name2index_[String(STORAGE_TYPE_NAME)] = GlobalOptionIndex::kStorageType;
+    name2index_[String(OBJECT_STORAGE_NAME)] = GlobalOptionIndex::kObjectStorage;
+    name2index_[String(OBJECT_STORAGE_HOST_NAME)] = GlobalOptionIndex::kObjectStorageHost;
+    name2index_[String(OBJECT_STORAGE_PORT_NAME)] = GlobalOptionIndex::kObjectStoragePort;
+    name2index_[String(OBJECT_STORAGE_BUCKET_NAME)] = GlobalOptionIndex::kObjectStorageBucket;
 
     name2index_[String(BUFFER_MANAGER_SIZE_OPTION_NAME)] = GlobalOptionIndex::kBufferManagerSize;
     name2index_[String(LRU_NUM_OPTION_NAME)] = GlobalOptionIndex::kLRUNum;

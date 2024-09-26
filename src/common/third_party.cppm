@@ -46,9 +46,11 @@ module;
 #include "oatpp/network/tcp/server/ConnectionProvider.hpp"
 #include "oatpp/web/server/HttpConnectionHandler.hpp"
 
+#include "Python.h"
 #include "arrow/api.h"
 #include "arrow/array.h"
 #include "arrow/array/array_base.h"
+#include "arrow/array/builder_primitive.h"
 #include "arrow/chunked_array.h"
 #include "arrow/io/api.h"
 #include "arrow/io/caching.h"
@@ -59,18 +61,38 @@ module;
 #include "arrow/status.h"
 #include "arrow/table.h"
 #include "arrow/type_fwd.h"
+#include "miniocpp/client.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/arrow/writer.h"
 #include <arrow/array/array_nested.h>
 #include <arrow/array/array_primitive.h>
 #include <arrow/io/interfaces.h>
 #include <arrow/type.h>
-#include "arrow/array/builder_primitive.h"
-#include "Python.h"
 
 #pragma clang diagnostic pop
 
 export module third_party;
+
+namespace minio {
+    namespace s3 {
+        export using minio::s3::BaseUrl;
+        export using minio::s3::Client;
+        export using minio::s3::RemoveObjectArgs;
+        export using minio::s3::RemoveObjectResponse;
+        export using minio::s3::CopyObjectArgs;
+        export using minio::s3::CopySource;
+        export using minio::s3::CopyObjectResponse;
+        export using minio::s3::DownloadObjectArgs;
+        export using minio::s3::DownloadObjectResponse;
+        export using minio::s3::UploadObjectArgs;
+        export using minio::s3::UploadObjectResponse;
+    } // namespace s3
+
+    namespace creds {
+        export using minio::creds::StaticProvider;
+    } // namespace creds
+
+} // namespace minio
 
 namespace fmt {
 
@@ -135,7 +157,7 @@ export using magic_enum::underlying_type_t;
 namespace moodycamel {
 export using moodycamel::ConcurrentQueue;
 export using moodycamel::BlockingConcurrentQueue;
-}
+} // namespace moodycamel
 
 namespace arrow {
 export using Status = arrow::Status;

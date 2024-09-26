@@ -385,9 +385,6 @@ void TableIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     if (this->deleted_) {
         return;
     }
-    if (table_entry_ != nullptr) {
-        table_entry_->InvalidateFullTextIndexCache(this);
-    }
     std::unique_lock w_lock(rw_locker_);
     for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
         segment_index_entry->Cleanup(info_tracer, dropped);
@@ -410,7 +407,6 @@ void TableIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
-    table_entry_ = table_index_meta()->GetTableEntry();
     std::shared_lock r_lock(rw_locker_);
     for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
         segment_index_entry->PickCleanup(scanner);

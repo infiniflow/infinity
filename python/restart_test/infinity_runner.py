@@ -27,6 +27,12 @@ class InfinityRunner:
             config_path = self.default_config_path
         cmd = f"{self.infinity_path} --config={config_path} > restart_test.log.{self.i} 2>&1"
 
+        pids = [proc.pid for proc in psutil.process_iter(['pid', 'name']) if "infinity" in proc.info['name']]
+        if len(pids) > 0:
+            ret = os.system(f"bash {self.script_path} 30 {' '.join(map(str, pids))}")
+            if ret != 0:
+                raise Exception("An error occurred.")
+
         # unset env LD_PRELOAD, ASAN_OPTIONS
         my_env = os.environ.copy()
         my_env["LD_PRELOAD"] = ""
@@ -39,6 +45,8 @@ class InfinityRunner:
         pids = []
         for child in psutil.Process(self.process.pid).children(recursive=True):
             pids.append(child.pid)
+        if len(pids) == 0:
+            raise Exception("Cannot find infinity process.")
         ret = os.system(f"bash {self.script_path} {timeout} {' '.join(map(str, pids))}")
         if ret != 0:
             raise Exception("An error occurred.")
@@ -63,9 +71,11 @@ def infinity_runner_decorator_factory(
         def wrapper(*args, **kwargs):
             infinity_runner.init(config_path)
             infinity_obj = InfinityRunner.connect(uri)
-            f(infinity_obj, *args, **kwargs)
-            infinity_obj.disconnect()
-            infinity_runner.uninit()
+            try :
+                f(infinity_obj, *args, **kwargs)
+            finally:
+                infinity_obj.disconnect()
+                infinity_runner.uninit()
 
         return wrapper
 

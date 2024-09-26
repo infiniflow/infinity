@@ -26,6 +26,7 @@
 *.lib
 *.lo
 *.log
+*.log.*
 *.mod
 *.o
 *.obj
@@ -134,3 +135,4 @@ python/benchmark/datasets/
 tmp*/
 
 dist/
+python/infinity_sdk/infinity_sdk.egg-info/

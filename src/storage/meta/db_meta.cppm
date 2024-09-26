@@ -27,15 +27,13 @@ import base_entry;
 import txn_manager;
 import meta_info;
 import entry_list;
-
-import meta_entry_interface;
 import cleanup_scanner;
 
 namespace infinity {
 
 struct Catalog;
 
-export struct DBMeta : public MetaInterface {
+export struct DBMeta : public BaseMeta {
     using EntryT = DBEntry;
 
     friend struct Catalog;

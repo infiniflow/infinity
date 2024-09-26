@@ -22,7 +22,6 @@ import stl;
 import third_party;
 import internal_types;
 import base_entry;
-import meta_entry_interface;
 import cleanup_scanner;
 import index_file_worker;
 import index_base;
@@ -40,13 +39,15 @@ class BufferManager;
 struct SegmentEntry;
 
 // ChunkIndexEntry is an immutable chunk of SegmentIndexEntry. MemIndexer(for fulltext) is the mutable chunk of SegmentIndexEntry.
-export class ChunkIndexEntry : public BaseEntry, public EntryInterface {
+export class ChunkIndexEntry : public BaseEntry {
 public:
     static Vector<std::string_view> DecodeIndex(std::string_view encode);
 
     static String EncodeIndex(const ChunkID chunk_id, const String &base_name, const SegmentIndexEntry *segment_index_entry);
 
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
+
+    ~ChunkIndexEntry() override;
 
 private:
     ChunkIndexEntry(const ChunkIndexEntry &other);
@@ -130,7 +131,7 @@ public:
 
     void LoadPartsReader(BufferManager *buffer_mgr);
 
-    BufferObj *GetBufferObj() { return buffer_obj_.get(); }
+    BufferObj *GetBufferObj() { return buffer_obj_; }
 
     void DeprecateChunk(TxnTimeStamp commit_ts);
 
@@ -153,8 +154,8 @@ public:
     Atomic<TxnTimeStamp> deprecate_ts_{UNCOMMIT_TS};
 
 private:
-    BufferPtr buffer_obj_{};
-    Vector<BufferPtr> part_buffer_objs_;
+    BufferObj *buffer_obj_{};
+    Vector<BufferObj *> part_buffer_objs_;
 };
 
 } // namespace infinity

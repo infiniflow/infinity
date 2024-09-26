@@ -29,13 +29,13 @@ import internal_types;
 import base_entry;
 import column_def;
 import value;
+import cleanup_scanner;
 
 namespace infinity {
 
 struct BlockEntry;
 struct TableEntry;
 struct SegmentEntry;
-class CleanupInfoTracer;
 
 export struct BlockColumnEntry : public BaseEntry {
 public:
@@ -47,6 +47,8 @@ public:
 
 public:
     explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id);
+
+    ~BlockColumnEntry() override;
 
 private:
     BlockColumnEntry(const BlockColumnEntry &other);
@@ -73,7 +75,7 @@ public:
     // Getter
     inline const BlockEntry *GetBlockEntry() const { return block_entry_; }
     inline const SharedPtr<DataType> &column_type() const { return column_type_; }
-    inline BufferObj *buffer() const { return buffer_.get(); }
+    inline BufferObj *buffer() const { return buffer_; }
     inline u64 column_id() const { return column_id_; }
     inline const SharedPtr<String> &filename() const { return file_name_; }
     inline const BlockEntry *block_entry() const { return block_entry_; }
@@ -103,7 +105,7 @@ public:
 
     BufferObj *GetOutlineBuffer(SizeT idx) const {
         std::shared_lock lock(mutex_);
-        return outline_buffers_.empty() ? nullptr : outline_buffers_[idx].get();
+        return outline_buffers_.empty() ? nullptr : outline_buffers_[idx];
     }
 
     SizeT OutlineBufferCount() const {
@@ -122,7 +124,7 @@ public:
 
     void FlushColumn(TxnTimeStamp checkpoint_ts);
 
-    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true);
+    void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     void DropColumn();
 
@@ -132,12 +134,12 @@ private:
     const BlockEntry *block_entry_{nullptr};
     ColumnID column_id_{};
     SharedPtr<DataType> column_type_{};
-    BufferPtr buffer_{};
+    BufferObj *buffer_{};
 
     SharedPtr<String> file_name_{};
 
     mutable std::shared_mutex mutex_{};
-    Vector<BufferPtr> outline_buffers_;
+    Vector<BufferObj *> outline_buffers_;
     u64 last_chunk_offset_{};
 };
 

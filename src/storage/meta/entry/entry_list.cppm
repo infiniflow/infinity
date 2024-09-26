@@ -20,7 +20,6 @@ export module entry_list;
 
 import stl;
 import base_entry;
-import meta_entry_interface;
 import infinity_exception;
 import cleanup_scanner;
 import status;

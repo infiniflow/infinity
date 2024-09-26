@@ -40,7 +40,6 @@ import db_meta;
 import meta_map;
 import base_entry;
 import column_def;
-import meta_entry_interface;
 import cleanup_scanner;
 import log_file;
 
@@ -230,8 +229,6 @@ public:
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
-    void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
-
     static UniquePtr<Catalog> NewCatalog();
 
     static UniquePtr<Catalog>
@@ -246,7 +243,7 @@ private:
 
     static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info);
 
-    void LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr);
+    void LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, BufferManager *buffer_mgr);
 
     static UniquePtr<Catalog> LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr);
 

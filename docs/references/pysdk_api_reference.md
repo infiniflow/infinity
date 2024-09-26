@@ -1851,9 +1851,9 @@ A dictionary representing additional options for the selected reranking method:
 - **match_tensor-specific options**: *Optional*  
   Settings when employing match_tensor for reranking.
   - `"field"`: The name of the tensor column for reranking.
-  - `"data"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy
+  - `"query_tensor"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy
     array of numerical values.
-  - `"data_type"`: The element data type of the query tensor. Usually `"float"`.
+  - `"element_type"`: The element data type of the query tensor. Usually `"float"`.
 
 ### Returns
 
@@ -1912,7 +1912,7 @@ table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_
             .match_sparse("sparse_column", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
             .match_text("body", "blooms", 10)
             .filter("year < 2024")
-            .fusion("match_tensor", 2, {"field": "tensor", "data_type": "float", "data": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
+            .fusion("match_tensor", 2, {"field": "tensor", "element_type": "float", "query_tensor": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
             .to_pl()
 ```
 
