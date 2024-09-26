@@ -26,7 +26,7 @@ import periodic_trigger_thread;
 import log_file;
 import memindex_tracer;
 import persistence_manager;
-import virtual_storage_system;
+import virtual_storage;
 
 export module storage;
 
@@ -50,7 +50,7 @@ public:
 
     [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return persistence_manager_.get(); }
 
-    [[nodiscard]] inline VirtualStorageSystem *virtual_storage_system() noexcept { return virtual_storage_system_.get(); }
+    [[nodiscard]] inline VirtualStorage *virtual_storage() noexcept { return virtual_storage_system_.get(); }
 
     [[nodiscard]] inline BGTaskProcessor *bg_processor() const noexcept { return bg_processor_.get(); }
 
@@ -76,7 +76,7 @@ private:
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<PersistenceManager> persistence_manager_{};
-    UniquePtr<VirtualStorageSystem> virtual_storage_system_{};
+    UniquePtr<VirtualStorage> virtual_storage_system_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};

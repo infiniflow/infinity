@@ -17,11 +17,11 @@ module;
 module object_file;
 
 import status;
-import virtual_storage_system;
+import virtual_storage;
 
 namespace infinity {
 
-ObjectFile::ObjectFile(VirtualStorageSystem *storage_system, StorageType type)
+ObjectFile::ObjectFile(VirtualStorage *storage_system, StorageType type)
     : AbstractFileHandle(storage_system, type) {}
 
 ObjectFile::~ObjectFile() = default;
@@ -43,5 +43,7 @@ SizeT ObjectFile::FileSize() { return 0; }
 Tuple<char *, SizeT, Status> ObjectFile::MmapRead(const String &name) { return {nullptr, 0, Status::OK()}; }
 
 Status ObjectFile::Unmmap(const String &name) { return Status::OK(); }
+
+Status ObjectFile::Sync() { return Status::OK(); }
 
 } // namespace infinity

@@ -25,7 +25,7 @@ module;
 
 import stl;
 import status;
-import virtual_storage_system;
+import virtual_storage;
 import third_party;
 import infinity_context;
 import abstract_file_handle;
@@ -39,7 +39,7 @@ namespace fs = std::filesystem;
 std::mutex MinioFile::mtx_{};
 HashMap<String, MinoMmapInfo> MinioFile::mapped_files_{};
 
-MinioFile::MinioFile(VirtualStorageSystem *storage_system)
+MinioFile::MinioFile(VirtualStorage *storage_system)
     : ObjectFile(storage_system, StorageType::kMinio) {}
 
 MinioFile::~MinioFile() = default;
@@ -202,5 +202,7 @@ Status MinioFile::Unmmap(const String &file_path) {
 
     return Status::OK(); 
 }
+
+Status MinioFile::Sync() { return Status::OK(); }
 
 } 

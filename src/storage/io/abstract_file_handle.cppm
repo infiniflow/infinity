@@ -17,31 +17,32 @@ module;
 export module abstract_file_handle;
 
 import stl;
-import virtual_storage_system_type;
+import virtual_storage_type;
 import status;
 
 namespace infinity {
 
-class VirtualStorageSystem;
+class VirtualStorage;
 
 export enum class FileAccessMode { kWrite, kRead, kMmapRead, kInvalid };
 
 export class AbstractFileHandle {
 public:
-    explicit AbstractFileHandle(VirtualStorageSystem *storage_system, StorageType storage_type);
-    virtual ~AbstractFileHandle();
-    virtual Status Open(const String &path, FileAccessMode access_mode);
-    virtual Status Close() { return Status::NotSupport("In abstract class"); }
-    virtual Status Append(const char *buffer, u64 nbytes) { return Status::NotSupport("In abstract class"); }
-    virtual Status Append(const String &buffer, u64 nbytes) { return Status::NotSupport("In abstract class"); }
-    virtual Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) { return {0, Status::NotSupport("In abstract class")}; }
-    virtual Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) { return {0, Status::NotSupport("In abstract class")}; }
+    explicit AbstractFileHandle(VirtualStorage *storage_system, StorageType storage_type);
+    virtual ~AbstractFileHandle() = 0;
+    virtual Status Open(const String &path, FileAccessMode access_mode) = 0;
+    virtual Status Close() = 0;
+    virtual Status Append(const char *buffer, u64 nbytes) = 0;
+    virtual Status Append(const String &buffer, u64 nbytes) = 0;
+    virtual Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) = 0;
+    virtual Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) = 0;
     virtual SizeT FileSize() = 0;
-    virtual Tuple<char *, SizeT, Status> MmapRead(const String &name) { return {nullptr, 0, Status::NotSupport("In abstract class")}; }
-    virtual Status Unmmap(const String &name) { return Status::NotSupport("In abstract class"); }
+    virtual Tuple<char *, SizeT, Status> MmapRead(const String &name) = 0;
+    virtual Status Unmmap(const String &name) = 0;
+    virtual Status Sync() = 0;
 
 protected:
-    VirtualStorageSystem *storage_system_{};
+    VirtualStorage *storage_system_{};
     StorageType storage_type_{StorageType::kLocal};
     atomic_bool open_{false};
     String path_;
