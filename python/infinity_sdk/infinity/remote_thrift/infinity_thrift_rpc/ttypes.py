@@ -201,6 +201,11 @@ class LiteralType(object):
     DoubleTensorArray = 10
     SparseIntegerArray = 11
     SparseDoubleArray = 12
+    Date = 13
+    Time = 14
+    Inteval = 15
+    DateTime = 16
+    Timestamp = 17
 
     _VALUES_TO_NAMES = {
         0: "Boolean",
@@ -216,6 +221,11 @@ class LiteralType(object):
         10: "DoubleTensorArray",
         11: "SparseIntegerArray",
         12: "SparseDoubleArray",
+        13: "Date",
+        14: "Time",
+        15: "Inteval",
+        16: "DateTime",
+        17: "Timestamp",
     }
 
     _NAMES_TO_VALUES = {
@@ -232,6 +242,11 @@ class LiteralType(object):
         "DoubleTensorArray": 10,
         "SparseIntegerArray": 11,
         "SparseDoubleArray": 12,
+        "Date": 13,
+        "Time": 14,
+        "Inteval": 15,
+        "DateTime": 16,
+        "Timestamp": 17,
     }
 
 

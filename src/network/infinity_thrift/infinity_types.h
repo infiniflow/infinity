@@ -132,7 +132,12 @@ struct LiteralType {
     IntegerTensorArray = 9,
     DoubleTensorArray = 10,
     SparseIntegerArray = 11,
-    SparseDoubleArray = 12
+    SparseDoubleArray = 12,
+    Date = 13,
+    Time = 14,
+    Inteval = 15,
+    DateTime = 16,
+    Timestamp = 17
   };
 };
 

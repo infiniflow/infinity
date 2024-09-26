@@ -60,15 +60,15 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
         case ttypes.LogicType.Sparse:
             return object
         case ttypes.LogicType.Date:
-            return date
+            return object
         case ttypes.LogicType.Time:
-            return time
+            return object
         case ttypes.LogicType.DateTime:
-            return datetime
+            return object
         case ttypes.LogicType.Interval:
-            return timedelta
+            return object
         case ttypes.LogicType.Timestamp:
-            return datetime
+            return object
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
 

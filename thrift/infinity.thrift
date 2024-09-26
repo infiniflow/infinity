@@ -115,6 +115,11 @@ IntegerTensorArray,
 DoubleTensorArray,
 SparseIntegerArray,
 SparseDoubleArray,
+Date,
+Time,
+Inteval,
+DateTime,
+Timestamp,
 }
 
 union ParsedExprType {

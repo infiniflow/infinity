@@ -25,6 +25,7 @@ from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
 from infinity.common import InfinityException, SparseVector
 from infinity.errors import ErrorCode
+from datetime import date, time, datetime, timedelta
 
 
 def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
@@ -325,6 +326,13 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
                 case _:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                             f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
+        case date():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Date, str_value=value.strftime("%Y-%m-%d"))
+        case time():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Time, str_value=value.strftime("%H-%M-%S"))
+        case datetime():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Date, str_value=value.strftime("%Y-%m-%d %H-%M-%S"))
+
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
     return constant_expression

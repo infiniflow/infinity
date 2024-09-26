@@ -1779,6 +1779,12 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
             }
             return parsed_expr;
         }
+        case infinity_thrift_rpc::LiteralType::Date: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kDate);
+            parsed_expr->date_value_ = strdup(expr.str_value.c_str());
+            return parsed_expr;
+        }
+
         default: {
             status = Status::InvalidConstantType();
             return nullptr;

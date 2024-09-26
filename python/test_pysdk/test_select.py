@@ -216,6 +216,29 @@ class TestInfinity:
         res = db_obj.drop_table("test_select"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def test_select_datetime(self, suffix):
+        """
+        target: test table select apis
+        methods:
+        1. create tables
+            - 'test_select_datetime'
+                - c1 date
+                - c2 time
+                - c3 datetime
+        2. insert
+            - ('2024-09-23', '20:45:11', '2024-09-23 20:45:11')
+        3. select
+            - select * from test_select_datetime
+        """
+
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_datetime"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "test_select_datetime"+suffix, {
+                "c1": {"type": "date"},
+                "c2": {"type": "time"},
+                "c3" : {"type": "datetime"}}, ConflictType.Error)
+
     def test_select_aggregate(self, suffix):
         """
         target: test table select apis

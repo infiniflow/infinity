@@ -235,7 +235,12 @@ int _kLiteralTypeValues[] = {
   LiteralType::IntegerTensorArray,
   LiteralType::DoubleTensorArray,
   LiteralType::SparseIntegerArray,
-  LiteralType::SparseDoubleArray
+  LiteralType::SparseDoubleArray,
+  LiteralType::Date,
+  LiteralType::Time,
+  LiteralType::Inteval,
+  LiteralType::DateTime,
+  LiteralType::Timestamp
 };
 const char* _kLiteralTypeNames[] = {
   "Boolean",
@@ -250,9 +255,14 @@ const char* _kLiteralTypeNames[] = {
   "IntegerTensorArray",
   "DoubleTensorArray",
   "SparseIntegerArray",
-  "SparseDoubleArray"
+  "SparseDoubleArray",
+  "Date",
+  "Time",
+  "Inteval",
+  "DateTime",
+  "Timestamp"
 };
-const std::map<int, const char*> _LiteralType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(13, _kLiteralTypeValues, _kLiteralTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _LiteralType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(18, _kLiteralTypeValues, _kLiteralTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const LiteralType::type& val) {
   std::map<int, const char*>::const_iterator it = _LiteralType_VALUES_TO_NAMES.find(val);

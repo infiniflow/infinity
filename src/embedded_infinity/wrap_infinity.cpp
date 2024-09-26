@@ -150,6 +150,26 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
             }
             break;
         }
+        case LiteralType::kDate: {
+            constant_expr->date_value_ = strdup(str_value.c_str());
+            break;
+        }
+        case LiteralType::kTime: {
+            constant_expr->date_value_ = strdup(str_value.c_str());
+            break;
+        }
+        case LiteralType::kDateTime: {
+            constant_expr->date_value_ = strdup(str_value.c_str());
+            break;
+        }
+        case LiteralType::kTimestamp: {
+            constant_expr->date_value_ = strdup(str_value.c_str());
+            break;
+        }
+        case LiteralType::kInterval: {
+            constant_expr->date_value_ = strdup(str_value.c_str());
+            break;
+        }
         default: {
             status = Status::InvalidConstantType();
             return nullptr;
@@ -1081,6 +1101,14 @@ void HandleRowIDType(ColumnField &output_column_field, SizeT row_count, const Sh
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
+void HandleTimeRelatedTypes(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+    auto size = column_vector->data_type()->Size() * row_count;
+    String dst;
+    dst.resize(size);
+    std::memcpy(dst.data(), column_vector->data(), size);
+    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+}
+
 void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     switch (column_vector->data_type()->type()) {
         case LogicalType::kBoolean: {
@@ -1127,6 +1155,14 @@ void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, c
             HandleRowIDType(output_column_field, row_count, column_vector);
             break;
         }
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kDateTime:
+        case LogicalType::kInterval:
+        case LogicalType::kTimestamp: {
+            HandleTimeRelatedTypes(output_column_field, row_count, column_vector);
+            break;
+        }
         default: {
             throw UnrecoverableException("Unsupported column type");
         }
@@ -1153,7 +1189,12 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
         case LogicalType::kFloat16:
         case LogicalType::kBFloat16:
         case LogicalType::kFloat:
-        case LogicalType::kDouble: {
+        case LogicalType::kDouble:
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kDateTime:
+        case LogicalType::kInterval:
+        case LogicalType::kTimestamp: {
             proto_data_type.logical_type = data_type->type();
             break;
         }
