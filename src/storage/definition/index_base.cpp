@@ -15,6 +15,7 @@
 module;
 
 #include <string>
+#include <sstream>
 #include <vector>
 
 module index_base;
