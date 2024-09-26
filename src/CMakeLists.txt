@@ -315,7 +315,7 @@ add_executable(infinity
 #        ${network_cppm}
 #)
 
-add_dependencies(infinity oatpp miniocpp)
+add_dependencies(infinity oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
 
 target_link_libraries(infinity
         infinity_core
@@ -381,7 +381,7 @@ if (SKBUILD)
     set(libname "nanobind-static-abi3")
     nanobind_build_library(${libname})
     nanobind_extension_abi3(embedded_infinity_ext)
-    add_dependencies(embedded_infinity_ext oatpp miniocpp)
+    add_dependencies(embedded_infinity_ext oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
 
     target_link_libraries(embedded_infinity_ext PRIVATE
             ${libname}

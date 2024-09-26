@@ -52,7 +52,7 @@ Status MinioFile::Open(const String &path, FileAccessMode access_mode) {
         return Status::SyntaxError(error_message);
     }
 
-    if(!std::filesystem::exists(path)){
+    if(access_mode != FileAccessMode::kWrite && !std::filesystem::exists(path)){
         minio::s3::Client * client = storage_system_->GetMinioClient();
         // Create download object arguments.
         minio::s3::DownloadObjectArgs args;
@@ -76,9 +76,6 @@ Status MinioFile::Open(const String &path, FileAccessMode access_mode) {
             if (fd_ == -1) {
                 return Status::IOError(fmt::format("Can't open file: {}: {}", path, strerror(errno)));
             }
-            open_ = true;
-            path_ = path;
-            access_mode_ = access_mode;
             break;
         
         case FileAccessMode::kMmapRead:
@@ -86,14 +83,19 @@ Status MinioFile::Open(const String &path, FileAccessMode access_mode) {
             break;
 
         case FileAccessMode::kWrite:
-            path_ = path;
-            access_mode_ = access_mode;
+            fd_ = open(path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0666);
+            if (fd_ == -1) {
+                return Status::IOError(fmt::format("Can't open file: {}: {}", path, strerror(errno)));
+            }
             break;
         default:
             return Status::IOError("Unsupported access mode for s3 storage.");
             break;
     }
 
+    open_ = true;
+    path_ = path;
+    access_mode_ = access_mode;
     return Status::OK();
 }
 
@@ -110,16 +112,38 @@ Status MinioFile::Close() {
     return Status::OK(); 
 }
 
-Status MinioFile::Append(const char *buffer, u64 nbytes) { return Status::OK(); }
+Status MinioFile::Append(const char *buffer, u64 nbytes) { 
+    i64 written = 0;
+    while (written < (i64)nbytes) {
+        i64 write_count = write(fd_, (char *)buffer + written, nbytes - written);
+        if (write_count == -1) {
+            String error_message = fmt::format("Can't write file: {}: {}. fd: {}", path_, strerror(errno), fd_);
+            return Status::IOError(error_message);
+        }
+        written += write_count;
+    }
 
-Status MinioFile::Append(const String &buffer, u64 nbytes) { return Status::OK(); }
+    return Status::OK(); 
+}
+
+Status MinioFile::Append(const String &buffer, u64 nbytes) { 
+    i64 written = 0;
+    while (written < (i64)nbytes) {
+        i64 write_count = write(fd_, (char *)buffer.c_str() + written, nbytes - written);
+        if (write_count == -1) {
+            String error_message = fmt::format("Can't write file: {}: {}. fd: {}", path_, strerror(errno), fd_);
+            return Status::IOError(error_message);
+        }
+        written += write_count;
+    }
+    return Status::OK(); 
+}
 
 Tuple<SizeT, Status> MinioFile::Read(char *buffer, u64 nbytes) { 
-    i32 fd = fd_;
     i64 readen = 0;
     while (readen < (i64)nbytes) {
         SizeT a = nbytes - readen;
-        i64 read_count = read(fd, buffer + readen, a);
+        i64 read_count = read(fd_, buffer + readen, a);
         if (read_count == 0) {
             break;
         }
@@ -133,7 +157,25 @@ Tuple<SizeT, Status> MinioFile::Read(char *buffer, u64 nbytes) {
     return {readen, Status::OK()}; 
 }
 
-Tuple<SizeT, Status> MinioFile::Read(String &buffer, u64 nbytes) { return {0, Status::OK()}; }
+Tuple<SizeT, Status> MinioFile::Read(String &buffer, u64 nbytes) { 
+    i64 readen = 0;
+    char *helper_buffer = new char[nbytes];
+    while (readen < (i64)nbytes) {
+        SizeT a = nbytes - readen;
+        i64 read_count = read(fd_, helper_buffer + readen, a);
+        if (read_count == 0) {
+            break;
+        }
+        if (read_count == -1) {
+            String error_message = fmt::format("Can't read file: {}: {}", path_, strerror(errno));
+            delete [] helper_buffer;
+            return {0, Status::IOError(error_message)};
+        }
+        readen += read_count;
+    }
+    buffer = String(std::move(helper_buffer), readen);
+    return {readen, Status::OK()}; 
+}
 
 SizeT MinioFile::FileSize() { 
     return std::filesystem::file_size(path_);
@@ -203,6 +245,29 @@ Status MinioFile::Unmmap(const String &file_path) {
     return Status::OK(); 
 }
 
-Status MinioFile::Sync() { return Status::OK(); }
+Status MinioFile::Sync() {
+    if (fsync(fd_) != 0) {
+        String error_message = fmt::format("fsync failed: {}, {}", path_, strerror(errno));
+        return Status::IOError(error_message);
+    }
+
+    String bucket_name = InfinityContext::instance().config()->ObjectStorageBucket();
+    minio::s3::Client * client = storage_system_->GetMinioClient();
+    // Create upload object arguments.
+    minio::s3::UploadObjectArgs args;
+    args.bucket = bucket_name;
+    args.object = path_;
+    args.filename = path_;
+
+    // Call upload object.
+    minio::s3::UploadObjectResponse resp = client->UploadObject(args);
+
+    // Handle response.
+    if (!resp) {
+        return Status::IOError(resp.Error().String());
+    } 
+
+    return Status::OK();
+}
 
 } 
