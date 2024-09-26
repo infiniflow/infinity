@@ -110,11 +110,10 @@ Status VirtualStorageSystem::UnInit() {
     return Status::OK();
 }
 
-Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorageSystem::BuildFileHandle(const String &path, FileAccessMode access_mode) {
-    // Open the file according to the path and access_mode
+Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorageSystem::BuildFileHandle() {
     switch (storage_type_) {
         case StorageType::kLocal: {
-            UniquePtr<LocalFile> local_file = MakeUnique<LocalFile>(this, path, access_mode);
+            UniquePtr<LocalFile> local_file = MakeUnique<LocalFile>(this);
             return {std::move(local_file), Status::OK()};
         }
         case StorageType::kMinio: {
