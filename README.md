@@ -57,7 +57,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ## 🎮 Get Started
 
-Infinity supports two working modes, embedded mode and client-server mode. Infinity's embedded mode enables you to quickly embed Infinity into Python applications, without the need to connect to a separate backend server. The following shows how to operate in embedded mode:
+Infinity supports two working modes, embedded mode and client-server mode. Infinity's embedded mode enables you to quickly embed Infinity into your Python applications, without the need to connect to a separate backend server. The following shows how to operate in embedded mode:
 
    ```bash
    pip install infinity-embedded-sdk==0.4.0.dev2
@@ -82,9 +82,9 @@ Infinity supports two working modes, embedded mode and client-server mode. Infin
    print(res)
    ```
 
-#### 🔧 Deploy Infinity as a separate server
+#### 🔧 Deploy Infinity in client-server mode
 
-If you wish to deploy a standalone Infinity server and access it from a client, see the [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
+If you wish to deploy Infinity with the server and client as separate processes, see the [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
 
 #### 🔧 Build from Source
 
