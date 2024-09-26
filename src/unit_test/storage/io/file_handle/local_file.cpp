@@ -39,16 +39,17 @@ class LocalFileTest : public BaseTest {};
 
 TEST_F(LocalFileTest, test1) {
     using namespace infinity;
-    String dir = String(GetFullTmpDir());
-    String path = dir + "/test_file.test";
+    String path = String(GetFullTmpDir()) + "/test_file2.abc";
 
     VirtualStorage virtual_storage;
     Map<String, String> configs;
     virtual_storage.Init(StorageType::kLocal, configs);
+
     auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
     EXPECT_TRUE(status.ok());
 
-    local_file_handle->Open(path, FileAccessMode::kWrite);
+    status = local_file_handle->Open(path, FileAccessMode::kWrite);
+    EXPECT_TRUE(status.ok());
 
     SizeT len = 10;
     UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
@@ -65,4 +66,39 @@ TEST_F(LocalFileTest, test1) {
     EXPECT_FALSE(virtual_storage.Exists(path));
 
     virtual_storage.UnInit();
+}
+
+TEST_F(LocalFileTest, test2) {
+    using namespace infinity;
+    String dir = String(GetFullTmpDir()) + "/unit_test";
+    String path = dir + "/test_file.test";
+
+    VirtualStorage virtual_storage;
+    Map<String, String> configs;
+    virtual_storage.Init(StorageType::kLocal, configs);
+
+    virtual_storage.MakeLocalDirectory(dir);
+
+    auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(status.ok());
+
+    status = local_file_handle->Open(path, FileAccessMode::kWrite);
+    EXPECT_TRUE(status.ok());
+
+    SizeT len = 10;
+    UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
+    for(SizeT i = 0; i < len; ++ i) {
+        data_array[i] = i + 1;
+    }
+
+    local_file_handle->Append(data_array.get(), len);
+    local_file_handle->Sync();
+    local_file_handle->Close();
+
+    EXPECT_TRUE(virtual_storage.Exists(path));
+    EXPECT_TRUE(virtual_storage.LocalExists(dir));
+
+    virtual_storage.RemoveLocalDirectory(dir);
+    EXPECT_FALSE(virtual_storage.Exists(path));
+    EXPECT_FALSE(virtual_storage.Exists(dir));
 }

@@ -135,6 +135,61 @@ Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorage::BuildFileHandle() {
 LocalDiskCache *VirtualStorage::GetLocalDiskCache() const { return local_disk_cache_.get(); }
 
 Status VirtualStorage::DeleteFile(const String &file_name) {
+    switch (storage_type_) {
+        case StorageType::kLocal: {
+            return DeleteLocalFile(file_name);
+        }
+        default: {
+            Status status = Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
+            LOG_ERROR(status.message());
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status VirtualStorage::Rename(const String &old_path, const String &new_path) { return Status::OK(); }
+
+bool VirtualStorage::Exists(const String &path) {
+    switch (storage_type_) {
+        case StorageType::kLocal: {
+            return LocalExists(path);
+        }
+        default: {
+            Status status = Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
+            LOG_ERROR(status.message());
+            return false;
+        }
+    }
+    return false;
+}
+
+Tuple<Vector<String>, Status> VirtualStorage::ListDirectory(const String &path) {
+    Vector<String> result;
+    return {result, Status::OK()};
+}
+
+bool VirtualStorage::IsRegularFile(const String &path) { return false; }
+
+// For local disk filesystem, such as temp file, disk cache and WAL
+bool VirtualStorage::LocalExists(const String& path) {
+    if (!std::filesystem::path(path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", path);
+        UnrecoverableError(error_message);
+    }
+    std::error_code error_code;
+    Path p{path};
+    bool is_exists = std::filesystem::exists(p, error_code);
+    if (error_code.value() == 0) {
+        return is_exists;
+    } else {
+        String error_message = fmt::format("{} exists exception: {}", path, strerror(errno));
+        UnrecoverableError(error_message);
+    }
+    return false;
+}
+
+Status VirtualStorage::DeleteLocalFile(const String &file_name) {
     if (!std::filesystem::path(file_name).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", file_name);
         UnrecoverableError(error_message);
@@ -156,36 +211,58 @@ Status VirtualStorage::DeleteFile(const String &file_name) {
     return Status::OK();
 }
 
-Status VirtualStorage::Rename(const String &old_path, const String &new_path) { return Status::OK(); }
-
-bool VirtualStorage::Exists(const String &path) {
+Status VirtualStorage::MakeLocalDirectory(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
     }
     std::error_code error_code;
     Path p{path};
-    bool is_exists = std::filesystem::exists(p, error_code);
-    if (error_code.value() == 0) {
-        return is_exists;
-    } else {
-        String error_message = fmt::format("{} exists exception: {}", path, strerror(errno));
+    std::filesystem::create_directories(p, error_code);
+    if (error_code.value() != 0) {
+        String error_message = fmt::format("{} create exception: {}", path, strerror(errno));
         UnrecoverableError(error_message);
     }
-    return false;
+    return Status::OK();
 }
 
-Tuple<Vector<String>, Status> VirtualStorage::ListDirectory(const String &path) {
-    Vector<String> result;
-    return {result, Status::OK()};
+Status VirtualStorage::RemoveLocalDirectory(const String &path) {
+    if (!std::filesystem::path(path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", path);
+        UnrecoverableError(error_message);
+    }
+    std::error_code error_code;
+    Path p{path};
+    std::filesystem::remove_all(p, error_code);
+    if (error_code.value() != 0) {
+        String error_message = fmt::format("Delete directory {} exception: {}", path, error_code.message());
+        UnrecoverableError(error_message);
+    }
+    return Status::OK();
 }
 
-bool VirtualStorage::IsRegularFile(const String &path) { return false; }
-
-// For local disk filesystem, such as temp file, disk cache and WAL
-Status VirtualStorage::DeleteLocalFile(const String &path) { return Status::OK(); }
-Status VirtualStorage::MakeLocalDirectory(const String &path) { return Status::OK(); }
-Status VirtualStorage::RemoveLocalDirectory(const String &path) { return Status::OK(); }
-Status VirtualStorage::CleanupLocalDirectory(const String &path) { return Status::OK(); }
+Status VirtualStorage::CleanupLocalDirectory(const String &path) {
+    if (!std::filesystem::path(path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", path);
+        UnrecoverableError(error_message);
+    }
+    std::error_code error_code;
+    Path p{path};
+    if (!std::filesystem::exists(p)) {
+        std::filesystem::create_directories(p, error_code);
+        if (error_code.value() != 0) {
+            String error_message = fmt::format("CleanupDirectory create {} exception: {}", path, error_code.message());
+            UnrecoverableError(error_message);
+        }
+        return Status::OK();
+    }
+    try {
+        std::ranges::for_each(std::filesystem::directory_iterator{path}, [&](const auto &dir_entry) { std::filesystem::remove_all(dir_entry); });
+    } catch (const std::filesystem::filesystem_error &e) {
+        String error_message = fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what());
+        UnrecoverableError(error_message);
+    }
+    return Status::OK();
+}
 
 } // namespace infinity

@@ -54,6 +54,7 @@ public:
     bool IsRegularFile(const String& path);
 
     // For local disk filesystem, such as temp file, disk cache and WAL
+    bool LocalExists(const String& path);
     Status DeleteLocalFile(const String& path);
     Status MakeLocalDirectory(const String& path);
     Status RemoveLocalDirectory(const String& path);
