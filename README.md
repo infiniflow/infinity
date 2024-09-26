@@ -57,34 +57,38 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ## 🎮 Get Started
 
-Infinity, also available as a Python module, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
+Infinity supports two working modes, embedded mode and client-server mode. Infinity's embedded mode enables you to quickly embed Infinity into your Python applications, without the need to connect to a separate backend server. The following shows how to operate in embedded mode:
 
    ```bash
    pip install infinity-embedded-sdk==0.4.0.dev2
    ```
-
+1. Use Infinity to conduct a dense vector search:
    ```python
-   import infinity-embedded as infinity
+   import infinity_embedded
 
    # Connect to infinity
-   infinity_obj = infinity.connect("/path/to/save/to")
-   db = infinity_obj.get_database("default_db")
-   table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
-   table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-   table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
-   res = table.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
+   infinity_object = infinity_embedded.connect("/absolute/path/to/save/to")
+   # Retrieve a database object named default_db
+   db_object = infinity_object.get_database("default_db")
+   # Create a table with an integer column, a varchar column, and a dense vector column
+   table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
+   # Insert two rows into the table
+   table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+   table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+   # Conduct a dense vector search
+   res = table_object.output(["*"])
+                     .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
+                     .to_pl()
    print(res)
    ```
 
-### 🛠️ Deploy Infinity as a separate server
+#### 🔧 Deploy Infinity in client-server mode
 
-If you wish to deploy a standalone Infinity server and access it remotely: 
+If you wish to deploy Infinity with the server and client as separate processes, see the [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
 
-See [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server).
+#### 🔧 Build from Source
 
-#### 🛠️ Build from Source
-
-See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
+See the [Build from Source](https://infiniflow.org/docs/dev/build_from_source) guide.
 
 > 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/python_api_reference).
 
