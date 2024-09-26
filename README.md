@@ -57,9 +57,8 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ## 🎮 Get Started
 
-The Infinity-embedded SDK allows you to embed Infinity into Python applications, eliminates the need for a separate back-end server. By using `pip install infinity-embedded-sdk` and `import infinity_embedded`, you can quickly develop a local AI application in Python, leveraging the fastest and most powerful RAG database in the world:
+Infinity supports two modes of operation, embedded mode and client-server mode. Infinity's embedded mode enables you to quickly embed Infinity into Python applications, without the need to connect to a separate backend server. The following shows how to operate in embedded mode:
 
-1. Install the Infinity-embedded SDK:
    ```bash
    pip install infinity-embedded-sdk==0.4.0.dev2
    ```
@@ -83,15 +82,13 @@ The Infinity-embedded SDK allows you to embed Infinity into Python applications,
    print(res)
    ```
 
-### 🔧 Deploy Infinity as a separate server
+#### 🔧 Deploy Infinity as a separate server
 
-If you wish to deploy a standalone Infinity server and access it remotely:  
-
-See [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server).
+If you wish to deploy a standalone Infinity server and access it from a client, see the [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
 
 #### 🔧 Build from Source
 
-See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
+See the [Build from Source](https://infiniflow.org/docs/dev/build_from_source) guide.
 
 > 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/python_api_reference).
 
