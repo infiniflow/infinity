@@ -17,7 +17,7 @@ https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz
 https://github.com/Kitware/CMake/releases/download/v3.30.1/cmake-3.30.1-linux-x86_64.tar.gz
 https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
 https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/llvm-project-18.1.8.src.tar.xz
-https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.bz2
+https://boostorg.jfrog.io/artifactory/main/release/1.86.0/source/boost_1_86_0.tar.bz2
 https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz
 https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
 https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz

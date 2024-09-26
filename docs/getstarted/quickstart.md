@@ -13,9 +13,9 @@ slug: /
   - Windows 10+ with WSL/WSL2.
 - Python: Python 3.10+.
 
-## Install embedded Infinity using pip
+## Install embedded Infinity
 
-The Infinity-embedded SDK allows you to embed Infinity into Python applications, eliminates the need for a separate back-end server. By using `pip install infinity-embedded-sdk` and `import infinity_embedded`, you can quickly develop a local AI application in Python, leveraging the fastest and most powerful RAG database in the world:
+If you wish to embed Infinity into your Python application without the need for a separate backend server:  
 
 1. Install the Infinity-embedded SDK:
    ```bash
