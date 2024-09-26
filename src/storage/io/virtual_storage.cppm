@@ -46,6 +46,17 @@ public:
     minio::s3::Client* GetMinioClient() const {
         return minio_client_.get();
     }
+
+    Status DeleteFile(const String& path);
+    Status Rename(const String& old_path, const String& new_path);
+    Status Exists(const String& path);
+    Tuple<Vector<String>, Status> ListDirectory(const String& path);
+    bool IsRegularFile(const String& path);
+
+    // For local disk filesystem, such as temp file, disk cache and WAL
+    Status CreateLocalDirectory(const String& path);
+    Status DeleteLocalDirectory(const String& path);
+    Status CleanupLocalDirectory(const String& path);
 private:
     StorageType storage_type_{StorageType::kLocal};
     UniquePtr<LocalDiskCache> local_disk_cache_{};

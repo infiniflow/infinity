@@ -133,4 +133,22 @@ Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorage::BuildFileHandle() {
 
 LocalDiskCache *VirtualStorage::GetLocalDiskCache() const { return local_disk_cache_.get(); }
 
+Status VirtualStorage::DeleteFile(const String &path) { return Status::OK(); }
+
+Status VirtualStorage::Rename(const String &old_path, const String &new_path) { return Status::OK(); }
+
+Status VirtualStorage::Exists(const String &path) { return Status::OK(); }
+
+Tuple<Vector<String>, Status> VirtualStorage::ListDirectory(const String &path) {
+    Vector<String> result;
+    return {result, Status::OK()};
+}
+
+bool VirtualStorage::IsRegularFile(const String &path) { return false; }
+
+// For local disk filesystem, such as temp file, disk cache and WAL
+Status VirtualStorage::CreateLocalDirectory(const String &path) { return Status::OK(); }
+Status VirtualStorage::DeleteLocalDirectory(const String &path) { return Status::OK(); }
+Status VirtualStorage::CleanupLocalDirectory(const String &path) { return Status::OK(); }
+
 } // namespace infinity
