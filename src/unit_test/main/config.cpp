@@ -61,7 +61,7 @@ TEST_F(ConfigTest, test1) {
     // Storage
     EXPECT_EQ(config.DataDir(), "/var/infinity/data");
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
-    EXPECT_EQ(config.FileSystemType(), "local");
+    EXPECT_EQ(config.StorageType(), "local");
 
     // buffer
     EXPECT_EQ(config.BufferManagerSize(), 8 * 1024l * 1024l * 1024l);
@@ -99,7 +99,7 @@ TEST_F(ConfigTest, test2) {
     // Storage
     EXPECT_EQ(config.DataDir(), "/var/infinity/data");
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
-    EXPECT_EQ(config.FileSystemType(), "minio");
+    EXPECT_EQ(config.StorageType(), "minio");
     EXPECT_EQ(config.ObjectStorageHost(), "0.0.0.0");
     EXPECT_EQ(config.ObjectStoragePort(), 9000);
     EXPECT_EQ(config.ObjectStorageBucket(), "infinity");

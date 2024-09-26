@@ -345,9 +345,10 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME, persistence_object_size_limit, std::numeric_limits<i64>::max(), 0);
         global_options_.AddOption(std::move(persistence_object_size_limit_option));
 
-        String fs_type = String(DEFAULT_STORAGE_TYPE);
-        UniquePtr<StringOption> fs_type_option = MakeUnique<StringOption>(STORAGE_TYPE_NAME, fs_type);
-        status = global_options_.AddOption(std::move(fs_type_option));
+        // Storage type
+        String storage_type = String(DEFAULT_STORAGE_TYPE);
+        UniquePtr<StringOption> storage_type_option = MakeUnique<StringOption>(STORAGE_TYPE_OPTION_NAME, storage_type);
+        status = global_options_.AddOption(std::move(storage_type_option));
         if(!status.ok()) {
             fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
@@ -403,6 +404,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Buffer manager size
         SizeT lru_num = DEFAULT_BUFFER_MANAGER_LRU_COUNT;
         UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, 100, 1);
         status = global_options_.AddOption(std::move(lru_num_option));
@@ -411,6 +413,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Memory index capacity
         i64 memindex_memory_quota = DEFAULT_MEMINDEX_MEMORY_QUOTA;
         UniquePtr<IntegerOption> memindex_memory_quota_option = MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME,
                                                                                           memindex_memory_quota, std::numeric_limits<i64>::max(), 0);
@@ -1366,7 +1369,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                 return Status::InvalidConfig("'storage_type' field isn't string.");
                             }
 
-                            auto storage_type_option = MakeUnique<StringOption>(STORAGE_TYPE_NAME, storage_type_str);
+                            auto storage_type_option = MakeUnique<StringOption>(STORAGE_TYPE_OPTION_NAME, storage_type_str);
                             Status status = global_options_.AddOption(std::move(storage_type_option));
                             if(!status.ok()) {
                                 UnrecoverableError(status.message());
@@ -1394,7 +1397,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                         } else {
                                             return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
                                         }
-                                        auto object_storage_host_option = MakeUnique<StringOption>(OBJECT_STORAGE_HOST_NAME, object_storage_host_str);
+                                        auto object_storage_host_option = MakeUnique<StringOption>(OBJECT_STORAGE_HOST_OPTION_NAME, object_storage_host_str);
                                         global_options_.AddOption(std::move(object_storage_host_option));
                                         break;
                                     }
@@ -1409,7 +1412,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                         } else {
                                             return Status::InvalidConfig("'port' field in [storage.object_storage] isn't integer.");
                                         }
-                                        UniquePtr<IntegerOption> object_storage_port_option = MakeUnique<IntegerOption>(OBJECT_STORAGE_PORT_NAME, object_storage_port, 65535, 0);
+                                        UniquePtr<IntegerOption> object_storage_port_option = MakeUnique<IntegerOption>(OBJECT_STORAGE_PORT_OPTION_NAME, object_storage_port, 65535, 0);
                                         if (!object_storage_port_option->Validate()) {
                                             return Status::InvalidConfig(fmt::format("Invalid object storage port: {}", object_storage_port));
                                         }
@@ -1423,7 +1426,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                         } else {
                                             return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
                                         }
-                                        auto object_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_NAME, object_storage_bucket);
+                                        auto object_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_OPTION_NAME, object_storage_bucket);
                                         global_options_.AddOption(std::move(object_bucket_option));
                                         break;
                                     }
@@ -1440,7 +1443,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageBucket) == nullptr) {
                                 String object_storage_bucket = String(DEFAULT_OBJECT_STORAGE_BUCKET);
-                                UniquePtr<StringOption> object_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_NAME, object_storage_bucket);
+                                UniquePtr<StringOption> object_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_OPTION_NAME, object_storage_bucket);
                                 Status status = global_options_.AddOption(std::move(object_bucket_option));
                                 if (!status.ok()) {
                                     UnrecoverableError(status.message());
@@ -1525,7 +1528,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                 if (BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kStorageType); base_option == nullptr) {
                     String storage_type_str = String(DEFAULT_STORAGE_TYPE);
-                    UniquePtr<StringOption> storage_type_option = MakeUnique<StringOption>(STORAGE_TYPE_NAME, storage_type_str);
+                    UniquePtr<StringOption> storage_type_option = MakeUnique<StringOption>(STORAGE_TYPE_OPTION_NAME, storage_type_str);
                     Status status = global_options_.AddOption(std::move(storage_type_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
@@ -2170,9 +2173,10 @@ i64 Config::MemIndexCapacity() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexCapacity);
 }
 
-String Config::FileSystemType() {
+StorageType Config::StorageType() {
     std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetStringValue(GlobalOptionIndex::kStorageType);
+    String storage_type_str = global_options_.GetStringValue(GlobalOptionIndex::kStorageType);
+    return String2StorageType(storage_type_str);
 }
 
 String Config::ObjectStorageHost() {
@@ -2338,6 +2342,20 @@ void Config::PrintAll() {
     fmt::print(" - compact_interval: {}\n", Utility::FormatTimeInfo(CompactInterval()));
     fmt::print(" - optimize_index_interval: {}\n", Utility::FormatTimeInfo(OptimizeIndexInterval()));
     fmt::print(" - memindex_capacity: {}\n", Utility::FormatByteSize(MemIndexCapacity()));
+    fmt::print(" - storage_type: {}\n", ToString(StorageType()));
+    switch(StorageType() ) {
+        case StorageType::kLocal:  {
+            break;
+        }
+        case StorageType::kMinio: {
+            fmt::print(" - object_storage_host: {}\n", ObjectStorageHost());
+            fmt::print(" - object_storage_port: {}\n", ObjectStoragePort());
+            fmt::print(" - object_storage_bucket: {}\n", ObjectStorageBucket());
+        }
+        default: {
+            break;
+        }
+    }
 
     // Buffer manager
     fmt::print(" - buffer_manager_size: {}\n", Utility::FormatByteSize(BufferManagerSize()));

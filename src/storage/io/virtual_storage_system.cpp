@@ -111,6 +111,7 @@ Status VirtualStorageSystem::UnInit() {
 }
 
 Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorageSystem::BuildFileHandle() {
+    // Open the file according to the path and access_mode
     switch (storage_type_) {
         case StorageType::kLocal: {
             UniquePtr<LocalFile> local_file = MakeUnique<LocalFile>(this);

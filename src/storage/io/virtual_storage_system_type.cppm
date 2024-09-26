@@ -34,68 +34,8 @@ export enum class StorageType {
     kNFS,
 };
 
-export StorageType String2StorageType(const String &storage_type) {
-    if (std::strcmp(storage_type.c_str(), "local")) {
-        return StorageType::kLocal;
-    } else if (std::strcmp(storage_type.c_str(), "minio")) {
-        return StorageType::kMinio;
-    } else if (std::strcmp(storage_type.c_str(), "aws_s3")) {
-        return StorageType::kAwsS3;
-    } else if (std::strcmp(storage_type.c_str(), "azure_blob")) {
-        return StorageType::kAzureBlob;
-    } else if (std::strcmp(storage_type.c_str(), "gcs")) {
-        return StorageType::kGCS;
-    } else if (std::strcmp(storage_type.c_str(), "oss")) {
-        return StorageType::kOSS;
-    } else if (std::strcmp(storage_type.c_str(), "cos")) {
-        return StorageType::kCOS;
-    } else if (std::strcmp(storage_type.c_str(), "obs")) {
-        return StorageType::kOBS;
-    } else if (std::strcmp(storage_type.c_str(), "hdfs")) {
-        return StorageType::kHDFS;
-    } else if (std::strcmp(storage_type.c_str(), "nfs")) {
-        return StorageType::kNFS;
-    } else {
-        return StorageType::kInvalid;
-    }
-}
+export StorageType String2StorageType(const String &storage_type);
 
-export String ToString(StorageType storage_type) {
-    switch (storage_type) {
-        case StorageType::kLocal: {
-            return "local";
-        }
-        case StorageType::kMinio: {
-            return "minio";
-        }
-        case StorageType::kAwsS3: {
-            return "aws s3";
-        }
-        case StorageType::kAzureBlob: {
-            return "azure blob";
-        }
-        case StorageType::kGCS: {
-            return "google cloud storage";
-        }
-        case StorageType::kOSS: {
-            return "aliyun object storage service";
-        }
-        case StorageType::kCOS: {
-            return "tencent cloud object storage";
-        }
-        case StorageType::kOBS: {
-            return "huawei object storage service";
-        }
-        case StorageType::kHDFS: {
-            return "hadoop file system";
-        }
-        case StorageType::kNFS: {
-            return "network file system";
-        }
-        default: {
-            return "invalid";
-        }
-    }
-}
+export String ToString(StorageType storage_type);
 
-}
+} // namespace infinity
