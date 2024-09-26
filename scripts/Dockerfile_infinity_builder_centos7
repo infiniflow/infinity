@@ -70,12 +70,12 @@ RUN --mount=type=bind,source=llvm-project-18.1.8.src.tar.xz,target=/root/llvm-pr
     && ninja install/strip \
     && ldconfig && cd /root && rm -rf llvm-project-18.1.8.src
 
-# Install boost-1.81.0
-RUN --mount=type=bind,source=boost_1_81_0.tar.bz2,target=/root/boost_1_81_0.tar.bz2 \
-    cd /root && tar xf boost_1_81_0.tar.bz2 \
-    && cd boost_1_81_0 && ./bootstrap.sh --with-python=python3 \
-    && ./b2 -j12 install \
-    && ldconfig && cd /root && rm -rf boost_1_81_0
+# Install boost-1.86.0
+RUN --mount=type=bind,source=boost_1_86_0.tar.bz2,target=/root/boost_1_86_0.tar.bz2 \
+    cd /root && tar xf boost_1_86_0.tar.bz2 \
+    && cd boost_1_86_0 && ./bootstrap.sh \
+    && ./b2 --without-python -j12 install \
+    && ldconfig && cd /root && rm -rf boost_1_86_0
 
 # Install flex-2.6.4
 RUN --mount=type=bind,source=flex-2.6.4.tar.gz,target=/root/flex-2.6.4.tar.gz  \
@@ -199,7 +199,7 @@ RUN --mount=type=bind,source=thrift-0.20.0.tar.gz,target=/root/thrift-0.20.0.tar
     && cp compiler/cpp/bin/thrift /usr/local/bin/thrift \
     && cd /root && rm -rf thrift-0.20.0
 
-RUN yum -y install expat-static perl-core \
+RUN yum -y install expat-static perl-core libpcap-devel \
     && yum clean all
 
 RUN --mount=type=bind,source=openssl-3.0.15.tar.gz,target=/root/openssl-3.0.15.tar.gz  \
@@ -208,7 +208,29 @@ RUN --mount=type=bind,source=openssl-3.0.15.tar.gz,target=/root/openssl-3.0.15.t
     && make -j && make install \
     && ldconfig && cd /root && rm -rf openssl-3.0.15
 
-ENV PATH="/usr/local/venv310/bin:$PATH"
+RUN git clone --single-branch --depth=1 https://github.com/adrian-thurston/colm.git \
+    && cd colm \
+    && ./autogen.sh \
+    && ./configure --prefix=/usr/local/colm \
+    && make -j 12 install \
+    && rm -rf ../colm
+
+RUN git clone --single-branch --depth=1 https://github.com/adrian-thurston/ragel.git \
+    && cd ragel \
+    && ./autogen.sh \
+    && ./configure --prefix=/usr/local/ragel --with-colm=/usr/local/colm \
+    && make -j 12 install \
+    && rm -rf ../ragel
+
+ENV PATH="/usr/local/venv310/bin:/usr/local/ragel/bin:$PATH"
+
+RUN git clone --single-branch --depth=1 https://github.com/VectorCamp/vectorscan.git \
+    && cd vectorscan \
+    && mkdir build \
+    && cd build \
+    && cmake -DCMAKE_BUILD_TYPE=Release -DFAT_RUNTIME=On ..  \
+    && make -j 12 install \
+    && rm -rf ../../vectorscan
 
 ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local
 
