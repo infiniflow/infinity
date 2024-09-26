@@ -340,9 +340,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, begin_row_id);
             }
-            auto block_id = block_entry->block_id();
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
-            memory_secondary_index_->Insert(block_id, block_column_entry, buffer_manager, row_offset, row_count);
+            memory_secondary_index_->InsertBlockData(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
         case IndexType::kIVFFlat: {
@@ -581,9 +580,9 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                const auto block_id = block_entry->block_id();
+                const auto block_offset = block_entry->segment_offset();
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
-                memory_secondary_index_->Insert(block_id, block_column_entry, buffer_mgr, 0, block_entry->row_count());
+                memory_secondary_index_->InsertBlockData(block_offset, block_column_entry, buffer_mgr, 0, block_entry->row_count());
             }
             dumped_memindex_entry = MemIndexDump();
             break;
