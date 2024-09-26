@@ -35,9 +35,9 @@ export struct IndexIVFCentroidOption {
 
 export struct IndexIVFStorageOption {
     enum class Type {
-        kPlain,
-        kScalarQuantization,  // quantization for every dimension
-        kProductQuantization, // centroid tag for several subspaces
+        kPlain,               // for floating-point, i8, u8
+        kScalarQuantization,  // for floating-point, quantization for every dimension
+        kProductQuantization, // for floating-point, centroid tag for several subspaces
     };
     Type type_ = Type::kPlain;
     // kPlain

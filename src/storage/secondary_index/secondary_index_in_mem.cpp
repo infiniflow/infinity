@@ -47,8 +47,12 @@ class SecondaryIndexInMemT final : public SecondaryIndexInMem {
 public:
     explicit SecondaryIndexInMemT(const RowID begin_row_id, const u32 max_size) : begin_row_id_(begin_row_id), max_size_(max_size) {}
     u32 GetRowCount() const override { return in_mem_secondary_index_.size(); }
-    void Insert(const u16 block_id, BlockColumnEntry *block_column_entry, BufferManager *buffer_manager, u32 row_offset, u32 row_count) override {
-        MemIndexInserterIter<RawValueType> iter(block_id * DEFAULT_BLOCK_CAPACITY, block_column_entry, buffer_manager, row_offset, row_count);
+    void InsertBlockData(const SegmentOffset block_offset,
+                         BlockColumnEntry *block_column_entry,
+                         BufferManager *buffer_manager,
+                         const u32 row_offset,
+                         const u32 row_count) override {
+        MemIndexInserterIter<RawValueType> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
         InsertInner(iter);
     }
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const override {

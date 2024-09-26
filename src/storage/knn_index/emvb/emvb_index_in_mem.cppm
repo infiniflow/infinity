@@ -45,7 +45,7 @@ export class EMVBIndexInMem {
     u32 row_count_ = 0;       // row of tensors
     u32 embedding_count_ = 0; // count of total embeddings
     UniquePtr<EMVBIndex> emvb_index_;
-    atomic_flag is_built_;
+    std::atomic_flag is_built_;
     mutable std::shared_mutex rw_mutex_;
     u32 build_index_threshold_ = 0; // bar for building index
 

@@ -49,7 +49,7 @@ export struct CommonQueryFilter {
     UniquePtr<IndexFilterEvaluator> index_filter_evaluator_;
 
     // result will not be populated if always_true_ be true
-    atomic_flag finish_build_;
+    std::atomic_flag finish_build_;
     std::mutex result_mutex_;
     Map<SegmentID, Bitmask> filter_result_;
     SizeT filter_result_count_ = 0;

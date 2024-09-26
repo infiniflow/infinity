@@ -14,33 +14,45 @@
 
 module;
 
-export module secondary_index_in_mem;
+export module ivf_index_data_in_mem;
 
 import stl;
-import roaring_bitmap;
+import internal_types;
+import index_ivf;
+import ivf_index_storage;
+import column_def;
 
 namespace infinity {
 
-struct RowID;
 struct BlockColumnEntry;
 class BufferManager;
-class ColumnDef;
 class ChunkIndexEntry;
 class SegmentIndexEntry;
+class IndexBase;
 
-export class SecondaryIndexInMem {
+export class IVFIndexInMem {
+protected:
+    const RowID begin_row_id_ = {};
+    const IndexIVFOption ivf_option_ = {};
+    std::atomic_flag have_ivf_index_ = {};
+    mutable std::shared_mutex rw_mutex_ = {};
+    u32 input_row_count_ = 0;
+    u32 input_embedding_count_ = 0;
+    IVF_Centroids_Storage ivf_centroids_storage_ = {};
+    Vector<UniquePtr<IVF_Part_Storage>> ivf_part_storages_ = {};
+
 public:
-    virtual ~SecondaryIndexInMem() = default;
-    virtual u32 GetRowCount() const = 0;
+    explicit IVFIndexInMem(const RowID begin_row_id, const IndexIVFOption &ivf_option) : begin_row_id_(begin_row_id), ivf_option_(ivf_option) {}
+    virtual ~IVFIndexInMem() = default;
+    u32 GetInputRowCount() const;
     virtual void InsertBlockData(SegmentOffset block_offset,
                                  BlockColumnEntry *block_column_entry,
                                  BufferManager *buffer_manager,
                                  u32 row_offset,
                                  u32 row_count) = 0;
     virtual SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const = 0;
-    virtual Pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
-
-    static SharedPtr<SecondaryIndexInMem> NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, RowID begin_row_id, u32 max_size = 5 << 20);
+    // TODO: query
+    static SharedPtr<IVFIndexInMem> NewIVFIndexInMem(const ColumnDef *column_def, const IndexBase *index_base, RowID begin_row_id);
 };
 
 } // namespace infinity
