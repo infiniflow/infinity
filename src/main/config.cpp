@@ -1374,8 +1374,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             break;
                         }
                         case GlobalOptionIndex::kObjectStorage: {
-                            auto object_storage_config = config_toml["storage.object_storage"];
-                            auto object_storage_config_table = object_storage_config.as_table();
+                            const auto &object_storage_config = elem.second;
+                            const auto &object_storage_config_table = object_storage_config.as_table();
                             for (auto &elem : *object_storage_config_table) {
                                 String var_name = String(elem.first);
                                 GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
@@ -1411,7 +1411,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                         }
                                         UniquePtr<IntegerOption> object_storage_port_option = MakeUnique<IntegerOption>(OBJECT_STORAGE_PORT_NAME, object_storage_port, 65535, 0);
                                         if (!object_storage_port_option->Validate()) {
-                                            return Status::InvalidConfig(fmt::format("Invalid remote fs port: {}", object_storage_port));
+                                            return Status::InvalidConfig(fmt::format("Invalid object storage port: {}", object_storage_port));
                                         }
                                         global_options_.AddOption(std::move(object_storage_port_option));
                                         break;
@@ -1423,8 +1423,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                         } else {
                                             return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
                                         }
-                                        auto remote_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_NAME, object_storage_bucket);
-                                        global_options_.AddOption(std::move(remote_bucket_option));
+                                        auto object_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_NAME, object_storage_bucket);
+                                        global_options_.AddOption(std::move(object_bucket_option));
                                         break;
                                     }
                                     default: {
@@ -1440,8 +1440,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageBucket) == nullptr) {
                                 String object_storage_bucket = String(DEFAULT_OBJECT_STORAGE_BUCKET);
-                                UniquePtr<StringOption> remote_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_NAME, object_storage_bucket);
-                                Status status = global_options_.AddOption(std::move(remote_bucket_option));
+                                UniquePtr<StringOption> object_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_NAME, object_storage_bucket);
+                                Status status = global_options_.AddOption(std::move(object_bucket_option));
                                 if (!status.ok()) {
                                     UnrecoverableError(status.message());
                                 }
