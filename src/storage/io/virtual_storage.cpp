@@ -23,6 +23,7 @@ import third_party;
 import virtual_storage_type;
 import logger;
 import local_file;
+import minio_file;
 
 namespace infinity {
 
@@ -118,9 +119,8 @@ Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorage::BuildFileHandle() {
             return {std::move(local_file), Status::OK()};
         }
         case StorageType::kMinio: {
-            Status status = Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
-            LOG_ERROR(status.message());
-            return {nullptr, status};
+            UniquePtr<MinioFile> minio_file = MakeUnique<MinioFile>(this);
+            return {std::move(minio_file), Status::OK()};
         }
         default: {
             Status status = Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));

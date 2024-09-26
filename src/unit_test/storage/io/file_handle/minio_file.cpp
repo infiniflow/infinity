@@ -18,8 +18,8 @@ import stl;
 import status;
 import infinity_context;
 import compilation_config;
-import virtual_storage_system_type;
-import virtual_storage_system;
+import virtual_storage_type;
+import virtual_storage;
 import abstract_file_handle;
 
 import minio_file;
@@ -55,7 +55,7 @@ TEST_F(MinioFileTest, TestFileOpen) {
     using namespace infinity; 
     infinity::InfinityContext::instance().Init(MinioFileTest::config_path());
 
-    VirtualStorageSystem VSS;
+    VirtualStorage VSS;
     VSS.Init(StorageType::kMinio, default_config);
     auto [minio_file, status] = VSS.BuildFileHandle();
     EXPECT_TRUE(status.ok());
