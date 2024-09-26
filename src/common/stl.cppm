@@ -104,6 +104,7 @@ export namespace std {
     using std::lower_bound;
     using std::upper_bound;
 
+    using std::atomic_flag;
     using std::condition_variable;
     using std::lock_guard;
     using std::memory_order;
@@ -517,7 +518,6 @@ namespace infinity {
     using ai64 = std::atomic_int64_t;
     using aptr = std::atomic_uintptr_t;
     using atomic_bool = std::atomic_bool;
-    using atomic_flag = std::atomic_flag;
 
     template<typename T>
     using Atomic = std::atomic<T>;

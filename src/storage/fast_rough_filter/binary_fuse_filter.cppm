@@ -34,7 +34,7 @@ private:
     TxnTimeStamp build_time_{UNCOMMIT_TS};
 
     // in query, use atomic_flag to check if filter is ready
-    atomic_flag finished_build_filter_;
+    std::atomic_flag finished_build_filter_;
     // zero-initialize the filter
     binary_fuse8_t filter = {};
 

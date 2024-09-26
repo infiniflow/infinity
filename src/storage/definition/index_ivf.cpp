@@ -288,7 +288,8 @@ void IndexIVF::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
         RecoverableError(Status::ColumnNotExist(column_name));
     }
     const auto column_id = std::distance(column_names_vector.begin(), name_it);
-    if (const auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kEmbedding) {
+    if (const auto &data_type = column_types_vector[column_id];
+        data_type->type() != LogicalType::kEmbedding && data_type->type() != LogicalType::kMultiVector) {
         RecoverableError(Status::InvalidIndexDefinition(
             std::format("Attempt to create IVF index on column: {}, data type: {}.", column_name, data_type->ToString())));
     } else {
