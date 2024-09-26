@@ -26,6 +26,7 @@ import third_party;
 import status;
 import virtual_storage;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -42,19 +43,25 @@ Status LocalFile::Open(const String &path, FileAccessMode access_mode) {
     switch (access_mode_) {
         case FileAccessMode::kRead: {
             fd_ = open(path.c_str(), O_RDONLY, 0666);
-            open_ = true;
             break;
         }
         case FileAccessMode::kWrite: {
+            fd_ = open(path.c_str(), O_RDWR | O_CREAT, 0666);
             break;
         }
         case FileAccessMode::kMmapRead: {
+            UnrecoverableError("Unsupported now.");
             break;
         }
         case FileAccessMode::kInvalid: {
             break;
         }
     }
+    if(fd_ == -1) {
+        String error_message = fmt::format("File open failed: {}", strerror(errno));
+        return Status::IOError(error_message);
+    }
+    open_ = true;
     return Status::OK();
 }
 
@@ -75,12 +82,32 @@ Status LocalFile::Close() {
     return Status::OK();
 }
 
-Status LocalFile::Append(const char *buffer, u64 nbytes) { return Status::OK(); }
+Status LocalFile::Append(const char *buffer, u64 nbytes) {
+    if(!open_ or access_mode_ != FileAccessMode::kWrite) {
+        String error_message = fmt::format("File: {} isn't open.", path_);
+        UnrecoverableError(error_message);
+    }
+    i64 written = 0;
+    while (written < (i64)nbytes) {
+        i64 write_count = write(fd_, buffer + written, nbytes - written);
+        if (write_count == -1) {
+            String error_message = fmt::format("Can't write file: {}: {}. fd: {}", path_, strerror(errno), fd_);
+            UnrecoverableError(error_message);
+        }
+        written += write_count;
+    }
+    return Status::OK();
+}
 
-Status LocalFile::Append(const String &buffer, u64 nbytes) { return Status::OK(); }
+Status LocalFile::Append(const String &buffer, u64 nbytes) {
+    return Append(buffer.data(), nbytes);
+}
 
 Tuple<SizeT, Status> LocalFile::Read(char *buffer, u64 nbytes) {
-
+    if(!open_) {
+        String error_message = fmt::format("File: {} isn't open.", path_);
+        UnrecoverableError(error_message);
+    }
     i64 read_n = 0;
     while (read_n < (i64)nbytes) {
         SizeT a = nbytes - read_n;
