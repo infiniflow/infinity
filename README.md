@@ -83,13 +83,13 @@ The Infinity-embedded SDK allows you to embed Infinity into Python applications,
    print(res)
    ```
 
-### 🛠️ Deploy Infinity as a separate server
+### 🔧 Deploy Infinity as a separate server
 
-If you wish to deploy a standalone Infinity server and access it remotely: 
+If you wish to deploy a standalone Infinity server and access it remotely:  
 
 See [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server).
 
-#### 🛠️ Build from Source
+#### 🔧 Build from Source
 
 See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
 
