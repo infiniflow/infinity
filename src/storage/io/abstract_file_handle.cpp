@@ -16,17 +16,14 @@ module;
 
 module abstract_file_handle;
 
-import stl;
-import virtual_storage_system_type;
-import virtual_storage_system;
+import status;
+import virtual_storage;
 
 namespace infinity {
 
-AbstractFileHandle::~AbstractFileHandle() = default;
-
-AbstractFileHandle::AbstractFileHandle(VirtualStorageSystem *storage_system, StorageType storage_type)
+AbstractFileHandle::AbstractFileHandle(VirtualStorage *storage_system, StorageType storage_type)
     : storage_system_(storage_system), storage_type_(storage_type) {}
 
-Status AbstractFileHandle::Open(const String &path, FileAccessMode access_mode) { return Status::NotSupport("In abstract class"); };
+AbstractFileHandle::~AbstractFileHandle() = default;
 
 } // namespace infinity

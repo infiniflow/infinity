@@ -17,14 +17,14 @@ module;
 export module minio_file;
 
 import stl;
-import virtual_storage_system_type;
+import virtual_storage_type;
 import status;
 import object_file;
 import abstract_file_handle;
 
 namespace infinity {
 
-class VirtualStorageSystem;
+class VirtualStorage;
 struct MinoMmapInfo {
     char *data_ptr_{};
     SizeT data_len_{};
@@ -33,7 +33,7 @@ struct MinoMmapInfo {
 
 export class MinioFile final : public ObjectFile {
 public:
-    MinioFile(VirtualStorageSystem *storage_system);
+    MinioFile(VirtualStorage *storage_system);
     ~MinioFile() final;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;

@@ -16,7 +16,7 @@ module;
 
 #include <string>
 
-module virtual_storage_system_type ;
+module virtual_storage_type ;
 
 import stl;
 

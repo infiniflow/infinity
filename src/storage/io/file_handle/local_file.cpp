@@ -17,12 +17,11 @@ module;
 module local_file;
 
 import status;
-import virtual_storage_system;
+import virtual_storage;
 
 namespace infinity {
 
-LocalFile::LocalFile(VirtualStorageSystem *storage_system)
-    : AbstractFileHandle(storage_system, StorageType::kLocal) {}
+LocalFile::LocalFile(VirtualStorage *storage_system) : AbstractFileHandle(storage_system, StorageType::kLocal) {}
 
 LocalFile::~LocalFile() = default;
 
@@ -44,6 +43,6 @@ Tuple<char *, SizeT, Status> LocalFile::MmapRead(const String &name) { return {n
 
 Status LocalFile::Unmmap(const String &name) { return Status::OK(); }
 
-Status LocalFile::Sync() { return Status::OK(); } 
+Status LocalFile::Sync() { return Status::OK(); }
 
 } // namespace infinity

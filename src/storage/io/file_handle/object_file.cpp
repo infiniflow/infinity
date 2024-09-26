@@ -17,11 +17,11 @@ module;
 module object_file;
 
 import status;
-import virtual_storage_system;
+import virtual_storage;
 
 namespace infinity {
 
-ObjectFile::ObjectFile(VirtualStorageSystem *storage_system, StorageType type)
+ObjectFile::ObjectFile(VirtualStorage *storage_system, StorageType type)
     : AbstractFileHandle(storage_system, type) {}
 
 ObjectFile::~ObjectFile() = default;

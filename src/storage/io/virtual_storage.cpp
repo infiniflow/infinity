@@ -16,18 +16,17 @@ module;
 
 #include <string>
 
-module virtual_storage_system;
+module virtual_storage;
 
 import stl;
 import third_party;
-import virtual_storage_system_type;
+import virtual_storage_type;
 import logger;
 import local_file;
-import minio_file;
 
 namespace infinity {
 
-Status VirtualStorageSystem::Init(StorageType storage_type, Map<String, String> &config) {
+Status VirtualStorage::Init(StorageType storage_type, Map<String, String> &config) {
     // Init remote filesystem and local disk cache
     storage_type_ = storage_type;
     switch (storage_type) {
@@ -78,14 +77,14 @@ Status VirtualStorageSystem::Init(StorageType storage_type, Map<String, String> 
 
             iter = config.find("disk_cache_limit");
             if (iter == config.end()) {
-                return Status::InvalidConfig("Missing MINIO 'cache_limit'");
+                return Status::InvalidConfig("Missing MINIO 'cache_dir'");
             }
             String disk_cache_limit_str = iter->second;
             SizeT disk_cache_limit = std::stoull(disk_cache_limit_str);
 
             iter = config.find("disk_cache_lru_count");
             if (iter == config.end()) {
-                return Status::InvalidConfig("Missing MINIO 'cache_lru_count'");
+                return Status::InvalidConfig("Missing MINIO 'cache_dir'");
             }
             String disk_cache_lru_count_str = iter->second;
             SizeT disk_cache_lru_count = std::stoull(disk_cache_lru_count_str);
@@ -103,7 +102,7 @@ Status VirtualStorageSystem::Init(StorageType storage_type, Map<String, String> 
     return Status::OK();
 }
 
-Status VirtualStorageSystem::UnInit() {
+Status VirtualStorage::UnInit() {
     minio_client_.reset();
     minio_provider_.reset();
     minio_base_url_.reset();
@@ -111,15 +110,17 @@ Status VirtualStorageSystem::UnInit() {
     return Status::OK();
 }
 
-Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorageSystem::BuildFileHandle() {
+Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorage::BuildFileHandle() {
+    // Open the file according to the path and access_mode
     switch (storage_type_) {
         case StorageType::kLocal: {
             UniquePtr<LocalFile> local_file = MakeUnique<LocalFile>(this);
             return {std::move(local_file), Status::OK()};
         }
         case StorageType::kMinio: {
-            UniquePtr<MinioFile> minio_file = MakeUnique<MinioFile>(this);
-            return {std::move(minio_file), Status::OK()};
+            Status status = Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
+            LOG_ERROR(status.message());
+            return {nullptr, status};
         }
         default: {
             Status status = Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
@@ -130,6 +131,6 @@ Tuple<UniquePtr<AbstractFileHandle>, Status> VirtualStorageSystem::BuildFileHand
     return {nullptr, Status::OK()};
 }
 
-LocalDiskCache *VirtualStorageSystem::GetLocalDiskCache() const { return local_disk_cache_.get(); }
+LocalDiskCache *VirtualStorage::GetLocalDiskCache() const { return local_disk_cache_.get(); }
 
 } // namespace infinity

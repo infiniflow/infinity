@@ -50,8 +50,8 @@ import memindex_tracer;
 import cleanup_scanner;
 import persistence_manager;
 import extra_ddl_info;
-import virtual_storage_system;
-import virtual_storage_system_type;
+import virtual_storage;
+import virtual_storage_type;
 
 namespace infinity {
 
@@ -104,7 +104,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             if (virtual_storage_system_ != nullptr) {
                 UnrecoverableError("Virtual storage system was initialized before.");
             }
-            virtual_storage_system_ = MakeUnique<VirtualStorageSystem>();
+            virtual_storage_system_ = MakeUnique<VirtualStorage>();
 
             switch (config_ptr_->StorageType()) {
                 case StorageType::kLocal: {

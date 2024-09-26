@@ -33,7 +33,7 @@ import status;
 import options;
 import command_statement;
 import infinity_exception;
-import virtual_storage_system_type;
+import virtual_storage_type;
 
 namespace infinity {
 

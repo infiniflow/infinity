@@ -17,17 +17,17 @@ module;
 export module local_file;
 
 import stl;
-import virtual_storage_system_type;
+import virtual_storage_type;
 import status;
 import abstract_file_handle;
 
 namespace infinity {
 
-class VirtualStorageSystem;
+class VirtualStorage;
 
 export class LocalFile final : public AbstractFileHandle {
 public:
-    explicit LocalFile(VirtualStorageSystem *storage_system);
+    explicit LocalFile(VirtualStorage *storage_system);
     ~LocalFile() final;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
@@ -39,6 +39,9 @@ public:
     Tuple<char *, SizeT, Status> MmapRead(const String &name) final;
     Status Unmmap(const String &name) final;
     Status Sync() final;
+
+private:
+    i32 fd_{-1};
 };
 
 } // namespace infinity

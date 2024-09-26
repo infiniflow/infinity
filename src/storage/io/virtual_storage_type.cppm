@@ -14,7 +14,7 @@
 
 module;
 
-export module virtual_storage_system_type;
+export module virtual_storage_type;
 
 import stl;
 
