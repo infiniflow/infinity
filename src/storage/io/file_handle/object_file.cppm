@@ -27,7 +27,7 @@ class VirtualStorageSystem;
 
 export class ObjectFile : public AbstractFileHandle {
 public:
-    ObjectFile(VirtualStorageSystem *storage_system, StorageType type, const String& path, FileAccessMode access_mode);
+    ObjectFile(VirtualStorageSystem *storage_system, StorageType type);
     ~ObjectFile() override;
     Status Open(const String &path, FileAccessMode access_mode) override;
     Status Close() override;

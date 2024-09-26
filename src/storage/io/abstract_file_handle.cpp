@@ -24,8 +24,8 @@ namespace infinity {
 
 AbstractFileHandle::~AbstractFileHandle() = default;
 
-AbstractFileHandle::AbstractFileHandle(VirtualStorageSystem *storage_system, StorageType storage_type, const String &path, FileAccessMode access_mode)
-    : storage_system_(storage_system), storage_type_(storage_type), path_(path), access_mode_(access_mode) {}
+AbstractFileHandle::AbstractFileHandle(VirtualStorageSystem *storage_system, StorageType storage_type)
+    : storage_system_(storage_system), storage_type_(storage_type) {}
 
 Status AbstractFileHandle::Open(const String &path, FileAccessMode access_mode) { return Status::NotSupport("In abstract class"); };
 

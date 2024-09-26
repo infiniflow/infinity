@@ -21,8 +21,8 @@ import virtual_storage_system;
 
 namespace infinity {
 
-LocalFile::LocalFile(VirtualStorageSystem *storage_system, const String &path, FileAccessMode access_mode)
-    : AbstractFileHandle(storage_system, StorageType::kLocal, path, access_mode) {}
+LocalFile::LocalFile(VirtualStorageSystem *storage_system)
+    : AbstractFileHandle(storage_system, StorageType::kLocal) {}
 
 LocalFile::~LocalFile() = default;
 

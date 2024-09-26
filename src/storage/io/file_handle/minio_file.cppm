@@ -28,7 +28,7 @@ class VirtualStorageSystem;
 
 export class MinioFile final : public ObjectFile {
 public:
-    MinioFile(VirtualStorageSystem *storage_system, const String &path, FileAccessMode access_mode);
+    MinioFile(VirtualStorageSystem *storage_system);
     ~MinioFile() final;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
@@ -40,8 +40,9 @@ public:
     Tuple<char *, SizeT, Status> MmapRead(const String &name) final;
     Status Unmmap(const String &name) final;
 
-public:
+private:
     i32 fd_{-1};
+    static std::mutex mtx_;
 };
 
 } // namespace infinity

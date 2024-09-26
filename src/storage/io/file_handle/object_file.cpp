@@ -21,8 +21,8 @@ import virtual_storage_system;
 
 namespace infinity {
 
-ObjectFile::ObjectFile(VirtualStorageSystem *storage_system, StorageType type, const String& path, FileAccessMode access_mode)
-    : AbstractFileHandle(storage_system, type, path, access_mode) {}
+ObjectFile::ObjectFile(VirtualStorageSystem *storage_system, StorageType type)
+    : AbstractFileHandle(storage_system, type) {}
 
 ObjectFile::~ObjectFile() = default;
 

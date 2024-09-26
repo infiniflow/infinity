@@ -27,7 +27,7 @@ class VirtualStorageSystem;
 
 export class LocalFile final : public AbstractFileHandle {
 public:
-    explicit LocalFile(VirtualStorageSystem *storage_system, const String &path, FileAccessMode access_mode);
+    explicit LocalFile(VirtualStorageSystem *storage_system);
     ~LocalFile() final;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
