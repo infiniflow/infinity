@@ -86,6 +86,8 @@ namespace minio {
         export using minio::s3::DownloadObjectResponse;
         export using minio::s3::UploadObjectArgs;
         export using minio::s3::UploadObjectResponse;
+        export using minio::s3::PutObjectArgs;
+        export using minio::s3::PutObjectResponse;
     } // namespace s3
 
     namespace creds {

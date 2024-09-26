@@ -44,6 +44,7 @@ public:
     SizeT FileSize() final;
     Tuple<char *, SizeT, Status> MmapRead(const String &name) final;
     Status Unmmap(const String &name) final;
+    Status Sync() final;
 
 private:
     i32 fd_{-1};

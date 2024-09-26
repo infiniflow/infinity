@@ -38,6 +38,7 @@ public:
     SizeT FileSize() override;
     Tuple<char *, SizeT, Status> MmapRead(const String &name) override;
     Status Unmmap(const String &name) override;
+    Status Sync() override;
 };
 
 }

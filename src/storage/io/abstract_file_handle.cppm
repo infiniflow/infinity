@@ -39,6 +39,7 @@ public:
     virtual SizeT FileSize() = 0;
     virtual Tuple<char *, SizeT, Status> MmapRead(const String &name) { return {nullptr, 0, Status::NotSupport("In abstract class")}; }
     virtual Status Unmmap(const String &name) { return Status::NotSupport("In abstract class"); }
+    virtual Status Sync() { return Status::NotSupport("In abstract class"); }
 
 protected:
     VirtualStorageSystem *storage_system_{};

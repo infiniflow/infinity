@@ -44,4 +44,6 @@ Tuple<char *, SizeT, Status> LocalFile::MmapRead(const String &name) { return {n
 
 Status LocalFile::Unmmap(const String &name) { return Status::OK(); }
 
+Status LocalFile::Sync() { return Status::OK(); } 
+
 } // namespace infinity

@@ -44,4 +44,6 @@ Tuple<char *, SizeT, Status> ObjectFile::MmapRead(const String &name) { return {
 
 Status ObjectFile::Unmmap(const String &name) { return Status::OK(); }
 
+Status ObjectFile::Sync() { return Status::OK(); }
+
 } // namespace infinity
