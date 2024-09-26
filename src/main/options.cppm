@@ -152,11 +152,12 @@ export enum class GlobalOptionIndex : i8 {
     kPeerServerPort = 36,
     kPeerServerConnectionPoolSize = 37,
     kFileSystemType = 38,
-    kRemoteFSHost = 39,
-    kRemoteFSPort = 40,
-    kRemoteFSBucket = 41,
+    kRemoteFS = 39,
+    kRemoteFSHost = 40,
+    kRemoteFSPort = 41,
+    kRemoteFSBucket = 42,
 
-    kInvalid = -1,
+    kInvalid = 43,
 };
 
 export struct GlobalOptions {

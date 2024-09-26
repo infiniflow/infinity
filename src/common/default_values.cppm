@@ -227,6 +227,7 @@ export {
     constexpr std::string_view PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME = "persistence_object_size_limit";
 
     constexpr std::string_view FILESYSTEM_TYPE_NAME = "filesystem_type";
+    constexpr std::string_view REMOTE_FS_NAME = "remote_fs";
     constexpr std::string_view REMOTE_FS_HOST_NAME = "host";
     constexpr std::string_view REMOTE_FS_PORT_NAME = "port";
     constexpr std::string_view REMOTE_FS_BUCKET_NAME = "bucket_name";

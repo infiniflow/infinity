@@ -61,7 +61,7 @@ TEST_F(ConfigTest, test1) {
     // Storage
     EXPECT_EQ(config.DataDir(), "/var/infinity/data");
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
-    EXPECT_EQ(config.FileSystemType, "local");
+    EXPECT_EQ(config.FileSystemType(), "local");
 
     // buffer
     EXPECT_EQ(config.BufferManagerSize(), 8 * 1024l * 1024l * 1024l);
