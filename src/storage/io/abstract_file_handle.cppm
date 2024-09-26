@@ -32,10 +32,10 @@ public:
     virtual ~AbstractFileHandle();
     virtual Status Open(const String &path, FileAccessMode access_mode);
     virtual Status Close() { return Status::NotSupport("In abstract class"); }
-    virtual Status Append(const char *buffer) { return Status::NotSupport("In abstract class"); }
-    virtual Status Append(const String &buffer) { return Status::NotSupport("In abstract class"); }
-    virtual Tuple<SizeT, Status> Read(char *buffer) { return {0, Status::NotSupport("In abstract class")}; }
-    virtual Tuple<SizeT, Status> Read(String &buffer) { return {0, Status::NotSupport("In abstract class")}; }
+    virtual Status Append(const char *buffer, u64 nbytes) { return Status::NotSupport("In abstract class"); }
+    virtual Status Append(const String &buffer, u64 nbytes) { return Status::NotSupport("In abstract class"); }
+    virtual Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) { return {0, Status::NotSupport("In abstract class")}; }
+    virtual Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) { return {0, Status::NotSupport("In abstract class")}; }
     virtual SizeT FileSize() = 0;
     virtual Tuple<char *, SizeT, Status> MmapRead(const String &name) { return {nullptr, 0, Status::NotSupport("In abstract class")}; }
     virtual Status Unmmap(const String &name) { return Status::NotSupport("In abstract class"); }

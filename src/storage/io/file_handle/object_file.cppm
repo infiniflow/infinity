@@ -31,10 +31,10 @@ public:
     ~ObjectFile() override;
     Status Open(const String &path, FileAccessMode access_mode) override;
     Status Close() override;
-    Status Append(const char *buffer) override;
-    Status Append(const String &buffer) override;
-    Tuple<SizeT, Status> Read(char *buffer) override;
-    Tuple<SizeT, Status> Read(String &buffer) override;
+    Status Append(const char *buffer, u64 nbytes) override;
+    Status Append(const String &buffer, u64 nbytes) override;
+    Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) override;
+    Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) override;
     SizeT FileSize() override;
     Tuple<char *, SizeT, Status> MmapRead(const String &name) override;
     Status Unmmap(const String &name) override;

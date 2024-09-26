@@ -30,13 +30,13 @@ Status LocalFile::Open(const String &path, FileAccessMode access_mode) { return 
 
 Status LocalFile::Close() { return Status::OK(); }
 
-Status LocalFile::Append(const char *buffer) { return Status::OK(); }
+Status LocalFile::Append(const char *buffer, u64 nbytes) { return Status::OK(); }
 
-Status LocalFile::Append(const String &buffer) { return Status::OK(); }
+Status LocalFile::Append(const String &buffer, u64 nbytes) { return Status::OK(); }
 
-Tuple<SizeT, Status> LocalFile::Read(char *buffer) { return {0, Status::OK()}; }
+Tuple<SizeT, Status> LocalFile::Read(char *buffer, u64 nbytes) { return {0, Status::OK()}; }
 
-Tuple<SizeT, Status> LocalFile::Read(String &buffer) { return {0, Status::OK()}; }
+Tuple<SizeT, Status> LocalFile::Read(String &buffer, u64 nbytes) { return {0, Status::OK()}; }
 
 SizeT LocalFile::FileSize() { return 0; }
 
