@@ -321,6 +321,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("GetObjCache Failed to find object for local path {}", local_path);
         LOG_WARN(error_message);
+        result.cached_ = true; // TODO
         return result;
     }
     auto oit = objects_.find(it->second.obj_key_);
