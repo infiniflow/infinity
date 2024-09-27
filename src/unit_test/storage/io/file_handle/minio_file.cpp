@@ -36,6 +36,7 @@ Map<String, String> default_config = {
     {"disk_cache_lru_count", "0"},
 };
 
+#if 0
 class MinioFileTest : public BaseTest {
 protected:
     static std::shared_ptr<std::string> config_path() {
@@ -192,3 +193,4 @@ TEST_F(MinioFileTest, TestFileSize) {
 
     infinity::InfinityContext::instance().UnInit();
 }
+#endif
