@@ -13,23 +13,11 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
+
 import base_test;
-// import infinity_exception;
-//
- import stl;
- import virtual_storage;
- import virtual_storage_type;
-// import global_resource_usage;
-// import third_party;
-// import logger;
-//
-// import file_system;
-// import local_file_system;
-// import file_writer;
-// import file_reader;
-// import infinity_context;
-// import stream_io;
-// import file_system_type;
+import stl;
+import virtual_storage;
+import virtual_storage_type;
 import local_file;
 import abstract_file_handle;
 
@@ -37,7 +25,7 @@ using namespace infinity;
 
 class LocalFileTest : public BaseTest {};
 
-TEST_F(LocalFileTest, test1) {
+TEST_F(LocalFileTest, TestAppend) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file2.abc";
 
@@ -68,7 +56,7 @@ TEST_F(LocalFileTest, test1) {
     virtual_storage.UnInit();
 }
 
-TEST_F(LocalFileTest, test2) {
+TEST_F(LocalFileTest, TestDir) {
     using namespace infinity;
     String dir = String(GetFullTmpDir()) + "/unit_test";
     String path = dir + "/test_file.test";
@@ -102,3 +90,240 @@ TEST_F(LocalFileTest, test2) {
     EXPECT_FALSE(virtual_storage.Exists(path));
     EXPECT_FALSE(virtual_storage.Exists(dir));
 }
+
+TEST_F(LocalFileTest, TestRead) {
+    using namespace infinity;
+
+    String path = String(GetFullTmpDir()) + "/test_file_read.abc";
+
+    VirtualStorage virtual_storage;
+    Map<String, String> configs;
+    virtual_storage.Init(StorageType::kLocal, configs);
+
+    auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(status.ok());
+
+    status = local_file_handle->Open(path, FileAccessMode::kWrite);
+    EXPECT_TRUE(status.ok());
+
+    SizeT len = 10;
+    UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
+    for (SizeT i = 0; i < len; ++i) {
+        data_array[i] = i + 1;
+    }
+
+    local_file_handle->Append(data_array.get(), len);
+    local_file_handle->Sync();
+    local_file_handle->Close();
+
+    status = local_file_handle->Open(path, FileAccessMode::kRead);
+    EXPECT_TRUE(status.ok());
+
+    UniquePtr<char[]> read_data = MakeUnique<char[]>(len);
+    auto [read_len, read_status] = local_file_handle->Read(read_data.get(), len);
+    EXPECT_TRUE(read_status.ok());
+    local_file_handle->Close();
+
+    EXPECT_EQ(read_len, len);
+    for(SizeT i = 0; i < len; ++i) {
+        EXPECT_EQ(read_data[i], i + 1);
+    }
+
+    virtual_storage.DeleteFile(path);
+    EXPECT_FALSE(virtual_storage.Exists(path));
+}
+
+TEST_F(LocalFileTest, TestRename) {
+    using namespace infinity;
+    VirtualStorage virtual_storage;
+    Map<String, String> configs;
+    virtual_storage.Init(StorageType::kLocal, configs);
+
+    String old_path = String(GetFullTmpDir()) + "/test_file_old.abc";
+    String new_path = String(GetFullTmpDir()) + "/test_file_new.abc";
+
+    auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(status.ok());
+
+    status = local_file_handle->Open(old_path, FileAccessMode::kWrite);
+    EXPECT_TRUE(status.ok());
+
+    SizeT len = 10;
+    UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
+    for(SizeT i = 0; i < len; ++ i) {
+        data_array[i] = i + 1;
+    }
+
+    local_file_handle->Append(data_array.get(), len);
+    local_file_handle->Sync();
+    local_file_handle->Close();
+
+    status = virtual_storage.RenameLocal(old_path, new_path);
+    EXPECT_TRUE(status.ok());
+
+    EXPECT_FALSE(virtual_storage.Exists(old_path));
+    EXPECT_TRUE(virtual_storage.Exists(new_path));
+
+    virtual_storage.DeleteFile(new_path);
+    EXPECT_FALSE(virtual_storage.Exists(new_path));
+}
+
+TEST_F(LocalFileTest, TestTruncate) {
+    using namespace infinity;
+    VirtualStorage virtual_storage;
+    Map<String, String> configs;
+    virtual_storage.Init(StorageType::kLocal, configs);
+
+    String path = String(GetFullTmpDir()) + "/test_file_truncate.abc";
+
+    auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(status.ok());
+
+    status = local_file_handle->Open(path, FileAccessMode::kWrite);
+    EXPECT_TRUE(status.ok());
+
+    SizeT len = 20;
+    UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
+    for(SizeT i = 0; i < len; ++ i) {
+        data_array[i] = i + 1;
+    }
+
+    local_file_handle->Append(data_array.get(), len);
+    local_file_handle->Sync();
+    local_file_handle->Close();
+
+    virtual_storage.TruncateLocal(path, 10);
+
+    status = local_file_handle->Open(path, FileAccessMode::kRead);
+    EXPECT_TRUE(status.ok());
+
+    UniquePtr<char[]> truncated_data = MakeUnique<char[]>(10);
+    auto [read_len, read_status] = local_file_handle->Read(truncated_data.get(), 10);
+    EXPECT_TRUE(read_status.ok());
+    EXPECT_EQ(read_len, 10);
+
+    status = local_file_handle->Close();
+    EXPECT_TRUE(status.ok());
+
+    for(SizeT i = 0; i < 10; ++i) {
+        EXPECT_EQ(truncated_data[i], i + 1);
+    }
+
+    virtual_storage.DeleteFile(path);
+    EXPECT_FALSE(virtual_storage.Exists(path));
+}
+
+
+TEST_F(LocalFileTest, TestMerge) {
+    using namespace infinity;
+    using namespace infinity;
+    VirtualStorage virtual_storage;
+    Map<String, String> configs;
+    virtual_storage.Init(StorageType::kLocal, configs);
+
+    String dst_path = String(GetFullTmpDir()) + "/test_file_append_dst.abc";
+    String src_path = String(GetFullTmpDir()) + "/test_file_append_src.abc";
+
+    // Write source file
+    auto [src_file_handle, status] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(status.ok());
+
+    status = src_file_handle->Open(src_path, FileAccessMode::kWrite);
+    EXPECT_TRUE(status.ok());
+
+    SizeT src_len = 10;
+    UniquePtr<char[]> data_array1 = MakeUnique<char[]>(src_len);
+    for(SizeT i = 0; i < src_len; ++ i) {
+        data_array1[i] = i + 1;
+    }
+
+    src_file_handle->Append(data_array1.get(), src_len);
+    src_file_handle->Sync();
+    src_file_handle->Close();
+
+    auto [dst_file_handle, dst_status] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(dst_status.ok());
+
+    status = dst_file_handle->Open(dst_path, FileAccessMode::kWrite);
+    EXPECT_TRUE(status.ok());
+
+    SizeT dst_len = 10;
+    UniquePtr<char[]> data_array2 = MakeUnique<char[]>(dst_len);
+    for(SizeT i = 0; i < dst_len; ++ i) {
+        data_array2[i] = i + 1;
+    }
+
+    dst_file_handle->Append(data_array2.get(), dst_len);
+    dst_file_handle->Sync();
+    dst_file_handle->Close();
+
+    virtual_storage.MergeLocal(dst_path, src_path);
+    
+    auto [merge_file_handle, merge_status] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(merge_status.ok());
+
+    status = merge_file_handle->Open(dst_path, FileAccessMode::kRead);
+    EXPECT_TRUE(status.ok());
+
+    UniquePtr<char[]> combined_data = MakeUnique<char[]>(src_len + dst_len);
+    auto [read_len, merge_read_status] = merge_file_handle->Read(combined_data.get(), src_len + dst_len);
+    EXPECT_TRUE(merge_read_status.ok());
+    merge_file_handle->Close();
+
+    EXPECT_EQ(read_len, (i64)(src_len + dst_len));
+    for(SizeT i = 0; i < dst_len; ++i) {
+        EXPECT_EQ(combined_data[i], i + 1);
+    }
+    for(SizeT i = dst_len; i < src_len + dst_len; ++i) {
+        EXPECT_EQ(combined_data[i], i - dst_len + 1);
+    }
+
+    virtual_storage.DeleteFile(src_path);
+    virtual_storage.DeleteFile(dst_path);
+    EXPECT_FALSE(virtual_storage.Exists(src_path));
+    EXPECT_FALSE(virtual_storage.Exists(dst_path));
+}
+
+//TEST_F(LocalFileTest, TestCleanDir) {
+//    using namespace infinity;
+//    LocalFileSystem local_file_system;
+//    String dir = String(GetFullTmpDir()) + "/cleanup_test_dir";
+//    String file_path1 = dir + "/file1.txt";
+//    String file_path2 = dir + "/file2.txt";
+//
+//    local_file_system.CreateDirectory(dir);
+//
+//    auto [file_handler1, status1] =
+//        local_file_system.OpenFile(file_path1, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kWriteLock);
+//    if(!status1.ok()) {
+//        UnrecoverableError(status1.message());
+//    }
+//    SizeT len1 = 10;
+//    UniquePtr<char[]> data_array1 = MakeUnique<char[]>(len1);
+//    for(SizeT i = 0; i < len1; ++i) {
+//        data_array1[i] = i + 1;
+//    }
+//    file_handler1->Write(data_array1.get(), len1);
+//    file_handler1->Sync();
+//    file_handler1->Close();
+//
+//    auto [file_handler2, status2] =
+//        local_file_system.OpenFile(file_path2, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kWriteLock);
+//    if(!status2.ok()) {
+//        UnrecoverableError(status2.message());
+//    }
+//    SizeT len2 = 20;
+//    UniquePtr<char[]> data_array2 = MakeUnique<char[]>(len2);
+//    for(SizeT i = 0; i < len2; ++i) {
+//        data_array2[i] = i + 11;
+//    }
+//    file_handler2->Write(data_array2.get(), len2);
+//    file_handler2->Sync();
+//    file_handler2->Close();
+//
+//    local_file_system.CleanupDirectory(dir);
+//
+//    EXPECT_FALSE(local_file_system.Exists(file_path1));
+//    EXPECT_FALSE(local_file_system.Exists(file_path2));
+//    EXPECT_TRUE(local_file_system.Exists(dir));
+//}

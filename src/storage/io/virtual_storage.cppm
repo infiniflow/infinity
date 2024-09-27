@@ -48,7 +48,7 @@ public:
     }
 
     Status DeleteFile(const String& path);
-    Status Rename(const String& old_path, const String& new_path);
+
     bool Exists(const String& path);
     Tuple<Vector<String>, Status> ListDirectory(const String& path);
     bool IsRegularFile(const String& path);
@@ -59,6 +59,9 @@ public:
     Status MakeLocalDirectory(const String& path);
     Status RemoveLocalDirectory(const String& path);
     Status CleanupLocalDirectory(const String& path);
+    Status RenameLocal(const String& old_path, const String& new_path);
+    Status TruncateLocal(const String& file_name, SizeT new_length);
+    Status MergeLocal(const String& dst_file, const String& src_file);
 private:
     StorageType storage_type_{StorageType::kLocal};
     UniquePtr<LocalDiskCache> local_disk_cache_{};

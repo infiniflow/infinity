@@ -283,6 +283,8 @@ export {
     constexpr std::string_view CPU_USAGE_VAR_NAME = "cpu_usage";  // global
     constexpr std::string_view FOLLOWER_NUMBER = "follower_number";  // global
 
+    // IO related
+    constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;
 }
 
 } // namespace infinity

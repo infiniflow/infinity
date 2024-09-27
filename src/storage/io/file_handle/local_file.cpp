@@ -78,6 +78,9 @@ Status LocalFile::Close() {
         close(fd_);
         fd_ = -1;
         open_ = false;
+        path_.clear();
+        sync_ = false;
+        access_mode_ = FileAccessMode::kInvalid;
     }
     return Status::OK();
 }
