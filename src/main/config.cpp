@@ -114,8 +114,6 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
     return Status::OK();
 }
 
-// extern SharedPtr<spdlogger> infinity_logger;
-
 Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
     toml::table config_toml{};
     if (config_path.get() == nullptr || config_path->empty() || !VirtualStorage::ExistsLocal(std::filesystem::absolute(*config_path))) {
