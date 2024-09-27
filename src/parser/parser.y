@@ -442,7 +442,6 @@ struct SQL_LTYPE {
 %type <with_expr_t>             with_expr
 %type <with_expr_list_t>        with_expr_list with_clause
 %type <set_operator_t>          set_operator
-%type <explain_type_t>          explain_type
 
 %type <expr_t>                  expr expr_alias column_expr function_expr subquery_expr match_vector_expr match_tensor_expr match_sparse_expr sub_search
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
@@ -1052,19 +1051,20 @@ optional_identifier_array: '(' identifier_array ')' {
  */
 explain_statement : EXPLAIN IDENTIFIER explainable_statement {
     $$ = new infinity::ExplainStatement();
-    if(!strcmp($2, "ANALYZE")) $$->type_ = infinity::ExplainType::kAnalyze;
-    else if(!strcmp($2, "AST")) $$->type_ =infinity::ExplainType::kAst;
-    else if(!strcmp($2, "RAW")) $$->type_ =infinity::ExplainType::kUnOpt;
-    else if(!strcmp($2, "LOGICAL")) $$->type_ =infinity::ExplainType::kOpt;
-    else if(!strcmp($2, "PHYSICAL")) $$->type_ =infinity::ExplainType::kPhysical;
-    else if(!strcmp($2, "PIPELINE")) $$->type_ =infinity::ExplainType::kPipeline;
-    else if(!strcmp($2, "FRAGMENT")) $$->type_ =infinity::ExplainType::kFragment;
+    ParserHelper::ToLower($2);
+    if(!strcmp($2, "analyze")) $$->type_ = infinity::ExplainType::kAnalyze;
+    else if(!strcmp($2, "ast")) $$->type_ =infinity::ExplainType::kAst;
+    else if(!strcmp($2, "raw")) $$->type_ =infinity::ExplainType::kUnOpt;
+    else if(!strcmp($2, "logical")) $$->type_ =infinity::ExplainType::kOpt;
+    else if(!strcmp($2, "physical")) $$->type_ =infinity::ExplainType::kPhysical;
+    else if(!strcmp($2, "pipeline")) $$->type_ =infinity::ExplainType::kPipeline;
+    else if(!strcmp($2, "fragment")) $$->type_ =infinity::ExplainType::kFragment;
     free($2);
     $$->statement_ = $3;0
 } | EXPLAIN explainable_statement {
     $$ = new infinity::ExplainStatement();
     $$->type_ =infinity::ExplainType::kPhysical;
-    $$->statement_ = $3;
+    $$->statement_ = $2;
 }
 
 /*
