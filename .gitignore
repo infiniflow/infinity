@@ -135,3 +135,4 @@ python/benchmark/datasets/
 tmp*/
 
 dist/
+python/infinity_sdk/infinity_sdk.egg-info/

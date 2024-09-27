@@ -316,7 +316,7 @@ add_executable(infinity
 #        ${network_cppm}
 #)
 
-add_dependencies(infinity oatpp miniocpp)
+add_dependencies(infinity oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
 
 target_link_libraries(infinity
         infinity_core
@@ -342,6 +342,12 @@ target_link_libraries(infinity
         snappy.a
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
+        pugixml-static
+        curlpp_static
+        inih.a
+        libcurl_static
+        ssl.a
+        crypto.a
         re2.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -349,7 +355,12 @@ target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/s
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+target_link_directories(infinity PUBLIC "/usr/local/openssl30/lib64")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -373,7 +384,7 @@ if (SKBUILD)
     set(libname "nanobind-static-abi3")
     nanobind_build_library(${libname})
     nanobind_extension_abi3(embedded_infinity_ext)
-    add_dependencies(embedded_infinity_ext oatpp miniocpp)
+    add_dependencies(embedded_infinity_ext oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
 
     target_link_libraries(embedded_infinity_ext PRIVATE
             ${libname}
@@ -399,6 +410,12 @@ if (SKBUILD)
             snappy.a
             ${JEMALLOC_STATIC_LIB}
             miniocpp.a
+            pugixml-static
+            curlpp_static
+            inih.a
+            libcurl_static
+            ssl.a
+            crypto.a
             re2.a
     )
 
@@ -411,6 +428,11 @@ if (SKBUILD)
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+    target_link_directories(embedded_infinity_ext PUBLIC "/usr/local/openssl30/lib64")
     nanobind_disable_stack_protector(embedded_infinity_ext)
     nanobind_opt_size(embedded_infinity_ext)
     nanobind_strip(embedded_infinity_ext)

@@ -28,11 +28,24 @@ target_link_libraries(
     c++abi.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    miniocpp.a
+    pugixml-static
+    curlpp_static
+    inih.a
+    libcurl_static
+    ssl.a
+    crypto.a
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(infinity_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # ########################################
 # knn
@@ -66,11 +79,24 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    miniocpp.a
+    pugixml-static
+    curlpp_static
+    inih.a
+    libcurl_static
+    ssl.a
+    crypto.a
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(knn_import_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # query benchmark
 add_executable(knn_query_benchmark
@@ -100,11 +126,24 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    miniocpp.a
+    pugixml-static
+    curlpp_static
+    inih.a
+    libcurl_static
+    ssl.a
+    crypto.a
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(knn_query_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # ########################################
 # fulltext
@@ -136,11 +175,24 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    miniocpp.a
+    pugixml-static
+    curlpp_static
+    inih.a
+    libcurl_static
+    ssl.a
+    crypto.a
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(fulltext_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # ########################################
 add_executable(sparse_benchmark
@@ -170,11 +222,24 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    miniocpp.a
+    pugixml-static
+    curlpp_static
+    inih.a
+    libcurl_static
+    ssl.a
+    crypto.a
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(sparse_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 add_executable(bmp_benchmark
     ./sparse/bmp_benchmark.cpp
@@ -203,11 +268,24 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    miniocpp.a
+    pugixml-static
+    curlpp_static
+    inih.a
+    libcurl_static
+    ssl.a
+    crypto.a
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(bmp_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 add_executable(hnsw_benchmark
     ./knn/hnsw_benchmark.cpp
@@ -236,11 +314,24 @@ target_link_libraries(
     thriftnb.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
+    miniocpp.a
+    pugixml-static
+    curlpp_static
+    inih.a
+    libcurl_static
+    ssl.a
+    crypto.a
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(hnsw_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

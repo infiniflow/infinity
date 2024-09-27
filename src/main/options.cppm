@@ -111,7 +111,7 @@ export struct FlushOption : public BaseOption {
     FlushOptionType value_{};
 };
 
-export enum class GlobalOptionIndex {
+export enum class GlobalOptionIndex : i8 {
     // System config
     kVersion = 0,
     kTimeZone = 1,
@@ -151,7 +151,12 @@ export enum class GlobalOptionIndex {
     kPeerServerIP = 35,
     kPeerServerPort = 36,
     kPeerServerConnectionPoolSize = 37,
-    kInvalid = 38,
+    kStorageType = 38,
+    kObjectStorage = 39,
+    kObjectStorageUrl = 40,
+    kObjectStorageBucket = 41,
+
+    kInvalid = 42,
 };
 
 export struct GlobalOptions {

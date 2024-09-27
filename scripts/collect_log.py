@@ -37,7 +37,7 @@ stdout_path = args.stdout_path
 stderror_path = args.stderror_path
 executable_path = args.executable_path
 output_dir = args.output_dir
-failure = args.failure == "failure"
+failure = args.failure == "true" or args.failure == "True"
 
 if not os.path.isdir(output_dir):
     os.makedirs(output_dir)

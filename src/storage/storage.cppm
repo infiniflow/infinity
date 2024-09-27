@@ -26,6 +26,7 @@ import periodic_trigger_thread;
 import log_file;
 import memindex_tracer;
 import persistence_manager;
+import virtual_storage;
 
 export module storage;
 
@@ -47,6 +48,10 @@ public:
 
     [[nodiscard]] inline WalManager *wal_manager() const noexcept { return wal_mgr_.get(); }
 
+    [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return persistence_manager_.get(); }
+
+    [[nodiscard]] inline VirtualStorage *virtual_storage() noexcept { return virtual_storage_system_.get(); }
+
     [[nodiscard]] inline BGTaskProcessor *bg_processor() const noexcept { return bg_processor_.get(); }
 
     [[nodiscard]] inline PeriodicTriggerThread *periodic_trigger_thread() const noexcept { return periodic_trigger_thread_.get(); }
@@ -54,8 +59,6 @@ public:
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
 
     [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
-
-    [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return persistence_manager_.get(); }
 
     StorageMode GetStorageMode() const;
     void SetStorageMode(StorageMode mode);
@@ -73,6 +76,7 @@ private:
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<PersistenceManager> persistence_manager_{};
+    UniquePtr<VirtualStorage> virtual_storage_system_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
