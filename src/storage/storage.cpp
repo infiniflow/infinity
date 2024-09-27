@@ -114,8 +114,8 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 }
                 case StorageType::kMinio: {
                     Map<String, String> configs;
-                    configs.emplace("url", config_ptr_->ObjectStorageHost());
-                    virtual_storage_system_->Init(StorageType::kLocal, configs);
+                    configs.emplace("url", config_ptr_->ObjectStorageUrl());
+                    virtual_storage_system_->Init(StorageType::kMinio, configs);
                     break;
                 }
                 default: {

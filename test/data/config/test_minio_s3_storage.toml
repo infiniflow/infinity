@@ -36,8 +36,7 @@ storage_type             = "minio"
 mem_index_capacity       = 1048576
 
 [storage.object_storage]
-host                     = "127.0.0.1"
-port                     = 9000
+url                      = "127.0.0.1:9000"
 bucket_name              = "infinity"
 
 [buffer]
@@ -61,8 +60,3 @@ wal_flush                     = "only_write"
 
 [resource]
 resource_dir                  = "/var/infinity/resource"
-
-[object_storage]
-host                   = "127.0.0.1"
-port                   = "9000"
-bucket_name            = "infinity"

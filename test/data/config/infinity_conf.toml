@@ -22,11 +22,10 @@ log_level               = "trace"
 
 [storage]
 persistence_dir         = "/var/infinity/persistence"
-storage_type        = "minio"
+storage_type            = "minio"
 
 [storage.object_storage]
-host                    = "0.0.0.0"
-port                    = 9000
+url                     = "0.0.0.0:9000"
 bucket_name             = "infinity"
 
 [buffer]

@@ -61,8 +61,7 @@ GlobalOptions::GlobalOptions() {
 
     name2index_[String(STORAGE_TYPE_OPTION_NAME)] = GlobalOptionIndex::kStorageType;
     name2index_[String(OBJECT_STORAGE_OPTION_NAME)] = GlobalOptionIndex::kObjectStorage;
-    name2index_[String(OBJECT_STORAGE_HOST_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageHost;
-    name2index_[String(OBJECT_STORAGE_PORT_OPTION_NAME)] = GlobalOptionIndex::kObjectStoragePort;
+    name2index_[String(OBJECT_STORAGE_URL_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageUrl;
     name2index_[String(OBJECT_STORAGE_BUCKET_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageBucket;
 
     name2index_[String(BUFFER_MANAGER_SIZE_OPTION_NAME)] = GlobalOptionIndex::kBufferManagerSize;

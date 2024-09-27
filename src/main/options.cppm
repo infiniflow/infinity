@@ -153,11 +153,10 @@ export enum class GlobalOptionIndex : i8 {
     kPeerServerConnectionPoolSize = 37,
     kStorageType = 38,
     kObjectStorage = 39,
-    kObjectStorageHost = 40,
-    kObjectStoragePort = 41,
-    kObjectStorageBucket = 42,
+    kObjectStorageUrl = 40,
+    kObjectStorageBucket = 41,
 
-    kInvalid = 43,
+    kInvalid = 42,
 };
 
 export struct GlobalOptions {

@@ -97,8 +97,7 @@ public:
     i64 MemIndexCapacity();
 
     StorageType StorageType();
-    String ObjectStorageHost();
-    i64 ObjectStoragePort();
+    String ObjectStorageUrl();
     String ObjectStorageBucket();
 
     // Persistence
