@@ -29,7 +29,7 @@ parser.add_argument(
     required=True,
     help="Path to the output directory",
 )
-parser.add_argument("--failure", type=str, required=True, help="If the test failured")
+parser.add_argument("--failure", type=bool, required=True, help="If the test failured")
 args = parser.parse_args()
 
 log_path = args.log_path
@@ -37,7 +37,7 @@ stdout_path = args.stdout_path
 stderror_path = args.stderror_path
 executable_path = args.executable_path
 output_dir = args.output_dir
-failure = args.failure == "failure"
+failure = args.failure
 
 if not os.path.isdir(output_dir):
     os.makedirs(output_dir)
