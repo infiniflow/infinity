@@ -1,0 +1,535 @@
+// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+module;
+
+#include <re2/re2.h>
+
+#include <cmath>
+#include <filesystem>
+#include <sstream>
+
+#include "string_utils.h"
+
+module rag_analyzer;
+
+import stl;
+import term;
+import stemmer;
+import analyzer;
+import darts_trie;
+
+namespace fs = std::filesystem;
+
+namespace infinity {
+
+static const String DICT_PATH = "rag/huqie.txt";
+static const String POS_DEF_PATH = "rag/pos-id.def";
+static const String TRIE_PATH = "rag/huqie.trie";
+
+static const String REGEX_SPLIT_CHAR = R"([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+)";
+
+void Split(const String &line, const String &split_pattern, Vector<String> &result) {
+    re2::StringPiece input(line);
+
+    // Using re2::Splits to split the string
+    re2::StringPiece piece;
+    while (RE2::FindAndConsume(&input, split_pattern, &piece)) {
+        if (!piece.empty()) {
+            result.push_back(piece.as_string());
+        }
+    }
+
+    // Add remaining part if there's any
+    if (!input.empty()) {
+        result.push_back(input.as_string());
+    }
+}
+
+String Replace(const RE2 &re, const String &replacement, const String &input) {
+    String output = input;
+    RE2::GlobalReplace(&output, re, replacement);
+    return output;
+}
+
+bool RegexMatch(const String &str, const String &pattern) { return RE2::PartialMatch(str, RE2(pattern)); }
+
+String Join(const Vector<String> &tokens, int start, int end) {
+    std::ostringstream oss;
+    for (int i = start; i < end; ++i) {
+        if (i > start)
+            oss << " ";
+        oss << tokens[i];
+    }
+    return oss.str();
+}
+
+String Join(const Vector<String> &tokens, int start) { return Join(tokens, start, tokens.size()); }
+
+std::wstring UTF8ToWide(const String &utf8) {
+    std::wstring result;
+    int i = 0, length = utf8.length();
+
+    while (i < length) {
+        wchar_t wchar;
+        unsigned char byte1 = utf8[i];
+
+        if (byte1 <= 0x7F) {
+            wchar = byte1;
+            i += 1;
+        } else if ((byte1 & 0xE0) == 0xC0) {
+            if (i + 1 >= length)
+                throw std::runtime_error("Invalid UTF-8 string");
+            wchar = (byte1 & 0x1F) << 6 | (utf8[i + 1] & 0x3F);
+            i += 2;
+        } else if ((byte1 & 0xF0) == 0xE0) {
+            if (i + 2 >= length)
+                throw std::runtime_error("Invalid UTF-8 string");
+            wchar = (byte1 & 0x0F) << 12 | (utf8[i + 1] & 0x3F) << 6 | (utf8[i + 2] & 0x3F);
+            i += 3;
+        } else {
+            throw std::runtime_error("Invalid UTF-8 string");
+        }
+
+        result += wchar;
+    }
+
+    return result;
+}
+
+String WideCharToUTF8(wchar_t wchar) {
+    String result;
+
+    if (wchar <= 0x7F) {
+        result += static_cast<char>(wchar); // 1 byte
+    } else if (wchar <= 0x7FF) {
+        result += static_cast<char>(0xC0 | ((wchar >> 6) & 0x1F)); // 2 bytes
+        result += static_cast<char>(0x80 | (wchar & 0x3F));
+    } else if (wchar <= 0xFFFF) {
+        result += static_cast<char>(0xE0 | ((wchar >> 12) & 0x0F)); // 3 bytes
+        result += static_cast<char>(0x80 | ((wchar >> 6) & 0x3F));
+        result += static_cast<char>(0x80 | (wchar & 0x3F));
+    } else if (wchar <= 0x10FFFF) {
+        result += static_cast<char>(0xF0 | ((wchar >> 18) & 0x07)); // 4 bytes
+        result += static_cast<char>(0x80 | ((wchar >> 12) & 0x3F));
+        result += static_cast<char>(0x80 | ((wchar >> 6) & 0x3F));
+        result += static_cast<char>(0x80 | (wchar & 0x3F));
+    }
+
+    return result;
+}
+
+int GetNextPosUTF8(const String &line, int last_pos) {
+    if (last_pos < 0 || last_pos >= static_cast<int>(line.size())) {
+        throw std::out_of_range("last_pos is out of range");
+    }
+
+    int next_pos = last_pos + 1;
+    while (next_pos < static_cast<int>(line.size())) {
+        if ((line[next_pos] & 0b11000000) != 0b10000000) {
+            return next_pos;
+        }
+        ++next_pos;
+    }
+
+    return line.size();
+}
+
+int GetPrevPosUTF8(const String &line, int last_pos) {
+    if (last_pos <= 0 || last_pos > static_cast<int>(line.size())) {
+        throw std::out_of_range("last_pos is out of range");
+    }
+
+    int prev_pos = last_pos - 1;
+    while (prev_pos >= 0) {
+        if ((line[prev_pos] & 0b11000000) != 0b10000000) {
+            return prev_pos;
+        }
+        --prev_pos;
+    }
+
+    return -1;
+}
+
+int GetStepPosUTF8(const String &line, int last_pos, int step) {
+    if (last_pos < 0 || last_pos >= static_cast<int>(line.size())) {
+        throw std::out_of_range("last_pos is out of range");
+    }
+
+    int current_pos = last_pos;
+
+    int step_counter = 0;
+
+    while (step_counter != step) {
+        if (step > 0) {
+            current_pos++;
+            if (current_pos >= static_cast<int>(line.size())) {
+                return line.size();
+            }
+            if ((line[current_pos] & 0b11000000) != 0b10000000) {
+                step_counter++;
+            }
+        } else {
+            current_pos--;
+            if (current_pos < 0) {
+                return 0;
+            }
+            if ((line[current_pos] & 0b11000000) != 0b10000000) {
+                step_counter--;
+            }
+        }
+    }
+
+    return current_pos;
+}
+
+RAGAnalyzer::RAGAnalyzer(const String &path) : dict_path_(path) {}
+
+RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other) : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_) {}
+
+RAGAnalyzer::~RAGAnalyzer() {
+    if (own_dict_) {
+        delete trie_;
+        delete pos_table_;
+    }
+}
+
+Status RAGAnalyzer::Load() {
+    fs::path root(dict_path_);
+    fs::path dict_path(root / DICT_PATH);
+
+    if (!fs::exists(dict_path)) {
+        return Status::InvalidAnalyzerFile(dict_path);
+    }
+
+    fs::path pos_def_path(root / POS_DEF_PATH);
+    if (!fs::exists(pos_def_path)) {
+        return Status::InvalidAnalyzerFile(pos_def_path);
+    }
+    own_dict_ = true;
+    trie_ = new DartsTrie();
+    pos_table_ = new POSTable(pos_def_path.string());
+    if (!pos_table_->Load().ok()) {
+        return Status::InvalidAnalyzerFile("Failed to load RAGAnalyzer POS definition");
+    }
+
+    fs::path trie_path(root / TRIE_PATH);
+    if (fs::exists(trie_path)) {
+        trie_->Load(trie_path.string());
+    } else {
+        // Build trie
+        try {
+            std::istringstream from(dict_path.string());
+            String line;
+            std::istringstream iss;
+            const String split_pattern = R"([ \t])";
+
+            while (getline(from, line)) {
+                line = line.substr(0, line.find('\r'));
+                if (line.empty())
+                    continue;
+                Vector<String> results;
+                Split(line, split_pattern, results);
+                i32 freq = std::stoi(results[1]);
+                freq = i32(std::log(float(freq) / DENOMINATOR) + 0.5);
+                i32 pos_idx = pos_table_->GetPOSIndex(results[2]);
+                i64 value = (i64)freq << 32 | pos_idx;
+                trie_->Add(results[0], value);
+            }
+            trie_->Build();
+        } catch (const std::exception &e) {
+            return Status::InvalidAnalyzerFile("Failed to load RAGAnalyzer analyzer");
+        }
+        trie_->Save(trie_path.string());
+    }
+
+    return Status::OK();
+}
+
+String RAGAnalyzer::StrQ2B(const String &input) {
+    std::wstring wide_str = UTF8ToWide(input);
+    String result;
+
+    for (wchar_t wchar : wide_str) {
+        int code = static_cast<int>(wchar);
+        if (code == 0x3000) {
+            result += ' ';
+        } else if (code >= 0xFF01 && code <= 0xFF5E) {
+            // Convert full-width characters to half-width
+            result += static_cast<char>(code - 0xfee0);
+        } else {
+            result += WideCharToUTF8(wchar);
+        }
+    }
+
+    return result;
+}
+
+i32 RAGAnalyzer::Freq(const String &key) {
+    i32 v = trie_->Get(key) >> 32;
+    return i32(std::exp(v) * DENOMINATOR + 0.5);
+}
+
+String RAGAnalyzer::Key(const String &line) { return ToLowerString(line); }
+
+String RAGAnalyzer::RKey(const String &line) {
+    String reversed;
+    for (size_t i = line.size(); i > 0;) {
+        size_t start = i - 1;
+        while (start > 0 && (line[start] & 0xC0) == 0x80) {
+            --start;
+        }
+        reversed += line.substr(start, i - start);
+        i = start;
+    }
+    return "DD" + ToLowerString(reversed);
+}
+
+Pair<Vector<String>, double> RAGAnalyzer::Score(const Vector<Pair<String, i64>> &token_freqs) {
+    const int B = 30;
+    double F = 0.0, L = 0.0;
+    Vector<String> tokens;
+    tokens.reserve(token_freqs.size());
+
+    for (const auto &tk_freq_tag : token_freqs) {
+        const String &token = tk_freq_tag.first;
+        const auto &freq_tag = tk_freq_tag.second;
+        i32 freq = freq_tag >> 32;
+
+        F += freq;
+        L += (token.length() < 2) ? 0 : 1;
+        tokens.push_back(token);
+    }
+
+    if (!tokens.empty()) {
+        F /= tokens.size();
+        L /= tokens.size();
+    }
+
+    double score = B / static_cast<double>(tokens.size()) + L + F;
+    return {tokens, score};
+}
+
+void RAGAnalyzer::SortTokens(const Vector<Vector<Pair<String, i64>>> &token_list, Vector<Pair<Vector<String>, double>> &res) {
+    for (const auto &tfts : token_list) {
+        auto [tks, score] = Score(tfts);
+        res.emplace_back(tks, score);
+    }
+
+    // Sort the results in descending order based on the score
+    std::sort(res.begin(), res.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
+}
+
+Pair<Vector<String>, double> RAGAnalyzer::MaxForward(const String &line) {
+    Vector<Pair<String, i64>> res;
+    std::size_t s = 0;
+
+    while (s < line.length()) {
+        std::size_t e = GetNextPosUTF8(line, s + 1);
+        String t = line.substr(s, e - s);
+
+        while (e < line.length() && trie_->HasKeysWithPrefix(Key(t))) {
+            e = GetNextPosUTF8(line, e);
+            t = line.substr(s, e - s);
+        }
+
+        while (e - 1 > s && trie_->Get(Key(t)) == -1) {
+            e = GetPrevPosUTF8(line, e);
+            t = line.substr(s, e - s);
+        }
+
+        i64 v = trie_->Get(Key(t));
+        if (v != -1) {
+            res.emplace_back(t, v);
+        } else {
+            res.emplace_back(t, v);
+        }
+
+        s = e;
+    }
+
+    return Score(res);
+}
+
+Pair<Vector<String>, double> RAGAnalyzer::MaxBackward(const String &line) {
+    Vector<Pair<String, i64>> res;
+    int s = line.length() - 1;
+
+    while (s >= 0) {
+        int e = GetNextPosUTF8(line, s + 1);
+        String t = line.substr(s, e - s);
+
+        while (s > 0 && trie_->HasKeysWithPrefix(RKey(t))) {
+            s = GetPrevPosUTF8(line, s);
+            t = line.substr(s, e - s);
+        }
+        while (s + 1 < e && trie_->Get(Key(t)) == -1) {
+            s = GetNextPosUTF8(line, s);
+            t = line.substr(s, e - s);
+        }
+
+        i64 v = trie_->Get(Key(t));
+        res.emplace_back(t, v);
+
+        s = GetNextPosUTF8(line, s);
+    }
+
+    std::reverse(res.begin(), res.end());
+    return Score(res);
+}
+
+int RAGAnalyzer::DFS(const String &chars, int s, Vector<Pair<String, i64>> &pre_tokens, Vector<Vector<Pair<String, i64>>> &token_list) {
+    int res = s;
+
+    if (s >= static_cast<int>(chars.size())) {
+        token_list.push_back(pre_tokens);
+        return res;
+    }
+    // pruning
+    int S = GetStepPosUTF8(chars, s, 1);
+    if (GetStepPosUTF8(chars, s, 2) <= static_cast<int>(chars.size())) {
+        String t1 = chars.substr(s, GetStepPosUTF8(chars, s, 1));
+        String t2 = chars.substr(s, GetStepPosUTF8(chars, s, 2));
+        if (trie_->HasKeysWithPrefix(Key(t1)) && !trie_->HasKeysWithPrefix(Key(t2))) {
+            S = GetStepPosUTF8(chars, s, 2);
+        }
+    }
+
+    if (pre_tokens.size() > 2 && pre_tokens[pre_tokens.size() - 1].first.size() == 1 && pre_tokens[pre_tokens.size() - 2].first.size() == 1 &&
+        pre_tokens[pre_tokens.size() - 3].first.size() == 1) {
+        String t1 = pre_tokens[pre_tokens.size() - 1].first + chars[s];
+        if (trie_->HasKeysWithPrefix(Key(t1))) {
+            S = GetStepPosUTF8(chars, s, 2);
+        }
+    }
+
+    for (int e = S; e <= static_cast<int>(chars.size()); ++e) {
+        String t(chars.begin() + s, chars.begin() + e);
+        String k = Key(t);
+
+        if (e > GetStepPosUTF8(chars, s, 1) && !trie_->HasKeysWithPrefix(k)) {
+            break;
+        }
+
+        if (trie_->HasKeysWithPrefix(k)) {
+            auto pretks = pre_tokens;
+            i64 v = trie_->Get(k);
+            pretks.emplace_back(t, v);
+            res = std::max(res, DFS(chars, e, pretks, token_list));
+        }
+    }
+
+    if (res > s) {
+        return res;
+    }
+
+    String t = chars.substr(s, GetStepPosUTF8(chars, s, 1));
+    String k = Key(t);
+    i64 v = trie_->Get(k);
+    pre_tokens.emplace_back(t, v);
+
+    return DFS(chars, GetStepPosUTF8(chars, s, 1), pre_tokens, token_list);
+}
+
+String RAGAnalyzer::Merge(const String &tks) {
+    String modified_tokens = tks;
+
+    RE2 re_space(R"(([ ]+))");
+    modified_tokens = Replace(re_space, " ", modified_tokens);
+
+    Vector<String> tokens;
+    Split(modified_tokens, " ", tokens);
+    Vector<String> res;
+    int s = 0;
+
+    while (true) {
+        if (s >= static_cast<int>(tokens.size())) {
+            break;
+        }
+
+        int E = GetStepPosUTF8(tks, s, 1);
+        int e = GetStepPosUTF8(tks, s, 2);
+        int s6 = GetStepPosUTF8(tks, s, 6);
+        for (; e < std::min(static_cast<int>(tokens.size()) + 2, s6);) {
+            String tk = Join(tokens, s, e);
+            if (RE2::PartialMatch(tk, REGEX_SPLIT_CHAR)) {
+                if (Freq(tk)) {
+                    E = e;
+                }
+            }
+            e = GetStepPosUTF8(tks, e, 1);
+        }
+        res.push_back(Join(tokens, s, E));
+        s = E;
+    }
+
+    return Join(res, 0, res.size());
+}
+
+void RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
+    Vector<String> arr;
+    Split(line, REGEX_SPLIT_CHAR, arr);
+
+    for (const auto &L : arr) {
+        if (L.length() < 2 || RegexMatch(L, "[a-z\\.-]+$") || RegexMatch(L, "[0-9\\.-]+$")) {
+            res.push_back(L);
+            continue;
+        }
+
+        auto [tks, s] = MaxForward(L);
+        auto [tks1, s1] = MaxBackward(L);
+
+        Vector<int> diff(std::max(tks.size(), tks1.size()), 0);
+        for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
+            if (tks[i] != tks1[i]) {
+                diff[i] = 1;
+            }
+        }
+
+        if (s1 > s) {
+            tks = tks1;
+        }
+
+        std::size_t i = 0;
+        while (i < tks.size()) {
+            std::size_t s = i;
+            while (s < tks.size() && diff[s] == 0) {
+                s++;
+            }
+            if (s == tks.size()) {
+                res.push_back(Join(tks, i, tks.size()));
+                break;
+            }
+            if (s > i) {
+                res.push_back(Join(tks, i, s));
+            }
+
+            std::size_t e = s;
+            while (e < tks.size() && e - s < 5 && diff[e] == 1) {
+                e++;
+            }
+
+            Vector<Pair<String, i64>> pre_tokens;
+            Vector<Vector<Pair<String, i64>>> token_list;
+            DFS(Join(tks, s, e + 1), 0, pre_tokens, token_list);
+            Vector<Pair<Vector<String>, double>> sorted_tokens;
+            SortTokens(token_list, sorted_tokens);
+            res.push_back(Join(sorted_tokens[0].first, 0));
+            i = e + 1;
+        }
+    }
+    // Merge(res);
+}
+
+} // namespace infinity
