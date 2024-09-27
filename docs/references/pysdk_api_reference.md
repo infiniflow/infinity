@@ -625,6 +625,73 @@ db_object.drop_table("my_table", ConflictType.Ignore)
 
 ---
 
+## add_columns
+
+```python
+table_object.add_columns(column_defs)
+```
+
+### Parameters
+
+#### column_defs: `dict[str, dict[str, Any]]`, *Required*
+
+A dictionary defining the columns to add. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value. See the description of `create_table()`'s `columns_definition` for all available settings. 
+
+:::caution NOTE
+You must specify a default value each time you add a column.
+:::
+
+
+### Examples
+
+#### Add an Integer column and a varchar column at once
+
+```python
+table_obj.add_columns({"column_name1": {"type": "integer", "default": 0}, "column_name2": {"type": "varchar", "default": ""}})
+```
+
+#### Add a multivector column
+
+```python
+table_obj.add_columns({"column_name1": {"type": "multivector,4,float", "default": [[1.0, 0.0, 0.0, 0.0], [1.2, 0.0, 0.0, 0.0]]}})
+```
+
+#### Add a dense vector column
+
+```python
+table_obj.add_columns({"column_name1": {"type": "multivector,4,float", "default": [1.0, 0.0, 0.0, 0.0]}})
+```
+
+---
+
+## drop_columns
+
+```python
+table_object.drop_columns(column_names)
+```
+
+### Parameters
+
+#### column_names: `list[str]`, *Required*
+
+A list of strings representing the names of the columns to drop.
+
+### Examples
+
+#### Remove one column from the table
+
+```python
+table_object.drop_columns(["column_name"])
+```
+
+#### Remove two columns at once
+
+```python
+table_object.drop_columns(["column_name1", "column_name2"])
+```
+
+---
+
 ## get_table
 
 ```python
@@ -1914,52 +1981,6 @@ table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_
             .filter("year < 2024")
             .fusion("match_tensor", 2, {"field": "tensor", "element_type": "float", "query_tensor": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
             .to_pl()
-```
-
----
-
-## add_columns
-
-```python
-table_object.add_columns(column_defs)
-```
-
-### Parameters
-
-#### column_defs: `dict[str, dict[str, Any]]`, *Required*
-
-A dictionary defining the columns to add. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value. See the description of `create_table()`'s `columns_definition` for all available settings. 
-
-:::caution NOTE
-You must specify a default value each time you add a column.
-:::
-
-
-#### Examples
-```python
-# Add an integer column and a varchar column at once
-table_obj.add_columns({"new_column_name1": {"type": "integer", "default": 0}, "new_column_name2": {"type": "varchar", "default": ""}})
-```
-
----
-
-# drop_columns
-
-```python
-table_object.drop_columns(column_names)
-```
-
-### Parameters
-
-#### column_names: `list[str]`, *Required*
-
-A list of strings representing the names of the columns to drop.
-
-#### Examples
-
-```python
-# Remove two columns at once
-table_object.drop_columns(["column_name1", "column_name2"])
 ```
 
 ---

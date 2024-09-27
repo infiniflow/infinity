@@ -1,11 +1,6 @@
----
-sidebar_position: 0
-slug: /contribution_guidelines
----
-
 # Contribution Guidelines
 
-Thanks for wanting to contribute to Infinity. This document offers guidelines and major considerations for submitting your contributions. 
+Thanks for wanting to contribute to Infinity. This document offers guidelines and major considerations for submitting your contributions.
 
 - To report a bug, file a [GitHub issue](https://github.com/infiniflow/infinity/issues/new/choose) with us.
 - For further questions, you can explore existing discussions or initiate a new one in [Discussions](https://github.com/orgs/infiniflow/discussions).
