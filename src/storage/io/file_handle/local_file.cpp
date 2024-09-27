@@ -144,6 +144,10 @@ Tuple<SizeT, Status> LocalFile::Read(String &buffer, u64 nbytes) {
     return {read_n, Status::OK()};
 }
 
+Status LocalFile::Download(const String &url, const String &path) { return Status::OK(); }
+
+Status LocalFile::Upload(const String &path, const String &url) { return Status::OK(); }
+
 SizeT LocalFile::FileSize() {
     struct stat s {};
     if (fstat(fd_, &s) == -1) {

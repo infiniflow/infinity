@@ -65,7 +65,7 @@ TEST_F(LocalFileTest, TestDir) {
     Map<String, String> configs;
     virtual_storage.Init(StorageType::kLocal, configs);
 
-    virtual_storage.MakeLocalDirectory(dir);
+    VirtualStorage::MakeLocalDirectory(dir);
 
     auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
     EXPECT_TRUE(status.ok());
@@ -84,9 +84,9 @@ TEST_F(LocalFileTest, TestDir) {
     local_file_handle->Close();
 
     EXPECT_TRUE(virtual_storage.Exists(path));
-    EXPECT_TRUE(virtual_storage.LocalExists(dir));
+    EXPECT_TRUE(VirtualStorage::LocalExists(dir));
 
-    virtual_storage.RemoveLocalDirectory(dir);
+    VirtualStorage::RemoveLocalDirectory(dir);
     EXPECT_FALSE(virtual_storage.Exists(path));
     EXPECT_FALSE(virtual_storage.Exists(dir));
 }
@@ -158,7 +158,7 @@ TEST_F(LocalFileTest, TestRename) {
     local_file_handle->Sync();
     local_file_handle->Close();
 
-    status = virtual_storage.RenameLocal(old_path, new_path);
+    status = VirtualStorage::RenameLocal(old_path, new_path);
     EXPECT_TRUE(status.ok());
 
     EXPECT_FALSE(virtual_storage.Exists(old_path));
@@ -192,7 +192,7 @@ TEST_F(LocalFileTest, TestTruncate) {
     local_file_handle->Sync();
     local_file_handle->Close();
 
-    virtual_storage.TruncateLocal(path, 10);
+    VirtualStorage::TruncateLocal(path, 10);
 
     status = local_file_handle->Open(path, FileAccessMode::kRead);
     EXPECT_TRUE(status.ok());
@@ -256,7 +256,7 @@ TEST_F(LocalFileTest, TestMerge) {
     dst_file_handle->Sync();
     dst_file_handle->Close();
 
-    virtual_storage.MergeLocal(dst_path, src_path);
+    VirtualStorage::MergeLocal(dst_path, src_path);
     
     auto [merge_file_handle, merge_status] = virtual_storage.BuildFileHandle();
     EXPECT_TRUE(merge_status.ok());
@@ -293,7 +293,7 @@ TEST_F(LocalFileTest, TestCleanDir) {
     String file_path1 = dir + "/file1.txt";
     String file_path2 = dir + "/file2.txt";
 
-    virtual_storage.MakeLocalDirectory(dir);
+    VirtualStorage::MakeLocalDirectory(dir);
 
     // Append file1.txt
     auto [src_file_handle, status1] = virtual_storage.BuildFileHandle();
@@ -341,11 +341,11 @@ TEST_F(LocalFileTest, TestCleanDir) {
     append_file2_handle->Sync();
     append_file2_handle->Close();
 
-    virtual_storage.CleanupLocalDirectory(dir);
+    VirtualStorage::CleanupLocalDirectory(dir);
 
     EXPECT_FALSE(virtual_storage.Exists(file_path1));
     EXPECT_FALSE(virtual_storage.Exists(file_path2));
     EXPECT_TRUE(virtual_storage.Exists(dir));
-    virtual_storage.RemoveLocalDirectory(dir);
+    VirtualStorage::RemoveLocalDirectory(dir);
     EXPECT_FALSE(virtual_storage.Exists(dir));
 }

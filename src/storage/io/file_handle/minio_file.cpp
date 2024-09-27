@@ -202,6 +202,11 @@ Tuple<SizeT, Status> MinioFile::Read(String &buffer, u64 nbytes) {
     return {readen, Status::OK()}; 
 }
 
+Status MinioFile::Download(const String &url, const String &path) { return Status::OK(); }
+
+Status MinioFile::Upload(const String &path, const String &url) { return Status::OK(); }
+
+
 SizeT MinioFile::FileSize() { 
     return std::filesystem::file_size(path_);
 }

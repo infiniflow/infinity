@@ -21,8 +21,7 @@ import virtual_storage;
 
 namespace infinity {
 
-ObjectFile::ObjectFile(VirtualStorage *storage_system, StorageType type)
-    : AbstractFileHandle(storage_system, type) {}
+ObjectFile::ObjectFile(VirtualStorage *storage_system, StorageType type) : AbstractFileHandle(storage_system, type) {}
 
 ObjectFile::~ObjectFile() = default;
 
@@ -37,6 +36,10 @@ Status ObjectFile::Append(const String &buffer, u64 nbytes) { return Status::OK(
 Tuple<SizeT, Status> ObjectFile::Read(char *buffer, u64 nbytes) { return {0, Status::OK()}; }
 
 Tuple<SizeT, Status> ObjectFile::Read(String &buffer, u64 nbytes) { return {0, Status::OK()}; }
+
+Status ObjectFile::Download(const String &url, const String &path) { return Status::OK(); }
+
+Status ObjectFile::Upload(const String &path, const String &url) { return Status::OK(); }
 
 SizeT ObjectFile::FileSize() { return 0; }
 

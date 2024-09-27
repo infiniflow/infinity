@@ -35,6 +35,8 @@ public:
     Status Append(const String &buffer, u64 nbytes) override;
     Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) override;
     Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) override;
+    Status Download(const String& url, const String& path) override;
+    Status Upload(const String& path, const String& url) override;
     SizeT FileSize() override;
     Tuple<char *, SizeT, Status> MmapRead(const String &name) override;
     Status Unmmap(const String &name) override;
