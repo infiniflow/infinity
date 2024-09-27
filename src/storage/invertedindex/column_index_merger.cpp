@@ -31,6 +31,7 @@ import persistence_manager;
 import infinity_context;
 import defer_op;
 import utility;
+import persist_result_handler;
 
 namespace infinity {
 ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag) : index_dir_(index_dir), flag_(flag) {}
@@ -96,7 +97,10 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             u32 id_offset = base_row_id - merge_base_rowid;
 
             if (use_object_cache) {
-                column_len_file = pm->GetObjPath(pm->GetObjCache(column_len_file).obj_key_);
+                PersistResultHandler handler(pm);
+                PersistReadResult result = pm->GetObjCache(column_len_file);
+                const ObjAddr &obj_addr = handler.HandleReadResult(result);
+                column_len_file = pm->GetObjPath(obj_addr.obj_key_);
             }
 
             auto [file_handler, status] = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
@@ -147,9 +151,13 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     fs_.AppendFile(tmp_dict_file, tmp_fst_file);
     fs_.DeleteFile(tmp_fst_file);
     if (use_object_cache) {
-        pm->Persist(dict_file, tmp_dict_file, false);
-        pm->Persist(posting_file, tmp_posting_file, false);
-        pm->Persist(column_length_file, tmp_column_length_file, false);
+        PersistResultHandler handler(pm);
+        PersistWriteResult result1 = pm->Persist(dict_file, tmp_dict_file, false);
+        PersistWriteResult result2 = pm->Persist(posting_file, tmp_posting_file, false);
+        PersistWriteResult result3 = pm->Persist(column_length_file, tmp_column_length_file, false);
+        handler.HandleWriteResult(result1);
+        handler.HandleWriteResult(result2);
+        handler.HandleWriteResult(result3);
     }
 }
 
