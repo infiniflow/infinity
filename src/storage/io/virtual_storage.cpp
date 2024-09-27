@@ -25,6 +25,7 @@ import logger;
 import local_file;
 import minio_file;
 import infinity_exception;
+import default_values;
 
 namespace infinity {
 
@@ -148,8 +149,6 @@ Status VirtualStorage::DeleteFile(const String &file_name) {
     return Status::OK();
 }
 
-Status VirtualStorage::Rename(const String &old_path, const String &new_path) { return Status::OK(); }
-
 bool VirtualStorage::Exists(const String &path) {
     switch (storage_type_) {
         case StorageType::kLocal: {
@@ -172,7 +171,7 @@ Tuple<Vector<String>, Status> VirtualStorage::ListDirectory(const String &path) 
 bool VirtualStorage::IsRegularFile(const String &path) { return false; }
 
 // For local disk filesystem, such as temp file, disk cache and WAL
-bool VirtualStorage::LocalExists(const String& path) {
+bool VirtualStorage::LocalExists(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
@@ -262,6 +261,69 @@ Status VirtualStorage::CleanupLocalDirectory(const String &path) {
         String error_message = fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what());
         UnrecoverableError(error_message);
     }
+    return Status::OK();
+}
+
+Status VirtualStorage::RenameLocal(const String &old_path, const String &new_path) {
+    if (!std::filesystem::path(old_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", old_path);
+        UnrecoverableError(error_message);
+    }
+    if (!std::filesystem::path(new_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", new_path);
+        UnrecoverableError(error_message);
+    }
+    if (rename(old_path.c_str(), new_path.c_str()) != 0) {
+        String error_message = fmt::format("Can't rename file: {}, {}", old_path, strerror(errno));
+        UnrecoverableError(error_message);
+    }
+    return Status::OK();
+}
+
+Status VirtualStorage::TruncateLocal(const String& file_name, SizeT new_length) {
+    if (!std::filesystem::path(file_name).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", file_name);
+        UnrecoverableError(error_message);
+    }
+    std::error_code error_code;
+    std::filesystem::resize_file(file_name, new_length, error_code);
+    if (error_code.value() != 0) {
+        String error_message = fmt::format("Failed to truncate {} to size {}", file_name, strerror(errno));
+        UnrecoverableError(error_message);
+    }
+    return Status::OK();
+}
+
+Status VirtualStorage::MergeLocal(const String& dst_path, const String& src_path) {
+    if (!std::filesystem::path(dst_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", dst_path);
+        UnrecoverableError(error_message);
+    }
+    if (!std::filesystem::path(src_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", src_path);
+        UnrecoverableError(error_message);
+    }
+    Path dst{dst_path};
+    Path src{src_path};
+    std::ifstream srcFile(src, std::ios::binary);
+    if (!srcFile.is_open()) {
+        String error_message = fmt::format("Failed to open source file {}", src_path);
+        UnrecoverableError(error_message);
+        return Status::OK();
+    }
+    std::ofstream dstFile(dst, std::ios::binary | std::ios::app);
+    if (!dstFile.is_open()) {
+        String error_message = fmt::format("Failed to open destination file {}", dst_path);
+        UnrecoverableError(error_message);
+        return Status::OK();
+    }
+    char buffer[DEFAULT_READ_BUFFER_SIZE];
+    while (srcFile.read(buffer, DEFAULT_READ_BUFFER_SIZE)) {
+        dstFile.write(buffer, srcFile.gcount());
+    }
+    dstFile.write(buffer, srcFile.gcount());
+    srcFile.close();
+    dstFile.close();
     return Status::OK();
 }
 
