@@ -27,6 +27,7 @@ import stl;
 import status;
 import virtual_storage;
 import third_party;
+import infinity_exception;
 import infinity_context;
 import abstract_file_handle;
 
@@ -37,7 +38,7 @@ namespace infinity {
 namespace fs = std::filesystem;
 
 std::mutex MinioFile::mtx_{};
-HashMap<String, MinoMmapInfo> MinioFile::mapped_files_{};
+HashMap<String, MinioMmapInfo> MinioFile::mapped_files_{};
 
 MinioFile::MinioFile(VirtualStorage *storage_system)
     : ObjectFile(storage_system, StorageType::kMinio) {}
@@ -45,7 +46,9 @@ MinioFile::MinioFile(VirtualStorage *storage_system)
 MinioFile::~MinioFile() = default;
 
 Status MinioFile::Open(const String &path, FileAccessMode access_mode) {
-    String bucket_name = InfinityContext::instance().config()->ObjectStorageBucket();
+    if(!path_.empty()) {
+        return Status::FileIsOpen(path);
+    }
 
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
@@ -53,6 +56,7 @@ Status MinioFile::Open(const String &path, FileAccessMode access_mode) {
     }
 
     if(access_mode != FileAccessMode::kWrite && !std::filesystem::exists(path)){
+        String bucket_name = InfinityContext::instance().config()->ObjectStorageBucket();
         minio::s3::Client * client = storage_system_->GetMinioClient();
         // Create download object arguments.
         minio::s3::DownloadObjectArgs args;
@@ -99,20 +103,32 @@ Status MinioFile::Open(const String &path, FileAccessMode access_mode) {
     return Status::OK();
 }
 
-Status MinioFile::Close() { 
-    i32 fd = fd_;
-    fd_ = -1;
-
-    if (close(fd) != 0) {
-        String error_message = fmt::format("Can't close file: {}: {}", path_, strerror(errno));
-        return Status::IOError(error_message);
+Status MinioFile::Close() {
+    if(access_mode_ == FileAccessMode::kWrite) {
+        if(!sync_) {
+            Status status = Sync();
+            if(!status.ok()) {
+                return status;
+            }
+        }
     }
 
-    open_ = false;
+    if(open_) {
+        if (close(fd_) != 0) {
+            String error_message = fmt::format("Can't close file: {}: {}", path_, strerror(errno));
+            return Status::IOError(error_message);
+        }
+        fd_ =  -1;
+        open_ = false;
+    }
     return Status::OK(); 
 }
 
 Status MinioFile::Append(const char *buffer, u64 nbytes) { 
+    if(!open_ or access_mode_ != FileAccessMode::kWrite) {
+        String error_message = fmt::format("File: {} isn't open.", path_);
+        UnrecoverableError(error_message);
+    }
     i64 written = 0;
     while (written < (i64)nbytes) {
         i64 write_count = write(fd_, (char *)buffer + written, nbytes - written);
@@ -127,6 +143,10 @@ Status MinioFile::Append(const char *buffer, u64 nbytes) {
 }
 
 Status MinioFile::Append(const String &buffer, u64 nbytes) { 
+    if(!open_ or access_mode_ != FileAccessMode::kWrite) {
+        String error_message = fmt::format("File: {} isn't open.", path_);
+        UnrecoverableError(error_message);
+    }
     i64 written = 0;
     while (written < (i64)nbytes) {
         i64 write_count = write(fd_, (char *)buffer.c_str() + written, nbytes - written);
@@ -140,6 +160,10 @@ Status MinioFile::Append(const String &buffer, u64 nbytes) {
 }
 
 Tuple<SizeT, Status> MinioFile::Read(char *buffer, u64 nbytes) { 
+    if(!open_) {
+        String error_message = fmt::format("File: {} isn't open.", path_);
+        UnrecoverableError(error_message);
+    }
     i64 readen = 0;
     while (readen < (i64)nbytes) {
         SizeT a = nbytes - readen;
@@ -158,22 +182,23 @@ Tuple<SizeT, Status> MinioFile::Read(char *buffer, u64 nbytes) {
 }
 
 Tuple<SizeT, Status> MinioFile::Read(String &buffer, u64 nbytes) { 
+    if(!open_) {
+        String error_message = fmt::format("File: {} isn't open.", path_);
+        UnrecoverableError(error_message);
+    }
     i64 readen = 0;
-    char *helper_buffer = new char[nbytes];
     while (readen < (i64)nbytes) {
         SizeT a = nbytes - readen;
-        i64 read_count = read(fd_, helper_buffer + readen, a);
+        i64 read_count = read(fd_, buffer.data() + readen, a);
         if (read_count == 0) {
             break;
         }
         if (read_count == -1) {
             String error_message = fmt::format("Can't read file: {}: {}", path_, strerror(errno));
-            delete [] helper_buffer;
             return {0, Status::IOError(error_message)};
         }
         readen += read_count;
     }
-    buffer = String(std::move(helper_buffer), readen);
     return {readen, Status::OK()}; 
 }
 
@@ -218,7 +243,7 @@ Tuple<char *, SizeT, Status> MinioFile::MmapRead(const String &file_path) {
         return {nullptr, 0, Status::IOError("MAP_MADVISE_FAILED")};
     data_ptr = (char *)tmpd;
     data_len = len_f;
-    mapped_files_.emplace(file_path, MinoMmapInfo{data_ptr, data_len, 1});
+    mapped_files_.emplace(file_path, MinioMmapInfo{data_ptr, data_len, 1});
 
     path_ = file_path;
     access_mode_ = FileAccessMode::kMmapRead;
@@ -246,27 +271,34 @@ Status MinioFile::Unmmap(const String &file_path) {
 }
 
 Status MinioFile::Sync() {
-    if (fsync(fd_) != 0) {
-        String error_message = fmt::format("fsync failed: {}, {}", path_, strerror(errno));
-        return Status::IOError(error_message);
+    if(access_mode_ != FileAccessMode::kWrite) {
+        return Status::InvalidCommand("Non-write access mode, shouldn't call Sync()");
     }
 
-    String bucket_name = InfinityContext::instance().config()->ObjectStorageBucket();
-    minio::s3::Client * client = storage_system_->GetMinioClient();
-    // Create upload object arguments.
-    minio::s3::UploadObjectArgs args;
-    args.bucket = bucket_name;
-    args.object = path_;
-    args.filename = path_;
+    if (!sync_) {
+        if (fsync(fd_) != 0) {
+            String error_message = fmt::format("fsync failed: {}, {}", path_, strerror(errno));
+            return Status::IOError(error_message);
+        }
 
-    // Call upload object.
-    minio::s3::UploadObjectResponse resp = client->UploadObject(args);
+        String bucket_name = InfinityContext::instance().config()->ObjectStorageBucket();
+        minio::s3::Client * client = storage_system_->GetMinioClient();
+        // Create upload object arguments.
+        minio::s3::UploadObjectArgs args;
+        args.bucket = bucket_name;
+        args.object = path_;
+        args.filename = path_;
 
-    // Handle response.
-    if (!resp) {
-        return Status::IOError(resp.Error().String());
-    } 
+        // Call upload object.
+        minio::s3::UploadObjectResponse resp = client->UploadObject(args);
 
+        // Handle response.
+        if (!resp) {
+            return Status::IOError(resp.Error().String());
+        } 
+
+        sync_ = true;
+    }
     return Status::OK();
 }
 

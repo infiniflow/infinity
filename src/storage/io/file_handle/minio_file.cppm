@@ -25,7 +25,7 @@ import abstract_file_handle;
 namespace infinity {
 
 class VirtualStorage;
-struct MinoMmapInfo {
+struct MinioMmapInfo {
     char *data_ptr_{};
     SizeT data_len_{};
     SizeT rc_{};
@@ -49,7 +49,7 @@ public:
 private:
     i32 fd_{-1};
     static std::mutex mtx_;
-    static HashMap<String, MinoMmapInfo> mapped_files_;
+    static HashMap<String, MinioMmapInfo> mapped_files_;
 };
 
 } // namespace infinity
