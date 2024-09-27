@@ -1386,37 +1386,19 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                     return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage.object_storage' field", var_name));
                                 }
                                 switch (option_index) {
-                                    case GlobalOptionIndex::kObjectStorageHost: {
-                                        String object_storage_host_str;
+                                    case GlobalOptionIndex::kObjectStorageUrl: {
+                                        String object_storage_url_str;
                                         if (elem.second.is_string()) {
                                             Optional<String> str_optional = elem.second.value<std::string>();
                                             if (!str_optional.has_value()) {
-                                                return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
+                                                return Status::InvalidConfig("'url' field in [storage.object_storage] isn't string");
                                             }
-                                            object_storage_host_str = *str_optional;
+                                            object_storage_url_str = *str_optional;
                                         } else {
-                                            return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
+                                            return Status::InvalidConfig("'url' field in [storage.object_storage] isn't string");
                                         }
-                                        auto object_storage_host_option = MakeUnique<StringOption>(OBJECT_STORAGE_HOST_OPTION_NAME, object_storage_host_str);
-                                        global_options_.AddOption(std::move(object_storage_host_option));
-                                        break;
-                                    }
-                                    case GlobalOptionIndex::kObjectStoragePort: {
-                                        i64 object_storage_port = 0;
-                                        if(elem.second.is_integer()) {
-                                            auto int_option = elem.second.value<i64>();
-                                            if (!int_option.has_value()) {
-                                                return Status::InvalidConfig("'port' field in [storage.object_storage] isn't integer.");
-                                            }
-                                            object_storage_port = int_option.value();
-                                        } else {
-                                            return Status::InvalidConfig("'port' field in [storage.object_storage] isn't integer.");
-                                        }
-                                        UniquePtr<IntegerOption> object_storage_port_option = MakeUnique<IntegerOption>(OBJECT_STORAGE_PORT_OPTION_NAME, object_storage_port, 65535, 0);
-                                        if (!object_storage_port_option->Validate()) {
-                                            return Status::InvalidConfig(fmt::format("Invalid object storage port: {}", object_storage_port));
-                                        }
-                                        global_options_.AddOption(std::move(object_storage_port_option));
+                                        auto object_storage_url_option = MakeUnique<StringOption>(OBJECT_STORAGE_URL_OPTION_NAME, object_storage_url_str);
+                                        global_options_.AddOption(std::move(object_storage_url_option));
                                         break;
                                     }
                                     case GlobalOptionIndex::kObjectStorageBucket: {
@@ -1435,11 +1417,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                     }
                                 }
                             }
-                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageHost) == nullptr) {
-                                return Status::InvalidConfig("No 'host' field in [storage.object_storage]");
-                            }
-                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStoragePort) == nullptr) {
-                                return Status::InvalidConfig("No 'port' field in [storage.object_storage]");
+                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageUrl) == nullptr) {
+                                return Status::InvalidConfig("No 'url' field in [storage.object_storage]");
                             }
                             if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageBucket) == nullptr) {
                                 String object_storage_bucket = String(DEFAULT_OBJECT_STORAGE_BUCKET);
@@ -2179,14 +2158,9 @@ StorageType Config::StorageType() {
     return String2StorageType(storage_type_str);
 }
 
-String Config::ObjectStorageHost() {
+String Config::ObjectStorageUrl() {
     std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetStringValue(GlobalOptionIndex::kObjectStorageHost);
-}
-
-i64 Config::ObjectStoragePort() {
-    std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetIntegerValue(GlobalOptionIndex::kObjectStoragePort);
+    return global_options_.GetStringValue(GlobalOptionIndex::kObjectStorageUrl);
 }
 
 String Config::ObjectStorageBucket() {
@@ -2348,8 +2322,7 @@ void Config::PrintAll() {
             break;
         }
         case StorageType::kMinio: {
-            fmt::print(" - object_storage_host: {}\n", ObjectStorageHost());
-            fmt::print(" - object_storage_port: {}\n", ObjectStoragePort());
+            fmt::print(" - object_storage_url: {}\n", ObjectStorageUrl());
             fmt::print(" - object_storage_bucket: {}\n", ObjectStorageBucket());
         }
         default: {
