@@ -251,7 +251,7 @@ Tuple<char *, SizeT, Status> MinioFile::MmapRead(const String &file_path) {
 }
 
 Status MinioFile::Unmmap(const String &file_path) { 
-        if(!std::filesystem::path(file_path).is_absolute()) {
+    if(!std::filesystem::path(file_path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", file_path);
         return Status::SyntaxError(error_message);
     }

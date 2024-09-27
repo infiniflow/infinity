@@ -47,7 +47,7 @@ protected:
     }
 
     void TearDown() override {
-
+        CleanupDbDirs();
     }
 };
 
@@ -59,10 +59,11 @@ TEST_F(MinioFileTest, TestFileOpen) {
     VS.Init(StorageType::kMinio, default_config);
     auto [minio_file, status] = VS.BuildFileHandle();
     EXPECT_TRUE(status.ok());
-    String home_dir(GetHomeDir());
-    Path p{home_dir + "/minio_open_test.txt"};
+    String tmp_dir(GetFullTmpDir());
+    tmp_dir += "/minio_open_test.txt";
+    Path p{tmp_dir};
     std::filesystem::remove(p);
-    auto status1 = minio_file->Open(home_dir + "/minio_open_test.txt", FileAccessMode::kWrite);
+    auto status1 = minio_file->Open(tmp_dir, FileAccessMode::kWrite);
     EXPECT_TRUE(status1.ok());
     auto status2 = minio_file->Append("hello world", 11);
     EXPECT_TRUE(status2.ok());
@@ -73,7 +74,7 @@ TEST_F(MinioFileTest, TestFileOpen) {
 
     auto [minio_file2, status5] = VS.BuildFileHandle();
     EXPECT_TRUE(status5.ok());
-    auto status6 = minio_file2->Open(home_dir + "/minio_open_test.txt", FileAccessMode::kRead);
+    auto status6 = minio_file2->Open(tmp_dir, FileAccessMode::kRead);
     EXPECT_TRUE(status6.ok());
     String buffer;
     auto [read_n, status7] = minio_file2->Read(buffer, 11);
@@ -86,7 +87,7 @@ TEST_F(MinioFileTest, TestFileOpen) {
     std::filesystem::remove(p);
     auto [minio_file3, status10] = VS.BuildFileHandle();
     EXPECT_TRUE(status10.ok());
-    auto status11 = minio_file3->Open(home_dir + "/minio_open_test.txt", FileAccessMode::kRead);
+    auto status11 = minio_file3->Open(tmp_dir, FileAccessMode::kRead);
     EXPECT_TRUE(status11.ok());
     buffer.clear();
     auto [read_n2, status12] = minio_file3->Read(buffer, 11);
@@ -100,7 +101,7 @@ TEST_F(MinioFileTest, TestFileOpen) {
     infinity::InfinityContext::instance().UnInit();
 }
 
-TEST_F(MinioFileTest, TestFileAppend) {
+TEST_F(MinioFileTest, TestFileAppendAndRead) {
     using namespace infinity;
     infinity::InfinityContext::instance().Init(MinioFileTest::config_path());
 
@@ -108,28 +109,47 @@ TEST_F(MinioFileTest, TestFileAppend) {
     VS.Init(StorageType::kMinio, default_config);
     auto [minio_file, status] = VS.BuildFileHandle();
     EXPECT_TRUE(status.ok());
-    String home_dir(GetHomeDir());
-    Path p{home_dir + "/minio_append_test.txt"};
+    String tmp_dir(GetFullTmpDir());
+    tmp_dir += "/minio_append_test.txt";
+    Path p{tmp_dir};
     std::filesystem::remove(p);
-    auto status1 = minio_file->Open(home_dir + "/minio_append_test.txt", FileAccessMode::kWrite);
+    auto status1 = minio_file->Open(tmp_dir, FileAccessMode::kWrite);
     EXPECT_TRUE(status1.ok());
+    //char *
     auto status2 = minio_file->Append("infinity", 8);
     EXPECT_TRUE(status2.ok());
-    auto status3 = minio_file->Sync();
+    String str("infinity");
+    //string
+    auto status3 = minio_file->Append(str, 8);
     EXPECT_TRUE(status3.ok());
-    auto status4 = minio_file->Close();
+    auto status4 = minio_file->Sync();
     EXPECT_TRUE(status4.ok());
-
-    auto [minio_file2, status5] = VS.BuildFileHandle();
+    auto status5 = minio_file->Close();
     EXPECT_TRUE(status5.ok());
-    auto status6 = minio_file2->Open(home_dir + "/minio_append_test.txt", FileAccessMode::kRead);
+
+    auto [minio_file2, status6] = VS.BuildFileHandle();
     EXPECT_TRUE(status6.ok());
-    String buffer;
-    auto [read_n, status7] = minio_file2->Read(buffer, 8);
+    auto status7 = minio_file2->Open(tmp_dir, FileAccessMode::kRead);
     EXPECT_TRUE(status7.ok());
-    EXPECT_STREQ(buffer.c_str(), "infinity");
-    auto status8 = minio_file2->Close();
+    String buffer;
+    auto [read_n, status8] = minio_file2->Read(buffer, 16);
     EXPECT_TRUE(status8.ok());
+    EXPECT_STREQ(buffer.c_str(), "infinityinfinity");
+    auto status9 = minio_file2->Close();
+    EXPECT_TRUE(status9.ok());
+
+    auto [minio_file3, status10] = VS.BuildFileHandle();
+    EXPECT_TRUE(status10.ok());
+    auto status11 = minio_file3->Open(tmp_dir, FileAccessMode::kRead);
+    EXPECT_TRUE(status11.ok());
+    char *buffer1 = new char[17];
+    auto [read_n1, status12] = minio_file3->Read(buffer1, 16);
+    EXPECT_TRUE(status12.ok());
+    buffer1[16] = '\0';
+    EXPECT_STREQ(buffer1, "infinityinfinity");
+    delete[] buffer1;
+    auto status13 = minio_file3->Close();
+    EXPECT_TRUE(status13.ok());
 
     std::filesystem::remove(p);
 
@@ -144,22 +164,25 @@ TEST_F(MinioFileTest, TestFileSize) {
     VS.Init(StorageType::kMinio, default_config);
     auto [minio_file, status] = VS.BuildFileHandle();
     EXPECT_TRUE(status.ok());
-    String home_dir(GetHomeDir());
-    Path p{home_dir + "/minio_append_test.txt"};
+    String tmp_dir(GetFullTmpDir());
+    tmp_dir += "/minio_append_test.txt";
+    Path p{tmp_dir};
     std::filesystem::remove(p);
-    auto status1 = minio_file->Open(home_dir + "/minio_append_test.txt", FileAccessMode::kRead);
+    auto status1 = minio_file->Open(tmp_dir, FileAccessMode::kRead);
     EXPECT_TRUE(status1.ok());
     SizeT len =  minio_file->FileSize();
-    EXPECT_EQ(len, 8);
+    EXPECT_EQ(len, 16);
     auto status2 = minio_file->Close();
     EXPECT_TRUE(status2.ok());
     std::filesystem::remove(p);
 
     auto [minio_file1, status3] = VS.BuildFileHandle();
     EXPECT_TRUE(status3.ok());
-    Path p1{home_dir + "/minio_open_test.txt"};
+    String tmp_dir1(GetFullTmpDir());
+    tmp_dir1 += "/minio_open_test.txt";
+    Path p1{tmp_dir1};
     std::filesystem::remove(p1);
-    auto status4 = minio_file1->Open(home_dir + "/minio_open_test.txt", FileAccessMode::kRead);
+    auto status4 = minio_file1->Open(tmp_dir1, FileAccessMode::kRead);
     EXPECT_TRUE(status4.ok());
     len =  minio_file1->FileSize();
     EXPECT_EQ(len, 11);
