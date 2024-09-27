@@ -30,10 +30,14 @@ data_dir                = "/var/infinity/data"
 optimize_interval        = "10s"
 cleanup_interval         = "60s"
 compact_interval         = "120s"
-storage_type             = "local"
+storage_type             = "minio"
 
 # dump memory index entry when it reachs the capacity
 mem_index_capacity       = 1048576
+
+[storage.object_storage]
+url                      = "127.0.0.1:9000"
+bucket_name              = "infinity"
 
 [buffer]
 buffer_manager_size      = "4GB"

@@ -191,6 +191,13 @@ export {
     constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "100MB"; // 100MB
     constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 100 * 1024lu * 1024lu;  // 100MB
 
+    constexpr std::string_view DEFAULT_STORAGE_TYPE = "local";
+    constexpr std::string_view DEFAULT_OBJECT_STORAGE_BUCKET = "infinity";
+    constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_DIR = "/var/infinity/localdiskcache";
+    constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT_STR = "100GB"; // 100GB
+    constexpr SizeT DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT = 100 * 1024lu * 1024lu * 1024lu; // 100GB
+
+
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";
     constexpr std::string_view SERVER_MODE_OPTION_NAME = "server_mode";
@@ -222,6 +229,17 @@ export {
 
     constexpr std::string_view PERSISTENCE_DIR_OPTION_NAME = "persistence_dir";
     constexpr std::string_view PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME = "persistence_object_size_limit";
+
+    constexpr std::string_view STORAGE_TYPE_OPTION_NAME = "storage_type";
+    constexpr std::string_view OBJECT_STORAGE_OPTION_NAME = "object_storage";
+    constexpr std::string_view OBJECT_STORAGE_URL_OPTION_NAME = "url";
+    constexpr std::string_view OBJECT_STORAGE_BUCKET_OPTION_NAME = "bucket_name";
+    constexpr std::string_view OBJECT_STORAGE_ACCESS_KEY_OPTION_NAME = "access_key";
+    constexpr std::string_view OBJECT_STORAGE_SECRET_KEY_OPTION_NAME = "secret_key";
+    constexpr std::string_view OBJECT_STORAGE_ENABLE_HTTPS_OPTION_NAME = "enable_https";
+    constexpr std::string_view OBJECT_STORAGE_DISK_CACHE_DIR_OPTION_NAME = "disk_cache_dir";
+    constexpr std::string_view OBJECT_STORAGE_DISK_CACHE_LIMIT_OPTION_NAME = "disk_cache_limit";
+    constexpr std::string_view OBJECT_STORAGE_DISK_CACHE_LRU_COUNT_OPTION_NAME = "disk_cache_lru_count";
 
     constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
     constexpr std::string_view LRU_NUM_OPTION_NAME = "lru_num";
@@ -265,6 +283,8 @@ export {
     constexpr std::string_view CPU_USAGE_VAR_NAME = "cpu_usage";  // global
     constexpr std::string_view FOLLOWER_NUMBER = "follower_number";  // global
 
+    // IO related
+    constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;
 }
 
 } // namespace infinity
