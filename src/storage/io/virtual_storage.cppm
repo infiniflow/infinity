@@ -54,11 +54,11 @@ public:
     bool IsRegularFile(const String& path);
 
     // For local disk filesystem, such as temp file, disk cache and WAL
-    static bool LocalExists(const String& path);
-    static Status DeleteLocalFile(const String& path);
-    static Status MakeLocalDirectory(const String& path);
-    static Status RemoveLocalDirectory(const String& path);
-    static Status CleanupLocalDirectory(const String& path);
+    static bool ExistsLocal(const String& path);
+    static Status DeleteFileLocal(const String& path);
+    static Status MakeDirectoryLocal(const String& path);
+    static Status RemoveDirectoryLocal(const String& path);
+    static Status CleanupDirectoryLocal(const String& path);
     static Status RenameLocal(const String& old_path, const String& new_path);
     static Status TruncateLocal(const String& file_name, SizeT new_length);
     static Status MergeLocal(const String& dst_file, const String& src_file);

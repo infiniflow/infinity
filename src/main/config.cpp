@@ -14,8 +14,6 @@
 
 module;
 
-// #include <bits/chrono.h>
-// #include <cctype>
 #include <string>
 #include <unistd.h>
 
@@ -27,7 +25,7 @@ import boost;
 import compilation_config;
 import default_values;
 import logger;
-import local_file_system;
+import virtual_storage;
 import utility;
 import status;
 import options;
@@ -119,10 +117,8 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
 // extern SharedPtr<spdlogger> infinity_logger;
 
 Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
-    LocalFileSystem fs;
-
     toml::table config_toml{};
-    if (config_path.get() == nullptr || config_path->empty() || !fs.Exists(std::filesystem::absolute(*config_path))) {
+    if (config_path.get() == nullptr || config_path->empty() || !VirtualStorage::ExistsLocal(std::filesystem::absolute(*config_path))) {
         if (config_path.get() == nullptr || config_path->empty()) {
 //            fmt::print("No config file is given, use default configs.\n");
             ;

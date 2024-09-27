@@ -138,7 +138,7 @@ LocalDiskCache *VirtualStorage::GetLocalDiskCache() const { return local_disk_ca
 Status VirtualStorage::DeleteFile(const String &file_name) {
     switch (storage_type_) {
         case StorageType::kLocal: {
-            return DeleteLocalFile(file_name);
+            return DeleteFileLocal(file_name);
         }
         default: {
             Status status = Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
@@ -152,7 +152,7 @@ Status VirtualStorage::DeleteFile(const String &file_name) {
 bool VirtualStorage::Exists(const String &path) {
     switch (storage_type_) {
         case StorageType::kLocal: {
-            return LocalExists(path);
+            return ExistsLocal(path);
         }
         default: {
             Status status = Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
@@ -171,7 +171,7 @@ Tuple<Vector<String>, Status> VirtualStorage::ListDirectory(const String &path) 
 bool VirtualStorage::IsRegularFile(const String &path) { return false; }
 
 // For local disk filesystem, such as temp file, disk cache and WAL
-bool VirtualStorage::LocalExists(const String &path) {
+bool VirtualStorage::ExistsLocal(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
@@ -188,7 +188,7 @@ bool VirtualStorage::LocalExists(const String &path) {
     return false;
 }
 
-Status VirtualStorage::DeleteLocalFile(const String &file_name) {
+Status VirtualStorage::DeleteFileLocal(const String &file_name) {
     if (!std::filesystem::path(file_name).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", file_name);
         UnrecoverableError(error_message);
@@ -210,7 +210,7 @@ Status VirtualStorage::DeleteLocalFile(const String &file_name) {
     return Status::OK();
 }
 
-Status VirtualStorage::MakeLocalDirectory(const String &path) {
+Status VirtualStorage::MakeDirectoryLocal(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
@@ -225,7 +225,7 @@ Status VirtualStorage::MakeLocalDirectory(const String &path) {
     return Status::OK();
 }
 
-Status VirtualStorage::RemoveLocalDirectory(const String &path) {
+Status VirtualStorage::RemoveDirectoryLocal(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
@@ -240,7 +240,7 @@ Status VirtualStorage::RemoveLocalDirectory(const String &path) {
     return Status::OK();
 }
 
-Status VirtualStorage::CleanupLocalDirectory(const String &path) {
+Status VirtualStorage::CleanupDirectoryLocal(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);

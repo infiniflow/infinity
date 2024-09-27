@@ -65,7 +65,7 @@ TEST_F(LocalFileTest, TestDir) {
     Map<String, String> configs;
     virtual_storage.Init(StorageType::kLocal, configs);
 
-    VirtualStorage::MakeLocalDirectory(dir);
+    VirtualStorage::MakeDirectoryLocal(dir);
 
     auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
     EXPECT_TRUE(status.ok());
@@ -84,9 +84,9 @@ TEST_F(LocalFileTest, TestDir) {
     local_file_handle->Close();
 
     EXPECT_TRUE(virtual_storage.Exists(path));
-    EXPECT_TRUE(VirtualStorage::LocalExists(dir));
+    EXPECT_TRUE(VirtualStorage::ExistsLocal(dir));
 
-    VirtualStorage::RemoveLocalDirectory(dir);
+    VirtualStorage::RemoveDirectoryLocal(dir);
     EXPECT_FALSE(virtual_storage.Exists(path));
     EXPECT_FALSE(virtual_storage.Exists(dir));
 }
@@ -293,7 +293,7 @@ TEST_F(LocalFileTest, TestCleanDir) {
     String file_path1 = dir + "/file1.txt";
     String file_path2 = dir + "/file2.txt";
 
-    VirtualStorage::MakeLocalDirectory(dir);
+    VirtualStorage::MakeDirectoryLocal(dir);
 
     // Append file1.txt
     auto [src_file_handle, status1] = virtual_storage.BuildFileHandle();
@@ -341,11 +341,11 @@ TEST_F(LocalFileTest, TestCleanDir) {
     append_file2_handle->Sync();
     append_file2_handle->Close();
 
-    VirtualStorage::CleanupLocalDirectory(dir);
+    VirtualStorage::CleanupDirectoryLocal(dir);
 
     EXPECT_FALSE(virtual_storage.Exists(file_path1));
     EXPECT_FALSE(virtual_storage.Exists(file_path2));
     EXPECT_TRUE(virtual_storage.Exists(dir));
-    VirtualStorage::RemoveLocalDirectory(dir);
+    VirtualStorage::RemoveDirectoryLocal(dir);
     EXPECT_FALSE(virtual_storage.Exists(dir));
 }
