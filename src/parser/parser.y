@@ -387,7 +387,7 @@ struct SQL_LTYPE {
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT LOCK UNLOCK ADD RENAME
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
-%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK
+%token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
@@ -1050,35 +1050,21 @@ optional_identifier_array: '(' identifier_array ')' {
 /*
  * EXPLAIN STATEMENT
  */
-explain_statement : EXPLAIN explain_type explainable_statement {
+explain_statement : EXPLAIN IDENTIFIER explainable_statement {
     $$ = new infinity::ExplainStatement();
-    $$->type_ = $2;
+    if(!strcmp($2, "ANALYZE")) $$->type_ = infinity::ExplainType::kAnalyze;
+    else if(!strcmp($2, "AST")) $$->type_ =infinity::ExplainType::kAst;
+    else if(!strcmp($2, "RAW")) $$->type_ =infinity::ExplainType::kUnOpt;
+    else if(!strcmp($2, "LOGICAL")) $$->type_ =infinity::ExplainType::kOpt;
+    else if(!strcmp($2, "PHYSICAL")) $$->type_ =infinity::ExplainType::kPhysical;
+    else if(!strcmp($2, "PIPELINE")) $$->type_ =infinity::ExplainType::kPipeline;
+    else if(!strcmp($2, "FRAGMENT")) $$->type_ =infinity::ExplainType::kFragment;
+    free($2);
+    $$->statement_ = $3;0
+} | EXPLAIN explainable_statement {
+    $$ = new infinity::ExplainStatement();
+    $$->type_ =infinity::ExplainType::kPhysical;
     $$->statement_ = $3;
-}
-
-explain_type: ANALYZE {
-    $$ = infinity::ExplainType::kAnalyze;
-}
-| AST {
-    $$ = infinity::ExplainType::kAst;
-}
-| RAW {
-    $$ = infinity::ExplainType::kUnOpt;
-}
-| LOGICAL {
-    $$ = infinity::ExplainType::kOpt;
-}
-| PHYSICAL {
-    $$ = infinity::ExplainType::kPhysical;
-}
-| PIPELINE {
-    $$ = infinity::ExplainType::kPipeline;
-}
-| FRAGMENT {
-    $$ = infinity::ExplainType::kFragment;
-}
-| {
-    $$ = infinity::ExplainType::kPhysical;
 }
 
 /*
