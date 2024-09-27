@@ -45,6 +45,7 @@ import column_def;
 import internal_types;
 import infinity_context;
 import persistence_manager;
+import persist_result_handler;
 
 namespace infinity {
 
@@ -399,8 +400,11 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
         String posting_file = index_prefix + POSTING_SUFFIX;
         String dict_file = index_prefix + DICT_SUFFIX;
         if (pm != nullptr) {
-            pm->Cleanup(posting_file);
-            pm->Cleanup(dict_file);
+            PersistResultHandler handler(pm);
+            PersistWriteResult result1 = pm->Cleanup(posting_file);
+            PersistWriteResult result2 = pm->Cleanup(dict_file);
+            handler.HandleWriteResult(result1);
+            handler.HandleWriteResult(result2);
             LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}", index_prefix, posting_file, dict_file));
         } else {
             String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
