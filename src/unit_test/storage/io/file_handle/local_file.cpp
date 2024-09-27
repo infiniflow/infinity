@@ -216,7 +216,6 @@ TEST_F(LocalFileTest, TestTruncate) {
 
 TEST_F(LocalFileTest, TestMerge) {
     using namespace infinity;
-    using namespace infinity;
     VirtualStorage virtual_storage;
     Map<String, String> configs;
     virtual_storage.Init(StorageType::kLocal, configs);
@@ -284,46 +283,69 @@ TEST_F(LocalFileTest, TestMerge) {
     EXPECT_FALSE(virtual_storage.Exists(dst_path));
 }
 
-//TEST_F(LocalFileTest, TestCleanDir) {
-//    using namespace infinity;
-//    LocalFileSystem local_file_system;
-//    String dir = String(GetFullTmpDir()) + "/cleanup_test_dir";
-//    String file_path1 = dir + "/file1.txt";
-//    String file_path2 = dir + "/file2.txt";
-//
-//    local_file_system.CreateDirectory(dir);
-//
-//    auto [file_handler1, status1] =
-//        local_file_system.OpenFile(file_path1, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kWriteLock);
-//    if(!status1.ok()) {
-//        UnrecoverableError(status1.message());
-//    }
-//    SizeT len1 = 10;
-//    UniquePtr<char[]> data_array1 = MakeUnique<char[]>(len1);
-//    for(SizeT i = 0; i < len1; ++i) {
-//        data_array1[i] = i + 1;
-//    }
-//    file_handler1->Write(data_array1.get(), len1);
-//    file_handler1->Sync();
-//    file_handler1->Close();
-//
-//    auto [file_handler2, status2] =
-//        local_file_system.OpenFile(file_path2, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kWriteLock);
-//    if(!status2.ok()) {
-//        UnrecoverableError(status2.message());
-//    }
-//    SizeT len2 = 20;
-//    UniquePtr<char[]> data_array2 = MakeUnique<char[]>(len2);
-//    for(SizeT i = 0; i < len2; ++i) {
-//        data_array2[i] = i + 11;
-//    }
-//    file_handler2->Write(data_array2.get(), len2);
-//    file_handler2->Sync();
-//    file_handler2->Close();
-//
-//    local_file_system.CleanupDirectory(dir);
-//
-//    EXPECT_FALSE(local_file_system.Exists(file_path1));
-//    EXPECT_FALSE(local_file_system.Exists(file_path2));
-//    EXPECT_TRUE(local_file_system.Exists(dir));
-//}
+TEST_F(LocalFileTest, TestCleanDir) {
+    using namespace infinity;
+    VirtualStorage virtual_storage;
+    Map<String, String> configs;
+    virtual_storage.Init(StorageType::kLocal, configs);
+
+    String dir = String(GetFullTmpDir()) + "/cleanup_test_dir";
+    String file_path1 = dir + "/file1.txt";
+    String file_path2 = dir + "/file2.txt";
+
+    virtual_storage.MakeLocalDirectory(dir);
+
+    // Append file1.txt
+    auto [src_file_handle, status1] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(status1.ok());
+
+    status1 = src_file_handle->Open(file_path1, FileAccessMode::kWrite);
+    EXPECT_TRUE(status1.ok());
+
+    SizeT src_len = 10;
+    UniquePtr<char[]> data_array1 = MakeUnique<char[]>(src_len);
+    for(SizeT i = 0; i < src_len; ++ i) {
+        data_array1[i] = i + 1;
+    }
+
+    src_file_handle->Append(data_array1.get(), src_len);
+    src_file_handle->Sync();
+    src_file_handle->Close();
+
+    // Append more to file1.txt
+    auto [append_src_file_handle, status2] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(status2.ok());
+
+    status2 = append_src_file_handle->Open(file_path1, FileAccessMode::kWrite);
+    EXPECT_TRUE(status2.ok());
+
+    append_src_file_handle->Append(data_array1.get(), src_len);
+    append_src_file_handle->Sync();
+    append_src_file_handle->Close();
+
+
+    // Append more to file2.txt
+    auto [append_file2_handle, status3] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(status3.ok());
+
+    status3 = append_file2_handle->Open(file_path2, FileAccessMode::kWrite);
+    EXPECT_TRUE(status3.ok());
+
+    SizeT len2 = 20;
+    UniquePtr<char[]> data_array2 = MakeUnique<char[]>(len2);
+    for(SizeT i = 0; i < len2; ++i) {
+        data_array2[i] = i + 11;
+    }
+
+    append_file2_handle->Append(data_array2.get(), src_len);
+    append_file2_handle->Sync();
+    append_file2_handle->Close();
+
+    virtual_storage.CleanupLocalDirectory(dir);
+
+    EXPECT_FALSE(virtual_storage.Exists(file_path1));
+    EXPECT_FALSE(virtual_storage.Exists(file_path2));
+    EXPECT_TRUE(virtual_storage.Exists(dir));
+    virtual_storage.RemoveLocalDirectory(dir);
+    EXPECT_FALSE(virtual_storage.Exists(dir));
+}
