@@ -4728,7 +4728,7 @@ yyreduce:
     else if(!strcmp((yyvsp[-1].str_value), "pipeline")) (yyval.explain_stmt)->type_ =infinity::ExplainType::kPipeline;
     else if(!strcmp((yyvsp[-1].str_value), "fragment")) (yyval.explain_stmt)->type_ =infinity::ExplainType::kFragment;
     free((yyvsp[-1].str_value));
-    (yyval.explain_stmt)->statement_ = (yyvsp[0].base_stmt);0
+    (yyval.explain_stmt)->statement_ = (yyvsp[0].base_stmt);
 }
 #line 4734 "parser.cpp"
     break;

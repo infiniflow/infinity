@@ -1060,7 +1060,7 @@ explain_statement : EXPLAIN IDENTIFIER explainable_statement {
     else if(!strcmp($2, "pipeline")) $$->type_ =infinity::ExplainType::kPipeline;
     else if(!strcmp($2, "fragment")) $$->type_ =infinity::ExplainType::kFragment;
     free($2);
-    $$->statement_ = $3;0
+    $$->statement_ = $3;
 } | EXPLAIN explainable_statement {
     $$ = new infinity::ExplainStatement();
     $$->type_ =infinity::ExplainType::kPhysical;
