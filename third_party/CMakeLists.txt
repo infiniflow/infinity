@@ -86,3 +86,5 @@ add_library(inih
 )
 
 add_subdirectory(curl)
+
+add_subdirectory(re2)

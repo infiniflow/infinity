@@ -244,7 +244,7 @@ target_sources(infinity_core
         ${network_cppm}
 )
 
-add_dependencies(infinity_core thrift thriftnb parquet_static snappy)
+add_dependencies(infinity_core thrift thriftnb parquet_static snappy re2)
 target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
@@ -279,6 +279,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts/")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
 
 if (NOT SUPPORT_FMA EQUAL 0)
     message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -341,12 +342,14 @@ target_link_libraries(infinity
         snappy.a
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
+        re2.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -396,6 +399,7 @@ if (SKBUILD)
             snappy.a
             ${JEMALLOC_STATIC_LIB}
             miniocpp.a
+            re2.a
     )
 
     # WARN: python modules shall not link to static libstdc++!!!
@@ -510,7 +514,7 @@ add_executable(unit_test
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
+add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2)
 
 target_link_libraries(unit_test
         gtest
@@ -537,6 +541,7 @@ target_link_libraries(unit_test
         thriftnb.a
         event.a
         miniocpp.a
+        re2.a
         pugixml-static
         curlpp_static
         inih.a
@@ -544,8 +549,6 @@ target_link_libraries(unit_test
         ssl.a
         crypto.a
 )
-
-add_dependencies(unit_test oatpp)
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
@@ -555,6 +558,7 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(unit_test PUBLIC "/usr/local/openssl30/lib64")
 
@@ -582,6 +586,8 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ope
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts")
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
+
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
