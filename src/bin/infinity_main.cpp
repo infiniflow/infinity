@@ -152,6 +152,17 @@ auto main(int argc, char **argv) -> int {
                "|  | |  |\\   | |  |     |  | |  |\\   | |  |     |  |         |  |     \n"
                "|__| |__| \\__| |__|     |__| |__| \\__| |__|     |__|         |__|     \n");
 
+    fmt::print("Release: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
+               version_major(),
+               version_minor(),
+               version_patch(),
+               current_system_time(),
+               build_type(),
+               git_branch_name(),
+               git_commit_id());
+
+    fmt::print("Currently enabled SIMD support: {}\n", fmt::join(GetSupportedSimdTypesList(), ", "));
+
     CLI::App app{"infinity_main"};
 
     SharedPtr<String> config_path = MakeShared<String>();
@@ -168,16 +179,7 @@ auto main(int argc, char **argv) -> int {
 
     InfinityContext::instance().config()->PrintAll();
 
-    fmt::print("Release: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
-               version_major(),
-               version_minor(),
-               version_patch(),
-               current_system_time(),
-               build_type(),
-               git_branch_name(),
-               git_commit_id());
 
-    fmt::print("Currently enabled SIMD support: {}\n", fmt::join(GetSupportedSimdTypesList(), ", "));
 
     auto start_thrift_servers = [&]() {
         u32 thrift_server_port = InfinityContext::instance().config()->ClientPort();

@@ -117,13 +117,15 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
 // extern SharedPtr<spdlogger> infinity_logger;
 
 Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
+    LocalFileSystem fs;
+
     toml::table config_toml{};
     if (config_path.get() == nullptr || config_path->empty() || !VirtualStorage::ExistsLocal(std::filesystem::absolute(*config_path))) {
         if (config_path.get() == nullptr || config_path->empty()) {
-//            fmt::print("No config file is given, use default configs.\n");
-            ;
+            fmt::print("No config file is given, use default configs.\n");
         } else {
-            fmt::print("Config file: {} is not existent.\n", *config_path);
+            fmt::print("Config file: {} is not found.\n", *config_path);
+            return Status::NotFound(fmt::format("Config file: {} not found", *config_path));
         }
 
         Status status;
