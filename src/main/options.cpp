@@ -59,6 +59,11 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(PERSISTENCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kPersistenceDir;
     name2index_[String(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kPersistenceObjectSizeLimit;
 
+    name2index_[String(STORAGE_TYPE_OPTION_NAME)] = GlobalOptionIndex::kStorageType;
+    name2index_[String(OBJECT_STORAGE_OPTION_NAME)] = GlobalOptionIndex::kObjectStorage;
+    name2index_[String(OBJECT_STORAGE_URL_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageUrl;
+    name2index_[String(OBJECT_STORAGE_BUCKET_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageBucket;
+
     name2index_[String(BUFFER_MANAGER_SIZE_OPTION_NAME)] = GlobalOptionIndex::kBufferManagerSize;
     name2index_[String(LRU_NUM_OPTION_NAME)] = GlobalOptionIndex::kLRUNum;
     name2index_[String(TEMP_DIR_OPTION_NAME)] = GlobalOptionIndex::kTempDir;

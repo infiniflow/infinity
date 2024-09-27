@@ -20,6 +20,7 @@ import third_party;
 import options;
 import status;
 import command_statement;
+import virtual_storage_type;
 
 namespace infinity {
 
@@ -94,6 +95,10 @@ public:
     void SetOptimizeInterval(i64);
 
     i64 MemIndexCapacity();
+
+    StorageType StorageType();
+    String ObjectStorageUrl();
+    String ObjectStorageBucket();
 
     // Persistence
     String PersistenceDir();

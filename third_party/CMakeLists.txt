@@ -80,9 +80,16 @@ add_subdirectory(minio-cpp)
 add_subdirectory(curlpp)
 add_subdirectory(pugixml)
 
-add_library(inih
+add_library(inih STATIC
         inih/cpp/INIReader.cpp
         inih/ini.c
+)
+
+target_compile_options(
+        inih
+        PRIVATE
+        -O3 -Wno-sign-compare
+        -fPIC
 )
 
 add_subdirectory(curl)

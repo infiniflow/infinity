@@ -126,6 +126,12 @@ endif()
 if(BUILD_STATIC_LIBS)
   list(APPEND libcurl_export ${LIB_STATIC})
   add_library(${LIB_STATIC} STATIC ${LIB_SOURCE})
+  target_compile_options(
+          ${LIB_STATIC}
+          PRIVATE
+          -O3 -Wno-sign-compare
+          -fPIC
+  )
   add_library(${PROJECT_NAME}::${LIB_STATIC} ALIAS ${LIB_STATIC})
   if(WIN32)
     set_property(TARGET ${LIB_OBJECT} APPEND

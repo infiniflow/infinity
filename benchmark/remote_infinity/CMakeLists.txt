@@ -13,6 +13,12 @@ target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/th
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(remote_query_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 target_link_libraries(
         remote_query_benchmark
@@ -35,6 +41,13 @@ target_link_libraries(
         arrow.a
         snappy.a
         ${JEMALLOC_STATIC_LIB}
+        miniocpp.a
+        pugixml-static
+        curlpp_static
+        inih.a
+        libcurl_static
+        ssl.a
+        crypto.a
 )
 
 # add_definitions(-march=native)

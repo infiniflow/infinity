@@ -440,6 +440,8 @@ Status Status::NotFound(const String &detailed_info) { return Status(ErrorCode::
 
 Status Status::ErrorInit(const String &detailed_info) { return Status(ErrorCode::kErrorInit, MakeUnique<String>(detailed_info)); }
 
+Status Status::FileIsOpen(const String &filename) { return Status(ErrorCode::kFileIsOpen, MakeUnique<String>(filename)); }
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));
