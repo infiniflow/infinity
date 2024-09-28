@@ -31,6 +31,7 @@ import vector_with_lock;
 import logger;
 import infinity_context;
 import persistence_manager;
+import persist_result_handler;
 
 using namespace infinity;
 
@@ -151,7 +152,10 @@ TEST_P(PostingMergerTest, Basic) {
             String real_column_len_file = column_len_file;
             PersistenceManager *pm = InfinityContext::instance().persistence_manager();
             if (pm != nullptr) {
-                real_column_len_file = pm->GetObjPath(pm->GetObjCache(real_column_len_file).obj_key_);
+                PersistResultHandler handler(pm);
+                PersistReadResult result = pm->GetObjCache(real_column_len_file);
+                const ObjAddr &obj_addr = handler.HandleReadResult(result);
+                real_column_len_file = pm->GetObjPath(obj_addr.obj_key_);
             }
             RowID base_row_id = row_ids[i];
             u32 id_offset = base_row_id - merge_base_rowid;

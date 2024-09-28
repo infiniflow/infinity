@@ -36,6 +36,7 @@ import status;
 import logger;
 import persistence_manager;
 import infinity_context;
+import persist_result_handler;
 
 namespace infinity {
 
@@ -49,7 +50,9 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
     posting_file_.append(POSTING_SUFFIX);
     String posting_file = posting_file_;
     if (nullptr != pm) {
-        ObjAddr obj_addr = pm->GetObjCache(posting_file);
+        PersistResultHandler handler(pm);
+        PersistReadResult result = pm->GetObjCache(posting_file);
+        const ObjAddr &obj_addr = handler.HandleReadResult(result);
         if (!obj_addr.Valid()) {
             // Empty posting
             return;
@@ -72,7 +75,10 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
     dict_file_.append(DICT_SUFFIX);
     String dict_file = dict_file_;
     if (nullptr != pm) {
-        dict_file = pm->GetObjPath(pm->GetObjCache(dict_file).obj_key_);
+        PersistResultHandler handler(pm);
+        PersistReadResult result = pm->GetObjCache(dict_file);
+        const ObjAddr &obj_addr = handler.HandleReadResult(result);
+        dict_file = pm->GetObjPath(obj_addr.obj_key_);
     }
     dict_reader_ = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag));
 }

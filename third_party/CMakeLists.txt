@@ -85,11 +85,12 @@ add_library(inih STATIC
         inih/ini.c
 )
 
+add_subdirectory(curl)
+
+add_subdirectory(re2)
 target_compile_options(
         inih
         PRIVATE
         -O3 -Wno-sign-compare
         -fPIC
 )
-
-add_subdirectory(curl)

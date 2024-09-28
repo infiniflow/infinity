@@ -71,6 +71,17 @@ export struct ObjStat {
     static ObjStat ReadBufAdv(const char *&buf);
 };
 
+export struct PersistWriteResult {
+    ObjAddr obj_addr_; // where data is persisted, only returned by Persist
+    Vector<String> persist_keys_; // object that should be persisted to local disk. because of cleanup current_object
+    Vector<String> drop_keys_; // object that should be removed from local disk. because of 1. disk used over limit (TODO) 2. object's all parts are deleted
+};
+
+export struct PersistReadResult {
+    ObjAddr obj_addr_; // where data should read from
+    bool cached_; // whether the object is in localdisk cache
+};
+
 export class PersistenceManager {
 public:
     // TODO: build cache from existing files under workspace
@@ -81,24 +92,24 @@ public:
     // Create new object or append to current object, and returns the location.
     // file_path is the key of local_path_obj_ and may not exist. tmp_file_path is the file which contains the data to be persisted.
     // tmp_file_path will be deleted after its data be persisted.
-    ObjAddr Persist(const String &file_path, const String &tmp_file_path, bool try_compose = true);
+    [[nodiscard]] PersistWriteResult Persist(const String &file_path, const String &tmp_file_path, bool try_compose = true);
 
     // Force finalize current object. Subsequent append on the finalized object is forbidden.
-    void CurrentObjFinalize(bool validate = false);
+    [[nodiscard]] PersistWriteResult CurrentObjFinalize(bool validate = false);
 
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
-    ObjAddr GetObjCache(const String &local_path);
+    [[nodiscard]] PersistReadResult GetObjCache(const String &local_path);
 
     ObjAddr GetObjCacheWithoutCnt(const String &local_path);
 
     void PutObjCache(const String &file_path);
 
-    void Cleanup(const String &file_path);
+    [[nodiscard]] PersistWriteResult Cleanup(const String &file_path);
 
     /**
      * Utils
      */
-    String GetObjPath(const String &obj_key) { return std::filesystem::path(workspace_).append(obj_key).string(); }
+    String GetObjPath(const String &obj_key) const { return std::filesystem::path(workspace_).append(obj_key).string(); }
     nlohmann::json Serialize();
 
     void Deserialize(const nlohmann::json &obj);
@@ -117,10 +128,10 @@ private:
     void CurrentObjAppendNoLock(const String &tmp_file_path, SizeT file_size);
 
     // Finalize current object.
-    void CurrentObjFinalizeNoLock();
+    void CurrentObjFinalizeNoLock(Vector<String> &persist_keys);
 
     // Cleanup
-    void CleanupNoLock(const ObjAddr &object_addr, bool check_ref_count = false);
+    void CleanupNoLock(const ObjAddr &object_addr, Vector<String> &persist_keys, Vector<String> &drop_keys ,bool check_ref_count = false);
 
     String RemovePrefix(const String &path);
 
