@@ -60,73 +60,13 @@ ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
     return ret;
 }
 
-nlohmann::json ObjStat::Serialize() const {
-    nlohmann::json obj;
-    obj["obj_size"] = obj_size_;
-    obj["parts"] = parts_;
-    obj["deleted_ranges"] = nlohmann::json::array();
-    for (auto &range : deleted_ranges_) {
-        nlohmann::json range_obj;
-        range_obj["start"] = range.start_;
-        range_obj["end"] = range.end_;
-        obj["deleted_ranges"].emplace_back(range_obj);
-    }
-    return obj;
-}
-
-void ObjStat::Deserialize(const nlohmann::json &obj) {
-    ref_count_ = 0;
-    obj_size_ = obj["obj_size"];
-    parts_ = obj["parts"];
-    if (obj.contains("deleted_ranges")) {
-        SizeT start = 0;
-        SizeT end = 0;
-        for (auto &range_obj : obj["deleted_ranges"]) {
-            if (range_obj.contains("start")) {
-                start = range_obj["start"];
-            }
-            if (range_obj.contains("end")) {
-                end = range_obj["end"];
-            }
-            deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
-        }
-    }
-}
-
-SizeT ObjStat::GetSizeInBytes() const {
-    SizeT size = sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT);
-    size += (sizeof(SizeT) + sizeof(SizeT)) * deleted_ranges_.size();
-    return size;
-}
-
-void ObjStat::WriteBufAdv(char *&buf) const {
-    ::infinity::WriteBufAdv(buf, obj_size_);
-    ::infinity::WriteBufAdv(buf, parts_);
-    ::infinity::WriteBufAdv(buf, deleted_ranges_.size());
-    for (auto &range : deleted_ranges_) {
-        ::infinity::WriteBufAdv(buf, range.start_);
-        ::infinity::WriteBufAdv(buf, range.end_);
-    }
-}
-
-ObjStat ObjStat::ReadBufAdv(const char *&buf) {
-    ObjStat ret;
-    ret.obj_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
-    ret.parts_ = ::infinity::ReadBufAdv<SizeT>(buf);
-    ret.ref_count_ = 0;
-
-    SizeT start, end;
-    SizeT len = ::infinity::ReadBufAdv<SizeT>(buf);
-    for (SizeT i = 0; i < len; ++i) {
-        start = ::infinity::ReadBufAdv<SizeT>(buf);
-        end = ::infinity::ReadBufAdv<SizeT>(buf);
-        ret.deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
-    }
-    return ret;
-}
-
-PersistenceManager::PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit)
+PersistenceManager::PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit, bool local_storage)
     : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
+    if (local_storage) {
+        objects_ = MakeUnique<ObjectStatAccessor_LocalStorage>();
+    } else {
+        UnrecoverableError("Remote storage is not supported yet.");
+    }
     current_object_key_ = ObjCreate();
     current_object_size_ = 0;
     current_object_parts_ = 0;
@@ -142,16 +82,7 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
     }
 }
 
-PersistenceManager::~PersistenceManager() {
-    [[maybe_unused]] SizeT sum_ref_count = 0;
-    for (auto &[key, obj_stat] : objects_) {
-        if (obj_stat.ref_count_ > 0) {
-            LOG_ERROR(fmt::format("Object {} still has ref count {}", key, obj_stat.ref_count_));
-        }
-        sum_ref_count += obj_stat.ref_count_;
-    }
-    assert(sum_ref_count == 0);
-}
+PersistenceManager::~PersistenceManager() = default;
 
 PersistWriteResult PersistenceManager::Persist(const String &file_path, const String &tmp_file_path, bool try_compose) {
     PersistWriteResult result;
@@ -200,7 +131,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(src_size, 1, 0));
+        objects_->PutNew(obj_key, ObjStat(src_size, 1, 0), result.drop_keys_);
         LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
         local_path_obj_[local_path] = obj_addr;
@@ -215,7 +146,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
     } else {
         std::lock_guard<std::mutex> lock(mtx_);
         if (int(src_size) > CurrentObjRoomNoLock()) {
-            CurrentObjFinalizeNoLock(result.persist_keys_);
+            CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
         }
         ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
         CurrentObjAppendNoLock(tmp_file_path, src_size);
@@ -241,47 +172,27 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
 PersistWriteResult PersistenceManager::CurrentObjFinalize(bool validate) {
     PersistWriteResult result;
     std::lock_guard<std::mutex> lock(mtx_);
-    CurrentObjFinalizeNoLock(result.persist_keys_);
+    CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
 
-    if (!validate)
-        return result;
+    if (validate) {
+        CheckValid();
+    }
+
+    return result;
+}
+
+void PersistenceManager::CheckValid() {
     for (auto &[local_path, obj_addr] : local_path_obj_) {
-        auto it = objects_.find(obj_addr.obj_key_);
-        if (it == objects_.end()) {
+        ObjStat *obj_stat = objects_->GetNoCount(obj_addr.obj_key_);
+        if (obj_stat == nullptr) {
             String error_message = fmt::format("CurrentObjFinalize Failed to find object for local path {}", local_path);
             LOG_ERROR(error_message);
         }
     }
-    for (auto &[obj_key, obj_stat] : objects_) {
-        Set<Range> &deleted_ranges = obj_stat.deleted_ranges_;
-        if (deleted_ranges.size() >= 2) {
-            auto it1 = deleted_ranges.begin();
-            auto it2 = std::next(it1);
-            while (it2 != deleted_ranges.end()) {
-                if (it1->end_ >= it2->start_) {
-                    String error_message = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
-                                                       obj_key,
-                                                       it1->start_,
-                                                       it1->end_,
-                                                       it2->start_,
-                                                       it2->end_);
-                    LOG_ERROR(error_message);
-                }
-                it1 = it2;
-                it2 = std::next(it2);
-            }
-        } else if (deleted_ranges.size() == 1) {
-            auto it1 = deleted_ranges.begin();
-            if (it1->start_ == 0 && it1->end_ == current_object_size_) {
-                String error_message = fmt::format("CurrentObjFinalize Object {} is fully deleted", obj_key);
-                LOG_ERROR(error_message);
-            }
-        }
-    }
-    return result;
+    objects_->CheckValid(current_object_size_);
 }
 
-void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys) {
+void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, Vector<String> &drop_keys) {
     persist_keys.push_back(current_object_key_);
     if (current_object_size_ > 0) {
         if (current_object_parts_ > 1) {
@@ -298,7 +209,7 @@ void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys) 
             outFile.close();
         }
 
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_));
+        objects_->PutNew(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_), drop_keys);
         LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
@@ -321,13 +232,13 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("GetObjCache Failed to find object for local path {}", local_path);
         LOG_WARN(error_message);
-        result.cached_ = true; // TODO
+        result.cached_ = true;
         return result;
     }
-    auto oit = objects_.find(it->second.obj_key_);
-    if (oit != objects_.end()) {
-        oit->second.ref_count_++;
-        LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, oit->second.ref_count_));
+    result.obj_addr_ = it->second;
+    if (ObjStat *obj_stat = objects_->Get(it->second.obj_key_); obj_stat != nullptr) {
+        LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
+        result.cached_ = obj_stat->cached_;
     } else {
         if (it->second.obj_key_ != current_object_key_) {
             String error_message = fmt::format("GetObjCache object {} not found", it->second.obj_key_);
@@ -335,9 +246,8 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         }
         current_object_ref_count_++;
         LOG_TRACE(fmt::format("GetObjCache current object {} ref count {}", it->second.obj_key_, current_object_ref_count_));
+        result.cached_ = true;
     }
-    result.obj_addr_ = it->second;
-    result.cached_ = true; // TODO
     return result;
 }
 
@@ -358,7 +268,8 @@ ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const String &local_path) {
     return it->second;
 }
 
-void PersistenceManager::PutObjCache(const String &file_path) {
+PersistWriteResult PersistenceManager::PutObjCache(const String &file_path) {
+    PersistWriteResult result;
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         String error_message = fmt::format("Failed to find file path of {}", file_path);
@@ -374,26 +285,20 @@ void PersistenceManager::PutObjCache(const String &file_path) {
     if (it->second.part_size_ == 0) {
         UnrecoverableError(fmt::format("PutObjCache object {} part size is 0", it->second.obj_key_));
     }
-    auto oit = objects_.find(it->second.obj_key_);
-    if (oit == objects_.end()) {
+    ObjStat *obj_stat = objects_->Release(it->second.obj_key_, result.drop_keys_); 
+    if (obj_stat == nullptr) {
         if (it->second.obj_key_ != current_object_key_) {
             UnrecoverableError(fmt::format("PutObjCache object {} not found", it->second.obj_key_));
-            return;
         }
         if (current_object_ref_count_ <= 0) {
             UnrecoverableError(fmt::format("PutObjCache object {} ref count is {}", it->second.obj_key_, current_object_ref_count_));
         }
         current_object_ref_count_--;
         LOG_TRACE(fmt::format("PutObjCache current object {} ref count {}", it->second.obj_key_, current_object_ref_count_));
-        return;
+        return result;
     }
-
-    if (oit->second.ref_count_ <= 0) {
-        UnrecoverableError(fmt::format("PutObjCache object {} ref count is {}", it->second.obj_key_, oit->second.ref_count_));
-    }
-
-    oit->second.ref_count_--;
-    LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", it->second.obj_key_, oit->second.ref_count_));
+    LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
+    return result;
 }
 
 String PersistenceManager::ObjCreate() { return UUID().to_string(); }
@@ -429,12 +334,12 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
 }
 
 void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, Vector<String> &persist_keys, Vector<String> &drop_keys, bool check_ref_count) {
-    auto it = objects_.find(object_addr.obj_key_);
-    if (it == objects_.end()) {
+    ObjStat *obj_stat = objects_->GetNoCount(object_addr.obj_key_);
+    if (obj_stat == nullptr) {
         if (object_addr.obj_key_ == current_object_key_) {
-            CurrentObjFinalizeNoLock(persist_keys);
-            it = objects_.find(object_addr.obj_key_);
-            assert(it != objects_.end());
+            CurrentObjFinalizeNoLock(persist_keys, drop_keys);
+            obj_stat = objects_->GetNoCount(object_addr.obj_key_);
+            assert(obj_stat != nullptr);
         } else {
             String error_message = fmt::format("CleanupNoLock Failed to find object {}", object_addr.obj_key_);
             UnrecoverableError(error_message);
@@ -442,17 +347,16 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, Vector<String
         }
     }
     if (check_ref_count) {
-        const ObjStat &stat = it->second;
-        if (stat.ref_count_ > 0) {
-            String error_message = fmt::format("CleanupNoLock object {} ref count is {}", object_addr.obj_key_, stat.ref_count_);
+        if (obj_stat->ref_count_ > 0) {
+            String error_message = fmt::format("CleanupNoLock object {} ref count is {}", object_addr.obj_key_, obj_stat->ref_count_);
             UnrecoverableError(error_message);
         }
     }
     Range orig_range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
     Range range(orig_range);
-    auto inst_it = it->second.deleted_ranges_.lower_bound(range);
+    auto inst_it = obj_stat->deleted_ranges_.lower_bound(range);
 
-    if (inst_it != it->second.deleted_ranges_.begin()) {
+    if (inst_it != obj_stat->deleted_ranges_.begin()) {
         auto inst_it_prev = std::prev(inst_it);
         if (inst_it_prev->Cover(orig_range)) {
             // Check duplication. Cleanup could delete a local file multiple times.
@@ -471,11 +375,11 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, Vector<String
         } else if (orig_range.start_ == inst_it_prev->end_) {
             // Try merge with prev range
             range.start_ = inst_it_prev->start_;
-            inst_it = it->second.deleted_ranges_.erase(inst_it_prev);
+            inst_it = obj_stat->deleted_ranges_.erase(inst_it_prev);
         }
     }
 
-    if (inst_it != it->second.deleted_ranges_.end()) {
+    if (inst_it != obj_stat->deleted_ranges_.end()) {
         if (inst_it->Cover(orig_range)) {
             // Check duplication. Cleanup could delete a local file multiple times.
             String error_message = fmt::format("CleanupNoLock delete [{}, {}) more than once", orig_range.start_, orig_range.end_);
@@ -493,38 +397,35 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, Vector<String
         } else if (orig_range.end_ == inst_it->start_) {
             // Try merge with next range
             range.end_ = inst_it->end_;
-            it->second.deleted_ranges_.erase(inst_it);
+            obj_stat->deleted_ranges_.erase(inst_it);
         }
     }
 
-    auto [_, ok] = it->second.deleted_ranges_.insert(range);
+    auto [_, ok] = obj_stat->deleted_ranges_.insert(range);
     if (!ok) {
         String error_message = fmt::format("Failed to delete ObjAddr {} range [{}, {})", object_addr.obj_key_, range.start_, range.end_);
         UnrecoverableError(error_message);
     }
 
     LOG_TRACE(fmt::format("Deleted object {} range [{}, {})", object_addr.obj_key_, orig_range.start_, orig_range.end_));
-    if (range.start_ == 0 && range.end_ == it->second.obj_size_ && object_addr.obj_key_ != current_object_key_) {
-        // fs::path fp = workspace_;
+    if (range.start_ == 0 && range.end_ == obj_stat->obj_size_ && object_addr.obj_key_ != current_object_key_) {
         if (object_addr.obj_key_.empty()) {
             String error_message = fmt::format("Failed to find object key");
             UnrecoverableError(error_message);
         }
         drop_keys.emplace_back(object_addr.obj_key_);
-        // fp.append(object_addr.obj_key_);
-        // fs::remove(fp);
-        objects_.erase(it);
-        // LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
+        objects_->Invalidate(object_addr.obj_key_);
+        LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
     }
 }
 
 ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {
     std::lock_guard<std::mutex> lock(mtx_);
-    auto it = objects_.find(obj_addr.obj_key_);
-    if (it == objects_.end()) {
+    ObjStat *obj_stat = objects_->GetNoCount(obj_addr.obj_key_);
+    if (obj_stat == nullptr) {
         return ObjStat();
     }
-    return it->second;
+    return *obj_stat;
 }
 
 void PersistenceManager::SaveLocalPath(const String &file_path, const ObjAddr &object_addr) {
@@ -555,13 +456,7 @@ void PersistenceManager::SaveLocalPath(const String &file_path, const ObjAddr &o
 
 void PersistenceManager::SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat) {
     std::lock_guard<std::mutex> lock(mtx_);
-    auto it = objects_.find(obj_addr.obj_key_);
-    if (it != objects_.end()) {
-        it->second = obj_stat;
-    } else {
-        objects_.emplace(obj_addr.obj_key_, obj_stat);
-        LOG_TRACE(fmt::format("SaveObjStat added object {}", obj_addr.obj_key_));
-    }
+    objects_->PutNoCount(obj_addr.obj_key_, obj_stat);
 }
 
 String PersistenceManager::RemovePrefix(const String &path) {
@@ -602,14 +497,7 @@ PersistWriteResult PersistenceManager::Cleanup(const String &file_path) {
 nlohmann::json PersistenceManager::Serialize() {
     std::lock_guard<std::mutex> lock(mtx_);
     nlohmann::json json_obj;
-    json_obj["obj_stat_size"] = objects_.size();
-    json_obj["obj_stat_array"] = nlohmann::json::array();
-    for (auto &[obj_key, obj_stat] : objects_) {
-        nlohmann::json pair;
-        pair["obj_key"] = obj_key;
-        pair["obj_stat"] = obj_stat.Serialize();
-        json_obj["obj_stat_array"].emplace_back(pair);
-    }
+    json_obj["objects"] = objects_->Serialize();
     json_obj["obj_addr_size"] = local_path_obj_.size();
     json_obj["obj_addr_array"] = nlohmann::json::array();
     for (auto &[path, obj_addr] : local_path_obj_) {
@@ -623,19 +511,8 @@ nlohmann::json PersistenceManager::Serialize() {
 
 void PersistenceManager::Deserialize(const nlohmann::json &obj) {
     std::lock_guard<std::mutex> lock(mtx_);
+    objects_->Deserialize(obj["objects"]);
     SizeT len = 0;
-    if (obj.contains("obj_stat_size")) {
-        len = obj["obj_stat_size"];
-    }
-    for (SizeT i = 0; i < len; ++i) {
-        auto &json_pair = obj["obj_stat_array"][i];
-        String obj_key = json_pair["obj_key"];
-        ObjStat obj_stat;
-        obj_stat.Deserialize(json_pair["obj_stat"]);
-        objects_.emplace(obj_key, obj_stat);
-        LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
-    }
-    len = 0;
     if (obj.contains("obj_addr_size")) {
         len = obj["obj_addr_size"];
     }
@@ -651,7 +528,7 @@ void PersistenceManager::Deserialize(const nlohmann::json &obj) {
 
 HashMap<String, ObjStat> PersistenceManager::GetAllObjects() const {
     std::lock_guard<std::mutex> lock(mtx_);
-    return objects_;
+    return objects_->GetAllObjects();
 }
 
 HashMap<String, ObjAddr> PersistenceManager::GetAllFiles() const {

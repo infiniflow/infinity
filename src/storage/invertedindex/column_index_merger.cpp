@@ -91,13 +91,13 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
         // otherwise the range of row_id will be very large ( >= 2^32)
         Vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
         unsafe_column_lengths.clear();
+        PersistResultHandler handler(pm);
         for (u32 i = 0; i < base_names.size(); ++i) {
             String column_len_file = Path(InfinityContext::instance().config()->DataDir()) / index_dir_ / (base_names[i] + LENGTH_SUFFIX);
             RowID base_row_id = base_rowids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
 
             if (use_object_cache) {
-                PersistResultHandler handler(pm);
                 PersistReadResult result = pm->GetObjCache(column_len_file);
                 const ObjAddr &obj_addr = handler.HandleReadResult(result);
                 column_len_file = pm->GetObjPath(obj_addr.obj_key_);
@@ -122,7 +122,8 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
 
             if (use_object_cache) {
                 column_len_file = Path(InfinityContext::instance().config()->DataDir()) / index_dir_ / (base_names[i] + LENGTH_SUFFIX);
-                pm->PutObjCache(column_len_file);
+                PersistWriteResult res = pm->PutObjCache(column_len_file);
+                handler.HandleWriteResult(res);
             }
         }
 

@@ -146,13 +146,13 @@ TEST_P(PostingMergerTest, Basic) {
         // prepare column length info
         // the indexes to be merged should be from the same segment
         // otherwise the range of row_id will be very large ( >= 2^32)
+        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        PersistResultHandler handler(pm);
         unsafe_column_length_array.clear();
         for (u32 i = 0; i < base_names.size(); ++i) {
             String column_len_file = (Path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
             String real_column_len_file = column_len_file;
-            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
             if (pm != nullptr) {
-                PersistResultHandler handler(pm);
                 PersistReadResult result = pm->GetObjCache(real_column_len_file);
                 const ObjAddr &obj_addr = handler.HandleReadResult(result);
                 real_column_len_file = pm->GetObjPath(obj_addr.obj_key_);
@@ -174,7 +174,8 @@ TEST_P(PostingMergerTest, Basic) {
                 UnrecoverableError(error_message);
             }
             if (pm != nullptr) {
-                pm->PutObjCache(column_len_file);
+                PersistWriteResult res = pm->PutObjCache(column_len_file);
+                handler.HandleWriteResult(res);
             }
         }
     }

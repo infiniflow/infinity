@@ -23,6 +23,8 @@ namespace infinity {
 
 export class PersistResultHandler {
 public:
+    PersistResultHandler() : pm_(nullptr) {}
+
     PersistResultHandler(PersistenceManager *pm) : pm_(pm) {}
 
     void HandleWriteResult(const PersistWriteResult &result);

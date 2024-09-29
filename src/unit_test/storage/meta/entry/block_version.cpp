@@ -24,7 +24,9 @@ import third_party;
 import infinity_context;
 import block_version;
 import file_system;
-import local_file_system;
+import virtual_storage;
+import virtual_storage_type;
+import abstract_file_handle;
 import file_system_type;
 import buffer_manager;
 import version_file_worker;
@@ -49,22 +51,25 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
     block_version.Delete(2, 30);
     block_version.Delete(5, 40);
     String version_path = String(GetFullDataDir()) + "/block_version_test";
-    LocalFileSystem fs;
+
+    VirtualStorage virtual_storage;
+    Map<String, String> configs;
+    virtual_storage.Init(StorageType::kLocal, configs);
 
     {
-        auto [file_handler, status] = fs.OpenFile(version_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        block_version.SpillToFile(*file_handler);
+        auto [version_file_handle, status] = virtual_storage.BuildFileHandle();
+        EXPECT_TRUE(status.ok());
+        status = version_file_handle->Open(version_path, FileAccessMode::kWrite);
+        EXPECT_TRUE(status.ok());
+        block_version.SpillToFile(version_file_handle.get());
     }
 
     {
-        auto [file_handler, status] = fs.OpenFile(version_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        auto block_version2 = BlockVersion::LoadFromFile(*file_handler);
+        auto [version_file_handle, status] = virtual_storage.BuildFileHandle();
+        EXPECT_TRUE(status.ok());
+        status = version_file_handle->Open(version_path, FileAccessMode::kRead);
+
+        auto block_version2 = BlockVersion::LoadFromFile(version_file_handle.get());
         ASSERT_EQ(block_version, *block_version2);
     }
 }

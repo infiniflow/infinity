@@ -124,7 +124,7 @@ Status MinioFile::Close() {
     return Status::OK(); 
 }
 
-Status MinioFile::Append(const char *buffer, u64 nbytes) { 
+Status MinioFile::Append(const void *buffer, u64 nbytes) {
     if(!open_ or access_mode_ != FileAccessMode::kWrite) {
         String error_message = fmt::format("File: {} isn't open.", path_);
         UnrecoverableError(error_message);
@@ -159,7 +159,7 @@ Status MinioFile::Append(const String &buffer, u64 nbytes) {
     return Status::OK(); 
 }
 
-Tuple<SizeT, Status> MinioFile::Read(char *buffer, u64 nbytes) { 
+Tuple<SizeT, Status> MinioFile::Read(void *buffer, u64 nbytes) {
     if(!open_) {
         String error_message = fmt::format("File: {} isn't open.", path_);
         UnrecoverableError(error_message);
@@ -167,7 +167,7 @@ Tuple<SizeT, Status> MinioFile::Read(char *buffer, u64 nbytes) {
     i64 readen = 0;
     while (readen < (i64)nbytes) {
         SizeT a = nbytes - readen;
-        i64 read_count = read(fd_, buffer + readen, a);
+        i64 read_count = read(fd_, (char*)buffer + readen, a);
         if (read_count == 0) {
             break;
         }

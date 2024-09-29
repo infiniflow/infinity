@@ -1,9 +1,4 @@
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import AddIcon from '/public/add.svg';
 
 import {
@@ -14,6 +9,7 @@ import {
   SelectValue
 } from '@radix-ui/react-select';
 import { listDatabase } from './actions';
+import { DatabaseCard } from './database-card';
 import { DatabaseCreatingDialog } from './database-creating-dialog';
 
 interface IDatabaseSelectProps {
@@ -51,12 +47,7 @@ export default async function HomePage({
   return (
     <div className="grid grid-cols-4 gap-4">
       {ret.databases.map((x: string, idx: number) => (
-        <Card className="w-full max-w-sm" key={idx}>
-          <CardHeader>
-            <CardTitle className="text-1xl">{x}</CardTitle>
-            <CardDescription>db description</CardDescription>
-          </CardHeader>
-        </Card>
+        <DatabaseCard key={idx} data={x}></DatabaseCard>
       ))}
       <Card className="w-full max-w-sm">
         <DatabaseCreatingDialog>
