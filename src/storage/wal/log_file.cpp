@@ -19,7 +19,7 @@ module;
 module log_file;
 
 import stl;
-import virtual_storage;
+import virtual_store;
 import third_party;
 import infinity_exception;
 import logger;
@@ -153,11 +153,11 @@ Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::Par
 
 Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(const String &wal_dir) {
 
-    if (!VirtualStorage::ExistsLocal(wal_dir)) {
+    if (!LocalStore::Exists(wal_dir)) {
         return {None, Vector<WalFileInfo>{}};
     }
 
-    auto [entries, status] = VirtualStorage::ListDirectoryLocal(wal_dir);
+    auto [entries, status] = LocalStore::ListDirectory(wal_dir);
     if(!status.ok()) {
         LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
@@ -222,7 +222,7 @@ void WalFile::RecycleWalFile(TxnTimeStamp max_commit_ts, const String &wal_dir) 
     auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
     for (const auto &wal_info : wal_infos) {
         if (wal_info.max_commit_ts_ <= max_commit_ts) {
-            VirtualStorage::DeleteFileLocal(wal_info.path_);
+            LocalStore::DeleteFile(wal_info.path_);
             LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
         }
     }

@@ -24,7 +24,7 @@ module local_file_handle;
 
 import third_party;
 import status;
-import virtual_storage;
+import virtual_store;
 import infinity_exception;
 import logger;
 import abstract_file_handle;
