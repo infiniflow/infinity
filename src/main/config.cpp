@@ -14,8 +14,6 @@
 
 module;
 
-// #include <bits/chrono.h>
-// #include <cctype>
 #include <string>
 #include <unistd.h>
 
@@ -27,12 +25,13 @@ import boost;
 import compilation_config;
 import default_values;
 import logger;
-import local_file_system;
+import virtual_storage;
 import utility;
 import status;
 import options;
 import command_statement;
 import infinity_exception;
+import virtual_storage_type;
 
 namespace infinity {
 
@@ -115,18 +114,14 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
     return Status::OK();
 }
 
-// extern SharedPtr<spdlogger> infinity_logger;
-
 Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
-    LocalFileSystem fs;
-
     toml::table config_toml{};
-    if (config_path.get() == nullptr || config_path->empty() || !fs.Exists(std::filesystem::absolute(*config_path))) {
+    if (config_path.get() == nullptr || config_path->empty() || !VirtualStorage::ExistsLocal(std::filesystem::absolute(*config_path))) {
         if (config_path.get() == nullptr || config_path->empty()) {
-//            fmt::print("No config file is given, use default configs.\n");
-            ;
+            fmt::print("No config file is given, use default configs.\n");
         } else {
-            fmt::print("Config file: {} is not existent.\n", *config_path);
+            fmt::print("Config file: {} is not found.\n", *config_path);
+            return Status::NotFound(fmt::format("Config file: {} not found", *config_path));
         }
 
         Status status;
@@ -344,6 +339,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME, persistence_object_size_limit, std::numeric_limits<i64>::max(), 0);
         global_options_.AddOption(std::move(persistence_object_size_limit_option));
 
+        // Storage type
+        String storage_type = String(DEFAULT_STORAGE_TYPE);
+        UniquePtr<StringOption> storage_type_option = MakeUnique<StringOption>(STORAGE_TYPE_OPTION_NAME, storage_type);
+        status = global_options_.AddOption(std::move(storage_type_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Cleanup Interval
         i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
         UniquePtr<IntegerOption> cleanup_interval_option =
@@ -394,6 +398,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Buffer manager size
         SizeT lru_num = DEFAULT_BUFFER_MANAGER_LRU_COUNT;
         UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, 100, 1);
         status = global_options_.AddOption(std::move(lru_num_option));
@@ -402,6 +407,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Memory index capacity
         i64 memindex_memory_quota = DEFAULT_MEMINDEX_MEMORY_QUOTA;
         UniquePtr<IntegerOption> memindex_memory_quota_option = MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME,
                                                                                           memindex_memory_quota, std::numeric_limits<i64>::max(), 0);
@@ -1348,6 +1354,76 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kStorageType: {
+                            // File System Type
+                            String storage_type_str = String(DEFAULT_STORAGE_TYPE);
+                            if(elem.second.is_string()) {
+                                storage_type_str = elem.second.value_or(storage_type_str);
+                            } else {
+                                return Status::InvalidConfig("'storage_type' field isn't string.");
+                            }
+
+                            auto storage_type_option = MakeUnique<StringOption>(STORAGE_TYPE_OPTION_NAME, storage_type_str);
+                            Status status = global_options_.AddOption(std::move(storage_type_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kObjectStorage: {
+                            const auto &object_storage_config = elem.second;
+                            const auto &object_storage_config_table = object_storage_config.as_table();
+                            for (auto &elem : *object_storage_config_table) {
+                                String var_name = String(elem.first);
+                                GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
+                                if(option_index == GlobalOptionIndex::kInvalid) {
+                                    return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage.object_storage' field", var_name));
+                                }
+                                switch (option_index) {
+                                    case GlobalOptionIndex::kObjectStorageUrl: {
+                                        String object_storage_url_str;
+                                        if (elem.second.is_string()) {
+                                            Optional<String> str_optional = elem.second.value<std::string>();
+                                            if (!str_optional.has_value()) {
+                                                return Status::InvalidConfig("'url' field in [storage.object_storage] isn't string");
+                                            }
+                                            object_storage_url_str = *str_optional;
+                                        } else {
+                                            return Status::InvalidConfig("'url' field in [storage.object_storage] isn't string");
+                                        }
+                                        auto object_storage_url_option = MakeUnique<StringOption>(OBJECT_STORAGE_URL_OPTION_NAME, object_storage_url_str);
+                                        global_options_.AddOption(std::move(object_storage_url_option));
+                                        break;
+                                    }
+                                    case GlobalOptionIndex::kObjectStorageBucket: {
+                                        String object_storage_bucket = String(DEFAULT_OBJECT_STORAGE_BUCKET);
+                                        if (elem.second.is_string()) {
+                                            object_storage_bucket = elem.second.value_or(object_storage_bucket);
+                                        } else {
+                                            return Status::InvalidConfig("'host' field in [storage.object_storage] isn't string");
+                                        }
+                                        auto object_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_OPTION_NAME, object_storage_bucket);
+                                        global_options_.AddOption(std::move(object_bucket_option));
+                                        break;
+                                    }
+                                    default: {
+                                        return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage.object_storage' field", var_name));
+                                    }
+                                }
+                            }
+                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageUrl) == nullptr) {
+                                return Status::InvalidConfig("No 'url' field in [storage.object_storage]");
+                            }
+                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageBucket) == nullptr) {
+                                String object_storage_bucket = String(DEFAULT_OBJECT_STORAGE_BUCKET);
+                                UniquePtr<StringOption> object_bucket_option = MakeUnique<StringOption>(OBJECT_STORAGE_BUCKET_OPTION_NAME, object_storage_bucket);
+                                Status status = global_options_.AddOption(std::move(object_bucket_option));
+                                if (!status.ok()) {
+                                    UnrecoverableError(status.message());
+                                }
+                            }
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage' field", var_name));
                         }
@@ -1419,6 +1495,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                         MakeUnique<IntegerOption>(MEM_INDEX_CAPACITY_OPTION_NAME, mem_index_capacity, MAX_MEMINDEX_CAPACITY, MIN_MEMINDEX_CAPACITY);
                     Status status = global_options_.AddOption(std::move(mem_index_capacity_option));
                     if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if (BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kStorageType); base_option == nullptr) {
+                    String storage_type_str = String(DEFAULT_STORAGE_TYPE);
+                    UniquePtr<StringOption> storage_type_option = MakeUnique<StringOption>(STORAGE_TYPE_OPTION_NAME, storage_type_str);
+                    Status status = global_options_.AddOption(std::move(storage_type_option));
+                    if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
                 }
@@ -2061,6 +2146,22 @@ i64 Config::MemIndexCapacity() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexCapacity);
 }
 
+StorageType Config::StorageType() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    String storage_type_str = global_options_.GetStringValue(GlobalOptionIndex::kStorageType);
+    return String2StorageType(storage_type_str);
+}
+
+String Config::ObjectStorageUrl() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kObjectStorageUrl);
+}
+
+String Config::ObjectStorageBucket() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kObjectStorageBucket);
+}
+
 // Persistence
 String Config::PersistenceDir() {
     std::lock_guard<std::mutex> guard(mutex_);
@@ -2209,6 +2310,19 @@ void Config::PrintAll() {
     fmt::print(" - compact_interval: {}\n", Utility::FormatTimeInfo(CompactInterval()));
     fmt::print(" - optimize_index_interval: {}\n", Utility::FormatTimeInfo(OptimizeIndexInterval()));
     fmt::print(" - memindex_capacity: {}\n", Utility::FormatByteSize(MemIndexCapacity()));
+    fmt::print(" - storage_type: {}\n", ToString(StorageType()));
+    switch(StorageType() ) {
+        case StorageType::kLocal:  {
+            break;
+        }
+        case StorageType::kMinio: {
+            fmt::print(" - object_storage_url: {}\n", ObjectStorageUrl());
+            fmt::print(" - object_storage_bucket: {}\n", ObjectStorageBucket());
+        }
+        default: {
+            break;
+        }
+    }
 
     // Buffer manager
     fmt::print(" - buffer_manager_size: {}\n", Utility::FormatByteSize(BufferManagerSize()));

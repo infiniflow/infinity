@@ -153,7 +153,9 @@ PersistenceManager::~PersistenceManager() {
     assert(sum_ref_count == 0);
 }
 
-ObjAddr PersistenceManager::Persist(const String &file_path, const String &tmp_file_path, bool try_compose) {
+PersistWriteResult PersistenceManager::Persist(const String &file_path, const String &tmp_file_path, bool try_compose) {
+    PersistWriteResult result;
+
     std::error_code ec;
     fs::path src_fp = tmp_file_path;
 
@@ -167,7 +169,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path, const String &tmp_f
         std::lock_guard<std::mutex> lock(mtx_);
         auto it = local_path_obj_.find(local_path);
         if (it != local_path_obj_.end()) {
-            CleanupNoLock(it->second);
+            CleanupNoLock(it->second, result.persist_keys_, result.drop_keys_);
             LOG_TRACE(fmt::format("Persist deleted mapping from local path {} to ObjAddr({}, {}, {})",
                                   local_path,
                                   it->second.obj_key_,
@@ -186,7 +188,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path, const String &tmp_f
         LOG_WARN(error_message);
         std::lock_guard<std::mutex> lock(mtx_);
         local_path_obj_.erase(local_path);
-        return ObjAddr();
+        return result;
     } else if (!try_compose || src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         fs::path dst_fp = workspace_;
@@ -207,11 +209,13 @@ ObjAddr PersistenceManager::Persist(const String &file_path, const String &tmp_f
                               obj_addr.obj_key_,
                               obj_addr.part_offset_,
                               obj_addr.part_size_));
-        return obj_addr;
+        result.persist_keys_.push_back(obj_key);
+        result.obj_addr_ = obj_addr;
+        return result;
     } else {
         std::lock_guard<std::mutex> lock(mtx_);
         if (int(src_size) > CurrentObjRoomNoLock()) {
-            CurrentObjFinalizeNoLock();
+            CurrentObjFinalizeNoLock(result.persist_keys_);
         }
         ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
         CurrentObjAppendNoLock(tmp_file_path, src_size);
@@ -227,18 +231,20 @@ ObjAddr PersistenceManager::Persist(const String &file_path, const String &tmp_f
                               obj_addr.obj_key_,
                               obj_addr.part_offset_,
                               obj_addr.part_size_));
-        return obj_addr;
+        result.obj_addr_ = obj_addr;
+        return result;
     }
 }
 
 // TODO:
 // - Upload the finalized object to object store in background.
-void PersistenceManager::CurrentObjFinalize(bool validate) {
+PersistWriteResult PersistenceManager::CurrentObjFinalize(bool validate) {
+    PersistWriteResult result;
     std::lock_guard<std::mutex> lock(mtx_);
-    CurrentObjFinalizeNoLock();
+    CurrentObjFinalizeNoLock(result.persist_keys_);
 
     if (!validate)
-        return;
+        return result;
     for (auto &[local_path, obj_addr] : local_path_obj_) {
         auto it = objects_.find(obj_addr.obj_key_);
         if (it == objects_.end()) {
@@ -272,9 +278,11 @@ void PersistenceManager::CurrentObjFinalize(bool validate) {
             }
         }
     }
+    return result;
 }
 
-void PersistenceManager::CurrentObjFinalizeNoLock() {
+void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys) {
+    persist_keys.push_back(current_object_key_);
     if (current_object_size_ > 0) {
         if (current_object_parts_ > 1) {
             // Add footer to composed object -- format version 1
@@ -299,7 +307,9 @@ void PersistenceManager::CurrentObjFinalizeNoLock() {
     }
 }
 
-ObjAddr PersistenceManager::GetObjCache(const String &file_path) {
+PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
+    PersistReadResult result;
+
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         String error_message = fmt::format("Failed to find local path of {}", local_path);
@@ -311,7 +321,8 @@ ObjAddr PersistenceManager::GetObjCache(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("GetObjCache Failed to find object for local path {}", local_path);
         LOG_WARN(error_message);
-        return ObjAddr();
+        result.cached_ = true; // TODO
+        return result;
     }
     auto oit = objects_.find(it->second.obj_key_);
     if (oit != objects_.end()) {
@@ -321,12 +332,13 @@ ObjAddr PersistenceManager::GetObjCache(const String &file_path) {
         if (it->second.obj_key_ != current_object_key_) {
             String error_message = fmt::format("GetObjCache object {} not found", it->second.obj_key_);
             UnrecoverableError(error_message);
-            return ObjAddr();
         }
         current_object_ref_count_++;
         LOG_TRACE(fmt::format("GetObjCache current object {} ref count {}", it->second.obj_key_, current_object_ref_count_));
     }
-    return it->second;
+    result.obj_addr_ = it->second;
+    result.cached_ = true; // TODO
+    return result;
 }
 
 ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const String &local_path) {
@@ -379,6 +391,7 @@ void PersistenceManager::PutObjCache(const String &file_path) {
     if (oit->second.ref_count_ <= 0) {
         UnrecoverableError(fmt::format("PutObjCache object {} ref count is {}", it->second.obj_key_, oit->second.ref_count_));
     }
+
     oit->second.ref_count_--;
     LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", it->second.obj_key_, oit->second.ref_count_));
 }
@@ -415,11 +428,11 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
     dstFile.close();
 }
 
-void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, bool check_ref_count) {
+void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, Vector<String> &persist_keys, Vector<String> &drop_keys, bool check_ref_count) {
     auto it = objects_.find(object_addr.obj_key_);
     if (it == objects_.end()) {
         if (object_addr.obj_key_ == current_object_key_) {
-            CurrentObjFinalizeNoLock();
+            CurrentObjFinalizeNoLock(persist_keys);
             it = objects_.find(object_addr.obj_key_);
             assert(it != objects_.end());
         } else {
@@ -492,15 +505,16 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, bool check_re
 
     LOG_TRACE(fmt::format("Deleted object {} range [{}, {})", object_addr.obj_key_, orig_range.start_, orig_range.end_));
     if (range.start_ == 0 && range.end_ == it->second.obj_size_ && object_addr.obj_key_ != current_object_key_) {
-        fs::path fp = workspace_;
+        // fs::path fp = workspace_;
         if (object_addr.obj_key_.empty()) {
             String error_message = fmt::format("Failed to find object key");
             UnrecoverableError(error_message);
         }
-        fp.append(object_addr.obj_key_);
-        fs::remove(fp);
+        drop_keys.emplace_back(object_addr.obj_key_);
+        // fp.append(object_addr.obj_key_);
+        // fs::remove(fp);
         objects_.erase(it);
-        LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
+        // LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
     }
 }
 
@@ -559,7 +573,9 @@ String PersistenceManager::RemovePrefix(const String &path) {
     return "";
 }
 
-void PersistenceManager::Cleanup(const String &file_path) {
+PersistWriteResult PersistenceManager::Cleanup(const String &file_path) {
+    PersistWriteResult result;
+
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         String error_message = fmt::format("Failed to find local path of {}", local_path);
@@ -571,15 +587,16 @@ void PersistenceManager::Cleanup(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("Failed to find object for local path {}", local_path);
         LOG_WARN(error_message);
-        return;
+        return result;
     }
-    CleanupNoLock(it->second, true);
+    CleanupNoLock(it->second, result.persist_keys_, result.drop_keys_, true);
     LOG_TRACE(fmt::format("Deleted mapping from local path {} to ObjAddr({}, {}, {})",
                           local_path,
                           it->second.obj_key_,
                           it->second.part_offset_,
                           it->second.part_size_));
     local_path_obj_.erase(it);
+    return result;
 }
 
 nlohmann::json PersistenceManager::Serialize() {

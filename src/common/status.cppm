@@ -134,6 +134,7 @@ export enum class ErrorCode : long {
     kFunctionIsDisable = 3087,
     kNotFound = 3088,
     kErrorInit = 3089,
+    kFileIsOpen = 3090,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -184,7 +185,8 @@ export enum class ErrorCode : long {
     kWrongCheckpointType = 8006,
     kInvalidNodeRole = 8007,
     kInvalidNodeStatus = 8008,
-    kNodeInfoUpdated = 8009
+    kNodeInfoUpdated = 8009,
+    kNodeNameMismatch = 8010
 };
 
 export class Status {
@@ -297,6 +299,7 @@ public:
     static Status FunctionIsDisable(const String &function_name);
     static Status NotFound(const String &detailed_info);
     static Status ErrorInit(const String &detailed_info);
+    static Status FileIsOpen(const String &filename);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");
@@ -348,6 +351,7 @@ public:
     static Status InvalidNodeRole(const String &message);
     static Status InvalidNodeStatus(const String &message);
     static Status NodeInfoUpdated(const String &message);
+    static Status NodeNameMismatch(const String &actual_node_name, const String &expected_node_name);
 
 public:
     Status() = default;

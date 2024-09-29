@@ -43,6 +43,7 @@ import table_def;
 import third_party;
 import logger;
 import query_options;
+import defer_op;
 
 namespace infinity {
 
@@ -148,6 +149,26 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
             } else if (!f64_tensor_array_value.empty()) {
                 create_vvv(f64_tensor_array_value);
             }
+            break;
+        }
+        case LiteralType::kDate: {
+            constant_expr->date_value_ = strdup(str_value.c_str());
+            break;
+        }
+        case LiteralType::kTime: {
+            constant_expr->date_value_ = strdup(str_value.c_str());
+            break;
+        }
+        case LiteralType::kDateTime: {
+            constant_expr->date_value_ = strdup(str_value.c_str());
+            break;
+        }
+        case LiteralType::kTimestamp: {
+            constant_expr->date_value_ = strdup(str_value.c_str());
+            break;
+        }
+        case LiteralType::kInterval: {
+            constant_expr->date_value_ = strdup(str_value.c_str());
             break;
         }
         default: {
@@ -451,24 +472,18 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
 
 ParsedExpr *WrapInExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
-
-    auto in_expr = new InExpr();
-    Vector<ParsedExpr *> *in_arguments = new Vector<ParsedExpr *>();
-    in_arguments->reserve(arguments.size());
+    auto in_expr = MakeUnique<InExpr>();
+    in_expr->arguments_ = new Vector<ParsedExpr *>();
+    in_expr->arguments_->reserve(arguments.size());
     for (SizeT i = 0; i < arguments.size(); ++i) {
-        in_arguments->emplace_back(arguments[i]->GetParsedExpr(status));
+        in_expr->arguments_->emplace_back(arguments[i]->GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
-            delete in_expr;
-            delete in_arguments;
-            in_expr = nullptr;
             return nullptr;
         }
     }
-
     in_expr->left_ = left->GetParsedExpr(status);
     in_expr->in_ = in;
-    in_expr->arguments_ = in_arguments;
-    return in_expr;
+    return in_expr.release();
 }
 
 ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
@@ -1081,6 +1096,14 @@ void HandleRowIDType(ColumnField &output_column_field, SizeT row_count, const Sh
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
+void HandleTimeRelatedTypes(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+    auto size = column_vector->data_type()->Size() * row_count;
+    String dst;
+    dst.resize(size);
+    std::memcpy(dst.data(), column_vector->data(), size);
+    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+}
+
 void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     switch (column_vector->data_type()->type()) {
         case LogicalType::kBoolean: {
@@ -1127,6 +1150,14 @@ void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, c
             HandleRowIDType(output_column_field, row_count, column_vector);
             break;
         }
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kDateTime:
+        case LogicalType::kInterval:
+        case LogicalType::kTimestamp: {
+            HandleTimeRelatedTypes(output_column_field, row_count, column_vector);
+            break;
+        }
         default: {
             throw UnrecoverableException("Unsupported column type");
         }
@@ -1153,7 +1184,12 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
         case LogicalType::kFloat16:
         case LogicalType::kBFloat16:
         case LogicalType::kFloat:
-        case LogicalType::kDouble: {
+        case LogicalType::kDouble:
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kDateTime:
+        case LogicalType::kInterval:
+        case LogicalType::kTimestamp: {
             proto_data_type.logical_type = data_type->type();
             break;
         }
@@ -1224,44 +1260,46 @@ WrapQueryResult WrapSearch(Infinity &instance,
                            WrapParsedExpr *limit_expr,
                            WrapParsedExpr *offset_expr) {
     SearchExpr *search_expr = nullptr;
-    if (wrap_search_expr != nullptr) {
-        Status status;
-        search_expr = dynamic_cast<SearchExpr *>(wrap_search_expr->GetParsedExpr(status));
-        if (status.code_ != ErrorCode::kOk) {
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
-            return WrapQueryResult(status.code_, status.msg_->c_str());
-        }
-    }
-    ParsedExpr *filter = nullptr;
-    if (where_expr != nullptr) {
-        Status status;
-        filter = where_expr->GetParsedExpr(status);
-        if (status.code_ != ErrorCode::kOk) {
-            if (filter != nullptr) {
-                delete filter;
-                filter = nullptr;
-            }
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
-            return WrapQueryResult(status.code_, status.msg_->c_str());
-        }
-    }
-    Vector<ParsedExpr *> *output_columns = nullptr;
-
-    if (select_list.empty()) {
-        if (filter != nullptr) {
-            delete filter;
-            filter = nullptr;
-        }
+    DeferFn defer_fn1([&]() {
         if (search_expr != nullptr) {
             delete search_expr;
             search_expr = nullptr;
         }
+    });
+    if (wrap_search_expr != nullptr) {
+        Status status;
+        search_expr = dynamic_cast<SearchExpr *>(wrap_search_expr->GetParsedExpr(status));
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+    ParsedExpr *filter = nullptr;
+    DeferFn defer_fn2([&]() {
+        if (filter != nullptr) {
+            delete filter;
+            filter = nullptr;
+        }
+    });
+    if (where_expr != nullptr) {
+        Status status;
+        filter = where_expr->GetParsedExpr(status);
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+    Vector<ParsedExpr *> *output_columns = nullptr;
+    DeferFn defer_fn3([&]() {
+        if(output_columns != nullptr) {
+            SizeT output_column_len = output_columns->size();
+            for(SizeT i = 0; i < output_column_len; ++ i) {
+                if ((*output_columns)[i] != nullptr) {
+                    delete (*output_columns)[i];
+                    (*output_columns)[i] = nullptr;
+                }
+            }
+        }
+    });
+    if (select_list.empty()) {
         return WrapQueryResult(ErrorCode::kEmptySelectFields, "[error] Select fields are empty");
     } else {
         output_columns = new Vector<ParsedExpr *>();
@@ -1270,30 +1308,47 @@ WrapQueryResult WrapSearch(Infinity &instance,
             Status status;
             output_columns->emplace_back(select_list[i].GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
-                if (output_columns != nullptr) {
-                    for (SizeT j = 0; j <= i; ++j) {
-                        if ((*output_columns)[j] != nullptr) {
-                            delete (*output_columns)[j];
-                            (*output_columns)[j] = nullptr;
-                        }
-                    }
-                    delete output_columns;
-                    output_columns = nullptr;
-                }
-                if (filter != nullptr) {
-                    delete filter;
-                    filter = nullptr;
-                }
-                if (search_expr != nullptr) {
-                    delete search_expr;
-                    search_expr = nullptr;
-                }
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
         }
     }
 
-    auto query_result = instance.Search(db_name, table_name, search_expr, filter, output_columns);
+    ParsedExpr *limit = nullptr;
+    DeferFn defer_fn4([&]() {
+        if (limit != nullptr) {
+            delete limit;
+            limit = nullptr;
+        }
+    });
+    if (limit_expr != nullptr) {
+        Status status;
+        limit = limit_expr->GetParsedExpr(status);
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+
+    ParsedExpr *offset = nullptr;
+    DeferFn defer_fn5([&]() {
+        if (offset != nullptr) {
+            delete offset;
+            offset = nullptr;
+        }
+    });
+    if (offset_expr != nullptr) {
+        Status status;
+        offset = offset_expr->GetParsedExpr(status);
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+
+    auto query_result = instance.Search(db_name, table_name, search_expr, filter, limit, offset, output_columns);
+    search_expr = nullptr;
+    filter = nullptr;
+    limit = nullptr;
+    offset = nullptr;
+    output_columns = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }
@@ -1312,63 +1367,63 @@ WrapQueryResult WrapExplain(Infinity &instance,
                             WrapSearchExpr *wrap_search_expr,
                             WrapParsedExpr *wrap_filter) {
     SearchExpr *search_expr = nullptr;
+    DeferFn defer_fn1([&]() {
+        if (search_expr != nullptr) {
+            delete search_expr;
+            search_expr = nullptr;
+        }
+    });
     if (wrap_search_expr != nullptr) {
         Status status;
         search_expr = dynamic_cast<SearchExpr *>(wrap_search_expr->GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
     }
     ParsedExpr *filter = nullptr;
+    DeferFn defer_fn2([&]() {
+        if (filter != nullptr) {
+            delete filter;
+            filter = nullptr;
+        }
+    });
     if (wrap_filter != nullptr) {
         Status status;
         filter = wrap_filter->GetParsedExpr(status);
         if (status.code_ != ErrorCode::kOk) {
-            if (filter != nullptr) {
-                delete filter;
-                filter = nullptr;
-            }
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
     }
-    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
-    output_columns->reserve(wrap_output_columns.size());
-    for (SizeT i = 0; i < wrap_output_columns.size(); ++i) {
-        Status status;
-        output_columns->emplace_back(wrap_output_columns[i].GetParsedExpr(status));
-        if (status.code_ != ErrorCode::kOk) {
-            if (output_columns != nullptr) {
-                for (SizeT j = 0; j <= i; ++j) {
-                    if ((*output_columns)[j] != nullptr) {
-                        delete (*output_columns)[j];
-                        (*output_columns)[j] = nullptr;
-                    }
+    Vector<ParsedExpr *> *output_columns = nullptr;
+    DeferFn defer_fn3([&]() {
+        if(output_columns != nullptr) {
+            SizeT output_column_len = output_columns->size();
+            for(SizeT i = 0; i < output_column_len; ++ i) {
+                if ((*output_columns)[i] != nullptr) {
+                    delete (*output_columns)[i];
+                    (*output_columns)[i] = nullptr;
                 }
-                delete output_columns;
-                output_columns = nullptr;
             }
-            if (filter != nullptr) {
-                delete filter;
-                filter = nullptr;
+        }
+    });
+    if (wrap_output_columns.empty()) {
+        return WrapQueryResult(ErrorCode::kEmptySelectFields, "[error] Select fields are empty");
+    } else {
+        output_columns = new Vector<ParsedExpr *>();
+        output_columns->reserve(wrap_output_columns.size());
+        for (SizeT i = 0; i < wrap_output_columns.size(); ++i) {
+            Status status;
+            output_columns->emplace_back(wrap_output_columns[i].GetParsedExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
             }
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
-            return WrapQueryResult(status.code_, status.msg_->c_str());
         }
     }
 
-    auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, output_columns);
-
+    auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, nullptr, nullptr, output_columns);
+    search_expr = nullptr;
+    filter = nullptr;
+    output_columns = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }

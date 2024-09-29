@@ -165,7 +165,7 @@ public:
 
     virtual void ReadIndexInner(FileHandler &file_handler) = 0;
 
-    virtual void InsertData(void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) = 0;
+    virtual void InsertData(const void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) = 0;
 
     virtual void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks, SharedPtr<ChunkIndexEntry> &merged_chunk_index_entry) = 0;
 };

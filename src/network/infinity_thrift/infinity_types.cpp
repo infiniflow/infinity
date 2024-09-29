@@ -31,6 +31,11 @@ int _kLogicTypeValues[] = {
   LogicType::TensorArray,
   LogicType::Sparse,
   LogicType::MultiVector,
+  LogicType::Date,
+  LogicType::Time,
+  LogicType::DateTime,
+  LogicType::Timestamp,
+  LogicType::Interval,
   LogicType::Invalid
 };
 const char* _kLogicTypeNames[] = {
@@ -51,9 +56,14 @@ const char* _kLogicTypeNames[] = {
   "TensorArray",
   "Sparse",
   "MultiVector",
+  "Date",
+  "Time",
+  "DateTime",
+  "Timestamp",
+  "Interval",
   "Invalid"
 };
-const std::map<int, const char*> _LogicType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(18, _kLogicTypeValues, _kLogicTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _LogicType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(23, _kLogicTypeValues, _kLogicTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const LogicType::type& val) {
   std::map<int, const char*>::const_iterator it = _LogicType_VALUES_TO_NAMES.find(val);
@@ -225,7 +235,12 @@ int _kLiteralTypeValues[] = {
   LiteralType::IntegerTensorArray,
   LiteralType::DoubleTensorArray,
   LiteralType::SparseIntegerArray,
-  LiteralType::SparseDoubleArray
+  LiteralType::SparseDoubleArray,
+  LiteralType::Date,
+  LiteralType::Time,
+  LiteralType::Inteval,
+  LiteralType::DateTime,
+  LiteralType::Timestamp
 };
 const char* _kLiteralTypeNames[] = {
   "Boolean",
@@ -240,9 +255,14 @@ const char* _kLiteralTypeNames[] = {
   "IntegerTensorArray",
   "DoubleTensorArray",
   "SparseIntegerArray",
-  "SparseDoubleArray"
+  "SparseDoubleArray",
+  "Date",
+  "Time",
+  "Inteval",
+  "DateTime",
+  "Timestamp"
 };
-const std::map<int, const char*> _LiteralType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(13, _kLiteralTypeValues, _kLiteralTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _LiteralType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(18, _kLiteralTypeValues, _kLiteralTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const LiteralType::type& val) {
   std::map<int, const char*>::const_iterator it = _LiteralType_VALUES_TO_NAMES.find(val);
@@ -350,6 +370,11 @@ int _kColumnTypeValues[] = {
   ColumnType::ColumnSparse,
   ColumnType::ColumnMultiVector,
   ColumnType::ColumnRowID,
+  ColumnType::ColumnDate,
+  ColumnType::ColumnTime,
+  ColumnType::ColumnDateTime,
+  ColumnType::ColumnTimestamp,
+  ColumnType::ColumnInterval,
   ColumnType::ColumnInvalid
 };
 const char* _kColumnTypeNames[] = {
@@ -369,9 +394,14 @@ const char* _kColumnTypeNames[] = {
   "ColumnSparse",
   "ColumnMultiVector",
   "ColumnRowID",
+  "ColumnDate",
+  "ColumnTime",
+  "ColumnDateTime",
+  "ColumnTimestamp",
+  "ColumnInterval",
   "ColumnInvalid"
 };
-const std::map<int, const char*> _ColumnType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(17, _kColumnTypeValues, _kColumnTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _ColumnType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(22, _kColumnTypeValues, _kColumnTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const ColumnType::type& val) {
   std::map<int, const char*>::const_iterator it = _ColumnType_VALUES_TO_NAMES.find(val);

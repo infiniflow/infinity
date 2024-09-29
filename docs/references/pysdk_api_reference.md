@@ -7,6 +7,14 @@ slug: /python_api_reference
 ## connect
 
 ```python
+# Connect to the local directory and get an Infinity object
+infinity_embedded.connect(uri)
+```
+
+Or
+
+```python
+# Connect to the Infinity server and get an Infinity object
 infinity.connect(uri)
 ```
 
@@ -22,10 +30,19 @@ You must have an Infinity object ready to perform database-specific operations.
 
 The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
-- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is imported as a Python module.
+- `"/absolute/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is imported as an embedded Python module.
 - `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
   - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
   - `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
+
+:::tip IMPORTANT
+- When setting `uri` as `"/absolute/path/to/save/to"`, ensure you:
+  - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.4.0.dev1_OR_HIGHER>`
+  - Import the `infinity_embedded` module: `import infinity_embedded`.
+- When setting `uri` as `NetworkAddress`, ensure you:
+  - Install the Infinity SDK: `pip install infinity==<VERSION>`
+  - Import the `infinity` module: `import infinity`.
+:::
 
 :::caution IMPORTANT
 When connecting to Infinity in client-server mode, ensure that the client version *exactly* matches the server version. For example:
@@ -66,16 +83,16 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 #### Connect to the local directory of Infinity
 
-From v0.2.1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed Infinity via `pip install infinity-sdk==<v0.2.1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
+From v0.4.0.dev1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
 ```python
-import infinity
-infinity_object = infinity.connect("/path/to/save/to")
+import infinity_embedded
+infinity_object = infinity_embedded.connect("/absolute/path/to/save/to")
 ```
 
 #### Connect to Infinity in client-server mode
 
-If you have deployed Infinity as a separate server, connect to it via its IP address. If your Infinity is running on your local machine, you can also use `infinity.common.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet.
+If you have deployed Infinity as a separate server and installed the Infinity client via `pip install infinity==<VERSION>`, you can connect to it via its IP address. If your Infinity is running on your local machine, you can also use `infinity.common.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet.
 
 ```python
 import infinity
@@ -717,11 +734,11 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
   - Parameter settings for a full-text index:
     - `"ANALYZER"`: *Optional*
-      - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs. Use `-` to specify stemmer for languages, `English` is the default stemmer: `"standard-english"` and `"standard"` have the same stemmer setting. Supported language stemmer includes: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`,`Russian`,`Spanish`,`Swedish`,`Turkish`.
+      - `"standard"`: (Default) The standard analyzer, segmented by token, lowercase processing, and provides stemming output. Use `-` to specify the languages stemmer. `English` is the default stemmer: `"standard-english"` and `"standard"` are the same stemmer setting. Supported language stemmers include: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`, `Russian`, `Spanish`, `Swedish`, and `Turkish`.
       - `"chinese"`: Simplified Chinese
-      - `"tradition"`: Traditional Chinese
+      - `"traditional"`: Traditional Chinese
       - `"japanese"`: Japanese
-      - `"korea"`: Korea
+      - `"korean"`: Korean
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
   - Parameter settings for a secondary index:  
     No parameters are required. For now, use an empty list `[]`.
@@ -1834,9 +1851,9 @@ A dictionary representing additional options for the selected reranking method:
 - **match_tensor-specific options**: *Optional*  
   Settings when employing match_tensor for reranking.
   - `"field"`: The name of the tensor column for reranking.
-  - `"data"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy
+  - `"query_tensor"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy
     array of numerical values.
-  - `"data_type"`: The element data type of the query tensor. Usually `"float"`.
+  - `"element_type"`: The element data type of the query tensor. Usually `"float"`.
 
 ### Returns
 
@@ -1895,7 +1912,7 @@ table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_
             .match_sparse("sparse_column", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
             .match_text("body", "blooms", 10)
             .filter("year < 2024")
-            .fusion("match_tensor", 2, {"field": "tensor", "data_type": "float", "data": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
+            .fusion("match_tensor", 2, {"field": "tensor", "element_type": "float", "query_tensor": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
             .to_pl()
 ```
 

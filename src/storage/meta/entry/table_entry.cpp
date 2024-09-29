@@ -655,6 +655,7 @@ Status TableEntry::CommitWrite(TransactionID txn_id,
                                TxnTimeStamp commit_ts,
                                const HashMap<SegmentID, TxnSegmentStore> &segment_stores,
                                const DeleteState *delete_state) {
+    std::unique_lock w_lock(rw_locker_);
     for (const auto &[segment_id, segment_store] : segment_stores) {
         auto *segment_entry = segment_store.segment_entry_;
         segment_entry->CommitSegment(txn_id, commit_ts, segment_store, delete_state);
@@ -1219,6 +1220,11 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
     SegmentID unsealed_id = table_entry_json["unsealed_id"];
     SegmentID next_segment_id = table_entry_json["next_segment_id"];
+
+    if(!table_entry_json.contains("next_column_id")) {
+        String error_message = "No 'next_column_id in table entry of catalog file, maybe your catalog is generated before 0.4.0.'";
+        UnrecoverableError(error_message);
+    }
     ColumnID next_column_id = table_entry_json["next_column_id"];
 
     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted,
@@ -1376,8 +1382,8 @@ IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_colum
 void TableEntry::InvalidateFullTextIndexCache(TableIndexEntry *table_index_entry) {
     const IndexBase *index_base = table_index_entry->index_base();
     String index_name = *table_index_entry->GetIndexName();
-    LOG_DEBUG(fmt::format("Invalidate fulltext index cache: {}", index_name));
     String column_name = index_base->column_name();
+    LOG_DEBUG(fmt::format("Invalidate fulltext index cache: {}, column_name: {}, table_name: {}", index_name, column_name, *table_name_));
     ColumnID column_id = GetColumnIdByName(column_name);
     fulltext_column_index_cache_->InvalidateColumn(column_id, column_name);
 }

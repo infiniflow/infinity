@@ -292,13 +292,13 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
     }
     TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
     TxnTimeStamp res = std::min(first_uncommitted_begin_ts, checkpointed_ts);
-    LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", res, checkpointed_ts));
     for (auto *txn : finished_txns_) {
-        res = std::min(res, txn->BeginTS());
+        res = std::min(res, txn->CommitTS());
     }
     for (auto *txn : finishing_txns_) {
         res = std::min(res, txn->BeginTS());
     }
+    LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", res, checkpointed_ts));
     return res;
 }
 
@@ -334,14 +334,16 @@ void TxnManager::FinishTxn(Txn *txn) {
     for (auto *finishing_txn : finishing_txns_) {
         max_commit_ts = std::max(max_commit_ts, finishing_txn->CommitTS());
     }
-    while (!finished_txns_.empty()) {
-        auto *finished_txn = finished_txns_.front();
+    auto iter = finished_txns_.begin();
+    while (iter != finished_txns_.end()) {
+        auto *finished_txn = *iter;
         if (finished_txn->CommitTS() < max_commit_ts) {
-            break;
+            ++iter;
+            continue;
         }
         auto finished_txn_id = finished_txn->TxnID();
         // LOG_INFO(fmt::format("Txn: {} is finished. committed ts: {}", finished_txn_id, finished_txn->CommittedTS()));
-        finished_txns_.pop_front();
+        iter = finished_txns_.erase(iter);
         SizeT remove_n = txn_map_.erase(finished_txn_id);
         if (remove_n == 0) {
             String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);

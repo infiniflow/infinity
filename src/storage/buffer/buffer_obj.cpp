@@ -41,9 +41,7 @@ BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<Fil
 
 BufferObj::~BufferObj() = default;
 
-void BufferObj::SetFileWorker(UniquePtr<FileWorker> file_worker) {
-    file_worker_ = std::move(file_worker);
-}
+void BufferObj::SetFileWorker(UniquePtr<FileWorker> file_worker) { file_worker_ = std::move(file_worker); }
 
 BufferHandle BufferObj::Load() {
     std::unique_lock<std::mutex> locker(w_locker_);
@@ -161,7 +159,12 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
 
 void BufferObj::PickForCleanup() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (*ptr_rc_ > 1) {
+    if (obj_rc_ == 0) {
+        UnrecoverableError(fmt::format("SubObjRc: obj_rc_ is 0, buffer: {}", GetFilename()));
+    }
+    obj_rc_--;
+    if (obj_rc_ > 0) {
+        LOG_INFO(fmt::format("BufferObj::PickForCleanup: obj_rc_ is {}, buffer: {}", obj_rc_, GetFilename()));
         return;
     }
     switch (status_) {
@@ -257,6 +260,19 @@ bool BufferObj::AddBufferSize(SizeT add_size) {
         LOG_WARN(warn_msg);
     }
     return free_success;
+}
+
+void BufferObj::AddObjRc() { 
+    std::unique_lock<std::mutex> locker(w_locker_);
+    obj_rc_++;
+}
+
+void BufferObj::SubObjRc() {
+    std::unique_lock<std::mutex> locker(w_locker_);
+    if (obj_rc_ == 0) {
+        UnrecoverableError(fmt::format("SubObjRc: obj_rc_ is 0, buffer: {}", GetFilename()));
+    }
+    obj_rc_--;
 }
 
 void BufferObj::CheckState() const {

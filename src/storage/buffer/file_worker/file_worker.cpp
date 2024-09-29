@@ -28,6 +28,7 @@ import local_file_system;
 import persistence_manager;
 import infinity_context;
 import logger;
+import persist_result_handler;
 
 namespace infinity {
 
@@ -65,8 +66,13 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         }
 
         fs.SyncFile(*file_handler_);
-        obj_addr_ = persistence_manager_->Persist(write_path, tmp_write_path);
-        fs.DeleteFile(tmp_write_path);
+
+        PersistResultHandler handler(persistence_manager_);
+        PersistWriteResult persist_result = persistence_manager_->Persist(write_path, tmp_write_path);
+        handler.HandleWriteResult(persist_result);
+
+        obj_addr_ = persist_result.obj_addr_;
+
         return all_save;
     } else {
         String write_dir = ChooseFileDir(to_spill);
@@ -109,7 +115,9 @@ void FileWorker::ReadFromFile(bool from_spill) {
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
     String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
-        obj_addr_ = persistence_manager_->GetObjCache(read_path);
+        PersistResultHandler handler(persistence_manager_);
+        PersistReadResult result = persistence_manager_->GetObjCache(read_path);
+        obj_addr_ = handler.HandleReadResult(result);
         if (!obj_addr_.Valid()) {
             String error_message = fmt::format("Failed to find object for local path {}", read_path);
             UnrecoverableError(error_message);
@@ -159,7 +167,11 @@ void FileWorker::MoveFile() {
         // }
         fs.Rename(src_path, dest_path);
     } else {
-        obj_addr_ = persistence_manager_->Persist(dest_path, src_path);
+        PersistResultHandler handler(persistence_manager_);
+        PersistWriteResult persist_result = persistence_manager_->Persist(dest_path, src_path);
+        handler.HandleWriteResult(persist_result);
+
+        obj_addr_ = persist_result.obj_addr_;
     }
 }
 
@@ -173,8 +185,10 @@ String FileWorker::ChooseFileDir(bool spill) const {
 
 void FileWorker::CleanupFile() const {
     if (persistence_manager_ != nullptr) {
+        PersistResultHandler handler(persistence_manager_);
         String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
-        persistence_manager_->Cleanup(path);
+        PersistWriteResult result = persistence_manager_->Cleanup(path);
+        handler.HandleWriteResult(result);
         return;
     }
     LocalFileSystem fs;

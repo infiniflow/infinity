@@ -136,12 +136,12 @@ public:
 
     void ReadIndexInner(FileHandler &file_handler) override { pgm_index_->LoadIndex(file_handler); }
 
-    void InsertData(void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) override {
+    void InsertData(const void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) override {
         if (!need_save_) {
             String error_message = "InsertData(): error: SecondaryIndexDataT is not allocated.";
             UnrecoverableError(error_message);
         }
-        auto map_ptr = static_cast<MultiMap<OrderedKeyType, u32> *>(ptr);
+        auto map_ptr = static_cast<const MultiMap<OrderedKeyType, u32> *>(ptr);
         if (!map_ptr) {
             String error_message = "InsertData(): error: map_ptr type error.";
             UnrecoverableError(error_message);

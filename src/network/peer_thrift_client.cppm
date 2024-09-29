@@ -50,6 +50,7 @@ public:
     Status UnInit();
 
     Status Reconnect();
+    Status Disconnect();
     void Send(SharedPtr<PeerTask> task);
 
     bool ServerConnected() const { return server_connected_; }
@@ -59,6 +60,7 @@ private:
     void Register(RegisterPeerTask *peer_task);
     void Unregister(UnregisterPeerTask *peer_task);
     void HeartBeat(HeartBeatPeerTask *peer_task);
+    void SyncLogs(SyncLogTask *peer_task);
 
 private:
     String this_node_name_;

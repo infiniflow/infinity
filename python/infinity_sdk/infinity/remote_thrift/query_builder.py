@@ -275,8 +275,8 @@ class InfinityThriftQueryBuilder(ABC):
                     final_option_text += f";{k}={v}"
         elif method in ["match_tensor"]:
             fusion_expr.optional_match_tensor_expr = make_match_tensor_expr(
-                vector_column_name=fusion_params["field"], embedding_data=fusion_params["data"],
-                embedding_data_type=fusion_params["data_type"], method_type="maxsim", extra_option=None)
+                vector_column_name=fusion_params["field"], embedding_data=fusion_params["query_tensor"],
+                embedding_data_type=fusion_params["element_type"], method_type="maxsim", extra_option=None)
         else:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid fusion method")
         fusion_expr.options_text = final_option_text

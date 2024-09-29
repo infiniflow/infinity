@@ -15,6 +15,7 @@ import pandas as pd
 import polars as pl
 import pyarrow as pa
 from infinity.table import ExplainType
+from datetime import date, time, datetime
 
 
 class infinity_http:
@@ -403,6 +404,12 @@ class infinity_http:
                                 value[key][idx] = value[key][idx].tolist()
                     if isinstance(value[key], SparseVector):
                         value[key] = value[key].to_dict()
+                    if isinstance(value[key], datetime):
+                        value[key] = value[key].strftime("%Y-%m-%d %H:%M:%S")
+                    if isinstance(value[key], date):
+                        value[key] = value[key].strftime("%Y-%m-%d")
+                    if isinstance(value[key], time):
+                        value[key] = value[key].strftime("%H:%M:%S")
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])
@@ -561,7 +568,7 @@ class infinity_http:
 
     def match_tensor(self, column_name: str, query_data, query_data_type: str, topn: int,
                      extra_option: Optional[dict] = None):
-        tmp_match_tensor = {"match_method": "tensor", "fields": column_name, "query_tensor": query_data,
+        tmp_match_tensor = {"match_method": "tensor", "field": column_name, "query_tensor": query_data,
                             "element_type": query_data_type, "topn": topn}
         if extra_option is not None:
             tmp_match_tensor["params"] = extra_option
@@ -597,12 +604,12 @@ class infinity_http:
     def fusion(self, method: str, topn: int, fusion_params: Optional[dict] = None):
         tmp_fusion_expr = {"fusion_method": method, "topn": topn}
         if method == "match_tensor":
-            tmp_new_params = {"fields": fusion_params["field"], "query_tensor": fusion_params["data"],
-                              "element_type": fusion_params["data_type"]}
+            tmp_new_params = {"field": fusion_params["field"], "query_tensor": fusion_params["query_tensor"],
+                              "element_type": fusion_params["element_type"]}
             # handle left params
             fusion_params.pop("field")
-            fusion_params.pop("data")
-            fusion_params.pop("data_type")
+            fusion_params.pop("query_tensor")
+            fusion_params.pop("element_type")
             tmp_new_params.update(fusion_params)
             tmp_fusion_expr["params"] = tmp_new_params
         else:
@@ -634,16 +641,26 @@ class infinity_http:
 
         for res in self.output_res:
             for k in res:
+                print(res[k])
                 if k not in df_dict:
                     df_dict[k] = ()
                 tup = df_dict[k]
                 if res[k].isdigit() or is_float(res[k]):
                     new_tup = tup + (eval(res[k]), )
+                elif is_time(res[k]):
+                    new_tup = tup + (datetime.strptime(res[k], "%H:%M:%S").time(), )
+                    print("time!")
+                elif is_datetime(res[k]):
+                    new_tup = tup + (datetime.strptime(res[k], "%Y-%m-%d %H:%M:%S"), )
+                    print("datetime!")
+                elif is_date(res[k]):
+                    new_tup = tup + (datetime.strptime(res[k], "%Y-%m-%d").date(), )
+                    print("date!")
                 elif is_list(res[k]):
                     new_tup = tup + (ast.literal_eval(res[k]), )
                 elif is_sparse(res[k]):# sparse vector
                     sparse_vec = str2sparse(res[k])
-                    new_tup = tup + (sparse_vec, )
+                    new_tup = tup + (sparse_vec, ) 
                 else:
                     if res[k].lower() == 'true':
                         res[k] = True

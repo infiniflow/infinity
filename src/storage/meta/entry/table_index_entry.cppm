@@ -29,7 +29,6 @@ import status;
 import random;
 import statement_common;
 import cleanup_scanner;
-import meta_entry_interface;
 import index_file_worker;
 import column_def;
 
@@ -52,7 +51,7 @@ export struct SegmentIndexesGuard {
     std::shared_lock<std::shared_mutex> lock_;
 };
 
-export struct TableIndexEntry : public BaseEntry, public EntryInterface {
+export struct TableIndexEntry : public BaseEntry {
     friend struct TableEntry;
 
 public:

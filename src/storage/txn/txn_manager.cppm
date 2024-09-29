@@ -124,7 +124,7 @@ private:
 
     Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
     HashSet<Txn *> finishing_txns_;     // the txns in committing stage, can use flat_map
-    Deque<Txn *> finished_txns_;        // the txns that committed_ts
+    List<Txn *> finished_txns_;        // the txns that committed_ts
 
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 

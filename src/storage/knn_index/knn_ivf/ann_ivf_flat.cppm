@@ -17,8 +17,6 @@ module;
 export module ann_ivf_flat;
 
 import stl;
-import knn_distance;
-
 import infinity_exception;
 import index_base;
 import annivfflat_index_data;
@@ -34,8 +32,8 @@ import logger;
 
 namespace infinity {
 
-template <typename Compare, MetricType metric, KnnDistanceAlgoType algo>
-class AnnIVFFlat final : public KnnDistance<typename Compare::DistanceType> {
+template <typename Compare, MetricType metric>
+class AnnIVFFlat {
     using DistType = typename Compare::DistanceType;
     using ResultHandler = ReservoirResultHandler<Compare>;
     static inline DistType Distance(const DistType *x, const DistType *y, u32 dimension) {
@@ -46,21 +44,21 @@ class AnnIVFFlat final : public KnnDistance<typename Compare::DistanceType> {
         } else if constexpr (metric == MetricType::kMetricInnerProduct) {
             return IPDistance<DistType>(x, y, dimension);
         } else {
-            String error_message = "Metric type is invalid";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Metric type is invalid");
+            return {};
         }
     }
 
 public:
     explicit AnnIVFFlat(const DistType *queries, u64 query_count, u32 top_k, u32 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(algo, elem_data_type, query_count, dimension, top_k), queries_(queries) {
+        : query_count_(query_count), top_k_(top_k), dimension_(dimension), elem_type_(elem_data_type), queries_(queries) {
         id_array_ = MakeUniqueForOverwrite<RowID[]>(top_k * query_count);
         distance_array_ = MakeUniqueForOverwrite<DistType[]>(top_k * query_count);
         result_handler_ = MakeUnique<ResultHandler>(query_count, top_k, distance_array_.get(), id_array_.get());
     }
 
     static UniquePtr<AnnIVFFlatIndexData<DistType>> CreateIndex(u32 dimension, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
-        return AnnIVFFlat<Compare, metric, algo>::CreateIndex(dimension, vector_count, vectors_ptr, vector_count, vectors_ptr, partition_num);
+        return AnnIVFFlat::CreateIndex(dimension, vector_count, vectors_ptr, vector_count, vectors_ptr, partition_num);
     }
 
     static UniquePtr<AnnIVFFlatIndexData<DistType>>
@@ -70,7 +68,7 @@ public:
         return index_data;
     }
 
-    void Begin() final {
+    void Begin() {
         if (begin_ || this->query_count_ == 0) {
             return;
         }
@@ -86,25 +84,13 @@ public:
         begin_ = true;
     }
 
-    void Search(const DistType *, u16, u32, u16) final {
-        String error_message = "Unsupported search function";
-        UnrecoverableError(error_message);
-    }
-
-    void Search(const DistType *, u16, u32, u16, Bitmask &) final {
-        String error_message = "Unsupported search function";
-        UnrecoverableError(error_message);
-    }
-
     void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes) {
         // check metric type
         if (base_ivf->metric_ != metric) {
-            String error_message = "Metric type is invalid";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Metric type is invalid");
         }
         if (!begin_) {
-            String error_message = "IVFFlat isn't begin";
-            UnrecoverableError(error_message);
+            UnrecoverableError("IVFFlat isn't begin");
         }
         n_probes = std::min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -160,12 +146,10 @@ public:
     void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes, Filter &filter) {
         // check metric type
         if (base_ivf->metric_ != metric) {
-            String error_message = "Metric type is invalid";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Metric type is invalid");
         }
         if (!begin_) {
-            String error_message = "IVFFlat isn't begin";
-            UnrecoverableError(error_message);
+            UnrecoverableError("IVFFlat isn't begin");
         }
         n_probes = std::min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -223,7 +207,7 @@ public:
         }
     }
 
-    void End() final {
+    void End() {
         if (!begin_) {
             return;
         }
@@ -239,22 +223,20 @@ public:
         begin_ = false;
     }
 
-    [[nodiscard]] inline DistType *GetDistances() const final { return distance_array_.get(); }
+    [[nodiscard]] inline DistType *GetDistances() const { return distance_array_.get(); }
 
-    [[nodiscard]] inline RowID *GetIDs() const final { return id_array_.get(); }
+    [[nodiscard]] inline RowID *GetIDs() const { return id_array_.get(); }
 
-    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
+    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const  {
         if (idx >= this->query_count_) {
-            String error_message = "Query index exceeds the limit";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Query index exceeds the limit");
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
-    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
+    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const  {
         if (idx >= this->query_count_) {
-            String error_message = "Query index exceeds the limit";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Query index exceeds the limit");
         }
         return id_array_.get() + idx * this->top_k_;
     }
@@ -269,17 +251,22 @@ private:
 
     UniquePtr<ResultHandler> result_handler_{};
 
+    u64 query_count_{};
+    u64 top_k_{};
+    u64 dimension_{};
+    EmbeddingDataType elem_type_{EmbeddingDataType::kElemInvalid};
     const DistType *queries_{};
     bool begin_{false};
+    u64 total_base_count_{};
 };
 
 export template <typename DistType>
-using AnnIVFFlatL2 = AnnIVFFlat<CompareMax<DistType, RowID>, MetricType::kMetricL2, KnnDistanceAlgoType::kKnnFlatL2>;
+using AnnIVFFlatL2 = AnnIVFFlat<CompareMax<DistType, RowID>, MetricType::kMetricL2>;
 
 export template <typename DistType>
-using AnnIVFFlatIP = AnnIVFFlat<CompareMin<DistType, RowID>, MetricType::kMetricInnerProduct, KnnDistanceAlgoType::kKnnFlatIp>;
+using AnnIVFFlatIP = AnnIVFFlat<CompareMin<DistType, RowID>, MetricType::kMetricInnerProduct>;
 
 export template <typename DistType>
-using AnnIVFFlatCOS = AnnIVFFlat<CompareMin<DistType, RowID>, MetricType::kMetricCosine, KnnDistanceAlgoType::kKnnFlatCosine>;
+using AnnIVFFlatCOS = AnnIVFFlat<CompareMin<DistType, RowID>, MetricType::kMetricCosine>;
 
 }; // namespace infinity

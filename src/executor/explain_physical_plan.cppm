@@ -66,6 +66,7 @@ import physical_match;
 import physical_match_tensor_scan;
 import physical_fusion;
 import physical_merge_aggregate;
+import physical_match_sparse_scan;
 
 export module explain_physical_plan;
 
@@ -107,10 +108,7 @@ public:
 
     static void Explain(const PhysicalCreateTable *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
-    static void Explain(const PhysicalCreateIndexPrepare *create_index,
-                        SharedPtr<Vector<SharedPtr<String>>> &result,
-
-                        i64 intent_size = 0);
+    static void Explain(const PhysicalCreateIndexPrepare *create_index, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const PhysicalCreateCollection *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
@@ -148,15 +146,10 @@ public:
 
     static void Explain(const PhysicalSink *flush_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
-    static void Explain(const PhysicalParallelAggregate *parallel_aggregate_node,
-                        SharedPtr<Vector<SharedPtr<String>>> &result,
+    static void Explain(const PhysicalParallelAggregate *parallel_aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
-                        i64 intent_size = 0);
-
-    static void Explain(const PhysicalMergeParallelAggregate *merge_parallel_aggregate_node,
-                        SharedPtr<Vector<SharedPtr<String>>> &result,
-
-                        i64 intent_size = 0);
+    static void
+    Explain(const PhysicalMergeParallelAggregate *merge_parallel_aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const PhysicalIntersect *intersect_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
@@ -178,10 +171,12 @@ public:
 
     static void Explain(const PhysicalMatchTensorScan *match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
+    static void Explain(const PhysicalMatchSparseScan *match_sparse_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
     static void Explain(const PhysicalMergeMatchTensor *merge_match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const PhysicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
- 
+
     static void Explain(const PhysicalMergeAggregate *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 };
 

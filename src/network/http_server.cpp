@@ -65,24 +65,18 @@ namespace {
 
 using namespace infinity;
 
-int ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_definitions, nlohmann::json &json_response) {
+infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_definitions) {
     SizeT column_count = fields.size();
     for (SizeT column_id = 0; column_id < column_count; ++column_id) {
         auto &field_element = fields[column_id];
 
         if (!field_element.contains("name") && !field_element["name"].is_string()) {
-            infinity::Status status = infinity::Status::InvalidColumnDefinition("Name field is missing or not string");
-            json_response["error_code"] = status.code();
-            json_response["error_message"] = status.message();
-            return 1;
+            return infinity::Status::InvalidColumnDefinition("Name field is missing or not string");
         }
         String column_name = field_element["name"];
 
         if (!field_element.contains("type") && !field_element["type"].is_string()) {
-            infinity::Status status = infinity::Status::InvalidColumnDefinition("Type field is missing or not string");
-            json_response["error_code"] = status.code();
-            json_response["error_message"] = status.message();
-            return 1;
+            return infinity::Status::InvalidColumnDefinition("Type field is missing or not string");
         }
         String value_type = field_element["type"];
         ToLower(value_type);
@@ -94,7 +88,10 @@ int ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_de
         SharedPtr<TypeInfo> type_info{nullptr};
         try{
             if (tokens[0] == "vector" || tokens[0] == "multivector" || tokens[0] == "tensor" || tokens[0] == "tensorarray") {
-                int dimension = std::stoi(tokens[1]);
+                if(tokens.size() != 3) {
+                    return infinity::Status::ParserError("vector / multivector / tensor / tensorarray type syntax error");
+                }
+                SizeT dimension = std::stoull(tokens[1]);
                 String etype = tokens[2];
                 EmbeddingDataType e_data_type;
                 if (etype == "int" || etype == "integer" || etype == "int32") {
@@ -112,12 +109,9 @@ int ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_de
                 } else if (etype == "bfloat16") {
                     e_data_type = EmbeddingDataType::kElemBFloat16;
                 } else {
-                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
-                    json_response["error_code"] = status.code();
-                    json_response["error_message"] = status.message();
-                    return 1;
+                    return infinity::Status::InvalidEmbeddingDataType(etype);
                 }
-                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+                type_info = EmbeddingInfo::Make(e_data_type, dimension);
                 LogicalType logical_type_v = LogicalType::kInvalid;
                 if (tokens[0] == "vector") {
                     logical_type_v = LogicalType::kEmbedding;
@@ -130,7 +124,10 @@ int ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_de
                 }
                 column_type = std::make_shared<DataType>(logical_type_v, type_info);
             } else if (tokens[0] == "sparse") {
-                int dimension = std::stoi(tokens[1]);
+                if(tokens.size() != 4) {
+                    return infinity::Status::ParserError("sparse type syntax error");
+                }
+                SizeT dimension = std::stoull(tokens[1]);
                 String dtype = tokens[2];
                 String itype = tokens[3];
                 EmbeddingDataType d_data_type;
@@ -142,10 +139,7 @@ int ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_de
                 } else if (dtype == "double" || dtype == "float64") {
                     d_data_type = EmbeddingDataType::kElemDouble;
                 } else {
-                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(dtype);
-                    json_response["error_code"] = status.code();
-                    json_response["error_message"] = status.message();
-                    return 1;
+                    return infinity::Status::InvalidEmbeddingDataType(dtype);
                 }
 
                 if (itype == "tinyint" || itype == "int8") {
@@ -157,32 +151,23 @@ int ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_de
                 } else if (itype == "bigint" || itype == "int64") {
                     i_data_type = EmbeddingDataType::kElemInt64;
                 } else {
-                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(itype);
-                    json_response["error_code"] = status.code();
-                    json_response["error_message"] = status.message();
-                    return 1;
+                    return infinity::Status::InvalidEmbeddingDataType(itype);
                 }
-                type_info = SparseInfo::Make(d_data_type, i_data_type, size_t(dimension), SparseStoreType::kSort);
+                type_info = SparseInfo::Make(d_data_type, i_data_type, dimension, SparseStoreType::kSort);
                 column_type = std::make_shared<DataType>(LogicalType::kSparse, type_info);
             } else if (tokens[0] == "decimal") {
                 type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
                 column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
             } else if (tokens[0] == "array") {
-                infinity::Status::ParserError("Array isn't implemented here.");
                 type_info = nullptr;
+                return infinity::Status::ParserError("Array isn't implemented here.");
             } else if (tokens.size() == 1) {
                 column_type = DataType::StringDeserialize(tokens[0]);
             } else {
-                infinity::Status status = infinity::Status::ParserError("type syntax error");
-                json_response["error_code"] = status.code();
-                json_response["error_message"] = status.message();
-                return 1;
+                return infinity::Status::ParserError(fmt::format("{} isn't supported.", tokens[0]));
             }
         } catch(std::exception &e) {
-            infinity::Status status = infinity::Status::ParserError("type syntax error");
-            json_response["error_code"] = status.code();
-            json_response["error_message"] = status.message();
-            return 1;
+            return infinity::Status::ParserError("type syntax error");
         }
 
         if (column_type) {
@@ -210,13 +195,10 @@ int ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_de
             ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, default_expr);
             column_definitions.emplace_back(col_def);
         } else {
-            infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
-            json_response["error_code"] = status.code();
-            json_response["error_message"] = status.message();
-            return 1;
+            return infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
         }
     }
-    return 0;
+    return Status::OK();
 }
 
 class ListDatabaseHandler final : public HttpRequestHandler {
@@ -447,7 +429,9 @@ public:
                 constraint = nullptr;
             }
         });
-        if (int res = ParseColumnDefs(fields, column_definitions, json_response); res) {
+        if (infinity::Status status = ParseColumnDefs(fields, column_definitions); !status.ok()) {
+            json_response["error_code"] = status.code();
+            json_response["error_message"] = status.message();
             HTTPStatus http_status;
             http_status = HTTPStatus::CODE_500;
             return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -2628,7 +2612,9 @@ public:
             }
         });
         const nlohmann::json &fields = json_body["fields"];
-        if (int res = ParseColumnDefs(fields, column_def_ptrs, json_response); res) {
+        if (infinity::Status status = ParseColumnDefs(fields, column_def_ptrs); !status.ok()) {
+            json_response["error_code"] = status.code();
+            json_response["error_message"] = status.message();
             HTTPStatus http_status;
             http_status = HTTPStatus::CODE_500;
             return ResponseFactory::createResponse(http_status, json_response.dump());

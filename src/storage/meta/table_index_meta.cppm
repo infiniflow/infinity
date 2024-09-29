@@ -24,7 +24,6 @@ import index_base;
 import status;
 import extra_ddl_info;
 import entry_list;
-import meta_entry_interface;
 import cleanup_scanner;
 import meta_info;
 
@@ -35,7 +34,7 @@ class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
 
-export class TableIndexMeta : public MetaInterface {
+export class TableIndexMeta : public BaseMeta {
     friend struct TableEntry;
 
 public:

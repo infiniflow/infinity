@@ -22,7 +22,7 @@ export module meta_map;
 import stl;
 import local_file_system;
 import cleanup_scanner;
-import meta_entry_interface;
+import base_entry;
 import third_party;
 import logger;
 import txn_manager;

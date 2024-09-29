@@ -20,16 +20,6 @@ import stl;
 
 import infinity_exception;
 import third_party;
-import knn_flat_ip;
-import knn_flat_ip_blas;
-import knn_flat_ip_blas_reservoir;
-import knn_flat_ip_reservoir;
-import knn_flat_l2;
-import knn_flat_l2_blas;
-import knn_flat_l2_blas_reservoir;
-import knn_flat_l2_reservoir;
-import knn_flat_l2_top1;
-import knn_flat_l2_top1_blas;
 import logical_type;
 import merge_knn;
 import knn_result_handler;

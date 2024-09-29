@@ -50,6 +50,8 @@ import memindex_tracer;
 import cleanup_scanner;
 import persistence_manager;
 import extra_ddl_info;
+import virtual_storage;
+import virtual_storage_type;
 
 namespace infinity {
 
@@ -98,7 +100,30 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 break;
             }
 
-            // Construct buffer manager
+            // Construct virtual storage system;
+            if (virtual_storage_system_ != nullptr) {
+                UnrecoverableError("Virtual storage system was initialized before.");
+            }
+            virtual_storage_system_ = MakeUnique<VirtualStorage>();
+
+            switch (config_ptr_->StorageType()) {
+                case StorageType::kLocal: {
+                    Map<String, String> configs;
+                    virtual_storage_system_->Init(StorageType::kLocal, configs);
+                    break;
+                }
+                case StorageType::kMinio: {
+                    Map<String, String> configs;
+                    configs.emplace("url", config_ptr_->ObjectStorageUrl());
+                    virtual_storage_system_->Init(StorageType::kMinio, configs);
+                    break;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+                }
+            }
+
+            // Construct persistence store
             String persistence_dir = config_ptr_->PersistenceDir();
             if (!persistence_dir.empty()) {
                 if (persistence_manager_ != nullptr) {
@@ -205,6 +230,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
                 bg_processor_->Submit(force_ckp_task);
                 force_ckp_task->Wait();
+                txn->SetReaderAllowed(true);
                 txn_mgr_->CommitTxn(txn);
             }
 
@@ -266,10 +292,14 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 //                i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
                 i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
                 i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
-                periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
-                periodic_trigger_thread_->delta_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
-                periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
-                periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
+                periodic_trigger_thread_->full_checkpoint_trigger_ =
+                    MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
+                periodic_trigger_thread_->delta_checkpoint_trigger_ =
+                    MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
+                periodic_trigger_thread_->compact_segment_trigger_ =
+                    MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
+                periodic_trigger_thread_->optimize_index_trigger_ =
+                    MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
                 periodic_trigger_thread_->Start();
             }
             break;
@@ -347,7 +377,7 @@ void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vect
 
 void Storage::CreateDefaultDB() {
     Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"));
-
+    new_txn->SetReaderAllowed(true);
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase("default_db", ConflictType::kError);
     if (!status.ok()) {

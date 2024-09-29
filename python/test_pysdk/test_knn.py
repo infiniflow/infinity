@@ -1024,8 +1024,8 @@ class TestInfinity:
                .match_text('body', 'off', 4)
                .match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 2)
                .fusion(method='rrf', topn=10)
-               .fusion(method='match_tensor', topn=2, fusion_params={'field': 't', 'data_type': 'float',
-                                                                     'data': [[0.0, -10.0, 0.0, 0.7],
+               .fusion(method='match_tensor', topn=2, fusion_params={'field': 't', 'element_type': 'float',
+                                                                     'query_tensor': [[0.0, -10.0, 0.0, 0.7],
                                                                               [9.2, 45.6, -55.8, 3.5]]})
                .to_pl())
         print(res)
@@ -1155,6 +1155,12 @@ class TestInfinity:
 
     # "^5" indicates the point that column "body" get multipy by 5, default is multipy by 1
     # refer to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
+
+    # sql:
+    # create table test_with_various_fulltext_match_http(doctitle varchar, docdate varchar, body varchar, num int, vec embedding(float, 4));
+    # create index my_index on test_with_various_fulltext_match_http(body) using fulltext with(analyzer=standard);
+    # copy test_with_various_fulltext_match_http from '/home/huikong/Code/work/infinity/test/data/csv/enwiki_embedding_99_commas.csv' with(delimiter ',', format csv);
+    # select * from test_with_various_fulltext_match_http search match text('body','"black white"', 'topn=1'),match vector(vec,[3.0,2.8,2.7,3.1],'float','ip',1),fusion('rrf');
     @pytest.mark.parametrize("fields_and_matching_text", [
         ["body", "black"],
         ["body^5", "black"],
@@ -1319,7 +1325,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("table_params", [
-        "vector,100,float,int8",
+        "vector,100,float",
         "sparse,0,float,int8",
         "sparse,100,int,int8",
         "sparse,100,float,float",

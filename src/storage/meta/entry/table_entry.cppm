@@ -36,7 +36,6 @@ import table_index_meta;
 import compaction_alg;
 import meta_map;
 
-import meta_entry_interface;
 import cleanup_scanner;
 import random;
 
@@ -55,7 +54,7 @@ class Txn;
 struct Catalog;
 class AddTableEntryOp;
 
-export struct TableEntry final : public BaseEntry, public EntryInterface {
+export struct TableEntry final : public BaseEntry {
     friend struct Catalog;
 
 public:

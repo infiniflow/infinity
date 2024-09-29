@@ -117,8 +117,15 @@ SegmentIndexEntry::SegmentIndexEntry(const SegmentIndexEntry &other)
     ft_column_len_cnt_ = other.ft_column_len_cnt_;
 }
 
+SegmentIndexEntry::~SegmentIndexEntry() = default;
+
 UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Clone(TableIndexEntry *table_index_entry) const {
     auto ret = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(*this));
+    for (auto *buffer : vector_buffer_) {
+        if (buffer != nullptr) {
+            buffer->SubObjRc();
+        }
+    }
     std::shared_lock lock(rw_locker_);
     for (const auto &chunk_index_entry : chunk_index_entries_) {
         ret->chunk_index_entries_.emplace_back(chunk_index_entry->Clone(ret.get()));
@@ -272,9 +279,9 @@ SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segmen
     return res;
 }
 
-BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0].get()->Load(); }
+BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
 
-BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1].get()->Load(); }
+BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1]->Load(); }
 
 void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                        u32 row_offset,
@@ -291,6 +298,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
     auto *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
     SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
 
+    std::lock_guard lck_m(mem_index_locker_);
     switch (index_base->index_type_) {
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
@@ -319,7 +327,6 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             break;
         }
         case IndexType::kHnsw: {
-            std::lock_guard lck(mem_index_locker_);
             if (memory_hnsw_index_.get() == nullptr) {
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_hnsw_index_ = HnswIndexInMem::Make(begin_row_id, index_base.get(), column_def.get(), this, true /*trace*/);
@@ -333,9 +340,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, begin_row_id);
             }
-            auto block_id = block_entry->block_id();
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
-            memory_secondary_index_->Insert(block_id, block_column_entry, buffer_manager, row_offset, row_count);
+            memory_secondary_index_->InsertBlockData(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
         case IndexType::kIVFFlat: {
@@ -395,19 +401,17 @@ void SegmentIndexEntry::MemIndexWaitInflightTasks() {
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *dump_size) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();
+    std::lock_guard lck_m(mem_index_locker_);
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
-            {
-                std::lock_guard lck(mem_index_locker_);
-                if (memory_hnsw_index_.get() == nullptr) {
-                    break;
-                }
-                chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_manager_, dump_size);
-                std::unique_lock lck2(rw_locker_);
-                chunk_index_entries_.push_back(chunk_index_entry);
-                memory_hnsw_index_.reset();
+            if (memory_hnsw_index_.get() == nullptr) {
+                break;
             }
+            chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_manager_, dump_size);
             chunk_index_entry->SaveIndexFile();
+            std::unique_lock lck2(rw_locker_);
+            chunk_index_entries_.push_back(chunk_index_entry);
+            memory_hnsw_index_.reset();
             break;
         }
         case IndexType::kFullText: {
@@ -427,9 +431,9 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             if (memory_secondary_index_.get() == nullptr) {
                 break;
             }
-            std::unique_lock lck(rw_locker_);
             chunk_index_entry = memory_secondary_index_->Dump(this, buffer_manager_);
             chunk_index_entry->SaveIndexFile();
+            std::unique_lock lck(rw_locker_);
             chunk_index_entries_.push_back(chunk_index_entry);
             memory_secondary_index_.reset();
             break;
@@ -449,9 +453,9 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             if (memory_bmp_index_.get() == nullptr) {
                 return nullptr;
             }
-            std::unique_lock lck(rw_locker_);
             chunk_index_entry = memory_bmp_index_->Dump(this, buffer_manager_);
             chunk_index_entry->SaveIndexFile();
+            std::unique_lock lck(rw_locker_);
             chunk_index_entries_.push_back(chunk_index_entry);
             memory_bmp_index_.reset();
             break;
@@ -576,9 +580,9 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                const auto block_id = block_entry->block_id();
+                const auto block_offset = block_entry->segment_offset();
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
-                memory_secondary_index_->Insert(block_id, block_column_entry, buffer_mgr, 0, block_entry->row_count());
+                memory_secondary_index_->InsertBlockData(block_offset, block_column_entry, buffer_mgr, 0, block_entry->row_count());
             }
             dumped_memindex_entry = MemIndexDump();
             break;
@@ -891,14 +895,14 @@ void SegmentIndexEntry::CommitIndex(TxnTimeStamp commit_ts) {
 }
 
 void SegmentIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
-    for (auto &buffer_ptr : vector_buffer_) {
-        if (buffer_ptr.get() == nullptr) {
+    for (auto *buffer_ptr : vector_buffer_) {
+        if (buffer_ptr == nullptr) {
             String error_message = "vector_buffer should not has nullptr.";
             UnrecoverableError(error_message);
         }
-        buffer_ptr.get()->PickForCleanup();
+        buffer_ptr->PickForCleanup();
         if (info_tracer != nullptr) {
-            String file_path = buffer_ptr.get()->GetFilename();
+            String file_path = buffer_ptr->GetFilename();
             info_tracer->AddCleanupInfo(std::move(file_path));
         }
     }
@@ -1083,8 +1087,8 @@ void SegmentIndexEntry::SaveIndexFile() {
     String &index_name = *table_index_entry_->index_dir();
     u64 segment_id = this->segment_id_;
     LOG_TRACE(fmt::format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
-    for (auto &buffer_ptr : vector_buffer_) {
-        buffer_ptr.get()->Save();
+    for (auto *buffer_ptr : vector_buffer_) {
+        buffer_ptr->Save();
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->SaveIndexFile();

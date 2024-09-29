@@ -16,10 +16,10 @@ module;
 
 #include <functional>
 
-export module knn_flat_l2;
+export module deprecated_knn_flat_l2;
 
 import stl;
-import knn_distance;
+import deprecated_knn_distance;
 import logger;
 
 import knn_result_handler;

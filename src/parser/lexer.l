@@ -33,10 +33,8 @@ ADMIN           { return ADMIN; }
 ALL             { return ALL; }
 ALLOCATION      { return ALLOCATION; }
 ALTER           { return ALTER; }
-ANALYZE         { return ANALYZE; }
 AND             { return AND; }
 AS              { return AS; }
-AST             { return AST; }
 ASC             { return ASC; }
 BETWEEN         { return BETWEEN; }
 BFLOAT16        { return BFLOAT16; }
@@ -98,7 +96,6 @@ FLOAT16         { return FLOAT16; }
 FLUSH           { return FLUSH; }
 FOLLOWER        { return FOLLOWER; }
 FORMAT          { return FORMAT; }
-FRAGMENT        { return FRAGMENT; }
 FROM            { return FROM; }
 FULL            { return FULL; }
 FUSION          { return FUSION; }
@@ -133,7 +130,6 @@ LINE            { return LINE; }
 LOCK            { return LOCK; }
 LOG             { return LOG; }
 LOGS            { return LOGS; }
-LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
 MATCH           { return MATCH; }
 MAXSIM          { return MAXSIM; }
@@ -160,8 +156,6 @@ ORDER           { return ORDER; }
 OUTER           { return OUTER; }
 PATH            { return PATH; }
 PERSISTENCE     { return PERSISTENCE; }
-PHYSICAL        { return PHYSICAL; }
-PIPELINE        { return PIPELINE; }
 POINT           { return POINT; }
 POLYGON         { return POLYGON; }
 PREPARE         { return PREPARE; }
@@ -171,7 +165,6 @@ PROFILES        { return PROFILES; }
 PROPERTIES      { return PROPERTIES; }
 QUERIES         { return QUERIES; }
 QUERY           { return QUERY; }
-RAW             { return RAW; }
 REAL            { return REAL; }
 RENAME          { return RENAME; }
 RIGHT           { return RIGHT; }

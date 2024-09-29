@@ -564,25 +564,49 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         }
     }
 
-    // TODO:
-    //    ParsedExpr *offset;
-    // offset = new ParsedExpr();
+    // Limit
+    ParsedExpr *limit = nullptr;
+    DeferFn defer_fn7([&]() {
+        if (limit != nullptr) {
+            delete limit;
+            limit = nullptr;
+        }
+    });
+    if (request.__isset.limit_expr == true) {
+        limit = GetParsedExprFromProto(parsed_expr_status, request.limit_expr);
+        if (!parsed_expr_status.ok()) {
+            ProcessStatus(response, parsed_expr_status);
+            return;
+        }
+    }
 
-    // limit
-    //        ParsedExpr *limit = nullptr;
-    //        if (request.__isset.limit_expr == true) {
-    //            limit = GetParsedExprFromProto(request.limit_expr);
-    //        }
+    // Offset
+    ParsedExpr *offset = nullptr;
+    DeferFn defer_fn8([&]() {
+        if (offset != nullptr) {
+            delete offset;
+            offset = nullptr;
+        }
+    });
+    if (request.__isset.offset_expr == true) {
+        offset = GetParsedExprFromProto(parsed_expr_status, request.offset_expr);
+        if (!parsed_expr_status.ok()) {
+            ProcessStatus(response, parsed_expr_status);
+            return;
+        }
+    }
 
     // auto end2 = std::chrono::steady_clock::now();
     // phase_2_duration_ += end2 - start2;
     //
     // auto start3 = std::chrono::steady_clock::now();
 
-    const QueryResult result = infinity->Search(request.db_name, request.table_name, search_expr, filter, output_columns);
+    const QueryResult result = infinity->Search(request.db_name, request.table_name, search_expr, filter, limit, offset, output_columns);
     output_columns = nullptr;
     filter = nullptr;
     search_expr = nullptr;
+    limit = nullptr;
+    offset = nullptr;
     // auto end3 = std::chrono::steady_clock::now();
     //
     // phase_3_duration_ += end3 - start3;
@@ -635,21 +659,21 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
     Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
     output_columns->reserve(request.select_list.size());
+    DeferFn defer_fn1([&]() {
+        if (output_columns != nullptr) {
+            for (auto &expr_ptr : *output_columns) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
+            delete output_columns;
+            output_columns = nullptr;
+        }
+    });
 
     Status parsed_expr_status;
     for (auto &expr : request.select_list) {
         auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
         if (!parsed_expr_status.ok()) {
-
-            if (output_columns != nullptr) {
-                for (auto &expr_ptr : *output_columns) {
-                    delete expr_ptr;
-                    expr_ptr = nullptr;
-                }
-                delete output_columns;
-                output_columns = nullptr;
-            }
-
             if (parsed_expr != nullptr) {
                 delete parsed_expr;
                 parsed_expr = nullptr;
@@ -663,43 +687,44 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
     // search expr
     SearchExpr *search_expr = nullptr;
+    DeferFn defer_fn5([&]() {
+        if (search_expr != nullptr) {
+            delete search_expr;
+            search_expr = nullptr;
+        }
+    });
     if (request.__isset.search_expr) {
         auto search_expr_list = new Vector<ParsedExpr *>();
+        DeferFn defer_fn2([&]() {
+            if (search_expr_list != nullptr) {
+                for (auto &expr_ptr : *search_expr_list) {
+                    delete expr_ptr;
+                    expr_ptr = nullptr;
+                }
+                delete search_expr_list;
+                search_expr_list = nullptr;
+            }
+        });
+
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
         SizeT total_expr_count = match_expr_count + fusion_expr_count;
         search_expr_list->reserve(total_expr_count);
         for (SizeT idx = 0; idx < match_expr_count; ++idx) {
             Status status;
-            auto match_expr = GetGenericMatchExprFromProto(status, request.search_expr.match_exprs[idx]);
-            if (!status.ok()) {
-                if (output_columns != nullptr) {
-                    for (auto &expr_ptr : *output_columns) {
-                        delete expr_ptr;
-                        expr_ptr = nullptr;
-                    }
-                    delete output_columns;
-                    output_columns = nullptr;
-                }
-
-                if (search_expr_list != nullptr) {
-                    for (auto &expr_ptr : *search_expr_list) {
-                        delete expr_ptr;
-                        expr_ptr = nullptr;
-                    }
-                    delete search_expr_list;
-                    search_expr_list = nullptr;
-                }
-
+            ParsedExpr *match_expr = GetGenericMatchExprFromProto(status, request.search_expr.match_exprs[idx]);
+            DeferFn defer_fn3([&]() {
                 if (match_expr != nullptr) {
                     delete match_expr;
                     match_expr = nullptr;
                 }
-
+            });
+            if (!status.ok()) {
                 ProcessStatus(response, status);
                 return;
             }
             search_expr_list->emplace_back(match_expr);
+            match_expr = nullptr;
         }
 
         for (SizeT idx = 0; idx < fusion_expr_count; ++idx) {
@@ -709,6 +734,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
         search_expr = new SearchExpr();
         search_expr->SetExprs(search_expr_list);
+        search_expr_list = nullptr;
     }
 
     // filter
@@ -716,16 +742,6 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     if (request.__isset.where_expr == true) {
         filter = GetParsedExprFromProto(parsed_expr_status, request.where_expr);
         if (!parsed_expr_status.ok()) {
-
-            if (output_columns != nullptr) {
-                for (auto &expr_ptr : *output_columns) {
-                    delete expr_ptr;
-                    expr_ptr = nullptr;
-                }
-                delete output_columns;
-                output_columns = nullptr;
-            }
-
             if (search_expr != nullptr) {
                 delete search_expr;
                 search_expr = nullptr;
@@ -741,19 +757,46 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
         }
     }
 
-    // TODO:
-    //    ParsedExpr *offset;
-    // offset = new ParsedExpr();
+    // Limit
+    ParsedExpr *limit = nullptr;
+    DeferFn defer_fn7([&]() {
+        if (limit != nullptr) {
+            delete limit;
+            limit = nullptr;
+        }
+    });
+    if (request.__isset.limit_expr == true) {
+        limit = GetParsedExprFromProto(parsed_expr_status, request.limit_expr);
+        if (!parsed_expr_status.ok()) {
+            ProcessStatus(response, parsed_expr_status);
+            return;
+        }
+    }
 
-    // limit
-    //        ParsedExpr *limit = nullptr;
-    //        if (request.__isset.limit_expr == true) {
-    //            limit = GetParsedExprFromProto(request.limit_expr);
-    //        }
+    // Offset
+    ParsedExpr *offset = nullptr;
+    DeferFn defer_fn8([&]() {
+        if (offset != nullptr) {
+            delete offset;
+            offset = nullptr;
+        }
+    });
+    if (request.__isset.offset_expr == true) {
+        offset = GetParsedExprFromProto(parsed_expr_status, request.offset_expr);
+        if (!parsed_expr_status.ok()) {
+            ProcessStatus(response, parsed_expr_status);
+            return;
+        }
+    }
 
     // Explain type
     auto explain_type = GetExplainTypeFromProto(request.explain_type);
-    const QueryResult result = infinity->Explain(request.db_name, request.table_name, explain_type, search_expr, filter, output_columns);
+    const QueryResult result = infinity->Explain(request.db_name, request.table_name, explain_type, search_expr, filter, limit, offset, output_columns);
+    output_columns = nullptr;
+    search_expr = nullptr;
+    filter = nullptr;
+    limit = nullptr;
+    offset = nullptr;
 
     if (result.IsOk()) {
         auto &columns = response.column_fields;
@@ -1584,6 +1627,21 @@ SharedPtr<DataType> InfinityThriftService::GetColumnTypeFromProto(const infinity
             auto sparse_info = SparseInfo::Make(embedding_type, index_type, type.physical_type.sparse_type.dimension, SparseStoreType::kSort);
             return MakeShared<infinity::DataType>(infinity::LogicalType::kSparse, sparse_info);
         }
+        case infinity_thrift_rpc::LogicType::Date: {
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kDate);
+        }
+        case infinity_thrift_rpc::LogicType::Time: {
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kTime);
+        }
+        case infinity_thrift_rpc::LogicType::DateTime: {
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kDateTime);
+        }
+        case infinity_thrift_rpc::LogicType::Timestamp: {
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kTimestamp);
+        }
+        case infinity_thrift_rpc::LogicType::Interval: {
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kInterval);
+        }
         case infinity_thrift_rpc::LogicType::Invalid: {
             return MakeShared<infinity::DataType>(infinity::LogicalType::kInvalid);
         }
@@ -1764,6 +1822,22 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
             }
             return parsed_expr;
         }
+        case infinity_thrift_rpc::LiteralType::Date: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kDate);
+            parsed_expr->date_value_ = strdup(expr.str_value.c_str());
+            return parsed_expr;
+        }
+        case infinity_thrift_rpc::LiteralType::Time: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kTime);
+            parsed_expr->date_value_ = strdup(expr.str_value.c_str());
+            return parsed_expr;
+        }
+        case infinity_thrift_rpc::LiteralType::DateTime: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kDateTime);
+            parsed_expr->date_value_ = strdup(expr.str_value.c_str());
+            return parsed_expr;
+        }
+
         default: {
             status = Status::InvalidConstantType();
             return nullptr;
@@ -1986,21 +2060,18 @@ FusionExpr *InfinityThriftService::GetFusionExprFromProto(const infinity_thrift_
 
 InExpr *InfinityThriftService::GetInExprFromProto(Status &status, const infinity_thrift_rpc::InExpr &in_expr) {
     auto parsed_expr = MakeUnique<InExpr>();
-
-    ParsedExpr *left_operand = GetParsedExprFromProto(status, in_expr.left_operand);
-
-    auto arguments = MakeUnique<Vector<ParsedExpr *>>();
-    arguments->reserve(in_expr.arguments.size());
+    parsed_expr->left_ = GetParsedExprFromProto(status, in_expr.left_operand);
+    if (!status.ok()) {
+        return nullptr;
+    }
+    parsed_expr->arguments_ = new Vector<ParsedExpr *>();
+    parsed_expr->arguments_->reserve(in_expr.arguments.size());
     for (auto &arg : in_expr.arguments) {
-        arguments->emplace_back(GetParsedExprFromProto(status, arg));
+        parsed_expr->arguments_->emplace_back(GetParsedExprFromProto(status, arg));
         if (!status.ok()) {
-            parsed_expr.reset();
             return nullptr;
         }
     }
-
-    parsed_expr->left_ = left_operand;
-    parsed_expr->arguments_ = arguments.release();
     parsed_expr->in_ = in_expr.in_type;
     return parsed_expr.release();
 }
@@ -2172,6 +2243,16 @@ infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColu
             return infinity_thrift_rpc::ColumnType::ColumnRowID;
         case LogicalType::kSparse:
             return infinity_thrift_rpc::ColumnType::ColumnSparse;
+        case LogicalType::kDate:
+            return infinity_thrift_rpc::ColumnType::ColumnDate;
+        case LogicalType::kTime:
+            return infinity_thrift_rpc::ColumnType::ColumnTime;
+        case LogicalType::kDateTime:
+            return infinity_thrift_rpc::ColumnType::ColumnDateTime;
+        case LogicalType::kTimestamp:
+            return infinity_thrift_rpc::ColumnType::ColumnTimestamp;
+        case LogicalType::kInterval:
+            return infinity_thrift_rpc::ColumnType::ColumnInterval;
         default: {
             String error_message = fmt::format("Invalid logical data type: {}", data_type->ToString());
             UnrecoverableError(error_message);
@@ -2284,6 +2365,31 @@ UniquePtr<infinity_thrift_rpc::DataType> InfinityThriftService::DataTypeToProtoD
             infinity_thrift_rpc::PhysicalType physical_type;
             physical_type.__set_sparse_type(sparse_type);
             data_type_proto->__set_physical_type(physical_type);
+            return data_type_proto;
+        }
+        case LogicalType::kTime: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Time);
+            return data_type_proto;
+        }
+        case LogicalType::kDate: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Date);
+            return data_type_proto;
+        }
+        case LogicalType::kDateTime: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::DateTime);
+            return data_type_proto;
+        }
+        case LogicalType::kTimestamp: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Timestamp);
+            return data_type_proto;
+        }
+        case LogicalType::kInterval: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Interval);
             return data_type_proto;
         }
         default: {
@@ -2424,11 +2530,29 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
             HandleRowIDType(output_column_field, row_count, column_vector);
             break;
         }
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kDateTime:
+        case LogicalType::kTimestamp:
+        case LogicalType::kInterval: {
+            HandleTimeRelatedTypes(output_column_field, row_count, column_vector);
+            break;
+        }
         default: {
             return Status::InvalidDataType();
         }
     }
     return Status::OK();
+}
+
+void InfinityThriftService::HandleTimeRelatedTypes(infinity_thrift_rpc::ColumnField &output_column_field,
+                                                   SizeT row_count,
+                                                   const SharedPtr<ColumnVector> &column_vector) {
+    auto size = column_vector->data_type()->Size() * row_count;
+    String dst;
+    dst.resize(size);
+    std::memcpy(dst.data(), column_vector->data(), size);
+    output_column_field.column_vectors.emplace_back(std::move(dst));
 }
 
 void InfinityThriftService::HandleBoolType(infinity_thrift_rpc::ColumnField &output_column_field,

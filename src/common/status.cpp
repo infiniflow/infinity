@@ -440,6 +440,8 @@ Status Status::NotFound(const String &detailed_info) { return Status(ErrorCode::
 
 Status Status::ErrorInit(const String &detailed_info) { return Status(ErrorCode::kErrorInit, MakeUnique<String>(detailed_info)); }
 
+Status Status::FileIsOpen(const String &filename) { return Status(ErrorCode::kFileIsOpen, MakeUnique<String>(filename)); }
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));
@@ -595,5 +597,10 @@ Status Status::InvalidNodeRole(const String &message) { return Status(ErrorCode:
 Status Status::InvalidNodeStatus(const String &message) { return Status(ErrorCode::kInvalidNodeStatus, MakeUnique<String>(message)); }
 
 Status Status::NodeInfoUpdated(const String &message) { return Status(ErrorCode::kNodeInfoUpdated, MakeUnique<String>(message)); }
+
+Status Status::NodeNameMismatch(const String &actual_node_name, const String &expected_node_name) {
+    return Status(ErrorCode::kNodeNameMismatch,
+                  MakeUnique<String>(fmt::format("Expect node name: {}, actual node name: {}", expected_node_name, actual_node_name)));
+}
 
 } // namespace infinity

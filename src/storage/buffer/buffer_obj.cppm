@@ -138,6 +138,10 @@ public:
     u64 rc() const { return rc_; }
     u32 id() const { return id_; }
 
+    void AddObjRc();
+
+    void SubObjRc();
+
     // check the invalid state, only used in tests.
     void CheckState() const;
 
@@ -154,47 +158,7 @@ protected:
 private:
     u32 id_;
 
-    friend class BufferPtr;
-    SharedPtr<u32> ptr_rc_ = MakeShared<u32>(0);
-};
-
-export class BufferPtr {
-public:
-    BufferPtr() : buffer_obj_(nullptr) {}
-
-    ~BufferPtr() {
-        if (buffer_obj_ != nullptr && *ptr_rc_ > 0) {
-            --*ptr_rc_;
-        }
-    }
-
-    BufferPtr(BufferObj *buffer_obj) : buffer_obj_(buffer_obj), ptr_rc_(buffer_obj->ptr_rc_) { ++*buffer_obj_->ptr_rc_; }
-
-    BufferPtr(const BufferPtr &other) : buffer_obj_(other.buffer_obj_), ptr_rc_(other.ptr_rc_) { ++*buffer_obj_->ptr_rc_; }
-    BufferPtr &operator=(const BufferPtr &other) {
-        if (this != &other) {
-            if (buffer_obj_ != nullptr) {
-                --*ptr_rc_;
-            }
-            buffer_obj_ = other.buffer_obj_;
-            ptr_rc_ = other.ptr_rc_;
-            ++*buffer_obj_->ptr_rc_;
-        }
-        return *this;
-    }
-
-    BufferObj *get() const { return buffer_obj_; }
-
-    void reset() {
-        if (buffer_obj_ != nullptr) {
-            --*ptr_rc_;
-            buffer_obj_ = nullptr;
-        }
-    }
-
-private:
-    BufferObj *buffer_obj_;
-    SharedPtr<u32> ptr_rc_;
+    u32 obj_rc_ = 1;
 };
 
 } // namespace infinity

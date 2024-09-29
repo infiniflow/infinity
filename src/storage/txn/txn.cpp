@@ -52,6 +52,7 @@ import chunk_index_entry;
 import memory_indexer;
 import persistence_manager;
 import infinity_context;
+import peer_task;
 
 namespace infinity {
 
@@ -483,6 +484,13 @@ TxnTimeStamp Txn::Commit() {
         return commit_ts;
     }
 
+    NodeRole current_node_role = InfinityContext::instance().GetServerRole();
+    if(current_node_role != NodeRole::kStandalone and current_node_role != NodeRole::kLeader) {
+        if(!IsReaderAllowed()) {
+            RecoverableError(Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_node_role))));
+        }
+    }
+
     // register commit ts in wal manager here, define the commit sequence
     TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampW(this);
     LOG_TRACE(fmt::format("Txn: {} is committing, begin_ts:{} committing ts: {}", txn_id_, BeginTS(), commit_ts));
@@ -493,7 +501,7 @@ TxnTimeStamp Txn::Commit() {
     // LOG_INFO(fmt::format("Txn {} commit ts: {}", txn_id_, commit_ts));
 
     if (txn_mgr_->CheckConflict(this)) {
-        LOG_ERROR(fmt::format("Txn: {} is rollbacked. rollback ts: {}", txn_id_, commit_ts));
+        LOG_ERROR(fmt::format("Txn: {} is rolled back. rollback ts: {}", txn_id_, commit_ts));
         wal_entry_ = nullptr;
         txn_mgr_->SendToWAL(this);
         RecoverableError(Status::TxnConflict(txn_id_, "Txn conflict reason."));

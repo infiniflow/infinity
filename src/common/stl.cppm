@@ -104,6 +104,7 @@ export namespace std {
     using std::lower_bound;
     using std::upper_bound;
 
+    using std::atomic_flag;
     using std::condition_variable;
     using std::lock_guard;
     using std::memory_order;
@@ -246,6 +247,7 @@ export namespace std {
     using std::filesystem::remove;
     using std::filesystem::remove_all;
     using std::filesystem::rename;
+    using std::filesystem::resize_file;
 
     using std::filesystem::is_directory;
     using std::filesystem::is_regular_file;
@@ -517,7 +519,6 @@ namespace infinity {
     using ai64 = std::atomic_int64_t;
     using aptr = std::atomic_uintptr_t;
     using atomic_bool = std::atomic_bool;
-    using atomic_flag = std::atomic_flag;
 
     template<typename T>
     using Atomic = std::atomic<T>;

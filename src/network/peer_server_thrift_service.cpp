@@ -144,6 +144,11 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
 
 void PeerServerThriftService::SyncLog(infinity_peer_server::SyncLogResponse &response, const infinity_peer_server::SyncLogRequest &request) {
     LOG_INFO("Get SyncLog request");
+    Status status = InfinityContext::instance().cluster_manager()->ApplySyncedLogNolock(request.log_entries);
+    if (!status.ok()) {
+        response.error_code = static_cast<i64>(status.code());
+        response.error_message = status.message();
+    }
     return;
 }
 

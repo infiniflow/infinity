@@ -25,7 +25,6 @@ import stl;
 import infinity;
 
 import profiler;
-import local_file_system;
 import third_party;
 
 import query_options;
@@ -43,6 +42,7 @@ import knn_expr;
 import column_def;
 import statement_common;
 import data_type;
+import virtual_storage;
 
 using namespace infinity;
 
@@ -84,8 +84,7 @@ int main() {
 
     String path = "/var/infinity";
 
-    LocalFileSystem fs;
-    fs.CleanupDirectory(path);
+    VirtualStorage::CleanupDirectoryLocal(path);
 
     Infinity::LocalInit(path);
 
@@ -217,7 +216,8 @@ int main() {
                         col2->names_.emplace_back("col2");
                         output_columns->emplace_back(col2);
 
-                        __attribute__((unused)) auto ignored = infinity->Search("default_db", "benchmark_test", nullptr, nullptr, output_columns);
+                        [[maybe_unused]] auto ignored =
+                            infinity->Search("default_db", "benchmark_test", nullptr, nullptr, nullptr, nullptr, output_columns);
                     });
                 results.push_back(fmt::format("-> Select QPS: {}", total_times / tims_costing_second));
             }
@@ -373,7 +373,7 @@ int main() {
         auto r2 = infinity->CreateTable(db_name, table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
 
         std::string sift_base_path = std::string(test_data_path()) + "/benchmark/sift/base.fvecs";
-        if (!fs.Exists(sift_base_path)) {
+        if (!VirtualStorage::ExistsLocal(sift_base_path)) {
             std::cout << "File: " << sift_base_path << " doesn't exist" << std::endl;
             break;
         }
