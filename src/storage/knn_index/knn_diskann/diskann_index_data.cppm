@@ -23,6 +23,7 @@ import stl;
 import index_base;
 import file_system;
 import file_system_type;
+import local_file_system;
 import search_top_1;
 import kmeans_partition;
 import infinity_exception;
@@ -56,8 +57,8 @@ private:
     Vector<LabelType> labels_;
     u32 train_size_{}; // size of sample training set
 
-    SharedPtr<f32[]> full_pivot_data; // pivot data for all chunks, every num_pq_chunks chunks are combined into a dim vector
-    SharedPtr<f32[]> centroid; // global centroid data, type is f32
+    SharedPtr<f32[]> full_pivot_data; // pivot data for all chunks, every num_pq_chunks chunks are combined into a dim vector [num_centers * dim]
+    SharedPtr<f32[]> centroid; // centroids after zero-mean, used for an option of L2 distance
     Vector<u32> rearrangement; // the dimensions in the order of chunks
     Vector<u32> chunk_offsets; // the starting index of each chunk in rearrangement
 
@@ -66,6 +67,7 @@ private:
     Path index_file_path_;
     Path pqCompressed_data_file_path_;
     Path sample_data_file_path_;
+    Path pq_pivot_file_path_;
 
 private:
     // build vamana graph and merge graph with num_parts_
@@ -174,7 +176,7 @@ private:
         }
     }
 
-    void SaveSampleData(FileSystem& fs, FileHandler &train_data_handler, FileHandler &train_ids_handler, SharedPtr<VectorDataType[]> train_data, SharedPtr<SizeT[]> train_data_ids){
+    void SaveSampleData(FileSystem& fs, FileHandler &train_data_handler, FileHandler &train_ids_handler, SharedPtr<VectorDataType[]> &train_data, SharedPtr<SizeT[]> &train_data_ids){
         train_data_handler.Write(&this->train_size_, sizeof(u32));
         train_data_handler.Write(&this->dimension_, sizeof(u32));
         train_ids_handler.Write(&this->train_size_, sizeof(u32));
@@ -182,7 +184,7 @@ private:
         train_ids_handler.Write(&const_one, sizeof(u32));
         for (u32 i = 0; i < this->train_size_; i++) {
             train_data_handler.Write(train_data.get() + i * this->dimension_, sizeof(VectorDataType) * this->dimension_);
-            train_ids_handler.Write(train_data_ids.get() + i, sizeof(u32));
+            train_ids_handler.Write(train_data_ids.get() + i, sizeof(SizeT));
         }
     }
     
@@ -205,7 +207,8 @@ public:
                     Path mem_index_file_path,
                     Path index_file_path,
                     Path pqCompressed_data_file_path,
-                    Path sample_data_file_path){
+                    Path sample_data_file_path,
+                    Path pq_pivot_file_path){
         if (loaded_) {
             String error_message = "DiskAnnIndexData::BuildIndex(): Index data already exists.";
             UnrecoverableError(error_message);
@@ -229,9 +232,9 @@ public:
             loaded_.store(true);
             return;
         }
-        num_pq_chunks_ = num_pq_chunks_ <= 0 ? 1 : num_pq_chunks_;
-        num_pq_chunks_ = num_pq_chunks_ > dimension ? dimension : num_pq_chunks_;
-        num_pq_chunks_ = num_pq_chunks_ > DISKANN_MAX_PQ_CHUNKS ? DISKANN_MAX_PQ_CHUNKS : num_pq_chunks_;
+        num_pq_chunks_ = std::max(num_pq_chunks_, 1u);
+        num_pq_chunks_ = std::min(num_pq_chunks_, static_cast<u32>(dimension));
+        num_pq_chunks_ = std::min(num_pq_chunks_, static_cast<u32>(DISKANN_MAX_PQ_CHUNKS));
         data_num_ = data_num;
         labels_ = std::move(labels);
         this->data_file_path_ = std::move(data_file_path);
@@ -239,6 +242,8 @@ public:
         this->index_file_path_ = std::move(index_file_path);
         this->pqCompressed_data_file_path_ = std::move(pqCompressed_data_file_path);
         this->sample_data_file_path_ = std::move(sample_data_file_path);
+        this->pq_pivot_file_path_ = std::move(pq_pivot_file_path);
+
         auto [data_file_handler, data_file_status] = fs.OpenFile(data_file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
         if (!data_file_status.ok()) {
             UnrecoverableError(data_file_status.message());
@@ -251,13 +256,17 @@ public:
         {
             u32 train_size;
             p_val = ((f64)DISKANN_TRAINING_SET_SIZE / (f64)data_num);
-            if (data_num >= DISKANN_TRAINING_SET_SIZE) {
+            if (data_num > DISKANN_TRAINING_SET_SIZE) {
                 GenRandomSlice<VectorDataType>(*data_file_handler, p_val, train_data, train_size, dimension_, data_num_, train_data_ids);
             } else {
                 LOG_TRACE(fmt::format("data num is less than sample_size {}, using all data", DISKANN_TRAINING_SET_SIZE));
                 train_size = data_num;
-                train_data = MakeUniqueForOverwrite<VectorDataType[]>(train_size * dimension_);
+                train_data = MakeUnique<VectorDataType[]>(train_size * dimension_);
+                train_data_ids = MakeUnique<SizeT[]>(train_size);
                 data_file_handler->Read(train_data.get(), train_size * dimension_ * sizeof(VectorDataType));
+                for (SizeT i = 0; i < train_size; i++) {
+                    train_data_ids[i] = i;
+                }
             }
             this->train_size_ = train_size;
             LOG_TRACE(fmt::format("Sample training size :{}", train_size));
@@ -272,15 +281,19 @@ public:
             if (!pq_data_file_status.ok()) {
                 UnrecoverableError(pq_data_file_status.message());
             }
+            auto [pq_pivot_file_handler, pq_pivot_file_status] = 
+                fs.OpenFile(pq_pivot_file_path_, FileFlags::CREATE_FLAG | FileFlags::WRITE_FLAG, FileLockType::kWriteLock);
+            if (!pq_pivot_file_status.ok()) {
+                UnrecoverableError(pq_pivot_file_status.message());
+            };
             bool make_zero_mean = true; // mean subtraction for centering, not for inner product
             if (metric_ == MetricType::kMetricInnerProduct)
                 make_zero_mean = false;
-
+            
             if (train_size_ > num_centers_){
-                GeneratePqPivots<VectorDataType>(train_data, train_size_, dimension_, num_centers_,
+                GeneratePqPivots<VectorDataType>(*pq_pivot_file_handler, train_data, train_size_, dimension_, num_centers_,
                                 num_pq_chunks_, DISKANN_NUM_KMEANS_REPS, make_zero_mean,
                                 full_pivot_data, centroid, rearrangement, chunk_offsets);
-                LOG_TRACE(fmt::format("generate Pq pivots done"));
                 GeneratePqDataFromPivots<VectorDataType>(*data_file_handler, *pqCompressed_data_file_handler, data_num_, dimension_, num_centers_,num_pq_chunks_,
                                                         full_pivot_data, centroid, rearrangement, chunk_offsets);
                 LOG_TRACE(fmt::format("generate Pq data done"));
@@ -291,6 +304,7 @@ public:
                 // LOG_TRACE("Train size is less than number of centers, using train data as pivots");
             }
             pqCompressed_data_file_handler->Close();
+            pq_pivot_file_handler->Close();
             LOG_TRACE(fmt::format("Finished generating pq pivots and pq data"));
         }
         
@@ -346,9 +360,9 @@ public:
             }
 
             SaveSampleData(fs, *train_data_handler, *train_data_ids_handler, train_data, train_data_ids);
-            train_data.reset();
-            train_data_ids.reset();
-            fs.DeleteFile(mem_index_file_path);
+            // train_data.reset();
+            // train_data_ids.reset();
+            fs.DeleteFile(mem_index_file_path_); // delete mem index file
             data_file_handler->Close();
             train_data_handler->Close();
             train_data_ids_handler->Close();
@@ -359,6 +373,72 @@ public:
     }
 
 
+    void UnitTest() {
+        LOG_TRACE("DiskAnnIndexData::UnitTest()");
+        LocalFileSystem fs;
+
+        LOG_TRACE("UnitTest(): Test train data and ids");
+        {
+            Path train_data_path = sample_data_file_path_ / "train_data.bin";
+            Path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
+            auto [train_data_handler, train_data_status] = fs.OpenFile(train_data_path, 
+                                                                FileFlags::READ_FLAG, FileLockType::kReadLock);                                               
+            if (!train_data_status.ok()) {
+                UnrecoverableError(train_data_status.message());
+            }
+            auto [train_data_ids_handler, train_data_ids_status] = fs.OpenFile(train_data_ids_path, 
+                                                                FileFlags::READ_FLAG, FileLockType::kReadLock);
+            if (!train_data_ids_status.ok()) {
+                UnrecoverableError(train_data_ids_status.message());
+            }
+            UniquePtr<VectorDataType[]> train_data = MakeUnique<VectorDataType[]>(train_size_ * dimension_);
+            UniquePtr<SizeT[]> train_data_ids = MakeUnique<SizeT[]>(train_size_);
+            fmt::print("train_size: {}, dimension: {}\n", train_size_, dimension_);
+            train_data_handler->Read(train_data.get(), train_size_ * dimension_ * sizeof(VectorDataType));
+            train_data_ids_handler->Read(train_data_ids.get(), train_size_ * sizeof(SizeT));
+                fmt::print("train_data_ids[0] {} :\n", train_data_ids[0]);
+                fmt::print("train_data_ids[1] {} :\n", train_data_ids[1]);
+                for (u32 j = 0; j < dimension_; j++) {
+                    fmt::print("{}, ", train_data[0 * dimension_ + j]);
+                }
+                fmt::print("\n");
+                for (u32 j = 0; j < dimension_; j++) {
+                    fmt::print("{}, ", train_data[1 * dimension_ + j]);
+                }
+                fmt::print("\n");
+            train_data_handler->Close();
+            train_data_ids_handler->Close();
+        }
+
+        LOG_TRACE("UnitTest(): Test Pq pivots and pq data");
+        {
+            
+            fmt::print("centroid: \n");
+            for (u32 j = 0; j < dimension_; j++) {
+                fmt::print("{} ,", centroid[j]);
+            }
+            fmt::print("\n");
+            for (u32 i = 0; i < 3; i++) {
+                fmt::print("pivots[{}]: \n", i);
+                for (u32 j = 0; j < num_centers_; j++) {
+                    fmt::print("{} ", full_pivot_data[i * dimension_ + j]);
+                }
+                fmt::print("\n");
+            }
+            auto [pqCompressed_data_file_handler, pq_data_file_status] = 
+                fs.OpenFile(pqCompressed_data_file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+            if (!pq_data_file_status.ok()) {
+                UnrecoverableError(pq_data_file_status.message());
+            }
+            UniquePtr<u32[]> pqdata = MakeUniqueForOverwrite<u32[]>(num_pq_chunks_* data_num_);
+            pqCompressed_data_file_handler->Read(pqdata.get(), num_pq_chunks_ * sizeof(u32) * data_num_);
+            fmt::print("pqdata[0]: \n");
+            for (u32 j = 0; j < num_pq_chunks_; j++) {
+                fmt::print("{}, ", pqdata[j]);
+            }
+            fmt::print("\n");
+        }
+    }
 
 
 

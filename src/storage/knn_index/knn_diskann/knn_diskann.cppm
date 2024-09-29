@@ -17,15 +17,13 @@ module;
 export module knn_diskann;
 
 import stl;
-import knn_distance;
-
+import deprecated_knn_distance;
 import infinity_exception;
 import index_base;
 import kmeans_partition;
 import search_top_1;
 import search_top_k;
 import knn_result_handler;
-import bitmask;
 import knn_expr;
 import internal_types;
 import logger;
@@ -34,7 +32,7 @@ import diskann_dist_func;
 
 namespace infinity {
 template <typename Compare, MetricType metric, KnnDistanceAlgoType algo>
-class KnnDiskAnn final : public KnnDistance<typename Compare::DistanceType> {
+class KnnDiskAnn {
     using DistType = typename Compare::DistanceType;
     using ResultHandler = ReservoirResultHandler<Compare>;
 
@@ -54,7 +52,7 @@ public:
         //TODO
     }
 
-    void Begin() final {
+    void Begin() {
         if (begin_ || this->query_count_ == 0) {
             return;
         }
@@ -70,7 +68,7 @@ public:
         begin_ = true;
     }
 
-    void End() final {
+    void End() {
         if (!begin_) {
             return;
         }
@@ -86,11 +84,11 @@ public:
         begin_ = false;
     }
 
-    [[nodiscard]] inline DistType *GetDistances() const final { return distance_array_.get(); }
+    [[nodiscard]] inline DistType *GetDistances() const  { return distance_array_.get(); }
 
-    [[nodiscard]] inline RowID *GetIDs() const final { return id_array_.get(); }
+    [[nodiscard]] inline RowID *GetIDs() const  { return id_array_.get(); }
 
-    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
+    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const  {
         if (idx >= this->query_count_) {
             String error_message = "Query index exceeds the limit";
             UnrecoverableError(error_message);
@@ -98,7 +96,7 @@ public:
         return distance_array_.get() + idx * this->top_k_;
     }
 
-    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
+    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const  {
         if (idx >= this->query_count_) {
             String error_message = "Query index exceeds the limit";
             UnrecoverableError(error_message);

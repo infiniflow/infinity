@@ -36,9 +36,6 @@ public:
 
     template<typename DiskAnnIndexDataType>
     void TestCreateIndex() {
-        // const std::string save_dir_ = tmp_dir + "/diskann_test";
-
-        std::cout << "Testing Simple Create Index" << std::endl;
         u32 dim = 100;
         u32 num_points = 100000;
         u32 R = 32;
@@ -52,6 +49,7 @@ public:
             labels[i] = i;
         }
         auto data = MakeUnique<f32[]>(dim * num_points);
+        // std::fill(data.get(), data.get() + dim * num_points, 1.0f);
         for (u32 i = 0; i < num_points; i++) {
             u32 non_zero_dim = i / 1000;
             data[i * dim + non_zero_dim] = 1.0f;
@@ -62,16 +60,23 @@ public:
         std::string mem_index_path = save_dir_ + "/mem_index.bin";
         std::string index_file_path = save_dir_ + "/index.bin";
         std::string pqCompressed_data_path = save_dir_ + "/pqCompressed_data.bin";
+        std::string pq_pivot_data_path = save_dir_ + "/pq_pivot.bin";
         std::string sample_data_path = save_dir_;
-        auto [data_file_handler, status] = fs.OpenFile(data_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+        auto [data_file_handler, status] = fs.OpenFile(data_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
         data_file_handler->Write(data.get(), sizeof(f32) * dim * num_points);
-
+        data_file_handler->Close();
         {
             auto disk_data = DiskAnnIndexDataType::Make(dim, num_points, R, L, num_pq_chunks, num_parts, num_centers);
             
-            disk_data->BuildIndex(dim, num_points, labels, fs, Path(data_file_path), Path(mem_index_path), Path(index_file_path), Path(pqCompressed_data_path), Path(sample_data_path));
+            disk_data->BuildIndex(dim, num_points, labels, fs, Path(data_file_path), Path(mem_index_path), Path(index_file_path), 
+                                 Path(pqCompressed_data_path), Path(sample_data_path), Path(pq_pivot_data_path));  
 
             std::cout << "Index built successfully" << std::endl;
+
+            // disk_data->UnitTest();
         }
 
     }

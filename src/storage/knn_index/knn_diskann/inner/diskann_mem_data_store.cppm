@@ -15,8 +15,8 @@
 module;
 
 #include <cassert>
-#include <ostream>
 #include <fstream>
+#include <ostream>
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <xmmintrin.h>
 #elif defined(__GNUC__) && defined(__aarch64__)
@@ -39,7 +39,7 @@ public:
     using DistanceFunc = DiskAnnDistance<DataType>;
     using UniquePtrDataTypeAligned = std::unique_ptr<DataType[], decltype([](DataType *p) { std::free(p); })>;
 
-    DiskAnnMemDataStore(): capacity_(0), dim_(0){};
+    DiskAnnMemDataStore() : capacity_(0), dim_(0) {};
     DiskAnnMemDataStore(SizeT num_points, SizeT dim, DistanceFunc distance_fn)
         : capacity_(num_points), dim_(dim), distance_fn_(std::move(distance_fn)) {
         aligned_dim_ = RoundUp(dim, distance_fn.GetRequiredAlignment());
@@ -56,13 +56,13 @@ public:
         // AlignedFree(data_);
     }
 
-    DiskAnnMemDataStore(const This &&other) 
-    : capacity_(std::exchange(other.capacity_, 0)), dim_(std::exchange(other.dim_, 0)), 
-      distance_fn_(std::move(other.distance_fn_)), aligned_dim_(std::exchange(other.aligned_dim_, 0)), 
-      data_unique_(std::move(other.data_unique_)), data_(std::move(other.data_)), pre_computed_norms_(std::move(other.pre_computed_norms_)) {}
+    DiskAnnMemDataStore(const This &&other)
+        : capacity_(std::exchange(other.capacity_, 0)), dim_(std::exchange(other.dim_, 0)), distance_fn_(std::move(other.distance_fn_)),
+          aligned_dim_(std::exchange(other.aligned_dim_, 0)), data_unique_(std::move(other.data_unique_)), data_(std::move(other.data_)),
+          pre_computed_norms_(std::move(other.pre_computed_norms_)) {}
 
     DiskAnnMemDataStore &operator=(This &&other) {
-        if (this != &other){    
+        if (this != &other) {
             this->capacity_ = std::exchange(other.capacity_, 0);
             this->dim_ = std::exchange(other.dim_, 0);
             this->distance_fn_ = std::move(other.distance_fn_);
@@ -74,29 +74,21 @@ public:
         return *this;
     }
 
-    static This Make(SizeT num_points, SizeT dim, DiskAnnMetricType metric){
+    static This Make(SizeT num_points, SizeT dim, DiskAnnMetricType metric) {
         DistanceFunc distance_fn = DistanceFunc::Make(metric);
         return This(num_points, dim, distance_fn);
     }
 
-    SizeT GetAlignedDim() const {
-        return aligned_dim_;
-    }
+    SizeT GetAlignedDim() const { return aligned_dim_; }
 
-    SizeT GetAlignmentFactor() const {
-        return distance_fn_.GetRequiredAlignment();
-    }
+    SizeT GetAlignmentFactor() const { return distance_fn_.GetRequiredAlignment(); }
 
-    SizeT Capacity() const {
-        return capacity_;
-    }
+    SizeT Capacity() const { return capacity_; }
 
-    SizeT GetDims() const {
-        return dim_;
-    }
+    SizeT GetDims() const { return dim_; }
 
-    SizeT Resize(SizeT new_num_points){
-        if (new_num_points > capacity_){
+    SizeT Resize(SizeT new_num_points) {
+        if (new_num_points > capacity_) {
             return Expand(new_num_points);
         } else if (new_num_points < capacity_) {
             return Shrink(new_num_points);
@@ -105,13 +97,10 @@ public:
         }
     }
 
-    void Load(FileHandler& load_file_handler){
+    void Load(FileHandler &load_file_handler) {}
+    void Save(FileHandler &save_file_handler) {}
 
-    }
-    void Save(FileHandler& save_file_handler){
-    }
-
-    void PopulateData(DataType* vectors, SizeT num_pts) {
+    void PopulateData(DataType *vectors, SizeT num_pts) {
         memset(data_, 0, num_pts * aligned_dim_ * sizeof(DataType));
         for (SizeT i = 0; i < num_pts; i++) {
             std::memmove(data_ + i * aligned_dim_, vectors + i * dim_, dim_ * sizeof(DataType));
@@ -122,8 +111,8 @@ public:
         }
     }
 
-    void PopulateData(FileHandler& file_handler, SizeT num_pts) {
-        if (num_pts > this->capacity_){
+    void PopulateData(FileHandler &file_handler, SizeT num_pts) {
+        if (num_pts > this->capacity_) {
             UnrecoverableError("DiskAnnMemDataStore::PopulateData(): num_pts > capacity_");
         }
 
@@ -136,11 +125,9 @@ public:
         }
     }
 
-    void GetVector(SizeT idx, DataType* vector) const {
-        memcpy(vector, data_ + idx * aligned_dim_, dim_ * sizeof(DataType));
-    }
+    void GetVector(SizeT idx, DataType *vector) const { memcpy(vector, data_ + idx * aligned_dim_, dim_ * sizeof(DataType)); }
 
-    void SetVector(SizeT loc, DataType* vector) {
+    void SetVector(SizeT loc, DataType *vector) {
         SizeT offset = loc * aligned_dim_;
         memset(data_ + offset, 0, aligned_dim_ * sizeof(DataType));
         memcpy(data_ + offset, vector, dim_ * sizeof(DataType));
@@ -149,28 +136,24 @@ public:
         }
     }
 
-    void PrefetchVector(SizeT idx){
+    void PrefetchVector(SizeT idx) {
         SizeT max_prefetch_size = (aligned_dim_ * sizeof(DataType) / 64) * 64;
-        for (SizeT i = 0; i < max_prefetch_size; i += 64){
-            _mm_prefetch(((const char*)data_ + idx * aligned_dim_ * sizeof(DataType)) + i, _MM_HINT_T0);
+        for (SizeT i = 0; i < max_prefetch_size; i += 64) {
+            _mm_prefetch(((const char *)data_ + idx * aligned_dim_ * sizeof(DataType)) + i, _MM_HINT_T0);
         }
     }
 
-    void PreprocessQuery(DataType* query, AbstractScratch<DataType> *query_scratch) const {
-        if (query_scratch != nullptr){
+    void PreprocessQuery(DataType *query, AbstractScratch<DataType> *query_scratch) const {
+        if (query_scratch != nullptr) {
             memcpy(query_scratch->AlignedQueryT(), query, sizeof(DataType) * dim_);
-        }
-        else {
+        } else {
             UnrecoverableError("DiskAnnMemDataStore::PreprocessQuery(): query_scratch is null");
         }
     }
 
-    f32 GetDistance(DataType* query, SizeT loc) const {
-        return distance_fn_.Compare(query, data_ + loc * aligned_dim_, aligned_dim_);
-    }
+    f32 GetDistance(DataType *query, SizeT loc) const { return distance_fn_.Compare(query, data_ + loc * aligned_dim_, aligned_dim_); }
 
-    void GetDistance(DataType* query, SizeT *locations, const SizeT location_count,
-                    f32* distances, AbstractScratch<DataType> *query_scratch) const {
+    void GetDistance(DataType *query, SizeT *locations, const SizeT location_count, f32 *distances, AbstractScratch<DataType> *query_scratch) const {
         for (SizeT i = 0; i < location_count; i++) {
             distances[i] = distance_fn_.Compare(query, data_ + locations[i] * aligned_dim_, aligned_dim_);
         }
@@ -180,8 +163,7 @@ public:
         return distance_fn_.Compare(data_ + loc1 * aligned_dim_, data_ + loc2 * aligned_dim_, aligned_dim_);
     }
 
-    void GetDistance(DataType *preprocessed_query, Vector<SizeT>& ids,
-                    Vector<f32> &distances, AbstractScratch<DataType> *query_scratch) const {
+    void GetDistance(DataType *preprocessed_query, Vector<SizeT> &ids, Vector<f32> &distances, AbstractScratch<DataType> *query_scratch) const {
         if (distances.size() < ids.size()) {
             distances.resize(ids.size());
         }
@@ -197,7 +179,7 @@ public:
             UnrecoverableError("DiskAnnMemDataStore::Expand(): cannot Expand to smaller size");
         }
 
-        DataType* new_data = nullptr;
+        DataType *new_data = nullptr;
         AllocAligned((void **)&new_data, new_size * aligned_dim_ * sizeof(DataType), 8 * sizeof(DataType));
         memcpy(new_data, data_, this->capacity_ * aligned_dim_ * sizeof(DataType));
         data_unique_.reset(new_data);
@@ -209,12 +191,11 @@ public:
     SizeT Shrink(SizeT new_size) {
         if (new_size == this->capacity_) {
             return this->capacity_;
-        }
-        else if (new_size > this->capacity_) {
+        } else if (new_size > this->capacity_) {
             UnrecoverableError("DiskAnnMemDataStore::Shrink(): cannot Shrink to larger size");
         }
 
-        DataType* new_data = nullptr;
+        DataType *new_data = nullptr;
         AllocAligned((void **)&new_data, new_size * aligned_dim_ * sizeof(DataType), 8 * sizeof(DataType));
         memcpy(new_data, data_, new_size * aligned_dim_ * sizeof(DataType));
         data_unique_.reset(new_data);
@@ -223,7 +204,7 @@ public:
         return this->capacity_;
     }
 
-    void MoveVectors(u32 old_location_start, u32 new_location_start, u32 num_locations){
+    void MoveVectors(u32 old_location_start, u32 new_location_start, u32 num_locations) {
         if (num_locations == 0 || old_location_start == new_location_start) {
             return;
         }
@@ -233,12 +214,11 @@ public:
 
         // If ranges are overlapping, make sure not to clear the newly copied data.
         if (new_location_start < old_location_start) {
-            if (mem_clear_loc_start < new_location_start + num_locations) { 
+            if (mem_clear_loc_start < new_location_start + num_locations) {
                 // Clear only after the end of the new range.
                 mem_clear_loc_start = new_location_start + num_locations;
             }
-        }
-        else {
+        } else {
             if (mem_clear_loc_end_limit > new_location_start) {
                 // Clear only up to the beginning of the new range.
                 mem_clear_loc_end_limit = new_location_start;
@@ -246,11 +226,10 @@ public:
         }
 
         CopyVectors(old_location_start, new_location_start, num_locations);
-        memset(data_ + aligned_dim_ * mem_clear_loc_start, 0,
-                sizeof(DataType) * aligned_dim_ * (mem_clear_loc_end_limit - mem_clear_loc_start));
+        memset(data_ + aligned_dim_ * mem_clear_loc_start, 0, sizeof(DataType) * aligned_dim_ * (mem_clear_loc_end_limit - mem_clear_loc_start));
     }
 
-    void CopyVectors(SizeT from_loc, SizeT to_loc, SizeT num_points){
+    void CopyVectors(SizeT from_loc, SizeT to_loc, SizeT num_points) {
         assert(from_loc < this->capacity_);
         assert(to_loc < this->capacity_);
         assert(num_points < this->capacity_);
@@ -258,7 +237,7 @@ public:
     }
 
     // retun the index of min distance point from the center as the enter point
-    SizeT CalculateMedoid() const { 
+    SizeT CalculateMedoid() const {
         UniquePtr<f32[]> center = MakeUnique<f32[]>(aligned_dim_);
         for (SizeT i = 0; i < aligned_dim_; i++)
             center[i] = 0.0f;
@@ -277,13 +256,8 @@ public:
         UniquePtr<f32[]> distances = MakeUnique<f32[]>(capacity_);
         for (SizeT i = 0; i < capacity_; i++) {
             f32 &dist = distances[i];
-            const DataType* cur_vec = data_ + i * aligned_dim_;
-            dist = 0;
-            f32 diff = 0;
-            for (SizeT j = 0; j < aligned_dim_; j++) {
-                diff = (center[j] - (f32)cur_vec[j]) * (center[j] - (f32)cur_vec[j]);
-                dist += diff;
-            }
+            const DataType *cur_vec = data_ + i * aligned_dim_;
+            dist = L2Distance<f32, DataType, f32>(cur_vec, center.get(), static_cast<u32>(aligned_dim_));
         }
         u32 min_idx = 0;
         f32 min_dist = distances[0];
@@ -296,20 +270,17 @@ public:
         return min_idx;
     }
 
-    DistanceFunc getDistFn() const {
-        return this->distance_fn_;
-    }
+    DistanceFunc getDistFn() const { return this->distance_fn_; }
 
 private:
     SizeT capacity_;
     SizeT dim_;
 
     UniquePtrDataTypeAligned data_unique_;
-    DataType* data_;
+    DataType *data_;
     SizeT aligned_dim_;
-    DistanceFunc distance_fn_; 
+    DistanceFunc distance_fn_;
     SharedPtr<f32[]> pre_computed_norms_; // in case we need to save vector norms for optimization
-
 };
 
 } // namespace infinity

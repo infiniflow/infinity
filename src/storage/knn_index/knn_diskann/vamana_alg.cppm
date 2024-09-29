@@ -28,7 +28,6 @@ import file_system;
 import file_system_type;
 import infinity_exception;
 import knn_result_handler;
-import bitmask;
 import logical_type;
 import third_party;
 import diskann_mem_data_store;
@@ -145,25 +144,26 @@ private:
         Vector<SizeT> visit_order;
         // Vector<Neighbor> pool, tmp;
         // std::unordered_set<SizeT> visited;
-        visit_order.reserve(nd_ + num_frozen_pts_);
-        for (SizeT i = 0; i < nd_; i++) {
-            visit_order.emplace_back(i);
-        }
-        for (SizeT i = max_points_; i < max_points_ + num_frozen_pts_; i++) {
-            visit_order.emplace_back(i);
+        visit_order.resize(nd_ + num_frozen_pts_);
+        std::iota(visit_order.begin(), visit_order.begin() + nd_, 0);
+        if (num_frozen_pts_ > 0) {
+            std::iota(visit_order.begin() + nd_, visit_order.end(), max_points_);
         }
 
         if (num_frozen_pts_ > 0) {
+            LOG_TRACE(fmt::format("init node start_ = {}", start_));
             start_ = max_points_; // start from the first frozen point
         } else {
             start_ = CalculateEntryPoint(); // calculate medoid as enterpoint
         }
 
-        // std::cout<<"init id:"<<GetInitIds()[0]<<std::endl;
         for (SizeT node_ctr = 0; node_ctr < visit_order.size(); node_ctr++) {
-        // for (SizeT node_ctr = 0; node_ctr < 5; node_ctr++) {
-            // std::cout <<std::endl<<std::endl<<"Link node_ctr: "<<node_ctr<<std::endl;
             SizeT node = visit_order[node_ctr];
+            // Avoid the case where the first Prune node is exactly start_ resulting in a pruned_list of none
+            if (node == start_ && node_ctr == 0) {
+                continue;
+            }
+            // LOG_TRACE(fmt::format("start_: {}, Link node: {}",start_, node));
             ScratchStoreManager<InMemQueryScratch> manager(query_scratch_); // get new scratch
             auto scratch = manager.ScratchSpace();
             Vector<SizeT> pruned_list;
@@ -230,10 +230,12 @@ private:
         for (SizeT i = 0; i < pool.size(); i++) { // remove self from pool
             if (pool[i].id == location) {
                 pool.erase(pool.begin() + i);
+                LOG_TRACE(fmt::format("SearchForPointAndPrune(): remove self from pool: {}", location));
                 i--;
             }
         }
 
+        assert(pool.size() > 0);
         assert(pruned_list.size() == 0);
         PruneNeighbors(location, pool, pruned_list, scratch);
         assert(!pruned_list.empty());
@@ -297,7 +299,6 @@ private:
                 best_l_nodes.Insert(nn);
             }
         }
-        // std::cout<<"best_l_nodes size: "<<best_l_nodes.Size()<<std::endl;
 
         u32 hops = 0; // number of hops in the graph
         u32 cmps = 0; // number of comparisons
@@ -344,6 +345,7 @@ private:
             }
 
         }
+        assert(best_l_nodes.Size() != 0);
 
         return std::make_pair(hops, cmps);
     }
