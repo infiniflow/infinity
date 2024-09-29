@@ -3095,6 +3095,146 @@ public:
     }
 };
 
+class ShowSessionVariablesHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto result = infinity->ShowVariables(SetScope::kSession);
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
+            auto row_count = data_block->row_count();
+            for (int row = 0; row < row_count; ++row) {
+                // variable name
+                Value name_value = data_block->GetValue(0, row);
+                const String& config_name = name_value.ToString();
+                // variable value
+                Value value = data_block->GetValue(1, row);
+                const String &config_value = value.ToString();
+                json_response[config_name] = config_value;
+            }
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowSessionVariableHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto variable_name = request->getPathVariable("variable_name");
+        auto result = infinity->ShowVariable(variable_name, SetScope::kSession);
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+            Value value = data_block->GetValue(0, 0);
+            const String &variable_value = value.ToString();
+            json_response[variable_name] = variable_value;
+
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class SetSessionVariableHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result;
+
+        String data_body = request->readBodyToString();
+        try {
+
+            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
+            if(http_body_json.size() != 1) {
+                json_response["error_code"] = 3076;
+                json_response["error_message"] = "No variable will be set";
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+
+            for (const auto &set_variable : http_body_json.items()) {
+                String var_name = set_variable.key();
+                const auto &var_value = set_variable.value();
+                switch (var_value.type()) {
+                    case nlohmann::json::value_t::boolean: {
+                        bool bool_value = var_value.template get<bool>();
+                        result = infinity->SetVariableOrConfig(var_name, bool_value, SetScope::kSession);
+                        break;
+                    }
+                    case nlohmann::json::value_t::number_integer: {
+                        i64 integer_value = var_value.template get<i64>();
+                        result = infinity->SetVariableOrConfig(var_name, integer_value, SetScope::kSession);
+                        break;
+                    }
+                    case nlohmann::json::value_t::number_unsigned: {
+                        i64 integer_value = var_value.template get<u64>();
+                        result = infinity->SetVariableOrConfig(var_name, integer_value, SetScope::kSession);
+                        break;
+                    }
+                    case nlohmann::json::value_t::number_float: {
+                        f64 double_value = var_value.template get<f64>();
+                        result = infinity->SetVariableOrConfig(var_name, double_value, SetScope::kSession);
+                        break;
+                    }
+                    case nlohmann::json::value_t::string: {
+                        String str_value = var_value.template get<std::string>();
+                        result = infinity->SetVariableOrConfig(var_name, str_value, SetScope::kSession);
+                        break;
+                    }
+                    case nlohmann::json::value_t::array:
+                    case nlohmann::json::value_t::object:
+                    case nlohmann::json::value_t::binary:
+                    case nlohmann::json::value_t::null:
+                    case nlohmann::json::value_t::discarded: {
+                        json_response["error_code"] = ErrorCode::kInvalidExpression;
+                        json_response["error_message"] = fmt::format("Invalid set variable expression");
+                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                    }
+                }
+            }
+        } catch (nlohmann::json::exception &e) {
+            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+            json_response["error_message"] = e.what();
+        }
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class SetConfigHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -3220,7 +3360,7 @@ void HTTPServer::Start(const String& ip_address, u16 port) {
     router->route("PUT", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<OptimizeIndexHandler>());
 
     // alter
-    router->route("PUT", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<AddColumnsHandler>());
+    router->route("POST", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<AddColumnsHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<DropColumnsHandler>());
 
     // segment
@@ -3243,10 +3383,12 @@ void HTTPServer::Start(const String& ip_address, u16 port) {
     router->route("POST", "/configs", MakeShared<SetConfigHandler>());
 
     // variable
-    router->route("GET", "/variables", MakeShared<ShowGlobalVariablesHandler>());
-    router->route("GET", "/variables/{variable_name}", MakeShared<ShowGlobalVariableHandler>());
-
-    router->route("POST", "/variables", MakeShared<SetGlobalVariableHandler>());
+    router->route("GET", "/variables/global", MakeShared<ShowGlobalVariablesHandler>());
+    router->route("GET", "/variables/global/{variable_name}", MakeShared<ShowGlobalVariableHandler>());
+    router->route("SET", "/variables/global", MakeShared<SetGlobalVariableHandler>());
+    router->route("GET", "/variables/session", MakeShared<ShowSessionVariablesHandler>());
+    router->route("GET", "/variables/session/{variable_name}", MakeShared<ShowSessionVariableHandler>());
+    router->route("SET", "/variables/session", MakeShared<SetSessionVariableHandler>());
 
     SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({ip_address, port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler = HttpConnectionHandler::createShared(router);
