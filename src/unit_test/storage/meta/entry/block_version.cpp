@@ -59,7 +59,7 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
     }
 
     {
-        auto [local_file_handle, status]  = version_file_handle->Open(version_path, FileAccessMode::kRead);
+        auto [local_file_handle, status]  = LocalStore::Open(version_path, FileAccessMode::kRead);
         EXPECT_TRUE(status.ok());
         auto block_version2 = BlockVersion::LoadFromFile(local_file_handle.get());
         ASSERT_EQ(block_version, *block_version2);
