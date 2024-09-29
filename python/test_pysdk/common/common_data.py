@@ -16,6 +16,7 @@ import ast
 from enum import Enum
 from infinity.table import ExplainType
 from . import common_index
+import re
 
 default_url = "http://localhost:23820/"
 
@@ -154,6 +155,21 @@ def str2sparse(str_input):
         sparce_vec[str(eval(t[0]))] = eval(t[1])
 
     return sparce_vec
+
+def is_date(str_input):
+    if re.match(r"^\b\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b$", str_input):
+        return True
+    return False
+
+def is_time(str_input):
+    if re.match(r"^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$", str_input):
+        return True
+    return False
+
+def is_datetime(str_input):
+    if re.match(r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]) ([01]\d|2[0-3]):[0-5]\d:[0-5]\d$", str_input):
+        return True
+    return False
 
 index_type_transfrom = {
     1:"IVFFLAT",

@@ -2,7 +2,9 @@
 import base_test;
 import stl;
 import persistence_manager;
-import local_file_system;
+import virtual_storage;
+import virtual_storage_type;
+import abstract_file_handle;
 import file_system_type;
 import third_party;
 import persist_result_handler;
@@ -41,15 +43,22 @@ void PersistenceManagerTest::CheckObjData(const String& local_file_path, const S
     SizeT obj_file_size = fs::file_size(obj_fp);
     ASSERT_LE(obj_file_size, ObjSizeLimit);
 
-    LocalFileSystem local_fs;
-    auto [file_handler, status] = local_fs.OpenFile(obj_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
-    ASSERT_TRUE(status.ok());
-    local_fs.Seek(*file_handler, obj_addr.part_offset_);
+    VirtualStorage virtual_storage;
+    Map<String, String> configs;
+    virtual_storage.Init(StorageType::kLocal, configs);
+    auto [pm_file_handle, status] = virtual_storage.BuildFileHandle();
+    EXPECT_TRUE(status.ok());
+
+    status = pm_file_handle->Open(obj_path, FileAccessMode::kRead);
+    EXPECT_TRUE(status.ok());
+    status = pm_file_handle->Seek(obj_addr.part_offset_);
+    EXPECT_TRUE(status.ok());
     auto file_size = obj_addr.part_size_;
     auto buffer = std::make_unique<char[]>(file_size);
-    local_fs.Read(*file_handler, buffer.get(), file_size);
+    auto [nread, read_status] = pm_file_handle->Read(buffer.get(), file_size);
+    EXPECT_TRUE(read_status.ok());
     ASSERT_EQ(String(buffer.get(), file_size), data);
-    local_fs.Close(*file_handler);
+    pm_file_handle->Close();
 
     pm_->PutObjCache(local_file_path);
 }

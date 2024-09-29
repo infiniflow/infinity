@@ -40,7 +40,12 @@ struct LogicType {
     TensorArray = 14,
     Sparse = 15,
     MultiVector = 16,
-    Invalid = 17
+    Date = 17,
+    Time = 18,
+    DateTime = 19,
+    Timestamp = 20,
+    Interval = 21,
+    Invalid = 22
   };
 };
 
@@ -127,7 +132,12 @@ struct LiteralType {
     IntegerTensorArray = 9,
     DoubleTensorArray = 10,
     SparseIntegerArray = 11,
-    SparseDoubleArray = 12
+    SparseDoubleArray = 12,
+    Date = 13,
+    Time = 14,
+    Inteval = 15,
+    DateTime = 16,
+    Timestamp = 17
   };
 };
 
@@ -187,7 +197,12 @@ struct ColumnType {
     ColumnSparse = 13,
     ColumnMultiVector = 14,
     ColumnRowID = 15,
-    ColumnInvalid = 16
+    ColumnDate = 16,
+    ColumnTime = 17,
+    ColumnDateTime = 18,
+    ColumnTimestamp = 19,
+    ColumnInterval = 20,
+    ColumnInvalid = 21
   };
 };
 
