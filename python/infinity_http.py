@@ -533,7 +533,7 @@ class infinity_http:
                 tmp[param_name.lower()] = columns_definition[col][param_name]
             fields.append(tmp)
         d = self.set_up_data([], {"fields": fields})
-        r = self.request(url, "put", h, d)
+        r = self.request(url, "post", h, d)
         return self.get_database_result(r)
 
     def drop_columns(self, column_name: list[str] | str):
