@@ -136,36 +136,36 @@ private:
 export template <typename DataType>
 class PQScratch {
 public:
-    f32 *aligned_pqtable_dist_scratch = nullptr;
-    f32 *aligned_dist_scratch = nullptr;
-    u8 *aligned_pq_coord_scratch = nullptr;
-    f32 *rotated_query = nullptr;
-    f32 *aligned_query_float = nullptr;
+    f32 *aligned_pqtable_dist_scratch_ = nullptr;
+    f32 *aligned_dist_scratch_ = nullptr;
+    u8 *aligned_pq_coord_scratch_ = nullptr;
+    f32 *rotated_query_ = nullptr;
+    f32 *aligned_query_float_ = nullptr;
 
     PQScratch(SizeT graph_degree, SizeT aligned_dim) {
-        AllocAligned((void **)&aligned_pq_coord_scratch, graph_degree * DISKANN_MAX_PQ_CHUNKS * sizeof(u8), 256);
-        AllocAligned((void **)&aligned_pqtable_dist_scratch, 256 * DISKANN_MAX_PQ_CHUNKS * sizeof(float), 256);
-        AllocAligned((void **)&aligned_dist_scratch, graph_degree * sizeof(f32), 256);
-        AllocAligned((void **)&rotated_query, aligned_dim * sizeof(f32), 8 * sizeof(f32));
+        AllocAligned((void **)&aligned_pq_coord_scratch_, graph_degree * DISKANN_MAX_PQ_CHUNKS * sizeof(u8), 256);
+        AllocAligned((void **)&aligned_pqtable_dist_scratch_, 256 * DISKANN_MAX_PQ_CHUNKS * sizeof(float), 256);
+        AllocAligned((void **)&aligned_dist_scratch_, graph_degree * sizeof(f32), 256);
+        AllocAligned((void **)&rotated_query_, aligned_dim * sizeof(f32), 8 * sizeof(f32));
 
-        memset(aligned_query_float, 0, aligned_dim * sizeof(f32));
-        memset(rotated_query, 0, aligned_dim * sizeof(f32));
+        memset(aligned_query_float_, 0, aligned_dim * sizeof(f32));
+        memset(rotated_query_, 0, aligned_dim * sizeof(f32));
     }
     void Initialize(SizeT dim, const DataType *query, const f32 norm = 1.0f) {
         for (SizeT d = 0; d < dim; ++d) {
             if (norm != 1.0f)
-                rotated_query[d] = aligned_query_float[d] = static_cast<float>(query[d]) / norm;
+                rotated_query_[d] = aligned_query_float_[d] = static_cast<float>(query[d]) / norm;
             else
-                rotated_query[d] = aligned_query_float[d] = static_cast<float>(query[d]);
+                rotated_query_[d] = aligned_query_float_[d] = static_cast<float>(query[d]);
         }
     }
 
     virtual ~PQScratch() {
-        AlignedFree((void *)aligned_pq_coord_scratch);
-        AlignedFree((void *)aligned_pqtable_dist_scratch);
-        AlignedFree((void *)aligned_dist_scratch);
-        AlignedFree((void *)aligned_query_float);
-        AlignedFree((void *)rotated_query);
+        AlignedFree((void *)aligned_pq_coord_scratch_);
+        AlignedFree((void *)aligned_pqtable_dist_scratch_);
+        AlignedFree((void *)aligned_dist_scratch_);
+        AlignedFree((void *)aligned_query_float_);
+        AlignedFree((void *)rotated_query_);
     }
 };
 
@@ -294,28 +294,28 @@ class ConcurrentQueue {
     typedef std::chrono::microseconds chrono_us_t;
     typedef std::unique_lock<std::mutex> mutex_locker;
 
-    std::queue<T> q;
-    std::mutex mut;
-    std::mutex push_mut;
-    std::mutex pop_mut;
-    std::condition_variable push_cv;
-    std::condition_variable pop_cv;
-    T null_T;
+    std::queue<T> q_;
+    std::mutex mut_;
+    std::mutex push_mut_;
+    std::mutex pop_mut_;
+    std::condition_variable push_cv_;
+    std::condition_variable pop_cv_;
+    T null_T_;
 
 public:
     ConcurrentQueue() {}
 
-    ConcurrentQueue(T nullT) { this->null_T = nullT; }
+    ConcurrentQueue(T nullT) { this->null_T_ = nullT; }
 
     ~ConcurrentQueue() {
-        this->push_cv.notify_all();
-        this->pop_cv.notify_all();
+        this->push_cv_.notify_all();
+        this->pop_cv_.notify_all();
     }
 
     // queue stats
     uint64_t Size() {
-        mutex_locker lk(this->mut);
-        uint64_t ret = q.size();
+        mutex_locker lk(this->mut_);
+        uint64_t ret = q_.size();
         lk.unlock();
         return ret;
     }
@@ -324,29 +324,29 @@ public:
 
     // PUSH BACK
     void Push(T &new_val) {
-        mutex_locker lk(this->mut);
-        this->q.push(new_val);
+        mutex_locker lk(this->mut_);
+        this->q_.push(new_val);
         lk.unlock();
     }
 
     template <class Iterator>
     void Insert(Iterator iter_begin, Iterator iter_end) {
-        mutex_locker lk(this->mut);
+        mutex_locker lk(this->mut_);
         for (Iterator it = iter_begin; it != iter_end; it++) {
-            this->q.push(*it);
+            this->q_.push(*it);
         }
         lk.unlock();
     }
 
     // POP FRONT
     T Pop() {
-        mutex_locker lk(this->mut);
-        if (this->q.empty()) {
+        mutex_locker lk(this->mut_);
+        if (this->q_.empty()) {
             lk.unlock();
-            return this->null_T;
+            return this->null_T_;
         } else {
-            T ret = this->q.front();
-            this->q.pop();
+            T ret = this->q_.front();
+            this->q_.pop();
             lk.unlock();
             return ret;
         }
@@ -354,22 +354,22 @@ public:
 
     // register for notifications
     void WaitForPushNotify(chrono_us_t wait_time = chrono_us_t{10}) {
-        mutex_locker lk(this->push_mut);
-        this->push_cv.wait_for(lk, wait_time);
+        mutex_locker lk(this->push_mut_);
+        this->push_cv_.wait_for(lk, wait_time);
         lk.unlock();
     }
 
     void WaitForPopNotify(chrono_us_t wait_time = chrono_us_t{10}) {
-        mutex_locker lk(this->pop_mut);
-        this->pop_cv.wait_for(lk, wait_time);
+        mutex_locker lk(this->pop_mut_);
+        this->pop_cv_.wait_for(lk, wait_time);
         lk.unlock();
     }
 
     // just notify functions
-    void PushNotifyOne() { this->push_cv.notify_one(); }
-    void PushNotifyAll() { this->push_cv.notify_all(); }
-    void PopNotifyOne() { this->pop_cv.notify_one(); }
-    void PopNotifyAll() { this->pop_cv.notify_all(); }
+    void PushNotifyOne() { this->push_cv_.notify_one(); }
+    void PushNotifyAll() { this->push_cv_.notify_all(); }
+    void PopNotifyOne() { this->pop_cv_.notify_one(); }
+    void PopNotifyAll() { this->pop_cv_.notify_all(); }
 };
 
 export template <typename T>

@@ -38,7 +38,7 @@ import diskann_dist_func;
 namespace infinity {
 export template <typename VectorDataType, typename LabelType, MetricType metric>
 class DiskAnnIndexData {
-    using KnnDiskAnn = KnnDiskAnn<VectorDataType, LabelType, metric>;
+    using MemVamana = MemVamana<VectorDataType, LabelType, metric>;
     using This = DiskAnnIndexData<VectorDataType, LabelType, metric>;
 
 private:
@@ -53,14 +53,14 @@ private:
     u32 num_centers_{}; // kmeans centers num
 
     bool use_disk_pq_{false}; // store pq vector on disk
-    f64 p_val{}; // Sampling ratio 
+    f64 p_val_{}; // Sampling ratio 
     Vector<LabelType> labels_;
     u32 train_size_{}; // size of sample training set
 
-    SharedPtr<f32[]> full_pivot_data; // pivot data for all chunks, every num_pq_chunks chunks are combined into a dim vector [num_centers * dim]
-    SharedPtr<f32[]> centroid; // centroids after zero-mean, used for an option of L2 distance
-    Vector<u32> rearrangement; // the dimensions in the order of chunks
-    Vector<u32> chunk_offsets; // the starting index of each chunk in rearrangement
+    SharedPtr<f32[]> full_pivot_data_; // pivot data for all chunks, every num_pq_chunks chunks are combined into a dim vector [num_centers * dim]
+    SharedPtr<f32[]> centroid_; // centroids after zero-mean, used for an option of L2 distance
+    Vector<u32> rearrangement_; // the dimensions in the order of chunks
+    Vector<u32> chunk_offsets_; // the starting index of each chunk in rearrangement_
 
     Path data_file_path_;
     Path mem_index_file_path_;
@@ -73,8 +73,8 @@ private:
     // build vamana graph and merge graph with num_parts_
     void BuildMergedVamanaIndex(FileHandler &data_file_handler, FileHandler &mem_index_file_handler,  Vector<LabelType> &labels) {
         if (num_parts_ == 1){
-            // KnnDiskAnn mem_index = KnnDiskAnn::Make(L_, R_, dimension_, data_num_);
-            KnnDiskAnn mem_index(L_, R_, dimension_, data_num_);
+            // MemVamana mem_index = MemVamana::Make(L_, R_, dimension_, data_num_);
+            MemVamana mem_index(L_, R_, dimension_, data_num_);
             mem_index.Build(data_file_handler, data_num_, labels);
 
             mem_index.SaveGraph(mem_index_file_handler);
@@ -255,9 +255,9 @@ public:
         // step 1. generates random sample and sets it to train_data and train_size
         {
             u32 train_size;
-            p_val = ((f64)DISKANN_TRAINING_SET_SIZE / (f64)data_num);
+            p_val_ = ((f64)DISKANN_TRAINING_SET_SIZE / (f64)data_num);
             if (data_num > DISKANN_TRAINING_SET_SIZE) {
-                GenRandomSlice<VectorDataType>(*data_file_handler, p_val, train_data, train_size, dimension_, data_num_, train_data_ids);
+                GenRandomSlice<VectorDataType>(*data_file_handler, p_val_, train_data, train_size, dimension_, data_num_, train_data_ids);
             } else {
                 LOG_TRACE(fmt::format("data num is less than sample_size {}, using all data", DISKANN_TRAINING_SET_SIZE));
                 train_size = data_num;
@@ -293,9 +293,9 @@ public:
             if (train_size_ > num_centers_){
                 GeneratePqPivots<VectorDataType>(*pq_pivot_file_handler, train_data, train_size_, dimension_, num_centers_,
                                 num_pq_chunks_, DISKANN_NUM_KMEANS_REPS, make_zero_mean,
-                                full_pivot_data, centroid, rearrangement, chunk_offsets);
+                                full_pivot_data_, centroid_, rearrangement_, chunk_offsets_);
                 GeneratePqDataFromPivots<VectorDataType>(*data_file_handler, *pqCompressed_data_file_handler, data_num_, dimension_, num_centers_,num_pq_chunks_,
-                                                        full_pivot_data, centroid, rearrangement, chunk_offsets);
+                                                        full_pivot_data_, centroid_, rearrangement_, chunk_offsets_);
                 LOG_TRACE(fmt::format("generate Pq data done"));
             } else {
                 Status status = Status::NotSupport("training size is less than centers num");
@@ -413,15 +413,15 @@ public:
         LOG_TRACE("UnitTest(): Test Pq pivots and pq data");
         {
             
-            fmt::print("centroid: \n");
+            fmt::print("centroid_: \n");
             for (u32 j = 0; j < dimension_; j++) {
-                fmt::print("{} ,", centroid[j]);
+                fmt::print("{} ,", centroid_[j]);
             }
             fmt::print("\n");
             for (u32 i = 0; i < 3; i++) {
                 fmt::print("pivots[{}]: \n", i);
                 for (u32 j = 0; j < num_centers_; j++) {
-                    fmt::print("{} ", full_pivot_data[i * dimension_ + j]);
+                    fmt::print("{} ", full_pivot_data_[i * dimension_ + j]);
                 }
                 fmt::print("\n");
             }

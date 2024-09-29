@@ -39,12 +39,12 @@ import default_values;
 namespace infinity {
 
 export template <typename VectorDataType, typename LabelType, MetricType metric>
-class KnnDiskAnn {
+class MemVamana {
 public:
-    using This = KnnDiskAnn<VectorDataType, LabelType, metric>;
+    using This = MemVamana<VectorDataType, LabelType, metric>;
     using InMemQueryScratch = InMemQueryScratch<VectorDataType>;
 
-    KnnDiskAnn(SizeT L, SizeT R, SizeT dim, SizeT point_num) 
+    MemVamana(SizeT L, SizeT R, SizeT dim, SizeT point_num) 
         : L_(L), R_(R), dim_(dim), nd_(point_num) {
         max_points_ = point_num;
         locks_ = Vector<std::mutex>(point_num);
@@ -57,7 +57,7 @@ public:
         } else if constexpr (metric == MetricType::kMetricInnerProduct) {
             dist_metric = DiskAnnMetricType::IP;
         } else {
-            UnrecoverableError("vamana_alg::KnnDiskAnn(): Unknown Metric type!");
+            UnrecoverableError("vamana_alg::MemVamana(): Unknown Metric type!");
         }
 
         if (dynamic_index_ && num_frozen_pts_ == 0){ // init medoid as first frozen point
@@ -69,8 +69,8 @@ public:
     }
 
 public:
-    KnnDiskAnn() : L_(0), R_(0) {}
-    KnnDiskAnn(This &&other) : L_(std::exchange(other.L_, 0)), R_(std::exchange(other.R_, 0)), dim_(std::exchange(other.dim_, 0)), nd_(std::exchange(other.nd_, 0)) {}
+    MemVamana() : L_(0), R_(0) {}
+    MemVamana(This &&other) : L_(std::exchange(other.L_, 0)), R_(std::exchange(other.R_, 0)), dim_(std::exchange(other.dim_, 0)), nd_(std::exchange(other.nd_, 0)) {}
     This &operator=(This &&other) {
         if (this != &other) {
             this->max_points_ = std::exchange(other.max_points_, 0);
@@ -80,7 +80,7 @@ public:
         }
         return *this;
     }
-    ~KnnDiskAnn() = default;
+    ~MemVamana() = default;
 
     static This Make(SizeT L, SizeT R, SizeT dim, SizeT point_num) {
         This ret(L, R, dim, point_num);
