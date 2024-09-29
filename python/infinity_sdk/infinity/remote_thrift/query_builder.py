@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SparseVector, InfinityException
+from infinity.common import VEC, SparseVector, InfinityException, SortType
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -75,6 +75,8 @@ class InfinityThriftQueryBuilder(ABC):
         self._filter = None
         self._limit = None
         self._offset = None
+        self._sort_columns = None
+        self._sort_type = None
 
     def reset(self):
         self._columns = None
@@ -82,6 +84,8 @@ class InfinityThriftQueryBuilder(ABC):
         self._filter = None
         self._limit = None
         self._offset = None
+        self._sort_columns = None
+        self._sort_type = None
 
     def match_dense(
         self,
@@ -339,6 +343,46 @@ class InfinityThriftQueryBuilder(ABC):
                     select_list.append(parse_expr(maybe_parse(column)))
 
         self._columns = select_list
+        return self
+    
+    def sort(self, columns: Optional[list], sort_type: SortType) -> InfinityThriftQueryBuilder:
+        self._sort_type = sort_type
+        self._sort_columns = columns
+        select_list: List[ParsedExpr] = []
+        for column in columns:
+            if isinstance(column, str):
+                column = column.lower()
+
+            match column:
+                case "*":
+                    column_expr = ColumnExpr(star=True, column_name=[])
+                    expr_type = ParsedExprType(column_expr=column_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+                case "_row_id":
+                    func_expr = FunctionExpr(function_name="row_id", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+                case "_score":
+                    func_expr = FunctionExpr(function_name="score", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+                case "_similarity":
+                    func_expr = FunctionExpr(function_name="similarity", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+                case "_distance":
+                    func_expr = FunctionExpr(function_name="distance", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+                case _:
+                    select_list.append(parse_expr(maybe_parse(column)))
+
+        self._sort_columns = select_list
         return self
 
     def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any]]:

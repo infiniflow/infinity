@@ -35,7 +35,7 @@ from infinity.remote_thrift.utils import (
     get_ordinary_info,
 )
 from infinity.table import ExplainType
-from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN, SortType
 from infinity.utils import deprecated_api
 
 
@@ -375,6 +375,10 @@ class RemoteTable():
 
     def offset(self, offset: Optional[int]):
         self.query_builder.offset(offset)
+        return self
+    
+    def sort(self, columns: Optional[List[str]], sort_type: SortType = SortType.Asc):
+        self.query_builder.sort(columns, sort_type)
         return self
 
     def to_result(self):
