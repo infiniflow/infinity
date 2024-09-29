@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -21,6 +22,8 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { CreateOption } from '@/lib/constant/common';
+import { createDatabase } from './actions';
 
 export const FormSchema = z.object({
   database_name: z
@@ -28,27 +31,33 @@ export const FormSchema = z.object({
       required_error: 'Please input name'
     })
     .trim(),
-  create_option: z.string()
+  create_option: z.nativeEnum(CreateOption)
 });
 
-export function DatabaseCreatingForm() {
+interface IProps {
+  hide(): void;
+}
+
+export function DatabaseCreatingForm({ hide }: IProps) {
+  const router = useRouter();
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      create_option: 'error'
+      create_option: CreateOption.Error
     }
   });
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    console.log('🚀 ~ onSubmit ~ data:', data);
-    toast({
-      title: 'You submitted the following values:',
-      description: (
-        <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-          <code className="text-white">{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      )
-    });
+  async function onSubmit(data: z.infer<typeof FormSchema>) {
+    const ret = await createDatabase(data);
+    console.log('🚀 ~ onSubmit ~ ret:', ret);
+    if (ret.error_code === 0) {
+      router.refresh();
+      hide();
+      toast({
+        title: 'Create Success',
+        description: ''
+      });
+    }
   }
 
   return (
