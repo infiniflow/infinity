@@ -19,6 +19,8 @@ export module persistence_manager;
 import stl;
 import serialize;
 import third_party;
+import obj_status;
+import obj_stat_accessor;
 
 // A view means a logical plan
 namespace infinity {
@@ -41,36 +43,6 @@ export struct ObjAddr {
     static ObjAddr ReadBufAdv(const char *&buf);
 };
 
-export struct Range {
-    SizeT start_{}; // inclusive
-    SizeT end_{};   // exclusive
-    bool operator<(const Range &rhs) const { return start_ < rhs.start_; }
-    bool operator==(const Range &rhs) const { return start_ == rhs.start_ && end_ == rhs.end_; }
-    bool Cover(const Range &rhs) const { return start_ <= rhs.start_ && rhs.end_ <= end_; }
-    bool Intersect(const Range &rhs) const { return start_ < rhs.end_ && rhs.start_ < end_; }
-};
-
-export struct ObjStat {
-    SizeT obj_size_{}; // footer (if present) is excluded
-    SizeT parts_{};    // an object attribute
-    SizeT ref_count_{}; // the number of user (R and W) of some part of this object
-    Set<Range> deleted_ranges_{};
-
-    ObjStat() = default;
-
-    ObjStat(SizeT obj_size, SizeT parts, SizeT ref_count) : obj_size_(obj_size), parts_(parts), ref_count_(ref_count) {}
-
-    nlohmann::json Serialize() const;
-
-    void Deserialize(const nlohmann::json &obj);
-
-    SizeT GetSizeInBytes() const;
-
-    void WriteBufAdv(char *&buf) const;
-
-    static ObjStat ReadBufAdv(const char *&buf);
-};
-
 export struct PersistWriteResult {
     ObjAddr obj_addr_; // where data is persisted, only returned by Persist
     Vector<String> persist_keys_; // object that should be persisted to local disk. because of cleanup current_object
@@ -80,12 +52,13 @@ export struct PersistWriteResult {
 export struct PersistReadResult {
     ObjAddr obj_addr_; // where data should read from
     bool cached_; // whether the object is in localdisk cache
+    Vector<String> drop_keys_;
 };
 
 export class PersistenceManager {
 public:
     // TODO: build cache from existing files under workspace
-    PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit);
+    PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit, bool local_storage = true);
 
     ~PersistenceManager();
 
@@ -102,7 +75,7 @@ public:
 
     ObjAddr GetObjCacheWithoutCnt(const String &local_path);
 
-    void PutObjCache(const String &file_path);
+    [[nodiscard]] PersistWriteResult PutObjCache(const String &file_path);
 
     [[nodiscard]] PersistWriteResult Cleanup(const String &file_path);
 
@@ -128,7 +101,7 @@ private:
     void CurrentObjAppendNoLock(const String &tmp_file_path, SizeT file_size);
 
     // Finalize current object.
-    void CurrentObjFinalizeNoLock(Vector<String> &persist_keys);
+    void CurrentObjFinalizeNoLock(Vector<String> &persist_keys, Vector<String> &drop_keys);
 
     // Cleanup
     void CleanupNoLock(const ObjAddr &object_addr, Vector<String> &persist_keys, Vector<String> &drop_keys ,bool check_ref_count = false);
@@ -136,6 +109,8 @@ private:
     String RemovePrefix(const String &path);
 
     ObjStat GetObjStatByObjAddr(const ObjAddr &obj_addr);
+
+    void CheckValid();
 
 public: // for unit test
     void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
@@ -148,7 +123,8 @@ private:
     SizeT object_size_limit_;
 
     mutable std::mutex mtx_;
-    HashMap<String, ObjStat> objects_;        // obj_key -> ObjStat
+    // HashMap<String, ObjStat> objects_;        // obj_key -> ObjStat
+    UniquePtr<ObjectStatAccessorBase> objects_; // obj_key -> ObjStat
     HashMap<String, ObjAddr> local_path_obj_; // local_file_path -> ObjAddr
     // Current unsealed object key
     String current_object_key_;
