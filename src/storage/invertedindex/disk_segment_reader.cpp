@@ -98,8 +98,11 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
         RecoverableError(status);
     }
     if (nullptr != pm) {
-        pm->PutObjCache(dict_file_);
-        pm->PutObjCache(posting_file_);
+        PersistResultHandler handler(pm);
+        PersistWriteResult res1 = pm->PutObjCache(dict_file_);
+        PersistWriteResult res2 = pm->PutObjCache(posting_file_);
+        handler.HandleWriteResult(res1);
+        handler.HandleWriteResult(res2);
     }
 }
 

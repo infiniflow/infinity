@@ -14,10 +14,14 @@
 
 module;
 
+#include <__iterator/next.h>
+
 module obj_status;
 
 import serialize;
 import status;
+import logger;
+import third_party;
 
 namespace infinity {
 
@@ -84,6 +88,33 @@ ObjStat ObjStat::ReadBufAdv(const char *&buf) {
         ret.deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
     }
     return ret;
+}
+
+void ObjStat::CheckValid(const String &obj_key, SizeT current_object_size) const {
+    const Set<Range> &deleted_ranges = deleted_ranges_;
+    if (deleted_ranges.size() >= 2) {
+        auto it1 = deleted_ranges.begin();
+        auto it2 = std::next(it1);
+        while (it2 != deleted_ranges.end()) {
+            if (it1->end_ >= it2->start_) {
+                String error_message = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
+                                                    obj_key,
+                                                    it1->start_,
+                                                    it1->end_,
+                                                    it2->start_,
+                                                    it2->end_);
+                LOG_ERROR(error_message);
+            }
+            it1 = it2;
+            it2 = std::next(it2);
+        }
+    } else if (deleted_ranges.size() == 1) {
+        auto it1 = deleted_ranges.begin();
+        if (it1->start_ == 0 && it1->end_ == current_object_size) {
+            String error_message = fmt::format("CurrentObjFinalize Object {} is fully deleted", obj_key);
+            LOG_ERROR(error_message);
+        }
+    }
 }
 
 } // namespace infinity

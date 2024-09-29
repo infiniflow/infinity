@@ -23,8 +23,11 @@ import third_party;
 namespace infinity {
 
 struct LRUListEntry {
-    String path_{};
+    LRUListEntry(String key, ObjStat obj_stat, bool cleaned) : key_(std::move(key)), obj_stat_(std::move(obj_stat)), cleaned_(cleaned) {}
+
+    String key_{};
     ObjStat obj_stat_{};
+    bool cleaned_{};
 };
 
 class ObjectStatMap {
@@ -33,16 +36,18 @@ class ObjectStatMap {
     using LRUMap = HashMap<String, LRUListIter>;
 
 public:
+    ~ObjectStatMap();
+
     // Get stat of object[key], if not in cache, return nullptr
     // called when read object from local cache, ref count by 1, if ref count 0 -> 1, move from lru_list to using_list
     ObjStat *Get(const String &key);
 
-    // the same with Get, but not increase ref count
+    // Get stat of object[key], and not update lru and ref count
     ObjStat *GetNoCount(const String &key);
 
     // Release object[key], decrease ref count by 1, if ref count 1 -> 0, move from using_list to lru_list
-    // called when object file is closed
-    bool Release(const String &key);
+    // called when object file is closed, return true if object[key] exists and ref count -> 0
+    Pair<bool, ObjStat *> Release(const String &key);
 
     // Add new object to cache.
     // the object[key] is not in obj_map, add key->obj_stat mapping. called by checkpoint.
@@ -58,7 +63,9 @@ public:
 
     // Envict old object
     // move the last object in lru_list to cleanuped_list. called when disk used over limit, return nullptr if lru_list is empty
-    ObjStat *EnvictLast();
+    LRUListEntry *EnvictLast();
+
+    const LRUMap &obj_map() const { return obj_map_; }
 
 private:
     LRUMap obj_map_{};
@@ -77,9 +84,11 @@ public:
 
     virtual ObjStat *GetNoCount(const String &key) = 0;
 
-    virtual ObjStat *Release(const String &key) = 0;
+    virtual ObjStat *Release(const String &key, Vector<String> &drop_keys) = 0;
 
-    virtual void PutNew(const String &key, ObjStat obj_stat) = 0;
+    virtual void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) = 0;
+
+    virtual void PutNoCount(const String &key, ObjStat obj_stat) = 0;
 
     virtual Optional<ObjStat> Invalidate(const String &key) = 0;
 
@@ -100,9 +109,11 @@ public:
 
     ObjStat *GetNoCount(const String &key) override;
 
-    ObjStat *Release(const String &key) override;
+    ObjStat *Release(const String &key, Vector<String> &drop_keys) override;
 
-    void PutNew(const String &key, ObjStat obj_stat) override;
+    void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) override;
+
+    void PutNoCount(const String &key, ObjStat obj_stat) override;
 
     Optional<ObjStat> Invalidate(const String &key) override;
 
@@ -121,13 +132,19 @@ private:
 // envict and recover is encapsulated
 export class ObjectStatAccessor_ObjectStorage : public ObjectStatAccessorBase {
 public:
+    ObjectStatAccessor_ObjectStorage(SizeT disk_capacity_limit);
+
+    ~ObjectStatAccessor_ObjectStorage() override;
+
     ObjStat *Get(const String &key) override;
 
     ObjStat *GetNoCount(const String &key) override;
 
-    ObjStat *Release(const String &key) override;
+    ObjStat *Release(const String &key, Vector<String> &drop_keys) override;
 
-    void PutNew(const String &key, ObjStat obj_stat) override;
+    void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) override;
+
+    void PutNoCount(const String &key, ObjStat obj_stat) override;
 
     Optional<ObjStat> Invalidate(const String &key) override;
 
@@ -138,6 +155,11 @@ public:
     void Deserialize(const nlohmann::json &obj) override;
 
     HashMap<String, ObjStat> GetAllObjects() const override;
+
+    SizeT disk_used() const { return disk_used_; }
+
+private:
+    bool Envict(Vector<String> &drop_keys);
 
 private:
     ObjectStatMap obj_map_{};

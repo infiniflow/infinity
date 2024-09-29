@@ -131,7 +131,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_->PutNew(obj_key, ObjStat(src_size, 1, 0));
+        objects_->PutNew(obj_key, ObjStat(src_size, 1, 0), result.drop_keys_);
         LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
         local_path_obj_[local_path] = obj_addr;
@@ -146,7 +146,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
     } else {
         std::lock_guard<std::mutex> lock(mtx_);
         if (int(src_size) > CurrentObjRoomNoLock()) {
-            CurrentObjFinalizeNoLock(result.persist_keys_);
+            CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
         }
         ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
         CurrentObjAppendNoLock(tmp_file_path, src_size);
@@ -172,7 +172,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
 PersistWriteResult PersistenceManager::CurrentObjFinalize(bool validate) {
     PersistWriteResult result;
     std::lock_guard<std::mutex> lock(mtx_);
-    CurrentObjFinalizeNoLock(result.persist_keys_);
+    CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
 
     if (validate) {
         CheckValid();
@@ -192,7 +192,7 @@ void PersistenceManager::CheckValid() {
     objects_->CheckValid(current_object_size_);
 }
 
-void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys) {
+void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, Vector<String> &drop_keys) {
     persist_keys.push_back(current_object_key_);
     if (current_object_size_ > 0) {
         if (current_object_parts_ > 1) {
@@ -209,7 +209,7 @@ void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys) 
             outFile.close();
         }
 
-        objects_->PutNew(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_));
+        objects_->PutNew(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_), drop_keys);
         LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
@@ -235,6 +235,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         result.cached_ = true; // TODO
         return result;
     }
+    result.obj_addr_ = it->second;
     if (ObjStat *obj_stat = objects_->Get(it->second.obj_key_); obj_stat != nullptr) {
         LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
     } else {
@@ -245,8 +246,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         current_object_ref_count_++;
         LOG_TRACE(fmt::format("GetObjCache current object {} ref count {}", it->second.obj_key_, current_object_ref_count_));
     }
-    result.obj_addr_ = it->second;
-    result.cached_ = true; // TODO
+    // result.cached_ = true; // TODO
     return result;
 }
 
@@ -267,7 +267,8 @@ ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const String &local_path) {
     return it->second;
 }
 
-void PersistenceManager::PutObjCache(const String &file_path) {
+PersistWriteResult PersistenceManager::PutObjCache(const String &file_path) {
+    PersistWriteResult result;
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         String error_message = fmt::format("Failed to find file path of {}", file_path);
@@ -283,20 +284,20 @@ void PersistenceManager::PutObjCache(const String &file_path) {
     if (it->second.part_size_ == 0) {
         UnrecoverableError(fmt::format("PutObjCache object {} part size is 0", it->second.obj_key_));
     }
-    ObjStat *obj_stat = objects_->Release(it->second.obj_key_); 
+    ObjStat *obj_stat = objects_->Release(it->second.obj_key_, result.drop_keys_); 
     if (obj_stat == nullptr) {
         if (it->second.obj_key_ != current_object_key_) {
             UnrecoverableError(fmt::format("PutObjCache object {} not found", it->second.obj_key_));
-            return;
         }
         if (current_object_ref_count_ <= 0) {
             UnrecoverableError(fmt::format("PutObjCache object {} ref count is {}", it->second.obj_key_, current_object_ref_count_));
         }
         current_object_ref_count_--;
         LOG_TRACE(fmt::format("PutObjCache current object {} ref count {}", it->second.obj_key_, current_object_ref_count_));
-        return;
+        return result;
     }
     LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
+    return result;
 }
 
 String PersistenceManager::ObjCreate() { return UUID().to_string(); }
@@ -335,7 +336,7 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, Vector<String
     ObjStat *obj_stat = objects_->GetNoCount(object_addr.obj_key_);
     if (obj_stat == nullptr) {
         if (object_addr.obj_key_ == current_object_key_) {
-            CurrentObjFinalizeNoLock(persist_keys);
+            CurrentObjFinalizeNoLock(persist_keys, drop_keys);
             obj_stat = objects_->GetNoCount(object_addr.obj_key_);
             assert(obj_stat != nullptr);
         } else {
@@ -454,7 +455,7 @@ void PersistenceManager::SaveLocalPath(const String &file_path, const ObjAddr &o
 
 void PersistenceManager::SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat) {
     std::lock_guard<std::mutex> lock(mtx_);
-    objects_->PutNew(obj_addr.obj_key_, obj_stat);
+    objects_->PutNoCount(obj_addr.obj_key_, obj_stat);
 }
 
 String PersistenceManager::RemovePrefix(const String &path) {

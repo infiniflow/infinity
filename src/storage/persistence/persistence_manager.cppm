@@ -52,6 +52,7 @@ export struct PersistWriteResult {
 export struct PersistReadResult {
     ObjAddr obj_addr_; // where data should read from
     bool cached_; // whether the object is in localdisk cache
+    Vector<String> drop_keys_;
 };
 
 export class PersistenceManager {
@@ -74,7 +75,7 @@ public:
 
     ObjAddr GetObjCacheWithoutCnt(const String &local_path);
 
-    void PutObjCache(const String &file_path);
+    [[nodiscard]] PersistWriteResult PutObjCache(const String &file_path);
 
     [[nodiscard]] PersistWriteResult Cleanup(const String &file_path);
 
@@ -100,7 +101,7 @@ private:
     void CurrentObjAppendNoLock(const String &tmp_file_path, SizeT file_size);
 
     // Finalize current object.
-    void CurrentObjFinalizeNoLock(Vector<String> &persist_keys);
+    void CurrentObjFinalizeNoLock(Vector<String> &persist_keys, Vector<String> &drop_keys);
 
     // Cleanup
     void CleanupNoLock(const ObjAddr &object_addr, Vector<String> &persist_keys, Vector<String> &drop_keys ,bool check_ref_count = false);

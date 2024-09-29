@@ -60,8 +60,11 @@ ColumnIndexIterator::~ColumnIndexIterator() {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->PutObjCache(dict_file_path_);
-        pm->PutObjCache(posting_file_path_);
+        PersistResultHandler handler(pm);
+        PersistWriteResult res1 = pm->PutObjCache(dict_file_path_);
+        PersistWriteResult res2 = pm->PutObjCache(posting_file_path_);
+        handler.HandleWriteResult(res1);
+        handler.HandleWriteResult(res2);
     }
 }
 

@@ -53,6 +53,8 @@ export struct ObjStat {
     void WriteBufAdv(char *&buf) const;
 
     static ObjStat ReadBufAdv(const char *&buf);
+
+    void CheckValid(const String &obj_key, SizeT current_object_size) const;
 };
 
 }

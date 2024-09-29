@@ -51,7 +51,8 @@ void PersistenceManagerTest::CheckObjData(const String& local_file_path, const S
     ASSERT_EQ(String(buffer.get(), file_size), data);
     local_fs.Close(*file_handler);
 
-    pm_->PutObjCache(local_file_path);
+    PersistWriteResult res = pm_->PutObjCache(local_file_path);
+    handler_->HandleWriteResult(res);
 }
 
 TEST_F(PersistenceManagerTest, PersistFileBasic) {
