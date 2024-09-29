@@ -4,10 +4,8 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
-import { ApiUrl } from '@/lib/constant/api';
 import AddIcon from '/public/add.svg';
 
-import { request } from '@/lib/request';
 import {
   Select,
   SelectContent,
@@ -15,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@radix-ui/react-select';
+import { listDatabase } from './actions';
 import { DatabaseCreatingDialog } from './database-creating-dialog';
 
 interface IDatabaseSelectProps {
@@ -44,7 +43,7 @@ export default async function HomePage({
 }: {
   searchParams: { q: string; offset: string };
 }) {
-  const ret = await request(ApiUrl.databases);
+  const ret = await listDatabase();
   console.log('🚀 ~ x:', ret);
   const search = searchParams.q ?? '';
   const offset = searchParams.offset ?? 0;

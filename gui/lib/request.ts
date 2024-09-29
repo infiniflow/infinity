@@ -29,7 +29,7 @@ export const request = async (
   }
 };
 
-export const get = (url: string, params: Record<string, string>) =>
+export const get = (url: string, params?: Record<string, string>) =>
   request(url, params, 'GET');
 
 export const post = (url: string, params: Record<string, string>) =>
