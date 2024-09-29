@@ -31,9 +31,9 @@ public:
     ~ObjectFile() override;
     Status Open(const String &path, FileAccessMode access_mode) override;
     Status Close() override;
-    Status Append(const char *buffer, u64 nbytes) override;
+    Status Append(const void *buffer, u64 nbytes) override;
     Status Append(const String &buffer, u64 nbytes) override;
-    Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) override;
+    Tuple<SizeT, Status> Read(void *buffer, u64 nbytes) override;
     Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) override;
     Status Seek(u64 nbytes) override;
     Status Download(const String& url, const String& path) override;
