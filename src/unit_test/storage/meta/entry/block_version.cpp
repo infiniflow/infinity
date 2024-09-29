@@ -52,24 +52,16 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
     block_version.Delete(5, 40);
     String version_path = String(GetFullDataDir()) + "/block_version_test";
 
-    VirtualStorage virtual_storage;
-    Map<String, String> configs;
-    virtual_storage.Init(StorageType::kLocal, configs);
-
     {
-        auto [version_file_handle, status] = virtual_storage.BuildFileHandle();
+        auto [local_file_handle, status] = LocalStore::Open(version_path, FileAccessMode::kWrite);
         EXPECT_TRUE(status.ok());
-        status = version_file_handle->Open(version_path, FileAccessMode::kWrite);
-        EXPECT_TRUE(status.ok());
-        block_version.SpillToFile(version_file_handle.get());
+        block_version.SpillToFile(local_file_handle.get());
     }
 
     {
-        auto [version_file_handle, status] = virtual_storage.BuildFileHandle();
+        auto [local_file_handle, status]  = version_file_handle->Open(version_path, FileAccessMode::kRead);
         EXPECT_TRUE(status.ok());
-        status = version_file_handle->Open(version_path, FileAccessMode::kRead);
-
-        auto block_version2 = BlockVersion::LoadFromFile(version_file_handle.get());
+        auto block_version2 = BlockVersion::LoadFromFile(local_file_handle.get());
         ASSERT_EQ(block_version, *block_version2);
     }
 }

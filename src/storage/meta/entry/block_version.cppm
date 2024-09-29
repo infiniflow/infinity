@@ -18,7 +18,7 @@ export module block_version;
 
 import stl;
 import file_system;
-import abstract_file_handle;
+import local_file_handle;
 
 namespace infinity {
 
@@ -38,8 +38,8 @@ struct CreateField {
     void SaveToFile(FileHandler &file_handler) const;
     static CreateField LoadFromFile(FileHandler &file_handler);
 
-    void SaveToFile(AbstractFileHandle *file_handle) const;
-    static CreateField LoadFromFile(AbstractFileHandle *file_handle);
+    void SaveToFile(LocalFileHandle *file_handle) const;
+    static CreateField LoadFromFile(LocalFileHandle *file_handle);
 };
 
 export struct BlockVersion {
@@ -61,8 +61,8 @@ export struct BlockVersion {
     void SpillToFile(FileHandler &file_handler) const;
     static UniquePtr<BlockVersion> LoadFromFile(FileHandler &file_handler);
 
-    void SpillToFile(AbstractFileHandle *file_handle) const;
-    static UniquePtr<BlockVersion> LoadFromFile(AbstractFileHandle *file_handle);
+    void SpillToFile(LocalFileHandle *file_handle) const;
+    static UniquePtr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);
 
 
     void GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const;

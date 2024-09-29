@@ -26,7 +26,7 @@ import default_values;
 import column_vector;
 import serialize;
 import local_file_system;
-import abstract_file_handle;
+import local_file_handle;
 import status;
 
 namespace infinity {
@@ -45,7 +45,7 @@ CreateField CreateField::LoadFromFile(FileHandler &file_handler) {
     return create_field;
 }
 
-void CreateField::SaveToFile(AbstractFileHandle *file_handle) const {
+void CreateField::SaveToFile(LocalFileHandle *file_handle) const {
     Status status = file_handle->Append((char*)(&create_ts_), sizeof(create_ts_));
     if(!status.ok()) {
         UnrecoverableError(status.message());
@@ -56,7 +56,7 @@ void CreateField::SaveToFile(AbstractFileHandle *file_handle) const {
     }
 }
 
-CreateField CreateField::LoadFromFile(AbstractFileHandle *file_handle) {
+CreateField CreateField::LoadFromFile(LocalFileHandle *file_handle) {
     CreateField create_field;
     auto [size1, status1] = file_handle->Read(&create_field.create_ts_, sizeof(create_field.create_ts_));
     if(!status1.ok()) {
@@ -132,7 +132,7 @@ void BlockVersion::SpillToFile(FileHandler &file_handler) const {
     file_handler.Write(deleted_.data(), capacity * sizeof(TxnTimeStamp));
 }
 
-void BlockVersion::SpillToFile(AbstractFileHandle *file_handle) const {
+void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
     BlockOffset create_size = created_.size();
     Status status = file_handle->Append(&create_size, sizeof(create_size));
     if(!status.ok()) {
@@ -173,7 +173,7 @@ UniquePtr<BlockVersion> BlockVersion::LoadFromFile(FileHandler &file_handler) {
 }
 
 
-UniquePtr<BlockVersion> BlockVersion::LoadFromFile(AbstractFileHandle *file_handle) {
+UniquePtr<BlockVersion> BlockVersion::LoadFromFile(LocalFileHandle *file_handle) {
     auto block_version = MakeUnique<BlockVersion>();
 
     BlockOffset create_size;
