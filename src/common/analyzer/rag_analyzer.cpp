@@ -406,26 +406,23 @@ String RAGAnalyzer::Merge(const String &tks_str) {
     tks = Replace(re_space, " ", tks);
 
     Vector<String> tokens;
-    Split(tks, " ", tokens);
+    Split(tks, "( )", tokens);
     Vector<String> res;
-    int s = 0;
-
+    std::size_t s = 0;
     while (true) {
-        int len = UTF8Length(tks);
-        if (s >= len) {
+        if (s >= tokens.size())
             break;
-        }
 
-        int E = s + 1;
-        for (int e = s + 2; e < std::min(len + 2, s + 6); ++e) {
-            String tk = Join(tokens, s, e);
+        std::size_t E = s + 1;
+        for (std::size_t e = s + 2; e < std::min(tokens.size() + 1, s + 6); ++e) {
+            String tk = Join(tokens, s, e, "");
             if (RE2::PartialMatch(tk, REGEX_SPLIT_CHAR)) {
-                if (Freq(tk)) {
+                if (Freq(tk) > 0) {
                     E = e;
                 }
             }
         }
-        res.push_back(Join(tokens, s, E));
+        res.push_back(Join(tokens, s, E, ""));
         s = E;
     }
 
@@ -499,7 +496,10 @@ void RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
     for (auto &r : res)
         std::cout << r << std::endl;
 
-    // Merge(res);
+    String r = Join(res, 0);
+    std::cout << "r:" << r << std::endl;
+    String ret = Merge(r);
+    std::cout << ret << std::endl;
 }
 
 } // namespace infinity
