@@ -1,4 +1,4 @@
-const baseUrl = 'http://127.0.0.1:23820/';
+const baseUrl = 'http://127.0.0.1:3000/';
 
 export const request = async (
   url: string,
@@ -34,3 +34,6 @@ export const get = (url: string, params?: Record<string, string>) =>
 
 export const post = (url: string, params: Record<string, string>) =>
   request(url, params, 'POST');
+
+export const drop = (url: string, params: Record<string, string>) =>
+  request(url, params, 'DELETE');
