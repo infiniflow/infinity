@@ -32,9 +32,9 @@ public:
     virtual ~AbstractFileHandle() = 0;
     virtual Status Open(const String &path, FileAccessMode access_mode) = 0;
     virtual Status Close() = 0;
-    virtual Status Append(const char *buffer, u64 nbytes) = 0;
+    virtual Status Append(const void *buffer, u64 nbytes) = 0;
     virtual Status Append(const String &buffer, u64 nbytes) = 0;
-    virtual Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) = 0;
+    virtual Tuple<SizeT, Status> Read(void *buffer, u64 nbytes) = 0;
     virtual Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) = 0;
     virtual Status Seek(u64 nbytes) = 0;
     virtual Status Download(const String& url, const String& path) = 0; // Download from url to path

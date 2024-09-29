@@ -85,14 +85,14 @@ Status LocalFile::Close() {
     return Status::OK();
 }
 
-Status LocalFile::Append(const char *buffer, u64 nbytes) {
+Status LocalFile::Append(const void *buffer, u64 nbytes) {
     if(!open_ or access_mode_ != FileAccessMode::kWrite) {
         String error_message = fmt::format("File: {} isn't open.", path_);
         UnrecoverableError(error_message);
     }
     i64 written = 0;
     while (written < (i64)nbytes) {
-        i64 write_count = write(fd_, buffer + written, nbytes - written);
+        i64 write_count = write(fd_, (char*)buffer + written, nbytes - written);
         if (write_count == -1) {
             String error_message = fmt::format("Can't write file: {}: {}. fd: {}", path_, strerror(errno), fd_);
             UnrecoverableError(error_message);
@@ -106,7 +106,7 @@ Status LocalFile::Append(const String &buffer, u64 nbytes) {
     return Append(buffer.data(), nbytes);
 }
 
-Tuple<SizeT, Status> LocalFile::Read(char *buffer, u64 nbytes) {
+Tuple<SizeT, Status> LocalFile::Read(void *buffer, u64 nbytes) {
     if(!open_) {
         String error_message = fmt::format("File: {} isn't open.", path_);
         UnrecoverableError(error_message);

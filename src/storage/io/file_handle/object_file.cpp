@@ -29,11 +29,11 @@ Status ObjectFile::Open(const String &path, FileAccessMode access_mode) { return
 
 Status ObjectFile::Close() { return Status::OK(); }
 
-Status ObjectFile::Append(const char *buffer, u64 nbytes) { return Status::OK(); }
+Status ObjectFile::Append(const void *buffer, u64 nbytes) { return Status::OK(); }
 
 Status ObjectFile::Append(const String &buffer, u64 nbytes) { return Status::OK(); }
 
-Tuple<SizeT, Status> ObjectFile::Read(char *buffer, u64 nbytes) { return {0, Status::OK()}; }
+Tuple<SizeT, Status> ObjectFile::Read(void *buffer, u64 nbytes) { return {0, Status::OK()}; }
 
 Tuple<SizeT, Status> ObjectFile::Read(String &buffer, u64 nbytes) { return {0, Status::OK()}; }
 
