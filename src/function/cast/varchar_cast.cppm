@@ -82,13 +82,13 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             UnrecoverableError(error_message);
         }
         case LogicalType::kDate: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DateT, TryCastVarchar>);
+            return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, DateT, TryCastVarcharVector>);
         }
         case LogicalType::kTime: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, TimeT, TryCastVarchar>);
+            return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, TimeT, TryCastVarcharVector>);
         }
         case LogicalType::kDateTime: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DateTimeT, TryCastVarchar>);
+            return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, DateTimeT, TryCastVarcharVector>);
         }
         case LogicalType::kTimestamp: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, TimestampT, TryCastVarchar>);
@@ -295,6 +295,48 @@ struct TryCastVarcharVector {
         return false;
     }
 };
+
+// Cast VarcharT to DateT type
+template <>
+inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, DateT &target) {
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    // Used in libc++
+    String substr(data.data(), data.size());
+    try {
+        target.FromString(substr);
+    } catch(const std::exception &e) {
+        return false;
+    }
+    return true;
+}
+
+// Cast VarcharT to DateT type
+template <>
+inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, TimeT &target) {
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    // Used in libc++
+    String substr(data.data(), data.size());
+    try {
+        target.FromString(substr);
+    } catch(const std::exception &e) {
+        return false;
+    }
+    return true;
+}
+
+// Cast VarcharT to DateT type
+template <>
+inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, DateTimeT &target) {
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    // Used in libc++
+    String substr(data.data(), data.size());
+    try {
+        target.FromString(substr);
+    } catch(const std::exception &e) {
+        return false;
+    }
+    return true;
+}
 
 // Cast VarcharT to BigIntT type
 template <>
