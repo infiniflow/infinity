@@ -84,6 +84,21 @@ Status RemoteStore::Init(StorageType storage_type, Map<String, String> &config) 
     return Status::OK();
 }
 
+Status RemoteStore::UnInit() {
+    switch (storage_type_) {
+        case StorageType::kMinio: {
+            minio_base_url_.reset();
+            minio_provider_.reset();
+            minio_client_.reset();
+            break;
+        }
+        default: {
+            return Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
+        }
+    }
+    return Status::OK();
+}
+
 Tuple<UniquePtr<LocalFileHandle>, Status> LocalStore::Open(const String& path, FileAccessMode access_mode) {
     i32 fd = -1;
     switch (access_mode) {

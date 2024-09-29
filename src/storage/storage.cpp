@@ -50,7 +50,7 @@ import memindex_tracer;
 import cleanup_scanner;
 import persistence_manager;
 import extra_ddl_info;
-import virtual_storage;
+import virtual_store;
 import virtual_storage_type;
 
 namespace infinity {
@@ -100,22 +100,18 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 break;
             }
 
-            // Construct virtual storage system;
-            if (virtual_storage_system_ != nullptr) {
-                UnrecoverableError("Virtual storage system was initialized before.");
-            }
-            virtual_storage_system_ = MakeUnique<VirtualStorage>();
-
-            switch (config_ptr_->StorageType()) {
+            switch(config_ptr_->StorageType()) {
                 case StorageType::kLocal: {
-                    Map<String, String> configs;
-                    virtual_storage_system_->Init(StorageType::kLocal, configs);
+                    // Not init remote store
                     break;
                 }
                 case StorageType::kMinio: {
+                    if (remote_store_ != nullptr) {
+                        UnrecoverableError("remote storage system was initialized before.");
+                    }
                     Map<String, String> configs;
                     configs.emplace("url", config_ptr_->ObjectStorageUrl());
-                    virtual_storage_system_->Init(StorageType::kMinio, configs);
+                    remote_store_->Init(StorageType::kMinio, configs);
                     break;
                 }
                 default: {
@@ -257,6 +253,21 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
+                switch(config_ptr_->StorageType()) {
+                    case StorageType::kLocal: {
+                        // Not init remote store
+                        break;
+                    }
+                    case StorageType::kMinio: {
+                        remote_store_->UnInit();
+                        remote_store_.reset();
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+                    }
+                }
+
                 wal_mgr_->Stop();
                 wal_mgr_.reset();
                 if (target_mode == StorageMode::kAdmin) {
@@ -326,6 +337,21 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 new_catalog_.reset();
 
                 memory_index_tracer_.reset();
+
+                switch(config_ptr_->StorageType()) {
+                    case StorageType::kLocal: {
+                        // Not init remote store
+                        break;
+                    }
+                    case StorageType::kMinio: {
+                        remote_store_->UnInit();
+                        remote_store_.reset();
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+                    }
+                }
 
                 wal_mgr_->Stop();
                 wal_mgr_.reset();
