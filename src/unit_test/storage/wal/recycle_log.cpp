@@ -27,7 +27,6 @@ import log_file;
 import config;
 import bg_task;
 import background_process;
-import local_file_system;
 import default_values;
 import status;
 import logger;
@@ -65,7 +64,6 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         BGTaskProcessor *bg_processor = storage->bg_processor();
 
         const String &wal_dir = config->WALDir();
-        LocalFileSystem fs;
         {
             time_t start = time(nullptr);
             while (true) {
@@ -161,7 +159,6 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
 
         const String &wal_dir = config->WALDir();
         const String &catalog_dir = config->DataDir() + "/" + String(CATALOG_FILE_DIR);
-        LocalFileSystem fs;
         for (int i = 0; i < 2; ++i) { // create 2 delta catalog file
             time_t start = time(nullptr);
             while (true) {

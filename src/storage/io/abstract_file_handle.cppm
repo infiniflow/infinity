@@ -36,6 +36,7 @@ public:
     virtual Status Append(const String &buffer, u64 nbytes) = 0;
     virtual Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) = 0;
     virtual Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) = 0;
+    virtual Status Seek(u64 nbytes) = 0;
     virtual Status Download(const String& url, const String& path) = 0; // Download from url to path
     virtual Status Upload(const String& path, const String& url) = 0; // Upload from path to url
     virtual SizeT FileSize() = 0;

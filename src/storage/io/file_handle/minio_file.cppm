@@ -41,6 +41,7 @@ public:
     Status Append(const String &buffer, u64 nbytes) final;
     Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) final;
     Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) final;
+    Status Seek(u64 nbytes) final;
     Status Download(const String &url, const String &path) final;
     Status Upload(const String &path, const String &url) final;
     SizeT FileSize() final;

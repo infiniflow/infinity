@@ -25,6 +25,7 @@ from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
 from infinity.common import InfinityException, SparseVector
 from infinity.errors import ErrorCode
+from datetime import date, time, datetime, timedelta
 
 
 def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
@@ -315,6 +316,13 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
                 case _:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                             f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
+        case datetime():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DateTime, str_value=value.strftime("%Y-%m-%d %H:%M:%S"))
+        case date():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Date, str_value=value.strftime("%Y-%m-%d"))
+        case time():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Time, str_value=value.strftime("%H:%M:%S"))
+
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
     return constant_expression
@@ -549,6 +557,16 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.physical_type = ttypes.VarcharType()
                     case "bool":
                         proto_column_type.logic_type = ttypes.LogicType.Boolean
+                    case "date":
+                        proto_column_type.logic_type = ttypes.LogicType.Date
+                    case "time":
+                        proto_column_type.logic_type = ttypes.LogicType.Time
+                    case "datetime":
+                        proto_column_type.logic_type = ttypes.LogicType.DateTime
+                    case "timestamp":
+                        proto_column_type.logic_type = ttypes.LogicType.Timestamp
+                    case "interval":
+                        proto_column_type.logic_type = ttypes.LogicType.Interval
                     case _:
                         raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
                 proto_column_def.data_type = proto_column_type

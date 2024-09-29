@@ -62,6 +62,7 @@ public:
     static Status RenameLocal(const String& old_path, const String& new_path);
     static Status TruncateLocal(const String& file_name, SizeT new_length);
     static Status MergeLocal(const String& dst_file, const String& src_file);
+    static Tuple<Vector<SharedPtr<DirEntry>>, Status> ListDirectoryLocal(const String& path);
 private:
     StorageType storage_type_{StorageType::kLocal};
     UniquePtr<LocalDiskCache> local_disk_cache_{};

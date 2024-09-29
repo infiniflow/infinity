@@ -21,6 +21,7 @@ from numpy import dtype
 from infinity_embedded.common import VEC, SparseVector, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity_embedded.embedded_infinity_ext import *
 from infinity_embedded.errors import ErrorCode
+from datetime import date, time, datetime, timedelta
 
 def logic_type_to_dtype(ttype: WrapDataType):
     match ttype.logical_type:
@@ -53,6 +54,16 @@ def logic_type_to_dtype(ttype: WrapDataType):
         case LogicalType.kTensorArray:
             return object
         case LogicalType.kSparse:
+            return object
+        case LogicalType.kDate:
+            return object
+        case LogicalType.kTime:
+            return object
+        case LogicalType.kDateTime:
+            return object
+        case LogicalType.kInterval:
+            return object
+        case LogicalType.kTimestamp:
             return object
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
@@ -222,8 +233,53 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
             return parse_tensor_bytes(column_data_type, column_vector)
         case LogicalType.kTensorArray:
             return parse_tensorarray_bytes(column_data_type, column_vector)
+        case LogicalType.kDate:
+            return parse_date_bytes(column_vector)
+        case LogicalType.kTime:
+            return parse_time_bytes(column_vector)
+        case LogicalType.kDateTime:
+            return parse_datetime_bytes(column_vector)
+        case LogicalType.kTimestamp:
+            return parse_datetime_bytes(column_vector)
+        case LogicalType.kInterval:
+            return parse_interval_bytes(column_vector)
+
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
+
+def parse_date_bytes(column_vector):
+    parsed_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+    date_list = []
+    epoch = date(1970, 1, 1)
+    for value in parsed_list: 
+        date_list.append(epoch + timedelta(days = value))
+    return date_list
+
+def parse_time_bytes(column_vector):
+    parsed_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+    time_list = []
+    for value in parsed_list:
+        hours = (value // 3600) % 24
+        minutes = (value % 3600) // 60
+        seconds = value % 60
+        time_list.append(time(hour=hours, minute=minutes, second=seconds))
+    return time_list
+
+def parse_datetime_bytes(column_vector):
+    parsed_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+    datetime_list = []
+    epoch = datetime(1970, 1, 1)
+    for i in range(0, len(parsed_list), 2):
+        if i + 1 < len(parsed_list):
+            datetime_list.append(epoch + timedelta(days = parsed_list[i], seconds = parsed_list[i + 1]));
+    return datetime_list
+
+def parse_interval_bytes(column_vector):
+    parsed_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+    interval_list = []
+    for value in parsed_list:
+        time_list.append(timedelta(seconds=value))
+    return interval_list
 
 def parse_sparse_bytes(column_data_type, column_vector):
     dimension = column_data_type.sparse_type.dimension

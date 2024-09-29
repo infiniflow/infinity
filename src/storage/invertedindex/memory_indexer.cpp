@@ -66,6 +66,7 @@ import blocking_queue;
 import segment_index_entry;
 import persistence_manager;
 import utility;
+import persist_result_handler;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -318,9 +319,13 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     fs.Write(*file_handler, &column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
     fs.Close(*file_handler);
     if (use_object_cache) {
-        pm->Persist(posting_file, tmp_posting_file, false);
-        pm->Persist(dict_file, tmp_dict_file, false);
-        pm->Persist(column_length_file, tmp_column_length_file, false);
+        PersistResultHandler handler(pm);
+        PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);
+        PersistWriteResult result2 = pm->Persist(dict_file, tmp_dict_file, false);
+        PersistWriteResult result3 = pm->Persist(column_length_file, tmp_column_length_file, false);
+        handler.HandleWriteResult(result1);
+        handler.HandleWriteResult(result2);
+        handler.HandleWriteResult(result3);
     }
 
     is_spilled_ = spill;
@@ -493,9 +498,13 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     fs.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
     fs.Close(*file_handler);
     if (use_object_cache) {
-        pm->Persist(posting_file, tmp_posting_file, false);
-        pm->Persist(dict_file, tmp_dict_file, false);
-        pm->Persist(column_length_file, tmp_column_length_file, false);
+        PersistResultHandler handler(pm);
+        PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);
+        PersistWriteResult result2 = pm->Persist(dict_file, tmp_dict_file, false);
+        PersistWriteResult result3 = pm->Persist(column_length_file, tmp_column_length_file, false);
+        handler.HandleWriteResult(result1);
+        handler.HandleWriteResult(result2);
+        handler.HandleWriteResult(result3);
     }
 }
 

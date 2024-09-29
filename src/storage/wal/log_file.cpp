@@ -19,12 +19,14 @@ module;
 module log_file;
 
 import stl;
-import local_file_system;
+import virtual_storage;
 import third_party;
 import infinity_exception;
 import logger;
 import default_values;
 import infinity_context;
+import status;
+import local_file_system;
 
 namespace infinity {
 
@@ -150,11 +152,17 @@ Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::Par
 }
 
 Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(const String &wal_dir) {
-    LocalFileSystem fs;
-    if (!fs.Exists(wal_dir)) {
+
+    if (!VirtualStorage::ExistsLocal(wal_dir)) {
         return {None, Vector<WalFileInfo>{}};
     }
-    const auto &entries = fs.ListDirectory(wal_dir);
+
+    auto [entries, status] = VirtualStorage::ListDirectoryLocal(wal_dir);
+    if(!status.ok()) {
+        LOG_CRITICAL(status.message());
+        UnrecoverableError(status.message());
+    }
+
     if (entries.empty()) {
         return {None, Vector<WalFileInfo>{}};
     }
@@ -208,14 +216,13 @@ String WalFile::TempWalFilename() { return String(WAL_FILE_TEMP_FILE); }
 //  * @brief Gc the old wal files.
 //  * Only delete the wal.log.* files. the wal.log file is current wal file.
 //  * Check if the wal.log.* files are too old.
-//  * if * is little than the max_commit_ts, we will delete it.
+//  * if * is less than the max_commit_ts, we will delete it.
 //  */
 void WalFile::RecycleWalFile(TxnTimeStamp max_commit_ts, const String &wal_dir) {
     auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
     for (const auto &wal_info : wal_infos) {
         if (wal_info.max_commit_ts_ <= max_commit_ts) {
-            LocalFileSystem fs;
-            fs.DeleteFile(wal_info.path_);
+            VirtualStorage::DeleteFileLocal(wal_info.path_);
             LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
         }
     }
