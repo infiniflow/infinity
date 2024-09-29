@@ -80,6 +80,7 @@ import global_resource_usage;
 import infinity_context;
 import peer_task;
 import cleanup_scanner;
+import obj_status;
 
 namespace infinity {
 

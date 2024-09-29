@@ -31,9 +31,9 @@ public:
     ~LocalFile() final;
     Status Open(const String &path, FileAccessMode access_mode) final;
     Status Close() final;
-    Status Append(const char *buffer, u64 nbytes) final;
+    Status Append(const void *buffer, u64 nbytes) final;
     Status Append(const String &buffer, u64 nbytes) final;
-    Tuple<SizeT, Status> Read(char *buffer, u64 nbytes) final;
+    Tuple<SizeT, Status> Read(void *buffer, u64 nbytes) final;
     Tuple<SizeT, Status> Read(String &buffer, u64 nbytes) final;
     Status Seek(u64 nbytes) final;
     Status Download(const String &url, const String &path) final;
