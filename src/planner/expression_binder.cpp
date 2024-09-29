@@ -898,6 +898,11 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
             }
             case ParsedExprType::kMatchSparse: {
                 const auto &match_sparse = *static_cast<const MatchSparseExpr *>(match_expr);
+                for(auto &param : match_sparse.opt_params_){
+                    if(param->param_name_ != "alpha" and param->param_name_ != "beta" and param->param_name_ != "tail"){
+                        RecoverableError(Status::SyntaxError(fmt::format("Unsupported optional parameter: {}", param->param_name_)));
+                    }
+                }
                 if (match_sparse.filter_expr_) {
                     have_filter_in_subsearch = true;
                 }
