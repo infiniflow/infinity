@@ -61,7 +61,8 @@ TEST_F(RAGAnalyzerTest, test1) {
     for (auto &query : queries) {
         // TermList term_list;
         // analyzer.Analyze(query, term_list);
-        std::cout << "Text #" << query << "# parsed as:" << std::endl;
+        Vector<String> tokens;
+        analyzer.Tokenize(query, tokens);
         //         for (unsigned i = 0; i < term_list.size(); ++i) {
         //             std::cout << "\t" << i << "#" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "#";
         //         }

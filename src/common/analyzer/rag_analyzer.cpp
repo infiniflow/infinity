@@ -74,6 +74,8 @@ bool RegexMatch(const String &str, const String &pattern) { return RE2::PartialM
 
 String Join(const Vector<String> &tokens, int start, int end, const String &delim = " ") {
     std::ostringstream oss;
+    if (end > (int)tokens.size())
+        std::cout << "token.size() " << tokens.size() << " start " << start << " end " << end << std::endl;
     for (int i = start; i < end; ++i) {
         if (i > start)
             oss << delim;
@@ -135,70 +137,6 @@ String WideCharToUTF8(wchar_t wchar) {
     }
 
     return result;
-}
-
-int GetNextPosUTF8(const String &line, int last_pos) {
-    if (last_pos < 0 || last_pos >= static_cast<int>(line.size())) {
-        throw std::out_of_range("last_pos is out of range");
-    }
-
-    int next_pos = last_pos + 1;
-    while (next_pos < static_cast<int>(line.size())) {
-        if ((line[next_pos] & 0b11000000) != 0b10000000) {
-            return next_pos;
-        }
-        ++next_pos;
-    }
-
-    return line.size();
-}
-
-int GetPrevPosUTF8(const String &line, int last_pos) {
-    if (last_pos <= 0 || last_pos > static_cast<int>(line.size())) {
-        throw std::out_of_range("last_pos is out of range");
-    }
-
-    int prev_pos = last_pos - 1;
-    while (prev_pos >= 0) {
-        if ((line[prev_pos] & 0b11000000) != 0b10000000) {
-            return prev_pos;
-        }
-        --prev_pos;
-    }
-
-    return -1;
-}
-
-int GetStepPosUTF8(const String &line, int last_pos, int step) {
-    if (last_pos < 0 || last_pos >= static_cast<int>(line.size())) {
-        throw std::out_of_range("last_pos is out of range");
-    }
-
-    int current_pos = last_pos;
-
-    int step_counter = 0;
-
-    while (step_counter != step) {
-        if (step > 0) {
-            current_pos++;
-            if (current_pos >= static_cast<int>(line.size())) {
-                return line.size();
-            }
-            if ((line[current_pos] & 0b11000000) != 0b10000000) {
-                step_counter++;
-            }
-        } else {
-            current_pos--;
-            if (current_pos < 0) {
-                return 0;
-            }
-            if ((line[current_pos] & 0b11000000) != 0b10000000) {
-                step_counter--;
-            }
-        }
-    }
-
-    return current_pos;
 }
 
 RAGAnalyzer::RAGAnalyzer(const String &path) : dict_path_(path) {}
@@ -344,19 +282,20 @@ void RAGAnalyzer::SortTokens(const Vector<Vector<Pair<String, i64>>> &token_list
 Pair<Vector<String>, double> RAGAnalyzer::MaxForward(const String &line) {
     Vector<Pair<String, i64>> res;
     std::size_t s = 0;
+    std::size_t len = UTF8Length(line);
 
-    while (s < line.length()) {
-        std::size_t e = GetNextPosUTF8(line, s + 1);
-        String t = line.substr(s, e - s);
+    while (s < len) {
+        std::size_t e = s + 1;
+        String t = UTF8Substr(line, s, e - s);
 
-        while (e < line.length() && trie_->HasKeysWithPrefix(Key(t))) {
-            e = GetNextPosUTF8(line, e);
-            t = line.substr(s, e - s);
+        while (e < len && trie_->HasKeysWithPrefix(Key(t))) {
+            e += 1;
+            t = UTF8Substr(line, s, e - s);
         }
 
         while (e - 1 > s && trie_->Get(Key(t)) == -1) {
-            e = GetPrevPosUTF8(line, e);
-            t = line.substr(s, e - s);
+            e -= 1;
+            t = UTF8Substr(line, s, e - s);
         }
 
         i64 v = trie_->Get(Key(t));
@@ -374,19 +313,18 @@ Pair<Vector<String>, double> RAGAnalyzer::MaxForward(const String &line) {
 
 Pair<Vector<String>, double> RAGAnalyzer::MaxBackward(const String &line) {
     Vector<Pair<String, i64>> res;
-    int s = line.length() - 1;
+    int s = UTF8Length(line) - 1;
 
     while (s >= 0) {
-        int e = GetNextPosUTF8(line, s + 1);
-        String t = line.substr(s, e - s);
-
+        int e = s + 1;
+        String t = UTF8Substr(line, s, e - s);
         while (s > 0 && trie_->HasKeysWithPrefix(RKey(t))) {
-            s = GetPrevPosUTF8(line, s);
-            t = line.substr(s, e - s);
+            s -= 1;
+            t = UTF8Substr(line, s, e - s);
         }
-        while (GetNextPosUTF8(line, s) < e && trie_->Get(Key(t)) == -1) {
-            s = GetNextPosUTF8(line, s);
-            t = line.substr(s, e - s);
+        while (s + 1 < e && trie_->Get(Key(t)) == -1) {
+            s += 1;
+            t = UTF8Substr(line, s, e - s);
         }
 
         i64 v = trie_->Get(Key(t));
@@ -395,7 +333,7 @@ Pair<Vector<String>, double> RAGAnalyzer::MaxBackward(const String &line) {
         else
             res.emplace_back(t, 0);
 
-        s = GetPrevPosUTF8(line, s);
+        s -= 1;
     }
 
     std::reverse(res.begin(), res.end());
@@ -404,41 +342,44 @@ Pair<Vector<String>, double> RAGAnalyzer::MaxBackward(const String &line) {
 
 int RAGAnalyzer::DFS(const String &chars, int s, Vector<Pair<String, i64>> &pre_tokens, Vector<Vector<Pair<String, i64>>> &token_list) {
     int res = s;
-    std::cout << "DFS " << chars << std::endl;
-    if (s >= static_cast<int>(chars.size())) {
+    int len = UTF8Length(chars);
+    if (s >= len) {
         token_list.push_back(pre_tokens);
         return res;
     }
     // pruning
-    int S = GetStepPosUTF8(chars, s, 1);
-    if (GetStepPosUTF8(chars, s, 2) <= static_cast<int>(chars.size())) {
-        String t1 = chars.substr(s, GetStepPosUTF8(chars, s, 1));
-        String t2 = chars.substr(s, GetStepPosUTF8(chars, s, 2));
+    int S = s + 1;
+    if (s + 2 <= len) {
+        String t1 = UTF8Substr(chars, s, 1);
+        String t2 = UTF8Substr(chars, s, 2);
         if (trie_->HasKeysWithPrefix(Key(t1)) && !trie_->HasKeysWithPrefix(Key(t2))) {
-            S = GetStepPosUTF8(chars, s, 2);
+            S = s + 2;
         }
     }
 
     if (pre_tokens.size() > 2 && UTF8Length(pre_tokens[pre_tokens.size() - 1].first) == 1 &&
         UTF8Length(pre_tokens[pre_tokens.size() - 2].first) == 1 && UTF8Length(pre_tokens[pre_tokens.size() - 3].first) == 1) {
-        String t1 = pre_tokens[pre_tokens.size() - 1].first + chars[s];
+        String t1 = pre_tokens[pre_tokens.size() - 1].first + UTF8Substr(chars, s, 1);
         if (trie_->HasKeysWithPrefix(Key(t1))) {
-            S = GetStepPosUTF8(chars, s, 2);
+            S = s + 2;
         }
     }
 
-    for (int e = S; e <= static_cast<int>(chars.size()); e = GetNextPosUTF8(chars, e)) {
-        String t = chars.substr(s, e);
+    for (int e = S; e <= len; ++e) {
+        String t = UTF8Substr(chars, s, e - s);
         String k = Key(t);
 
-        if (e > GetStepPosUTF8(chars, s, 1) && !trie_->HasKeysWithPrefix(k)) {
+        if (e > s + 1 && !trie_->HasKeysWithPrefix(k)) {
             break;
         }
 
         if (trie_->HasKeysWithPrefix(k)) {
             auto pretks = pre_tokens;
             i64 v = trie_->Get(k);
-            pretks.emplace_back(t, v);
+            if (v != -1)
+                pretks.emplace_back(t, v);
+            else
+                pretks.emplace_back(t, ((i64)-12) << 32);
             res = std::max(res, DFS(chars, e, pretks, token_list));
         }
     }
@@ -447,41 +388,42 @@ int RAGAnalyzer::DFS(const String &chars, int s, Vector<Pair<String, i64>> &pre_
         return res;
     }
 
-    String t = chars.substr(s, GetStepPosUTF8(chars, s, 1));
+    String t = UTF8Substr(chars, s, 1);
     String k = Key(t);
     i64 v = trie_->Get(k);
-    pre_tokens.emplace_back(t, v);
+    if (v != -1)
+        pre_tokens.emplace_back(t, v);
+    else
+        pre_tokens.emplace_back(t, ((i64)-12) << 32);
 
-    return DFS(chars, GetStepPosUTF8(chars, s, 1), pre_tokens, token_list);
+    return DFS(chars, s + 1, pre_tokens, token_list);
 }
 
-String RAGAnalyzer::Merge(const String &tks) {
-    String modified_tokens = tks;
+String RAGAnalyzer::Merge(const String &tks_str) {
+    String tks = tks_str;
 
     RE2 re_space(R"(([ ]+))");
-    modified_tokens = Replace(re_space, " ", modified_tokens);
+    tks = Replace(re_space, " ", tks);
 
     Vector<String> tokens;
-    Split(modified_tokens, " ", tokens);
+    Split(tks, " ", tokens);
     Vector<String> res;
     int s = 0;
 
     while (true) {
-        if (s >= static_cast<int>(tokens.size())) {
+        int len = UTF8Length(tks);
+        if (s >= len) {
             break;
         }
 
-        int E = GetStepPosUTF8(tks, s, 1);
-        int e = GetStepPosUTF8(tks, s, 2);
-        int s6 = GetStepPosUTF8(tks, s, 6);
-        for (; e < std::min(static_cast<int>(tokens.size()) + 2, s6);) {
+        int E = s + 1;
+        for (int e = s + 2; e < std::min(len + 2, s + 6); ++e) {
             String tk = Join(tokens, s, e);
             if (RE2::PartialMatch(tk, REGEX_SPLIT_CHAR)) {
                 if (Freq(tk)) {
                     E = e;
                 }
             }
-            e = GetStepPosUTF8(tks, e, 1);
         }
         res.push_back(Join(tokens, s, E));
         s = E;
@@ -499,15 +441,15 @@ void RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
             res.push_back(L);
             continue;
         }
-
+        std::cout << "L " << L << std::endl;
         auto [tks, s] = MaxForward(L);
-        auto [tks1, s1] = MaxBackward(L);
-
         std::cout << "Forward Tokens:";
         for (auto &token : tks) {
             std::cout << token << " ";
         }
         std::cout << std::endl;
+        auto [tks1, s1] = MaxBackward(L);
+
         std::cout << "Backward Tokens:";
         for (auto &token : tks1) {
             std::cout << token << " ";
@@ -546,14 +488,14 @@ void RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
 
             Vector<Pair<String, i64>> pre_tokens;
             Vector<Vector<Pair<String, i64>>> token_list;
-            DFS(Join(tks, s, e + 1, ""), 0, pre_tokens, token_list);
+            DFS(Join(tks, s, e, ""), 0, pre_tokens, token_list);
             Vector<Pair<Vector<String>, double>> sorted_tokens;
             SortTokens(token_list, sorted_tokens);
             res.push_back(Join(sorted_tokens[0].first, 0));
             i = e + 1;
         }
     }
-    std::cout << "res " << std::endl;
+    std::cout << "res " << res.size() << std::endl;
     for (auto &r : res)
         std::cout << r << std::endl;
 
