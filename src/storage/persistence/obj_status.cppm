@@ -38,11 +38,11 @@ export struct ObjStat {
     SizeT ref_count_{}; // the number of user (R and W) of some part of this object
     Set<Range> deleted_ranges_{};
 
-    bool cached_ = false; // whether the object is in localdisk cache
+    bool cached_ = true; // whether the object is in localdisk cache
 
     ObjStat() = default;
 
-    ObjStat(SizeT obj_size, SizeT parts, SizeT ref_count) : obj_size_(obj_size), parts_(parts), ref_count_(ref_count) {}
+    ObjStat(SizeT obj_size, SizeT parts, SizeT ref_count, bool cached = true) : obj_size_(obj_size), parts_(parts), ref_count_(ref_count), cached_(cached) {}
 
     nlohmann::json Serialize() const;
 
