@@ -55,7 +55,7 @@ export struct BlockVersion {
 
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
 
-    void SaveToFile(TxnTimeStamp checkpoint_ts, FileHandler &file_handler) const;
+    void SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
     // deprecated
     void SpillToFile(FileHandler &file_handler) const;

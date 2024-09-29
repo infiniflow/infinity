@@ -32,16 +32,16 @@ import status;
 namespace infinity {
 
 // deprecated
-void CreateField::SaveToFile(FileHandler &file_handler) const {
-    file_handler.Write(&create_ts_, sizeof(create_ts_));
-    file_handler.Write(&row_count_, sizeof(row_count_));
+void CreateField::SaveToFile(FileHandler &file_handle) const {
+    file_handle.Write(&create_ts_, sizeof(create_ts_));
+    file_handle.Write(&row_count_, sizeof(row_count_));
 }
 
 // deprecated
-CreateField CreateField::LoadFromFile(FileHandler &file_handler) {
+CreateField CreateField::LoadFromFile(FileHandler &file_handle) {
     CreateField create_field;
-    file_handler.Read(&create_field.create_ts_, sizeof(create_field.create_ts_));
-    file_handler.Read(&create_field.row_count_, sizeof(create_field.row_count_));
+    file_handle.Read(&create_field.create_ts_, sizeof(create_field.create_ts_));
+    file_handle.Read(&create_field.row_count_, sizeof(create_field.row_count_));
     return create_field;
 }
 
@@ -94,27 +94,27 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
     return iter->row_count_;
 }
 
-void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, FileHandler &file_handler) const {
+void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     BlockOffset create_size = created_.size();
     while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
         --create_size;
     }
 
-    file_handler.Write(&create_size, sizeof(create_size));
+    file_handle.Append(&create_size, sizeof(create_size));
     for (SizeT j = 0; j < create_size; ++j) {
-        created_[j].SaveToFile(file_handler);
+        created_[j].SaveToFile(&file_handle);
     }
 
     BlockOffset capacity = deleted_.size();
-    file_handler.Write(&capacity, sizeof(capacity));
+    file_handle.Append(&capacity, sizeof(capacity));
     TxnTimeStamp dump_ts = 0;
     u32 deleted_row_count = 0;
     for (const auto &ts : deleted_) {
         if (ts <= checkpoint_ts) {
-            file_handler.Write(&ts, sizeof(ts));
+            file_handle.Append(&ts, sizeof(ts));
         } else {
             ++ deleted_row_count;
-            file_handler.Write(&dump_ts, sizeof(dump_ts));
+            file_handle.Append(&dump_ts, sizeof(dump_ts));
         }
     }
     LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, 0 delete {}", checkpoint_ts, create_size, deleted_row_count));

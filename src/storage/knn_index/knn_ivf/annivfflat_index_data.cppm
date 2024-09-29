@@ -14,11 +14,13 @@
 
 module;
 
+#include <tuple>
+
 export module annivfflat_index_data;
 
 import stl;
 import index_base;
-import file_system;
+import local_file_handle;
 import file_system_type;
 import search_top_1;
 import kmeans_partition;
@@ -26,6 +28,8 @@ import infinity_exception;
 import logger;
 import third_party;
 import status;
+import virtual_store;
+import abstract_file_handle;
 
 namespace infinity {
 
@@ -226,71 +230,69 @@ struct AnnIVFFlatIndexData {
         data_num_ += vector_count;
     }
 
-    void SaveIndexInner(FileHandler &file_handler) {
+    void SaveIndexInner(LocalFileHandle &file_handle) {
         if (!loaded_) {
             String error_message = "AnnIVFFlatIndexData::SaveIndexInner(): Index data not loaded.";
             UnrecoverableError(error_message);
         }
-        file_handler.Write(&metric_, sizeof(metric_));
-        file_handler.Write(&dimension_, sizeof(dimension_));
-        file_handler.Write(&partition_num_, sizeof(partition_num_));
-        file_handler.Write(&data_num_, sizeof(data_num_));
+        file_handle.Append(&metric_, sizeof(metric_));
+        file_handle.Append(&dimension_, sizeof(dimension_));
+        file_handle.Append(&partition_num_, sizeof(partition_num_));
+        file_handle.Append(&data_num_, sizeof(data_num_));
         if (!centroids_.empty()) {
-            file_handler.Write(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
+            file_handle.Append(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
             u32 vector_element_num;
             for (u32 i = 0; i < partition_num_; ++i) {
                 vector_element_num = ids_[i].size();
-                file_handler.Write(&vector_element_num, sizeof(vector_element_num));
-                file_handler.Write(ids_[i].data(), sizeof(u32) * vector_element_num);
-                file_handler.Write(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
+                file_handle.Append(&vector_element_num, sizeof(vector_element_num));
+                file_handle.Append(ids_[i].data(), sizeof(u32) * vector_element_num);
+                file_handle.Append(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
             }
         }
     }
 
-    void SaveIndex(const String &file_path, UniquePtr<FileSystem> fs) {
-        u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+    void SaveIndex(const String &file_path) {
+        auto [file_handle, status] = LocalStore::Open(file_path, FileAccessMode::kWrite);
         if(!status.ok()) {
             UnrecoverableError(status.message());
         }
-        SaveIndexInner(*file_handler);
-        file_handler->Close();
+        SaveIndexInner(*file_handle);
+        file_handle->Close();
     }
 
-    void ReadIndexInner(FileHandler &file_handler) {
-        file_handler.Read(&metric_, sizeof(metric_));
-        file_handler.Read(&dimension_, sizeof(dimension_));
-        file_handler.Read(&partition_num_, sizeof(partition_num_));
-        file_handler.Read(&data_num_, sizeof(data_num_));
+    void ReadIndexInner(LocalFileHandle &file_handle) {
+        file_handle.Read(&metric_, sizeof(metric_));
+        file_handle.Read(&dimension_, sizeof(dimension_));
+        file_handle.Read(&partition_num_, sizeof(partition_num_));
+        file_handle.Read(&data_num_, sizeof(data_num_));
         centroids_.resize(dimension_ * partition_num_);
         ids_.resize(partition_num_);
         vectors_.resize(partition_num_);
-        file_handler.Read(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
+        file_handle.Read(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
         u32 vector_element_num;
         for (u32 i = 0; i < partition_num_; ++i) {
-            file_handler.Read(&vector_element_num, sizeof(vector_element_num));
+            file_handle.Read(&vector_element_num, sizeof(vector_element_num));
             ids_[i].resize(vector_element_num);
-            file_handler.Read(ids_[i].data(), sizeof(u32) * vector_element_num);
+            file_handle.Read(ids_[i].data(), sizeof(u32) * vector_element_num);
             vectors_[i].resize(dimension_ * vector_element_num);
-            file_handler.Read(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
+            file_handle.Read(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
         }
         loaded_ = true;
     }
 
-    static UniquePtr<AnnIVFFlatIndexData> LoadIndexInner(FileHandler &file_handler) {
+    static UniquePtr<AnnIVFFlatIndexData> LoadIndexInner(LocalFileHandle &file_handle) {
         auto index_data = MakeUnique<AnnIVFFlatIndexData>(MetricType::kInvalid, 0, 0);
-        index_data->ReadIndexInner(file_handler);
+        index_data->ReadIndexInner(file_handle);
         return index_data;
     }
 
-    static UniquePtr<AnnIVFFlatIndexData> LoadIndex(const String &file_path, UniquePtr<FileSystem> fs) {
-        u8 file_flags = FileFlags::READ_FLAG;
-        auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
+    static UniquePtr<AnnIVFFlatIndexData> LoadIndex(const String &file_path) {
+        auto [file_handle, status] = LocalStore::Open(file_path, FileAccessMode::kRead);
         if(!status.ok()) {
             UnrecoverableError(status.message());
         }
-        auto index_data = LoadIndexInner(*file_handler);
-        file_handler->Close();
+        auto index_data = LoadIndexInner(*file_handle);
+        file_handle->Close();
         return index_data;
     }
 };

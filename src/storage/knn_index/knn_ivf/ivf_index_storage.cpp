@@ -37,38 +37,38 @@ IVF_Centroids_Storage::IVF_Centroids_Storage(const u32 embedding_dimension, cons
     centroids_data_ = MakeUniqueForOverwrite<f32[]>(alloc_size);
 }
 
-void IVF_Centroids_Storage::Save(FileHandler &file_handler) const {
-    file_handler.Write(&embedding_dimension_, sizeof(embedding_dimension_));
-    file_handler.Write(&centroids_num_, sizeof(centroids_num_));
+void IVF_Centroids_Storage::Save(LocalFileHandle &file_handle) const {
+    file_handle.Append(&embedding_dimension_, sizeof(embedding_dimension_));
+    file_handle.Append(&centroids_num_, sizeof(centroids_num_));
     const auto alloc_size = centroids_num_ * (embedding_dimension_ * sizeof(f32));
-    file_handler.Write(centroids_data_.get(), alloc_size);
+    file_handle.Append(centroids_data_.get(), alloc_size);
 }
 
-void IVF_Centroids_Storage::Load(FileHandler &file_handler) {
-    file_handler.Read(&embedding_dimension_, sizeof(embedding_dimension_));
-    file_handler.Read(&centroids_num_, sizeof(centroids_num_));
+void IVF_Centroids_Storage::Load(LocalFileHandle &file_handle) {
+    file_handle.Read(&embedding_dimension_, sizeof(embedding_dimension_));
+    file_handle.Read(&centroids_num_, sizeof(centroids_num_));
     const auto alloc_size = centroids_num_ * (embedding_dimension_ * sizeof(f32));
     centroids_data_ = MakeUniqueForOverwrite<f32[]>(alloc_size);
-    file_handler.Read(centroids_data_.get(), alloc_size);
+    file_handle.Read(centroids_data_.get(), alloc_size);
 }
 
 // IVF_Part_Storage
 
-void IVF_Part_Storage::Save(FileHandler &file_handler) const {
-    file_handler.Write(&embedding_dimension_, sizeof(embedding_dimension_));
-    file_handler.Write(&part_id_, sizeof(part_id_));
-    file_handler.Write(&embedding_num_, sizeof(embedding_num_));
+void IVF_Part_Storage::Save(LocalFileHandle &file_handle) const {
+    file_handle.Append(&embedding_dimension_, sizeof(embedding_dimension_));
+    file_handle.Append(&part_id_, sizeof(part_id_));
+    file_handle.Append(&embedding_num_, sizeof(embedding_num_));
     static_assert(std::is_same_v<SegmentOffset, typename decltype(embedding_segment_offsets_)::value_type>);
     assert(embedding_num_ == embedding_segment_offsets_.size());
-    file_handler.Write(embedding_segment_offsets_.data(), embedding_num_ * sizeof(SegmentOffset));
+    file_handle.Append(embedding_segment_offsets_.data(), embedding_num_ * sizeof(SegmentOffset));
 }
 
-void IVF_Part_Storage::Load(FileHandler &file_handler) {
-    file_handler.Read(&embedding_dimension_, sizeof(embedding_dimension_));
-    file_handler.Read(&part_id_, sizeof(part_id_));
-    file_handler.Read(&embedding_num_, sizeof(embedding_num_));
+void IVF_Part_Storage::Load(LocalFileHandle &file_handle) {
+    file_handle.Read(&embedding_dimension_, sizeof(embedding_dimension_));
+    file_handle.Read(&part_id_, sizeof(part_id_));
+    file_handle.Read(&embedding_num_, sizeof(embedding_num_));
     embedding_segment_offsets_.resize(embedding_num_);
-    file_handler.Read(embedding_segment_offsets_.data(), embedding_num_ * sizeof(SegmentOffset));
+    file_handle.Read(embedding_segment_offsets_.data(), embedding_num_ * sizeof(SegmentOffset));
 }
 
 template <IsAnyOf<i8, u8, f32, Float16T, BFloat16T> StorageDataT>
@@ -78,17 +78,17 @@ class IVF_Part_Storage_Plain final : public IVF_Part_Storage {
 public:
     IVF_Part_Storage_Plain(const u32 embedding_dimension, const u32 part_id) : IVF_Part_Storage(embedding_dimension, part_id) {}
 
-    void Save(FileHandler &file_handler) const override {
-        IVF_Part_Storage::Save(file_handler);
+    void Save(LocalFileHandle &file_handle) const override {
+        IVF_Part_Storage::Save(file_handle);
         const u32 element_cnt = embedding_num() * embedding_dimension();
         assert(element_cnt == data_.size());
-        file_handler.Write(data_.data(), element_cnt * sizeof(StorageDataT));
+        file_handle.Append(data_.data(), element_cnt * sizeof(StorageDataT));
     }
-    void Load(FileHandler &file_handler) override {
-        IVF_Part_Storage::Load(file_handler);
+    void Load(LocalFileHandle &file_handle) override {
+        IVF_Part_Storage::Load(file_handle);
         const u32 element_cnt = embedding_num() * embedding_dimension();
         data_.resize(element_cnt);
-        file_handler.Read(data_.data(), element_cnt * sizeof(StorageDataT));
+        file_handle.Read(data_.data(), element_cnt * sizeof(StorageDataT));
     }
 
     // only for unit-test, return f32 / i8 / u8 embedding data

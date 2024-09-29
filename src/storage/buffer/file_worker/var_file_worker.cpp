@@ -14,14 +14,17 @@
 
 module;
 
+#include <tuple>
+
 module var_file_worker;
 
 import stl;
 import infinity_exception;
 import var_buffer;
 import third_party;
-import local_file_system;
+import local_file_handle;
 import persistence_manager;
+import status;
 
 namespace infinity {
 
@@ -79,11 +82,9 @@ bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
     char *ptr = buffer_data.get();
     buffer->Write(ptr);
 
-    LocalFileSystem fs;
-    u64 nbytes = fs.Write(*file_handler_, buffer_data.get(), data_size);
-    if (nbytes != data_size) {
-        String error_message = fmt::format("Write {} bytes to file failed, only {} bytes written.", data_size, nbytes);
-        UnrecoverableError(error_message);
+    Status status = file_handle_->Append(buffer_data.get(), data_size);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
     }
     prepare_success = true;
     buffer_size_ = data_size;
@@ -100,9 +101,11 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size) {
         UnrecoverableError(error_message);
     }
 
-    LocalFileSystem fs;
     auto buffer = MakeUnique<char[]>(buffer_size_);
-    u64 nbytes = fs.Read(*file_handler_, buffer.get(), buffer_size_);
+    auto [nbytes, status] = file_handle_->Read(buffer.get(), buffer_size_);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     if (nbytes != buffer_size_) {
         String error_message = fmt::format("Read {} bytes from file failed, only {} bytes read.", buffer_size_, nbytes);
         UnrecoverableError(error_message);

@@ -25,7 +25,7 @@ namespace infinity {
 export class LocalFileHandle {
 public:
     LocalFileHandle(i32 fd, const String &path, FileAccessMode file_access_mode) : fd_(fd), path_(path), access_mode_(file_access_mode) {}
-    ~LocalFileHandle() = default;
+    ~LocalFileHandle();
 
     Status Close();
     Status Append(const void *buffer, u64 nbytes);
@@ -37,6 +37,15 @@ public:
     Tuple<char *, SizeT, Status> MmapRead(const String &name);
     Status Unmmap(const String &name);
     Status Sync();
+
+public:
+    i32 FileDescriptor() const {
+        return fd_;
+    }
+
+    String Path() const {
+        return path_;
+    }
 
 private:
     i32 fd_{-1};

@@ -31,6 +31,17 @@ import abstract_file_handle;
 
 namespace infinity {
 
+LocalFileHandle::~LocalFileHandle() {
+    if(access_mode_ == FileAccessMode::kWrite) {
+        if(!sync_) {
+            UnrecoverableError("Not sync before destruction.");
+        }
+    }
+    if(fd_ != -1) {
+        UnrecoverableError("File isn't close before destruction.");
+    }
+}
+
 Status LocalFileHandle::Close() {
     if(access_mode_ == FileAccessMode::kWrite) {
         if(!sync_) {
@@ -39,6 +50,9 @@ Status LocalFileHandle::Close() {
                 return status;
             }
         }
+    }
+    if(fd_ == -1) {
+        UnrecoverableError("File was closed before");
     }
     close(fd_);
     fd_ = -1;

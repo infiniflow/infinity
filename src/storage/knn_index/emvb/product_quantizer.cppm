@@ -18,7 +18,7 @@ export module emvb_product_quantization;
 import stl;
 
 namespace infinity {
-class FileHandler;
+class LocalFileHandle;
 
 export class EMVBProductQuantizer {
 public:
@@ -29,8 +29,8 @@ public:
     virtual f32 GetSingleIPDistance(u32 embedding_id, u32 query_id, u32 query_num, const f32 *ip_table) const = 0;
     virtual void
     GetMultipleIPDistance(u32 embedding_offset, u32 embedding_num, u32 query_id, u32 query_num, const f32 *ip_table, f32 *output_ptr) const = 0;
-    virtual void Save(FileHandler &file_handler) = 0;
-    virtual void Load(FileHandler &file_handler) = 0;
+    virtual void Save(LocalFileHandle &file_handle) = 0;
+    virtual void Load(LocalFileHandle &file_handle) = 0;
 };
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
@@ -76,9 +76,9 @@ public:
 
     UniquePtr<f32[]> GetIPDistanceTable(const f32 *query_data, u32 query_num) const override;
 
-    void Save(FileHandler &file_handler) override;
+    void Save(LocalFileHandle &file_handle) override;
 
-    void Load(FileHandler &file_handler) override;
+    void Load(LocalFileHandle &file_handle) override;
 };
 
 export UniquePtr<EMVBProductQuantizer> GetEMVBOPQ(u32 pq_subspace_num, u32 pq_subspace_bits, u32 embedding_dimension);

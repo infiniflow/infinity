@@ -18,7 +18,7 @@ export module bmp_alg;
 
 import stl;
 import sparse_util;
-import file_system;
+import local_file_handle;
 import bm_posting;
 import bmp_util;
 import hnsw_common;
@@ -145,9 +145,9 @@ public:
     Pair<Vector<BMPDocID>, Vector<DataType>>
     SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options, const Filter &filter) const;
 
-    void Save(FileHandler &file_handler) const;
+    void Save(LocalFileHandle &file_handle) const;
 
-    static BMPAlg<DataType, IdxType, CompressType> Load(FileHandler &file_handler);
+    static BMPAlg<DataType, IdxType, CompressType> Load(LocalFileHandle &file_handle);
 
     SizeT GetSizeInBytes() const;
 

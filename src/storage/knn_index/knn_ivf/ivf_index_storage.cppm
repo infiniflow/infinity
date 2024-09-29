@@ -21,7 +21,7 @@ import stl;
 namespace infinity {
 
 struct IndexIVFStorageOption;
-class FileHandler;
+class LocalFileHandle;
 
 // always use float for centroids
 export class IVF_Centroids_Storage {
@@ -36,8 +36,8 @@ public:
     const f32 *data() const { return centroids_data_.get(); }
     u32 embedding_dimension() const { return embedding_dimension_; }
     u32 centroids_num() const { return centroids_num_; }
-    void Save(FileHandler &file_handler) const;
-    void Load(FileHandler &file_handler);
+    void Save(LocalFileHandle &file_handler) const;
+    void Load(LocalFileHandle &file_handler);
 };
 
 export class IVF_Part_Storage {
@@ -55,8 +55,8 @@ public:
     u32 embedding_num() const { return embedding_num_; }
     SegmentOffset embedding_segment_offset(const u32 embedding_index) const { return embedding_segment_offsets_[embedding_index]; }
 
-    virtual void Save(FileHandler &file_handler) const;
-    virtual void Load(FileHandler &file_handler);
+    virtual void Save(LocalFileHandle &file_handler) const;
+    virtual void Load(LocalFileHandle &file_handler);
 
     // only for unit-test, return f32 / i8 / u8 embedding data
     virtual Pair<const void *, SharedPtr<void>> GetDataForTest(u32 embedding_id) const = 0;

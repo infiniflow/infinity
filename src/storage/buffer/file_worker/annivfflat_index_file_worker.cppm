@@ -142,7 +142,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::FreeInMemory() {
 template <typename DataType>
 bool AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     auto *index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
-    index->SaveIndexInner(*file_handler_);
+    index->SaveIndexInner(*file_handle_);
     prepare_success = true;
     return true;
 }
@@ -151,7 +151,7 @@ template <typename DataType>
 void AnnIVFFlatIndexFileWorker<DataType>::ReadFromFileImpl(SizeT file_size) {
     data_ = new AnnIVFFlatIndexData<DataType>();
     auto *index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
-    index->ReadIndexInner(*file_handler_);
+    index->ReadIndexInner(*file_handle_);
 }
 
 template <typename DataType>

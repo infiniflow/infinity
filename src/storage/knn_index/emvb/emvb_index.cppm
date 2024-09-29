@@ -23,7 +23,7 @@ namespace infinity {
 
 extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
-class FileHandler;
+class LocalFileHandle;
 struct RowID;
 struct SegmentEntry;
 class ColumnDef;
@@ -79,9 +79,9 @@ public:
                                           u32 out_second_stage,
                                           f32 threshold_final) const;
 
-    void SaveIndexInner(FileHandler &file_handler);
+    void SaveIndexInner(LocalFileHandle &file_handle);
 
-    void ReadIndexInner(FileHandler &file_handler);
+    void ReadIndexInner(LocalFileHandle &file_handler);
 
     u32 GetDocNum() const;
 
