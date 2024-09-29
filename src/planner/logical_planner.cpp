@@ -69,7 +69,7 @@ import local_file_system;
 import status;
 import default_values;
 import index_base;
-import index_ivfflat;
+import index_ivf;
 import index_hnsw;
 import index_diskann;
 import index_secondary;
@@ -701,10 +701,11 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             base_index_ptr = IndexHnsw::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
-        case IndexType::kIVFFlat: {
+        case IndexType::kIVF: {
             assert(index_info->index_param_list_ != nullptr);
-            IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexIVFFlat::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            auto ivf_ptr = IndexIVF::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            ivf_ptr->ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = std::move(ivf_ptr);
             break;
         }
         case IndexType::kSecondary: {

@@ -430,7 +430,7 @@ struct GetTableRequest {
 }
 
 enum IndexType {
-IVFFlat,
+IVF,
 Hnsw,
 FullText,
 BMP,

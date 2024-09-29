@@ -48,8 +48,6 @@ import embedding_info;
 import buffer_manager;
 import merge_knn;
 import knn_result_handler;
-import ann_ivf_flat;
-import annivfflat_index_data;
 import buffer_handle;
 import data_block;
 import roaring_bitmap;
@@ -380,7 +378,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 }
                 // check index type
                 if (auto index_type = table_index_entry->index_base()->index_type_;
-                    index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
+                    index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                     LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
                     continue;
                 }
@@ -414,7 +412,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             }
             // check index type
             if (auto index_type = table_index_entry->index_base()->index_type_;
-                index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
+                index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                 LOG_ERROR("Invalid index type");
                 Status error_status = Status::InvalidIndexType("invalid index");
                 RecoverableError(std::move(error_status));
@@ -569,60 +567,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
 
         if (has_some_result) {
             switch (segment_index_entry->table_index_entry()->index_base()->index_type_) {
-                case IndexType::kIVFFlat: {
-                    if constexpr (!(t == LogicalType::kEmbedding && std::is_same_v<ColumnDataType, f32>)) {
-                        UnrecoverableError("Invalid data type");
-                    } else {
-                        BufferHandle index_handle = segment_index_entry->GetIndex();
-                        auto index = static_cast<const AnnIVFFlatIndexData<ColumnDataType> *>(index_handle.GetData());
-                        i32 n_probes = 1;
-                        auto IVFFlatScanTemplate = [&]<typename AnnIVFFlatType, typename... OptionalFilter>(OptionalFilter &&...filter) {
-                            AnnIVFFlatType ann_ivfflat_query(knn_query_ptr,
-                                                             knn_scan_shared_data->query_count_,
-                                                             knn_scan_shared_data->topk_,
-                                                             knn_scan_shared_data->dimension_,
-                                                             knn_scan_shared_data->query_elem_type_);
-                            ann_ivfflat_query.Begin();
-                            ann_ivfflat_query.Search(index, segment_id, n_probes, std::forward<OptionalFilter>(filter)...);
-                            ann_ivfflat_query.EndWithoutSort();
-                            auto dists = ann_ivfflat_query.GetDistances();
-                            auto row_ids = ann_ivfflat_query.GetIDs();
-                            // TODO: now only work for one query
-                            // FIXME: cant work for multiple queries
-                            auto result_count = std::lower_bound(dists,
-                                                                 dists + knn_scan_shared_data->topk_,
-                                                                 AnnIVFFlatType::InvalidValue(),
-                                                                 AnnIVFFlatType::CompareDist) -
-                                                dists;
-                            merge_heap->Search(dists, row_ids, result_count);
-                        };
-                        auto IVFFlatScan = [&]<typename... OptionalFilter>(OptionalFilter &&...filter) {
-                            switch (knn_scan_shared_data->knn_distance_type_) {
-                                case KnnDistanceType::kL2: {
-                                    IVFFlatScanTemplate.template operator()<AnnIVFFlatL2<ColumnDataType>>(std::forward<OptionalFilter>(filter)...);
-                                    break;
-                                }
-                                case KnnDistanceType::kInnerProduct: {
-                                    IVFFlatScanTemplate.template operator()<AnnIVFFlatIP<ColumnDataType>>(std::forward<OptionalFilter>(filter)...);
-                                    break;
-                                }
-                                case KnnDistanceType::kCosine: {
-                                    IVFFlatScanTemplate.template operator()<AnnIVFFlatCOS<ColumnDataType>>(std::forward<OptionalFilter>(filter)...);
-                                    break;
-                                }
-                                default: {
-                                    Status status = Status::NotSupport("Not implemented KNN distance");
-                                    RecoverableError(status);
-                                }
-                            }
-                        };
-                        if (use_bitmask) {
-                            BitmaskFilter<SegmentOffset> filter(bitmask);
-                            IVFFlatScan(filter);
-                        } else {
-                            IVFFlatScan();
-                        }
-                    }
+                case IndexType::kIVF: {
+                    UnrecoverableError("Not supported now");
                     break;
                 }
                 case IndexType::kHnsw: {

@@ -42,6 +42,7 @@ import logger;
 import base_memindex;
 import memindex_tracer;
 import table_index_entry;
+import buffer_handle;
 
 namespace infinity {
 
@@ -198,6 +199,7 @@ private:
     SegmentIndexEntry *segment_index_entry_{};
     bool trace_{};
     bool own_memory_{};
+    BufferHandle chunk_handle_{};
 };
 
 } // namespace infinity

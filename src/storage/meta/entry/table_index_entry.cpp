@@ -34,9 +34,6 @@ import base_entry;
 import logger;
 import index_hnsw;
 import index_file_worker;
-import annivfflat_index_file_worker;
-import hnsw_file_worker;
-import secondary_index_file_worker;
 import embedding_info;
 import block_entry;
 import segment_entry;
@@ -162,8 +159,7 @@ bool TableIndexEntry::GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedP
     std::unique_lock w_lock(rw_locker_);
     auto iter = index_by_segment_.find(segment_id);
     if (iter == index_by_segment_.end()) {
-        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, DEFAULT_SEGMENT_CAPACITY, column_def_);
-        segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
+        segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn);
         index_by_segment_.emplace(segment_id, segment_index_entry);
         created = true;
     } else {
@@ -313,9 +309,8 @@ SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *seg
             return nullptr;
         }
     }
-    auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_entry->row_capacity(), column_def_);
     u32 segment_id = segment_entry->segment_id();
-    SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
+    SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn);
     segment_index_entry->PopulateEntirely(segment_entry, txn, config);
     std::unique_lock w_lock(rw_locker_);
     index_by_segment_.emplace(segment_id, segment_index_entry);
@@ -340,11 +335,8 @@ TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prep
     Vector<SegmentIndexEntry *> segment_index_entries;
     SegmentID unsealed_id = table_entry->unsealed_id();
     for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
-        SegmentOffset segment_offset = segment_info.segment_offset_;
-
-        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_offset, column_def_);
         auto *segment_entry = segment_info.segment_entry_;
-        SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
+        SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn);
         if (!is_replay) {
             segment_index_entry->CreateIndexPrepare(segment_entry, txn, prepare, check_ts);
         }
