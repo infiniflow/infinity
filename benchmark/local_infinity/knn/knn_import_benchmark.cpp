@@ -26,7 +26,6 @@ import infinity;
 import logical_type;
 
 import profiler;
-import local_file_system;
 import third_party;
 import logical_node_type;
 import embedding_info;
@@ -38,6 +37,7 @@ import knn_expr;
 import column_def;
 import statement_common;
 import data_type;
+import virtual_storage;
 
 using namespace infinity;
 
@@ -59,11 +59,10 @@ int main(int argc, char *argv[]) {
         data_path = std::string(argv[3]);
     }
 
-    LocalFileSystem fs;
-    if (fs.Exists(data_path)) {
+    if (VirtualStorage::ExistsLocal(data_path)) {
         std::cout << "Data path: " << data_path << " is already existed." << std::endl;
     } else {
-        fs.CreateDirectory(data_path);
+        VirtualStorage::MakeDirectoryLocal(data_path);
         std::cout << "Data path: " << data_path << " is created." << std::endl;
     }
 
@@ -114,7 +113,7 @@ int main(int argc, char *argv[]) {
 
 //        auto [ table, status2 ] = data_base->GetTable(table_name);
 
-        if (!fs.Exists(base_path)) {
+        if (!VirtualStorage::ExistsLocal(base_path)) {
             std::cout << "File: " << base_path << " doesn't exist" << std::endl;
             break;
         }

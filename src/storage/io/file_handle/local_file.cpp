@@ -144,6 +144,14 @@ Tuple<SizeT, Status> LocalFile::Read(String &buffer, u64 nbytes) {
     return {read_n, Status::OK()};
 }
 
+Status LocalFile::Seek(u64 nbytes) {
+    if ((off_t)-1 == lseek(fd_, nbytes, SEEK_SET)) {
+        String error_message = fmt::format("Can't seek file: {}: {}", path_, strerror(errno));
+        UnrecoverableError(error_message);
+    }
+    return Status::OK();
+}
+
 Status LocalFile::Download(const String &url, const String &path) { return Status::OK(); }
 
 Status LocalFile::Upload(const String &path, const String &url) { return Status::OK(); }
