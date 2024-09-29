@@ -57,6 +57,7 @@ import search_expr;
 import explain_statement;
 import create_index_info;
 import command_statement;
+import select_statement;
 import data_block;
 import table_def;
 import extra_ddl_info;
@@ -596,17 +597,50 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         }
     }
 
+    //order by
+    Vector<OrderByExpr *> *order_by_list = new Vector<OrderByExpr *>();
+    DeferFn defer_fn9([&]() {
+        if (order_by_list != nullptr) {
+            for (auto &expr_ptr : *order_by_list) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
+            delete order_by_list;
+            order_by_list = nullptr;
+        }
+    });
+    order_by_list->reserve(request.order_by_list.size());
+
+    Status order_by_status;
+    for (auto &expr : request.order_by_list) {
+        auto order_by_expr = GetOrderByExprFromProto(order_by_status, expr);
+        DeferFn defer_fn4([&]() {
+            if (order_by_expr != nullptr) {
+                delete order_by_expr;
+                order_by_expr = nullptr;
+            }
+        });
+
+        if (!order_by_status.ok()) {
+            ProcessStatus(response, order_by_status);
+            return;
+        }
+        order_by_list->emplace_back(order_by_expr);
+        order_by_expr = nullptr;
+    }
+
     // auto end2 = std::chrono::steady_clock::now();
     // phase_2_duration_ += end2 - start2;
     //
     // auto start3 = std::chrono::steady_clock::now();
 
-    const QueryResult result = infinity->Search(request.db_name, request.table_name, search_expr, filter, limit, offset, output_columns);
+    const QueryResult result = infinity->Search(request.db_name, request.table_name, search_expr, filter, limit, offset, output_columns, order_by_list);
     output_columns = nullptr;
     filter = nullptr;
     search_expr = nullptr;
     limit = nullptr;
     offset = nullptr;
+    order_by_list = nullptr;
     // auto end3 = std::chrono::steady_clock::now();
     //
     // phase_3_duration_ += end3 - start3;
@@ -2102,6 +2136,20 @@ ParsedExpr *InfinityThriftService::GetParsedExprFromProto(Status &status, const 
         status = Status::InvalidParsedExprType();
     }
     return nullptr;
+}
+
+OrderByExpr *InfinityThriftService::GetOrderByExprFromProto(Status &status, const infinity_thrift_rpc::OrderByExpr &expr) {
+    auto order_by_expr = MakeUnique<OrderByExpr>();
+    order_by_expr->expr_ = GetParsedExprFromProto(status, expr.expr);
+    if (!status.ok()) {
+        return nullptr;
+    }
+    if(expr.asc){
+        order_by_expr->type_ = OrderType::kAsc;
+    }else{
+        order_by_expr->type_ = OrderType::kDesc;
+    }
+    return order_by_expr.release();
 }
 
 KnnDistanceType InfinityThriftService::GetDistanceTypeFormProto(const infinity_thrift_rpc::KnnDistanceType::type &type) {

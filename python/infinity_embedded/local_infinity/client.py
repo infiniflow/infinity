@@ -172,12 +172,13 @@ class LocalInfinityClient:
         return self.convert_res(self.client.Export(db_name, table_name, columns, file_name, export_options))
 
     def select(self, db_name: str, table_name: str, select_list: list[WrapParsedExpr], search_expr,
-               where_expr, limit_expr, offset_expr, group_by_list=None):
+               where_expr, limit_expr, offset_expr, order_by_list: list[WrapOrderByExpr], group_by_list=None):
         if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.Search(db_name, table_name, select_list,
+                                                   order_by_list=order_by_list,
                                                    wrap_search_expr=search_expr, where_expr=where_expr,
-                                                   limit_expr=limit_expr, offset_expr=offset_expr),
+                                                   limit_expr=limit_expr, offset_expr=offset_expr, ),
                                 has_result_data=True)
 
     def explain(self, db_name: str, table_name: str, explain_type, select_list, search_expr,

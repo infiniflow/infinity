@@ -222,6 +222,12 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("search_expr", &WrapParsedExpr::search_expr)
         .def_rw("in_expr", &WrapParsedExpr::in_expr);
 
+    //Bind WrapOrderByExpr
+    nb::class_<WrapOrderByExpr>(m, "WrapOrderByExpr")
+        .def(nb::init<WrapParsedExpr, bool>())
+        .def_rw("expr", &WrapOrderByExpr::expr)
+        .def_rw("asc", &WrapOrderByExpr::asc);
+
     // infinity
     nb::class_<Infinity>(m, "Infinity")
         .def(nb::init<>()) // bind constructor
@@ -297,6 +303,7 @@ NB_MODULE(embedded_infinity_ext, m) {
              nb::arg("db_name"),
              nb::arg("table_name"),
              nb::arg("select_list"),
+             nb::arg("order_by_list"),
              nb::arg("wrap_search_expr") = nullptr,
              nb::arg("where_expr") = nullptr,
              nb::arg("limit_expr") = nullptr,

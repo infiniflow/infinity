@@ -82,6 +82,7 @@ export using infinity_thrift_rpc::MatchExpr;
 export using infinity_thrift_rpc::GenericMatchExpr;
 export using infinity_thrift_rpc::FusionExpr;
 export using infinity_thrift_rpc::ParsedExpr;
+export using infinity_thrift_rpc::OrderByExpr;
 export using infinity_thrift_rpc::KnnDistanceType;
 export using infinity_thrift_rpc::ExplainType;
 export using infinity_thrift_rpc::EmbeddingData;

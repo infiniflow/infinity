@@ -377,8 +377,17 @@ class RemoteTable():
         self.query_builder.offset(offset)
         return self
     
-    def sort(self, columns: Optional[List[str]], sort_type: SortType = SortType.Asc):
-        self.query_builder.sort(columns, sort_type)
+    def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
+        for order_by_expr in order_by_expr_list:
+            if len(order_by_expr) != 2:
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"order_by_expr_list must be a list of [column_name, sort_type]")
+            if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"sort_type must be SortType.Asc or SortType.Desc")
+            if order_by_expr[1] == SortType.Asc:
+                order_by_expr[1] = True
+            else :
+                order_by_expr[1] = False
+        self.query_builder.sort(order_by_expr_list)
         return self
 
     def to_result(self):
@@ -425,7 +434,8 @@ class RemoteTable():
                                 where_expr=query.filter,
                                 group_by_list=None,
                                 limit_expr=query.limit,
-                                offset_expr=query.offset)
+                                offset_expr=query.offset,
+                                order_by_list=query.sort)
 
         # process the results
         if res.error_code == ErrorCode.OK:
