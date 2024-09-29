@@ -38,7 +38,7 @@ export struct ObjStat {
     SizeT ref_count_{}; // the number of user (R and W) of some part of this object
     Set<Range> deleted_ranges_{};
 
-    bool cached_{}; // whether the object is in localdisk cache
+    bool cached_ = false; // whether the object is in localdisk cache
 
     ObjStat() = default;
 

@@ -232,12 +232,13 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("GetObjCache Failed to find object for local path {}", local_path);
         LOG_WARN(error_message);
-        result.cached_ = true; // TODO
+        result.cached_ = true;
         return result;
     }
     result.obj_addr_ = it->second;
     if (ObjStat *obj_stat = objects_->Get(it->second.obj_key_); obj_stat != nullptr) {
         LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
+        result.cached_ = obj_stat->cached_;
     } else {
         if (it->second.obj_key_ != current_object_key_) {
             String error_message = fmt::format("GetObjCache object {} not found", it->second.obj_key_);
@@ -245,8 +246,8 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         }
         current_object_ref_count_++;
         LOG_TRACE(fmt::format("GetObjCache current object {} ref count {}", it->second.obj_key_, current_object_ref_count_));
+        result.cached_ = true;
     }
-    // result.cached_ = true; // TODO
     return result;
 }
 

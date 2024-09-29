@@ -38,6 +38,7 @@ TEST_F(ObjectStatMapTest, test1) {
 
     ObjStat *stat2 = obj_map.GetNoCount("key2");
     EXPECT_NE(stat2, nullptr);
+    EXPECT_FALSE(stat2->cached_);
     Optional<ObjStat> stat2_opt = obj_map.Invalidate("key2");
     EXPECT_TRUE(stat2_opt.has_value());
     stat2 = obj_map.GetNoCount("key2");

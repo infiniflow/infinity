@@ -23,11 +23,10 @@ import third_party;
 namespace infinity {
 
 struct LRUListEntry {
-    LRUListEntry(String key, ObjStat obj_stat, bool cleaned) : key_(std::move(key)), obj_stat_(std::move(obj_stat)), cleaned_(cleaned) {}
+    LRUListEntry(String key, ObjStat obj_stat) : key_(std::move(key)), obj_stat_(std::move(obj_stat)) {}
 
     String key_{};
     ObjStat obj_stat_{};
-    bool cleaned_{};
 };
 
 class ObjectStatMap {
