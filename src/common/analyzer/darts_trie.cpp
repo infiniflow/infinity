@@ -14,8 +14,8 @@
 module;
 
 #include <cstddef>
+#include <fstream>
 #include <map>
-#include <sstream>
 #include <vector>
 module darts_trie;
 
@@ -28,13 +28,12 @@ namespace infinity {
 POSTable::POSTable(const String &file_name) : file_(file_name) {}
 
 Status POSTable::Load() {
-    std::istringstream from(file_);
+    std::ifstream from(file_);
     if (!from.good()) {
         return Status::InvalidAnalyzerFile(file_);
     }
 
     String line;
-    std::istringstream iss;
     i32 index = 0;
 
     while (getline(from, line)) {
@@ -85,8 +84,8 @@ void DartsTrie::Build() {
         lengths.push_back(o.key_.size());
         values.push_back(o.value_);
     }
-    buffer_.clear();
     darts_->build(keys.size(), keys.data(), lengths.data(), values.data(), nullptr);
+    buffer_.clear();
 }
 
 void DartsTrie::Load(const String &file_name) { darts_->open(file_name.c_str()); }

@@ -126,4 +126,30 @@ inline uint32_t UTF8SeqLength(const uint8_t first_octet) {
     return bits - 1 - first_zero;
 }
 
+static const uint8_t UTF8_BYTE_LENGTH_TABLE[256] = {
+        // start byte of 1-byte utf8 char: 0b0000'0000 ~ 0b0111'1111
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        // continuation byte: 0b1000'0000 ~ 0b1011'1111
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        // start byte of 2-byte utf8 char: 0b1100'0000 ~ 0b1101'1111
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        // start byte of 3-byte utf8 char: 0b1110'0000 ~ 0b1110'1111
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        // start byte of 4-byte utf8 char: 0b1111'0000 ~ 0b1111'0111
+        // invalid utf8 byte: 0b1111'1000~ 0b1111'1111
+        4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1};
+
+inline uint32_t UTF8Length(std::string const &str) {
+    uint32_t len = 0;
+    for (uint32_t i = 0, char_size = 0; i < str.size(); i += char_size) {
+        char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(str.data()[i])];
+        ++len;
+    }
+    return len;
+}
+
 } // namespace infinity
