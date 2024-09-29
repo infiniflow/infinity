@@ -280,7 +280,7 @@ Status VirtualStorage::RenameLocal(const String &old_path, const String &new_pat
     return Status::OK();
 }
 
-Status VirtualStorage::TruncateLocal(const String& file_name, SizeT new_length) {
+Status VirtualStorage::TruncateLocal(const String &file_name, SizeT new_length) {
     if (!std::filesystem::path(file_name).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", file_name);
         UnrecoverableError(error_message);
@@ -294,7 +294,7 @@ Status VirtualStorage::TruncateLocal(const String& file_name, SizeT new_length) 
     return Status::OK();
 }
 
-Status VirtualStorage::MergeLocal(const String& dst_path, const String& src_path) {
+Status VirtualStorage::MergeLocal(const String &dst_path, const String &src_path) {
     if (!std::filesystem::path(dst_path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", dst_path);
         UnrecoverableError(error_message);
@@ -325,6 +325,23 @@ Status VirtualStorage::MergeLocal(const String& dst_path, const String& src_path
     srcFile.close();
     dstFile.close();
     return Status::OK();
+}
+
+Tuple<Vector<SharedPtr<DirEntry>>, Status> VirtualStorage::ListDirectoryLocal(const String &path) {
+    if (!std::filesystem::path(path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", path);
+        UnrecoverableError(error_message);
+    }
+    Path dir_path(path);
+    if (!is_directory(dir_path)) {
+        String error_message = fmt::format("{} isn't a directory", path);
+        UnrecoverableError(error_message);
+    }
+
+    Vector<SharedPtr<DirEntry>> file_array;
+    std::ranges::for_each(std::filesystem::directory_iterator{path},
+                          [&](const auto &dir_entry) { file_array.emplace_back(MakeShared<DirEntry>(dir_entry)); });
+    return {file_array, Status::OK()};
 }
 
 } // namespace infinity

@@ -37,6 +37,8 @@ Tuple<SizeT, Status> ObjectFile::Read(char *buffer, u64 nbytes) { return {0, Sta
 
 Tuple<SizeT, Status> ObjectFile::Read(String &buffer, u64 nbytes) { return {0, Status::OK()}; }
 
+Status ObjectFile::Seek(u64 nbytes) { return Status::OK(); }
+
 Status ObjectFile::Download(const String &url, const String &path) { return Status::OK(); }
 
 Status ObjectFile::Upload(const String &path, const String &url) { return Status::OK(); }

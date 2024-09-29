@@ -21,6 +21,11 @@ Tensor,
 TensorArray,
 Sparse,
 MultiVector,
+Date,
+Time,
+DateTime,
+Timestamp,
+Interval,
 Invalid
 }
 
@@ -110,6 +115,11 @@ IntegerTensorArray,
 DoubleTensorArray,
 SparseIntegerArray,
 SparseDoubleArray,
+Date,
+Time,
+Inteval,
+DateTime,
+Timestamp,
 }
 
 union ParsedExprType {
@@ -296,6 +306,11 @@ ColumnTensorArray,
 ColumnSparse,
 ColumnMultiVector,
 ColumnRowID,
+ColumnDate,
+ColumnTime,
+ColumnDateTime,
+ColumnTimestamp,
+ColumnInterval,
 ColumnInvalid,
 }
 
