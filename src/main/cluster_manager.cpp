@@ -230,7 +230,12 @@ void ClusterManager::CheckHeartBeat() {
 }
 
 void ClusterManager::CheckHeartBeatInner() {
-    auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval_);
+    if (this_node_->node_role_ != NodeRole::kLeader) {
+        String error_message = "Invalid node role.";
+        UnrecoverableError(error_message);
+    }
+    // this_node_ is the leader;
+    auto hb_interval = std::chrono::milliseconds(this_node_->heartbeat_interval_);
     while (true) {
         std::unique_lock hb_lock(this->hb_mutex_);
         this->hb_cv_.wait_for(hb_lock, hb_interval, [&] { return !this->hb_running_; });
@@ -245,7 +250,7 @@ void ClusterManager::CheckHeartBeatInner() {
 
         for (auto &[node_name, node_info] : other_node_map_) {
             if (node_info->node_status_ == NodeStatus::kAlive) {
-                if (node_info->last_update_ts_ + 2 * leader_node_->heartbeat_interval_ < this_node_->last_update_ts_) {
+                if (node_info->last_update_ts_ + 2 * this_node_->heartbeat_interval_ < this_node_->last_update_ts_) {
                     node_info->node_status_ = NodeStatus::kTimeout;
                     LOG_INFO(fmt::format("Node {} is timeout", node_name));
                 }

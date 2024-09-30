@@ -29,7 +29,6 @@ import wal_manager;
 import catalog;
 import txn_manager;
 import builtin_functions;
-import local_file_system;
 import third_party;
 import logger;
 
