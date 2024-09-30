@@ -626,6 +626,8 @@ Status LogicalPlanner::BuildCreateDatabase(const CreateStatement *statement, Sha
 }
 
 Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    return Status::NotSupport("View isn't supported");
+#if 0
     CreateViewInfo *create_view_info = (CreateViewInfo *)(statement->create_info_.get());
 
     // Check if columns is given.
@@ -657,6 +659,7 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
     return Status::OK();
+#endif
 }
 
 Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -1853,14 +1856,20 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
     switch (statement->type_) {
         case ExplainType::kAst: {
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-            ExplainAST::Explain(statement->statement_, texts_ptr);
+            Status status = ExplainAST::Explain(statement->statement_, texts_ptr);
+            if(!status.ok()) {
+                return status;
+            }
             explain_node->SetText(texts_ptr);
             break;
         }
         case ExplainType::kUnOpt: {
             Build(statement->statement_, bind_context_ptr);
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-            ExplainLogicalPlan::Explain(this->logical_plan_.get(), texts_ptr);
+            Status status = ExplainLogicalPlan::Explain(this->logical_plan_.get(), texts_ptr);
+            if(!status.ok()) {
+                return status;
+            }
             explain_node->SetText(texts_ptr);
             break;
         }
