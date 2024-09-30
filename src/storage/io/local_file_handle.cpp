@@ -125,7 +125,7 @@ Status LocalFileHandle::Seek(u64 nbytes) {
     return Status::OK();
 }
 
-SizeT LocalFileHandle::FileSize() {
+i64 LocalFileHandle::FileSize() {
     struct stat s {};
     if (fstat(fd_, &s) == -1) {
         return -1;

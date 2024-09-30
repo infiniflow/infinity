@@ -33,7 +33,7 @@ public:
     Tuple<SizeT, Status> Read(void *buffer, u64 nbytes);
     Tuple<SizeT, Status> Read(String &buffer, u64 nbytes);
     Status Seek(u64 nbytes);
-    SizeT FileSize();
+    i64 FileSize();
     Tuple<char *, SizeT, Status> MmapRead(const String &name);
     Status Unmmap(const String &name);
     Status Sync();

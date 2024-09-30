@@ -172,15 +172,15 @@ void PhysicalShow::Init() {
             output_names_->reserve(3);
             output_types_->reserve(3);
 
-            output_names_->emplace_back("column_name");
-            output_names_->emplace_back("column_type");
-            output_names_->emplace_back("constraint");
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("type");
             output_names_->emplace_back("default");
+//            output_names_->emplace_back("constraint");
 
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(varchar_type);
+//            output_types_->emplace_back(varchar_type);
             break;
         }
         case ShowType::kShowIndexes: {
@@ -1788,10 +1788,10 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "column_name", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "column_type", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "constraint", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(3, varchar_type, "default", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "type", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "default", std::set<ConstraintType>()),
+//        MakeShared<ColumnDef>(3, varchar_type, "constraint", std::set<ConstraintType>())
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), column_defs);
@@ -1802,7 +1802,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         varchar_type,
         varchar_type,
         varchar_type,
-        varchar_type,
+//        varchar_type,
     };
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
@@ -1835,25 +1835,25 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
         ++output_column_idx;
         {
-            // Append column constraint to the third column
-            String column_constraint;
-            for (auto &constraint : column->constraints_) {
-                column_constraint += " " + ConstrainTypeToString(constraint);
-            }
-
-            Value value = Value::MakeVarchar(column_constraint);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
-        }
-
-        ++output_column_idx;
-        {
             // Append column default value to the fourth column
             String column_default = column->default_expr_->ToString();
             Value value = Value::MakeVarchar(column_default);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
+
+//        ++output_column_idx;
+//        {
+//            // Append column constraint to the third column
+//            String column_constraint;
+//            for (auto &constraint : column->constraints_) {
+//                column_constraint += " " + ConstrainTypeToString(constraint);
+//            }
+//
+//            Value value = Value::MakeVarchar(column_constraint);
+//            ValueExpression value_expr(value);
+//            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+//        }
 
         if (++row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
