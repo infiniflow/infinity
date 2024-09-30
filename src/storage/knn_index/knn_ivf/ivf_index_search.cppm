@@ -92,17 +92,12 @@ struct IVF_Filter<false> {
 };
 
 template <LogicalType t,
-          typename ColumnDataType,
-          typename QueryDataType,
           template <typename, typename>
           typename C,
           typename DistanceDataType,
           bool use_bitmask,
           typename MultiVectorInnerTopnIndexType = void>
 class IVF_Search_HandlerT final : public IVF_Search_Handler<DistanceDataType> {
-    static_assert(((std::is_same_v<QueryDataType, u8> || std::is_same_v<QueryDataType, i8>) && std::is_same_v<QueryDataType, ColumnDataType>) ||
-                  (std::is_same_v<QueryDataType, f32> && (std::is_same_v<ColumnDataType, f64> || std::is_same_v<ColumnDataType, f32> ||
-                                                          std::is_same_v<ColumnDataType, Float16T> || std::is_same_v<ColumnDataType, BFloat16T>)));
     static_assert(t == LogicalType::kEmbedding || t == LogicalType::kMultiVector);
     static constexpr bool NEED_FLIP = !std::is_same_v<CompareMax<DistanceDataType, SegmentOffset>, C<DistanceDataType, SegmentOffset>>;
     using ResultHandler = std::conditional_t<t == LogicalType::kEmbedding,
@@ -131,17 +126,6 @@ public:
                                       this->ivf_params_.nprobe_,
                                       std::bind(&IVF_Search_HandlerT::AddResult, this, std::placeholders::_1, std::placeholders::_2));
     }
-    void Search(const IVF_Index_Storage *ivf_index_storage) {
-        assert(ivf_index_storage->column_logical_type() == t);
-        assert(ivf_index_storage->embedding_data_type() == CppTypeToEmbeddingDataTypeV<ColumnDataType>);
-        assert(ivf_index_storage->embedding_dimension() == this->ivf_params_.knn_scan_shared_data_->dimension_);
-        assert(CppTypeToEmbeddingDataTypeV<QueryDataType> == this->ivf_params_.query_elem_type_);
-        ivf_index_storage->SearchIndex(this->ivf_params_.knn_distance_type_,
-                                       this->ivf_params_.query_embedding_,
-                                       this->ivf_params_.query_elem_type_,
-                                       this->ivf_params_.nprobe_,
-                                       std::bind(&IVF_Search_HandlerT::AddResult, this, std::placeholders::_1, std::placeholders::_2));
-    }
     void AddResult(DistanceDataType d, SegmentOffset i) {
         if constexpr (t == LogicalType::kEmbedding) {
             result_handler_.AddResult(0, d, i);
@@ -156,19 +140,11 @@ public:
     }
 };
 
-export template <LogicalType t,
-                 typename ColumnDataType,
-                 typename QueryDataType,
-                 template <typename, typename>
-                 typename C,
-                 typename DistanceDataType,
-                 bool use_bitmask>
+export template <LogicalType t, template <typename, typename> typename C, typename DistanceDataType, bool use_bitmask>
 UniquePtr<IVF_Search_Handler<DistanceDataType>>
 GetIVFSearchHandler(const IVF_Search_Params &ivf_params, const Bitmask &bitmask, const SegmentOffset max_segment_offset) {
     if constexpr (t == LogicalType::kEmbedding) {
-        return MakeUnique<IVF_Search_HandlerT<t, ColumnDataType, QueryDataType, C, DistanceDataType, use_bitmask>>(ivf_params,
-                                                                                                                   bitmask,
-                                                                                                                   max_segment_offset);
+        return MakeUnique<IVF_Search_HandlerT<t, C, DistanceDataType, use_bitmask>>(ivf_params, bitmask, max_segment_offset);
     } else if constexpr (t == LogicalType::kMultiVector) {
         const auto top_k = ivf_params.topk_;
         if (top_k <= 0) {
@@ -176,19 +152,13 @@ GetIVFSearchHandler(const IVF_Search_Params &ivf_params, const Bitmask &bitmask,
             return nullptr;
         }
         if (top_k <= std::numeric_limits<u8>::max()) {
-            return MakeUnique<IVF_Search_HandlerT<t, ColumnDataType, QueryDataType, C, DistanceDataType, use_bitmask, u8>>(ivf_params,
-                                                                                                                           bitmask,
-                                                                                                                           max_segment_offset);
+            return MakeUnique<IVF_Search_HandlerT<t, C, DistanceDataType, use_bitmask, u8>>(ivf_params, bitmask, max_segment_offset);
         }
         if (top_k <= std::numeric_limits<u16>::max()) {
-            return MakeUnique<IVF_Search_HandlerT<t, ColumnDataType, QueryDataType, C, DistanceDataType, use_bitmask, u16>>(ivf_params,
-                                                                                                                            bitmask,
-                                                                                                                            max_segment_offset);
+            return MakeUnique<IVF_Search_HandlerT<t, C, DistanceDataType, use_bitmask, u16>>(ivf_params, bitmask, max_segment_offset);
         }
         if (top_k <= std::numeric_limits<u32>::max()) {
-            return MakeUnique<IVF_Search_HandlerT<t, ColumnDataType, QueryDataType, C, DistanceDataType, use_bitmask, u32>>(ivf_params,
-                                                                                                                            bitmask,
-                                                                                                                            max_segment_offset);
+            return MakeUnique<IVF_Search_HandlerT<t, C, DistanceDataType, use_bitmask, u32>>(ivf_params, bitmask, max_segment_offset);
         }
         RecoverableError(Status::SyntaxError(fmt::format("Unsupported topk : {}, which is larger than u32::max()", top_k)));
         return nullptr;
@@ -198,13 +168,13 @@ GetIVFSearchHandler(const IVF_Search_Params &ivf_params, const Bitmask &bitmask,
     }
 }
 
-export template <LogicalType t, typename ColumnDataType, typename QueryDataType, template <typename, typename> typename C, typename DistanceDataType>
+export template <LogicalType t, template <typename, typename> typename C, typename DistanceDataType>
 UniquePtr<IVF_Search_Handler<DistanceDataType>>
 GetIVFSearchHandler(const IVF_Search_Params &ivf_params, const bool use_bitmask, const Bitmask &bitmask, const SegmentOffset max_segment_offset) {
     if (use_bitmask) {
-        return GetIVFSearchHandler<t, ColumnDataType, QueryDataType, C, DistanceDataType, true>(ivf_params, bitmask, max_segment_offset);
+        return GetIVFSearchHandler<t, C, DistanceDataType, true>(ivf_params, bitmask, max_segment_offset);
     }
-    return GetIVFSearchHandler<t, ColumnDataType, QueryDataType, C, DistanceDataType, false>(ivf_params, bitmask, max_segment_offset);
+    return GetIVFSearchHandler<t, C, DistanceDataType, false>(ivf_params, bitmask, max_segment_offset);
 }
 
 } // namespace infinity
