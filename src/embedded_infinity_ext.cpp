@@ -475,7 +475,7 @@ NB_MODULE(embedded_infinity_ext, m) {
 
     // create_index_info
     nb::enum_<IndexType>(m, "IndexType")
-        .value("kIVFFlat", IndexType::kIVFFlat)
+        .value("kIVF", IndexType::kIVF)
         .value("kHnsw", IndexType::kHnsw)
         .value("kFullText", IndexType::kFullText)
         .value("kSecondary", IndexType::kSecondary)

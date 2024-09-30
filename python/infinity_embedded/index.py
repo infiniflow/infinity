@@ -23,7 +23,7 @@ from infinity_embedded.errors import ErrorCode
 
 
 class IndexType(Enum):
-    IVFFlat = 1
+    IVF = 1
     Hnsw = 2
     FullText = 3
     Secondary = 4
@@ -33,8 +33,8 @@ class IndexType(Enum):
 
     def to_local_type(self):
         match self:
-            case IndexType.IVFFlat:
-                return LocalIndexType.kIVFFlat
+            case IndexType.IVF:
+                return LocalIndexType.kIVF
             case IndexType.Hnsw:
                 return LocalIndexType.kHnsw
             case IndexType.FullText:

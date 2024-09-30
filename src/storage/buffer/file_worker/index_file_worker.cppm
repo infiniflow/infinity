@@ -25,15 +25,6 @@ import persistence_manager;
 
 namespace infinity {
 
-export struct CreateIndexParam {
-    virtual ~CreateIndexParam() = default;
-
-    SharedPtr<IndexBase> index_base_{};
-    SharedPtr<ColumnDef> column_def_{};
-
-    CreateIndexParam(SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def) : index_base_(index_base), column_def_(column_def) {}
-};
-
 export class IndexFileWorker : public FileWorker {
 protected:
     SharedPtr<ColumnDef> column_def_{};

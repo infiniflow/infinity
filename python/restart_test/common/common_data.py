@@ -99,7 +99,7 @@ def is_bool(str):
     return str.lower() == "true" or str.lower() == "false"
 
 index_type_transfrom = {
-    index.IndexType.IVFFlat:"IVFFlat",
+    index.IndexType.IVF:"IVF",
     index.IndexType.Hnsw:"HNSW",
     index.IndexType.FullText:"FULLTEXT",
     index.IndexType.Secondary:"Secondary",

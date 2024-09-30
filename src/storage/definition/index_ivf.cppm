@@ -31,6 +31,7 @@ export struct IndexIVFCentroidOption {
     u32 min_points_per_centroid_ = 32;  // for training centroids
     u32 max_points_per_centroid_ = 256; // for training centroids
     bool operator==(const IndexIVFCentroidOption &other) const = default;
+    String ToString() const;
 };
 
 export struct IndexIVFStorageOption {
@@ -41,17 +42,18 @@ export struct IndexIVFStorageOption {
     };
     Type type_ = Type::kPlain;
     // kPlain
-    EmbeddingDataType plain_data_type_ = EmbeddingDataType::kElemInvalid; // float32, float16, bfloat16, int8 or uint8
+    EmbeddingDataType plain_storage_data_type_ = EmbeddingDataType::kElemInvalid; // float32, float16, bfloat16, int8 or uint8
     // kScalarQuantization
     u32 scalar_quantization_bits_ = 0; // 4 or 8
     // kProductQuantization
     u32 product_quantization_subspace_num_ = 0;  // in range [1, dim]
     u32 product_quantization_subspace_bits_ = 0; // in range [4, 16]
     bool operator==(const IndexIVFStorageOption &other) const = default;
+    String ToString() const;
 };
 
 export struct IndexIVFOption {
-    MetricType metric_type_ = MetricType::kInvalid;
+    MetricType metric_ = MetricType::kInvalid;
     IndexIVFCentroidOption centroid_option_;
     IndexIVFStorageOption storage_option_;
     bool operator==(const IndexIVFOption &) const = default;
@@ -82,7 +84,7 @@ public:
 
     static IndexIVFOption DeserializeIndexIVFOption(const nlohmann::json &ivf_option_json);
 
-    void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) const;
+    void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 
     IndexIVFOption ivf_option_;
 };

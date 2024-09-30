@@ -3680,8 +3680,8 @@ index_info : '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list {
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp($5, "bmp") == 0) {
         index_type = infinity::IndexType::kBMP;
-    } else if (strcmp($5, "ivfflat") == 0) {
-        index_type = infinity::IndexType::kIVFFlat;
+    } else if (strcmp($5, "ivf") == 0) {
+        index_type = infinity::IndexType::kIVF;
     } else if (strcmp($5, "emvb") == 0) {
         index_type = infinity::IndexType::kEMVB;
     } else if(strcmp($5, "diskann") == 0){

@@ -29,12 +29,6 @@ import persistence_manager;
 
 namespace infinity {
 
-export struct CreateSecondaryIndexParam : public CreateIndexParam {
-    const u32 row_count_{}; // rows in the segment, include the deleted rows
-    CreateSecondaryIndexParam(SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def, u32 row_count)
-        : CreateIndexParam(index_base, column_def), row_count_(row_count) {}
-};
-
 // pgm index
 export class SecondaryIndexFileWorker final : public IndexFileWorker {
 public:

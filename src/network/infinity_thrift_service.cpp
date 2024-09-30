@@ -1692,8 +1692,8 @@ EmbeddingDataType InfinityThriftService::GetEmbeddingDataTypeFromProto(const inf
 
 IndexType InfinityThriftService::GetIndexTypeFromProto(const infinity_thrift_rpc::IndexType::type &type) {
     switch (type) {
-        case infinity_thrift_rpc::IndexType::IVFFlat:
-            return IndexType::kIVFFlat;
+        case infinity_thrift_rpc::IndexType::IVF:
+            return IndexType::kIVF;
         case infinity_thrift_rpc::IndexType::Hnsw:
             return IndexType::kHnsw;
         case infinity_thrift_rpc::IndexType::FullText:

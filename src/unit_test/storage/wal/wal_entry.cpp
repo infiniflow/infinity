@@ -28,8 +28,8 @@ import value;
 
 import data_block;
 import default_values;
-import index_ivfflat;
 import index_base;
+import index_ivf;
 import logical_type;
 import internal_types;
 import column_def;
@@ -209,9 +209,9 @@ TEST_F(WalEntryTest, ReadWrite) {
         entry->cmds_.push_back(MakeShared<WalCmdImport>("db1", "tbl1", std::move(segment_info)));
     }
     {
-        Vector<InitParameter *> parameters = {new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")};
+        Vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
         SharedPtr<String> index_name = MakeShared<String>("idx1");
-        auto index_base = IndexIVFFlat::Make(index_name, "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
+        auto index_base = IndexIVF::Make(index_name, "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
         for (auto parameter : parameters) {
             delete parameter;
         }
