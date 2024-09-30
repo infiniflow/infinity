@@ -572,7 +572,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
             switch (segment_index_entry->table_index_entry()->index_base()->index_type_) {
                 case IndexType::kIVF: {
                     const SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
-                    const auto ivf_search_params = IVF_Search_Params::Make(knn_scan_shared_data);
+                    const auto ivf_search_params = IVF_Search_Params::Make(knn_scan_function_data);
                     auto ivf_result_handler =
                         GetIVFSearchHandler<t, C, DistanceDataType>(ivf_search_params, use_bitmask, bitmask, max_segment_offset);
                     ivf_result_handler->Begin();

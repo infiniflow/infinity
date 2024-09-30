@@ -299,6 +299,7 @@ SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(Txn *txn, TxnTableStore
 SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config) {
     switch (index_base_->index_type_) {
         case IndexType::kHnsw:
+        case IndexType::kIVF:
         case IndexType::kEMVB:
         case IndexType::kFullText:
         case IndexType::kSecondary:
