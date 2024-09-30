@@ -60,6 +60,7 @@ import status;
 import constant_expr;
 import command_statement;
 import physical_import;
+import peer_task;
 
 namespace {
 
@@ -3312,6 +3313,76 @@ public:
     }
 };
 
+class ShowCurrentNodeHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+        http_status = HTTPStatus::CODE_200;
+        json_response["error_code"] = ErrorCode::kOk;
+        switch (InfinityContext::instance().GetServerRole()) {
+            case NodeRole::kAdmin : {
+                json_response["node_role"] = ToString(NodeRole::kAdmin);
+                json_response["node_status"] = ToString(NodeStatus::kAlive);
+                json_response["node_name"] = "admin";
+                break;
+            }
+            case NodeRole::kLeader:
+            case NodeRole::kLearner:
+            case NodeRole::kFollower: {
+                SharedPtr<NodeInfo> this_node = InfinityContext::instance().cluster_manager()->ThisNode();
+                json_response["node_role"] = ToString(this_node->node_role_);
+                json_response["node_status"] = ToString(this_node->node_status_);
+                json_response["node_name"] = this_node->node_name_;
+                break;
+            }
+            case NodeRole::kStandalone: {
+                json_response["node_role"] = ToString(NodeRole::kStandalone);
+                json_response["node_status"] = ToString(NodeStatus::kAlive);
+                json_response["node_name"] = "standalone";
+                break;
+            }
+            case NodeRole::kUnInitialized:
+            default:
+                http_status = HTTPStatus::CODE_500;
+                json_response["error_code"] = ErrorCode::kInvalidNodeRole;
+                json_response["error_msg"] = "Invalid NodeRole";
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+        } 
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowNodeByNameHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+        String node_name = request->getPathVariable("node_name");
+        SharedPtr<NodeInfo> nodeinfo = InfinityContext::instance().cluster_manager()->GetNodeInfoPtrByName(node_name);
+        if(nodeinfo == nullptr) {
+            http_status = HTTPStatus::CODE_200; 
+            json_response["node_role"] = ToString(nodeinfo->node_role_);
+            json_response["node_status"] = ToString(nodeinfo->node_status_);
+            json_response["node_name"] = nodeinfo->node_name_;
+        } else {
+            http_status = HTTPStatus::CODE_500;
+            json_response["error_code"] = ErrorCode::kNotExistNode;
+            json_response["error_msg"] = std::fmt("Node {} does not exist", node_name);
+            return ResponseFactory::createResponse(http_status, json_response.dump());
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
 
 } // namespace
 
@@ -3389,6 +3460,10 @@ void HTTPServer::Start(const String& ip_address, u16 port) {
     router->route("GET", "/variables/session", MakeShared<ShowSessionVariablesHandler>());
     router->route("GET", "/variables/session/{variable_name}", MakeShared<ShowSessionVariableHandler>());
     router->route("SET", "/variables/session", MakeShared<SetSessionVariableHandler>());
+
+    //admin
+    router->route("GET", "/admin/node/current", MakeShared<ShowCurrentNodeHandler>());
+    router->route("GET", "/admin/node/{node_name}", MakeShared<ShowNodeByNameHandler>());
 
     SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({ip_address, port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler = HttpConnectionHandler::createShared(router);
