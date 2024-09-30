@@ -199,4 +199,11 @@ class TestMemIdx:
             idx2_files_in_dir = list(idx2_dir.glob("*"))
             assert len(idx2_files_in_dir) == 3
 
+            infinity_obj.cleanup()
+            idx1_files_in_dir = list(idx1_dir.glob("*"))
+            assert len(idx1_files_in_dir) == 1
+
+            idx2_files_in_dir = list(idx2_dir.glob("*"))
+            assert len(idx2_files_in_dir) == 1
+
         part2()

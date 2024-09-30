@@ -116,9 +116,12 @@ void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
 }
 
-void TxnIndexStore::Rollback() {
+void TxnIndexStore::Rollback(TxnTimeStamp abort_ts) {
     for (auto [segment_index_entry, new_chunk, old_chunks] : optimize_data_) {
         segment_index_entry->ResetOptimizing();
+        for (ChunkIndexEntry *old_chunk : old_chunks) {
+            old_chunk->DeprecateChunk(abort_ts);
+        }
     }
 }
 
@@ -303,7 +306,7 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         Catalog::RemoveIndexEntry(table_index_entry, txn_id); // fix me
     }
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
-        txn_index_store->Rollback();
+        txn_index_store->Rollback(abort_ts);
     }
 }
 
