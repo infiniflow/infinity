@@ -106,7 +106,6 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
     if (!status.ok()) {
         RecoverableError(status);
     }
-    DeferFn file_defer([&]() { file_handle->Close(); });
 
     if (header_) {
         // Output CSV header
@@ -228,14 +227,15 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                     file_handle = std::move(new_file_handle);
                 }
                 file_handle->Append(line.c_str(), line.size());
-                file_handle->Close();
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
+                    file_handle->Close();
                     return row_count;
                 }
             }
         }
     }
+    file_handle->Close();
     LOG_DEBUG(fmt::format("Export to CSV, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
@@ -262,7 +262,6 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
     if (!status.ok()) {
         RecoverableError(status);
     }
-    DeferFn file_defer([&]() { file_handle->Close(); });
 
     SizeT offset = offset_;
     SizeT row_count{0};
@@ -359,14 +358,16 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 // LOG_DEBUG(line_json.dump());
                 String to_write = line_json.dump() + "\n";
                 file_handle->Append(to_write.c_str(), to_write.size());
-                file_handle->Close();
+
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
+                    file_handle->Close();
                     return row_count;
                 }
             }
         }
     }
+    file_handle->Close();
     LOG_DEBUG(fmt::format("Export to JSONL, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
@@ -404,7 +405,6 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     if (!status.ok()) {
         RecoverableError(status);
     }
-    DeferFn file_defer([&]() { file_handle->Close(); });
 
     SizeT offset = offset_;
     SizeT row_count{0};
@@ -449,14 +449,16 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
                 file_handle->Append(&dimension, sizeof(dimension));
                 file_handle->Append(embedding.data(), embedding.size_bytes());
-                file_handle->Close();
+
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
+                    file_handle->Close();
                     return row_count;
                 }
             }
         }
     }
+    file_handle->Close();
     LOG_DEBUG(fmt::format("Export to FVECS, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
