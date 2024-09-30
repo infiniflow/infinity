@@ -22,11 +22,12 @@ import knn_diskann;
 import internal_types;
 import file_system;
 import file_system_type;
-import local_file_system;
+import virtual_store;
 import file_system_type;
 import index_base;
 import diskann_index_data;
-
+import abstract_file_handle;
+import local_file_handle;
 
 using namespace infinity;
 
@@ -34,7 +35,7 @@ class DiskAnnTest : public BaseTest {
 public:
     const std::string save_dir_ = GetFullTmpDir();
 
-    template<typename DiskAnnIndexDataType>
+    template <typename DiskAnnIndexDataType>
     void TestCreateIndex() {
         u32 dim = 100;
         u32 num_points = 100000;
@@ -55,33 +56,37 @@ public:
             data[i * dim + non_zero_dim] = 1.0f;
         }
 
-        LocalFileSystem fs;
         std::string data_file_path = save_dir_ + "/data.bin";
         std::string mem_index_path = save_dir_ + "/mem_index.bin";
         std::string index_file_path = save_dir_ + "/index.bin";
         std::string pqCompressed_data_path = save_dir_ + "/pqCompressed_data.bin";
         std::string pq_pivot_data_path = save_dir_ + "/pq_pivot.bin";
         std::string sample_data_path = save_dir_;
-        auto [data_file_handler, status] = fs.OpenFile(data_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+        auto [data_file_handler, status] = LocalStore::Open(data_file_path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        data_file_handler->Write(data.get(), sizeof(f32) * dim * num_points);
+        data_file_handler->Append(data.get(), sizeof(f32) * dim * num_points);
         data_file_handler->Close();
         {
             auto disk_data = DiskAnnIndexDataType::Make(dim, num_points, R, L, num_pq_chunks, num_parts, num_centers);
-            
-            disk_data->BuildIndex(dim, num_points, labels, fs, Path(data_file_path), Path(mem_index_path), Path(index_file_path), 
-                                 Path(pqCompressed_data_path), Path(sample_data_path), Path(pq_pivot_data_path));  
+
+            disk_data->BuildIndex(dim,
+                                  num_points,
+                                  labels,
+                                  Path(data_file_path),
+                                  Path(mem_index_path),
+                                  Path(index_file_path),
+                                  Path(pqCompressed_data_path),
+                                  Path(sample_data_path),
+                                  Path(pq_pivot_data_path));
 
             std::cout << "Index built successfully" << std::endl;
 
             // disk_data->UnitTest();
         }
-
     }
 };
-
 
 TEST_F(DiskAnnTest, test1) {
     using DiskAnnIndexData = DiskAnnIndexData<f32, SizeT, MetricType::kMetricL2>;

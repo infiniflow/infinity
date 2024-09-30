@@ -25,7 +25,6 @@ import data_type;
 namespace infinity {
 
 class LocalFileHandle;
-class FileHandler;
 
 template <EmbeddingDataType t>
 struct EmbeddingDataTypeToCppType;

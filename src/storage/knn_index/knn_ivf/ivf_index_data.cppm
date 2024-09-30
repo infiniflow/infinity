@@ -28,7 +28,6 @@ import local_file_handle;
 namespace infinity {
 
 class IndexBase;
-class FileHandler;
 struct SegmentEntry;
 class BufferManager;
 

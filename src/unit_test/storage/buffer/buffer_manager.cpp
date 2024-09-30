@@ -26,7 +26,7 @@ import compilation_config;
 import third_party;
 import buffer_handle;
 import infinity_context;
-import local_file_system;
+import virtual_store;
 import logger;
 import config;
 import infinity_exception;
@@ -37,12 +37,10 @@ using namespace infinity;
 
 class BufferManagerTest : public BaseTest {
 private:
-    LocalFileSystem fs;
-
     Vector<SharedPtr<DirEntry>> ListAllFile(const String &path) {
         Vector<SharedPtr<DirEntry>> res;
         std::function<void(const String &)> f = [&](const String &path) {
-            auto entries = fs.ListDirectory(path);
+            auto [entries, status] = LocalStore::ListDirectory(path);
             for (auto &entry : entries) {
                 if (entry->is_directory()) {
                     f(entry->path());
@@ -78,18 +76,18 @@ protected:
     }
 
     void ResetDir() {
-        fs.DeleteDirectory(*data_dir_);
-        fs.DeleteDirectory(*temp_dir_);
-        fs.DeleteDirectory(*persistence_dir_);
-        fs.CreateDirectory(*data_dir_);
-        fs.CreateDirectory(*temp_dir_);
-        fs.CreateDirectory(*persistence_dir_);
+        LocalStore::RemoveDirectory(*data_dir_);
+        LocalStore::RemoveDirectory(*temp_dir_);
+        LocalStore::RemoveDirectory(*persistence_dir_);
+        LocalStore::MakeDirectory(*data_dir_);
+        LocalStore::MakeDirectory(*temp_dir_);
+        LocalStore::MakeDirectory(*persistence_dir_);
     }
 
     void TearDown() override {
-        fs.DeleteDirectory(*data_dir_);
-        fs.DeleteDirectory(*temp_dir_);
-        fs.DeleteDirectory(*persistence_dir_);
+        LocalStore::RemoveDirectory(*data_dir_);
+        LocalStore::RemoveDirectory(*temp_dir_);
+        LocalStore::RemoveDirectory(*persistence_dir_);
 
         Logger::Shutdown();
     }
@@ -194,7 +192,6 @@ TEST_F(BufferManagerTest, cleanup_test) {
 }
 
 TEST_F(BufferManagerTest, varfile_test) {
-    LocalFileSystem fs;
     SizeT buffer_size = 100;
     SizeT file_num = 10;
 
@@ -407,7 +404,6 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
         SharedPtr<PersistenceManager> persistence_manager_ = MakeShared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
         auto test1_obj = MakeUnique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_, temp_dir_);
-        LocalFileSystem fs;
 
         Vector<FileInfo> file_infos;
         for (SizeT i = 0; i < file_n; ++i) {
@@ -489,7 +485,6 @@ TEST_F(BufferManagerParallelTest, parallel_test2) {
     for (int i = 0; i < 1; ++i) {
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_, nullptr);
         auto test2_obj = MakeUnique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_, temp_dir_);
-        LocalFileSystem fs;
 
         Vector<FileInfo> file_infos;
         for (SizeT i = 0; i < file_n; ++i) {

@@ -55,7 +55,6 @@ protected:
         const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<DataType, IdxType>::GenerateGroundtruth(dataset, query_set, topk, false);
 
         String save_path = String(tmp_data_path()) + "/bmindex_test1.index";
-        LocalFileSystem fs;
 
         auto test_query = [&](const BMPAlg &index) {
             {
