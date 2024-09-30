@@ -204,10 +204,17 @@ public:
         BufferHandle handle = new_chunk_index_entry->GetIndex();
         auto *data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
         data_ptr->GetMemData(std::move(*ivf_index_storage_));
-        ivf_index_storage_ = data_ptr->BasePtr();
+        ivf_index_storage_ = data_ptr->GetIVFIndexStoragePtr();
         own_ivf_index_storage_ = false;
         dump_handle_ = std::move(handle);
         return new_chunk_index_entry;
+    }
+
+    void SearchIndexInMem(KnnDistanceType knn_distance_type,
+                          const void *query_ptr,
+                          EmbeddingDataType query_element_type,
+                          std::function<void(f32, SegmentOffset)> add_result_func) const override {
+        // TODO
     }
 };
 
@@ -258,6 +265,19 @@ SharedPtr<IVFIndexInMem> IVFIndexInMem::NewIVFIndexInMem(const ColumnDef *column
     }
     UnrecoverableError("IVFIndex can only apply to Embedding and multi-vector column");
     return {};
+}
+
+void IVFIndexInMem::SearchIndex(const KnnDistanceType knn_distance_type,
+                                const void *query_ptr,
+                                const EmbeddingDataType query_element_type,
+                                const u32 nprobe,
+                                std::function<void(f32, SegmentOffset)> add_result_func) const {
+    std::shared_lock lock(rw_mutex_);
+    if (have_ivf_index_.test(std::memory_order_acquire)) {
+        ivf_index_storage_->SearchIndex(knn_distance_type, query_ptr, query_element_type, nprobe, add_result_func);
+    } else {
+        SearchIndexInMem(knn_distance_type, query_ptr, query_element_type, add_result_func);
+    }
 }
 
 } // namespace infinity

@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <vector>
 module ivf_index_storage;
 
 import stl;
@@ -30,9 +31,37 @@ import logical_type;
 import data_type;
 import kmeans_partition;
 import search_top_1;
+import search_top_k;
 import column_vector;
 
 namespace infinity {
+
+inline auto ApplyEmbeddingDataTypeToFunc(const EmbeddingDataType embedding_data_type, auto func, auto default_f) {
+    switch (embedding_data_type) {
+        case EmbeddingDataType::kElemUInt8: {
+            return func.template operator()<EmbeddingDataType::kElemUInt8>();
+        }
+        case EmbeddingDataType::kElemInt8: {
+            return func.template operator()<EmbeddingDataType::kElemInt8>();
+        }
+        case EmbeddingDataType::kElemDouble: {
+            return func.template operator()<EmbeddingDataType::kElemDouble>();
+        }
+        case EmbeddingDataType::kElemFloat: {
+            return func.template operator()<EmbeddingDataType::kElemFloat>();
+        }
+        case EmbeddingDataType::kElemFloat16: {
+            return func.template operator()<EmbeddingDataType::kElemFloat16>();
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            return func.template operator()<EmbeddingDataType::kElemBFloat16>();
+        }
+        default: {
+            UnrecoverableError("Unsupported embedding data type");
+            return default_f();
+        }
+    }
+}
 
 // IVF_Centroids_Storage
 
@@ -121,6 +150,13 @@ public:
         ++embedding_num_;
     }
 
+    void SearchIndex(KnnDistanceType knn_distance_type,
+                     const void *query_ptr,
+                     EmbeddingDataType query_element_type,
+                     std::function<void(f32, SegmentOffset)> add_result_func) const override {
+        // TODO
+    }
+
     // only for unit-test, return f32 / i8 / u8 embedding data
     Pair<const void *, SharedPtr<void>> GetDataForTest(const u32 embedding_id) const override {
         if constexpr (IsAnyOf<StorageDataT, i8, u8, f32>) {
@@ -148,44 +184,20 @@ IVF_Part_Storage::Make(u32 part_id, u32 embedding_dimension, EmbeddingDataType e
         case IndexIVFStorageOption::Type::kPlain: {
             auto GetPlainResult =
                 [part_id, embedding_dimension, embedding_data_type]<EmbeddingDataType plain_data_type>() -> UniquePtr<IVF_Part_Storage> {
-                auto GetPlainResultInner = [part_id, embedding_dimension]<EmbeddingDataType src_embedding_data_type> {
-                    auto not_i8_u8 = [](EmbeddingDataType t) consteval {
-                        return t != EmbeddingDataType::kElemInt8 && t != EmbeddingDataType::kElemUInt8;
-                    };
-                    if constexpr (plain_data_type == src_embedding_data_type || (not_i8_u8(plain_data_type) && not_i8_u8(src_embedding_data_type))) {
-                        return MakeUnique<IVF_Part_Storage_Plain<plain_data_type, src_embedding_data_type>>(part_id, embedding_dimension);
-                    } else {
-                        return nullptr;
-                    }
-                };
-                switch (embedding_data_type) {
-                    case EmbeddingDataType::kElemInt8: {
-                        return GetPlainResultInner.template operator()<EmbeddingDataType::kElemInt8>();
-                    }
-                    case EmbeddingDataType::kElemUInt8: {
-                        return GetPlainResultInner.template operator()<EmbeddingDataType::kElemUInt8>();
-                    }
-                    case EmbeddingDataType::kElemFloat: {
-                        return GetPlainResultInner.template operator()<EmbeddingDataType::kElemFloat>();
-                    }
-                    case EmbeddingDataType::kElemFloat16: {
-                        return GetPlainResultInner.template operator()<EmbeddingDataType::kElemFloat16>();
-                    }
-                    case EmbeddingDataType::kElemBFloat16: {
-                        return GetPlainResultInner.template operator()<EmbeddingDataType::kElemBFloat16>();
-                    }
-                    case EmbeddingDataType::kElemDouble: {
-                        return GetPlainResultInner.template operator()<EmbeddingDataType::kElemDouble>();
-                    }
-                    case EmbeddingDataType::kElemBit:
-                    case EmbeddingDataType::kElemInt16:
-                    case EmbeddingDataType::kElemInt32:
-                    case EmbeddingDataType::kElemInt64:
-                    case EmbeddingDataType::kElemInvalid: {
-                        UnrecoverableError("Unsupported embedding element type for IVF");
-                        return nullptr;
-                    }
-                }
+                return ApplyEmbeddingDataTypeToFunc(
+                    embedding_data_type,
+                    [part_id, embedding_dimension]<EmbeddingDataType src_embedding_data_type>() -> UniquePtr<IVF_Part_Storage> {
+                        auto not_i8_u8 = [](EmbeddingDataType t) consteval {
+                            return t != EmbeddingDataType::kElemInt8 && t != EmbeddingDataType::kElemUInt8;
+                        };
+                        if constexpr (plain_data_type == src_embedding_data_type ||
+                                      (not_i8_u8(plain_data_type) && not_i8_u8(src_embedding_data_type))) {
+                            return MakeUnique<IVF_Part_Storage_Plain<plain_data_type, src_embedding_data_type>>(part_id, embedding_dimension);
+                        } else {
+                            return nullptr;
+                        }
+                    },
+                    [] { return UniquePtr<IVF_Part_Storage>(); });
             };
             switch (ivf_storage_option.plain_storage_data_type_) {
                 case EmbeddingDataType::kElemInt8: {
@@ -289,79 +301,59 @@ void IVF_Index_Storage::Train(const u32 training_embedding_num, const f32 *train
     }
 }
 
-inline void ApplyEmbeddingDataTypeToFunc(const EmbeddingDataType embedding_data_type, auto func) {
-    switch (embedding_data_type) {
-        case EmbeddingDataType::kElemUInt8: {
-            return func.template operator()<EmbeddingDataType::kElemUInt8>();
-        }
-        case EmbeddingDataType::kElemInt8: {
-            return func.template operator()<EmbeddingDataType::kElemInt8>();
-        }
-        case EmbeddingDataType::kElemDouble: {
-            return func.template operator()<EmbeddingDataType::kElemDouble>();
-        }
-        case EmbeddingDataType::kElemFloat: {
-            return func.template operator()<EmbeddingDataType::kElemFloat>();
-        }
-        case EmbeddingDataType::kElemFloat16: {
-            return func.template operator()<EmbeddingDataType::kElemFloat16>();
-        }
-        case EmbeddingDataType::kElemBFloat16: {
-            return func.template operator()<EmbeddingDataType::kElemBFloat16>();
-        }
-        default: {
-            UnrecoverableError("Unsupported embedding data type");
-        }
-    }
-}
-
 void IVF_Index_Storage::AddEmbedding(const SegmentOffset segment_offset, const void *embedding_ptr) {
     if (column_logical_type_ != LogicalType::kEmbedding) [[unlikely]] {
         UnrecoverableError("Column is not embedding type");
     }
-    return ApplyEmbeddingDataTypeToFunc(embedding_data_type_, [segment_offset, embedding_ptr, this]<EmbeddingDataType embedding_data_type> {
-        return AddEmbeddingT<embedding_data_type>(segment_offset,
-                                                  static_cast<const EmbeddingDataTypeToCppTypeT<embedding_data_type> *>(embedding_ptr));
-    });
+    return ApplyEmbeddingDataTypeToFunc(
+        embedding_data_type_,
+        [segment_offset, embedding_ptr, this]<EmbeddingDataType embedding_data_type> {
+            return AddEmbeddingT<embedding_data_type>(segment_offset,
+                                                      static_cast<const EmbeddingDataTypeToCppTypeT<embedding_data_type> *>(embedding_ptr));
+        },
+        [] {});
 }
 
 void IVF_Index_Storage::AddEmbeddingBatch(const SegmentOffset start_segment_offset, const void *embedding_ptr, const u32 embedding_num) {
     if (column_logical_type_ != LogicalType::kEmbedding) [[unlikely]] {
         UnrecoverableError("Column is not embedding type");
     }
-    return ApplyEmbeddingDataTypeToFunc(embedding_data_type_,
-                                        [start_segment_offset, embedding_ptr, embedding_num, this]<EmbeddingDataType embedding_data_type> {
-                                            return AddEmbeddingBatchT<embedding_data_type>(
-                                                start_segment_offset,
-                                                static_cast<const EmbeddingDataTypeToCppTypeT<embedding_data_type> *>(embedding_ptr),
-                                                embedding_num);
-                                        });
+    return ApplyEmbeddingDataTypeToFunc(
+        embedding_data_type_,
+        [start_segment_offset, embedding_ptr, embedding_num, this]<EmbeddingDataType embedding_data_type> {
+            return AddEmbeddingBatchT<embedding_data_type>(start_segment_offset,
+                                                           static_cast<const EmbeddingDataTypeToCppTypeT<embedding_data_type> *>(embedding_ptr),
+                                                           embedding_num);
+        },
+        [] {});
 }
 
 void IVF_Index_Storage::AddEmbeddingBatch(const SegmentOffset *segment_offset_ptr, const void *embedding_ptr, const u32 embedding_num) {
     if (column_logical_type_ != LogicalType::kEmbedding) [[unlikely]] {
         UnrecoverableError("Column is not embedding type");
     }
-    return ApplyEmbeddingDataTypeToFunc(embedding_data_type_,
-                                        [segment_offset_ptr, embedding_ptr, embedding_num, this]<EmbeddingDataType embedding_data_type> {
-                                            return AddEmbeddingBatchT<embedding_data_type>(
-                                                segment_offset_ptr,
-                                                static_cast<const EmbeddingDataTypeToCppTypeT<embedding_data_type> *>(embedding_ptr),
-                                                embedding_num);
-                                        });
+    return ApplyEmbeddingDataTypeToFunc(
+        embedding_data_type_,
+        [segment_offset_ptr, embedding_ptr, embedding_num, this]<EmbeddingDataType embedding_data_type> {
+            return AddEmbeddingBatchT<embedding_data_type>(segment_offset_ptr,
+                                                           static_cast<const EmbeddingDataTypeToCppTypeT<embedding_data_type> *>(embedding_ptr),
+                                                           embedding_num);
+        },
+        [] {});
 }
 
 void IVF_Index_Storage::AddMultiVector(const SegmentOffset segment_offset, const void *multi_vector_ptr, const u32 embedding_num) {
     if (column_logical_type_ != LogicalType::kMultiVector) [[unlikely]] {
         UnrecoverableError("Column is not multi-vector type");
     }
-    return ApplyEmbeddingDataTypeToFunc(embedding_data_type_,
-                                        [segment_offset, multi_vector_ptr, embedding_num, this]<EmbeddingDataType embedding_data_type> {
-                                            return AddMultiVectorT<embedding_data_type>(
-                                                segment_offset,
-                                                static_cast<const EmbeddingDataTypeToCppTypeT<embedding_data_type> *>(multi_vector_ptr),
-                                                embedding_num);
-                                        });
+    return ApplyEmbeddingDataTypeToFunc(
+        embedding_data_type_,
+        [segment_offset, multi_vector_ptr, embedding_num, this]<EmbeddingDataType embedding_data_type> {
+            return AddMultiVectorT<embedding_data_type>(segment_offset,
+                                                        static_cast<const EmbeddingDataTypeToCppTypeT<embedding_data_type> *>(multi_vector_ptr),
+                                                        embedding_num);
+        },
+        [] {});
 }
 
 template <IsAnyOf<u8, i8, f64, f32, Float16T, BFloat16T> ColumnEmbeddingElementT>
@@ -454,6 +446,33 @@ void IVF_Index_Storage::AddMultiVectorT(const SegmentOffset segment_offset,
     }
     embedding_count_ += embedding_num;
     ++row_count_;
+}
+
+void IVF_Index_Storage::SearchIndex(const KnnDistanceType knn_distance_type,
+                                    const void *query_ptr,
+                                    const EmbeddingDataType query_element_type,
+                                    u32 nprobe,
+                                    std::function<void(f32, SegmentOffset)> add_result_func) const {
+    const auto dimension = embedding_dimension();
+    const auto centroids_num = ivf_centroids_storage_.centroids_num();
+    const auto *centroids_data = ivf_centroids_storage_.data();
+    nprobe = std::min<u32>(nprobe, centroids_num);
+    auto [query_f32_ptr, _] = ApplyEmbeddingDataTypeToFunc(
+        query_element_type,
+        [query_ptr, dimension]<EmbeddingDataType query_element_type> {
+            return GetF32Ptr(static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr), dimension);
+        },
+        [] { return Pair<const f32 *, UniquePtr<f32[]>>(); });
+    Vector<u32> nprobe_result(nprobe);
+    if (nprobe == 1) {
+        search_top_1_without_dis<f32>(dimension, 1, query_f32_ptr, centroids_num, centroids_data, nprobe_result.data());
+    } else {
+        const auto centroid_dists = MakeUniqueForOverwrite<f32[]>(nprobe);
+        search_top_k_with_dis(nprobe, dimension, 1, query_f32_ptr, centroids_num, centroids_data, nprobe_result.data(), centroid_dists.get(), false);
+    }
+    for (const auto part_id : nprobe_result) {
+        ivf_part_storages_[part_id]->SearchIndex(knn_distance_type, query_ptr, query_element_type, add_result_func);
+    }
 }
 
 } // namespace infinity

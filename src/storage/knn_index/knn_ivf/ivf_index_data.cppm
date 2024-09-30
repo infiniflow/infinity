@@ -37,7 +37,9 @@ export class IVFIndexInChunk : protected IVF_Index_Storage {
 public:
     using IVF_Index_Storage::GetMemData;
 
-    IVF_Index_Storage *BasePtr() { return this; }
+    IVF_Index_Storage *GetIVFIndexStoragePtr() { return this; }
+
+    const IVF_Index_Storage *GetIVFIndexStoragePtr() const { return this; }
 
     void BuildIVFIndex(RowID base_rowid,
                        u32 row_count,
