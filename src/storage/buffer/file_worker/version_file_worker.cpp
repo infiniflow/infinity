@@ -76,11 +76,11 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
     TxnTimeStamp latest_change_ts = data->latest_change_ts();
 
     if (to_spill) {
-        data->SpillToFile(*file_handler_);
+        data->SpillToFile(file_handle_.get());
         return true;
     } else {
         const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
-        data->SaveToFile(ctx.checkpoint_ts_, *file_handler_);
+        data->SaveToFile(ctx.checkpoint_ts_, *file_handle_);
         return ctx.checkpoint_ts_ >= latest_change_ts;
     }
 }
@@ -90,7 +90,7 @@ void VersionFileWorker::ReadFromFileImpl(SizeT file_size) {
         String error_message = "Data is already allocated.";
         UnrecoverableError(error_message);
     }
-    auto *data = BlockVersion::LoadFromFile(*file_handler_).release();
+    auto *data = BlockVersion::LoadFromFile(file_handle_.get()).release();
     data_ = static_cast<void *>(data);
 }
 

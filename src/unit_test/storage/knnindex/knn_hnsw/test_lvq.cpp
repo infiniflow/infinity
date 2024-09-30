@@ -25,6 +25,9 @@ import vec_store_type;
 import stl;
 import infinity_exception;
 import hnsw_common;
+import virtual_store;
+import local_file_handle;
+import abstract_file_handle;
 
 using namespace infinity;
 
@@ -171,12 +174,10 @@ TEST_F(HnswLVQTest, test1) {
     {
         std::string file_path = file_dir_ + "/lvq_store1.bin";
 
-        LocalFileSystem fs;
-        fs.CleanupDirectory(file_dir_);
+        LocalStore::CleanupDirectory(file_dir_);
 
         {
-            uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-            auto [file_handler, status] = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+            auto [file_handle, status] = LocalStore::Open(file_path, FileAccessMode::kWrite);
             if(!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -189,17 +190,18 @@ TEST_F(HnswLVQTest, test1) {
             auto iter2 = DenseVectorIter<float, LabelT>(data.get() + vec_n_ / 2 * dim_, dim_, vec_n_ - vec_n_ / 2);
             lvq_store.AddVec(std::move(iter2));
 
-            lvq_store.Save(*file_handler);
+            lvq_store.Save(*file_handle);
+            file_handle->Close();
         }
         {
-            uint8_t file_flags = FileFlags::READ_FLAG;
-            auto [file_handler, status] = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
+            auto [file_handle, status] = LocalStore::Open(file_path, FileAccessMode::kRead);
             if(!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            auto lvq_store = DataStore::Load(*file_handler);
+            auto lvq_store = DataStore::Load(*file_handle);
 
             CheckStore(lvq_store, data.get());
+            file_handle->Close();
         }
     }
 }

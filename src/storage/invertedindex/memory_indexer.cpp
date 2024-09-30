@@ -67,6 +67,8 @@ import segment_index_entry;
 import persistence_manager;
 import utility;
 import persist_result_handler;
+import virtual_store;
+import abstract_file_handle;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -310,14 +312,14 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         fs.AppendFile(tmp_dict_file, tmp_fst_file);
         fs.DeleteFile(tmp_fst_file);
     }
-    auto [file_handler, status] = fs.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    auto [file_handle, status] = fs.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
     Vector<u32> &column_length_array = column_lengths_.UnsafeVec();
-    fs.Write(*file_handler, &column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
-    fs.Close(*file_handler);
+    fs.Write(*file_handle, &column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
+    fs.Close(*file_handle);
     if (use_object_cache) {
         PersistResultHandler handler(pm);
         PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);
@@ -356,15 +358,15 @@ void MemoryIndexer::Load() {
     }
 
     String column_length_file = index_prefix + LENGTH_SUFFIX + SPILL_SUFFIX;
-    auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+    auto [file_handle, status] = LocalStore::Open(column_length_file, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
     Vector<u32> &column_lengths = column_lengths_.UnsafeVec();
     column_lengths.resize(doc_count_);
-    fs.Read(*file_handler, &column_lengths[0], sizeof(column_lengths[0]) * column_lengths.size());
-    fs.Close(*file_handler);
+    file_handle->Read(&column_lengths[0], sizeof(column_lengths[0]) * column_lengths.size());
+    file_handle->Close();
     u32 column_length_sum = column_lengths_.Sum();
     column_length_sum_.store(column_length_sum);
 

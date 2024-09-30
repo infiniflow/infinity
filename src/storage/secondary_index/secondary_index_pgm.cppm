@@ -19,7 +19,7 @@ export module secondary_index_pgm;
 import stl;
 import logger;
 import third_party;
-import file_system;
+import local_file_handle;
 import infinity_exception;
 
 namespace infinity {
@@ -69,57 +69,57 @@ public:
     template <typename RandomIt>
     PGMWithExtraFunction(RandomIt first, RandomIt last) : PGMIndexType<IndexValueType>(first, last) {}
 
-    inline void Load(FileHandler &file_handler) {
+    inline void Load(LocalFileHandle &file_handle) {
         {
             // load n
             u32 save_n;
-            file_handler.Read(&save_n, sizeof(save_n));
+            file_handle.Read(&save_n, sizeof(save_n));
             this->n = save_n;
         }
         {
             // load first_key
             IndexValueType save_first_key;
-            file_handler.Read(&save_first_key, sizeof(save_first_key));
+            file_handle.Read(&save_first_key, sizeof(save_first_key));
             this->first_key = save_first_key;
         }
         {
             // load std::vector<Segment> segments
             u32 save_size;
-            file_handler.Read(&save_size, sizeof(save_size));
+            file_handle.Read(&save_size, sizeof(save_size));
             this->segments.resize(save_size);
-            file_handler.Read(this->segments.data(), save_size * sizeof(typename decltype(this->segments)::value_type));
+            file_handle.Read(this->segments.data(), save_size * sizeof(typename decltype(this->segments)::value_type));
         }
         {
             // load std::vector<size_t> levels_offsets
             u32 save_levels_offsets_size;
-            file_handler.Read(&save_levels_offsets_size, sizeof(save_levels_offsets_size));
+            file_handle.Read(&save_levels_offsets_size, sizeof(save_levels_offsets_size));
             this->levels_offsets.resize(save_levels_offsets_size);
-            file_handler.Read(this->levels_offsets.data(), save_levels_offsets_size * sizeof(typename decltype(this->levels_offsets)::value_type));
+            file_handle.Read(this->levels_offsets.data(), save_levels_offsets_size * sizeof(typename decltype(this->levels_offsets)::value_type));
         }
     }
 
-    inline void Save(FileHandler &file_handler) const {
+    inline void Save(LocalFileHandle &file_handle) const {
         {
             // save n
             u32 save_n = this->n;
-            file_handler.Write(&save_n, sizeof(save_n));
+            file_handle.Append(&save_n, sizeof(save_n));
         }
         {
             // save first_key
             IndexValueType save_first_key = this->first_key;
-            file_handler.Write(&save_first_key, sizeof(save_first_key));
+            file_handle.Append(&save_first_key, sizeof(save_first_key));
         }
         {
             // save std::vector<Segment> segments
             u32 save_size = this->segments.size();
-            file_handler.Write(&save_size, sizeof(save_size));
-            file_handler.Write(this->segments.data(), save_size * sizeof(typename decltype(this->segments)::value_type));
+            file_handle.Append(&save_size, sizeof(save_size));
+            file_handle.Append(this->segments.data(), save_size * sizeof(typename decltype(this->segments)::value_type));
         }
         {
             // save std::vector<size_t> levels_offsets
             u32 save_levels_offsets_size = this->levels_offsets.size();
-            file_handler.Write(&save_levels_offsets_size, sizeof(save_levels_offsets_size));
-            file_handler.Write(this->levels_offsets.data(), save_levels_offsets_size * sizeof(typename decltype(this->levels_offsets)::value_type));
+            file_handle.Append(&save_levels_offsets_size, sizeof(save_levels_offsets_size));
+            file_handle.Append(this->levels_offsets.data(), save_levels_offsets_size * sizeof(typename decltype(this->levels_offsets)::value_type));
         }
     }
 };
@@ -128,9 +128,9 @@ export class SecondaryPGMIndex {
 public:
     virtual ~SecondaryPGMIndex() = default;
 
-    virtual void SaveIndex(FileHandler &file_handler) const = 0;
+    virtual void SaveIndex(LocalFileHandle &file_handle) const = 0;
 
-    virtual void LoadIndex(FileHandler &file_handler) = 0;
+    virtual void LoadIndex(LocalFileHandle &file_handle) = 0;
 
     virtual void BuildIndex(SizeT data_cnt, const void *data_ptr) = 0;
 
@@ -147,21 +147,21 @@ public:
 
     ~SecondaryPGMIndexTemplate() final = default;
 
-    void SaveIndex(FileHandler &file_handler) const final {
+    void SaveIndex(LocalFileHandle &file_handle) const final {
         if (!initialized_) {
             String error_message = "Not initialized yet.";
             UnrecoverableError(error_message);
         }
-        pgm_index_->Save(file_handler);
+        pgm_index_->Save(file_handle);
     }
 
-    void LoadIndex(FileHandler &file_handler) final {
+    void LoadIndex(LocalFileHandle &file_handle) final {
         if (initialized_) {
             String error_message = "Already initialized.";
             UnrecoverableError(error_message);
         }
         pgm_index_ = MakeUnique<PGMWithExtraFunction<IndexValueType>>();
-        pgm_index_->Load(file_handler);
+        pgm_index_->Load(file_handle);
         initialized_ = true;
     }
 

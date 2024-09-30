@@ -21,7 +21,7 @@ export module graph_store;
 
 import stl;
 import hnsw_common;
-import file_system;
+import local_file_handle;
 
 namespace infinity {
 
@@ -68,24 +68,24 @@ public:
 
     SizeT GetSizeInBytes() const { return sizeof(Mmax0_) + sizeof(Mmax_) + sizeof(max_layer_) + sizeof(enterpoint_); }
 
-    void Save(FileHandler &file_handler) const {
-        file_handler.Write(&Mmax0_, sizeof(Mmax0_));
-        file_handler.Write(&Mmax_, sizeof(Mmax_));
+    void Save(LocalFileHandle &file_handle) const {
+        file_handle.Append(&Mmax0_, sizeof(Mmax0_));
+        file_handle.Append(&Mmax_, sizeof(Mmax_));
 
-        file_handler.Write(&max_layer_, sizeof(max_layer_));
-        file_handler.Write(&enterpoint_, sizeof(enterpoint_));
+        file_handle.Append(&max_layer_, sizeof(max_layer_));
+        file_handle.Append(&enterpoint_, sizeof(enterpoint_));
     }
 
-    static GraphStoreMeta Load(FileHandler &file_handler) {
+    static GraphStoreMeta Load(LocalFileHandle &file_handle) {
         SizeT Mmax0, Mmax;
-        file_handler.Read(&Mmax0, sizeof(Mmax0));
-        file_handler.Read(&Mmax, sizeof(Mmax));
+        file_handle.Read(&Mmax0, sizeof(Mmax0));
+        file_handle.Read(&Mmax, sizeof(Mmax));
 
         GraphStoreMeta meta(Mmax0, Mmax);
         i32 max_layer;
         VertexType enterpoint;
-        file_handler.Read(&max_layer, sizeof(max_layer));
-        file_handler.Read(&enterpoint, sizeof(enterpoint));
+        file_handle.Read(&max_layer, sizeof(max_layer));
+        file_handle.Read(&enterpoint, sizeof(enterpoint));
         meta.max_layer_ = max_layer;
         meta.enterpoint_ = enterpoint;
         return meta;
@@ -167,36 +167,36 @@ public:
         return size;
     }
 
-    void Save(FileHandler &file_handler, SizeT cur_vertex_n, const GraphStoreMeta &meta) const {
+    void Save(LocalFileHandle &file_handle, SizeT cur_vertex_n, const GraphStoreMeta &meta) const {
         SizeT layer_sum = 0;
         for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
             layer_sum += GetLevel0(vertex_i, meta)->layer_n_;
         }
-        file_handler.Write(&layer_sum, sizeof(layer_sum));
-        file_handler.Write(graph_.get(), cur_vertex_n * meta.level0_size());
+        file_handle.Append(&layer_sum, sizeof(layer_sum));
+        file_handle.Append(graph_.get(), cur_vertex_n * meta.level0_size());
         for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
             const VertexL0 *v = GetLevel0(vertex_i, meta);
             if (v->layer_n_) {
-                file_handler.Write(v->layers_p_, meta.levelx_size() * v->layer_n_);
+                file_handle.Append(v->layers_p_, meta.levelx_size() * v->layer_n_);
             }
         }
     }
 
-    static GraphStoreInner Load(FileHandler &file_handler, SizeT cur_vertex_n, SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
+    static GraphStoreInner Load(LocalFileHandle &file_handle, SizeT cur_vertex_n, SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
         assert(cur_vertex_n <= max_vertex);
 
         SizeT layer_sum;
-        file_handler.Read(&layer_sum, sizeof(layer_sum));
+        file_handle.Read(&layer_sum, sizeof(layer_sum));
 
         GraphStoreInner graph_store(max_vertex, meta, cur_vertex_n);
-        file_handler.Read(graph_store.graph_.get(), cur_vertex_n * meta.level0_size());
+        file_handle.Read(graph_store.graph_.get(), cur_vertex_n * meta.level0_size());
 
         auto loaded_layers = MakeUnique<char[]>(meta.levelx_size() * layer_sum);
         char *loaded_layers_p = loaded_layers.get();
         for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
             VertexL0 *v = graph_store.GetLevel0(vertex_i, meta);
             if (v->layer_n_) {
-                file_handler.Read(loaded_layers_p, meta.levelx_size() * v->layer_n_);
+                file_handle.Read(loaded_layers_p, meta.levelx_size() * v->layer_n_);
                 v->layers_p_ = loaded_layers_p;
                 loaded_layers_p += meta.levelx_size() * v->layer_n_;
             } else {

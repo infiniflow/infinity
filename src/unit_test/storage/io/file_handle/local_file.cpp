@@ -16,9 +16,9 @@
 
 import base_test;
 import stl;
-import virtual_storage;
+import virtual_store;
 import virtual_storage_type;
-import local_file;
+import local_file_handle;
 import abstract_file_handle;
 
 using namespace infinity;
@@ -29,14 +29,7 @@ TEST_F(LocalFileTest, TestAppend) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file2.abc";
 
-    VirtualStorage virtual_storage;
-    Map<String, String> configs;
-    virtual_storage.Init(StorageType::kLocal, configs);
-
-    auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(status.ok());
-
-    status = local_file_handle->Open(path, FileAccessMode::kWrite);
+    auto [local_file_handle, status] = LocalStore::Open(path, FileAccessMode::kWrite);
     EXPECT_TRUE(status.ok());
 
     SizeT len = 10;
@@ -49,11 +42,9 @@ TEST_F(LocalFileTest, TestAppend) {
     local_file_handle->Sync();
     local_file_handle->Close();
 
-    EXPECT_TRUE(virtual_storage.Exists(path));
-    virtual_storage.DeleteFile(path);
-    EXPECT_FALSE(virtual_storage.Exists(path));
-
-    virtual_storage.UnInit();
+    EXPECT_TRUE(LocalStore::Exists(path));
+    LocalStore::DeleteFile(path);
+    EXPECT_FALSE(LocalStore::Exists(path));
 }
 
 TEST_F(LocalFileTest, TestDir) {
@@ -61,16 +52,9 @@ TEST_F(LocalFileTest, TestDir) {
     String dir = String(GetFullTmpDir()) + "/unit_test";
     String path = dir + "/test_file.test";
 
-    VirtualStorage virtual_storage;
-    Map<String, String> configs;
-    virtual_storage.Init(StorageType::kLocal, configs);
+    LocalStore::MakeDirectory(dir);
 
-    VirtualStorage::MakeDirectoryLocal(dir);
-
-    auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(status.ok());
-
-    status = local_file_handle->Open(path, FileAccessMode::kWrite);
+    auto [local_file_handle, status] = LocalStore::Open(path, FileAccessMode::kWrite);;
     EXPECT_TRUE(status.ok());
 
     SizeT len = 10;
@@ -83,12 +67,12 @@ TEST_F(LocalFileTest, TestDir) {
     local_file_handle->Sync();
     local_file_handle->Close();
 
-    EXPECT_TRUE(virtual_storage.Exists(path));
-    EXPECT_TRUE(VirtualStorage::ExistsLocal(dir));
+    EXPECT_TRUE(LocalStore::Exists(path));
+    EXPECT_TRUE(LocalStore::Exists(dir));
 
-    VirtualStorage::RemoveDirectoryLocal(dir);
-    EXPECT_FALSE(virtual_storage.Exists(path));
-    EXPECT_FALSE(virtual_storage.Exists(dir));
+    LocalStore::RemoveDirectory(dir);
+    EXPECT_FALSE(LocalStore::Exists(path));
+    EXPECT_FALSE(LocalStore::Exists(dir));
 }
 
 TEST_F(LocalFileTest, TestRead) {
@@ -96,56 +80,47 @@ TEST_F(LocalFileTest, TestRead) {
 
     String path = String(GetFullTmpDir()) + "/test_file_read.abc";
 
-    VirtualStorage virtual_storage;
-    Map<String, String> configs;
-    virtual_storage.Init(StorageType::kLocal, configs);
-
-    auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(status.ok());
-
-    status = local_file_handle->Open(path, FileAccessMode::kWrite);
-    EXPECT_TRUE(status.ok());
-
     SizeT len = 10;
-    UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
-    for (SizeT i = 0; i < len; ++i) {
-        data_array[i] = i + 1;
+    {
+        auto [local_file_handle, status] = LocalStore::Open(path, FileAccessMode::kWrite);
+        EXPECT_TRUE(status.ok());
+
+        UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
+        for (SizeT i = 0; i < len; ++i) {
+            data_array[i] = i + 1;
+        }
+
+        local_file_handle->Append(data_array.get(), len);
+        local_file_handle->Sync();
+        local_file_handle->Close();
     }
 
-    local_file_handle->Append(data_array.get(), len);
-    local_file_handle->Sync();
-    local_file_handle->Close();
+    {
+        auto [local_file_handle, status] = LocalStore::Open(path, FileAccessMode::kRead);
+        EXPECT_TRUE(status.ok());
 
-    status = local_file_handle->Open(path, FileAccessMode::kRead);
-    EXPECT_TRUE(status.ok());
+        UniquePtr<char[]> read_data = MakeUnique<char[]>(len);
+        auto [read_len, read_status] = local_file_handle->Read(read_data.get(), len);
+        EXPECT_TRUE(read_status.ok());
+        local_file_handle->Close();
 
-    UniquePtr<char[]> read_data = MakeUnique<char[]>(len);
-    auto [read_len, read_status] = local_file_handle->Read(read_data.get(), len);
-    EXPECT_TRUE(read_status.ok());
-    local_file_handle->Close();
-
-    EXPECT_EQ(read_len, len);
-    for(SizeT i = 0; i < len; ++i) {
-        EXPECT_EQ(read_data[i], i + 1);
+        EXPECT_EQ(read_len, len);
+        for(SizeT i = 0; i < len; ++i) {
+            EXPECT_EQ(read_data[i], i + 1);
+        }
     }
 
-    virtual_storage.DeleteFile(path);
-    EXPECT_FALSE(virtual_storage.Exists(path));
+    LocalStore::DeleteFile(path);
+    EXPECT_FALSE(LocalStore::Exists(path));
 }
 
 TEST_F(LocalFileTest, TestRename) {
     using namespace infinity;
-    VirtualStorage virtual_storage;
-    Map<String, String> configs;
-    virtual_storage.Init(StorageType::kLocal, configs);
 
     String old_path = String(GetFullTmpDir()) + "/test_file_old.abc";
     String new_path = String(GetFullTmpDir()) + "/test_file_new.abc";
 
-    auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(status.ok());
-
-    status = local_file_handle->Open(old_path, FileAccessMode::kWrite);
+    auto [local_file_handle, status] = LocalStore::Open(old_path, FileAccessMode::kWrite);
     EXPECT_TRUE(status.ok());
 
     SizeT len = 10;
@@ -158,76 +133,68 @@ TEST_F(LocalFileTest, TestRename) {
     local_file_handle->Sync();
     local_file_handle->Close();
 
-    status = VirtualStorage::RenameLocal(old_path, new_path);
+    status = LocalStore::Rename(old_path, new_path);
     EXPECT_TRUE(status.ok());
 
-    EXPECT_FALSE(virtual_storage.Exists(old_path));
-    EXPECT_TRUE(virtual_storage.Exists(new_path));
+    EXPECT_FALSE(LocalStore::Exists(old_path));
+    EXPECT_TRUE(LocalStore::Exists(new_path));
 
-    virtual_storage.DeleteFile(new_path);
-    EXPECT_FALSE(virtual_storage.Exists(new_path));
+    LocalStore::DeleteFile(new_path);
+    EXPECT_FALSE(LocalStore::Exists(new_path));
 }
 
 TEST_F(LocalFileTest, TestTruncate) {
     using namespace infinity;
-    VirtualStorage virtual_storage;
-    Map<String, String> configs;
-    virtual_storage.Init(StorageType::kLocal, configs);
 
     String path = String(GetFullTmpDir()) + "/test_file_truncate.abc";
 
-    auto [local_file_handle, status] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(status.ok());
+    {
+        auto [local_file_handle, status] = LocalStore::Open(path, FileAccessMode::kWrite);
+        EXPECT_TRUE(status.ok());
 
-    status = local_file_handle->Open(path, FileAccessMode::kWrite);
-    EXPECT_TRUE(status.ok());
+        SizeT len = 20;
+        UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
+        for (SizeT i = 0; i < len; ++i) {
+            data_array[i] = i + 1;
+        }
 
-    SizeT len = 20;
-    UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
-    for(SizeT i = 0; i < len; ++ i) {
-        data_array[i] = i + 1;
+        local_file_handle->Append(data_array.get(), len);
+        local_file_handle->Sync();
+        local_file_handle->Close();
     }
 
-    local_file_handle->Append(data_array.get(), len);
-    local_file_handle->Sync();
-    local_file_handle->Close();
+    LocalStore::Truncate(path, 10);
 
-    VirtualStorage::TruncateLocal(path, 10);
+    {
+        auto [local_file_handle, status] = LocalStore::Open(path, FileAccessMode::kRead);
+        EXPECT_TRUE(status.ok());
 
-    status = local_file_handle->Open(path, FileAccessMode::kRead);
-    EXPECT_TRUE(status.ok());
+        UniquePtr<char[]> truncated_data = MakeUnique<char[]>(10);
+        auto [read_len, read_status] = local_file_handle->Read(truncated_data.get(), 10);
+        EXPECT_TRUE(read_status.ok());
+        EXPECT_EQ(read_len, 10);
 
-    UniquePtr<char[]> truncated_data = MakeUnique<char[]>(10);
-    auto [read_len, read_status] = local_file_handle->Read(truncated_data.get(), 10);
-    EXPECT_TRUE(read_status.ok());
-    EXPECT_EQ(read_len, 10);
+        status = local_file_handle->Close();
+        EXPECT_TRUE(status.ok());
 
-    status = local_file_handle->Close();
-    EXPECT_TRUE(status.ok());
-
-    for(SizeT i = 0; i < 10; ++i) {
-        EXPECT_EQ(truncated_data[i], i + 1);
+        for(SizeT i = 0; i < 10; ++i) {
+            EXPECT_EQ(truncated_data[i], i + 1);
+        }
     }
 
-    virtual_storage.DeleteFile(path);
-    EXPECT_FALSE(virtual_storage.Exists(path));
+    LocalStore::DeleteFile(path);
+    EXPECT_FALSE(LocalStore::Exists(path));
 }
 
 
 TEST_F(LocalFileTest, TestMerge) {
     using namespace infinity;
-    VirtualStorage virtual_storage;
-    Map<String, String> configs;
-    virtual_storage.Init(StorageType::kLocal, configs);
 
     String dst_path = String(GetFullTmpDir()) + "/test_file_append_dst.abc";
     String src_path = String(GetFullTmpDir()) + "/test_file_append_src.abc";
 
     // Write source file
-    auto [src_file_handle, status] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(status.ok());
-
-    status = src_file_handle->Open(src_path, FileAccessMode::kWrite);
+    auto [src_file_handle, status] = LocalStore::Open(src_path, FileAccessMode::kWrite);
     EXPECT_TRUE(status.ok());
 
     SizeT src_len = 10;
@@ -240,11 +207,8 @@ TEST_F(LocalFileTest, TestMerge) {
     src_file_handle->Sync();
     src_file_handle->Close();
 
-    auto [dst_file_handle, dst_status] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(dst_status.ok());
-
-    status = dst_file_handle->Open(dst_path, FileAccessMode::kWrite);
-    EXPECT_TRUE(status.ok());
+    auto [dst_file_handle, status1] = LocalStore::Open(dst_path, FileAccessMode::kWrite);
+    EXPECT_TRUE(status1.ok());
 
     SizeT dst_len = 10;
     UniquePtr<char[]> data_array2 = MakeUnique<char[]>(dst_len);
@@ -256,13 +220,10 @@ TEST_F(LocalFileTest, TestMerge) {
     dst_file_handle->Sync();
     dst_file_handle->Close();
 
-    VirtualStorage::MergeLocal(dst_path, src_path);
-    
-    auto [merge_file_handle, merge_status] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(merge_status.ok());
+    LocalStore::Merge(dst_path, src_path);
 
-    status = merge_file_handle->Open(dst_path, FileAccessMode::kRead);
-    EXPECT_TRUE(status.ok());
+    auto [merge_file_handle, merge_status] = LocalStore::Open(dst_path, FileAccessMode::kRead);
+    EXPECT_TRUE(merge_status.ok());
 
     UniquePtr<char[]> combined_data = MakeUnique<char[]>(src_len + dst_len);
     auto [read_len, merge_read_status] = merge_file_handle->Read(combined_data.get(), src_len + dst_len);
@@ -277,30 +238,24 @@ TEST_F(LocalFileTest, TestMerge) {
         EXPECT_EQ(combined_data[i], i - dst_len + 1);
     }
 
-    virtual_storage.DeleteFile(src_path);
-    virtual_storage.DeleteFile(dst_path);
-    EXPECT_FALSE(virtual_storage.Exists(src_path));
-    EXPECT_FALSE(virtual_storage.Exists(dst_path));
+    LocalStore::DeleteFile(src_path);
+    LocalStore::DeleteFile(dst_path);
+    EXPECT_FALSE(LocalStore::Exists(src_path));
+    EXPECT_FALSE(LocalStore::Exists(dst_path));
 }
 
 TEST_F(LocalFileTest, TestCleanDir) {
     using namespace infinity;
-    VirtualStorage virtual_storage;
-    Map<String, String> configs;
-    virtual_storage.Init(StorageType::kLocal, configs);
 
     String dir = String(GetFullTmpDir()) + "/cleanup_test_dir";
     String file_path1 = dir + "/file1.txt";
     String file_path2 = dir + "/file2.txt";
 
-    VirtualStorage::MakeDirectoryLocal(dir);
+    LocalStore::MakeDirectory(dir);
 
     // Append file1.txt
-    auto [src_file_handle, status1] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(status1.ok());
-
-    status1 = src_file_handle->Open(file_path1, FileAccessMode::kWrite);
-    EXPECT_TRUE(status1.ok());
+    auto [src_file_handle, status] = LocalStore::Open(file_path1, FileAccessMode::kWrite);
+    EXPECT_TRUE(status.ok());
 
     SizeT src_len = 10;
     UniquePtr<char[]> data_array1 = MakeUnique<char[]>(src_len);
@@ -313,10 +268,7 @@ TEST_F(LocalFileTest, TestCleanDir) {
     src_file_handle->Close();
 
     // Append more to file1.txt
-    auto [append_src_file_handle, status2] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(status2.ok());
-
-    status2 = append_src_file_handle->Open(file_path1, FileAccessMode::kWrite);
+    auto [append_src_file_handle, status2] = LocalStore::Open(file_path1, FileAccessMode::kWrite);
     EXPECT_TRUE(status2.ok());
 
     append_src_file_handle->Append(data_array1.get(), src_len);
@@ -325,10 +277,7 @@ TEST_F(LocalFileTest, TestCleanDir) {
 
 
     // Append more to file2.txt
-    auto [append_file2_handle, status3] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(status3.ok());
-
-    status3 = append_file2_handle->Open(file_path2, FileAccessMode::kWrite);
+    auto [append_file2_handle, status3] = LocalStore::Open(file_path2, FileAccessMode::kWrite);
     EXPECT_TRUE(status3.ok());
 
     SizeT len2 = 20;
@@ -341,11 +290,11 @@ TEST_F(LocalFileTest, TestCleanDir) {
     append_file2_handle->Sync();
     append_file2_handle->Close();
 
-    VirtualStorage::CleanupDirectoryLocal(dir);
+    LocalStore::CleanupDirectory(dir);
 
-    EXPECT_FALSE(virtual_storage.Exists(file_path1));
-    EXPECT_FALSE(virtual_storage.Exists(file_path2));
-    EXPECT_TRUE(virtual_storage.Exists(dir));
-    VirtualStorage::RemoveDirectoryLocal(dir);
-    EXPECT_FALSE(virtual_storage.Exists(dir));
+    EXPECT_FALSE(LocalStore::Exists(file_path1));
+    EXPECT_FALSE(LocalStore::Exists(file_path2));
+    EXPECT_TRUE(LocalStore::Exists(dir));
+    LocalStore::RemoveDirectory(dir);
+    EXPECT_FALSE(LocalStore::Exists(dir));
 }

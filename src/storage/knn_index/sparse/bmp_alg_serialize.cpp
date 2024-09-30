@@ -158,7 +158,7 @@ template class BlockFwd<f64, i8>;
 // --------------------------BMPAlg--------------------------
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
-void BMPAlg<DataType, IdxType, CompressType>::Save(FileHandler &file_handler) const {
+void BMPAlg<DataType, IdxType, CompressType>::Save(LocalFileHandle &file_handle) const {
     auto size = GetSizeInBytes();
     auto buffer = MakeUnique<char[]>(sizeof(size) + size);
     char *p = buffer.get();
@@ -167,15 +167,15 @@ void BMPAlg<DataType, IdxType, CompressType>::Save(FileHandler &file_handler) co
     if (SizeT write_n = p - buffer.get(); write_n != sizeof(size) + size) {
         UnrecoverableError(fmt::format("BMPAlg::Save: write_n != sizeof(size) + size: {} != {}", write_n, sizeof(size) + size));
     }
-    file_handler.Write(buffer.get(), sizeof(size) + size);
+    file_handle.Append(buffer.get(), sizeof(size) + size);
 }
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
-BMPAlg<DataType, IdxType, CompressType> BMPAlg<DataType, IdxType, CompressType>::Load(FileHandler &file_handler) {
+BMPAlg<DataType, IdxType, CompressType> BMPAlg<DataType, IdxType, CompressType>::Load(LocalFileHandle &file_handle) {
     SizeT size;
-    file_handler.Read(&size, sizeof(size));
+    file_handle.Read(&size, sizeof(size));
     auto buffer = MakeUnique<char[]>(size);
-    file_handler.Read(buffer.get(), size);
+    file_handle.Read(buffer.get(), size);
     const char *p = buffer.get();
     return ReadAdv(p);
 }

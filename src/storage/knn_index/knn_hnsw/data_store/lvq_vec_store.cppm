@@ -26,7 +26,7 @@ module;
 export module lvq_vec_store;
 
 import stl;
-import file_system;
+import local_file_handle;
 import hnsw_common;
 
 namespace infinity {
@@ -98,18 +98,18 @@ public:
 
     SizeT GetSizeInBytes() const { return sizeof(dim_) + sizeof(MeanType) * dim_ + sizeof(GlobalCacheType); }
 
-    void Save(FileHandler &file_handler) const {
-        file_handler.Write(&dim_, sizeof(dim_));
-        file_handler.Write(mean_.get(), sizeof(MeanType) * dim_);
-        file_handler.Write(&global_cache_, sizeof(GlobalCacheType));
+    void Save(LocalFileHandle &file_handle) const {
+        file_handle.Append(&dim_, sizeof(dim_));
+        file_handle.Append(mean_.get(), sizeof(MeanType) * dim_);
+        file_handle.Append(&global_cache_, sizeof(GlobalCacheType));
     }
 
-    static This Load(FileHandler &file_handler) {
+    static This Load(LocalFileHandle &file_handle) {
         SizeT dim;
-        file_handler.Read(&dim, sizeof(dim));
+        file_handle.Read(&dim, sizeof(dim));
         This meta(dim);
-        file_handler.Read(meta.mean_.get(), sizeof(MeanType) * dim);
-        file_handler.Read(&meta.global_cache_, sizeof(GlobalCacheType));
+        file_handle.Read(meta.mean_.get(), sizeof(MeanType) * dim);
+        file_handle.Read(&meta.global_cache_, sizeof(GlobalCacheType));
         return meta;
     }
 
@@ -265,14 +265,14 @@ public:
 
     SizeT GetSizeInBytes(SizeT cur_vec_num, const Meta &meta) const { return cur_vec_num * meta.compress_data_size(); }
 
-    void Save(FileHandler &file_handler, SizeT cur_vec_num, const Meta &meta) const {
-        file_handler.Write(ptr_.get(), cur_vec_num * meta.compress_data_size());
+    void Save(LocalFileHandle &file_handle, SizeT cur_vec_num, const Meta &meta) const {
+        file_handle.Append(ptr_.get(), cur_vec_num * meta.compress_data_size());
     }
 
-    static This Load(FileHandler &file_handler, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+    static This Load(LocalFileHandle &file_handle, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
         assert(cur_vec_num <= max_vec_num);
         This ret(max_vec_num, meta);
-        file_handler.Read(ret.ptr_.get(), cur_vec_num * meta.compress_data_size());
+        file_handle.Read(ret.ptr_.get(), cur_vec_num * meta.compress_data_size());
         mem_usage += max_vec_num * meta.compress_data_size();
         return ret;
     }

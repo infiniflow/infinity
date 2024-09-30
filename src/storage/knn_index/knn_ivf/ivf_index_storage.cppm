@@ -24,6 +24,7 @@ import data_type;
 
 namespace infinity {
 
+class LocalFileHandle;
 class FileHandler;
 
 template <EmbeddingDataType t>
@@ -74,8 +75,8 @@ public:
     const f32 *data() const { return centroids_data_.data(); }
     u32 embedding_dimension() const { return embedding_dimension_; }
     u32 centroids_num() const { return centroids_num_; }
-    void Save(FileHandler &file_handler) const;
-    void Load(FileHandler &file_handler);
+    void Save(LocalFileHandle &file_handle) const;
+    void Load(LocalFileHandle &file_handle);
 };
 
 class IVF_Part_Storage {
@@ -96,8 +97,8 @@ public:
     u32 embedding_num() const { return embedding_num_; }
     SegmentOffset embedding_segment_offset(const u32 embedding_index) const { return embedding_segment_offsets_[embedding_index]; }
 
-    virtual void Save(FileHandler &file_handler) const;
-    virtual void Load(FileHandler &file_handler);
+    virtual void Save(LocalFileHandle &file_handle) const;
+    virtual void Load(LocalFileHandle &file_handle);
 
     virtual void AppendOneEmbedding(const void *embedding_ptr, SegmentOffset segment_offset, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
 
@@ -134,8 +135,8 @@ public:
     void AddMultiVector(SegmentOffset segment_offset, const void *multi_vector_ptr, u32 embedding_num);
 
     void GetMemData(IVF_Index_Storage &&mem_data);
-    void Save(FileHandler &file_handler) const;
-    void Load(FileHandler &file_handler);
+    void Save(LocalFileHandle &file_handle) const;
+    void Load(LocalFileHandle &file_handle);
 
 private:
     template <EmbeddingDataType embedding_data_type>

@@ -18,7 +18,7 @@ export module secondary_index_data;
 
 import stl;
 import default_values;
-import file_system;
+import local_file_handle;
 import file_system_type;
 import infinity_exception;
 import column_vector;
@@ -161,9 +161,9 @@ public:
 
     [[nodiscard]] inline u32 GetChunkRowCount() const { return chunk_row_count_; }
 
-    virtual void SaveIndexInner(FileHandler &file_handler) const = 0;
+    virtual void SaveIndexInner(LocalFileHandle &file_handle) const = 0;
 
-    virtual void ReadIndexInner(FileHandler &file_handler) = 0;
+    virtual void ReadIndexInner(LocalFileHandle &file_handle) = 0;
 
     virtual void InsertData(const void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) = 0;
 

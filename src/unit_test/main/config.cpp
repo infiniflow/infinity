@@ -100,7 +100,7 @@ TEST_F(ConfigTest, test2) {
     // Storage
     EXPECT_EQ(config.DataDir(), "/var/infinity/data");
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
-    EXPECT_EQ(config.StorageType(), StorageType::kMinio);
+    EXPECT_EQ(config.StorageType(), StorageType::kLocal);
     EXPECT_EQ(config.ObjectStorageUrl(), "0.0.0.0:9000");
     EXPECT_EQ(config.ObjectStorageBucket(), "infinity");
 

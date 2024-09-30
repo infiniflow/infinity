@@ -21,10 +21,12 @@ import bp_reordering;
 import third_party;
 import infinity_exception;
 import file_system;
-import local_file_system;
+import virtual_store;
 import compilation_config;
 import file_system_type;
 import sparse_util;
+import abstract_file_handle;
+import local_file_handle;
 
 using namespace infinity;
 
@@ -163,14 +165,13 @@ TEST_F(BPReorderingTest, test1) {
 TEST_F(BPReorderingTest, test2) {
     // GTEST_SKIP() << "Skip this test. This program is not a test but for preprocessing data.";
 
-    LocalFileSystem fs;
     Path dataset_path = Path(test_data_path()) / "benchmark" / "splade" / "base_small.csr";
-    auto [file_handler, status] = fs.OpenFile(dataset_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+    auto [file_handle, status] = LocalStore::Open(dataset_path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         std::cout << String(status.message()) << std::endl;
         return;
     }
-    auto dataset = SparseMatrix<f32, i32>::Load(*file_handler);
+    auto dataset = SparseMatrix<f32, i32>::Load(*file_handle);
     i32 data_n = dataset.nrow_;
     // i32 data_n = 1000;
     Vector<Vector<i32>> fwd(data_n);

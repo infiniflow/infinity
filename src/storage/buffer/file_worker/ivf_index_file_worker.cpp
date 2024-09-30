@@ -57,7 +57,7 @@ void IVFIndexFileWorker::FreeInMemory() {
 bool IVFIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
         auto index = static_cast<IVFIndexInChunk *>(data_);
-        index->SaveIndexInner(*file_handler_);
+        index->SaveIndexInner(*file_handle_);
         prepare_success = true;
         LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
     } else {
@@ -69,7 +69,7 @@ bool IVFIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
 void IVFIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
     if (!data_) [[likely]] {
         auto index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
-        index->ReadIndexInner(*file_handler_);
+        index->ReadIndexInner(*file_handle_);
         data_ = static_cast<void *>(index);
         LOG_TRACE("Finished ReadFromFileImpl().");
     } else {

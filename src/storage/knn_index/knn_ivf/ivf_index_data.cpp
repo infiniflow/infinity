@@ -250,9 +250,9 @@ void IVFIndexInChunk::BuildIVFIndexT(const RowID base_rowid,
     }
 }
 
-void IVFIndexInChunk::SaveIndexInner(FileHandler &file_handler) const { IVF_Index_Storage::Save(file_handler); }
+void IVFIndexInChunk::SaveIndexInner(LocalFileHandle &file_handle) const { IVF_Index_Storage::Save(file_handle); }
 
-void IVFIndexInChunk::ReadIndexInner(FileHandler &file_handler) { IVF_Index_Storage::Load(file_handler); }
+void IVFIndexInChunk::ReadIndexInner(LocalFileHandle &file_handle) { IVF_Index_Storage::Load(file_handle); }
 
 IVFIndexInChunk *IVFIndexInChunk::GetNewIVFIndexInChunk(const IndexBase *ivf_index, const ColumnDef *column_def) {
     const auto *ivf_index_ptr = static_cast<const IndexIVF *>(ivf_index);
