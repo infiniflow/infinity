@@ -183,7 +183,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (c1) USING IVFFlat WITH(metric = l2);";
+        String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (c1) USING IVF WITH(metric = l2);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -201,7 +201,7 @@ TEST_F(StatementParsingTest, good_test1) {
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
         IndexInfo * index_info1 = create_index_info->index_info_;
-        EXPECT_EQ(index_info1->index_type_, IndexType::kIVFFlat);
+        EXPECT_EQ(index_info1->index_type_, IndexType::kIVF);
         EXPECT_EQ(index_info1->column_name_, "c1");
         EXPECT_EQ(index_info1->index_param_list_->size(), 1u);
         EXPECT_EQ((*index_info1->index_param_list_)[0]->param_name_, "metric");

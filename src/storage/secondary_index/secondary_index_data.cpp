@@ -23,7 +23,7 @@ import stl;
 
 import default_values;
 import index_base;
-import file_system;
+import local_file_handle;
 import file_system_type;
 import infinity_exception;
 import third_party;
@@ -126,15 +126,15 @@ public:
         }
     }
 
-    void SaveIndexInner(FileHandler &file_handler) const override {
+    void SaveIndexInner(LocalFileHandle &file_handle) const override {
         if (!need_save_) {
             String error_message = "SaveIndexInner(): error: SecondaryIndexDataT is not allocated.";
             UnrecoverableError(error_message);
         }
-        pgm_index_->SaveIndex(file_handler);
+        pgm_index_->SaveIndex(file_handle);
     }
 
-    void ReadIndexInner(FileHandler &file_handler) override { pgm_index_->LoadIndex(file_handler); }
+    void ReadIndexInner(LocalFileHandle &file_handle) override { pgm_index_->LoadIndex(file_handle); }
 
     void InsertData(const void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) override {
         if (!need_save_) {

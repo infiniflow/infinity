@@ -27,6 +27,8 @@ import local_file_system;
 import file_system_type;
 import sparse_test_util;
 import infinity_exception;
+import virtual_store;
+import abstract_file_handle;
 
 using namespace infinity;
 
@@ -99,20 +101,22 @@ protected:
             index.Optimize(optimize_options);
             test_query(index);
 
-            auto [file_handler, status] = fs.OpenFile(save_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+            auto [file_handle, status] = LocalStore::Open(save_path, FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }
-            index.Save(*file_handler);
+            index.Save(*file_handle);
+            file_handle->Close();
         }
         {
-            auto [file_handler, status] = fs.OpenFile(save_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handle, status] = LocalStore::Open(save_path, FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }
-            auto index = BMPAlg::Load(*file_handler);
+            auto index = BMPAlg::Load(*file_handle);
 
             test_query(index);
+            file_handle->Close();
         }
     }
 };

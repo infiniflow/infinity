@@ -14,21 +14,24 @@
 
 module;
 
+#include <tuple>
+
 module file_worker;
 
 import stl;
 import utility;
 import infinity_exception;
-import local_file_system;
+import local_file_handle;
 import third_party;
 import file_system_type;
 import defer_op;
 import status;
-import local_file_system;
+import virtual_store;
 import persistence_manager;
 import infinity_context;
 import logger;
 import persist_result_handler;
+import abstract_file_handle;
 
 namespace infinity {
 
@@ -40,32 +43,28 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         UnrecoverableError(error_message);
     }
 
-    LocalFileSystem fs;
-
     if(persistence_manager_ != nullptr && !to_spill) {
         String write_dir = *file_dir_;
         String write_path = Path(*data_dir_) / write_dir / *file_name_;
         String tmp_write_path = Path(*temp_dir_) / StringTransform(write_path, "/", "_");
 
-        u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        auto [file_handler, status] = fs.OpenFile(tmp_write_path, flags, FileLockType::kWriteLock);
+        auto [file_handle, status] = LocalStore::Open(tmp_write_path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        file_handler_ = std::move(file_handler);
+        file_handle_ = std::move(file_handle);
         bool prepare_success = false;
-
         DeferFn defer_fn([&]() {
-            fs.Close(*file_handler_);
-            file_handler_ = nullptr;
+            file_handle_->Close();
+            file_handle_ = nullptr;
         });
 
         bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
         if (prepare_success) {
-            fs.SyncFile(*file_handler_);
+            file_handle_->Sync();
         }
 
-        fs.SyncFile(*file_handler_);
+        file_handle_->Sync();
 
         PersistResultHandler handler(persistence_manager_);
         PersistWriteResult persist_result = persistence_manager_->Persist(write_path, tmp_write_path);
@@ -76,27 +75,25 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         return all_save;
     } else {
         String write_dir = ChooseFileDir(to_spill);
-        if (!fs.Exists(write_dir)) {
-            fs.CreateDirectory(write_dir);
+        if (!LocalStore::Exists(write_dir)) {
+            LocalStore::MakeDirectory(write_dir);
         }
         String write_path = fmt::format("{}/{}", write_dir, *file_name_);
 
-        u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        auto [file_handler, status] = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
+        auto [file_handle, status] = LocalStore::Open(write_path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        file_handler_ = std::move(file_handler);
+        file_handle_ = std::move(file_handle);
 
         if (to_spill) {
-            auto local_file_handle = static_cast<LocalFileHandler *>(file_handler_.get());
-            LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, local_file_handle->fd_));
+            LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
         }
         bool prepare_success = false;
 
         DeferFn defer_fn([&]() {
-            fs.Close(*file_handler_);
-            file_handler_ = nullptr;
+            file_handle_->Close();
+            file_handle_ = nullptr;
         });
 
         bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
@@ -104,14 +101,13 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
             if (to_spill) {
                 LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
             }
-            fs.SyncFile(*file_handler_);
+            file_handle_->Sync();
         }
         return all_save;
     }
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {
-    LocalFileSystem fs;
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
     PersistResultHandler handler;
     if (use_object_cache) {
@@ -128,21 +124,20 @@ void FileWorker::ReadFromFile(bool from_spill) {
         read_path = persistence_manager_->GetObjPath(obj_addr_.obj_key_);
     }
     SizeT file_size = 0;
-    u8 flags = FileFlags::READ_FLAG;
-    auto [file_handler, status] = fs.OpenFile(read_path, flags, FileLockType::kReadLock);
+    auto [file_handle, status] = LocalStore::Open(read_path, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     if (use_object_cache) {
-        fs.Seek(*file_handler, obj_addr_.part_offset_);
+        file_handle->Seek(obj_addr_.part_offset_);
         file_size = obj_addr_.part_size_;
     } else {
-        file_size = fs.GetFileSize(*file_handler);
+        file_size = file_handle->FileSize();
     }
-    file_handler_ = std::move(file_handler);
+    file_handle_ = std::move(file_handle);
     DeferFn defer_fn([&]() {
-        file_handler_->Close();
-        file_handler_ = nullptr;
+        file_handle_->Close();
+        file_handle_ = nullptr;
         if (use_object_cache && obj_addr_.Valid()) {
             String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
             PersistWriteResult res = persistence_manager_->PutObjCache(read_path);
@@ -153,23 +148,21 @@ void FileWorker::ReadFromFile(bool from_spill) {
 }
 
 void FileWorker::MoveFile() {
-    LocalFileSystem fs;
-
     String src_path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
     String dest_dir = ChooseFileDir(false);
     String dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
     if (persistence_manager_ == nullptr) {
-        if (!fs.Exists(src_path)) {
+        if (!LocalStore::Exists(src_path)) {
             Status status = Status::FileNotFound(src_path);
             RecoverableError(status);
         }
-        if (!fs.Exists(dest_dir)) {
-            fs.CreateDirectory(dest_dir);
+        if (!LocalStore::Exists(dest_dir)) {
+            LocalStore::MakeDirectory(dest_dir);
         }
         // if (fs.Exists(dest_path)) {
         //     UnrecoverableError(fmt::format("File {} was already been created before.", dest_path));
         // }
-        fs.Rename(src_path, dest_path);
+        LocalStore::Rename(src_path, dest_path);
     } else {
         PersistResultHandler handler(persistence_manager_);
         PersistWriteResult persist_result = persistence_manager_->Persist(dest_path, src_path);
@@ -195,20 +188,18 @@ void FileWorker::CleanupFile() const {
         handler.HandleWriteResult(result);
         return;
     }
-    LocalFileSystem fs;
 
     String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
-    if (fs.Exists(path)) {
-        fs.DeleteFile(path);
+    if (LocalStore::Exists(path)) {
+        LocalStore::DeleteFile(path);
         LOG_INFO(fmt::format("Cleaned file: {}", path));
     }
 }
 
 void FileWorker::CleanupTempFile() const {
-    LocalFileSystem fs;
     String path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
-    if (fs.Exists(path)) {
-        fs.DeleteFile(path);
+    if (LocalStore::Exists(path)) {
+        LocalStore::DeleteFile(path);
         LOG_INFO(fmt::format("Cleaned file: {}", path));
     } else {
         String error_message = fmt::format("Cleanup: File {} not found for deletion", path);

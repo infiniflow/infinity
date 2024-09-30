@@ -172,7 +172,7 @@ def is_datetime(str_input):
     return False
 
 index_type_transfrom = {
-    1:"IVFFLAT",
+    1:"IVF",
     2:"HNSW",
     3:"FULLTEXT",
     4:"SECONDARY",

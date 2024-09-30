@@ -58,25 +58,24 @@ def setup_class(request, local_infinity, http):
 @pytest.mark.usefixtures("suffix")
 class TestInfinity:
 
-    @pytest.mark.skip(reason="Disable IVF index")
-    def test_create_index_IVFFlat(self, suffix):
+    def test_create_index_IVF(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        res = db_obj.drop_table("test_index_ivfflat" + suffix, ConflictType.Ignore)
+        res = db_obj.drop_table("test_index_ivf" + suffix, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
-        table_obj = db_obj.create_table("test_index_ivfflat" + suffix, {
+        table_obj = db_obj.create_table("test_index_ivf" + suffix, {
             "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
-                                                     index.IndexType.IVFFlat,
-                                                     {"centroids_count": "128", "metric": "l2"}),
+                                                     index.IndexType.IVF,
+                                                     {"metric": "l2"}),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.drop_index("my_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        res = db_obj.drop_table("test_index_ivfflat" + suffix, ConflictType.Error)
+        res = db_obj.drop_table("test_index_ivf" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     def test_create_index_HNSW(self, suffix):
@@ -1205,7 +1204,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("index_type", [
-        # index.IndexType.IVFFlat,
+        common_index.IndexType.IVF,
         common_index.IndexType.Hnsw,
         common_index.IndexType.BMP,
         common_index.IndexType.FullText,
@@ -1217,15 +1216,15 @@ class TestInfinity:
         res = db_obj.drop_table("test_index" + suffix, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
-        if index_type == common_index.IndexType.IVFFlat:
+        if index_type == common_index.IndexType.IVF:
             table_obj = db_obj.create_table("test_index" + suffix, {
                 "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
             assert table_obj is not None
 
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
-                                                         index.IndexType.IVFFlat,
-                                                         {"CENTROIDS_COUNT": "128", "METRIC": "l2"}),
+                                                         index.IndexType.IVF,
+                                                         {"METRIC": "l2"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
         elif index_type == common_index.IndexType.Hnsw:
@@ -1303,7 +1302,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("index_type", [
-        # index.IndexType.IVFFlat,
+        common_index.IndexType.IVF,
         common_index.IndexType.Hnsw,
         common_index.IndexType.BMP,
         common_index.IndexType.FullText,
@@ -1314,15 +1313,15 @@ class TestInfinity:
         db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_index" + suffix, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
-        if index_type == common_index.IndexType.IVFFlat:
+        if index_type == common_index.IndexType.IVF:
             table_obj = db_obj.create_table("test_index" + suffix, {
                 "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
             assert table_obj is not None
 
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
-                                                         index.IndexType.IVFFlat,
-                                                         {"centroids_count": "128", "metric": "l2"}),
+                                                         index.IndexType.IVF,
+                                                         {"metric": "l2"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
         elif index_type == common_index.IndexType.Hnsw:

@@ -36,7 +36,7 @@ import physical_import;
 import txn;
 import catalog;
 import index_base;
-import index_ivfflat;
+import index_ivf;
 import index_hnsw;
 import index_full_text;
 import bg_task;
@@ -828,11 +828,11 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
 
             Vector<String> columns1{"col1"};
             Vector<InitParameter *> parameters1;
-            parameters1.emplace_back(new InitParameter("centroids_count", "100"));
             parameters1.emplace_back(new InitParameter("metric", "l2"));
+            parameters1.emplace_back(new InitParameter("plain_storage_data_type", "f32"));
 
             SharedPtr<String> index_name = MakeShared<String>("idx1");
-            auto index_base_ivf = IndexIVFFlat::Make(index_name, "idx1_tbl1", columns1, parameters1);
+            auto index_base_ivf = IndexIVF::Make(index_name, "idx1_tbl1", columns1, parameters1);
             for (auto *init_parameter : parameters1) {
                 delete init_parameter;
             }

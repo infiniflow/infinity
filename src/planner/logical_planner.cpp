@@ -64,12 +64,12 @@ import logical_command;
 import explain_logical_plan;
 import explain_ast;
 
-import local_file_system;
+import virtual_store;
 
 import status;
 import default_values;
 import index_base;
-import index_ivfflat;
+import index_ivf;
 import index_hnsw;
 import index_diskann;
 import index_secondary;
@@ -626,6 +626,8 @@ Status LogicalPlanner::BuildCreateDatabase(const CreateStatement *statement, Sha
 }
 
 Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    return Status::NotSupport("View isn't supported");
+#if 0
     CreateViewInfo *create_view_info = (CreateViewInfo *)(statement->create_info_.get());
 
     // Check if columns is given.
@@ -657,6 +659,7 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
     return Status::OK();
+#endif
 }
 
 Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -698,10 +701,11 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             base_index_ptr = IndexHnsw::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
-        case IndexType::kIVFFlat: {
+        case IndexType::kIVF: {
             assert(index_info->index_param_list_ != nullptr);
-            IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexIVFFlat::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            auto ivf_ptr = IndexIVF::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            ivf_ptr->ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = std::move(ivf_ptr);
             break;
         }
         case IndexType::kSecondary: {
@@ -914,10 +918,8 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     }
 
     // Check the file existence
-    LocalFileSystem fs;
-
     String to_write_path;
-    if (fs.Exists(statement->file_path_)) {
+    if (LocalStore::Exists(statement->file_path_)) {
         Status status = Status::DuplicatedFile(statement->file_path_);
         RecoverableError(status);
     }
@@ -1076,10 +1078,8 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     }
 
     // Check the file existence
-    LocalFileSystem fs;
-
     String to_write_path;
-    if (!fs.Exists(statement->file_path_)) {
+    if (!LocalStore::Exists(statement->file_path_)) {
         RecoverableError(Status::FileNotFound(statement->file_path_));
     }
 
@@ -1853,14 +1853,20 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
     switch (statement->type_) {
         case ExplainType::kAst: {
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-            ExplainAST::Explain(statement->statement_, texts_ptr);
+            Status status = ExplainAST::Explain(statement->statement_, texts_ptr);
+            if(!status.ok()) {
+                return status;
+            }
             explain_node->SetText(texts_ptr);
             break;
         }
         case ExplainType::kUnOpt: {
             Build(statement->statement_, bind_context_ptr);
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-            ExplainLogicalPlan::Explain(this->logical_plan_.get(), texts_ptr);
+            Status status = ExplainLogicalPlan::Explain(this->logical_plan_.get(), texts_ptr);
+            if(!status.ok()) {
+                return status;
+            }
             explain_node->SetText(texts_ptr);
             break;
         }

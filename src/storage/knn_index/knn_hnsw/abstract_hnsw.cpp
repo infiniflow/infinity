@@ -246,6 +246,7 @@ SharedPtr<ChunkIndexEntry> HnswIndexInMem::Dump(SegmentIndexEntry *segment_index
     auto *data_ptr = static_cast<AbstractHnsw *>(handle.GetDataMut());
     *data_ptr = hnsw_;
     own_memory_ = false;
+    chunk_handle_ = std::move(handle);
     return new_chunk_indey_entry;
 }
 

@@ -56,10 +56,10 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
         LocalFileSystem fs;
 
         String index_path = GetFilePath();
-        auto [file_handler, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        auto [file_handle, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
         if (status.ok()) {
             // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
-            index_size = fs.GetFileSize(*file_handler);
+            index_size = fs.GetFileSize(*file_handle);
         }
     }
     index_size_ = index_size;
@@ -112,7 +112,7 @@ bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 UnrecoverableError("Invalid index type.");
             } else {
-                index->Save(*file_handler_);
+                index->Save(*file_handle_);
             }
         },
         *hnsw_index);
@@ -133,7 +133,7 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {
                 UnrecoverableError("Invalid index type.");
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
-                index = IndexT::Load(*file_handler_).release();
+                index = IndexT::Load(*file_handle_).release();
             }
         },
         *hnsw_index);

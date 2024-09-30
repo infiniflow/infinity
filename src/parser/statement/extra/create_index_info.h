@@ -22,7 +22,7 @@
 namespace infinity {
 
 enum class IndexType {
-    kIVFFlat,
+    kIVF,
     kHnsw,
     kBMP,
     kFullText,

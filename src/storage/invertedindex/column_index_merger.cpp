@@ -103,18 +103,18 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
                 column_len_file = pm->GetObjPath(obj_addr.obj_key_);
             }
 
-            auto [file_handler, status] = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handle, status] = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
 
-            const u32 file_size = fs_.GetFileSize(*file_handler);
+            const u32 file_size = fs_.GetFileSize(*file_handle);
             u32 file_read_array_len = file_size / sizeof(u32);
             if (unsafe_column_lengths.size() < id_offset + file_read_array_len) {
                 unsafe_column_lengths.resize(id_offset + file_read_array_len);
             }
-            const i64 read_count = fs_.Read(*file_handler, unsafe_column_lengths.data() + id_offset, file_size);
-            file_handler->Close();
+            const i64 read_count = fs_.Read(*file_handle, unsafe_column_lengths.data() + id_offset, file_size);
+            file_handle->Close();
             if (read_count != file_size) {
                 String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
                 UnrecoverableError(error_message);
@@ -127,12 +127,12 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             }
         }
 
-        auto [file_handler, status] = fs_.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+        auto [file_handle, status] = fs_.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        fs_.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
-        fs_.Close(*file_handler);
+        fs_.Write(*file_handle, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
+        fs_.Close(*file_handle);
     }
 
     while (!term_posting_queue.Empty()) {

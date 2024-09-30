@@ -29,6 +29,7 @@ import internal_types;
 import index_bmp;
 import sparse_info;
 import internal_types;
+import buffer_handle;
 
 namespace infinity {
 
@@ -117,6 +118,7 @@ private:
     RowID begin_row_id_ = {};
     AbstractBMP bmp_ = nullptr;
     mutable bool own_memory_ = true;
+    mutable BufferHandle chunk_handle_{};
 };
 
 } // namespace infinity

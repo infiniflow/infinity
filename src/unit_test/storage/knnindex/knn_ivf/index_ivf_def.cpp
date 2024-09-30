@@ -62,7 +62,7 @@ struct InitParameterHelper {
 
 TEST_F(IndexIVFTest, testplain) {
     using namespace infinity;
-    Map<String, String> args_map{{"metric_Type", "cos"}, {"plain_storage_data_type", "f32"}};
+    Map<String, String> args_map{{"meTric", "cos"}, {"plain_storage_data_type", "f32"}};
     InitParameterHelper h;
     {
         auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
@@ -91,7 +91,7 @@ TEST_F(IndexIVFTest, testplain) {
 
 TEST_F(IndexIVFTest, testsq) {
     using namespace infinity;
-    Map<String, String> args_map{{"metric_Type", "L2"},
+    Map<String, String> args_map{{"metrIc", "L2"},
                                  {"centroids_num_ratio", "0.33"},
                                  {"storage_type", "Scalar_Quantization"},
                                  {"scalar_quantization_bits", "4"}};
@@ -117,7 +117,7 @@ TEST_F(IndexIVFTest, testsq) {
 
 TEST_F(IndexIVFTest, testpq) {
     using namespace infinity;
-    Map<String, String> args_map{{"metric_Type", "ip"},
+    Map<String, String> args_map{{"Metric", "ip"},
                                  {"storage_type", "product_quAntization"},
                                  {"product_quantization_subspace_num", "32"},
                                  {"product_quanTization_subspace_bits", "12"}};
@@ -129,7 +129,7 @@ TEST_F(IndexIVFTest, testpq) {
         std::cout << "IndexIVF::ToString(): " << ivf_index->ToString() << std::endl;
     }
     {
-        args_map.erase("metric_Type");
+        args_map.erase("Metric");
         EXPECT_THROW(IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map)),
                      RecoverableException);
     }

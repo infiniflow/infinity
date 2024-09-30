@@ -22,9 +22,9 @@ export module sparse_util;
 import stl;
 import sparse_vector_distance;
 import knn_result_handler;
-import file_system;
 import infinity_exception;
 import third_party;
+import local_file_handle;
 
 namespace infinity {
 
@@ -79,22 +79,22 @@ public:
         return SparseVecRef<DataT, IdxT>(nnz, indices, data);
     }
 
-    static SparseMatrix Load(FileHandler &file_handler) {
+    static SparseMatrix Load(LocalFileHandle &file_handle) {
         i64 nrow = 0;
         i64 ncol = 0;
         i64 nnz = 0;
-        file_handler.Read(&nrow, sizeof(nrow));
-        file_handler.Read(&ncol, sizeof(ncol));
-        file_handler.Read(&nnz, sizeof(nnz));
+        file_handle.Read(&nrow, sizeof(nrow));
+        file_handle.Read(&ncol, sizeof(ncol));
+        file_handle.Read(&nnz, sizeof(nnz));
 
         auto indptr = MakeUnique<i64[]>(nrow + 1);
-        file_handler.Read(indptr.get(), sizeof(i64) * (nrow + 1));
+        file_handle.Read(indptr.get(), sizeof(i64) * (nrow + 1));
         if (indptr[nrow] != nnz) {
             UnrecoverableError("Invalid indptr.");
         }
 
         auto indices = MakeUnique<IdxT[]>(nnz);
-        file_handler.Read(indices.get(), sizeof(IdxT) * nnz);
+        file_handle.Read(indices.get(), sizeof(IdxT) * nnz);
         // assert all element in indices >= 0 and < ncol
         {
             bool check = std::all_of(indices.get(), indices.get() + nnz, [ncol](IdxT ele) { return ele >= 0 && ele < ncol; });
@@ -104,17 +104,17 @@ public:
         }
 
         auto data = MakeUnique<DataT[]>(nnz);
-        file_handler.Read(data.get(), sizeof(DataT) * nnz);
+        file_handle.Read(data.get(), sizeof(DataT) * nnz);
         return {std::move(data), std::move(indices), std::move(indptr), nrow, ncol, nnz};
     }
 
-    void Save(FileHandler &file_handler) const {
-        file_handler.Write(&nrow_, sizeof(nrow_));
-        file_handler.Write(&ncol_, sizeof(ncol_));
-        file_handler.Write(&nnz_, sizeof(nnz_));
-        file_handler.Write(indptr_.get(), sizeof(i64) * (nrow_ + 1));
-        file_handler.Write(indices_.get(), sizeof(IdxT) * nnz_);
-        file_handler.Write(data_.get(), sizeof(DataT) * nnz_);
+    void Save(LocalFileHandle &file_handle) const {
+        file_handle.Append(&nrow_, sizeof(nrow_));
+        file_handle.Append(&ncol_, sizeof(ncol_));
+        file_handle.Append(&nnz_, sizeof(nnz_));
+        file_handle.Append(indptr_.get(), sizeof(i64) * (nrow_ + 1));
+        file_handle.Append(indices_.get(), sizeof(IdxT) * nnz_);
+        file_handle.Append(data_.get(), sizeof(DataT) * nnz_);
     }
 
     void Clear() {

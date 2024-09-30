@@ -25,7 +25,7 @@ module;
 export module plain_vec_store;
 
 import stl;
-import file_system;
+import local_file_handle;
 import hnsw_common;
 
 namespace infinity {
@@ -56,11 +56,11 @@ public:
 
     SizeT GetSizeInBytes() const { return sizeof(SizeT); }
 
-    void Save(FileHandler &file_handler) const { file_handler.Write(&dim_, sizeof(dim_)); }
+    void Save(LocalFileHandle &file_handle) const { file_handle.Append(&dim_, sizeof(dim_)); }
 
-    static This Load(FileHandler &file_handler) {
+    static This Load(LocalFileHandle &file_handle) {
         SizeT dim;
-        file_handler.Read(&dim, sizeof(dim));
+        file_handle.Read(&dim, sizeof(dim));
         return This(dim);
     }
 
@@ -94,14 +94,14 @@ public:
 
     SizeT GetSizeInBytes(SizeT cur_vec_num, const Meta &meta) const { return sizeof(DataType) * cur_vec_num * meta.dim(); }
 
-    void Save(FileHandler &file_handler, SizeT cur_vec_num, const Meta &meta) const {
-        file_handler.Write(ptr_.get(), sizeof(DataType) * cur_vec_num * meta.dim());
+    void Save(LocalFileHandle &file_handle, SizeT cur_vec_num, const Meta &meta) const {
+        file_handle.Append(ptr_.get(), sizeof(DataType) * cur_vec_num * meta.dim());
     }
 
-    static This Load(FileHandler &file_handler, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+    static This Load(LocalFileHandle &file_handle, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
         assert(cur_vec_num <= max_vec_num);
         This ret(max_vec_num, meta);
-        file_handler.Read(ret.ptr_.get(), sizeof(DataType) * cur_vec_num * meta.dim());
+        file_handle.Read(ret.ptr_.get(), sizeof(DataType) * cur_vec_num * meta.dim());
         mem_usage += sizeof(DataType) * max_vec_num * meta.dim();
         return ret;
     }

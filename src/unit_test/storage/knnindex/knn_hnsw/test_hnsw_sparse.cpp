@@ -27,6 +27,9 @@ import compilation_config;
 import infinity_exception;
 import third_party;
 import sparse_test_util;
+import virtual_store;
+import local_file_handle;
+import abstract_file_handle;
 
 using namespace infinity;
 
@@ -73,29 +76,28 @@ protected:
                     continue;
                 }
                 Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
-//                if (int(res[0].second) != gt_idx[i]) {
-//                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
-//                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
-//                }
+                //                if (int(res[0].second) != gt_idx[i]) {
+                //                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
+                //                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
+                //                }
                 // EXPECT_EQ(res[0].second, gt_idx[i]);
                 // EXPECT_NEAR(-res[0].first, gt_score[i], 1e-5);
             }
 
-            auto [file_handler, status] =
-                fs.OpenFile(save_dir_ + "/test_hnsw_sparse.bin", FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            hnsw_index->Save(*file_handler);
-            file_handler->Close();
+            hnsw_index->Save(*file_handle);
+            file_handle->Close();
         }
         {
-            auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw_sparse.bin", FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
 
-            auto hnsw_index = Hnsw::Load(*file_handler);
+            auto hnsw_index = Hnsw::Load(*file_handle);
             KnnSearchOption search_option{.ef_ = 50};
             for (SizeT i = 0; i < element_size; ++i) {
                 SparseVecRef<f32, IdxT> query = dataset.at(i);
@@ -103,13 +105,14 @@ protected:
                     continue;
                 }
                 Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
-//                if (int(res[0].second) != gt_idx[i]) {
-//                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
-//                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
-//                }
+                //                if (int(res[0].second) != gt_idx[i]) {
+                //                    std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
+                //                    std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
+                //                }
                 // EXPECT_EQ(res[0].second, gt_idx[i]);
                 // EXPECT_NEAR(-res[0].first, gt_score[i], 1e-5);
             }
+            file_handle->Close();
         }
     }
 

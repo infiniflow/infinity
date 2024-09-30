@@ -66,7 +66,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
 bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
         auto index = static_cast<SecondaryIndexData *>(data_);
-        index->SaveIndexInner(*file_handler_);
+        index->SaveIndexInner(*file_handle_);
         prepare_success = true;
         LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
     } else {
@@ -79,7 +79,7 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
 void SecondaryIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
     if (!data_) [[likely]] {
         auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
-        index->ReadIndexInner(*file_handler_);
+        index->ReadIndexInner(*file_handle_);
         data_ = static_cast<void *>(index);
         LOG_TRACE("Finished ReadFromFileImpl().");
     } else {
@@ -145,7 +145,7 @@ void SecondaryIndexFileWorkerParts::FreeInMemory() {
 
 bool SecondaryIndexFileWorkerParts::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
-        file_handler_->Write(data_, part_row_count_ * data_pair_size_);
+        file_handle_->Append(data_, part_row_count_ * data_pair_size_);
         prepare_success = true;
         LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
     } else {
@@ -163,7 +163,7 @@ void SecondaryIndexFileWorkerParts::ReadFromFileImpl(SizeT file_size) {
     if (!data_) [[likely]] {
         const u32 read_bytes = part_row_count_ * data_pair_size_;
         data_ = static_cast<void *>(new char[read_bytes]);
-        file_handler_->Read(data_, read_bytes);
+        file_handle_->Read(data_, read_bytes);
         LOG_TRACE("Finished ReadFromFileImpl().");
     } else {
         String error_message = "ReadFromFileImpl: data_ is not nullptr";

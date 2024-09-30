@@ -30,7 +30,6 @@ import table_entry;
 import infinity_exception;
 import status;
 import extra_ddl_info;
-import local_file_system;
 import txn;
 import create_index_info;
 import base_entry;
