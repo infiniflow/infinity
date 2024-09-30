@@ -20,7 +20,7 @@ from infinity.errors import ErrorCode
 
 
 class IndexType(Enum):
-    IVFFlat = 1
+    IVF = 1
     Hnsw = 2
     FullText = 3
     Secondary = 4
@@ -30,8 +30,8 @@ class IndexType(Enum):
 
     def to_ttype(self):
         match self:
-            case IndexType.IVFFlat:
-                return ttypes.IndexType.IVFFlat
+            case IndexType.IVF:
+                return ttypes.IndexType.IVF
             case IndexType.Hnsw:
                 return ttypes.IndexType.Hnsw
             case IndexType.FullText:

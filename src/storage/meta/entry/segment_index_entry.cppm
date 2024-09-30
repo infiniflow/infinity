@@ -45,6 +45,7 @@ class BufferManager;
 struct SegmentEntry;
 struct TableEntry;
 class HnswIndexInMem;
+class IVFIndexInMem;
 class SecondaryIndexInMem;
 class EMVBIndexInMem;
 class BMPIndexInMem;
@@ -61,9 +62,7 @@ public:
 
     static String EncodeIndex(const SegmentID segment_id, const TableIndexEntry *table_index_entry);
 
-public:
-    static SharedPtr<SegmentIndexEntry>
-    NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Txn *txn, CreateIndexParam *create_index_param);
+    static SharedPtr<SegmentIndexEntry> NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Txn *txn);
 
     static SharedPtr<SegmentIndexEntry> NewReplaySegmentIndexEntry(TableIndexEntry *table_index_entry,
                                                                    TableEntry *table_entry,
@@ -78,16 +77,7 @@ public:
 
     void UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> new_entry);
 
-    static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(BufferManager* buffer_mgr, SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id);
-
-    static String IndexFileName(SegmentID segment_id);
-
-    [[nodiscard]] BufferHandle GetIndex();
-
-    // load the idx part into memory
-    [[nodiscard]] BufferHandle GetIndexPartAt(u32 idx);
-
-    [[nodiscard]] inline u32 GetIndexPartNum() { return vector_buffer_.size() - 1; }
+    // static String IndexFileName(SegmentID segment_id);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
@@ -146,8 +136,6 @@ public:
 
     Status CreateIndexDo(atomic_u64 &create_index_idx);
 
-    static UniquePtr<CreateIndexParam> GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def);
-
     void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, SharedPtr<MemoryIndexer> &memory_indexer, Txn *txn = nullptr) {
         std::shared_lock lock(rw_locker_);
         chunk_index_entries.clear();
@@ -193,6 +181,11 @@ public:
         return {chunk_index_entries_, memory_bmp_index_};
     }
 
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<IVFIndexInMem>> GetIVFIndexSnapshot() {
+        std::shared_lock lock(rw_locker_);
+        return {chunk_index_entries_, memory_ivf_index_};
+    }
+
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> GetSecondaryIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
         return {chunk_index_entries_, memory_secondary_index_};
@@ -220,6 +213,8 @@ public:
     SharedPtr<ChunkIndexEntry> CreateHnswIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr, SizeT index_size);
 
     SharedPtr<ChunkIndexEntry> CreateSecondaryIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
+
+    SharedPtr<ChunkIndexEntry> CreateIVFIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
 
     SharedPtr<ChunkIndexEntry> CreateEMVBIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
 
@@ -257,7 +252,7 @@ public:
     ChunkID GetNextChunkID() { return next_chunk_id_++; }
 
 private:
-    explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer);
+    explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id);
 
     SegmentIndexEntry(const SegmentIndexEntry &other);
 
@@ -267,17 +262,10 @@ public:
     UniquePtr<SegmentIndexEntry> Clone(TableIndexEntry *table_index_entry) const;
 
 private:
-    // Load from disk. Is called by SegmentIndexEntry::Deserialize.
-    static UniquePtr<SegmentIndexEntry>
-    LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *create_index_param);
-
-private:
     BufferManager *buffer_manager_{};
     TableIndexEntry *table_index_entry_;
     SharedPtr<String> index_dir_{};
     const SegmentID segment_id_{};
-
-    Vector<BufferObj *> vector_buffer_{}; // size: 1 + GetIndexPartNum().
 
     mutable std::shared_mutex rw_locker_{};
 
@@ -290,6 +278,7 @@ private:
 
     std::mutex mem_index_locker_{};
     SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
+    SharedPtr<IVFIndexInMem> memory_ivf_index_{};
     SharedPtr<MemoryIndexer> memory_indexer_{};
     SharedPtr<SecondaryIndexInMem> memory_secondary_index_{};
     SharedPtr<EMVBIndexInMem> memory_emvb_index_{};

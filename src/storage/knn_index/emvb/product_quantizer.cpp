@@ -115,13 +115,13 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, c
             copy_dst += subspace_dimension_;
         }
         // k-means
-        const auto centroid_cnt_result = GetKMeansCentroids<f32>(MetricType::kMetricL2,
-                                                                 this->subspace_dimension_,
-                                                                 embedding_num,
-                                                                 part_train_data.get(),
-                                                                 subspace_centroids_[i],
-                                                                 subspace_centroid_num_,
-                                                                 iter_cnt);
+        const auto centroid_cnt_result = GetKMeansCentroids(MetricType::kMetricL2,
+                                                            this->subspace_dimension_,
+                                                            embedding_num,
+                                                            part_train_data.get(),
+                                                            subspace_centroids_[i],
+                                                            subspace_centroid_num_,
+                                                            iter_cnt);
         if (centroid_cnt_result != subspace_centroid_num_) {
             const auto error_info = fmt::format("KMeans failed to find {} centroids for subspace", subspace_centroid_num_);
             UnrecoverableError(error_info);

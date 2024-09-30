@@ -22,7 +22,7 @@ module index_base;
 
 import stl;
 import serialize;
-import index_ivfflat;
+import index_ivf;
 import index_hnsw;
 import index_diskann;
 import index_full_text;
@@ -118,10 +118,9 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
     }
     SharedPtr<IndexBase> res = nullptr;
     switch (index_type) {
-        case IndexType::kIVFFlat: {
-            size_t centroids_count = ReadBufAdv<size_t>(ptr);
-            MetricType metric_type = ReadBufAdv<MetricType>(ptr);
-            res = MakeShared<IndexIVFFlat>(index_name, file_name, column_names, centroids_count, metric_type);
+        case IndexType::kIVF: {
+            const auto ivf_option = ReadBufAdv<IndexIVFOption>(ptr);
+            res = MakeShared<IndexIVF>(index_name, file_name, column_names, ivf_option);
             break;
         }
         case IndexType::kHnsw: {
@@ -211,11 +210,9 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
     String file_name = index_def_json["file_name"];
     Vector<String> column_names = index_def_json["column_names"];
     switch (index_type) {
-        case IndexType::kIVFFlat: {
-            size_t centroids_count = index_def_json["centroids_count"];
-            MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
-            auto ptr = MakeShared<IndexIVFFlat>(index_name, file_name, std::move(column_names), centroids_count, metric_type);
-            res = std::static_pointer_cast<IndexBase>(ptr);
+        case IndexType::kIVF: {
+            const auto ivf_option = IndexIVF::DeserializeIndexIVFOption(index_def_json["ivf_option"]);
+            res = MakeShared<IndexIVF>(index_name, file_name, std::move(column_names), ivf_option);
             break;
         }
         case IndexType::kHnsw: {
@@ -224,9 +221,7 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             SizeT block_size = index_def_json["block_size"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             HnswEncodeType encode_type = StringToHnswEncodeType(index_def_json["encode_type"]);
-            auto ptr =
-                MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, block_size);
-            res = std::static_pointer_cast<IndexBase>(ptr);
+            res = MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, block_size);
             break;
         }
         case IndexType::kDiskAnn: {
@@ -236,20 +231,16 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             SizeT num_parts = index_def_json["num_parts"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             DiskAnnEncodeType encode_type = StringToDiskAnnEncodeType(index_def_json["encode_type"]);
-            auto ptr =
-                MakeShared<IndexDiskAnn>(index_name, file_name, std::move(column_names), metric_type, encode_type, R, L, num_pq_chunks, num_parts);
-            res = std::static_pointer_cast<IndexBase>(ptr);
+            res = MakeShared<IndexDiskAnn>(index_name, file_name, std::move(column_names), metric_type, encode_type, R, L, num_pq_chunks, num_parts);
             break;
         }
         case IndexType::kFullText: {
             String analyzer = index_def_json["analyzer"];
-            auto ptr = MakeShared<IndexFullText>(index_name, file_name, std::move(column_names), analyzer);
-            res = std::static_pointer_cast<IndexBase>(ptr);
+            res = MakeShared<IndexFullText>(index_name, file_name, std::move(column_names), analyzer);
             break;
         }
         case IndexType::kSecondary: {
-            auto ptr = MakeShared<IndexSecondary>(index_name, file_name, std::move(column_names));
-            res = std::static_pointer_cast<IndexBase>(ptr);
+            res = MakeShared<IndexSecondary>(index_name, file_name, std::move(column_names));
             break;
         }
         case IndexType::kEMVB: {

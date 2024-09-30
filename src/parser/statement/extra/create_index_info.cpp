@@ -21,8 +21,8 @@ namespace infinity {
 
 std::string IndexInfo::IndexTypeToString(IndexType index_type) {
     switch (index_type) {
-        case IndexType::kIVFFlat: {
-            return "IVFFLAT";
+        case IndexType::kIVF: {
+            return "IVF";
         }
         case IndexType::kHnsw: {
             return "HNSW";
@@ -50,8 +50,8 @@ std::string IndexInfo::IndexTypeToString(IndexType index_type) {
 }
 
 IndexType IndexInfo::StringToIndexType(const std::string &index_type_str) {
-    if (index_type_str == "IVFFLAT") {
-        return IndexType::kIVFFlat;
+    if (index_type_str == "IVF") {
+        return IndexType::kIVF;
     } else if (index_type_str == "HNSW") {
         return IndexType::kHnsw;
     } else if (index_type_str == "FULLTEXT") {

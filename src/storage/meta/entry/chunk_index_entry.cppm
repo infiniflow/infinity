@@ -76,6 +76,13 @@ public:
                                                                        u32 row_count,
                                                                        BufferManager *buffer_mgr);
 
+    static SharedPtr<ChunkIndexEntry> NewIVFIndexChunkIndexEntry(ChunkID chunk_id,
+                                                                 SegmentIndexEntry *segment_index_entry,
+                                                                 const String &base_name,
+                                                                 RowID base_rowid,
+                                                                 u32 row_count,
+                                                                 BufferManager *buffer_mgr);
+
     static SharedPtr<ChunkIndexEntry> NewEMVBIndexChunkIndexEntry(ChunkID chunk_id,
                                                                   SegmentIndexEntry *segment_index_entry,
                                                                   const String &base_name,
@@ -93,7 +100,6 @@ public:
 
     static SharedPtr<ChunkIndexEntry> NewReplayChunkIndexEntry(ChunkID chunk_id,
                                                                SegmentIndexEntry *segment_index_entry,
-                                                               CreateIndexParam *param,
                                                                const String &base_name,
                                                                RowID base_rowid,
                                                                u32 row_count,
@@ -121,7 +127,7 @@ public:
     nlohmann::json Serialize();
 
     static SharedPtr<ChunkIndexEntry>
-    Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry, CreateIndexParam *param, BufferManager *buffer_mgr);
+    Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
 
     virtual void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 

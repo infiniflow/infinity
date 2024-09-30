@@ -25,7 +25,7 @@ namespace infinity {
 export enum class FileWorkerType {
     kDataFile,
     kVarFile,
-    kIVFFlatIndexFile,
+    kIVFIndexFile,
     kHNSWIndexFile,
     kRawFile,
     kSecondaryIndexFile,
@@ -45,8 +45,8 @@ export String FileWorkerType2Str(FileWorkerType type) {
         case FileWorkerType::kVarFile: {
             return "var";
         }
-        case FileWorkerType::kIVFFlatIndexFile: {
-            return "IVF Flat index";
+        case FileWorkerType::kIVFIndexFile: {
+            return "IVF index";
         }
         case FileWorkerType::kHNSWIndexFile: {
             return "HNSW index";

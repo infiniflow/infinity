@@ -245,13 +245,8 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
     // step 1. train centroids
     const auto time_0 = std::chrono::high_resolution_clock::now();
     {
-        const auto result_centroid_num = GetKMeansCentroids<f32>(MetricType::kMetricL2,
-                                                                 embedding_dimension_,
-                                                                 embedding_num,
-                                                                 embedding_data,
-                                                                 centroids_data_,
-                                                                 n_centroids_,
-                                                                 iter_cnt);
+        const auto result_centroid_num =
+            GetKMeansCentroids(MetricType::kMetricL2, embedding_dimension_, embedding_num, embedding_data, centroids_data_, n_centroids_, iter_cnt);
         if (result_centroid_num != n_centroids_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::Train: KMeans failed to get {} centroids, got {} instead.", n_centroids_, result_centroid_num);

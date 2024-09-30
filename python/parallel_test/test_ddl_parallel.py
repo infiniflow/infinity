@@ -19,7 +19,7 @@ fulltext_columns = [{"doctitle": {"type": "varchar"}, "docdate": {"type": "varch
                     {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "int"}}]
 vec_indexes_on = ["c1", "c2"]
 fulltext_indexes_on = ["doctitle", "docdate"]
-vector_index_type = [index.IndexType.IVFFlat, index.IndexType.Hnsw]
+vector_index_type = [index.IndexType.IVF, index.IndexType.Hnsw]
 vector_index_option = [[index.InitParameter("centroids_count", "128"), index.InitParameter("metric", "l2")],
                        [
                            index.InitParameter("M", "16"),
