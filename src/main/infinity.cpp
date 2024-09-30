@@ -23,7 +23,7 @@ import config;
 import resource_manager;
 import task_scheduler;
 import storage;
-import local_file_system;
+import virtual_store;
 import third_party;
 import query_options;
 import query_result;
@@ -69,10 +69,9 @@ u64 Infinity::GetSessionId() { return session_->session_id(); }
 void Infinity::Hello() { fmt::print("hello infinity\n"); }
 
 void Infinity::LocalInit(const String &path) {
-    LocalFileSystem fs;
 
     SharedPtr<String> config_path = MakeShared<String>(std::filesystem::absolute(path + "/infinity_conf.toml"));
-    if (fs.Exists(*config_path)) {
+    if (LocalStore::Exists(*config_path)) {
         InfinityContext::instance().Init(config_path);
     } else {
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
