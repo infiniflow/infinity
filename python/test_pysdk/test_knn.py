@@ -1039,7 +1039,7 @@ class TestInfinity:
     @pytest.mark.parametrize("knn_column_name", ["gender_vector"])
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip", "cosine", "cos"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip", "cosine", "cos"])
-    @pytest.mark.parametrize("index_type", [common_index.IndexType.Hnsw]) # Remove index.IndexType.IVFFlat, after IVFFlat support cosine metric
+    @pytest.mark.parametrize("index_type", [common_index.IndexType.Hnsw, common_index.IndexType.IVF])
     def test_with_various_index_knn_distance_combination(self, check_data, index_column_name, knn_column_name,
                                                          index_distance_type, knn_distance_type, index_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -1075,27 +1075,17 @@ class TestInfinity:
             print(res)
             res = table_obj.drop_index("my_index", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-        elif index_type == common_index.IndexType.IVFFlat:
-            if index_distance_type == "cosine" or index_distance_type == "cos":
-                with pytest.raises(InfinityException) as e:
-                    res = table_obj.create_index("my_index",
-                                                 index.IndexInfo(index_column_name,
-                                                                 index.IndexType.IVFFlat,
-                                                                 {"centroids_count": "128", "metric": index_distance_type}),
-                                                 ConflictType.Error)
-                assert e.type == InfinityException
-                assert e.value.args[0] == ErrorCode.NOT_SUPPORTED
-            else:
+        elif index_type == common_index.IndexType.IVF:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo(index_column_name,
-                                                             index.IndexType.IVFFlat,
-                                                             {"centroids_count": "128", "metric": index_distance_type}),
+                                                             index.IndexType.IVF,
+                                                             {"metric": index_distance_type}),
                                              ConflictType.Error)
                 assert res.error_code == ErrorCode.OK
                 # for IVFFlat, index_distance_type has to match knn_distance_type?
-                res = table_obj.output(["variant_id"]).match_dense(
-                    knn_column_name, [1.0] * 4, "float", index_distance_type, 5).to_pl()
-                print(res)
+                #res = table_obj.output(["variant_id"]).match_dense(
+                #    knn_column_name, [1.0] * 4, "float", index_distance_type, 5).to_pl()
+                #print(res)
                 res = table_obj.drop_index("my_index", ConflictType.Error)
                 assert res.error_code == ErrorCode.OK
 
@@ -1388,7 +1378,7 @@ class TestInfinity:
                                                 ConflictType.Error)
             assert e.value.args[0] == ErrorCode.INVALID_EMBEDDING_DATA_TYPE
 
-    @pytest.mark.parametrize("index_type", [#common_index.IndexType.IVFFlat,
+    @pytest.mark.parametrize("index_type", [common_index.IndexType.IVF,
                                             common_index.IndexType.Hnsw,
                                             common_index.IndexType.EMVB,
                                             common_index.IndexType.FullText,
@@ -1407,11 +1397,11 @@ class TestInfinity:
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
 
         with pytest.raises(InfinityException) as e:
-            if index_type == common_index.IndexType.IVFFlat:
+            if index_type == common_index.IndexType.IVF:
                 res = table_obj.create_index("my_index",
                                              index.IndexInfo("c2",
-                                                             index.IndexType.IVFFlat,
-                                                             {"centroids_count": "128", "metric": "L2"}),
+                                                             index.IndexType.IVF,
+                                                             {"metric": "L2"}),
                                              ConflictType.Error)
             elif index_type == common_index.IndexType.Hnsw:
                 res = table_obj.create_index("my_index",

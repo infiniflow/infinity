@@ -37,7 +37,6 @@ import value;
 import table_def;
 import data_table;
 import third_party;
-import index_ivfflat;
 import index_base;
 import index_hnsw;
 import index_full_text;
@@ -1218,10 +1217,8 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
             switch (index_base->index_type_) {
-                case IndexType::kIVFFlat: {
-                    Status status3 = Status::InvalidIndexName(index_type_name);
-                    show_operator_state->status_ = status3;
-                    RecoverableError(status3);
+                case IndexType::kIVF: {
+                    chunk_index_entries = std::get<0>(segment_index_entry->GetIVFIndexSnapshot());
                     break;
                 }
                 case IndexType::kHnsw: {
@@ -1294,10 +1291,9 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_indexes;
     switch (index_base->index_type_) {
-        case IndexType::kIVFFlat: {
-            Status status3 = Status::InvalidIndexName(index_type_name);
-            show_operator_state->status_ = status3;
-            RecoverableError(status3);
+        case IndexType::kIVF: {
+            auto [chunk_index_entries, _] = segment_index_entry->GetIVFIndexSnapshot();
+            chunk_indexes = chunk_index_entries;
             break;
         }
         case IndexType::kHnsw: {

@@ -219,6 +219,7 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
         }
         case IndexType::kHnsw:
         case IndexType::kEMVB:
+        case IndexType::kIVF:
         case IndexType::kSecondary:
         case IndexType::kBMP: {
             String file_name = ChunkIndexEntry::IndexFileName(segment_index_entry->segment_id(), chunk_index_entry->chunk_id_);

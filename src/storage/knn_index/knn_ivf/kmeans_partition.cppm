@@ -27,20 +27,19 @@ import simd_functions;
 
 namespace infinity {
 
-inline Vector<u32> RandomPermutatePartially(u32 vector_count, u32 random_num = 0) {
+inline Vector<u32> RandomPermutatePartially(const u32 vector_count, u32 random_num = 0) {
     if (random_num == 0 || random_num > vector_count) {
         random_num = vector_count;
     }
     std::random_device rd;
     std::mt19937 gen(rd());
     Vector<u32> permutation(vector_count);
-    std::iota(permutation.begin(), permutation.end(), 0);
+    std::iota(permutation.begin(), permutation.end(), static_cast<u32>(0));
     for (u32 i = 0; i < random_num; ++i) {
         // generate j in range [i, vector_count)
         std::uniform_int_distribution<u32> dis(i, vector_count - 1);
-        u32 j = dis(gen);
-        // swap vectors[i] and vectors[j]
-        if (i != j) {
+        if (const u32 j = dis(gen); i != j) {
+            // swap vectors[i] and vectors[j]
             std::swap(permutation[i], permutation[j]);
         }
     }
@@ -49,10 +48,10 @@ inline Vector<u32> RandomPermutatePartially(u32 vector_count, u32 random_num = 0
 
 // normalize centroids
 template <typename CentroidType>
-inline void NormalizeCentroids(u32 dimension, u32 partition_num, CentroidType *centroids) {
+inline void NormalizeCentroids(const u32 dimension, const u32 partition_num, CentroidType *centroids) {
     for (u32 i = 0; i < partition_num; ++i) {
         CentroidType *centroid = centroids + i * dimension;
-        f32 square = IPDistance<f32>(centroid, centroid, dimension);
+        const f32 square = IPDistance<f32>(centroid, centroid, dimension);
         if (square > 0) {
             f32 div = 1.0f / sqrt(square);
             for (u32 j = 0; j < dimension; ++j) {
@@ -65,7 +64,8 @@ inline void NormalizeCentroids(u32 dimension, u32 partition_num, CentroidType *c
 // CentroidsType: the type to calculate centroids
 // partition_num: the number of partitions, default to sqrt(vector_count)
 // iteration_max: the max iteration count, default to 10
-export template <typename CentroidsType, typename ElemType, typename CentroidsOutputType>
+constexpr int default_iteration_max = 10;
+export template <typename ElemType, typename CentroidsOutputType>
 [[nodiscard]] u32 GetKMeansCentroids(const MetricType metric,
                                      const u32 dimension,
                                      const u32 vector_count,
@@ -74,9 +74,10 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
                                      u32 partition_num = 0,
                                      u32 iteration_max = 0,
                                      u32 min_points_per_centroid = 32,
-                                     u32 max_points_per_centroid = 256) {
-    constexpr int default_iteration_max = 10;
-    if (metric != MetricType::kMetricL2 && metric != MetricType::kMetricInnerProduct) {
+                                     u32 max_points_per_centroid = 256,
+                                     float centroids_num_ratio = 1.0f) {
+    using CentroidsType = f32;
+    if (metric == MetricType::kInvalid) {
         String error_message = "Metric type not implemented";
         UnrecoverableError(error_message);
     }
@@ -93,7 +94,11 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
         UnrecoverableError(error_message);
     }
     if (partition_num <= 0) {
-        partition_num = (int)sqrt(vector_count);
+        partition_num = static_cast<int>(sqrt(vector_count) * centroids_num_ratio);
+        if (partition_num <= 0) {
+            LOG_WARN("GetKMeansCentroids: partition_num too small, maybe centroids_num_ratio should be increased.");
+            partition_num = 1;
+        }
     }
     if (iteration_max <= 0) {
         iteration_max = default_iteration_max;
@@ -109,11 +114,11 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
         centroids = centroids_destructor.get();
     }
 
-    const ElemType *training_data = vectors_ptr;
     u32 training_data_num = vector_count;
 
+    const ElemType *elemtype_training_data = vectors_ptr;
     // Release temporary random training data when out of scope
-    UniquePtr<ElemType[]> random_training_data_destructor;
+    UniquePtr<ElemType[]> random_elemtype_training_data_destructor;
 
     // If input vectors are too few, warning and use all vectors to train.
     // If input vectors are too many, randomly choose some vectors to train.
@@ -127,10 +132,10 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
             // generate random training data
             {
                 Vector<u32> random_ids = RandomPermutatePartially(vector_count, training_data_num);
-                random_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
-                training_data = random_training_data_destructor.get();
+                random_elemtype_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
+                elemtype_training_data = random_elemtype_training_data_destructor.get();
                 for (u32 i = 0; i < training_data_num; ++i) {
-                    memcpy(random_training_data_destructor.get() + i * dimension,
+                    memcpy(random_elemtype_training_data_destructor.get() + i * dimension,
                            vectors_ptr + random_ids[i] * dimension,
                            dimension * sizeof(ElemType));
                 }
@@ -138,11 +143,23 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
         }
     }
 
+    UniquePtr<CentroidsType[]> training_data_holder;
+    const CentroidsType *training_data = nullptr;
+    if constexpr (std::is_same_v<ElemType, CentroidsType>) {
+        training_data = elemtype_training_data;
+    } else {
+        training_data_holder = MakeUnique<CentroidsType[]>(dimension * training_data_num);
+        training_data = training_data_holder.get();
+        for (u32 i = 0; i < dimension * training_data_num; ++i) {
+            training_data_holder[i] = elemtype_training_data[i];
+        }
+    }
+
     // Initializing centroids
     {
         // If training vectors are randomly chosen, centroids can be copied from training data.
         // Otherwise, centroids need to be randomly generated.
-        if (random_training_data_destructor) {
+        if (random_elemtype_training_data_destructor) {
             if constexpr (std::is_same_v<ElemType, CentroidsType>) {
                 memcpy(centroids, training_data, sizeof(ElemType) * partition_num * dimension);
             } else {
@@ -165,7 +182,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
             }
         }
         // normalize centroids if inner product metric is used
-        if (metric == MetricType::kMetricInnerProduct) {
+        if (metric == MetricType::kMetricInnerProduct || metric == MetricType::kMetricCosine) {
             NormalizeCentroids(dimension, partition_num, centroids);
         }
     }
@@ -226,8 +243,10 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
                         }
                     }
                 }
-            } else if (metric == MetricType::kMetricInnerProduct) {
+            } else if (metric == MetricType::kMetricInnerProduct || metric == MetricType::kMetricCosine) {
                 NormalizeCentroids(dimension, partition_num, centroids);
+            } else {
+                UnrecoverableError("Unexpected type");
             }
         }
 
@@ -275,7 +294,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
     // Output results if typeof(centroids_output) != typeof(centroids)
     if constexpr (!std::is_same_v<CentroidsOutputType, CentroidsType>) {
         for (u32 i = 0; i < partition_num * dimension; ++i) {
-            centroids_output[i] = (CentroidsOutputType)centroids[i];
+            centroids_output[i] = static_cast<CentroidsOutputType>(centroids[i]);
         }
     }
     return partition_num;

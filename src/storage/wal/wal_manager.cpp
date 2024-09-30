@@ -1182,8 +1182,6 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
         if (auto iter = index_by_segment.find(cmd.segment_id_); iter != index_by_segment.end()) {
             segment_index_entry = iter->second.get();
         } else {
-            auto create_index_param =
-                SegmentIndexEntry::GetCreateIndexParam(table_index_entry->table_index_def(), 0 /*segment_offset*/, table_index_entry->column_def());
             auto segment_index_entry_ptr = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
                                                                                          table_entry,
                                                                                          cmd.segment_id_,

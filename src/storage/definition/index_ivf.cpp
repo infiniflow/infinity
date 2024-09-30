@@ -61,7 +61,7 @@ String IndexIVF::ToString() const {
 }
 
 IndexIVF::IndexIVF(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const IndexIVFOption &ivf_option)
-    : IndexBase(IndexType::kIVFFlat, std::move(index_name), file_name, std::move(column_names)), ivf_option_(ivf_option) {}
+    : IndexBase(IndexType::kIVF, std::move(index_name), file_name, std::move(column_names)), ivf_option_(ivf_option) {}
 
 template <std::integral T, T min_v = std::numeric_limits<T>::min(), T max_v = std::numeric_limits<T>::max()>
     requires(min_v <= max_v)
@@ -94,9 +94,9 @@ IndexIVF::Make(SharedPtr<String> index_name, const String &file_name, Vector<Str
     }
     IndexIVFOption ivf_option;
     {
-        const auto nh = GetMandatoryParamNodeHandler(params_map, "metric_type");
+        const auto nh = GetMandatoryParamNodeHandler(params_map, "metric");
         ToLower(nh.mapped());
-        ivf_option.metric_type_ = StringToMetricType(nh.mapped());
+        ivf_option.metric_ = StringToMetricType(nh.mapped());
     }
     {
         // IndexIVFCentroidOption
@@ -128,9 +128,10 @@ IndexIVF::Make(SharedPtr<String> index_name, const String &file_name, Vector<Str
         }
         switch (ivf_option.storage_option_.type_) {
             case IndexIVFStorageOption::Type::kPlain: {
-                const auto nh = GetMandatoryParamNodeHandler(params_map, "plain_storage_data_type");
-                ToUpper(nh.mapped());
-                ivf_option.storage_option_.plain_data_type_ = EmbeddingT::String2EmbeddingDataType(nh.mapped());
+                if (const auto nh = params_map.extract("plain_storage_data_type"); nh) {
+                    ToUpper(nh.mapped());
+                    ivf_option.storage_option_.plain_storage_data_type_ = EmbeddingT::String2EmbeddingDataType(nh.mapped());
+                }
                 break;
             }
             case IndexIVFStorageOption::Type::kScalarQuantization: {
@@ -159,20 +160,20 @@ IndexIVF::Make(SharedPtr<String> index_name, const String &file_name, Vector<Str
     return MakeShared<IndexIVF>(std::move(index_name), file_name, std::move(column_names), ivf_option);
 }
 
-void CheckIndexIVFStorageOption(const IndexIVFStorageOption &storage_option, const DataType *column_data_type) {
+void CheckIndexIVFStorageOption(IndexIVFStorageOption &storage_option, const DataType *column_data_type) {
     const auto *embedding_type_info = static_cast<const EmbeddingInfo *>(column_data_type->type_info().get());
     const auto embedding_data_type = embedding_type_info->Type();
     const auto embedding_dimension = embedding_type_info->Dimension();
     switch (storage_option.type_) {
         case IndexIVFStorageOption::Type::kPlain: {
-            // check plain_data_type_
-            switch (storage_option.plain_data_type_) {
+            // check plain_storage_data_type_
+            switch (storage_option.plain_storage_data_type_) {
                 case EmbeddingDataType::kElemInt8:
                 case EmbeddingDataType::kElemUInt8: {
-                    if (storage_option.plain_data_type_ != embedding_data_type) {
+                    if (storage_option.plain_storage_data_type_ != embedding_data_type) {
                         RecoverableError(
                             Status::InvalidIndexDefinition(std::format("Invalid plain storage type: {} on Embedding column: {}",
-                                                                       EmbeddingT::EmbeddingDataType2String(storage_option.plain_data_type_),
+                                                                       EmbeddingT::EmbeddingDataType2String(storage_option.plain_storage_data_type_),
                                                                        column_data_type->ToString())));
                     }
                     break;
@@ -206,11 +207,38 @@ void CheckIndexIVFStorageOption(const IndexIVFStorageOption &storage_option, con
                 case EmbeddingDataType::kElemBit:
                 case EmbeddingDataType::kElemInt16:
                 case EmbeddingDataType::kElemInt32:
-                case EmbeddingDataType::kElemInt64:
-                case EmbeddingDataType::kElemInvalid: {
+                case EmbeddingDataType::kElemInt64:{
                     RecoverableError(Status::InvalidIndexDefinition(
-                        std::format("Invalid plain storage type: {}.", EmbeddingT::EmbeddingDataType2String(storage_option.plain_data_type_)) +
+                        std::format("Invalid plain storage type: {}.", EmbeddingT::EmbeddingDataType2String(storage_option.plain_storage_data_type_)) +
                         " Can only choose: int8 for int8, uint8 for uint8, float, float16 or bfloat16 for floating type"));
+                    break;
+                }
+                case EmbeddingDataType::kElemInvalid: {
+                    // i8 -> i8, u8 -> u8, floating -> f32
+                    switch (embedding_data_type) {
+                        case EmbeddingDataType::kElemUInt8:
+                        case EmbeddingDataType::kElemInt8: {
+                            storage_option.plain_storage_data_type_ = embedding_data_type;
+                            break;
+                        }
+                        case EmbeddingDataType::kElemFloat:
+                        case EmbeddingDataType::kElemDouble:
+                        case EmbeddingDataType::kElemFloat16:
+                        case EmbeddingDataType::kElemBFloat16: {
+                            storage_option.plain_storage_data_type_ = EmbeddingDataType::kElemFloat;
+                            break;
+                        }
+                        case EmbeddingDataType::kElemBit:
+                        case EmbeddingDataType::kElemInt16:
+                        case EmbeddingDataType::kElemInt32:
+                        case EmbeddingDataType::kElemInt64:
+                        case EmbeddingDataType::kElemInvalid: {
+                            RecoverableError(Status::InvalidIndexDefinition(
+                                std::format("Attempt to use floating point plain storage on embedding column with type: {}.",
+                                            column_data_type->ToString())));
+                            break;
+                        }
+                    }
                     break;
                 }
             }
@@ -269,7 +297,7 @@ void CheckIndexIVFStorageOption(const IndexIVFStorageOption &storage_option, con
 }
 
 void CheckIndexIVFCentroidOption(const IndexIVFCentroidOption &centroid_option) {
-    if (centroid_option.centroids_num_ratio_ <= 0.0f) {
+    if (centroid_option.centroids_num_ratio_ < 0.0f) {
         RecoverableError(Status::InvalidIndexDefinition(
             std::format("centroids_num_ratio parameter value '{}' is not positive.", centroid_option.centroids_num_ratio_)));
     }
@@ -280,7 +308,7 @@ void CheckIndexIVFCentroidOption(const IndexIVFCentroidOption &centroid_option) 
     }
 }
 
-void IndexIVF::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) const {
+void IndexIVF::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
     const auto &column_names_vector = *(base_table_ref->column_names_);
     const auto &column_types_vector = *(base_table_ref->column_types_);
     const auto name_it = std::find(column_names_vector.begin(), column_names_vector.end(), column_name);
@@ -293,7 +321,7 @@ void IndexIVF::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
         RecoverableError(Status::InvalidIndexDefinition(
             std::format("Attempt to create IVF index on column: {}, data type: {}.", column_name, data_type->ToString())));
     } else {
-        if (ivf_option_.metric_type_ == MetricType::kInvalid) {
+        if (ivf_option_.metric_ == MetricType::kInvalid) {
             RecoverableError(Status::InvalidIndexDefinition("Invalid metric type"));
         }
         CheckIndexIVFCentroidOption(ivf_option_.centroid_option_);
@@ -301,14 +329,14 @@ void IndexIVF::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
     }
 }
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFCentroidOption, centroids_num_ratio_, min_points_per_centroid_, max_points_per_centroid_)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFCentroidOption, centroids_num_ratio_, min_points_per_centroid_, max_points_per_centroid_);
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFStorageOption,
                                    type_,
-                                   plain_data_type_,
+                                   plain_storage_data_type_,
                                    scalar_quantization_bits_,
                                    product_quantization_subspace_num_,
-                                   product_quantization_subspace_bits_)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFOption, metric_type_, centroid_option_, storage_option_)
+                                   product_quantization_subspace_bits_);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFOption, metric_, centroid_option_, storage_option_);
 
 nlohmann::json IndexIVF::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();
@@ -318,10 +346,43 @@ nlohmann::json IndexIVF::Serialize() const {
 
 IndexIVFOption IndexIVF::DeserializeIndexIVFOption(const nlohmann::json &ivf_option_json) { return ivf_option_json; }
 
+String BuildIndexIVFStorageOptionStr();
+
+String IndexIVFCentroidOption::ToString() const {
+    return std::format("IndexIVFCentroidOption: [centroids_num_ratio: {}, min_points_per_centroid: {}, max_points_per_centroid: {}]",
+                       centroids_num_ratio_,
+                       min_points_per_centroid_,
+                       max_points_per_centroid_);
+}
+
+String IndexIVFStorageOption::ToString() const {
+    std::ostringstream oss;
+    oss << "IndexIVFStorageOption: [";
+    switch (type_) {
+        case Type::kPlain: {
+            oss << std::format("Type: Plain, plain_storage_data_type: {}", EmbeddingT::EmbeddingDataType2String(plain_storage_data_type_));
+            break;
+        }
+        case Type::kProductQuantization: {
+            oss << std::format("Type: ProductQuantization, scalar_quantization_bits: {}", scalar_quantization_bits_);
+            break;
+        }
+        case Type::kScalarQuantization: {
+            oss << std::format("Type: ScalarQuantization, product_quantization_subspace_num: {}, product_quantization_subspace_bits: {}",
+                               product_quantization_subspace_num_,
+                               product_quantization_subspace_bits_);
+            break;
+        }
+    }
+    oss << ']';
+    return std::move(oss).str();
+}
+
 String IndexIVF::BuildOtherParamsString() const {
-    nlohmann::json j;
-    to_json(j, ivf_option_);
-    return j.dump();
+    return std::format("metric: {}, {}, {}",
+                       MetricTypeToString(ivf_option_.metric_),
+                       ivf_option_.centroid_option_.ToString(),
+                       ivf_option_.storage_option_.ToString());
 }
 
 } // namespace infinity

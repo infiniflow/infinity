@@ -30,14 +30,6 @@ import persistence_manager;
 
 namespace infinity {
 
-export struct CreateHnswParam : public CreateIndexParam {
-    SizeT chunk_size_{};
-    SizeT max_chunk_num_{};
-
-    CreateHnswParam(SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def, SizeT chunk_size, SizeT max_chunk_num)
-        : CreateIndexParam(index_base, column_def), chunk_size_(chunk_size), max_chunk_num_(max_chunk_num) {}
-};
-
 export class HnswFileWorker : public IndexFileWorker {
 public:
     explicit HnswFileWorker(SharedPtr<String> data_dir,

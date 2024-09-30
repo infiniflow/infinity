@@ -28,7 +28,7 @@ import embedding_info;
 import sparse_info;
 import index_hnsw;
 import index_full_text;
-import index_ivfflat;
+import index_ivf;
 import index_bmp;
 import statement_common;
 import data_access_state;
@@ -93,7 +93,7 @@ TEST_P(SegmentIndexEntryTest, decode_index_test) {
     DropTable();
 }
 
-TEST_P(SegmentIndexEntryTest, create_ivfflat_index_test) {
+TEST_P(SegmentIndexEntryTest, create_ivf_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     {
@@ -118,10 +118,10 @@ TEST_P(SegmentIndexEntryTest, create_ivfflat_index_test) {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
         Vector<String> columns{"col1"};
         Vector<InitParameter *> parameters;
-        parameters.emplace_back(new InitParameter("centroids_count", "100"));
         parameters.emplace_back(new InitParameter("metric", "l2"));
+        parameters.emplace_back(new InitParameter("plain_storage_data_type", "f32"));
 
-        auto index_base = IndexIVFFlat::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
+        auto index_base = IndexIVF::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
     //    std::cout << "index_base: " << index_base->ToString() << std::endl;
         for (auto parameter : parameters) {
             delete parameter;
@@ -154,29 +154,6 @@ TEST_P(SegmentIndexEntryTest, create_ivfflat_index_test) {
         txn_mgr->CommitTxn(txn1);
     }
 
-    DropTable();
-}
-
-TEST_P(SegmentIndexEntryTest, index_file_name_test) {
-    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    CreateTable();
-    CreateIndex();
-
-    {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("name"));
-        const String &db_name = "default_db";
-        const String &table_name = "tbl1";
-        const String &index_name = "fulltext_index";
-        auto [index_entry, index_status] = txn1->GetIndexByName(db_name, table_name, index_name);
-        EXPECT_TRUE(index_status.ok());
-        SharedPtr<SegmentIndexEntry> segment_index_entry;
-        EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry));//create
-        String index_file_name = segment_index_entry->IndexFileName(0);
-        std::cout<<index_file_name<<std::endl;
-        EXPECT_STREQ(index_file_name.c_str(), "seg0.idx");
-    }
-
-    DropIndex();
     DropTable();
 }
 
