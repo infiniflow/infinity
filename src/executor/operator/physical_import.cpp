@@ -40,7 +40,6 @@ import expression_state;
 import data_block;
 import logger;
 import third_party;
-import local_file_system;
 import defer_op;
 import txn_store;
 
