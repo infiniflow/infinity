@@ -32,7 +32,7 @@ import column_def;
 import block_entry;
 import column_vector;
 import value;
-import local_file_system;
+import virtual_store;
 import file_system;
 import file_system_type;
 import defer_op;
@@ -102,12 +102,11 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
     SizeT select_column_count = select_columns.size();
 
-    LocalFileSystem fs;
-    auto [file_handle, status] = fs.OpenFile(file_path_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+    auto [file_handle, status] = LocalStore::Open(file_path_, FileAccessMode::kWrite);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    DeferFn file_defer([&]() { fs.Close(*file_handle); });
+    DeferFn file_defer([&]() { file_handle->Close(); });
 
     if (header_) {
         // Output CSV header
@@ -138,7 +137,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 header += '\n';
             }
         }
-        fs.Write(*file_handle, header.c_str(), header.size());
+        file_handle->Append(header.c_str(), header.size());
     }
 
     SizeT offset = offset_;
@@ -220,16 +219,15 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
                 if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++file_no_;
-                    fs.Close(*file_handle);
+                    file_handle->Close();
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
-                    auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if (!result.second.ok()) {
-                        RecoverableError(result.second);
+                    auto [new_file_handle, new_status] = LocalStore::Open(new_file_path, FileAccessMode::kWrite);
+                    if (!new_status.ok()) {
+                        RecoverableError(new_status);
                     }
-                    file_handle = std::move(result.first);
+                    file_handle = std::move(new_file_handle);
                 }
-
-                fs.Write(*file_handle, line.c_str(), line.size());
+                file_handle->Append(line.c_str(), line.size());
 
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
@@ -401,12 +399,11 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
     i32 dimension = embedding_type_info->Dimension();
 
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+    auto [file_handle, status] = LocalStore::Open(file_path_, FileAccessMode::kWrite);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    DeferFn file_defer([&]() { fs.Close(*file_handler); });
+    DeferFn file_defer([&]() { file_handle->Close(); });
 
     SizeT offset = offset_;
     SizeT row_count{0};
@@ -440,17 +437,17 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
                 if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++file_no_;
-                    fs.Close(*file_handler);
+                    file_handle->Close();
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
-                    auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if (!result.second.ok()) {
-                        RecoverableError(result.second);
+                    auto [new_file_handle, new_status] = LocalStore::Open(new_file_path, FileAccessMode::kWrite);
+                    if (!new_status.ok()) {
+                        RecoverableError(new_status);
                     }
-                    file_handler = std::move(result.first);
+                    file_handle = std::move(new_file_handle);
                 }
 
-                fs.Write(*file_handler, &dimension, sizeof(dimension));
-                fs.Write(*file_handler, embedding.data(), embedding.size_bytes());
+                file_handle->Append(&dimension, sizeof(dimension));
+                file_handle->Append(embedding.data(), embedding.size_bytes());
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
                     return row_count;
