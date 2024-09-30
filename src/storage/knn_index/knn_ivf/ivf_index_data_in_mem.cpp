@@ -204,7 +204,7 @@ public:
         BufferHandle handle = new_chunk_index_entry->GetIndex();
         auto *data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
         data_ptr->GetMemData(std::move(*ivf_index_storage_));
-        ivf_index_storage_ = data_ptr->BasePtr();
+        ivf_index_storage_ = data_ptr->GetIVFIndexStoragePtr();
         own_ivf_index_storage_ = false;
         dump_handle_ = std::move(handle);
         return new_chunk_index_entry;

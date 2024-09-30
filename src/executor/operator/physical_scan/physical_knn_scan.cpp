@@ -61,6 +61,9 @@ import segment_entry;
 import abstract_hnsw;
 import physical_match_tensor_scan;
 import hnsw_alg;
+import ivf_index_data_in_mem;
+import ivf_index_data;
+import ivf_index_search;
 
 namespace infinity {
 
@@ -568,7 +571,30 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         if (has_some_result) {
             switch (segment_index_entry->table_index_entry()->index_base()->index_type_) {
                 case IndexType::kIVF: {
-                    UnrecoverableError("Not supported now");
+                    const SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
+                    const auto ivf_search_params = IVF_Search_Params::Make(knn_scan_shared_data);
+                    auto ivf_result_handler = GetIVFSearchHandler<t, ColumnDataType, QueryDataType, C, DistanceDataType>(ivf_search_params,
+                                                                                                                         use_bitmask,
+                                                                                                                         bitmask,
+                                                                                                                         max_segment_offset);
+                    ivf_result_handler->Begin();
+                    const auto [chunk_index_entries, memory_ivf_index] = segment_index_entry->GetIVFIndexSnapshot();
+                    for (auto &chunk_index_entry : chunk_index_entries) {
+                        if (chunk_index_entry->CheckVisible(txn)) {
+                            BufferHandle index_handle = chunk_index_entry->GetIndex();
+                            const auto *ivf_chunk = static_cast<const IVFIndexInChunk *>(index_handle.GetData());
+                            ivf_result_handler->Search(ivf_chunk);
+                        }
+                    }
+                    if (memory_ivf_index) {
+                        ivf_result_handler->Search(memory_ivf_index.get());
+                    }
+                    auto [result_n, d_ptr, offset_ptr] = ivf_result_handler->EndWithoutSort();
+                    auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
+                    for (SizeT i = 0; i < result_n; ++i) {
+                        row_ids[i] = RowID{segment_id, offset_ptr[i]};
+                    }
+                    merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                     break;
                 }
                 case IndexType::kHnsw: {
