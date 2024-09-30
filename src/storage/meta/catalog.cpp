@@ -35,7 +35,7 @@ import table_function;
 import special_function;
 import buffer_manager;
 import column_def;
-import local_file_system;
+import virtual_store;
 import file_system_type;
 import file_system;
 import table_def;
@@ -61,6 +61,7 @@ import segment_index_entry;
 import chunk_index_entry;
 import log_file;
 import persist_result_handler;
+import abstract_file_handle;
 
 namespace infinity {
 
@@ -109,10 +110,9 @@ Vector<SharedPtr<QueryProfiler>> ProfileHistory::GetElements() {
 
 // TODO Consider letting it commit as a transaction.
 Catalog::Catalog() : catalog_dir_(MakeShared<String>(CATALOG_FILE_DIR)), running_(true) {
-    LocalFileSystem fs;
     String abs_catalog_dir = Path(InfinityContext::instance().config()->DataDir()) / String(CATALOG_FILE_DIR);
-    if (!fs.Exists(abs_catalog_dir)) {
-        fs.CreateDirectory(abs_catalog_dir);
+    if (!LocalStore::Exists(abs_catalog_dir)) {
+        LocalStore::MakeDirectory(abs_catalog_dir);
     }
 
     ResizeProfileHistory(DEFAULT_PROFILER_HISTORY_SIZE);
@@ -553,15 +553,14 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
 UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info) {
     const auto &catalog_path = delta_ckp_info.path_;
 
-    LocalFileSystem fs;
-    auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [catalog_file_handle, status] = LocalStore::Open(catalog_path, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    i32 file_size = fs.GetFileSize(*catalog_file_handler);
+    i32 file_size = catalog_file_handle->FileSize();
     Vector<char> buf(file_size);
-    fs.Read(*catalog_file_handler, buf.data(), file_size);
-    fs.Close(*catalog_file_handler);
+    catalog_file_handle->Read(buf.data(), file_size);
+    catalog_file_handle->Close();
     const char *ptr = buf.data();
     auto catalog_delta_entry = CatalogDeltaEntry::ReadAdv(ptr, file_size);
     if (catalog_delta_entry.get() == nullptr) {
@@ -936,15 +935,17 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
 UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
     const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / full_ckp_info.path_;
 
-    LocalFileSystem fs;
-    auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [catalog_file_handle, status] = LocalStore::Open(catalog_path, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    SizeT file_size = fs.GetFileSize(*catalog_file_handler);
+    i64 file_size = catalog_file_handle->FileSize();
     String json_str(file_size, 0);
-    SizeT n_bytes = catalog_file_handler->Read(json_str.data(), file_size);
-    if (file_size != n_bytes) {
+    auto [n_bytes, status_read] = catalog_file_handle->Read(json_str.data(), file_size);
+    if(!status.ok()) {
+        RecoverableError(status_read);
+    }
+    if ((SizeT)file_size != n_bytes) {
         Status status = Status::CatalogCorrupted(catalog_path);
         RecoverableError(status);
     }
@@ -987,25 +988,20 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     // Save catalog to tmp file.
     // FIXME: Temp implementation, will be replaced by async task.
-    LocalFileSystem fs;
-
-    u8 fileflags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-
-    auto [catalog_file_handler, status] = fs.OpenFile(catalog_tmp_path, fileflags, FileLockType::kWriteLock);
+    auto [catalog_file_handle, status] = LocalStore::Open(catalog_tmp_path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
-    SizeT n_bytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
-    if (n_bytes != catalog_str.size()) {
-        Status status = Status::DataCorrupted(catalog_tmp_path);
+    status = catalog_file_handle->Append(catalog_str.data(), catalog_str.size());
+    if(!status.ok()) {
         RecoverableError(status);
     }
-    catalog_file_handler->Sync();
-    catalog_file_handler->Close();
+    catalog_file_handle->Sync();
+    catalog_file_handle->Close();
 
     // Rename temp file to regular catalog file
-    catalog_file_handler->Rename(catalog_tmp_path, full_path);
+    LocalStore::Rename(catalog_tmp_path, full_path);
 
     global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
 
