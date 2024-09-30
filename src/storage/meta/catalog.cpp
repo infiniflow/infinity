@@ -939,6 +939,9 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
+    DeferFn defer_fn([&] {
+        catalog_file_handle->Close();
+    });
     i64 file_size = catalog_file_handle->FileSize();
     String json_str(file_size, 0);
     auto [n_bytes, status_read] = catalog_file_handle->Read(json_str.data(), file_size);
