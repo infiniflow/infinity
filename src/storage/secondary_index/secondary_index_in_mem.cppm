@@ -32,7 +32,11 @@ export class SecondaryIndexInMem {
 public:
     virtual ~SecondaryIndexInMem() = default;
     virtual u32 GetRowCount() const = 0;
-    virtual void Insert(u16 block_id, BlockColumnEntry *block_column_entry, BufferManager *buffer_manager, u32 row_offset, u32 row_count) = 0;
+    virtual void InsertBlockData(SegmentOffset block_offset,
+                                 BlockColumnEntry *block_column_entry,
+                                 BufferManager *buffer_manager,
+                                 u32 row_offset,
+                                 u32 row_count) = 0;
     virtual SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const = 0;
     virtual Pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
 

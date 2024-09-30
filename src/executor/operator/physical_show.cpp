@@ -80,6 +80,7 @@ import global_resource_usage;
 import infinity_context;
 import peer_task;
 import cleanup_scanner;
+import obj_status;
 
 namespace infinity {
 
@@ -4520,7 +4521,8 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 break;
             }
             case GlobalVariable::kFollowerNum: {
-                if(InfinityContext::instance().cluster_manager()->ThisNode()->node_role_ == NodeRole::kLeader) {
+                if(InfinityContext::instance().IsClusterRole()
+                && InfinityContext::instance().cluster_manager()->ThisNode()->node_role_ == NodeRole::kLeader) {
                     {
                         // option name
                         Value value = Value::MakeVarchar(var_name);

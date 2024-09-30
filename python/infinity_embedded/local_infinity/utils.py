@@ -26,7 +26,7 @@ from infinity_embedded.local_infinity.types import build_result, logic_type_to_d
 from infinity_embedded.utils import binary_exp_to_paser_exp
 from infinity_embedded.embedded_infinity_ext import WrapInExpr, WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapConstantExpr, ParsedExprType, LiteralType
 from infinity_embedded.embedded_infinity_ext import WrapEmbeddingType, WrapColumnDef, WrapDataType, LogicalType, EmbeddingDataType, WrapSparseType, ConstraintType
-
+from datetime import date, time, datetime, timedelta
 
 def traverse_conditions(cons, fn=None):
     if isinstance(cons, exp.Binary):
@@ -294,6 +294,16 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
                 case _:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                             f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
+        case datetime():
+            constant_expression.literal_type = LiteralType.kDateTime
+            constant_expression.str_value = value.strftime("%Y-%m-%d %H:%M:%S")
+        case date():
+            constant_expression.literal_type = LiteralType.kDate
+            constant_expression.str_value = value.strftime("%Y-%m-%d")
+        case time():
+            constant_expression.literal_type = LiteralType.kTime
+            constant_expression.str_value = value.strftime("%H:%M:%S")
+
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
     return constant_expression
@@ -536,6 +546,12 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.logical_type = LogicalType.kVarchar
                     case "bool":
                         proto_column_type.logical_type = LogicalType.kBoolean
+                    case "date":
+                        proto_column_type.logical_type = LogicalType.kDate
+                    case "time":
+                        proto_column_type.logical_type = LogicalType.kTime
+                    case "datetime":
+                        proto_column_type.logical_type = LogicalType.kDateTime
                     case _:
                         raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
                 proto_column_def.column_type = proto_column_type

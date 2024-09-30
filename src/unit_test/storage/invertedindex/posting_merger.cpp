@@ -31,6 +31,7 @@ import vector_with_lock;
 import logger;
 import infinity_context;
 import persistence_manager;
+import persist_result_handler;
 
 using namespace infinity;
 
@@ -145,13 +146,16 @@ TEST_P(PostingMergerTest, Basic) {
         // prepare column length info
         // the indexes to be merged should be from the same segment
         // otherwise the range of row_id will be very large ( >= 2^32)
+        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        PersistResultHandler handler(pm);
         unsafe_column_length_array.clear();
         for (u32 i = 0; i < base_names.size(); ++i) {
             String column_len_file = (Path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
             String real_column_len_file = column_len_file;
-            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
             if (pm != nullptr) {
-                real_column_len_file = pm->GetObjPath(pm->GetObjCache(real_column_len_file).obj_key_);
+                PersistReadResult result = pm->GetObjCache(real_column_len_file);
+                const ObjAddr &obj_addr = handler.HandleReadResult(result);
+                real_column_len_file = pm->GetObjPath(obj_addr.obj_key_);
             }
             RowID base_row_id = row_ids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
@@ -170,7 +174,8 @@ TEST_P(PostingMergerTest, Basic) {
                 UnrecoverableError(error_message);
             }
             if (pm != nullptr) {
-                pm->PutObjCache(column_len_file);
+                PersistWriteResult res = pm->PutObjCache(column_len_file);
+                handler.HandleWriteResult(res);
             }
         }
     }

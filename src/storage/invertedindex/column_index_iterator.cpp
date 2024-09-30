@@ -16,6 +16,7 @@ import local_file_system;
 import third_party;
 import infinity_context;
 import persistence_manager;
+import persist_result_handler;
 
 namespace infinity {
 
@@ -31,10 +32,15 @@ ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &
     posting_file.append(POSTING_SUFFIX);
 
     if (use_object_cache) {
+        PersistResultHandler handler(pm);
         dict_file_path_ = dict_file;
         posting_file_path_ = posting_file;
-        dict_file = pm->GetObjPath(pm->GetObjCache(dict_file).obj_key_);
-        posting_file = pm->GetObjPath(pm->GetObjCache(posting_file).obj_key_);
+        PersistReadResult result = pm->GetObjCache(dict_file);
+        const ObjAddr &obj_addr = handler.HandleReadResult(result);
+        dict_file = pm->GetObjPath(obj_addr.obj_key_);
+        PersistReadResult result2 = pm->GetObjCache(posting_file);
+        const ObjAddr &obj_addr2 = handler.HandleReadResult(result2);
+        posting_file = pm->GetObjPath(obj_addr2.obj_key_);
     }
 
     dict_reader_ = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag));
@@ -54,8 +60,11 @@ ColumnIndexIterator::~ColumnIndexIterator() {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->PutObjCache(dict_file_path_);
-        pm->PutObjCache(posting_file_path_);
+        PersistResultHandler handler(pm);
+        PersistWriteResult res1 = pm->PutObjCache(dict_file_path_);
+        PersistWriteResult res2 = pm->PutObjCache(posting_file_path_);
+        handler.HandleWriteResult(res1);
+        handler.HandleWriteResult(res2);
     }
 }
 

@@ -34,7 +34,12 @@ class LogicType(object):
     TensorArray = 14
     Sparse = 15
     MultiVector = 16
-    Invalid = 17
+    Date = 17
+    Time = 18
+    DateTime = 19
+    Timestamp = 20
+    Interval = 21
+    Invalid = 22
 
     _VALUES_TO_NAMES = {
         0: "Boolean",
@@ -54,7 +59,12 @@ class LogicType(object):
         14: "TensorArray",
         15: "Sparse",
         16: "MultiVector",
-        17: "Invalid",
+        17: "Date",
+        18: "Time",
+        19: "DateTime",
+        20: "Timestamp",
+        21: "Interval",
+        22: "Invalid",
     }
 
     _NAMES_TO_VALUES = {
@@ -75,7 +85,12 @@ class LogicType(object):
         "TensorArray": 14,
         "Sparse": 15,
         "MultiVector": 16,
-        "Invalid": 17,
+        "Date": 17,
+        "Time": 18,
+        "DateTime": 19,
+        "Timestamp": 20,
+        "Interval": 21,
+        "Invalid": 22,
     }
 
 
@@ -186,6 +201,11 @@ class LiteralType(object):
     DoubleTensorArray = 10
     SparseIntegerArray = 11
     SparseDoubleArray = 12
+    Date = 13
+    Time = 14
+    Inteval = 15
+    DateTime = 16
+    Timestamp = 17
 
     _VALUES_TO_NAMES = {
         0: "Boolean",
@@ -201,6 +221,11 @@ class LiteralType(object):
         10: "DoubleTensorArray",
         11: "SparseIntegerArray",
         12: "SparseDoubleArray",
+        13: "Date",
+        14: "Time",
+        15: "Inteval",
+        16: "DateTime",
+        17: "Timestamp",
     }
 
     _NAMES_TO_VALUES = {
@@ -217,6 +242,11 @@ class LiteralType(object):
         "DoubleTensorArray": 10,
         "SparseIntegerArray": 11,
         "SparseDoubleArray": 12,
+        "Date": 13,
+        "Time": 14,
+        "Inteval": 15,
+        "DateTime": 16,
+        "Timestamp": 17,
     }
 
 
@@ -285,7 +315,12 @@ class ColumnType(object):
     ColumnSparse = 13
     ColumnMultiVector = 14
     ColumnRowID = 15
-    ColumnInvalid = 16
+    ColumnDate = 16
+    ColumnTime = 17
+    ColumnDateTime = 18
+    ColumnTimestamp = 19
+    ColumnInterval = 20
+    ColumnInvalid = 21
 
     _VALUES_TO_NAMES = {
         0: "ColumnBool",
@@ -304,7 +339,12 @@ class ColumnType(object):
         13: "ColumnSparse",
         14: "ColumnMultiVector",
         15: "ColumnRowID",
-        16: "ColumnInvalid",
+        16: "ColumnDate",
+        17: "ColumnTime",
+        18: "ColumnDateTime",
+        19: "ColumnTimestamp",
+        20: "ColumnInterval",
+        21: "ColumnInvalid",
     }
 
     _NAMES_TO_VALUES = {
@@ -324,7 +364,12 @@ class ColumnType(object):
         "ColumnSparse": 13,
         "ColumnMultiVector": 14,
         "ColumnRowID": 15,
-        "ColumnInvalid": 16,
+        "ColumnDate": 16,
+        "ColumnTime": 17,
+        "ColumnDateTime": 18,
+        "ColumnTimestamp": 19,
+        "ColumnInterval": 20,
+        "ColumnInvalid": 21,
     }
 
 
