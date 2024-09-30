@@ -16,7 +16,7 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
         python_executable,
         "-m",
         "pytest",
-        # "--capture=tee-sys",
+        "--capture=tee-sys",
         "--tb=short",
         "-x",
         "-m",
