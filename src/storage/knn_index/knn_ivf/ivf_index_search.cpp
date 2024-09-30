@@ -35,6 +35,9 @@ namespace infinity {
 
 IVF_Search_Params IVF_Search_Params::Make(const KnnScanSharedData *knn_scan_shared_data) {
     IVF_Search_Params params;
+    if (knn_scan_shared_data->query_count_ != 1) {
+        RecoverableError(Status::SyntaxError(fmt::format("Invalid query_count: {} which is not 1.", knn_scan_shared_data->query_count_)));
+    }
     params.topk_ = knn_scan_shared_data->topk_;
     params.query_embedding_ = knn_scan_shared_data->query_embedding_;
     params.query_elem_type_ = knn_scan_shared_data->query_elem_type_;

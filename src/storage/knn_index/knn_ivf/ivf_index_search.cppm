@@ -14,6 +14,8 @@
 
 module;
 
+#include <cassert>
+#include <functional>
 export module ivf_index_search;
 
 import stl;
@@ -29,6 +31,11 @@ import status;
 import third_party;
 import roaring_bitmap;
 import knn_filter;
+import ivf_index_data;
+import ivf_index_data_in_mem;
+import ivf_index_storage;
+import search_top_1;
+import search_top_k;
 
 namespace infinity {
 
@@ -42,9 +49,6 @@ export struct IVF_Search_Params {
 
     static IVF_Search_Params Make(const KnnScanSharedData *knn_scan_shared_data);
 };
-
-class IVFIndexInChunk;
-class IVFIndexInMem;
 
 export template <typename DistanceDataType>
 class IVF_Search_Handler {
@@ -96,6 +100,9 @@ template <LogicalType t,
           bool use_bitmask,
           typename MultiVectorInnerTopnIndexType = void>
 class IVF_Search_HandlerT final : public IVF_Search_Handler<DistanceDataType> {
+    static_assert(((std::is_same_v<QueryDataType, u8> || std::is_same_v<QueryDataType, i8>) && std::is_same_v<QueryDataType, ColumnDataType>) ||
+                  (std::is_same_v<QueryDataType, f32> && (std::is_same_v<ColumnDataType, f64> || std::is_same_v<ColumnDataType, f32> ||
+                                                          std::is_same_v<ColumnDataType, Float16T> || std::is_same_v<ColumnDataType, BFloat16T>)));
     static_assert(t == LogicalType::kEmbedding || t == LogicalType::kMultiVector);
     static constexpr bool NEED_FLIP = !std::is_same_v<CompareMax<DistanceDataType, SegmentOffset>, C<DistanceDataType, SegmentOffset>>;
     using ResultHandler = std::conditional_t<t == LogicalType::kEmbedding,
@@ -109,8 +116,40 @@ public:
         : IVF_Search_Handler<DistanceDataType>(ivf_params), filter_(bitmask, max_segment_offset),
           result_handler_(1, this->ivf_params_.topk_, this->distance_output_ptr_.get(), this->segment_offset_output_ptr_.get()) {}
     void Begin() override { result_handler_.Begin(); }
-    void Search(const IVFIndexInChunk *ivf_index_in_chunk) override {}
-    void Search(const IVFIndexInMem *ivf_index_in_mem) override {}
+    void Search(const IVFIndexInChunk *ivf_index_in_chunk) override {
+        const auto *ivf_index_storage = ivf_index_in_chunk->GetIVFIndexStoragePtr();
+        ivf_index_storage->SearchIndex(this->ivf_params_.knn_distance_type_,
+                                       this->ivf_params_.query_embedding_,
+                                       this->ivf_params_.query_elem_type_,
+                                       this->ivf_params_.nprobe_,
+                                       std::bind(&IVF_Search_HandlerT::AddResult, this, std::placeholders::_1, std::placeholders::_2));
+    }
+    void Search(const IVFIndexInMem *ivf_index_in_mem) override {
+        ivf_index_in_mem->SearchIndex(this->ivf_params_.knn_distance_type_,
+                                      this->ivf_params_.query_embedding_,
+                                      this->ivf_params_.query_elem_type_,
+                                      this->ivf_params_.nprobe_,
+                                      std::bind(&IVF_Search_HandlerT::AddResult, this, std::placeholders::_1, std::placeholders::_2));
+    }
+    void Search(const IVF_Index_Storage *ivf_index_storage) {
+        assert(ivf_index_storage->column_logical_type() == t);
+        assert(ivf_index_storage->embedding_data_type() == CppTypeToEmbeddingDataTypeV<ColumnDataType>);
+        assert(ivf_index_storage->embedding_dimension() == this->ivf_params_.knn_scan_shared_data_->dimension_);
+        assert(CppTypeToEmbeddingDataTypeV<QueryDataType> == this->ivf_params_.query_elem_type_);
+        ivf_index_storage->SearchIndex(this->ivf_params_.knn_distance_type_,
+                                       this->ivf_params_.query_embedding_,
+                                       this->ivf_params_.query_elem_type_,
+                                       this->ivf_params_.nprobe_,
+                                       std::bind(&IVF_Search_HandlerT::AddResult, this, std::placeholders::_1, std::placeholders::_2));
+    }
+    void AddResult(DistanceDataType d, SegmentOffset i) {
+        if constexpr (t == LogicalType::kEmbedding) {
+            result_handler_.AddResult(0, d, i);
+        } else {
+            static_assert(t == LogicalType::kMultiVector);
+            result_handler_.AddResult(d, i);
+        }
+    }
     SizeT EndWithoutSortAndGetResultSize() override {
         result_handler_.EndWithoutSort();
         return result_handler_.GetSize(0);
