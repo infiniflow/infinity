@@ -99,7 +99,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
                 break;
             }
-
+            fmt::print("before config remote_store\n");
             switch(config_ptr_->StorageType()) {
                 case StorageType::kLocal: {
                     // Not init remote store
@@ -118,7 +118,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
                 }
             }
-
+            fmt::print("after config remote_store\n");
             // Construct persistence store
             String persistence_dir = config_ptr_->PersistenceDir();
             if (!persistence_dir.empty()) {

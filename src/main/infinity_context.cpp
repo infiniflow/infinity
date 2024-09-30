@@ -62,7 +62,7 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
         fmt::print("Error: {}", *status.msg_);
         std::exit(static_cast<int>(status.code()));
     }
-
+    fmt::print("After init config\n");
     Logger::Initialize(config_.get());
 
     resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
@@ -74,13 +74,14 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
         UnrecoverableError(status.message());
         return;
     }
-
+    fmt::print("After init admin\n");
     if (admin_flag or config_->ServerMode() == "cluster") {
         // Admin mode or cluster start phase
         return;
     }
 
     if (config_->ServerMode() == "standalone") {
+        fmt::print("Before switch to standalone\n");
         Status change_to_standalone = ChangeRole(NodeRole::kStandalone);
         if (!change_to_standalone.ok()) {
             UnrecoverableError(change_to_standalone.message());
@@ -111,7 +112,9 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
         case NodeRole::kAdmin: {
             switch (target_role) {
                 case NodeRole::kStandalone: {
+                    fmt::print("Before storage switch to standalone\n");
                     storage_->SetStorageMode(StorageMode::kWritable);
+                    fmt::print("After storage switch to standalone\n");
                     break;
                 }
                 case NodeRole::kLeader: {

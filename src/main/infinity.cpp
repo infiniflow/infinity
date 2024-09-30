@@ -57,6 +57,7 @@ import query_options;
 import extra_ddl_info;
 import drop_index_info;
 import drop_table_info;
+import third_party;
 
 import infinity_exception;
 import third_party;
@@ -71,9 +72,13 @@ void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
 
     SharedPtr<String> config_path = MakeShared<String>(std::filesystem::absolute(path + "/infinity_conf.toml"));
+    fmt::print("config: {}\n", *config_path);
     if (fs.Exists(*config_path)) {
+        fmt::print("found config: {}\n", *config_path);
         InfinityContext::instance().Init(config_path);
+        fmt::print("found config: {}, after init\n", *config_path);
     } else {
+        fmt::print("not found config: {}\n", *config_path);
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
         default_config->default_log_dir_ = fmt::format("{}/log", path);
         default_config->default_data_dir_ = fmt::format("{}/data", path);
@@ -83,7 +88,9 @@ void Infinity::LocalInit(const String &path) {
 
         default_config->default_log_level_ = LogLevel::kInfo;
         default_config->default_log_to_stdout_ = false;
+        fmt::print("not found config: {}, before init\n", *config_path);
         InfinityContext::instance().Init(nullptr, false, default_config.get());
+        fmt::print("not found config: {}, after init\n", *config_path);
     }
 }
 
