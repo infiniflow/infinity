@@ -580,12 +580,8 @@ void TxnStore::MaintainCompactionAlg() const {
 }
 
 bool TxnStore::CheckConflict(Catalog *catalog) {
-    if (txn_->db_name().empty() && !txn_tables_store_.empty()) {
-        const String &db_name = *txn_tables_store_.begin()->second->GetTableEntry()->GetDBName();
-        txn_->SetDBName(db_name);
-    }
-    const String &db_name = txn_->db_name();
     for (const auto &[table_name, table_store] : txn_tables_store_) {
+        const String &db_name = *table_store->GetTableEntry()->GetDBName();
         auto [table_entry1, status] = catalog->GetTableByName(db_name, table_name, txn_->TxnID(), txn_->CommitTS());
         if (!status.ok() || table_entry1 != table_store->GetTableEntry()) {
             return true;
