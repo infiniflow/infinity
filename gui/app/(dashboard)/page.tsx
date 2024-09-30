@@ -40,7 +40,6 @@ export default async function HomePage({
   searchParams: { q: string; offset: string };
 }) {
   const ret = await listDatabase();
-  console.log('🚀 ~ x:', ret);
   const search = searchParams.q ?? '';
   const offset = searchParams.offset ?? 0;
 

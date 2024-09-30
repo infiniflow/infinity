@@ -53,3 +53,82 @@ export const showDatabase = async (params: { database_name: string }) => {
     console.log('🚀 ~ error:', error);
   }
 };
+
+//#region table
+
+export const listTable = async (database_name: string) => {
+  try {
+    const x = await get(
+      `${ApiUrl.databases}/${database_name}/${ApiUrl.tables}`
+    );
+    return x;
+  } catch (error) {
+    console.log('🚀 ~ error:', error);
+  }
+};
+
+export const createTable = async ({
+  database_name,
+  table_name,
+  create_option,
+  fields
+}: {
+  database_name: string;
+  table_name: string;
+  fields: Array<{ name: string; type: string; default?: string }>;
+  create_option: CreateOption;
+}) => {
+  try {
+    const x = await post(
+      `${ApiUrl.databases}/${database_name}/${ApiUrl.tables}/${table_name}`,
+      {
+        create_option,
+        fields
+      }
+    );
+    return x;
+  } catch (error) {
+    console.log('🚀 ~ error:', error);
+  }
+};
+
+export const dropTable = async ({
+  database_name,
+  table_name,
+  drop_option
+}: {
+  database_name: string;
+  table_name: string;
+  drop_option: DropOption;
+}) => {
+  try {
+    const x = await drop(
+      `${ApiUrl.databases}/${database_name}/${ApiUrl.tables}/${table_name}`,
+      {
+        drop_option
+      }
+    );
+    return x;
+  } catch (error) {
+    console.log('🚀 ~ error:', error);
+  }
+};
+
+export const showTable = async ({
+  database_name,
+  table_name
+}: {
+  database_name: string;
+  table_name: string;
+}) => {
+  try {
+    const x = await get(
+      `${ApiUrl.databases}/${database_name}/${ApiUrl.tables}/${table_name}`
+    );
+    return x;
+  } catch (error) {
+    console.log('🚀 ~ error:', error);
+  }
+};
+
+//#endregion

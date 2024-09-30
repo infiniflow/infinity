@@ -1,4 +1,5 @@
 export const ApiUrl = {
   databases: 'databases',
-  database: 'database'
+  database: 'database',
+  tables: 'tables'
 };
