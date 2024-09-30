@@ -53,6 +53,7 @@ public:
     static Status Truncate(const String& file_name, SizeT new_length);
     static Status Merge(const String& dst_file, const String& src_file);
     static Tuple<Vector<SharedPtr<DirEntry>>, Status> ListDirectory(const String& path);
+    static SizeT GetFileSize(const String& path);
 };
 
 }

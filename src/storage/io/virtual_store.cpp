@@ -298,4 +298,12 @@ Tuple<Vector<SharedPtr<DirEntry>>, Status> LocalStore::ListDirectory(const Strin
     return {file_array, Status::OK()};
 }
 
+SizeT LocalStore::GetFileSize(const String& path) {
+    if(!std::filesystem::path(path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", path);
+        UnrecoverableError(error_message);
+    }
+    return std::filesystem::file_size(path);
+}
+
 } // namespace infinity
