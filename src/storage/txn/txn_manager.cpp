@@ -129,29 +129,38 @@ TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
 
 bool TxnManager::CheckConflict(Txn *txn) {
     TxnTimeStamp commit_ts = txn->CommitTS();
-    Vector<Txn *> candidate_txns;
+    Vector<SharedPtr<Txn>> candidate_txns;
+    TxnTimeStamp min_checking_ts = UNCOMMIT_TS;
     {
         std::lock_guard guard(locker_);
         // LOG_INFO(fmt::format("Txn {}(commit_ts:{}) check conflict", txn->TxnID(), txn->CommitTS()));
-        for (auto *finishing_txn : finishing_txns_) {
+        for (Txn *finishing_txn : finishing_txns_) {
             TxnTimeStamp finishing_commit_ts = finishing_txn->CommitTS();
             if (commit_ts > finishing_commit_ts) {
-                candidate_txns.push_back(finishing_txn);
+                candidate_txns.push_back(finishing_txn->shared_from_this());
+                min_checking_ts = std::min(min_checking_ts, finishing_txn->BeginTS());
             }
+        }
+        if (min_checking_ts != UNCOMMIT_TS) {
+            checking_ts_.insert(min_checking_ts);
         }
     }
     if (txn->CheckConflict(catalog_)) {
         return true;
     }
-    for (auto *candidate_txn : candidate_txns) {
+    for (SharedPtr<Txn> &candidate_txn : candidate_txns) {
         // LOG_INFO(fmt::format("Txn {}(commit_ts: {}) check conflict with txn {}(commit_ts: {})",
         //                      txn->TxnID(),
         //                      txn->CommitTS(),
         //                      candidate_txn->TxnID(),
         //                      candidate_txn->CommitTS()));
-        if (txn->CheckConflict(candidate_txn)) {
+        if (txn->CheckConflict(candidate_txn.get())) {
             return true;
         }
+    }
+    if (min_checking_ts != UNCOMMIT_TS) {
+        std::lock_guard guard(locker_);
+        checking_ts_.erase(min_checking_ts);
     }
     return false;
 }
@@ -292,12 +301,10 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
     }
     TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
     TxnTimeStamp res = std::min(first_uncommitted_begin_ts, checkpointed_ts);
-    for (auto *txn : finished_txns_) {
-        res = std::min(res, txn->CommitTS());
+    if (!checking_ts_.empty()) {
+        res = std::min(res, *checking_ts_.begin());
     }
-    for (auto *txn : finishing_txns_) {
-        res = std::min(res, txn->BeginTS());
-    }
+
     LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", res, checkpointed_ts));
     return res;
 }
@@ -318,10 +325,8 @@ void TxnManager::FinishTxn(Txn *txn) {
     auto state = txn->GetTxnState();
     if (state == TxnState::kCommitting) {
         txn->SetTxnCommitted();
-        finished_txns_.emplace_back(txn);
     } else if (state == TxnState::kRollbacking) {
         txn->SetTxnRollbacked();
-        finished_txns_.emplace_back(txn);
     } else {
         String error_message = fmt::format("Invalid transaction status: {}", ToString(state));
         UnrecoverableError(error_message);
@@ -330,25 +335,11 @@ void TxnManager::FinishTxn(Txn *txn) {
     if (remove_n == 0) {
         UnrecoverableError("Txn not found in finishing_txns_");
     }
-    TxnTimeStamp max_commit_ts = 0;
-    for (auto *finishing_txn : finishing_txns_) {
-        max_commit_ts = std::max(max_commit_ts, finishing_txn->CommitTS());
-    }
-    auto iter = finished_txns_.begin();
-    while (iter != finished_txns_.end()) {
-        auto *finished_txn = *iter;
-        if (finished_txn->CommitTS() < max_commit_ts) {
-            ++iter;
-            continue;
-        }
-        auto finished_txn_id = finished_txn->TxnID();
-        // LOG_INFO(fmt::format("Txn: {} is finished. committed ts: {}", finished_txn_id, finished_txn->CommittedTS()));
-        iter = finished_txns_.erase(iter);
-        SizeT remove_n = txn_map_.erase(finished_txn_id);
-        if (remove_n == 0) {
-            String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);
-            UnrecoverableError(error_message);
-        }
+    TransactionID txn_id = txn->TxnID();
+    remove_n = txn_map_.erase(txn_id);
+    if (remove_n == 0) {
+        String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
+        UnrecoverableError(error_message);
     }
 }
 
