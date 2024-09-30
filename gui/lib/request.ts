@@ -32,7 +32,7 @@ export const request = async (
 export const get = (url: string, params?: Record<string, string>) =>
   request(url, params, 'GET');
 
-export const post = (url: string, params: Record<string, string>) =>
+export const post = (url: string, params: Record<string, any>) =>
   request(url, params, 'POST');
 
 export const drop = (url: string, params: Record<string, string>) =>
