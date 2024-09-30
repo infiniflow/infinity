@@ -14,7 +14,6 @@
 
 module;
 
-
 import stl;
 import base_statement;
 import create_statement;
@@ -26,6 +25,7 @@ import show_statement;
 import flush_statement;
 import optimize_statement;
 import base_table_reference;
+import status;
 
 export module explain_ast;
 
@@ -33,28 +33,28 @@ namespace infinity {
 
 export class ExplainAST {
 public:
-    static void Explain(const BaseStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size = 0);
+    static Status Explain(const BaseStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size = 0);
 
-    static void BuildCreate(const CreateStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
+    static Status BuildCreate(const CreateStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
 
-    static void BuildInsert(const InsertStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
+    static Status BuildInsert(const InsertStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
 
-    static void BuildCopy(const CopyStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
+    static Status BuildCopy(const CopyStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
 
-    static void BuildDrop(const DropStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
+    static Status BuildDrop(const DropStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
 
-    static void BuildSelect(const SelectStatement *statement,
-                            SharedPtr<Vector<SharedPtr<String>>> &stmt_string,
-                            i64 intent_size,
-                            SharedPtr<String> alias_ptr = nullptr);
+    static Status BuildSelect(const SelectStatement *statement,
+                              SharedPtr<Vector<SharedPtr<String>>> &stmt_string,
+                              i64 intent_size,
+                              SharedPtr<String> alias_ptr = nullptr);
 
-    static void BuildBaseTableRef(const BaseTableReference *table_ref, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
+    static Status BuildBaseTableRef(const BaseTableReference *table_ref, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
 
-    static void BuildShow(const ShowStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
+    static Status BuildShow(const ShowStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size);
 
-    static void BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size);
+    static Status BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size);
 
-    static void BuildOptimize(const OptimizeStatement *optimize_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64);
+    static Status BuildOptimize(const OptimizeStatement *optimize_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64);
 };
 
 } // namespace infinity

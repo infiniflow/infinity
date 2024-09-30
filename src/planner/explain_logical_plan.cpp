@@ -82,7 +82,7 @@ import logger;
 
 namespace infinity {
 
-void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (statement->operator_type()) {
         case LogicalNodeType::kAggregate: {
             Explain((LogicalAggregate *)statement, result, intent_size);
@@ -237,9 +237,10 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
     if (statement->right_node().get() != nullptr) {
         ExplainLogicalPlan::Explain(statement->right_node().get(), result, intent_size + 2);
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalCreateSchema *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCreateSchema *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {
@@ -269,9 +270,10 @@ void ExplainLogicalPlan::Explain(const LogicalCreateSchema *create_node, SharedP
         String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {
@@ -325,9 +327,10 @@ void ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPt
         String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {
@@ -365,9 +368,10 @@ void ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, SharedPt
         String output_columns_str = String(intent_size, ' ') + " - output columns: [OK]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalCreateCollection *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCreateCollection *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {
@@ -403,9 +407,10 @@ void ExplainLogicalPlan::Explain(const LogicalCreateCollection *create_node, Sha
         String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {
@@ -465,9 +470,10 @@ void ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedPtr
         String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalDropSchema *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalDropSchema *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String drop_header_str;
         if (intent_size != 0) {
@@ -497,9 +503,10 @@ void ExplainLogicalPlan::Explain(const LogicalDropSchema *drop_node, SharedPtr<V
         String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalDropTable *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalDropTable *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String drop_header_str;
         if (intent_size != 0) {
@@ -535,9 +542,10 @@ void ExplainLogicalPlan::Explain(const LogicalDropTable *drop_node, SharedPtr<Ve
         String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalDropCollection *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalDropCollection *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String drop_header_str;
         if (intent_size != 0) {
@@ -573,9 +581,12 @@ void ExplainLogicalPlan::Explain(const LogicalDropCollection *drop_node, SharedP
         String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalDropView *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalDropView *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    return Status::NotSupport("DROP VIEW isn't supported");
+#if 0
     {
         String drop_header_str;
         if (intent_size != 0) {
@@ -611,9 +622,10 @@ void ExplainLogicalPlan::Explain(const LogicalDropView *drop_node, SharedPtr<Vec
         String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+#endif
 }
 
-void ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String insert_header_str;
         if (intent_size != 0) {
@@ -667,19 +679,22 @@ void ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<Vec
 
         result->emplace_back(MakeShared<String>(insert_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalDelete *delete_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalDelete *delete_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String header = delete_node->ToString(intent_size);
     result->emplace_back(MakeShared<String>(header));
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalUpdate *update_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalUpdate *update_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String header = update_node->ToString(intent_size);
     result->emplace_back(MakeShared<String>(header));
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalProject *project_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalProject *project_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String project_header;
         if (intent_size != 0) {
@@ -715,9 +730,10 @@ void ExplainLogicalPlan::Explain(const LogicalProject *project_node, SharedPtr<V
         expression_str += "]";
         result->emplace_back(MakeShared<String>(expression_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalFilter *filter_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalFilter *filter_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String filter_node_header;
     if (intent_size != 0) {
         filter_node_header = fmt::format("{}-> FILTER ", String(intent_size - 2, ' '));
@@ -749,9 +765,10 @@ void ExplainLogicalPlan::Explain(const LogicalFilter *filter_node, SharedPtr<Vec
 
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String table_scan_header;
     if (intent_size != 0) {
         table_scan_header = String(intent_size - 2, ' ');
@@ -796,9 +813,10 @@ void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shared
     output_columns += table_scan_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String index_scan_header;
     if (intent_size != 0) {
         index_scan_header = String(intent_size - 2, ' ');
@@ -851,9 +869,10 @@ void ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node, Shared
     result->emplace_back(MakeShared<String>(output_columns));
 
     // TODO: load meta
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String knn_scan_header;
     if (intent_size != 0) {
         knn_scan_header = String(intent_size - 2, ' ');
@@ -934,9 +953,10 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     output_columns += knn_scan_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     SizeT groups_count = aggregate_node->groups_.size();
     SizeT aggregates_count = aggregate_node->aggregates_.size();
     if (groups_count == 0 && aggregate_node == 0) {
@@ -1000,9 +1020,10 @@ void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedP
         group_by_expression_str += "]";
         result->emplace_back(MakeShared<String>(group_by_expression_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalSort *sort_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalSort *sort_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String sort_header;
         if (intent_size != 0) {
@@ -1054,9 +1075,10 @@ void ExplainLogicalPlan::Explain(const LogicalSort *sort_node, SharedPtr<Vector<
         output_columns_str += "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalLimit *limit_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalLimit *limit_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String limit_header;
         if (intent_size != 0) {
@@ -1100,9 +1122,10 @@ void ExplainLogicalPlan::Explain(const LogicalLimit *limit_node, SharedPtr<Vecto
         output_columns_str += "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalTop *top_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalTop *top_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String top_header;
         if (intent_size != 0) {
@@ -1157,9 +1180,10 @@ void ExplainLogicalPlan::Explain(const LogicalTop *top_node, SharedPtr<Vector<Sh
         output_columns_str += output_columns->back() + "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalCrossProduct *cross_product_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalCrossProduct *cross_product_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String cross_product_header;
         if (intent_size != 0) {
@@ -1188,9 +1212,10 @@ void ExplainLogicalPlan::Explain(const LogicalCrossProduct *cross_product_node, 
         output_columns_str += "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String join_header;
         if (intent_size != 0) {
@@ -1237,9 +1262,10 @@ void ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<
         output_columns_str += "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (show_node->show_type()) {
         case ShowType::kShowDatabase: {
             String show_str;
@@ -1918,9 +1944,10 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             UnrecoverableError(error_message);
         }
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &expr_str, bool consider_add_parentheses) {
+Status ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &expr_str, bool consider_add_parentheses) {
     switch (base_expression->type()) {
         case ExpressionType::kAggregate: {
             AggregateExpression *aggregate_expression = (AggregateExpression *)base_expression;
@@ -2072,9 +2099,10 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
             UnrecoverableError(error_message);
         }
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String import_header_str;
         if (intent_size != 0) {
@@ -2161,9 +2189,10 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
         String error_message = "Import node have children nodes.";
         UnrecoverableError(error_message);
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String export_header_str;
         if (intent_size != 0) {
@@ -2248,9 +2277,10 @@ void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vec
         String error_message = "EXPORT node have children nodes.";
         UnrecoverableError(error_message);
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String flush_header_str;
     if (intent_size != 0) {
         flush_header_str = String(intent_size - 2, ' ');
@@ -2277,9 +2307,10 @@ void ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, SharedPtr<Vecto
             break;
     }
     result->emplace_back(MakeShared<String>(flush_header_str));
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String optimize_header_str;
     if (intent_size != 0) {
         optimize_header_str = String(intent_size - 2, ' ');
@@ -2289,38 +2320,43 @@ void ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, SharedPtr
     }
 
     result->emplace_back(MakeShared<String>(optimize_header_str));
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     IStringStream iss(match_node->ToString(intent_size));
     String line;
     while (std::getline(iss, line)) {
         result->emplace_back(MakeShared<String>(std::move(line)));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalMatchSparseScan *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalMatchSparseScan *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     IStringStream iss(match_node->ToString(intent_size));
     String line;
     while (std::getline(iss, line)) {
         result->emplace_back(MakeShared<String>(std::move(line)));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalMatchTensorScan *match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalMatchTensorScan *match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     IStringStream iss(match_tensor_node->ToString(intent_size));
     String line;
     while (std::getline(iss, line)) {
         result->emplace_back(MakeShared<String>(std::move(line)));
     }
+    return Status::OK();
 }
 
-void ExplainLogicalPlan::Explain(const LogicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainLogicalPlan::Explain(const LogicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     IStringStream iss(fusion_node->ToString(intent_size));
     String line;
     while (std::getline(iss, line)) {
         result->emplace_back(MakeShared<String>(std::move(line)));
     }
+    return Status::OK();
 }
 
 } // namespace infinity
