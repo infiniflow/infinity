@@ -228,7 +228,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                     file_handle = std::move(new_file_handle);
                 }
                 file_handle->Append(line.c_str(), line.size());
-
+                file_handle->Close();
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
                     return row_count;
@@ -359,6 +359,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 // LOG_DEBUG(line_json.dump());
                 String to_write = line_json.dump() + "\n";
                 file_handle->Append(to_write.c_str(), to_write.size());
+                file_handle->Close();
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
                     return row_count;
@@ -448,6 +449,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
                 file_handle->Append(&dimension, sizeof(dimension));
                 file_handle->Append(embedding.data(), embedding.size_bytes());
+                file_handle->Close();
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
                     return row_count;

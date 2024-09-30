@@ -37,6 +37,7 @@ import diskann_dist_func;
 import local_file_handle;
 import abstract_file_handle;
 import virtual_store;
+import defer_op;
 
 namespace infinity {
 export template <typename VectorDataType, typename LabelType, MetricType metric>
@@ -257,6 +258,7 @@ public:
         if (!data_file_status.ok()) {
             UnrecoverableError(data_file_status.message());
         }
+        DeferFn defer_fn([&]() { data_file_handle->Close(); });
         SharedPtr<VectorDataType[]> train_data;
         SharedPtr<SizeT[]> train_data_ids;
 
@@ -287,10 +289,12 @@ public:
             if (!pq_data_file_status.ok()) {
                 UnrecoverableError(pq_data_file_status.message());
             }
+            DeferFn defer1_fn([&]() { pqCompressed_data_file_handle->Close(); });
             auto [pq_pivot_file_handle, pq_pivot_file_status] = LocalStore::Open(pq_pivot_file_path_, FileAccessMode::kWrite);
             if (!pq_pivot_file_status.ok()) {
                 UnrecoverableError(pq_pivot_file_status.message());
             };
+            DeferFn defer2_fn([&]() { pq_pivot_file_handle->Close(); });
             bool make_zero_mean = true; // mean subtraction for centering, not for inner product
             if (metric_ == MetricType::kMetricInnerProduct)
                 make_zero_mean = false;
@@ -325,8 +329,6 @@ public:
                 // TODO
                 //  LOG_TRACE("Train size is less than number of centers, using train data as pivots");
             }
-            pqCompressed_data_file_handle->Close();
-            pq_pivot_file_handle->Close();
             LOG_TRACE(fmt::format("Finished generating pq pivots and pq data"));
         }
 
@@ -337,6 +339,7 @@ public:
             if (!mem_index_write_status.ok()) {
                 UnrecoverableError(mem_index_write_status.message());
             }
+            DeferFn defer3_fn([&]() { mem_index_file_handle->Close(); });
             BuildMergedVamanaIndex(*data_file_handle, *mem_index_file_handle, labels_);
             mem_index_file_handle->Close();
             LOG_TRACE(fmt::format("Finished building and merging Vamana graph"));
@@ -349,13 +352,13 @@ public:
             if (!mem_index_read_status.ok()) {
                 UnrecoverableError(mem_index_read_status.message());
             }
+            DeferFn defer4_fn([&]() { mem_index_file_handle->Close(); });
             auto [index_file_handle, index_file_status] = LocalStore::Open(index_file_path_, FileAccessMode::kWrite);
             if (!index_file_status.ok()) {
                 UnrecoverableError(index_file_status.message());
             }
+            DeferFn defer5_fn([&]() { index_file_handle->Close(); });
             CreateDiskLayout(*data_file_handle, *mem_index_file_handle, *index_file_handle);
-            mem_index_file_handle->Close();
-            index_file_handle->Close();
             LOG_TRACE(fmt::format("Finished creating disk layout"));
         }
 
@@ -368,18 +371,17 @@ public:
             if (!train_data_status.ok()) {
                 UnrecoverableError(train_data_status.message());
             }
+            DeferFn defer6_fn([&]() { train_data_handle->Close(); });
             auto [train_data_ids_handle, train_data_ids_status] = LocalStore::Open(train_data_ids_path, FileAccessMode::kWrite);
             if (!train_data_ids_status.ok()) {
                 UnrecoverableError(train_data_ids_status.message());
             }
+            DeferFn defer7_fn([&]() { train_data_ids_handle->Close(); });
 
             SaveSampleData(*train_data_handle, *train_data_ids_handle, train_data, train_data_ids);
             // train_data.reset();
             // train_data_ids.reset();
             LocalStore::DeleteFile(mem_index_file_path_); // delete mem index file
-            data_file_handle->Close();
-            train_data_handle->Close();
-            train_data_ids_handle->Close();
             LOG_TRACE(fmt::format("Finished saving sample data"));
         }
 
@@ -397,10 +399,12 @@ public:
             if (!train_data_status.ok()) {
                 UnrecoverableError(train_data_status.message());
             }
+            DeferFn defer1_fn([&]() { train_data_handle->Close(); });
             auto [train_data_ids_handle, train_data_ids_status] = LocalStore::Open(train_data_ids_path, FileAccessMode::kRead);
             if (!train_data_ids_status.ok()) {
                 UnrecoverableError(train_data_ids_status.message());
             }
+            DeferFn defer2_fn([&]() { train_data_ids_handle->Close(); });
             UniquePtr<VectorDataType[]> train_data = MakeUnique<VectorDataType[]>(train_size_ * dimension_);
             UniquePtr<SizeT[]> train_data_ids = MakeUnique<SizeT[]>(train_size_);
             fmt::print("train_size: {}, dimension: {}\n", train_size_, dimension_);
@@ -416,8 +420,6 @@ public:
                 fmt::print("{}, ", train_data[1 * dimension_ + j]);
             }
             fmt::print("\n");
-            train_data_handle->Close();
-            train_data_ids_handle->Close();
         }
 
         LOG_TRACE("UnitTest(): Test Pq pivots and pq data");
@@ -439,6 +441,7 @@ public:
             if (!pq_data_file_status.ok()) {
                 UnrecoverableError(pq_data_file_status.message());
             }
+            DeferFn defer3_fn([&]() { pqCompressed_data_file_handle->Close(); });
             UniquePtr<u32[]> pqdata = MakeUniqueForOverwrite<u32[]>(num_pq_chunks_ * data_num_);
             pqCompressed_data_file_handle->Read(pqdata.get(), num_pq_chunks_ * sizeof(u32) * data_num_);
             fmt::print("pqdata[0]: \n");

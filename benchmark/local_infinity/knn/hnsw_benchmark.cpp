@@ -195,6 +195,9 @@ void Build(const BenchmarkOption &option) {
         if (!index_status.ok()) {
             UnrecoverableError(index_status.message());
         }
+        DeferFn defer_fn([&]() {
+            index_file->Close();
+        }
         hnsw->Save(*index_file);
     };
     if constexpr (std::is_same_v<HnswT, HnswT2>) {
@@ -212,6 +215,9 @@ void Query(const BenchmarkOption &option) {
     auto [index_file, index_status] = LocalStore::Open(option.index_save_path_.string(), FileAccessMode::kRead);
     if (!index_status.ok()) {
         UnrecoverableError(index_status.message());
+    }
+    DeferFn defer_fn([&]() {
+        index_file->Close();
     }
 
     auto hnsw = HnswT::Load(*index_file);
@@ -277,6 +283,9 @@ void Compress(const BenchmarkOption &option) {
     if (!index_status.ok()) {
         UnrecoverableError(index_status.message());
     }
+    DeferFn defer_fn([&]() {
+        index_file->Close();
+    }
     auto hnsw = HnswT::Load(*index_file);
 
     String new_index_name = BenchmarkOption::IndexName(option.benchmark_type_, BuildType::CompressToLVQ, option.M_, option.ef_construction_);
@@ -286,6 +295,9 @@ void Compress(const BenchmarkOption &option) {
     auto [index_file_lvq, index_status_lvq] = LocalStore::Open(new_index_save_path.string(), FileAccessMode::kRead);
     if (!index_status_lvq.ok()) {
         UnrecoverableError(index_status_lvq.message());
+    }
+    DeferFn defer_fn([&]() {
+        index_file_lvq->Close();
     }
     hnsw_lvq->Save(*index_file_lvq);
 }

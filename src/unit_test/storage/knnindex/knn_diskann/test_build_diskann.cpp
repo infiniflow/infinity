@@ -62,12 +62,12 @@ public:
         std::string pqCompressed_data_path = save_dir_ + "/pqCompressed_data.bin";
         std::string pq_pivot_data_path = save_dir_ + "/pq_pivot.bin";
         std::string sample_data_path = save_dir_;
-        auto [data_file_handler, status] = LocalStore::Open(data_file_path, FileAccessMode::kWrite);
+        auto [data_file_handle, status] = LocalStore::Open(data_file_path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        data_file_handler->Append(data.get(), sizeof(f32) * dim * num_points);
-        data_file_handler->Close();
+        data_file_handle->Append(data.get(), sizeof(f32) * dim * num_points);
+        data_file_handle->Close();
         {
             auto disk_data = DiskAnnIndexDataType::Make(dim, num_points, R, L, num_pq_chunks, num_parts, num_centers);
 

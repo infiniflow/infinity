@@ -557,10 +557,11 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
+    DeferFn defer_fn([&]() { catalog_file_handle->Close(); });
     i32 file_size = catalog_file_handle->FileSize();
     Vector<char> buf(file_size);
     catalog_file_handle->Read(buf.data(), file_size);
-    catalog_file_handle->Close();
+
     const char *ptr = buf.data();
     auto catalog_delta_entry = CatalogDeltaEntry::ReadAdv(ptr, file_size);
     if (catalog_delta_entry.get() == nullptr) {
@@ -939,13 +940,11 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    DeferFn defer_fn([&] {
-        catalog_file_handle->Close();
-    });
+    DeferFn defer_fn([&] { catalog_file_handle->Close(); });
     i64 file_size = catalog_file_handle->FileSize();
     String json_str(file_size, 0);
     auto [n_bytes, status_read] = catalog_file_handle->Read(json_str.data(), file_size);
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status_read);
     }
     if ((SizeT)file_size != n_bytes) {
@@ -995,13 +994,12 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-
+    DeferFn defer_fn([&]() { catalog_file_handle->Close(); });
     status = catalog_file_handle->Append(catalog_str.data(), catalog_str.size());
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status);
     }
     catalog_file_handle->Sync();
-    catalog_file_handle->Close();
 
     // Rename temp file to regular catalog file
     LocalStore::Rename(catalog_tmp_path, full_path);

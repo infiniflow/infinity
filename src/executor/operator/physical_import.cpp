@@ -404,6 +404,7 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
+    DeferFn defer_fn1([&]() { file_handle->Close(); });
 
     i64 nrow = 0;
     i64 ncol = 0;
@@ -427,11 +428,13 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
     if (!idx_status.ok()) {
         UnrecoverableError(idx_status.message());
     }
+    DeferFn defer_fn2([&]() { idx_file_handle->Close(); });
     idx_file_handle->Seek(3 * sizeof(i64) + (nrow + 1) * sizeof(i64));
     auto [data_file_handle, data_status] = LocalStore::Open(file_path_, FileAccessMode::kRead);
     if (!data_status.ok()) {
         UnrecoverableError(data_status.message());
     }
+    DeferFn defer_fn3([&]() { data_file_handle->Close(); });
     data_file_handle->Seek(3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32));
 
     //------------------------------------------------------------------------------------------------------------------------
