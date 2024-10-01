@@ -55,7 +55,6 @@ protected:
         const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<DataType, IdxType>::GenerateGroundtruth(dataset, query_set, topk, false);
 
         String save_path = String(tmp_data_path()) + "/bmindex_test1.index";
-        LocalFileSystem fs;
 
         auto test_query = [&](const BMPAlg &index) {
             {
@@ -106,7 +105,6 @@ protected:
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }
             index.Save(*file_handle);
-            file_handle->Close();
         }
         {
             auto [file_handle, status] = LocalStore::Open(save_path, FileAccessMode::kRead);
@@ -116,7 +114,6 @@ protected:
             auto index = BMPAlg::Load(*file_handle);
 
             test_query(index);
-            file_handle->Close();
         }
     }
 };

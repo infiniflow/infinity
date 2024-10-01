@@ -26,7 +26,7 @@ module;
 export module diskann_mem_data_store;
 
 import stl;
-import file_system;
+import local_file_handle;
 import diskann_dist_func;
 import diskann_utils;
 import infinity_exception;
@@ -97,8 +97,8 @@ public:
         }
     }
 
-    void Load(FileHandler &load_file_handler) {}
-    void Save(FileHandler &save_file_handler) {}
+    void Load(LocalFileHandle &load_file_handle) {}
+    void Save(LocalFileHandle &save_file_handle) {}
 
     void PopulateData(DataType *vectors, SizeT num_pts) {
         memset(data_, 0, num_pts * aligned_dim_ * sizeof(DataType));
@@ -111,13 +111,13 @@ public:
         }
     }
 
-    void PopulateData(FileHandler &file_handler, SizeT num_pts) {
+    void PopulateData(LocalFileHandle &file_handle, SizeT num_pts) {
         if (num_pts > this->capacity_) {
             UnrecoverableError("DiskAnnMemDataStore::PopulateData(): num_pts > capacity_");
         }
 
         for (SizeT i = 0; i < num_pts; i++) {
-            file_handler.Read(data_ + i * aligned_dim_, dim_ * sizeof(DataType));
+            file_handle.Read(data_ + i * aligned_dim_, dim_ * sizeof(DataType));
             memset(data_ + i * aligned_dim_ + dim_, 0, (aligned_dim_ - dim_) * sizeof(DataType));
         }
         if (distance_fn_.PreprocessingRequired()) {

@@ -56,7 +56,6 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
         auto [local_file_handle, status] = LocalStore::Open(version_path, FileAccessMode::kWrite);
         EXPECT_TRUE(status.ok());
         block_version.SpillToFile(local_file_handle.get());
-        local_file_handle->Close();
     }
 
     {
@@ -64,7 +63,6 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
         EXPECT_TRUE(status.ok());
         auto block_version2 = BlockVersion::LoadFromFile(local_file_handle.get());
         ASSERT_EQ(block_version, *block_version2);
-        local_file_handle->Close();
     }
 }
 

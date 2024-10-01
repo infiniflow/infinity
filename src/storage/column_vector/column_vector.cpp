@@ -1896,7 +1896,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
 
     if (*this->data_type_ != *other.data_type_) {
         String error_message =
-            fmt::format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString());
+            fmt::format("Attempt to append column vector {} to column vector {}", other.data_type_->ToString(), data_type_->ToString());
         UnrecoverableError(error_message);
     }
 

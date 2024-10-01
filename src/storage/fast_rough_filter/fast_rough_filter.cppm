@@ -22,7 +22,6 @@ import probabilistic_data_filter;
 import min_max_data_filter;
 import logger;
 import third_party;
-import local_file_system;
 import infinity_exception;
 import filter_expression_push_down_helper;
 

@@ -54,6 +54,7 @@ public:
     static Status Merge(const String& dst_file, const String& src_file);
     static Tuple<Vector<SharedPtr<DirEntry>>, Status> ListDirectory(const String& path);
     static SizeT GetFileSize(const String& path);
+    static String GetParentPath(const String& path);
 };
 
 }

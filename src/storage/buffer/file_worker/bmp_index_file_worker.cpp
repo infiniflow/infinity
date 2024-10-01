@@ -14,6 +14,8 @@
 
 module;
 
+#include <set>
+
 module bmp_index_file_worker;
 
 import index_bmp;
@@ -24,9 +26,10 @@ import internal_types;
 import bmp_util;
 import bmp_alg;
 import abstract_bmp;
-import local_file_system;
+import virtual_store;
 import file_system_type;
 import persistence_manager;
+import abstract_file_handle;
 
 namespace infinity {
 
@@ -46,13 +49,11 @@ BMPIndexFileWorker::BMPIndexFileWorker(SharedPtr<String> data_dir,
                       std::move(column_def),
                       persistence_manager) {
     if (index_size == 0) {
-        LocalFileSystem fs;
-
         String index_path = GetFilePath();
-        auto [file_handle, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        auto [file_handle, status] = LocalStore::Open(index_path, FileAccessMode::kRead);
         if (status.ok()) {
             // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
-            index_size = fs.GetFileSize(*file_handle);
+            index_size = file_handle->FileSize();
         }
     }
     index_size_ = index_size;

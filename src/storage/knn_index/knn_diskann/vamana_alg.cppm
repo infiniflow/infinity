@@ -14,17 +14,17 @@
 
 module;
 
+#include <boost/dynamic_bitset.hpp>
+#include <cassert>
 #include <ostream>
 #include <random>
-#include <cassert>
-#include <boost/dynamic_bitset.hpp>
 
 export module vamana_alg;
 
 import stl;
 import logger;
 import index_base;
-import file_system;
+import local_file_handle;
 import file_system_type;
 import infinity_exception;
 import knn_result_handler;
@@ -44,8 +44,7 @@ public:
     using This = MemVamana<VectorDataType, LabelType, metric>;
     using InMemQueryScratch = InMemQueryScratch<VectorDataType>;
 
-    MemVamana(SizeT L, SizeT R, SizeT dim, SizeT point_num) 
-        : L_(L), R_(R), dim_(dim), nd_(point_num) {
+    MemVamana(SizeT L, SizeT R, SizeT dim, SizeT point_num) : L_(L), R_(R), dim_(dim), nd_(point_num) {
         max_points_ = point_num;
         locks_ = Vector<std::mutex>(point_num);
 
@@ -60,17 +59,18 @@ public:
             UnrecoverableError("vamana_alg::MemVamana(): Unknown Metric type!");
         }
 
-        if (dynamic_index_ && num_frozen_pts_ == 0){ // init medoid as first frozen point
+        if (dynamic_index_ && num_frozen_pts_ == 0) { // init medoid as first frozen point
             num_frozen_pts_ = 1;
         }
-        
+
         data_store_ = DiskAnnMemDataStore<VectorDataType>::Make(point_num, dim, dist_metric);
         graph_store_ = DiskAnnMemGraphStore::Make(point_num, R);
     }
 
 public:
     MemVamana() : L_(0), R_(0) {}
-    MemVamana(This &&other) : L_(std::exchange(other.L_, 0)), R_(std::exchange(other.R_, 0)), dim_(std::exchange(other.dim_, 0)), nd_(std::exchange(other.nd_, 0)) {}
+    MemVamana(This &&other)
+        : L_(std::exchange(other.L_, 0)), R_(std::exchange(other.R_, 0)), dim_(std::exchange(other.dim_, 0)), nd_(std::exchange(other.nd_, 0)) {}
     This &operator=(This &&other) {
         if (this != &other) {
             this->max_points_ = std::exchange(other.max_points_, 0);
@@ -87,58 +87,51 @@ public:
         return ret;
     }
 
-    SizeT GetSizeInBytes() const {
+    SizeT GetSizeInBytes() const {}
 
-    }
-
-    void Save(FileHandler &file_handler) {
+    void Save(LocalFileHandle &file_handle) {
         // graph_store_.Save(file_handler, nd_ + num_frozen_pts_, num_frozen_pts_, start_);
         // data_store_.Save(file_handler);
         // SaveLabels(file_handler);
     }
 
-    void SaveGraph(FileHandler &file_handler) {
-        graph_store_.Save(file_handler, nd_ + num_frozen_pts_, num_frozen_pts_, start_);
-    }
+    void SaveGraph(LocalFileHandle &file_handle) { graph_store_.Save(file_handle, nd_ + num_frozen_pts_, num_frozen_pts_, start_); }
 
-    static UniquePtr<This> Load(FileHandler &file_handler) {
-        
-    }
+    static UniquePtr<This> Load(LocalFileHandle &file_handle) {}
 
-    void Build(FileHandler &data_file_handler, SizeT num_points, Vector<LabelType> &labels){
+    void Build(LocalFileHandle &data_file_handle, SizeT num_points, Vector<LabelType> &labels) {
         // https://github.com/microsoft/DiskANN/issues/53
         // graph initialization not be necessary if you shuffle the data before building it
         // graph_store_.InitRandomKnn(num_points);
 
-        //load data
-        this -> nd_ = num_points;
-        data_store_.PopulateData(data_file_handler, num_points);
+        // load data
+        this->nd_ = num_points;
+        data_store_.PopulateData(data_file_handle, num_points);
 
-        //build graph
+        // build graph
         BuildWithDataPopulated(labels);
     }
 
 private:
-    void BuildWithDataPopulated(Vector<LabelType> &labels){
+    void BuildWithDataPopulated(Vector<LabelType> &labels) {
         // load labels
-        if (labels.size() != nd_){
+        if (labels.size() != nd_) {
             UnrecoverableError("vamana_alg::Build(): Wrong number of labels!");
         }
-        for (SizeT i=0; i < nd_; i++){
+        for (SizeT i = 0; i < nd_; i++) {
             tag_to_location_[labels[i]] = i;
             location_to_tag_[i] = labels[i];
         }
 
-        if (query_scratch_.Size() == 0){
+        if (query_scratch_.Size() == 0) {
             u32 num_threads = 1; // single thread for now
-            InitializeQueryScratch(num_threads+5, L_, L_, R_, maxc_, data_store_.GetAlignedDim());
+            InitializeQueryScratch(num_threads + 5, L_, L_, R_, maxc_, data_store_.GetAlignedDim());
         }
 
         Link(); // build vamana graph in 2 rounds
-        
+
         has_built_ = true;
     }
-
 
     void Link() {
         Vector<SizeT> visit_order;
@@ -206,11 +199,9 @@ private:
     }
 
 private:
-    void InitializeQueryScratch(u32 num_threads, u32 search_l, u32 indexing_l,
-                                u32 r, u32 maxc, u32 dim) {
+    void InitializeQueryScratch(u32 num_threads, u32 search_l, u32 indexing_l, u32 r, u32 maxc, u32 dim) {
         for (u32 i = 0; i < num_threads; i++) {
-            auto scratch = new InMemQueryScratch(search_l, indexing_l, r, maxc, dim, data_store_.GetAlignedDim(),
-                                                    data_store_.GetAlignmentFactor());
+            auto scratch = new InMemQueryScratch(search_l, indexing_l, r, maxc, dim, data_store_.GetAlignedDim(), data_store_.GetAlignmentFactor());
             query_scratch_.Push(scratch);
         }
     }
@@ -220,13 +211,12 @@ private:
         return data_store_.CalculateMedoid();
     }
 
-    void SearchForPointAndPrune(SizeT location,  u32 Lindex, Vector<SizeT> &pruned_list,
-                                InMemQueryScratch *scratch) {
+    void SearchForPointAndPrune(SizeT location, u32 Lindex, Vector<SizeT> &pruned_list, InMemQueryScratch *scratch) {
         Vector<SizeT> init_ids = GetInitIds();
         data_store_.GetVector(location, scratch->AlignedQuery());
-        IterateToFixedPoint(scratch, Lindex, init_ids); 
+        IterateToFixedPoint(scratch, Lindex, init_ids);
 
-        auto &pool = scratch->Pool(); // pool is the expanded list of IterateToFixedPoint()
+        auto &pool = scratch->Pool();             // pool is the expanded list of IterateToFixedPoint()
         for (SizeT i = 0; i < pool.size(); i++) { // remove self from pool
             if (pool[i].id == location) {
                 pool.erase(pool.begin() + i);
@@ -244,8 +234,7 @@ private:
 
     // used in SearchForPointAndPrune()
     // abtain search path of location starting from init_ids
-    Pair<u32, u32> IterateToFixedPoint(InMemQueryScratch *scratch, const u32 Lsize, Vector<SizeT> &init_ids,
-                                        bool search_invocations = false) {
+    Pair<u32, u32> IterateToFixedPoint(InMemQueryScratch *scratch, const u32 Lsize, Vector<SizeT> &init_ids, bool search_invocations = false) {
         Vector<Neighbor> &expanded_nodes = scratch->Pool();
         NeighborPriorityQueue &best_l_nodes = scratch->BestLNodes();
         best_l_nodes.Reserve(Lsize);
@@ -260,19 +249,18 @@ private:
         assert(expanded_nodes.size() == 0 && id_scratch.size() == 0);
 
         SizeT total_num_points = max_points_ + num_frozen_pts_;
-        const SizeT MAX_POINTS_FOR_USING_BITSET = 10000000; // 10M points for using bitset
+        const SizeT MAX_POINTS_FOR_USING_BITSET = 10000000;                    // 10M points for using bitset
         bool fast_iterate = (total_num_points <= MAX_POINTS_FOR_USING_BITSET); // turn on fast iterate for small datasets(1e7)
-    
+
         if (fast_iterate) {
-            if (inserted_into_pool_bs.size() < total_num_points){
+            if (inserted_into_pool_bs.size() < total_num_points) {
                 SizeT resize_size = 2 * total_num_points > MAX_POINTS_FOR_USING_BITSET ? MAX_POINTS_FOR_USING_BITSET : 2 * total_num_points;
                 inserted_into_pool_bs.resize(resize_size);
             }
         }
 
         auto is_not_visited = [fast_iterate, &inserted_into_pool_bs, &inserted_into_pool_rs](const u32 id) {
-            return fast_iterate ? inserted_into_pool_bs[id] == 0
-                                : inserted_into_pool_rs.find(id) == inserted_into_pool_rs.end();
+            return fast_iterate ? inserted_into_pool_bs[id] == 0 : inserted_into_pool_rs.find(id) == inserted_into_pool_rs.end();
         };
 
         auto compute_dists = [this, scratch](Vector<SizeT> &ids, Vector<f32> &dists_out) {
@@ -340,10 +328,9 @@ private:
             compute_dists(id_scratch, dist_scratch);
             cmps += id_scratch.size();
 
-            for (SizeT i=0; i < id_scratch.size(); i++) {
+            for (SizeT i = 0; i < id_scratch.size(); i++) {
                 best_l_nodes.Insert(Neighbor(id_scratch[i], dist_scratch[i]));
             }
-
         }
         assert(best_l_nodes.Size() != 0);
 
@@ -357,7 +344,7 @@ private:
         init_ids.emplace_back(start_);
         for (SizeT i = 0; i < num_frozen_pts_; i++) {
             if (i != start_)
-                init_ids.emplace_back(max_points_ + i); 
+                init_ids.emplace_back(max_points_ + i);
         }
 
         return init_ids;
@@ -386,17 +373,21 @@ private:
                 if (pruned_list.size() >= range) {
                     break;
                 }
-                if ((std::find(pruned_list.begin(), pruned_list.end(), node.id) == pruned_list.end()) &&
-                    (node.id != location)) {
+                if ((std::find(pruned_list.begin(), pruned_list.end(), node.id) == pruned_list.end()) && (node.id != location)) {
                     pruned_list.push_back(node.id);
                 }
             }
         }
-        
     }
 
-    void OccludeList(SizeT location, Vector<Neighbor> &pool, f32 alpha, SizeT degree, SizeT maxc,
-                    Vector<SizeT> &result, InMemQueryScratch *scratch, std::unordered_set<SizeT> *delete_set_ptr = nullptr) {
+    void OccludeList(SizeT location,
+                     Vector<Neighbor> &pool,
+                     f32 alpha,
+                     SizeT degree,
+                     SizeT maxc,
+                     Vector<SizeT> &result,
+                     InMemQueryScratch *scratch,
+                     std::unordered_set<SizeT> *delete_set_ptr = nullptr) {
         if (pool.size() == 0)
             return;
 
@@ -413,7 +404,7 @@ private:
         while (cur_alpha <= alpha && result.size() < degree) {
             f32 eps = cur_alpha + 0.01f;
 
-            for (auto iter = pool.begin(); result.size() < degree && iter!= pool.end(); iter++) {
+            for (auto iter = pool.begin(); result.size() < degree && iter != pool.end(); iter++) {
                 if (occlude_factor[iter - pool.begin()] > cur_alpha) {
                     continue;
                 }
@@ -427,15 +418,14 @@ private:
                 // Update occlude factor for points from iter+1 to pool.end()
                 for (auto iter2 = iter + 1; iter2 != pool.end(); iter2++) {
                     auto t = iter2 - pool.begin();
-                    if (occlude_factor[t] > alpha){
+                    if (occlude_factor[t] > alpha) {
                         continue;
                     }
 
                     // bool prune_allowed = true;
                     f32 djk = data_store_.GetDistance(iter2->id, iter->id);
                     if constexpr (metric == MetricType::kMetricCosine || metric == MetricType::kMetricL2) {
-                        occlude_factor[t] = (djk == 0) ? std::numeric_limits<float>::max()
-                                                   : std::max(occlude_factor[t], iter2->distance / djk);
+                        occlude_factor[t] = (djk == 0) ? std::numeric_limits<float>::max() : std::max(occlude_factor[t], iter2->distance / djk);
                     } else if constexpr (metric == MetricType::kMetricInnerProduct) {
                         f32 x = -(iter2->distance);
                         f32 y = -djk;
@@ -465,7 +455,7 @@ private:
                 std::lock_guard<std::mutex> guard(locks_[des]);
                 auto &des_pool = graph_store_.GetNeighbours(des);
                 if (std::find(des_pool.begin(), des_pool.end(), n) == des_pool.end()) {
-                    if (des_pool.size() < range * DISKANN_GRAPH_SLACK_FACTOR){
+                    if (des_pool.size() < range * DISKANN_GRAPH_SLACK_FACTOR) {
                         graph_store_.AddNeighbour(des, n);
                         prune_needed = false;
                     } else {
@@ -480,7 +470,7 @@ private:
             if (prune_needed) {
                 std::unordered_set<SizeT> dummy_visited;
                 Vector<Neighbor> dummy_pool(0);
-                
+
                 SizeT reserveSize = (SizeT)(std::ceil(1.05 * DISKANN_GRAPH_SLACK_FACTOR * range));
                 dummy_visited.reserve(reserveSize);
                 dummy_pool.reserve(reserveSize);
@@ -499,11 +489,9 @@ private:
                     std::lock_guard<std::mutex> guard(locks_[des]);
                     graph_store_.SetNeighbours(des, new_out_neighbors);
                 }
-
             }
         }
     }
-
 
 private:
     SizeT L_; // candidates list size when building
@@ -519,15 +507,15 @@ private:
     bool saturate_graph_ = true; // whether to saturate the graph, is true when use_filters is false
     bool has_built_ = false;
     bool dynamic_index_ = false;
-    
+
     // VamanaStore vamana_store_;
     SizeT dim_;
-    SizeT nd_; // number of data points
+    SizeT nd_;         // number of data points
     SizeT max_points_; // maximum number of data points
     // SizeT aligned_dim_; // in data_store_
 
     UniquePtr<f32[]> centroid_; // global centroid data to calculate enterpoint
-    SizeT start_; // enterpoint 
+    SizeT start_;               // enterpoint
     HashMap<LabelType, SizeT> tag_to_location_;
     HashMap<SizeT, LabelType> location_to_tag_;
     Vector<std::mutex> locks_; // Per node lock
@@ -538,9 +526,6 @@ private:
     SizeT num_frozen_pts_ = 0; // number of frozen points
     // bool dynamic_index_ = false;
     // bool filtered_index = false;
-    
-
 };
-
 
 } // namespace infinity

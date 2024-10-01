@@ -20,7 +20,6 @@ module data_file_worker;
 
 import stl;
 import infinity_exception;
-import local_file_system;
 import third_party;
 import status;
 import logger;
@@ -66,7 +65,6 @@ void DataFileWorker::FreeInMemory() {
 
 // FIXME: to_spill
 bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    LocalFileSystem fs;
     // File structure:
     // - header: magic number
     // - header: buffer size
@@ -99,7 +97,6 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
 }
 
 void DataFileWorker::ReadFromFileImpl(SizeT file_size) {
-    LocalFileSystem fs;
 
     if (file_size < sizeof(u64) * 3) {
         Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));

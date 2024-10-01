@@ -14,6 +14,8 @@
 
 module;
 
+#include <set>
+
 module hnsw_file_worker;
 
 import infinity_exception;
@@ -31,9 +33,10 @@ import embedding_info;
 import create_index_info;
 import internal_types;
 import abstract_hnsw;
-import local_file_system;
 import file_system_type;
+import virtual_store;
 import persistence_manager;
+import abstract_file_handle;
 
 namespace infinity {
 
@@ -53,13 +56,12 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
                       std::move(column_def),
                       persistence_manager) {
     if (index_size == 0) {
-        LocalFileSystem fs;
 
         String index_path = GetFilePath();
-        auto [file_handle, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        auto [file_handle, status] = LocalStore::Open(index_path, FileAccessMode::kRead);
         if (status.ok()) {
             // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
-            index_size = fs.GetFileSize(*file_handle);
+            index_size = file_handle->FileSize();
         }
     }
     index_size_ = index_size;

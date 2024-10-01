@@ -22,7 +22,6 @@ import logical_type;
 import binary_fuse_filter;
 import file_system;
 import file_system_type;
-import local_file_system;
 import infinity_exception;
 
 namespace infinity {
