@@ -341,7 +341,6 @@ public:
             }
             DeferFn defer3_fn([&]() { mem_index_file_handle->Close(); });
             BuildMergedVamanaIndex(*data_file_handle, *mem_index_file_handle, labels_);
-            mem_index_file_handle->Close();
             LOG_TRACE(fmt::format("Finished building and merging Vamana graph"));
         }
 
