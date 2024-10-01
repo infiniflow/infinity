@@ -33,6 +33,8 @@ namespace infinity {
 
 LocalFileHandle::~LocalFileHandle() {
     if(fd_ == -1) {
+        String error_message = fmt::format("File was closed before");
+        LOG_ERROR(error_message);
         return ;
     }
 
@@ -40,17 +42,13 @@ LocalFileHandle::~LocalFileHandle() {
 }
 
 Status LocalFileHandle::Close() {
-    if(access_mode_ == FileAccessMode::kWrite) {
-        if(!sync_) {
-            Status status = Sync();
-            if(!status.ok()) {
-                return status;
-            }
-        }
+    Status status = Sync();
+    if(!status.ok()) {
+        return status;
     }
 
     if(fd_ == -1) {
-        String error_message = fmt::format("File {} was closed before", path_);
+        String error_message = fmt::format("File was closed before");
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
@@ -153,7 +151,10 @@ Status LocalFileHandle::Sync() {
     if(access_mode_ != FileAccessMode::kWrite) {
         String error_message = "Non-write access mode, shouldn't call Sync()";
         return Status::InvalidCommand(error_message);
+    } else {
+        return Status::OK();
     }
+
     if(!sync_) {
         sync_ = true;
         fsync(fd_);
