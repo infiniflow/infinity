@@ -28,7 +28,7 @@ bool BaseEntry::CheckVisible(Txn *txn) const {
     TxnTimeStamp begin_ts = txn->BeginTS();
     if (txn_id_ == 0) {
         // could not check if the entry is visible accurately. log a warning and return true
-        LOG_WARN(fmt::format("Entry {} txn id is not set, commit_ts: {}", *encode_, commit_ts_));
+        LOG_WARN(fmt::format("Entry {} txn id is not set, commit_ts", *encode_, commit_ts_));
         return begin_ts >= commit_ts_;
     }
     if (begin_ts >= commit_ts_ || txn_id_ == txn->TxnID()) {

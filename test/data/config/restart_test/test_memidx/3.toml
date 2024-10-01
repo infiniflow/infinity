@@ -8,7 +8,6 @@ log_to_stdout = true
 log_level = "trace"
 
 [storage]
-persistence_dir = ""
 optimize_interval = "1s"
 cleanup_interval = "0s"
 compact_interval = "0s"

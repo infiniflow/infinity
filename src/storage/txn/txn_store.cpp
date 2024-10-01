@@ -116,12 +116,9 @@ void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
 }
 
-void TxnIndexStore::Rollback(TxnTimeStamp abort_ts) {
+void TxnIndexStore::Rollback() {
     for (auto [segment_index_entry, new_chunk, old_chunks] : optimize_data_) {
         segment_index_entry->ResetOptimizing();
-        for (ChunkIndexEntry *old_chunk : old_chunks) {
-            old_chunk->DeprecateChunk(abort_ts);
-        }
     }
 }
 
@@ -306,7 +303,7 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         Catalog::RemoveIndexEntry(table_index_entry, txn_id); // fix me
     }
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
-        txn_index_store->Rollback(abort_ts);
+        txn_index_store->Rollback();
     }
 }
 
@@ -583,9 +580,12 @@ void TxnStore::MaintainCompactionAlg() const {
 }
 
 bool TxnStore::CheckConflict(Catalog *catalog) {
-    for (const auto &[table_name, table_store] : txn_tables_store_) {
-        const String &db_name = *table_store->GetTableEntry()->GetDBName();
+    if (txn_->db_name().empty() && !txn_tables_store_.empty()) {
+        const String &db_name = *txn_tables_store_.begin()->second->GetTableEntry()->GetDBName();
         txn_->SetDBName(db_name);
+    }
+    const String &db_name = txn_->db_name();
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
         auto [table_entry1, status] = catalog->GetTableByName(db_name, table_name, txn_->TxnID(), txn_->CommitTS());
         if (!status.ok() || table_entry1 != table_store->GetTableEntry()) {
             return true;
