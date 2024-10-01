@@ -102,6 +102,14 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
     SizeT select_column_count = select_columns.size();
 
+    String parent_path = LocalStore::GetParentPath(file_path_);
+    if(!parent_path.empty()) {
+        Status create_status = LocalStore::MakeDirectory(parent_path);
+        if(!create_status.ok()) {
+            RecoverableError(create_status);
+        }
+    }
+
     auto [file_handle, status] = LocalStore::Open(file_path_, FileAccessMode::kWrite);
     if (!status.ok()) {
         RecoverableError(status);
@@ -256,6 +264,14 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
 
     SizeT select_column_count = select_columns.size();
 
+    String parent_path = LocalStore::GetParentPath(file_path_);
+    if(!parent_path.empty()) {
+        Status create_status = LocalStore::MakeDirectory(parent_path);
+        if(!create_status.ok()) {
+            RecoverableError(create_status);
+        }
+    }
+
     auto [file_handle, status] = LocalStore::Open(file_path_, FileAccessMode::kWrite);
     if (!status.ok()) {
         RecoverableError(status);
@@ -397,6 +413,14 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
     i32 dimension = embedding_type_info->Dimension();
 
+    String parent_path = LocalStore::GetParentPath(file_path_);
+    if(!parent_path.empty()) {
+        Status create_status = LocalStore::MakeDirectory(parent_path);
+        if(!create_status.ok()) {
+            RecoverableError(create_status);
+        }
+    }
+
     auto [file_handle, status] = LocalStore::Open(file_path_, FileAccessMode::kWrite);
     if (!status.ok()) {
         RecoverableError(status);
@@ -483,6 +507,14 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     SharedPtr<arrow::Schema> schema = ::arrow::schema(std::move(fields));
     SharedPtr<::arrow::io::FileOutputStream> file_stream;
     SharedPtr<::parquet::arrow::FileWriter> file_writer;
+
+    String parent_path = LocalStore::GetParentPath(file_path_);
+    if(!parent_path.empty()) {
+        Status create_status = LocalStore::MakeDirectory(parent_path);
+        if(!create_status.ok()) {
+            RecoverableError(create_status);
+        }
+    }
 
     file_stream = ::arrow::io::FileOutputStream::Open(file_path_, pool).ValueOrDie();
     file_writer = ::parquet::arrow::FileWriter::Open(*schema, pool, file_stream, ::parquet::default_writer_properties()).ValueOrDie();
