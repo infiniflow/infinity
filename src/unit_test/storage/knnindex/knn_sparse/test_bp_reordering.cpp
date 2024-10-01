@@ -199,5 +199,4 @@ TEST_F(BPReorderingTest, test2) {
 
 //    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
     EXPECT_LE(new_cost, old_cost);
-    file_handle->Close();
 }

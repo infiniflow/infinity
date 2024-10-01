@@ -168,7 +168,6 @@ TEST_P(PostingMergerTest, Basic) {
             u32 file_read_array_len = file_size / sizeof(u32);
             unsafe_column_length_array.resize(id_offset + file_read_array_len);
             auto [read_count, _] = file_handle->Read(unsafe_column_length_array.data() + id_offset, file_size);
-            file_handle->Close();
             if (read_count != (SizeT)file_size) {
                 String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
                 UnrecoverableError(error_message);

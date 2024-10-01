@@ -140,7 +140,6 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     if (!status_open.ok()) {
         UnrecoverableError(status_open.message());
     }
-    DeferFn defer_fn([&]() { file_handle->Close(); });
 
     i32 dimension = 0;
     auto [nbytes, status_read] = file_handle->Read(&dimension, sizeof(dimension));
@@ -249,7 +248,6 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
     if (!status_open.ok()) {
         UnrecoverableError(status_open.message());
     }
-    DeferFn defer_fn([&]() { file_handle->Close(); });
 
     i32 dimension = 0;
     auto [nbytes, status_read] = file_handle->Read(&dimension, sizeof(dimension));
@@ -404,7 +402,6 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    DeferFn defer_fn1([&]() { file_handle->Close(); });
 
     i64 nrow = 0;
     i64 ncol = 0;
@@ -428,13 +425,13 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
     if (!idx_status.ok()) {
         UnrecoverableError(idx_status.message());
     }
-    DeferFn defer_fn2([&]() { idx_file_handle->Close(); });
+
     idx_file_handle->Seek(3 * sizeof(i64) + (nrow + 1) * sizeof(i64));
     auto [data_file_handle, data_status] = LocalStore::Open(file_path_, FileAccessMode::kRead);
     if (!data_status.ok()) {
         UnrecoverableError(data_status.message());
     }
-    DeferFn defer_fn3([&]() { data_file_handle->Close(); });
+
     data_file_handle->Seek(3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32));
 
     //------------------------------------------------------------------------------------------------------------------------
@@ -657,7 +654,6 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        DeferFn file_defer([&]() { file_handle->Close(); });
 
         i64 file_size = file_handle->FileSize();
         if (file_size == -1) {

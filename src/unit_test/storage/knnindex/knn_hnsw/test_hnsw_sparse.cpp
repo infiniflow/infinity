@@ -88,7 +88,6 @@ protected:
                 UnrecoverableError(status.message());
             }
             hnsw_index->Save(*file_handle);
-            file_handle->Close();
         }
         {
             auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kRead);
@@ -111,7 +110,6 @@ protected:
                 // EXPECT_EQ(res[0].second, gt_idx[i]);
                 // EXPECT_NEAR(-res[0].first, gt_score[i], 1e-5);
             }
-            file_handle->Close();
         }
     }
 

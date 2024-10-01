@@ -218,7 +218,6 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
                 if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++file_no_;
-                    file_handle->Close();
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto [new_file_handle, new_status] = LocalStore::Open(new_file_path, FileAccessMode::kWrite);
                     if (!new_status.ok()) {
@@ -229,13 +228,12 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 file_handle->Append(line.c_str(), line.size());
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
-                    file_handle->Close();
                     return row_count;
                 }
             }
         }
     }
-    file_handle->Close();
+
     LOG_DEBUG(fmt::format("Export to CSV, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
@@ -346,7 +344,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 }
                 if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++file_no_;
-                    file_handle->Close();
+
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto [part_file_handle, part_status] = LocalStore::Open(new_file_path, FileAccessMode::kWrite);
                     if (!part_status.ok()) {
@@ -361,13 +359,11 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
 
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
-                    file_handle->Close();
                     return row_count;
                 }
             }
         }
     }
-    file_handle->Close();
     LOG_DEBUG(fmt::format("Export to JSONL, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
@@ -438,7 +434,6 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
                 if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++file_no_;
-                    file_handle->Close();
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto [new_file_handle, new_status] = LocalStore::Open(new_file_path, FileAccessMode::kWrite);
                     if (!new_status.ok()) {
@@ -452,13 +447,11 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
-                    file_handle->Close();
                     return row_count;
                 }
             }
         }
     }
-    file_handle->Close();
     LOG_DEBUG(fmt::format("Export to FVECS, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }

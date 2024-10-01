@@ -97,7 +97,6 @@ public:
                 UnrecoverableError(status.message());
             }
             hnsw_index->Save(*file_handle);
-            file_handle->Close();
         }
 
         {
@@ -109,7 +108,6 @@ public:
             auto hnsw_index = Hnsw::Load(*file_handle);
 
             test_func(hnsw_index);
-            file_handle->Close();
         }
     }
 
@@ -170,7 +168,6 @@ public:
                 UnrecoverableError(status.message());
             }
             compress_hnsw->Save(*file_handle);
-            file_handle->Close();
         }
         {
             auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
@@ -181,7 +178,6 @@ public:
             auto compress_hnsw = CompressedHnsw::Load(*file_handle);
 
             test_func(compress_hnsw);
-            file_handle->Close();
         }
     }
 

@@ -114,7 +114,6 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
                 unsafe_column_lengths.resize(id_offset + file_read_array_len);
             }
             const i64 read_count = fs_.Read(*file_handle, unsafe_column_lengths.data() + id_offset, file_size);
-            file_handle->Close();
             if (read_count != file_size) {
                 String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
                 UnrecoverableError(error_message);

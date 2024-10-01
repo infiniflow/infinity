@@ -67,7 +67,6 @@ public:
             UnrecoverableError(status.message());
         }
         data_file_handle->Append(data.get(), sizeof(f32) * dim * num_points);
-        data_file_handle->Close();
         {
             auto disk_data = DiskAnnIndexDataType::Make(dim, num_points, R, L, num_pq_chunks, num_parts, num_centers);
 

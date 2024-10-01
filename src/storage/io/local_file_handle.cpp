@@ -32,14 +32,11 @@ import abstract_file_handle;
 namespace infinity {
 
 LocalFileHandle::~LocalFileHandle() {
-    if(access_mode_ == FileAccessMode::kWrite) {
-        if(!sync_) {
-            UnrecoverableError("Not sync before destruction.");
-        }
+    if(fd_ == -1) {
+        return ;
     }
-    if(fd_ != -1) {
-        UnrecoverableError("File isn't close before destruction.");
-    }
+
+    Close();
 }
 
 Status LocalFileHandle::Close() {
@@ -51,10 +48,20 @@ Status LocalFileHandle::Close() {
             }
         }
     }
+
     if(fd_ == -1) {
-        UnrecoverableError("File was closed before");
+        String error_message = fmt::format("File {} was closed before", path_);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
-    close(fd_);
+
+    i32 ret = close(fd_);
+    if(ret == -1) {
+        String error_message = fmt::format("Close file: {}, error: {}", path_, strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+
     fd_ = -1;
     path_.clear();
     sync_ = false;
@@ -65,6 +72,7 @@ Status LocalFileHandle::Close() {
 Status LocalFileHandle::Append(const void *buffer, u64 nbytes) {
     if(access_mode_ != FileAccessMode::kWrite) {
         String error_message = fmt::format("File: {} isn't open.", path_);
+        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     i64 written = 0;
@@ -72,6 +80,7 @@ Status LocalFileHandle::Append(const void *buffer, u64 nbytes) {
         i64 write_count = write(fd_, (char*)buffer + written, nbytes - written);
         if (write_count == -1) {
             String error_message = fmt::format("Can't write file: {}: {}. fd: {}", path_, strerror(errno), fd_);
+            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         written += write_count;
@@ -93,6 +102,7 @@ Tuple<SizeT, Status> LocalFileHandle::Read(void *buffer, u64 nbytes) {
         }
         if (read_count == -1) {
             String error_message = fmt::format("Can't read file: {}: {}", path_, strerror(errno));
+            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         read_n += read_count;
@@ -110,6 +120,7 @@ Tuple<SizeT, Status> LocalFileHandle::Read(String &buffer, u64 nbytes) {
         }
         if (read_count == -1) {
             String error_message = fmt::format("Can't read file: {}: {}", path_, strerror(errno));
+            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         read_n += read_count;
@@ -120,6 +131,7 @@ Tuple<SizeT, Status> LocalFileHandle::Read(String &buffer, u64 nbytes) {
 Status LocalFileHandle::Seek(u64 nbytes) {
     if ((off_t)-1 == lseek(fd_, nbytes, SEEK_SET)) {
         String error_message = fmt::format("Can't seek file: {}: {}", path_, strerror(errno));
+        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return Status::OK();
@@ -139,7 +151,8 @@ Status LocalFileHandle::Unmmap(const String &name) { return Status::OK(); }
 
 Status LocalFileHandle::Sync() {
     if(access_mode_ != FileAccessMode::kWrite) {
-        return Status::InvalidCommand("Non-write access mode, shouldn't call Sync()");
+        String error_message = "Non-write access mode, shouldn't call Sync()";
+        return Status::InvalidCommand(error_message);
     }
     if(!sync_) {
         sync_ = true;

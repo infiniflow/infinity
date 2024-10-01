@@ -62,7 +62,6 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
         if (status.ok()) {
             // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
             index_size = file_handle->FileSize();
-            file_handle->Close();
         }
     }
     index_size_ = index_size;

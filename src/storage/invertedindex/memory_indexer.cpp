@@ -362,7 +362,6 @@ void MemoryIndexer::Load() {
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    DeferFn defer_fn([&]() { file_handle->Close(); });
 
     Vector<u32> &column_lengths = column_lengths_.UnsafeVec();
     column_lengths.resize(doc_count_);
