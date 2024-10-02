@@ -191,7 +191,6 @@ TEST_F(HnswLVQTest, test1) {
             lvq_store.AddVec(std::move(iter2));
 
             lvq_store.Save(*file_handle);
-            file_handle->Close();
         }
         {
             auto [file_handle, status] = LocalStore::Open(file_path, FileAccessMode::kRead);
@@ -201,7 +200,6 @@ TEST_F(HnswLVQTest, test1) {
             auto lvq_store = DataStore::Load(*file_handle);
 
             CheckStore(lvq_store, data.get());
-            file_handle->Close();
         }
     }
 }
