@@ -49,19 +49,19 @@ private:
 
     String RKey(const String &line);
 
-    Pair<Vector<String>, double> Score(const Vector<Pair<String, i64>> &token_freqs);
+    Pair<Vector<String>, double> Score(const Vector<Pair<String, int>> &token_freqs);
 
-    void SortTokens(const Vector<Vector<Pair<String, i64>>> &token_list, Vector<Pair<Vector<String>, double>> &res);
+    void SortTokens(const Vector<Vector<Pair<String, int>>> &token_list, Vector<Pair<Vector<String>, double>> &res);
 
     Pair<Vector<String>, double> MaxForward(const String &line);
 
     Pair<Vector<String>, double> MaxBackward(const String &line);
 
-    int DFS(const String &chars, int s, Vector<Pair<String, i64>> &pre_tokens, Vector<Vector<Pair<String, i64>>> &token_list);
+    int DFS(const String &chars, int s, Vector<Pair<String, int>> &pre_tokens, Vector<Vector<Pair<String, int>>> &token_list);
 
     String Merge(const String &tokens);
 
-private:
+public:
     String dict_path_;
 
     bool own_dict_{};

@@ -17,6 +17,8 @@ module;
 #include <fstream>
 #include <map>
 #include <vector>
+
+#include "string_utils.h"
 module darts_trie;
 
 import stl;
@@ -67,18 +69,13 @@ i32 POSTable::GetPOSIndex(const String &tag) const {
 
 DartsTrie::DartsTrie() : darts_{MakeUnique<DartsCore>()} {}
 
-void DartsTrie::Add(const String &key, const i64 &value) { buffer_.push_back(DartsTuple(key, value)); }
+void DartsTrie::Add(const String &key, const int &value) { buffer_.push_back(DartsTuple(key, value)); }
 
 void DartsTrie::Build() {
-    std::sort(buffer_.begin(), buffer_.end(), [](const DartsTuple &l, const DartsTuple &r) {
-        int cmp = std::strncmp(l.key_.c_str(), r.key_.c_str(), std::min(l.key_.size(), r.key_.size()));
-        if (cmp == 0)
-            return l.key_.size() < r.key_.size();
-        return cmp < 0;
-    });
+    std::sort(buffer_.begin(), buffer_.end(), [](const DartsTuple &l, const DartsTuple &r) { return l.key_ < r.key_; });
     Vector<const char *> keys;
     Vector<std::size_t> lengths;
-    Vector<i64> values;
+    Vector<int> values;
     for (auto &o : buffer_) {
         keys.push_back(o.key_.c_str());
         lengths.push_back(o.key_.size());
@@ -93,12 +90,18 @@ void DartsTrie::Load(const String &file_name) { darts_->open(file_name.c_str());
 void DartsTrie::Save(const String &file_name) { darts_->save(file_name.c_str()); }
 
 bool DartsTrie::HasKeysWithPrefix(const String &key) {
-    Vector<DartsCore::result_pair_type> result_pairs(256);
-    std::size_t num_results = darts_->commonPrefixSearch(key.c_str(), &result_pairs[0], result_pairs.size());
-    return num_results > 0;
+    std::size_t key_pos = 0;
+    DartsCore::value_type result = 0;
+    std::size_t id = 0;
+    for (std::size_t i = 0; i < key.length(); ++i) {
+        result = darts_->traverse(key.c_str(), id, key_pos, i + 1);
+        if (result == -2)
+            return false;
+    }
+    return result != -2;
 }
 
-i64 DartsTrie::Get(const String &key) {
+int DartsTrie::Get(const String &key) {
     DartsCore::value_type value;
     darts_->exactMatchSearch(key.c_str(), value);
     return value;

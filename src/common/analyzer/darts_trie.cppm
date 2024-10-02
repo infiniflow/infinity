@@ -41,12 +41,12 @@ private:
     Map<String, i32> pos_map_;
 };
 
-export using DartsCore = DoubleArrayImpl<void, void, i64, void>;
+export using DartsCore = DoubleArrayImpl<void, void, int, void>;
 
 export struct DartsTuple {
-    DartsTuple(const String &k, const i64 &v) : key_(k), value_(v) {}
+    DartsTuple(const String &k, const int &v) : key_(k), value_(v) {}
     String key_;
-    i64 value_;
+    int value_;
 };
 
 export class DartsTrie {
@@ -56,7 +56,7 @@ export class DartsTrie {
 public:
     DartsTrie();
 
-    void Add(const String &key, const i64 &value);
+    void Add(const String &key, const int &value);
 
     void Build();
 
@@ -66,7 +66,7 @@ public:
 
     bool HasKeysWithPrefix(const String &key);
 
-    i64 Get(const String &key);
+    int Get(const String &key);
 };
 
 } // namespace infinity
