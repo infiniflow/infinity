@@ -275,12 +275,11 @@ class infinity_http:
         h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.raise_exception(r)
-        res = {"column_name":[], "column_type":[], "constraint":[], "default":[]}
+        res = {"name":[], "type":[], "default":[]}
         print(r.json())
         for col in r.json()["columns"]:
-            res["column_name"].append(col["column_name"])
-            res["column_type"].append(col["column_type"])
-            res["constraint"].append(col["constraint"])
+            res["name"].append(col["name"])
+            res["type"].append(col["type"])
             res["default"].append(col["default"])
         res = pl.from_pandas(pd.DataFrame(res))
         return res
@@ -292,7 +291,7 @@ class infinity_http:
         self.raise_exception(r)
         res = {}
         for col in r.json()["columns"]:
-            res[col["column_name"]] = col["column_type"]
+            res[col["name"]] = col["type"]
         return res
 
     # not implemented, just to pass test

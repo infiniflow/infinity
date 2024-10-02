@@ -170,24 +170,25 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
             switch(column_id) {
                 case COLUMN_IDENTIFIER_ROW_ID: {
                     u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + read_offset;
-                    output_ptr->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), write_size);
+                    output_ptr->column_vectors[output_column_id]->AppendWith(RowID(segment_id, segment_offset), write_size);
                     break;
                 }
                 case COLUMN_IDENTIFIER_CREATE: {
                     ColumnVector create_ts_vec = current_block_entry->GetCreateTSVector(buffer_mgr, read_offset, write_size);
-                    output_ptr->column_vectors[output_column_id++]->AppendWith(create_ts_vec);
+                    output_ptr->column_vectors[output_column_id]->AppendWith(create_ts_vec);
                     break;
                 }
                 case COLUMN_IDENTIFIER_DELETE: {
                     ColumnVector delete_ts_vec = current_block_entry->GetDeleteTSVector(buffer_mgr, read_offset, write_size);
-                    output_ptr->column_vectors[output_column_id++]->AppendWith(delete_ts_vec);
+                    output_ptr->column_vectors[output_column_id]->AppendWith(delete_ts_vec);
                     break;
                 }
                 default: {
                     ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr);
-                    output_ptr->column_vectors[output_column_id++]->AppendWith(column_vector, read_offset, write_size);
+                    output_ptr->column_vectors[output_column_id]->AppendWith(column_vector, read_offset, write_size);
                 }
             }
+            ++ output_column_id;
         }
 
         // write_size = already read size = already write size

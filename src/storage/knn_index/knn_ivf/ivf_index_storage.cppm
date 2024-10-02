@@ -26,7 +26,6 @@ import knn_expr;
 namespace infinity {
 
 class LocalFileHandle;
-class FileHandler;
 
 template <EmbeddingDataType t>
 struct EmbeddingDataTypeToCppType;
