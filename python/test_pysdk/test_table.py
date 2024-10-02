@@ -377,8 +377,8 @@ class TestInfinity:
         res = db_obj.show_columns(table_name)
         print("\n")
         print(res)
-        assert res["column_name"][0] == "c1"
-        assert res["column_name"][1] == "c2"
+        assert res["name"][0] == "c1"
+        assert res["name"][1] == "c2"
         db_obj.drop_table(table_name, ConflictType.Ignore)
 
     @pytest.mark.usefixtures("skip_if_http")

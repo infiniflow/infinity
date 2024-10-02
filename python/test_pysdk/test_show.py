@@ -69,7 +69,7 @@ class TestInfinity:
             res = db_obj.show_columns("test_show_columns"+suffix)
             print(res)
             # check the polars dataframe
-            assert res.columns == ["column_name", "column_type", "constraint", "default"]
+            assert res.columns == ["name", "type", "default"]
 
         res = db_obj.drop_table("test_show_columns"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
