@@ -306,4 +306,8 @@ SizeT LocalStore::GetFileSize(const String& path) {
     return std::filesystem::file_size(path);
 }
 
+String LocalStore::GetParentPath(const String& path) {
+    return Path(path).parent_path().string();
+}
+
 } // namespace infinity

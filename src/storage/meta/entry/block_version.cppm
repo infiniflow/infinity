@@ -34,10 +34,6 @@ struct CreateField {
 
     bool operator!=(const CreateField &rhs) const { return !(*this == rhs); }
 
-    // deprecated
-    void SaveToFile(FileHandler &file_handler) const;
-    static CreateField LoadFromFile(FileHandler &file_handler);
-
     void SaveToFile(LocalFileHandle *file_handle) const;
     static CreateField LoadFromFile(LocalFileHandle *file_handle);
 };
@@ -56,10 +52,6 @@ export struct BlockVersion {
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
 
     void SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
-
-    // deprecated
-    void SpillToFile(FileHandler &file_handler) const;
-    static UniquePtr<BlockVersion> LoadFromFile(FileHandler &file_handler);
 
     void SpillToFile(LocalFileHandle *file_handle) const;
     static UniquePtr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);

@@ -53,7 +53,6 @@ protected:
         SparseMatrix dataset = SparseTestUtil<f32, i32>::GenerateDataset(element_size, max_dim, sparsity, 0, 1.0);
         auto [gt_idx, gt_score] = SparseTestUtil<f32, i32>::GenerateGroundtruth(dataset, dataset, 1);
 
-        LocalFileSystem fs;
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, max_dim, M, ef_construction);
             auto iter = SparseVectorIter<float, IdxT, LabelT>(dataset.indptr_.get(), dataset.indices_.get(), dataset.data_.get(), dataset.nrow_);
