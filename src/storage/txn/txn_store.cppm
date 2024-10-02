@@ -69,7 +69,7 @@ public:
 
     void Commit(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    void Rollback(TxnTimeStamp abort_ts);
+    void Rollback();
 
 public:
     TableIndexEntry *const table_index_entry_{};

@@ -64,7 +64,7 @@ class BaseTableRef;
 enum class CompactStatementType;
 struct SegmentIndexEntry;
 
-export class Txn : public EnableSharedFromThis<Txn> {
+export class Txn {
 public:
     // For new txn
     explicit Txn(TxnManager *txn_manager,
