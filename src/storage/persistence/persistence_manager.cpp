@@ -22,7 +22,7 @@ import uuid;
 import serialize;
 import third_party;
 import infinity_exception;
-import local_file_system;
+import virtual_store;
 import logger;
 
 namespace fs = std::filesystem;
@@ -76,9 +76,8 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
         local_data_dir_ += '/';
     }
 
-    LocalFileSystem fs;
-    if (!fs.Exists(workspace_)) {
-        fs.CreateDirectory(workspace_);
+    if (!LocalStore::Exists(workspace_)) {
+        LocalStore::MakeDirectory(workspace_);
     }
 }
 

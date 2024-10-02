@@ -31,20 +31,6 @@ import status;
 
 namespace infinity {
 
-// deprecated
-void CreateField::SaveToFile(FileHandler &file_handle) const {
-    file_handle.Write(&create_ts_, sizeof(create_ts_));
-    file_handle.Write(&row_count_, sizeof(row_count_));
-}
-
-// deprecated
-CreateField CreateField::LoadFromFile(FileHandler &file_handle) {
-    CreateField create_field;
-    file_handle.Read(&create_field.create_ts_, sizeof(create_field.create_ts_));
-    file_handle.Read(&create_field.row_count_, sizeof(create_field.row_count_));
-    return create_field;
-}
-
 void CreateField::SaveToFile(LocalFileHandle *file_handle) const {
     Status status = file_handle->Append((char*)(&create_ts_), sizeof(create_ts_));
     if(!status.ok()) {
@@ -120,18 +106,6 @@ void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
     LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, 0 delete {}", checkpoint_ts, create_size, deleted_row_count));
 }
 
-void BlockVersion::SpillToFile(FileHandler &file_handler) const {
-    BlockOffset create_size = created_.size();
-    file_handler.Write(&create_size, sizeof(create_size));
-    for (const auto &create : created_) {
-        create.SaveToFile(file_handler);
-    }
-
-    BlockOffset capacity = deleted_.size();
-    file_handler.Write(&capacity, sizeof(capacity));
-    file_handler.Write(deleted_.data(), capacity * sizeof(TxnTimeStamp));
-}
-
 void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
     BlockOffset create_size = created_.size();
     Status status = file_handle->Append(&create_size, sizeof(create_size));
@@ -152,26 +126,6 @@ void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
         UnrecoverableError(status.message());
     }
 }
-
-UniquePtr<BlockVersion> BlockVersion::LoadFromFile(FileHandler &file_handler) {
-    auto block_version = MakeUnique<BlockVersion>();
-
-    BlockOffset create_size;
-    file_handler.Read(&create_size, sizeof(create_size));
-    block_version->created_.reserve(create_size);
-    for (BlockOffset i = 0; i < create_size; i++) {
-        block_version->created_.push_back(CreateField::LoadFromFile(file_handler));
-    }
-    LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
-    BlockOffset capacity;
-    file_handler.Read(&capacity, sizeof(capacity));
-    block_version->deleted_.resize(capacity);
-    for (BlockOffset i = 0; i < capacity; i++) {
-        file_handler.Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
-    }
-    return block_version;
-}
-
 
 UniquePtr<BlockVersion> BlockVersion::LoadFromFile(LocalFileHandle *file_handle) {
     auto block_version = MakeUnique<BlockVersion>();
