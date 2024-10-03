@@ -40,7 +40,6 @@ TEST_F(LocalFileTest, TestAppend) {
 
     local_file_handle->Append(data_array.get(), len);
     local_file_handle->Sync();
-    local_file_handle->Close();
 
     EXPECT_TRUE(LocalStore::Exists(path));
     LocalStore::DeleteFile(path);
@@ -65,7 +64,6 @@ TEST_F(LocalFileTest, TestDir) {
 
     local_file_handle->Append(data_array.get(), len);
     local_file_handle->Sync();
-    local_file_handle->Close();
 
     EXPECT_TRUE(LocalStore::Exists(path));
     EXPECT_TRUE(LocalStore::Exists(dir));
@@ -92,7 +90,6 @@ TEST_F(LocalFileTest, TestRead) {
 
         local_file_handle->Append(data_array.get(), len);
         local_file_handle->Sync();
-        local_file_handle->Close();
     }
 
     {
@@ -102,7 +99,6 @@ TEST_F(LocalFileTest, TestRead) {
         UniquePtr<char[]> read_data = MakeUnique<char[]>(len);
         auto [read_len, read_status] = local_file_handle->Read(read_data.get(), len);
         EXPECT_TRUE(read_status.ok());
-        local_file_handle->Close();
 
         EXPECT_EQ(read_len, len);
         for(SizeT i = 0; i < len; ++i) {
@@ -131,7 +127,6 @@ TEST_F(LocalFileTest, TestRename) {
 
     local_file_handle->Append(data_array.get(), len);
     local_file_handle->Sync();
-    local_file_handle->Close();
 
     status = LocalStore::Rename(old_path, new_path);
     EXPECT_TRUE(status.ok());
@@ -160,7 +155,6 @@ TEST_F(LocalFileTest, TestTruncate) {
 
         local_file_handle->Append(data_array.get(), len);
         local_file_handle->Sync();
-        local_file_handle->Close();
     }
 
     LocalStore::Truncate(path, 10);
@@ -174,7 +168,6 @@ TEST_F(LocalFileTest, TestTruncate) {
         EXPECT_TRUE(read_status.ok());
         EXPECT_EQ(read_len, 10);
 
-        status = local_file_handle->Close();
         EXPECT_TRUE(status.ok());
 
         for(SizeT i = 0; i < 10; ++i) {
@@ -205,7 +198,6 @@ TEST_F(LocalFileTest, TestMerge) {
 
     src_file_handle->Append(data_array1.get(), src_len);
     src_file_handle->Sync();
-    src_file_handle->Close();
 
     auto [dst_file_handle, status1] = LocalStore::Open(dst_path, FileAccessMode::kWrite);
     EXPECT_TRUE(status1.ok());
@@ -218,7 +210,6 @@ TEST_F(LocalFileTest, TestMerge) {
 
     dst_file_handle->Append(data_array2.get(), dst_len);
     dst_file_handle->Sync();
-    dst_file_handle->Close();
 
     LocalStore::Merge(dst_path, src_path);
 
@@ -228,7 +219,6 @@ TEST_F(LocalFileTest, TestMerge) {
     UniquePtr<char[]> combined_data = MakeUnique<char[]>(src_len + dst_len);
     auto [read_len, merge_read_status] = merge_file_handle->Read(combined_data.get(), src_len + dst_len);
     EXPECT_TRUE(merge_read_status.ok());
-    merge_file_handle->Close();
 
     EXPECT_EQ(read_len, (i64)(src_len + dst_len));
     for(SizeT i = 0; i < dst_len; ++i) {
@@ -265,7 +255,6 @@ TEST_F(LocalFileTest, TestCleanDir) {
 
     src_file_handle->Append(data_array1.get(), src_len);
     src_file_handle->Sync();
-    src_file_handle->Close();
 
     // Append more to file1.txt
     auto [append_src_file_handle, status2] = LocalStore::Open(file_path1, FileAccessMode::kWrite);
@@ -273,7 +262,6 @@ TEST_F(LocalFileTest, TestCleanDir) {
 
     append_src_file_handle->Append(data_array1.get(), src_len);
     append_src_file_handle->Sync();
-    append_src_file_handle->Close();
 
 
     // Append more to file2.txt
@@ -288,7 +276,6 @@ TEST_F(LocalFileTest, TestCleanDir) {
 
     append_file2_handle->Append(data_array2.get(), src_len);
     append_file2_handle->Sync();
-    append_file2_handle->Close();
 
     LocalStore::CleanupDirectory(dir);
 

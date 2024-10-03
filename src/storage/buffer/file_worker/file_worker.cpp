@@ -54,10 +54,6 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         }
         file_handle_ = std::move(file_handle);
         bool prepare_success = false;
-        DeferFn defer_fn([&]() {
-            file_handle_->Close();
-            file_handle_ = nullptr;
-        });
 
         bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
         if (prepare_success) {
@@ -90,11 +86,6 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
             LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
         }
         bool prepare_success = false;
-
-        DeferFn defer_fn([&]() {
-            file_handle_->Close();
-            file_handle_ = nullptr;
-        });
 
         bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
         if (prepare_success) {
@@ -136,8 +127,6 @@ void FileWorker::ReadFromFile(bool from_spill) {
     }
     file_handle_ = std::move(file_handle);
     DeferFn defer_fn([&]() {
-        file_handle_->Close();
-        file_handle_ = nullptr;
         if (use_object_cache && obj_addr_.Valid()) {
             String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
             PersistWriteResult res = persistence_manager_->PutObjCache(read_path);

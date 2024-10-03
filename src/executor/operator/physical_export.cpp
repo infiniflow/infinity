@@ -264,7 +264,6 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
     if (!status.ok()) {
         RecoverableError(status);
     }
-    DeferFn file_defer([&]() { file_handle->Close(); });
 
     SizeT offset = offset_;
     SizeT row_count{0};
@@ -349,7 +348,6 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 }
                 if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++file_no_;
-                    file_handle->Close();
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto [part_file_handle, part_status] = LocalStore::Open(new_file_path, FileAccessMode::kWrite);
                     if (!part_status.ok()) {

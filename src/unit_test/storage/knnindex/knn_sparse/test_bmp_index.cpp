@@ -105,7 +105,6 @@ protected:
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }
             index.Save(*file_handle);
-            file_handle->Close();
         }
         {
             auto [file_handle, status] = LocalStore::Open(save_path, FileAccessMode::kRead);
@@ -115,7 +114,6 @@ protected:
             auto index = BMPAlg::Load(*file_handle);
 
             test_query(index);
-            file_handle->Close();
         }
     }
 };
