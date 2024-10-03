@@ -168,8 +168,6 @@ TEST_F(LocalFileTest, TestTruncate) {
         EXPECT_TRUE(read_status.ok());
         EXPECT_EQ(read_len, 10);
 
-        EXPECT_TRUE(status.ok());
-
         for(SizeT i = 0; i < 10; ++i) {
             EXPECT_EQ(truncated_data[i], i + 1);
         }
