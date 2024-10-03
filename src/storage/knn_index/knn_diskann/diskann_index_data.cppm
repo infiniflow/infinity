@@ -190,9 +190,9 @@ private:
                         SharedPtr<SizeT[]> &train_data_ids) {
         train_data_handle.Append(&this->train_size_, sizeof(u32));
         train_data_handle.Append(&this->dimension_, sizeof(u32));
-        train_ids_handler.Append(&this->train_size_, sizeof(u32));
+        train_data_handle.Append(&this->train_size_, sizeof(u32));
         u32 const_one = 1;
-        train_ids_handler.Append(&const_one, sizeof(u32));
+        train_data_handle.Append(&const_one, sizeof(u32));
         for (u32 i = 0; i < this->train_size_; i++) {
             train_data_handle.Append(train_data.get() + i * this->dimension_, sizeof(VectorDataType) * this->dimension_);
             train_ids_handle.Append(train_data_ids.get() + i, sizeof(SizeT));

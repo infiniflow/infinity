@@ -20,7 +20,7 @@ module;
 export module diskann_mem_graph_store;
 
 import stl;
-import file_system;
+import local_file_handle;
 
 namespace infinity {
 export class DiskAnnMemGraphStore {
@@ -63,14 +63,14 @@ public:
     }
 
     // return Tuple of (load_point_num, enterpoint, frozen_pts)
-    Tuple<SizeT, SizeT, SizeT> Load(FileHandler &load_handler, SizeT expected_num_points){
+    Tuple<SizeT, SizeT, SizeT> Load(LocalFileHandle &load_handle, SizeT expected_num_points){
         SizeT expected_file_size = 0;
         SizeT start = 0; // enterpoint
         SizeT file_frozen_pts = 0;
-        load_handler.Read(&expected_file_size, sizeof(SizeT));
-        load_handler.Read(&max_observecd_degree_, sizeof(u32));
-        load_handler.Read(&start, sizeof(SizeT));
-        load_handler.Read(&file_frozen_pts, sizeof(SizeT));
+        load_handle.Read(&expected_file_size, sizeof(SizeT));
+        load_handle.Read(&max_observecd_degree_, sizeof(u32));
+        load_handle.Read(&start, sizeof(SizeT));
+        load_handle.Read(&file_frozen_pts, sizeof(SizeT));
 
         if (this->capacity_ < expected_num_points) {
             this->ResizeGraph(expected_num_points);
@@ -80,10 +80,10 @@ public:
         SizeT nodes_read = 0; // number of nodes read
         while (bytes_read != expected_file_size) {
             u32 k; // number of neighbors
-            load_handler.Read(&k, sizeof(u32));
+            load_handle.Read(&k, sizeof(u32));
             Vector<SizeT> tmp(k);
             tmp.reserve(k);
-            load_handler.Read(tmp.data(), sizeof(SizeT) * k);
+            load_handle.Read(tmp.data(), sizeof(SizeT) * k);
             graph_[nodes_read - 1].swap(tmp);
             bytes_read += sizeof(SizeT) * k + sizeof(u32);
             nodes_read++;
@@ -95,7 +95,7 @@ public:
         return Tuple<SizeT, SizeT, SizeT>(nodes_read, start, file_frozen_pts);
     }
 
-    void Save(FileHandler &save_handler, SizeT num_points, SizeT num_frozen_points, SizeT start) {
+    void Save(LocalFileHandle &save_handle, SizeT num_points, SizeT num_frozen_points, SizeT start) {
         SizeT index_size = 28; // init size of meta data :(sizeof(SizeT) * 3 + sizeof(u32)) bytes
         u32 max_degree = 0;
         for (SizeT i = 0; i < num_points; i++) {
@@ -104,14 +104,14 @@ public:
             max_degree = std::max(max_degree, gk);
         }
 
-        save_handler.Write(&index_size, sizeof(SizeT));
-        save_handler.Write(&max_degree, sizeof(u32));
-        save_handler.Write(&start, sizeof(SizeT));
-        save_handler.Write(&num_frozen_points, sizeof(SizeT));
+        save_handle.Append(&index_size, sizeof(SizeT));
+        save_handle.Append(&max_degree, sizeof(u32));
+        save_handle.Append(&start, sizeof(SizeT));
+        save_handle.Append(&num_frozen_points, sizeof(SizeT));
         for (SizeT i = 0; i < num_points; i++) {
             u32 gk = static_cast<u32>(graph_[i].size());
-            save_handler.Write(&gk, sizeof(u32));
-            save_handler.Write(graph_[i].data(), sizeof(SizeT) * gk);
+            save_handle.Append(&gk, sizeof(u32));
+            save_handle.Append(graph_[i].data(), sizeof(SizeT) * gk);
         }
     }
 
