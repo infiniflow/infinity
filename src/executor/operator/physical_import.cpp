@@ -66,6 +66,8 @@ import catalog_delta_entry;
 import build_fast_rough_filter_task;
 import stream_io;
 import parser_assert;
+import virtual_store;
+import abstract_file_handle;
 
 namespace infinity {
 
