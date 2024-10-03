@@ -200,7 +200,6 @@ public:
             data[i] = distrib_real(rng);
         }
 
-        LocalFileSystem fs;
         auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
 
         std::atomic<bool> stop = false;
