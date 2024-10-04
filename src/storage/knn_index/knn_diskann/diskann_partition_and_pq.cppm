@@ -30,6 +30,7 @@ import logger;
 import simd_functions;
 import diskann_dist_func;
 import default_values;
+import local_file_handle;
 
 namespace infinity {
 
@@ -49,7 +50,7 @@ void ConvertTypes(const InType *srcmat, OutType *destmat, size_t npts,
 
 // Generate random slice from existing data file
 export template <typename VectorDataType>
-void GenRandomSlice(FileHandler &data_file, f64 p_val, SharedPtr<VectorDataType[]> &sampled_data, 
+void GenRandomSlice(LocalFileHandle &data_file, f64 p_val, SharedPtr<VectorDataType[]> &sampled_data,
                         u32 &slice_size, u32 &ndims, SizeT &npts, SharedPtr<SizeT[]> &sampled_ids) {
     Vector<Vector<f32>> sampled_vectors;
     Vector<SizeT> sampled_ids_vec;
@@ -86,7 +87,7 @@ void GenRandomSlice(FileHandler &data_file, f64 p_val, SharedPtr<VectorDataType[
 // Generate PQ pivots from train_data
 // train_data in float32, and return full_pivot_data in float32
 export template <typename VectorDataType>
-void GeneratePqPivots(FileHandler &pq_pivot_file_handler, SharedPtr<VectorDataType[]>& origin_train_data, u32 num_train, u32 dim,
+void GeneratePqPivots(LocalFileHandle &pq_pivot_file_handle, SharedPtr<VectorDataType[]>& origin_train_data, u32 num_train, u32 dim,
                       u32 num_centers, u32 num_pq_chunks, u32 max_k_means_reps,
                       bool make_zero_mean, SharedPtr<f32[]> &full_pivot_data,
                       SharedPtr<f32[]> &centroid, Vector<u32> &rearrangement,
@@ -189,14 +190,14 @@ void GeneratePqPivots(FileHandler &pq_pivot_file_handler, SharedPtr<VectorDataTy
     meta_sector[1] = sizeof(f32) * num_centers * dim + meta_sector[0]; // full_pivot_data end offset
     meta_sector[2] = sizeof(f32) * dim + meta_sector[1]; // centroid end offset
     meta_sector[3] = sizeof(u32) * chunk_offsets.size() + meta_sector[2]; // chunk_offsets end offset
-    pq_pivot_file_handler.Write(meta_sector.get(), DISKANN_SECTOR_LEN);
-    pq_pivot_file_handler.Write(full_pivot_data.get(), sizeof(f32) * num_centers * dim);
-    pq_pivot_file_handler.Write(centroid.get(), sizeof(f32) * dim);
-    pq_pivot_file_handler.Write(chunk_offsets.data(), sizeof(u32) * chunk_offsets.size());
+    pq_pivot_file_handle.Append(meta_sector.get(), DISKANN_SECTOR_LEN);
+    pq_pivot_file_handle.Append(full_pivot_data.get(), sizeof(f32) * num_centers * dim);
+    pq_pivot_file_handle.Append(centroid.get(), sizeof(f32) * dim);
+    pq_pivot_file_handle.Append(chunk_offsets.data(), sizeof(u32) * chunk_offsets.size());
 }
 
 export template <typename VectorDataType> 
-void GeneratePqDataFromPivots(FileHandler &data_file, FileHandler &pqCompressed_data_file, 
+void GeneratePqDataFromPivots(LocalFileHandle &data_file, LocalFileHandle &pqCompressed_data_file,
                             SizeT num_points, u32 dim, u32 num_centers,
                             u32 num_pq_chunks, SharedPtr<f32[]> &full_pivot_data,
                             SharedPtr<f32[]> &centroid, Vector<u32> &rearrangement,
@@ -262,7 +263,7 @@ void GeneratePqDataFromPivots(FileHandler &data_file, FileHandler &pqCompressed_
             }       
         }
         // write pq Compressed data file
-        pqCompressed_data_file.Write(block_compressed_base.get(), cur_blk_size * num_pq_chunks * sizeof(u32));
+        pqCompressed_data_file.Append(block_compressed_base.get(), cur_blk_size * num_pq_chunks * sizeof(u32));
     }
 
 }
