@@ -20,13 +20,14 @@ import third_party;
 import hnsw_alg;
 import vec_store_type;
 import compilation_config;
-import local_file_system;
+import virtual_store;
 import file_system;
 import file_system_type;
 import status;
 import hnsw_common;
 import infinity_exception;
 import profiler;
+import abstract_file_handle;
 
 using namespace infinity;
 
@@ -153,7 +154,6 @@ using HnswLVQ = KnnHnsw<LVQL2VecStoreType<float, i8>, LabelT>;
 
 template <typename HnswT, typename HnswT2>
 void Build(const BenchmarkOption &option) {
-    LocalFileSystem fs;
     BaseProfiler profiler;
 
     auto [vec_num, dim, data] = benchmark::DecodeFvecsDataset<float>(option.data_path_);
@@ -191,8 +191,7 @@ void Build(const BenchmarkOption &option) {
     std::cout << "Build time: " << profiler.ElapsedToString(1000) << std::endl;
 
     auto save = [&](auto &hnsw) {
-        auto [index_file, index_status] =
-            fs.OpenFile(option.index_save_path_.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+        auto [index_file, index_status] = LocalStore::Open(option.index_save_path_.string(), FileAccessMode::kWrite);
         if (!index_status.ok()) {
             UnrecoverableError(index_status.message());
         }
@@ -208,10 +207,9 @@ void Build(const BenchmarkOption &option) {
 
 template <typename HnswT>
 void Query(const BenchmarkOption &option) {
-    LocalFileSystem fs;
     BaseProfiler profiler;
 
-    auto [index_file, index_status] = fs.OpenFile(option.index_save_path_.string(), FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [index_file, index_status] = LocalStore::Open(option.index_save_path_.string(), FileAccessMode::kRead);
     if (!index_status.ok()) {
         UnrecoverableError(index_status.message());
     }
@@ -271,13 +269,11 @@ void Query(const BenchmarkOption &option) {
 
 template <typename HnswT, typename HnswT2>
 void Compress(const BenchmarkOption &option) {
-    LocalFileSystem fs;
-
     if (option.build_type_ != BuildType::PLAIN) {
         UnrecoverableError("Compress only support plain build type");
     }
 
-    auto [index_file, index_status] = fs.OpenFile(option.index_save_path_.string(), FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [index_file, index_status] = LocalStore::Open(option.index_save_path_.string(), FileAccessMode::kRead);
     if (!index_status.ok()) {
         UnrecoverableError(index_status.message());
     }
@@ -287,8 +283,7 @@ void Compress(const BenchmarkOption &option) {
     Path new_index_save_path = option.index_dir_ / fmt::format("{}.bin", new_index_name);
 
     auto hnsw_lvq = std::move(*hnsw).CompressToLVQ();
-    auto [index_file_lvq, index_status_lvq] =
-        fs.OpenFile(new_index_save_path.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+    auto [index_file_lvq, index_status_lvq] = LocalStore::Open(new_index_save_path.string(), FileAccessMode::kWrite);
     if (!index_status_lvq.ok()) {
         UnrecoverableError(index_status_lvq.message());
     }

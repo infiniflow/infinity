@@ -16,7 +16,6 @@
 #include <random>
 import base_test;
 
-import local_file_system;
 import file_system;
 import file_system_type;
 import dist_func_l2;

@@ -27,7 +27,7 @@
 import compilation_config;
 
 import profiler;
-import local_file_system;
+import virtual_store;
 import third_party;
 import statement_common;
 import internal_types;
@@ -124,8 +124,6 @@ int main() {
     std::cout << "Please input ef:" << std::endl;
     std::cin >> ef;
 
-    infinity::LocalFileSystem fs;
-
     std::cout << ">>> Query Benchmark Start <<<" << std::endl;
     std::cout << "Thread Num: " << thread_num << ", Times: " << total_times << std::endl;
 
@@ -133,11 +131,11 @@ int main() {
 
     std::string sift_query_path = std::string(infinity::test_data_path()) + "/benchmark/sift_1m/sift_query.fvecs";
     std::string sift_groundtruth_path = std::string(infinity::test_data_path()) + "/benchmark/sift_1m/sift_groundtruth.ivecs";
-    if (!fs.Exists(sift_query_path)) {
+    if (!infinity::LocalStore::Exists(sift_query_path)) {
         std::cerr << "File: " << sift_query_path << " doesn't exist" << std::endl;
         exit(-1);
     }
-    if (!fs.Exists(sift_groundtruth_path)) {
+    if (!infinity::LocalStore::Exists(sift_groundtruth_path)) {
         std::cerr << "File: " << sift_groundtruth_path << " doesn't exist" << std::endl;
         exit(-1);
     }
