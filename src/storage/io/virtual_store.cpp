@@ -19,6 +19,7 @@ module;
 #include <unistd.h>
 #include <cerrno>
 #include <cstring>
+#include <filesystem>
 #include <sys/stat.h>
 
 module virtual_store;
@@ -311,6 +312,22 @@ SizeT LocalStore::GetFileSize(const String& path) {
 
 String LocalStore::GetParentPath(const String& path) {
     return Path(path).parent_path().string();
+}
+
+SizeT LocalStore::GetDirectorySize(const String &path) {
+    if(!std::filesystem::path(path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", path);
+        UnrecoverableError(error_message);
+    }
+    u64 totalSize = 0;
+
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(path)) {
+        if (std::filesystem::is_regular_file(entry.status())) {
+            totalSize += std::filesystem::file_size(entry);
+        }
+    }
+
+    return totalSize;
 }
 
 } // namespace infinity

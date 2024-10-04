@@ -25,7 +25,6 @@ import third_party;
 import default_values;
 import column_vector;
 import serialize;
-import local_file_system;
 import local_file_handle;
 import status;
 
