@@ -36,7 +36,9 @@ public:
 
     Status Load();
 
-    void Tokenize(const String &line, Vector<String> &res);
+    String Tokenize(const String &line, Vector<String> &res);
+
+    String FineGrainedTokenize(const String &tokens);
 
 private:
     static constexpr float DENOMINATOR = 1000000;

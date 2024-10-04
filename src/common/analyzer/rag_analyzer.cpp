@@ -160,6 +160,22 @@ String WideCharToUTF8(wchar_t wchar) {
     return result;
 }
 
+bool IsChinese(const String &str) {
+    for (std::size_t i = 0; i < str.length(); ++i) {
+        unsigned char c = str[i];
+        if (c >= 0xE4 && c <= 0xE9) {
+            if (i + 2 < str.length()) {
+                unsigned char c2 = str[i + 1];
+                unsigned char c3 = str[i + 2];
+                if ((c2 >= 0x80 && c2 <= 0xBF) && (c3 >= 0x80 && c3 <= 0xBF)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 RAGAnalyzer::RAGAnalyzer(const String &path) : dict_path_(path) {}
 
 RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other) : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_) {}
@@ -453,7 +469,7 @@ String RAGAnalyzer::Merge(const String &tks_str) {
     return Join(res, 0, res.size());
 }
 
-void RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
+String RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
     Vector<String> arr;
     Split(line, REGEX_SPLIT_CHAR, arr, true);
     for (const auto &L : arr) {
@@ -519,6 +535,75 @@ void RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
     String r = Join(res, 0);
     String ret = Merge(r);
     std::cout << "[TKS]" << ret << std::endl;
+    return ret;
+}
+
+String RAGAnalyzer::FineGrainedTokenize(const String &tokens) {
+    Vector<String> tks;
+    Split(tokens, "( )", tks);
+    Vector<String> res;
+    std::size_t zh_num = 0;
+    for (auto &token : tks) {
+        int len = UTF8Length(token);
+        for (int i = 0; i < len; ++i) {
+            String t = UTF8Substr(token, i, 1);
+            if (IsChinese(t)) {
+                zh_num++;
+            }
+        }
+    }
+    if (zh_num < tks.size() * 0.2) {
+        for (auto &token : tks) {
+            std::istringstream iss(token);
+            String sub_token;
+            while (std::getline(iss, sub_token, '/')) {
+                res.push_back(sub_token);
+            }
+        }
+        String ret = Join(res, 0);
+        std::cout << ret << std::endl;
+        return ret;
+    }
+
+    for (auto &token : tks) {
+        if (UTF8Length(token) < 3 || RegexMatch(token, "[0-9,\\.-]+$")) {
+            res.push_back(token);
+            continue;
+        }
+        Vector<Vector<Pair<String, int>>> token_list;
+        if (UTF8Length(token) > 10) {
+            Vector<Pair<String, int>> tk;
+            tk.emplace_back(token, Encode(-1, 0));
+            token_list.push_back(tk);
+        } else {
+            Vector<Pair<String, int>> pre_tokens;
+            DFS(token, 0, pre_tokens, token_list);
+        }
+        if (token_list.size() < 2) {
+            res.push_back(token);
+            continue;
+        }
+        Vector<Pair<Vector<String>, double>> sorted_tokens;
+        SortTokens(token_list, sorted_tokens);
+        auto stk = sorted_tokens[1].first;
+        String s_token;
+        if (stk.size() == token.length()) {
+            s_token = token;
+        } else if (RegexMatch(token, "[a-z\\.-]+")) {
+            for (auto &t : stk) {
+                if (UTF8Length(t) < 3) {
+                    s_token = token;
+                    break;
+                }
+            }
+        } else {
+            s_token = Join(stk, 0);
+        }
+        res.push_back(s_token);
+    }
+    String ret = Join(res, 0);
+    std::cout << ret << std::endl;
+    return ret;
 }
 
 } // namespace infinity
