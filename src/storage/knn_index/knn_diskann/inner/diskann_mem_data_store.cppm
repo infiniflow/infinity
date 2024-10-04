@@ -98,8 +98,8 @@ public:
         }
     }
 
-    void Load(FileHandler &load_file_handler) {}
-    void Save(FileHandler &save_file_handler) {}
+    void Load(LocalFileHandle &load_file_handle) {}
+    void Save(LocalFileHandle &save_file_handle) {}
 
     void PopulateData(DataType *vectors, SizeT num_pts) {
         memset(data_, 0, num_pts * aligned_dim_ * sizeof(DataType));
