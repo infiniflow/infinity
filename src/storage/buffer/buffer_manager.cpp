@@ -21,7 +21,6 @@ module buffer_manager;
 import stl;
 import file_worker;
 import third_party;
-import local_file_system;
 import logger;
 import specific_concurrent_queue;
 import infinity_exception;
@@ -29,6 +28,7 @@ import buffer_obj;
 import file_worker_type;
 import var_file_worker;
 import persistence_manager;
+import virtual_store;
 
 namespace infinity {
 
@@ -92,12 +92,11 @@ BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, Share
 BufferManager::~BufferManager() = default;
 
 void BufferManager::Start() {
-    LocalFileSystem fs;
-    if (!fs.Exists(*data_dir_)) {
-        fs.CreateDirectory(*data_dir_);
+    if (!LocalStore::Exists(*data_dir_)) {
+        LocalStore::MakeDirectory(*data_dir_);
     }
 
-    fs.CleanupDirectory(*temp_dir_);
+    LocalStore::CleanupDirectory(*temp_dir_);
 }
 
 void BufferManager::Stop() { RemoveClean(); }

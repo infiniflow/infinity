@@ -52,7 +52,6 @@ void PersistenceManagerTest::CheckObjData(const String& local_file_path, const S
     auto [nread, read_status] = pm_file_handle->Read(buffer.get(), file_size);
     EXPECT_TRUE(read_status.ok());
     ASSERT_EQ(String(buffer.get(), file_size), data);
-    pm_file_handle->Close();
 
     PersistWriteResult res = pm_->PutObjCache(local_file_path);
     handler_->HandleWriteResult(res);

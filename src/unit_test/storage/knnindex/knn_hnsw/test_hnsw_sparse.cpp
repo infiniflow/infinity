@@ -53,7 +53,6 @@ protected:
         SparseMatrix dataset = SparseTestUtil<f32, i32>::GenerateDataset(element_size, max_dim, sparsity, 0, 1.0);
         auto [gt_idx, gt_score] = SparseTestUtil<f32, i32>::GenerateGroundtruth(dataset, dataset, 1);
 
-        LocalFileSystem fs;
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, max_dim, M, ef_construction);
             auto iter = SparseVectorIter<float, IdxT, LabelT>(dataset.indptr_.get(), dataset.indices_.get(), dataset.data_.get(), dataset.nrow_);
@@ -89,7 +88,6 @@ protected:
                 UnrecoverableError(status.message());
             }
             hnsw_index->Save(*file_handle);
-            file_handle->Close();
         }
         {
             auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kRead);
@@ -112,7 +110,6 @@ protected:
                 // EXPECT_EQ(res[0].second, gt_idx[i]);
                 // EXPECT_NEAR(-res[0].first, gt_score[i], 1e-5);
             }
-            file_handle->Close();
         }
     }
 

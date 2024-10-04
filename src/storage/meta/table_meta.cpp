@@ -28,7 +28,6 @@ import txn_state;
 import txn_manager;
 import buffer_manager;
 import catalog_delta_entry;
-import local_file_system;
 import third_party;
 import status;
 import infinity_exception;

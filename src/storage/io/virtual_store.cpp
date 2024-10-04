@@ -126,10 +126,6 @@ Tuple<UniquePtr<LocalFileHandle>, Status> LocalStore::Open(const String& path, F
 
 // For local disk filesystem, such as temp file, disk cache and WAL
 bool LocalStore::Exists(const String &path) {
-    if (!std::filesystem::path(path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", path);
-        UnrecoverableError(error_message);
-    }
     std::error_code error_code;
     Path p{path};
     bool is_exists = std::filesystem::exists(p, error_code);
@@ -165,10 +161,17 @@ Status LocalStore::DeleteFile(const String &file_name) {
 }
 
 Status LocalStore::MakeDirectory(const String &path) {
-    if (!std::filesystem::path(path).is_absolute()) {
-        String error_message = fmt::format("{} isn't absolute path.", path);
-        UnrecoverableError(error_message);
+    if(LocalStore::Exists(path)) {
+        if(std::filesystem::is_directory(path)) {
+            return Status::OK();
+        } else {
+            String error_message = fmt::format("Exists file: {}", path);
+            LOG_ERROR(error_message);
+            Status status = Status::IOError(error_message);
+            return status;
+        }
     }
+
     std::error_code error_code;
     Path p{path};
     std::filesystem::create_directories(p, error_code);
@@ -304,6 +307,10 @@ SizeT LocalStore::GetFileSize(const String& path) {
         UnrecoverableError(error_message);
     }
     return std::filesystem::file_size(path);
+}
+
+String LocalStore::GetParentPath(const String& path) {
+    return Path(path).parent_path().string();
 }
 
 } // namespace infinity

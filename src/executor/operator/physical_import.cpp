@@ -40,7 +40,6 @@ import expression_state;
 import data_block;
 import logger;
 import third_party;
-import local_file_system;
 import defer_op;
 import txn_store;
 
@@ -66,6 +65,8 @@ import catalog_delta_entry;
 import build_fast_rough_filter_task;
 import stream_io;
 import parser_assert;
+import virtual_store;
+import abstract_file_handle;
 
 namespace infinity {
 
@@ -135,17 +136,17 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
 
-    LocalFileSystem fs;
-
-    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
+    auto [file_handle, status_open] = LocalStore::Open(file_path_, FileAccessMode::kRead);
+    if (!status_open.ok()) {
+        UnrecoverableError(status_open.message());
     }
-    DeferFn defer_fn([&]() { fs.Close(*file_handler); });
 
     i32 dimension = 0;
-    i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
-    fs.Seek(*file_handler, 0);
+    auto [nbytes, status_read] = file_handle->Read(&dimension, sizeof(dimension));
+    if (!status_read.ok()) {
+        RecoverableError(status_read);
+    }
+    file_handle->Seek(0);
     if (nbytes == 0) {
         // file is empty
         auto result_msg = MakeUnique<String>("IMPORT 0 Rows");
@@ -162,7 +163,10 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
             fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
         RecoverableError(status);
     }
-    SizeT file_size = fs.GetFileSize(*file_handler);
+    i64 file_size = file_handle->FileSize();
+    if (file_size == -1) {
+        UnrecoverableError("Can't get file size");
+    }
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
     if (file_size % row_size != 0) {
         String error_message = "Weird file size.";
@@ -181,14 +185,17 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         auto buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
         while (true) {
             i32 dim;
-            nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
+            auto [nbytes, status_read] = file_handle->Read(&dim, sizeof(dimension));
+            if(!status_read.ok()) {
+                RecoverableError(status_read);
+            }
             if (dim != dimension or nbytes != sizeof(dimension)) {
-                Status status =
+                Status status_error =
                     Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
-                RecoverableError(status);
+                RecoverableError(status_error);
             }
             ptr_t dst_ptr = buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension;
-            fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
+            file_handle->Read(dst_ptr, sizeof(FloatT) * dimension);
             block_entry->IncreaseRowCount(1);
             ++row_idx;
 
@@ -237,17 +244,17 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
 
-    LocalFileSystem fs;
-
-    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
+    auto [file_handle, status_open] = LocalStore::Open(file_path_, FileAccessMode::kRead);
+    if (!status_open.ok()) {
+        UnrecoverableError(status_open.message());
     }
-    DeferFn defer_fn([&]() { fs.Close(*file_handler); });
 
     i32 dimension = 0;
-    i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
-    fs.Seek(*file_handler, 0);
+    auto [nbytes, status_read] = file_handle->Read(&dimension, sizeof(dimension));
+    if (!status_read.ok()) {
+        RecoverableError(status_read);
+    }
+    file_handle->Seek(0);
     if (nbytes == 0) {
         // file is empty
         auto result_msg = MakeUnique<String>("IMPORT 0 Rows");
@@ -264,7 +271,10 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
             fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
         RecoverableError(status);
     }
-    SizeT file_size = fs.GetFileSize(*file_handler);
+    i64 file_size = file_handle->FileSize();
+    if (file_size == -1) {
+        UnrecoverableError("Can't get file size");
+    }
     SizeT row_size = dimension * sizeof(u8) + sizeof(dimension);
     if (file_size % row_size != 0) {
         String error_message = "Weird file size.";
@@ -285,13 +295,17 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         UniquePtr<u8[]> u8_buffer = MakeUniqueForOverwrite<u8[]>(sizeof(u8) * dimension);
         while (true) {
             i32 dim;
-            nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
-            if (dim != dimension or nbytes != sizeof(dimension)) {
-                Status status =
-                    Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+            auto [nbytes, status] = file_handle->Read(&dim, sizeof(dimension));
+            if (!status.ok()) {
                 RecoverableError(status);
             }
-            fs.Read(*file_handler, u8_buffer.get(), sizeof(u8) * dimension);
+
+            if (dim != dimension or nbytes != sizeof(dimension)) {
+                Status error_status =
+                    Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+                RecoverableError(error_status);
+            }
+            file_handle->Read(u8_buffer.get(), sizeof(u8) * dimension);
 
             u8 *dst_ptr = reinterpret_cast<u8 *>(buf_ptr + block_entry->row_count() * sizeof(u8) * dimension);
             for (i32 i = 0; i < dimension; ++i) {
@@ -384,8 +398,7 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         RecoverableError(status);
     }
 
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [file_handle, status] = LocalStore::Open(file_path_, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -393,31 +406,33 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
     i64 nrow = 0;
     i64 ncol = 0;
     i64 nnz = 0;
-    file_handler->Read(&nrow, sizeof(nrow));
-    file_handler->Read(&ncol, sizeof(ncol));
-    file_handler->Read(&nnz, sizeof(nnz));
+    file_handle->Read(&nrow, sizeof(nrow));
+    file_handle->Read(&ncol, sizeof(ncol));
+    file_handle->Read(&nnz, sizeof(nnz));
 
-    SizeT file_size = fs.GetFileSize(*file_handler);
-    if (file_size != 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32) + nnz * sizeof(FloatT)) {
+    i64 file_size = file_handle->FileSize();
+    if ((SizeT)file_size != 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32) + nnz * sizeof(FloatT)) {
         String error_message = "Invalid CSR file format.";
         UnrecoverableError(error_message);
     }
     i64 prev_off = 0;
-    file_handler->Read(&prev_off, sizeof(i64));
+    file_handle->Read(&prev_off, sizeof(i64));
     if (prev_off != 0) {
         String error_message = "Invalid CSR file format.";
         UnrecoverableError(error_message);
     }
-    auto [idx_reader, idx_status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [idx_file_handle, idx_status] = LocalStore::Open(file_path_, FileAccessMode::kRead);
     if (!idx_status.ok()) {
         UnrecoverableError(idx_status.message());
     }
-    fs.Seek(*idx_reader, 3 * sizeof(i64) + (nrow + 1) * sizeof(i64));
-    auto [data_reader, data_status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+
+    idx_file_handle->Seek(3 * sizeof(i64) + (nrow + 1) * sizeof(i64));
+    auto [data_file_handle, data_status] = LocalStore::Open(file_path_, FileAccessMode::kRead);
     if (!data_status.ok()) {
         UnrecoverableError(data_status.message());
     }
-    fs.Seek(*data_reader, 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32));
+
+    data_file_handle->Seek(3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32));
 
     //------------------------------------------------------------------------------------------------------------------------
 
@@ -433,13 +448,13 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         i64 row_id = 0;
         while (true) {
             i64 off = 0;
-            file_handler->Read(&off, sizeof(i64));
+            file_handle->Read(&off, sizeof(i64));
             i64 nnz = off - prev_off;
             SizeT data_len = sparse_info->DataSize(nnz);
             auto tmp_indice_ptr = MakeUnique<char[]>(sizeof(i32) * nnz);
             auto data_ptr = MakeUnique<char[]>(data_len);
-            idx_reader->Read(tmp_indice_ptr.get(), sizeof(i32) * nnz);
-            data_reader->Read(data_ptr.get(), data_len);
+            idx_file_handle->Read(tmp_indice_ptr.get(), sizeof(i32) * nnz);
+            data_file_handle->Read(data_ptr.get(), data_len);
             auto indice_ptr = ConvertCSRIndice(std::move(tmp_indice_ptr), sparse_info.get(), nnz);
 
             auto value = Value::MakeSparse(nnz, std::move(indice_ptr), std::move(data_ptr), sparse_info);
@@ -635,17 +650,21 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
 void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state) {
     nlohmann::json json_arr;
     {
-        LocalFileSystem fs;
-        auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+        auto [file_handle, status] = LocalStore::Open(file_path_, FileAccessMode::kRead);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
-        SizeT file_size = fs.GetFileSize(*file_handler);
+        i64 file_size = file_handle->FileSize();
+        if (file_size == -1) {
+            UnrecoverableError("Can't get file size");
+        }
         String json_str(file_size, 0);
-        SizeT read_n = file_handler->Read(json_str.data(), file_size);
-        if (read_n != file_size) {
+        auto [read_n, status_read] = file_handle->Read(json_str.data(), file_size);
+        if(!status_read.ok()) {
+            UnrecoverableError(status_read.message());
+        }
+        if ((i64)read_n != file_size) {
             String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
             UnrecoverableError(error_message);
         }

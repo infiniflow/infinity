@@ -28,7 +28,6 @@ import status;
 import catalog_delta_entry;
 import infinity_exception;
 import base_entry;
-import local_file_system;
 
 namespace infinity {
 
