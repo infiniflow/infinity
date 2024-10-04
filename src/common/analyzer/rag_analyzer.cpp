@@ -64,25 +64,22 @@ static inline i32 DecodeFreq(i32 value) {
     return v1;
 }
 
-void Split(const String &input, const String &split_pattern, std::vector<String> &result) {
+void Split(const String &input, const String &split_pattern, std::vector<String> &result, bool keep_delim = false) {
     re2::RE2 pattern(split_pattern);
     re2::StringPiece leftover(input.data());
     re2::StringPiece last_end = leftover;
     re2::StringPiece extracted_delim_token;
 
-    // Keep looking for split points until we have reached the end of the input.
     while (RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
         std::string_view token(last_end.data(), extracted_delim_token.data() - last_end.data());
-        bool has_non_empty_token = token.length() > 0;
-        last_end = leftover;
-
-        // Mark the end of the previous token, only if there was something.
-        if (has_non_empty_token) {
+        if (!token.empty()) {
             result.push_back(String(token.data(), token.size()));
         }
+        if (keep_delim)
+            result.push_back(std::string(extracted_delim_token.data(), extracted_delim_token.size()));
+        last_end = leftover;
     }
 
-    // Close the last token.
     if (!leftover.empty()) {
         result.push_back(String(leftover.data(), leftover.size()));
     }
@@ -252,10 +249,7 @@ String RAGAnalyzer::StrQ2B(const String &input) {
 
 i32 RAGAnalyzer::Freq(const String &key) {
     i32 v = trie_->Get(key);
-    // if (v != -1)
     v = DecodeFreq(v);
-    std::cout << "Freq " << v << std::endl;
-
     return i32(std::exp(v) * DENOMINATOR + 0.5);
 }
 
@@ -432,7 +426,7 @@ int RAGAnalyzer::DFS(const String &chars, int s, Vector<Pair<String, int>> &pre_
 String RAGAnalyzer::Merge(const String &tks_str) {
     String tks = tks_str;
 
-    RE2 re_space(R"(([ ]+))");
+    RE2 re_space(R"#(([ ]+))#");
     tks = Replace(re_space, " ", tks);
 
     Vector<String> tokens;
@@ -461,10 +455,9 @@ String RAGAnalyzer::Merge(const String &tks_str) {
 
 void RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
     Vector<String> arr;
-    Split(line, REGEX_SPLIT_CHAR, arr);
-
+    Split(line, REGEX_SPLIT_CHAR, arr, true);
     for (const auto &L : arr) {
-        if (L.length() < 2 || RegexMatch(L, "[a-z\\.-]+$") || RegexMatch(L, "[0-9\\.-]+$")) {
+        if (UTF8Length(L) < 2 || RegexMatch(L, "[a-z\\.-]+$") || RegexMatch(L, "[0-9\\.-]+$")) {
             res.push_back(L);
             continue;
         }
@@ -513,9 +506,6 @@ void RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
                 e++;
             }
 
-            for (auto &r : res)
-                std::cout << r << std::endl;
-
             Vector<Pair<String, int>> pre_tokens;
             Vector<Vector<Pair<String, int>>> token_list;
             DFS(Join(tks, s, e < tks.size() ? e + 1 : e, ""), 0, pre_tokens, token_list);
@@ -525,8 +515,6 @@ void RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
             i = e + 1;
         }
     }
-    for (auto &r : res)
-        std::cout << r << std::endl;
 
     String r = Join(res, 0);
     String ret = Merge(r);
