@@ -55,6 +55,7 @@ public:
     static Tuple<Vector<SharedPtr<DirEntry>>, Status> ListDirectory(const String& path);
     static SizeT GetFileSize(const String& path);
     static String GetParentPath(const String& path);
+    static SizeT GetDirectorySize(const String &path);
 };
 
 }

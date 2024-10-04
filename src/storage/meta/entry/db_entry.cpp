@@ -32,7 +32,6 @@ import infinity_exception;
 import status;
 import catalog_delta_entry;
 import column_def;
-import local_file_system;
 import extra_ddl_info;
 import cleanup_scanner;
 import infinity_context;

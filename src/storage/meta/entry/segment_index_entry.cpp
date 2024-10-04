@@ -52,7 +52,6 @@ import index_full_text;
 import index_defines;
 import column_inverter;
 import block_entry;
-import local_file_system;
 import chunk_index_entry;
 import abstract_hnsw;
 import abstract_bmp;
