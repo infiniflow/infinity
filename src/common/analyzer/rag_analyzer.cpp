@@ -518,7 +518,7 @@ void RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
 
             Vector<Pair<String, int>> pre_tokens;
             Vector<Vector<Pair<String, int>>> token_list;
-            DFS(Join(tks, s, e + 1, ""), 0, pre_tokens, token_list);
+            DFS(Join(tks, s, e < tks.size() ? e + 1 : e, ""), 0, pre_tokens, token_list);
             Vector<Pair<Vector<String>, double>> sorted_tokens;
             SortTokens(token_list, sorted_tokens);
             res.push_back(Join(sorted_tokens[0].first, 0));
