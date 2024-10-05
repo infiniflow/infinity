@@ -65,6 +65,7 @@ import stream_io;
 import parser_assert;
 import virtual_store;
 import abstract_file_handle;
+import file_system_type;
 
 namespace infinity {
 
