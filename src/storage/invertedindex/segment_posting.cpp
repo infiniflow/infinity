@@ -63,7 +63,7 @@ void SegmentPosting::Init(SharedPtr<ByteSliceList> doc_slice_list,
     posting_writer_ = nullptr;
     pos_begin_ = pos_begin;
     pos_size_ = pos_size;
-    posting_reader_ = MakeShared<FileReader>(posting_reader->fs_, posting_reader->path_, 1024);
+    posting_reader_ = MakeShared<FileReader>(posting_reader->path_, 1024);
 }
 
 const SharedPtr<ByteSliceList> &SegmentPosting::GetPosSliceListPtr() {

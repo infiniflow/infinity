@@ -56,6 +56,7 @@ public:
     static SizeT GetFileSize(const String& path);
     static String GetParentPath(const String& path);
     static SizeT GetDirectorySize(const String &path);
+    static String ConcatenatePath(const String &dir_path, const String &file_path);
 };
 
 }

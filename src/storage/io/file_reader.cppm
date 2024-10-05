@@ -14,26 +14,24 @@
 
 module;
 
-#include <cassert>
-#include <unistd.h>
+
 
 export module file_reader;
+
 import stl;
-import file_system;
-import file_system_type;
 import status;
 import infinity_exception;
-import local_file_system;
+import local_file_handle;
+import virtual_store;
 
 namespace infinity {
 
 export class FileReader {
 public:
-    explicit FileReader(FileSystem &fs, const String &path, SizeT buffer_size);
+    explicit FileReader(const String &path, SizeT buffer_size);
 
     FileReader(const FileReader &other) = delete;
 
-    FileSystem &fs_;
     String path_{};
     UniquePtr<char_t[]> data_{};
     u64 buffer_offset_{};
@@ -42,7 +40,7 @@ public:
     SizeT buffer_size_{};
     SizeT buffer_length_{};
     SizeT file_size_{};
-    UniquePtr<FileHandler> file_handler_{};
+    UniquePtr<LocalFileHandle> file_handle_{};
 
 public:
     u8 ReadByte();
@@ -59,8 +57,6 @@ public:
 
     void Read(char_t *buffer, SizeT read_size);
 
-    void ReadAt(i64 file_offset, char_t *buffer, SizeT read_size);
-
     bool Finished() const;
 
     u64 GetFilePointer() const;
@@ -70,24 +66,6 @@ public:
 private:
     void ReFill();
 };
-
-inline void FileReader::ReFill() {
-    buffer_start_ += buffer_offset_;
-    buffer_offset_ = buffer_length_ = 0;
-
-    if (buffer_start_ + buffer_size_ > file_size_)
-        buffer_length_ = file_size_ - buffer_start_;
-    else
-        buffer_length_ = buffer_size_;
-#ifndef NDEBUG
-    auto current_offset = lseek((dynamic_cast<LocalFileHandler *>(file_handler_.get()))->fd_, 0, SEEK_CUR);
-    assert(buffer_start_ == static_cast<SizeT>(current_offset));
-#endif
-    already_read_size_ = fs_.Read(*file_handler_, data_.get(), buffer_length_);
-    if (already_read_size_ == 0) {
-        RecoverableError(Status::DataCorrupted(file_handler_->path_.string()));
-    }
-}
 
 inline u8 FileReader::ReadByte() {
     if (buffer_offset_ >= buffer_length_) {

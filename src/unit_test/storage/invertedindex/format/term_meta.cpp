@@ -45,7 +45,7 @@ public:
         term_dumper.Dump(file_writer, term_meta);
         file_writer->Sync();
 
-        SharedPtr<FileReader> file_reader = MakeShared<FileReader>(fs_, file_name_, 128);
+        SharedPtr<FileReader> file_reader = MakeShared<FileReader>(file_name_, 128);
 
         TermMeta new_term_meta;
         TermMetaLoader term_loader(format_option);

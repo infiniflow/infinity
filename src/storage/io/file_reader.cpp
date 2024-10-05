@@ -14,6 +14,10 @@
 
 module;
 
+#include <set>
+#include <cassert>
+#include <unistd.h>
+
 module file_reader;
 
 import stl;
@@ -23,31 +27,57 @@ import status;
 import infinity_exception;
 import third_party;
 import logger;
+import virtual_store;
+import abstract_file_handle;
 
 namespace infinity {
 
-FileReader::FileReader(FileSystem &fs, const String &path, SizeT buffer_size)
-    : fs_(fs), path_(path), data_{nullptr}, buffer_offset_(0), buffer_start_(0), buffer_size_(buffer_size) {
+FileReader::FileReader(const String &path, SizeT buffer_size)
+    : path_(path), data_{nullptr}, buffer_offset_(0), buffer_start_(0), buffer_size_(buffer_size) {
     // Fixme: These two functions might throw exception
-    u8 flags = FileFlags::READ_FLAG;
     if (buffer_size != 0) {
         data_ = MakeUnique<char_t[]>(buffer_size);
     }
-    auto [file_handler, status] = fs_.OpenFile(path, flags, FileLockType::kReadLock);
+    auto [file_handle, status] = LocalStore::Open(path, FileAccessMode::kRead);
     if(!status.ok()) {
         UnrecoverableError(status.message());
     }
 
-    file_handler_ = std::move(file_handler);
-    file_size_ = fs_.GetFileSize(*file_handler_);
+    file_handle_ = std::move(file_handle);
+    file_size_ = file_handle_->FileSize();
+}
+
+void FileReader::ReFill() {
+    buffer_start_ += buffer_offset_;
+    buffer_offset_ = buffer_length_ = 0;
+
+    if (buffer_start_ + buffer_size_ > file_size_)
+        buffer_length_ = file_size_ - buffer_start_;
+    else
+        buffer_length_ = buffer_size_;
+#ifndef NDEBUG
+    auto current_offset = lseek(file_handle_->FileDescriptor(), 0, SEEK_CUR);
+    assert(buffer_start_ == static_cast<SizeT>(current_offset));
+#endif
+    auto [tmp_read_size, status] = file_handle_->Read(data_.get(), buffer_length_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    already_read_size_ = tmp_read_size;
+    if (already_read_size_ == 0) {
+        RecoverableError(Status::DataCorrupted(file_handle_->Path()));
+    }
 }
 
 void FileReader::Read(char_t *buffer, SizeT read_size) {
     if (buffer_size_ == 0) {
-        already_read_size_ = fs_.Read(*file_handler_, buffer, read_size);
-        if (already_read_size_ != read_size) {
-            Status status = Status::DataIOError(fmt::format("No enough data reading from {}", file_handler_->path_.string()));
+        auto [tmp_read_size, status] = file_handle_->Read(buffer, read_size);
+        if(!status.ok()) {
             RecoverableError(status);
+        }
+        already_read_size_ = tmp_read_size;
+        if (already_read_size_ != read_size) {
+            RecoverableError(Status::DataIOError(fmt::format("No enough data reading from {}", file_handle_->Path())));
         }
     } else {
         if (buffer_offset_ >= buffer_length_)
@@ -61,23 +91,18 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
                 std::memcpy(buffer, data_.get() + buffer_offset_, start);
             }
 
-            already_read_size_ = fs_.Read(*file_handler_, buffer + start, read_size - start);
-            if (already_read_size_ == 0) {
-                Status status = Status::DataIOError(fmt::format("No enough data reading from {}", file_handler_->path_.string()));
+            auto [tmp_read_size, status] = file_handle_->Read(buffer, read_size);
+            if(!status.ok()) {
                 RecoverableError(status);
+            }
+            already_read_size_ = tmp_read_size;
+            if (already_read_size_ == 0) {
+                RecoverableError(Status::DataIOError(fmt::format("No enough data reading from {}", file_handle_->Path())));
             }
 
             buffer_start_ += buffer_offset_ + read_size;
             buffer_offset_ = buffer_length_ = 0;
         }
-    }
-}
-
-void FileReader::ReadAt(i64 file_offset, char_t *buffer, SizeT read_size) {
-    already_read_size_ = fs_.ReadAt(*file_handler_, file_offset, buffer, read_size);
-    if (already_read_size_ != read_size) {
-        Status status = Status::DataIOError(fmt::format("No enough data from file: {}", file_handler_->path_.string()));
-        RecoverableError(status);
     }
 }
 
@@ -93,7 +118,7 @@ void FileReader::Seek(const u64 pos) {
         buffer_offset_ = 0;
         already_read_size_ = 0;
         buffer_length_ = 0;
-        fs_.Seek(*file_handler_, pos);
+        file_handle_->Seek(pos);
     }
 }
 } // namespace infinity

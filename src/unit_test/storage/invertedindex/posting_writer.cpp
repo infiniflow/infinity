@@ -73,7 +73,7 @@ TEST_P(PostingWriterTest, test1) {
     }
     {
         SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(posting_format_, column_length_array);
-        SharedPtr<FileReader> file_reader = MakeShared<FileReader>(fs_, file_, 128000);
+        SharedPtr<FileReader> file_reader = MakeShared<FileReader>(file_, 128000);
         posting->Load(file_reader);
 
         docid_t docid = 10;

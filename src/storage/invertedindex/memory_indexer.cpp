@@ -341,12 +341,11 @@ void MemoryIndexer::Load() {
     }
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
-    LocalFileSystem fs;
     String posting_file = index_prefix + POSTING_SUFFIX + SPILL_SUFFIX;
     String dict_file = index_prefix + DICT_SUFFIX + SPILL_SUFFIX;
 
     SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag_));
-    SharedPtr<FileReader> posting_reader = MakeShared<FileReader>(fs, posting_file, 1024);
+    SharedPtr<FileReader> posting_reader = MakeShared<FileReader>(posting_file, 1024);
     String term;
     TermMeta term_meta;
     doc_count_ = (u32)posting_reader->ReadVInt();

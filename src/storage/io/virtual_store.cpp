@@ -330,4 +330,9 @@ SizeT LocalStore::GetDirectorySize(const String &path) {
     return totalSize;
 }
 
+String LocalStore::ConcatenatePath(const String &dir_path, const String &file_path) {
+    std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
+    return full_path.string();
+}
+
 } // namespace infinity

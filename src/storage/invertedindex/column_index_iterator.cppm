@@ -41,7 +41,6 @@ private:
     TermMeta term_meta_;
 
     SharedPtr<PostingDecoder> posting_decoder_;
-    LocalFileSystem fs_;
 };
 
 } // namespace infinity
