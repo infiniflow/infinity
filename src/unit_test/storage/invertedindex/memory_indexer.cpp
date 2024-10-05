@@ -31,7 +31,6 @@ import column_index_reader;
 import posting_iterator;
 import column_inverter;
 import segment_index_entry;
-import local_file_system;
 import internal_types;
 import logical_type;
 import column_index_merger;

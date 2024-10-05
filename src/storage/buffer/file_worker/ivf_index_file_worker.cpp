@@ -24,7 +24,6 @@ import index_base;
 import ivf_index_data;
 import infinity_exception;
 import third_party;
-import file_system;
 import persistence_manager;
 
 namespace infinity {

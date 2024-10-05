@@ -22,8 +22,6 @@ import global_resource_usage;
 import third_party;
 import logger;
 
-import file_system;
-import local_file_system;
 import file_writer;
 import file_reader;
 import infinity_context;
@@ -36,7 +34,6 @@ class FileWriteReadTest : public BaseTest {};
 // write in abcabcabc...for 128 times, then read first 4 bytes
 TEST_F(FileWriteReadTest, test1) {
     using namespace infinity;
-    LocalFileSystem local_file_system;
     String path = String(GetFullTmpDir()) + "/test_file1.abc";
     FileWriter file_writer(path, 128);
 
@@ -54,13 +51,12 @@ TEST_F(FileWriteReadTest, test1) {
     file_reader.Read(read_str.data(), 4);
     EXPECT_STREQ(read_str.c_str(), "abca");
     EXPECT_FALSE(file_reader.Finished());
-    local_file_system.DeleteFile(path);
+    LocalStore::DeleteFile(path);
 }
 
 //write vint then read vint
 TEST_F(FileWriteReadTest, test2) {
     using namespace infinity;
-    LocalFileSystem local_file_system;
     String path = String(GetFullTmpDir()) + "/test_file2.abc";
     FileWriter file_writer(path, 128);
 
@@ -74,7 +70,7 @@ TEST_F(FileWriteReadTest, test2) {
         u32 a = file_reader.ReadVInt();
         EXPECT_EQ(a, i);
     }
-    local_file_system.DeleteFile(path);
+    LocalStore::DeleteFile(path);
 }
 
 //hybrid datatype

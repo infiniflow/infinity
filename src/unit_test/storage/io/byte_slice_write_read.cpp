@@ -7,7 +7,6 @@ import third_party;
 
 import file_writer;
 import file_reader;
-import local_file_system;
 import byte_slice;
 import byte_slice_reader;
 import byte_slice_writer;

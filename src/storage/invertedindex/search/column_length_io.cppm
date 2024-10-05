@@ -54,7 +54,6 @@ public:
 
 private:
     u32 SeekFile(RowID row_id);
-    UniquePtr<FileSystem> file_system_;
     const String &index_dir_;
     const Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries_; // must in ascending order
     SharedPtr<MemoryIndexer> memory_indexer_;

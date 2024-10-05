@@ -6,7 +6,6 @@ import stl;
 import file_reader;
 import file_writer;
 import index_defines;
-import local_file_system;
 import position_list_encoder;
 import position_list_decoder;
 import posting_list_format;

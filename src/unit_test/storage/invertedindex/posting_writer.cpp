@@ -21,7 +21,6 @@ import posting_list_format;
 import data_type;
 import file_writer;
 import file_reader;
-import local_file_system;
 import posting_writer;
 import term_meta;
 import internal_types;

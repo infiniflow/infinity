@@ -9,8 +9,6 @@ import posting_byte_slice;
 import index_defines;
 import posting_field;
 import file_writer;
-import file_system;
-import local_file_system;
 
 using namespace infinity;
 
@@ -31,7 +29,6 @@ protected:
 };
 
 SharedPtr<FileWriter> SkipListWriterTest::CreateFileWriter(infinity::String file_path) {
-    auto fs = MakeShared<LocalFileSystem>();
     return MakeShared<FileWriter>(file_path, BUFFER_SIZE_);
 }
 

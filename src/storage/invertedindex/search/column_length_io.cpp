@@ -21,7 +21,6 @@ module column_length_io;
 
 import stl;
 import column_index_reader;
-import local_file_system;
 import chunk_index_entry;
 import memory_indexer;
 import buffer_obj;
@@ -30,7 +29,7 @@ import buffer_handle;
 namespace infinity {
 
 FullTextColumnLengthReader::FullTextColumnLengthReader(ColumnIndexReader *reader)
-    : file_system_(MakeUnique<LocalFileSystem>()), index_dir_(reader->index_dir_), chunk_index_entries_(reader->chunk_index_entries_),
+    : index_dir_(reader->index_dir_), chunk_index_entries_(reader->chunk_index_entries_),
       memory_indexer_(reader->memory_indexer_) {
     Pair<u64, float> df_and_avg_column_len = reader->GetTotalDfAndAvgColumnLength();
     total_df_ = df_and_avg_column_len.first;
