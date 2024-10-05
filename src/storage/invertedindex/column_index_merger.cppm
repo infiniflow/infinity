@@ -13,7 +13,6 @@ import term_meta;
 import index_full_text;
 import column_index_iterator;
 import segment_term_posting;
-import local_file_system;
 import internal_types;
 import vector_with_lock;
 

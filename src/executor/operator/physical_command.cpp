@@ -271,7 +271,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 Status status = Status::DataNotExist(fmt::format("The record does not exist: {}", export_command->file_no()));
                 RecoverableError(status);
             }
-            LocalFileSystem fs;
             FileWriter file_writer(export_command->file_name(), 128);
 
             auto json = QueryProfiler::Serialize(profiler_record).dump();

@@ -27,7 +27,7 @@ import column_vector;
 import default_values;
 import third_party;
 import vector_buffer;
-import local_file_system;
+import virtual_store;
 import infinity_exception;
 import logger;
 import data_file_worker;
@@ -178,10 +178,10 @@ ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, c
 }
 
 Vector<String> BlockColumnEntry::FilePaths() const {
-    Vector<String> res = {LocalFileSystem::ConcatenateFilePath(*FileDir(), *file_name_)};
+    Vector<String> res = {LocalStore::ConcatenatePath(*FileDir(), *file_name_)};
     for (SizeT file_idx = 0; file_idx < outline_buffers_.size(); ++file_idx) {
         String outline_file_path = *OutlineFilename(file_idx);
-        res.push_back(LocalFileSystem::ConcatenateFilePath(*FileDir(), outline_file_path));
+        res.push_back(LocalStore::ConcatenatePath(*FileDir(), outline_file_path));
     }
     return res;
 }

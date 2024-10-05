@@ -22,7 +22,7 @@ import stl;
 import default_values;
 import third_party;
 import data_type;
-import local_file_system;
+import virtual_store;
 import column_vector;
 import roaring_bitmap;
 import internal_types;
@@ -169,7 +169,7 @@ public:
 
     i32 GetAvailableCapacity();
 
-    String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*block_dir_, String(BlockVersion::PATH)); }
+    String VersionFilePath() { return LocalStore::ConcatenatePath(*block_dir_, String(BlockVersion::PATH)); }
 
     const SharedPtr<DataType> GetColumnType(u64 column_id) const;
 
