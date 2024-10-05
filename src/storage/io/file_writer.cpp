@@ -14,24 +14,27 @@
 
 module;
 
+#include <set>
+
 module file_writer;
 
 import stl;
-import file_system;
-import file_system_type;
+import virtual_store;
+import local_file_handle;
+import abstract_file_handle;
 import infinity_exception;
 import logger;
 
 namespace infinity {
 
-FileWriter::FileWriter(FileSystem &fs, const String &path, SizeT buffer_size, u8 file_flags)
-    : fs_(fs), path_(path), data_(MakeUnique<char_t[]>(buffer_size)), offset_(0), total_written_(0), buffer_size_(buffer_size) {
+FileWriter::FileWriter(const String &path, SizeT buffer_size)
+    : path_(path), data_(MakeUnique<char_t[]>(buffer_size)), offset_(0), total_written_(0), buffer_size_(buffer_size) {
     // Fixme: Open file out of constructor
-    auto [file_handler, status] = fs.OpenFile(path, file_flags, FileLockType::kWriteLock);
+    auto [file_handle, status] = LocalStore::Open(path, FileAccessMode::kWrite);
     if(!status.ok()) {
         UnrecoverableError(status.message());
     }
-    file_handler_ = std::move(file_handler);
+    file_handle_ = std::move(file_handle);
 }
 
 void FileWriter::WriteByte(const u8 b) {
@@ -94,19 +97,19 @@ void FileWriter::Write(const char_t *buffer, SizeT bytes_count) {
 
 void FileWriter::Sync() {
     Flush();
-    file_handler_->Sync();
+    file_handle_->Sync();
 }
 
 void FileWriter::Flush() {
     if (offset_ == 0) {
         return;
     }
-    fs_.Write(*file_handler_, data_.get(), offset_);
+    file_handle_->Append(data_.get(), offset_);
     total_written_ += offset_;
     offset_ = 0;
 }
 
-i64 FileWriter::GetFileSize() { return fs_.GetFileSize(*file_handler_) + offset_; }
+i64 FileWriter::GetFileSize() { return file_handle_->FileSize() + offset_; }
 
 SizeT FileWriter::TotalWrittenBytes() const { return total_written_ + offset_; }
 

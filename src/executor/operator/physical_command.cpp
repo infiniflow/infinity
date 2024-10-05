@@ -272,7 +272,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 RecoverableError(status);
             }
             LocalFileSystem fs;
-            FileWriter file_writer(fs, export_command->file_name(), 128);
+            FileWriter file_writer(export_command->file_name(), 128);
 
             auto json = QueryProfiler::Serialize(profiler_record).dump();
             file_writer.Write(json.c_str(), json.size());

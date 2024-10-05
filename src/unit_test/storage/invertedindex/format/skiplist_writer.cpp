@@ -32,7 +32,7 @@ protected:
 
 SharedPtr<FileWriter> SkipListWriterTest::CreateFileWriter(infinity::String file_path) {
     auto fs = MakeShared<LocalFileSystem>();
-    return MakeShared<FileWriter>(*fs, file_path, BUFFER_SIZE_);
+    return MakeShared<FileWriter>(file_path, BUFFER_SIZE_);
 }
 
 TEST_F(SkipListWriterTest, test1) {

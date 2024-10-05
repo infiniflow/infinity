@@ -33,7 +33,6 @@ private:
     String index_dir_;
     optionflag_t flag_;
     SharedPtr<FileWriter> posting_file_writer_;
-    LocalFileSystem fs_;
 
     // for column length info
     VectorWithLock<u32> column_lengths_;

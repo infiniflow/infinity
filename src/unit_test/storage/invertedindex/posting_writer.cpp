@@ -45,7 +45,6 @@ protected:
     String file_;
     optionflag_t flag_{OPTION_FLAG_ALL};
     PostingFormat posting_format_{flag_};
-    LocalFileSystem fs_;
     String config_path_{};
 };
 
@@ -66,7 +65,7 @@ TEST_P(PostingWriterTest, test1) {
             posting->EndDocument(expected[i], 0);
         }
 
-        SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(fs_, file_, 128000);
+        SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(file_, 128000);
         TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
         posting->Dump(file_writer, term_meta, true);
         file_writer->Sync();

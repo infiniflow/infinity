@@ -20,10 +20,8 @@ using namespace infinity;
 class StreamIOTest : public BaseTest {};
 
 TEST_F(StreamIOTest, TestBasicStreamIO) {
-    using namespace infinity;
-    LocalFileSystem local_file_system;
     String path = String(GetFullTmpDir()) + "/test_streamio.abc";
-    FileWriter file_writer(local_file_system, path, 128);
+    FileWriter file_writer(path, 128);
 
     String lines[5];
     lines[0] = "hahahahha"; 

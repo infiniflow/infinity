@@ -27,6 +27,7 @@ import local_file_system;
 import file_writer;
 import file_reader;
 import infinity_context;
+import virtual_store;
 
 using namespace infinity;
 
@@ -37,7 +38,7 @@ TEST_F(FileWriteReadTest, test1) {
     using namespace infinity;
     LocalFileSystem local_file_system;
     String path = String(GetFullTmpDir()) + "/test_file1.abc";
-    FileWriter file_writer(local_file_system, path, 128);
+    FileWriter file_writer(path, 128);
 
     for (SizeT i = 0; i < 128; ++i) {
         String buffer = "abc";
@@ -61,7 +62,7 @@ TEST_F(FileWriteReadTest, test2) {
     using namespace infinity;
     LocalFileSystem local_file_system;
     String path = String(GetFullTmpDir()) + "/test_file2.abc";
-    FileWriter file_writer(local_file_system, path, 128);
+    FileWriter file_writer(path, 128);
 
     for (u32 i = 0; i < 128; ++i) {
         file_writer.WriteVInt(i);
@@ -79,9 +80,8 @@ TEST_F(FileWriteReadTest, test2) {
 //hybrid datatype
 TEST_F(FileWriteReadTest, test3) {
     using namespace infinity;
-    LocalFileSystem local_file_system;
     String path = String(GetFullTmpDir()) + "/test_file3.abc";
-    FileWriter file_writer(local_file_system, path, 128);
+    FileWriter file_writer(path, 128);
 
     for (u32 i = 0; i < 128; ++i) {
         file_writer.WriteVInt(i);
@@ -108,7 +108,7 @@ TEST_F(FileWriteReadTest, test3) {
         u32 a = file_reader.ReadVInt();
         EXPECT_EQ(a, i);
     }
-    local_file_system.DeleteFile(path);
+    LocalStore::DeleteFile(path);
 }
 
 
@@ -116,9 +116,8 @@ TEST_F(FileWriteReadTest, test3) {
 //plus exceed case for reader/writer buffer
 TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
     using namespace infinity;
-    LocalFileSystem local_file_system;
     String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
-    FileWriter file_writer(local_file_system, path, 128);
+    FileWriter file_writer(path, 128);
 
     for(i32 i = 0; i < 1024; ++i) {
         file_writer.WriteInt(i);
@@ -147,9 +146,8 @@ TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
 //seek a, finish
 TEST_F(FileWriteReadTest, TestFilePointerSeek) {
     using namespace infinity;
-    LocalFileSystem local_file_system;
     String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
-    FileWriter file_writer(local_file_system, path, 128);
+    FileWriter file_writer(path, 128);
 
     for(i32 i = 0; i < 1024; i++) {
         file_writer.WriteInt(i);
@@ -178,9 +176,8 @@ TEST_F(FileWriteReadTest, TestFilePointerSeek) {
 //test if ReFill works fine.
 TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
     using namespace infinity;
-    LocalFileSystem local_file_system;
     String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
-    FileWriter file_writer(local_file_system, path, 128);
+    FileWriter file_writer(path, 128);
 
     String s;
     for(i32 i = 0; i < 1000; i++) {
@@ -202,9 +199,8 @@ TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
 TEST_F(FileWriteReadTest, TestFileIODataTypes) {
 
     using namespace infinity;
-    LocalFileSystem local_file_system;
     String path = String(GetFullTmpDir()) + "/test_io_alltypes.abc";
-    FileWriter file_writer(local_file_system, path, 128);
+    FileWriter file_writer(path, 128);
 
     file_writer.WriteByte('a');
     file_writer.WriteInt(4);
