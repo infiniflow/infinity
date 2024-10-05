@@ -18,7 +18,6 @@ export module binary_fuse_filter;
 import stl;
 import default_values;
 import infinity_exception;
-import file_system;
 import third_party;
 import logger;
 

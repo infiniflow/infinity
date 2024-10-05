@@ -283,8 +283,8 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
     }
 
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, tmp_posting_file, 128000);
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, tmp_dict_file, 128000);
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(tmp_posting_file, 128000);
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(tmp_dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
 
     String tmp_fst_file = tmp_dict_file + ".fst";
@@ -411,8 +411,8 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
         tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
         tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
     }
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, tmp_posting_file, 128000);
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, tmp_dict_file, 128000);
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(tmp_posting_file, 128000);
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(tmp_dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
     String tmp_fst_file = tmp_dict_file + ".fst";
     std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);

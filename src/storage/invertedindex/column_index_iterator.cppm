@@ -12,7 +12,6 @@ import posting_list_format;
 import index_defines;
 import term_meta;
 import dict_reader;
-import local_file_system;
 namespace infinity {
 
 export class ColumnIndexIterator {

@@ -43,8 +43,6 @@ import third_party;
 import defer_op;
 import txn_store;
 
-import file_system_type;
-import file_system;
 import buffer_handle;
 import data_file_worker;
 
@@ -67,6 +65,7 @@ import stream_io;
 import parser_assert;
 import virtual_store;
 import abstract_file_handle;
+import file_system_type;
 
 namespace infinity {
 
