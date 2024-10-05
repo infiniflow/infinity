@@ -18,9 +18,9 @@
 
 import stl;
 import file_system;
-import local_file_system;
+import virtual_store;
 import infinity_exception;
-import file_system_type;
+import abstract_file_handle;
 
 using namespace infinity;
 
@@ -28,25 +28,24 @@ namespace benchmark {
 
 template <typename T>
 Tuple<SizeT, i32, UniquePtr<T[]>> DecodeFvecsDataset(const Path &path) {
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(path.string(), FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [file_handle, status] = LocalStore::Open(path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     i32 dim = 0;
-    file_handler->Read(&dim, sizeof(dim));
-    SizeT file_size = fs.GetFileSize(*file_handler);
+    file_handle->Read(&dim, sizeof(dim));
+    SizeT file_size = file_handle->FileSize();
     SizeT vec_num = file_size / (dim * sizeof(T) + sizeof(dim));
     auto data = MakeUniqueForOverwrite<T[]>(vec_num * dim);
     for (SizeT i = 0; i < vec_num - 1; ++i) {
-        file_handler->Read(data.get() + i * dim, dim * sizeof(T));
+        file_handle->Read(data.get() + i * dim, dim * sizeof(T));
         i32 dim1 = 0;
-        file_handler->Read(&dim1, sizeof(dim1));
+        file_handle->Read(&dim1, sizeof(dim1));
         if (dim1 != dim) {
             UnrecoverableError("dim not match");
         }
     }
-    file_handler->Read(data.get() + (vec_num - 1) * dim, dim * sizeof(T));
+    file_handle->Read(data.get() + (vec_num - 1) * dim, dim * sizeof(T));
     return {vec_num, dim, std::move(data)};
 }
 

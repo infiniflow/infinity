@@ -19,7 +19,6 @@ import stl;
 import hnsw_alg;
 import vec_store_type;
 import file_system;
-import local_file_system;
 import hnsw_common;
 import sparse_util;
 import file_system_type;

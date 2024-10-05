@@ -29,7 +29,6 @@ import segment_posting;
 import posting_iterator;
 import internal_types;
 import logical_type;
-import local_file_system;
 import segment_index_entry;
 import vector_with_lock;
 import persistence_manager;
