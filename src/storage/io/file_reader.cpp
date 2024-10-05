@@ -91,7 +91,7 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
                 std::memcpy(buffer, data_.get() + buffer_offset_, start);
             }
 
-            auto [tmp_read_size, status] = file_handle_->Read(buffer, read_size);
+            auto [tmp_read_size, status] = file_handle_->Read(buffer + start, read_size - start);
             if(!status.ok()) {
                 RecoverableError(status);
             }
