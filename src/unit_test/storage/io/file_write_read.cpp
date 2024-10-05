@@ -47,7 +47,7 @@ TEST_F(FileWriteReadTest, test1) {
     EXPECT_EQ(file_writer.GetFileSize(), 128 * 3);
     EXPECT_EQ(file_writer.total_written_, (SizeT)128 * 3);
 
-    FileReader file_reader(local_file_system, path, 128);
+    FileReader file_reader(path, 128);
     String read_str;
     read_str.resize(4);
     file_reader.Read(read_str.data(), 4);
@@ -68,7 +68,7 @@ TEST_F(FileWriteReadTest, test2) {
     }
     file_writer.Flush();
 
-    FileReader file_reader(local_file_system, path, 128);
+    FileReader file_reader(path, 128);
     for (u32 i = 0; i < 128; ++i) {
         u32 a = file_reader.ReadVInt();
         EXPECT_EQ(a, i);
@@ -95,7 +95,7 @@ TEST_F(FileWriteReadTest, test3) {
     }
     file_writer.Flush();
 
-    FileReader file_reader(local_file_system, path, 128);
+    FileReader file_reader(path, 128);
     for (u32 i = 0; i < 128; ++i) {
         u32 a = file_reader.ReadVInt();
         EXPECT_EQ(a, i);
@@ -128,7 +128,7 @@ TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
     file_writer.Write(buffer.c_str(), buffer.size());
     file_writer.Sync();
 
-    FileReader file_reader(local_file_system, path, 128);
+    FileReader file_reader(path, 128);
     for (i32 i = 0; i < 1024; ++i) {
         i32 a = file_reader.ReadInt();
         EXPECT_EQ(a, i);
@@ -156,7 +156,7 @@ TEST_F(FileWriteReadTest, TestFilePointerSeek) {
     }
     file_writer.Sync();
 
-    FileReader file_reader(local_file_system, path, 128);
+    FileReader file_reader(path, 128);
     u64 a;
     for (i32 i = 0; i < 1024; ++i) {
         if(i == 254) {
@@ -192,7 +192,7 @@ TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
 
     String read_s;
     read_s.resize(s.size());
-    FileReader file_reader(local_file_system, path, 128);
+    FileReader file_reader(path, 128);
     file_reader.Read(read_s.data(), read_s.size());
 
     EXPECT_STREQ(s.c_str(), read_s.c_str());
@@ -217,7 +217,7 @@ TEST_F(FileWriteReadTest, TestFileIODataTypes) {
     file_writer.Write(s.data(), s.size());
     file_writer.Sync();
 
-    FileReader file_reader(local_file_system, path, 128);
+    FileReader file_reader(path, 128);
     EXPECT_EQ(file_reader.ReadByte(), 'a');
     EXPECT_EQ(file_reader.ReadInt(), 4);
     EXPECT_EQ(file_reader.ReadVInt(), 23);
