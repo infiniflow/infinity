@@ -41,7 +41,7 @@ export struct DefaultConfig {
 
 export struct Config {
 public:
-    Status Init(const SharedPtr<String> &config_path, DefaultConfig* default_config);
+    Status Init(const SharedPtr<String> &config_path, DefaultConfig *default_config);
 
     void PrintAll();
 
@@ -53,9 +53,7 @@ public:
 
     void SetCPULimit(i64 new_cpu_limit);
     i64 CPULimit();
-    inline bool RecordRunningQuery() {
-        return record_running_query_;
-    }
+    inline bool RecordRunningQuery() { return record_running_query_; }
     void SetRecordRunningQuery(bool flag);
 
     // Network
@@ -131,9 +129,10 @@ public:
 
 public:
     // Get config by name
-    Tuple<BaseOption *, Status> GetConfigByName(const String& name);
+    Tuple<BaseOption *, Status> GetConfigByName(const String &name);
 
-    GlobalOptionIndex GetOptionIndex(const String& var_name) const { return global_options_.GetOptionIndex(var_name); }
+    GlobalOptionIndex GetOptionIndex(const String &var_name) const { return global_options_.GetOptionIndex(var_name); }
+
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 
