@@ -23,7 +23,6 @@ import internal_types;
 import virtual_store;
 import index_base;
 import diskann_index_data;
-import abstract_file_handle;
 import local_file_handle;
 
 using namespace infinity;

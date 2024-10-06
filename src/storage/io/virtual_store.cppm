@@ -20,11 +20,27 @@ import stl;
 import status;
 import third_party;
 import local_file_handle;
-import virtual_storage_type;
-import abstract_file_handle;
 import stream_reader;
 
 namespace infinity {
+
+export enum class StorageType {
+    kInvalid,
+    kLocal,
+    kMinio,
+    kAwsS3,
+    kAzureBlob, // Azure object store
+    kGCS,       // Google cloud storage
+    kOSS,       // Aliyun OSS
+    kCOS,       // Tencent object store
+    kOBS,       // Huawei object store
+    kHDFS,
+    kNFS,
+};
+
+export StorageType String2StorageType(const String &storage_type);
+
+export String ToString(StorageType storage_type);
 
 export struct MmapInfo {
     u8 *data_ptr_{};

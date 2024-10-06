@@ -50,7 +50,6 @@ import cleanup_scanner;
 import persistence_manager;
 import extra_ddl_info;
 import virtual_store;
-import virtual_storage_type;
 
 namespace infinity {
 

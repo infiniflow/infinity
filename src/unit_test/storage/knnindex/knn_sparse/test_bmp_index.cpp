@@ -15,6 +15,7 @@
 #include <cassert>
 
 #include "gtest/gtest.h"
+
 import base_test;
 import stl;
 import bmp_alg;
@@ -25,7 +26,7 @@ import compilation_config;
 import sparse_test_util;
 import infinity_exception;
 import virtual_store;
-import abstract_file_handle;
+import local_file_handle;
 
 using namespace infinity;
 

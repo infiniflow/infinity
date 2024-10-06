@@ -64,7 +64,7 @@ import build_fast_rough_filter_task;
 import stream_reader;
 import parser_assert;
 import virtual_store;
-import abstract_file_handle;
+import local_file_handle;
 
 namespace infinity {
 

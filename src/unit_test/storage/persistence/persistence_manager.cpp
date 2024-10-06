@@ -3,10 +3,9 @@ import base_test;
 import stl;
 import persistence_manager;
 import virtual_store;
-import virtual_storage_type;
-import abstract_file_handle;
 import third_party;
 import persist_result_handler;
+import local_file_handle;
 
 using namespace infinity;
 namespace fs = std::filesystem;

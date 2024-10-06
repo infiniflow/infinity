@@ -25,7 +25,6 @@ import status;
 import hnsw_common;
 import infinity_exception;
 import profiler;
-import abstract_file_handle;
 
 using namespace infinity;
 

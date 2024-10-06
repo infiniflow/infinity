@@ -59,7 +59,7 @@ import segment_index_entry;
 import chunk_index_entry;
 import log_file;
 import persist_result_handler;
-import abstract_file_handle;
+import local_file_handle;
 
 namespace infinity {
 

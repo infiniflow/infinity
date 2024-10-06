@@ -33,7 +33,6 @@ import diskann_partition_and_pq;
 import vamana_alg;
 import diskann_dist_func;
 import local_file_handle;
-import abstract_file_handle;
 import virtual_store;
 
 namespace infinity {

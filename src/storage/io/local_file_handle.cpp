@@ -27,7 +27,6 @@ import status;
 import virtual_store;
 import infinity_exception;
 import logger;
-import abstract_file_handle;
 
 namespace infinity {
 

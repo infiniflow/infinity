@@ -23,7 +23,6 @@ import infinity_exception;
 import virtual_store;
 import compilation_config;
 import sparse_util;
-import abstract_file_handle;
 import local_file_handle;
 
 using namespace infinity;

@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
 module;
 
 export module minio_file;
 
+#if 0
 import stl;
-import virtual_storage_type;
 import status;
 import object_file;
 import abstract_file_handle;
@@ -56,3 +57,4 @@ private:
 };
 
 } // namespace infinity
+#endif

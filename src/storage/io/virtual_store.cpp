@@ -27,14 +27,95 @@ module virtual_store;
 
 import stl;
 import third_party;
-import virtual_storage_type;
 import logger;
 import infinity_exception;
 import default_values;
-import abstract_file_handle;
 import stream_reader;
 
 namespace infinity {
+
+
+StorageType String2StorageType(const String &storage_type) {
+    if (storage_type == "local") {
+        return StorageType::kLocal;
+    }
+
+    if (storage_type == "minio") {
+        return StorageType::kMinio;
+    }
+
+    if (storage_type == "aws_s3") {
+        return StorageType::kLocal;
+    }
+
+    if (storage_type == "azure_blob") {
+        return StorageType::kLocal;
+    }
+
+    if (storage_type == "gcs") {
+        return StorageType::kLocal;
+    }
+
+    if (storage_type == "oss") {
+        return StorageType::kLocal;
+    }
+
+    if (storage_type == "cos") {
+        return StorageType::kLocal;
+    }
+    if (storage_type == "obs") {
+        return StorageType::kLocal;
+    }
+
+    if (storage_type == "hdfs") {
+        return StorageType::kLocal;
+    }
+
+    if (storage_type == "nfs") {
+        return StorageType::kLocal;
+    }
+
+    return StorageType::kInvalid;
+}
+
+
+String ToString(StorageType storage_type) {
+    switch (storage_type) {
+        case StorageType::kLocal: {
+            return "local";
+        }
+        case StorageType::kMinio: {
+            return "minio";
+        }
+        case StorageType::kAwsS3: {
+            return "aws s3";
+        }
+        case StorageType::kAzureBlob: {
+            return "azure blob";
+        }
+        case StorageType::kGCS: {
+            return "google cloud storage";
+        }
+        case StorageType::kOSS: {
+            return "aliyun object storage service";
+        }
+        case StorageType::kCOS: {
+            return "tencent cloud object storage";
+        }
+        case StorageType::kOBS: {
+            return "huawei object storage service";
+        }
+        case StorageType::kHDFS: {
+            return "hadoop file system";
+        }
+        case StorageType::kNFS: {
+            return "network file system";
+        }
+        default: {
+            return "invalid";
+        }
+    }
+}
 
 Status RemoteStore::Init(StorageType storage_type, Map<String, String> &config) {
     // Init remote filesystem and local disk cache

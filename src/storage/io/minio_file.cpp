@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+#if 0
 module;
 
 #include <cassert>
@@ -29,7 +29,6 @@ import virtual_storage;
 import third_party;
 import infinity_exception;
 import infinity_context;
-import abstract_file_handle;
 
 module minio_file;
 
@@ -309,4 +308,5 @@ Status MinioFile::Sync() {
     return Status::OK();
 }
 
-} 
+}
+#endif

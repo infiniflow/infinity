@@ -43,7 +43,6 @@ import default_values;
 import internal_types;
 import virtual_store;
 import local_file_handle;
-import abstract_file_handle;
 
 namespace infinity {
 
