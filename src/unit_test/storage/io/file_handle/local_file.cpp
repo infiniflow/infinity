@@ -17,7 +17,6 @@
 import base_test;
 import stl;
 import virtual_store;
-import virtual_storage_type;
 import local_file_handle;
 
 using namespace infinity;

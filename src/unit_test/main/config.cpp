@@ -21,7 +21,7 @@ import infinity_exception;
 import third_party;
 import status;
 import compilation_config;
-import virtual_storage_type;
+import virtual_store;
 
 using namespace infinity;
 class ConfigTest : public BaseTest {};

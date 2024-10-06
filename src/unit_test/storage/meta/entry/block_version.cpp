@@ -24,7 +24,6 @@ import third_party;
 import infinity_context;
 import block_version;
 import virtual_store;
-import virtual_storage_type;
 import buffer_manager;
 import version_file_worker;
 import column_vector;

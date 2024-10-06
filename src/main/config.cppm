@@ -20,7 +20,7 @@ import third_party;
 import options;
 import status;
 import command_statement;
-import virtual_storage_type;
+import virtual_store;
 
 namespace infinity {
 
