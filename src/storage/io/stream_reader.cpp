@@ -21,7 +21,6 @@ module stream_reader;
 import stl;
 import logger;
 import status;
-import file_system_type;
 import infinity_exception;
 import third_party;
 

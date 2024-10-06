@@ -19,7 +19,6 @@
 import stl;
 import virtual_store;
 import infinity_exception;
-import file_system_type;
 import third_party;
 import infinity_exception;
 import sparse_util;

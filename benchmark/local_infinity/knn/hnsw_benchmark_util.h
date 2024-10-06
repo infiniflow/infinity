@@ -17,7 +17,6 @@
 #include "CLI11.hpp"
 
 import stl;
-import file_system;
 import virtual_store;
 import infinity_exception;
 import abstract_file_handle;
