@@ -24,7 +24,6 @@ import infinity_exception;
 import sparse_util;
 import compilation_config;
 import bmp_util;
-import abstract_file_handle;
 
 using namespace infinity;
 

@@ -29,7 +29,6 @@ import virtual_storage;
 import third_party;
 import infinity_exception;
 import infinity_context;
-import abstract_file_handle;
 
 module minio_file;
 

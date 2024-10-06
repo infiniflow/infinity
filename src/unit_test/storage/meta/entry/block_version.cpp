@@ -25,7 +25,6 @@ import infinity_context;
 import block_version;
 import virtual_store;
 import virtual_storage_type;
-import abstract_file_handle;
 import buffer_manager;
 import version_file_worker;
 import column_vector;
@@ -33,6 +32,7 @@ import data_type;
 import logical_type;
 import persistence_manager;
 import default_values;
+import local_file_handle;
 
 using namespace infinity;
 

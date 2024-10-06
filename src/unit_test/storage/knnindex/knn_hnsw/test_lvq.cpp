@@ -24,7 +24,6 @@ import infinity_exception;
 import hnsw_common;
 import virtual_store;
 import local_file_handle;
-import abstract_file_handle;
 
 using namespace infinity;
 

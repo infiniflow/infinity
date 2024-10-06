@@ -21,7 +21,6 @@ module file_writer;
 import stl;
 import virtual_store;
 import local_file_handle;
-import abstract_file_handle;
 import infinity_exception;
 import logger;
 

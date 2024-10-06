@@ -30,7 +30,7 @@ import logger;
 import infinity_context;
 import persistence_manager;
 import persist_result_handler;
-import abstract_file_handle;
+import local_file_handle;
 
 using namespace infinity;
 

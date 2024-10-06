@@ -26,7 +26,7 @@ import file_writer;
 import file_reader;
 import infinity_context;
 import virtual_store;
-import abstract_file_handle;
+import local_file_handle;
 
 using namespace infinity;
 

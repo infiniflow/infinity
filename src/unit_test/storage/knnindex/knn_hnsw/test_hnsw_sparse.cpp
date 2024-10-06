@@ -26,7 +26,6 @@ import third_party;
 import sparse_test_util;
 import virtual_store;
 import local_file_handle;
-import abstract_file_handle;
 
 using namespace infinity;
 

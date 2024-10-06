@@ -29,6 +29,7 @@ import abstract_bmp;
 import virtual_store;
 import persistence_manager;
 import abstract_file_handle;
+import local_file_handle;
 
 namespace infinity {
 

@@ -19,7 +19,6 @@
 import stl;
 import virtual_store;
 import infinity_exception;
-import abstract_file_handle;
 
 using namespace infinity;
 

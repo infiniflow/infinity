@@ -32,7 +32,7 @@ import vec_store_type;
 import hnsw_common;
 import infinity_exception;
 import virtual_store;
-import abstract_file_handle;
+import local_file_handle;
 
 using namespace infinity;
 

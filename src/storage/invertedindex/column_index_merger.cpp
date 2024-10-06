@@ -23,7 +23,6 @@ import posting_byte_slice_reader;
 import posting_merger;
 import third_party;
 import virtual_store;
-import abstract_file_handle;
 import local_file_handle;
 import infinity_exception;
 import vector_with_lock;

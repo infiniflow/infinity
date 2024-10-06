@@ -26,7 +26,6 @@ import infinity_exception;
 import third_party;
 import logger;
 import virtual_store;
-import abstract_file_handle;
 
 namespace infinity {
 

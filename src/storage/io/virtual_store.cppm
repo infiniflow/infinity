@@ -21,7 +21,6 @@ import status;
 import third_party;
 import local_file_handle;
 import virtual_storage_type;
-import abstract_file_handle;
 import stream_reader;
 
 namespace infinity {

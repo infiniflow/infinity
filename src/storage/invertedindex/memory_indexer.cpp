@@ -65,7 +65,7 @@ import persistence_manager;
 import utility;
 import persist_result_handler;
 import virtual_store;
-import abstract_file_handle;
+import local_file_handle;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length

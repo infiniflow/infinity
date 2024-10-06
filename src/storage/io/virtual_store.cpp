@@ -31,7 +31,6 @@ import virtual_storage_type;
 import logger;
 import infinity_exception;
 import default_values;
-import abstract_file_handle;
 import stream_reader;
 
 namespace infinity {
