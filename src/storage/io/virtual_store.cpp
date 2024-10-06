@@ -33,6 +33,7 @@ import infinity_exception;
 import default_values;
 import abstract_file_handle;
 import local_file_system;
+import stream_reader;
 
 namespace infinity {
 
@@ -124,6 +125,15 @@ Tuple<UniquePtr<LocalFileHandle>, Status> LocalStore::Open(const String &path, F
         return {nullptr, Status::IOError(error_message)};
     }
     return {MakeUnique<LocalFileHandle>(fd, path, access_mode), Status::OK()};
+}
+
+UniquePtr<StreamReader> LocalStore::OpenStreamReader(const String& path) {
+    auto res = MakeUnique<StreamReader>();
+    Status status = res->Init(path);
+    if(!status.ok()) {
+        RecoverableError(status);
+    }
+    return res;
 }
 
 // For local disk filesystem, such as temp file, disk cache and WAL

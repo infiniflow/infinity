@@ -23,6 +23,7 @@ import local_file_handle;
 import virtual_storage_type;
 import abstract_file_handle;
 import local_file_system;
+import stream_reader;
 
 namespace infinity {
 
@@ -44,6 +45,7 @@ private:
 export class LocalStore {
 public:
     static Tuple<UniquePtr<LocalFileHandle>, Status> Open(const String& path, FileAccessMode access_mode);
+    static UniquePtr<StreamReader> OpenStreamReader(const String& path);
     static bool IsRegularFile(const String& path);
     static bool Exists(const String& path);
     static Status DeleteFile(const String& path);
