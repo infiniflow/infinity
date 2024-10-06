@@ -32,7 +32,6 @@ import logger;
 import infinity_exception;
 import default_values;
 import abstract_file_handle;
-import local_file_system;
 import stream_reader;
 
 namespace infinity {

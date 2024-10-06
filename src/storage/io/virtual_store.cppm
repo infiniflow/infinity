@@ -22,10 +22,15 @@ import third_party;
 import local_file_handle;
 import virtual_storage_type;
 import abstract_file_handle;
-import local_file_system;
 import stream_reader;
 
 namespace infinity {
+
+export struct MmapInfo {
+    u8 *data_ptr_{};
+    SizeT data_len_{};
+    SizeT rc_{};
+};
 
 // Only one instance;
 export class RemoteStore {
