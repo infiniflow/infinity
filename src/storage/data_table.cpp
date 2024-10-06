@@ -89,7 +89,8 @@ void DataTable::UnionWith(const SharedPtr<DataTable> &other) {
         UnrecoverableError(error_message);
     }
     if (this->data_blocks_.size() != other->data_blocks_.size()) {
-        String error_message = fmt::format("Can't union two table with different block count {}:{}.", this->data_blocks_.size(), other->data_blocks_.size());
+        String error_message =
+            fmt::format("Can't union two table with different block count {}:{}.", this->data_blocks_.size(), other->data_blocks_.size());
         UnrecoverableError(error_message);
     }
     SizeT block_count = this->data_blocks_.size();
@@ -105,7 +106,9 @@ void DataTable::Append(const SharedPtr<DataBlock> &data_block) {
     UpdateRowCount(data_block->row_count());
 }
 
-SharedPtr<DataTable> DataTable::Make(SharedPtr<TableDef> table_def_ptr, TableType type) { return MakeShared<DataTable>(std::move(table_def_ptr), type); }
+SharedPtr<DataTable> DataTable::Make(SharedPtr<TableDef> table_def_ptr, TableType type) {
+    return MakeShared<DataTable>(std::move(table_def_ptr), type);
+}
 
 SharedPtr<DataTable> DataTable::MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs) {
     SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, column_defs);
@@ -119,7 +122,8 @@ SharedPtr<DataTable> DataTable::MakeEmptyResultTable() {
 
 SharedPtr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum) {
     Vector<SharedPtr<ColumnDef>> column_defs;
-    column_defs.emplace_back(MakeShared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "count", std::set<ConstraintType>()));
+    column_defs.emplace_back(
+        MakeShared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "count", std::set<ConstraintType>()));
     column_defs.emplace_back(MakeShared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "sum", std::set<ConstraintType>()));
     SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(nullptr, nullptr, column_defs);
     SharedPtr<DataTable> result_table = Make(result_table_def_ptr, TableType::kResult);

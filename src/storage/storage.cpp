@@ -98,7 +98,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
                 break;
             }
-            switch(config_ptr_->StorageType()) {
+            switch (config_ptr_->StorageType()) {
                 case StorageType::kLocal: {
                     // Not init remote store
                     break;
@@ -250,7 +250,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
-                switch(config_ptr_->StorageType()) {
+                switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
                         // Not init remote store
                         break;
@@ -335,7 +335,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
-                switch(config_ptr_->StorageType()) {
+                switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
                         // Not init remote store
                         break;
