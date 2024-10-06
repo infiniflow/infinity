@@ -180,8 +180,7 @@ TEST_F(VirtualStoreTest, TestAppend) {
     String dst_path = String(GetFullTmpDir()) + "/test_file_append_dst.abc";
     String src_path = String(GetFullTmpDir()) + "/test_file_append_src.abc";
 
-    auto [src_handler, src_status] =
-        LocalStore::Open(src_path, FileAccessMode::kWrite);
+    auto [src_handler, src_status] = LocalStore::Open(src_path, FileAccessMode::kWrite);
     if (!src_status.ok()) {
         UnrecoverableError(src_status.message());
     }
@@ -194,8 +193,7 @@ TEST_F(VirtualStoreTest, TestAppend) {
     src_handler->Append(src_data.get(), src_len);
     src_handler->Sync();
 
-    auto [dst_handler, dst_status] =
-        LocalStore::Open(dst_path, FileAccessMode::kWrite);
+    auto [dst_handler, dst_status] = LocalStore::Open(dst_path, FileAccessMode::kWrite);
     if (!dst_status.ok()) {
         UnrecoverableError(dst_status.message());
     }
@@ -241,8 +239,7 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
 
     LocalStore::MakeDirectory(dir);
 
-    auto [file_handler1, status1] =
-        LocalStore::Open(file_path1, FileAccessMode::kWrite);
+    auto [file_handler1, status1] = LocalStore::Open(file_path1, FileAccessMode::kWrite);
     if (!status1.ok()) {
         UnrecoverableError(status1.message());
     }
@@ -254,8 +251,7 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
     file_handler1->Append(data_array1.get(), len1);
     file_handler1->Sync();
 
-    auto [file_handler2, status2] =
-        LocalStore::Open(file_path2, FileAccessMode::kWrite);
+    auto [file_handler2, status2] = LocalStore::Open(file_path2, FileAccessMode::kWrite);
     if (!status2.ok()) {
         UnrecoverableError(status2.message());
     }

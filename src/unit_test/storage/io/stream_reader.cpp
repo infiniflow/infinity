@@ -23,13 +23,13 @@ TEST_F(StreamReaderTest, TestBasicStreamIO) {
     FileWriter file_writer(path, 128);
 
     String lines[5];
-    lines[0] = "hahahahha"; 
+    lines[0] = "hahahahha";
     lines[1] = "xixixixiix";
     lines[2] = "huhuhuhu";
-    lines[3]= "xuxuxuxuxxu";
+    lines[3] = "xuxuxuxuxxu";
     lines[4] = "ddddd";
 
-    for(i64 i = 0; i < 5; i++) {
+    for (i64 i = 0; i < 5; i++) {
         file_writer.Write(lines[i].c_str(), lines[i].size());
         file_writer.Write("\n", 1);
     }
@@ -38,7 +38,7 @@ TEST_F(StreamReaderTest, TestBasicStreamIO) {
     UniquePtr<StreamReader> stream = LocalStore::OpenStreamReader(path);
     i32 i = 0;
     String line;
-    while(stream->ReadLine(line)) {
+    while (stream->ReadLine(line)) {
         EXPECT_STREQ(line.c_str(), lines[i].c_str());
         i++;
     }
