@@ -68,6 +68,7 @@ public:
     Config *config() const { return config_ptr_; }
 
     void CreateDefaultDB();
+
 private:
     Config *config_ptr_{};
     UniquePtr<Catalog> new_catalog_{};

@@ -18,10 +18,8 @@
 #include <stdexcept>
 
 import stl;
-import file_system;
 import virtual_store;
 import infinity_exception;
-import file_system_type;
 import compilation_config;
 import third_party;
 import profiler;

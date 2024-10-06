@@ -16,8 +16,6 @@
 #include <random>
 import base_test;
 
-import file_system;
-import file_system_type;
 import dist_func_l2;
 import data_store;
 import vec_store_type;

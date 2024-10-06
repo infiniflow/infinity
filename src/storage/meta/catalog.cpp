@@ -36,8 +36,6 @@ import special_function;
 import buffer_manager;
 import column_def;
 import virtual_store;
-import file_system_type;
-import file_system;
 import table_def;
 import table_entry_type;
 import meta_info;

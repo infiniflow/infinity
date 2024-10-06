@@ -23,8 +23,6 @@ import index_defines;
 import internal_types;
 import file_reader;
 
-import file_system;
-
 export module segment_posting;
 
 namespace infinity {

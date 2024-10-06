@@ -61,11 +61,10 @@ import value;
 import catalog;
 import catalog_delta_entry;
 import build_fast_rough_filter_task;
-import stream_io;
+import stream_reader;
 import parser_assert;
 import virtual_store;
 import abstract_file_handle;
-import file_system_type;
 
 namespace infinity {
 
@@ -577,9 +576,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
 }
 
 void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
-    StreamIO stream_io;
-    stream_io.Init(file_path_, FileFlags::READ_FLAG);
-    DeferFn file_defer([&]() { stream_io.Close(); });
+    UniquePtr<StreamReader> stream_reader = LocalStore::OpenStreamReader(file_path_);
 
     Txn *txn = query_context->GetTxn();
     u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
@@ -595,7 +592,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     SizeT row_count{0};
     while (true) {
         String json_str;
-        if (stream_io.ReadLine(json_str)) {
+        if (stream_reader->ReadLine(json_str)) {
             nlohmann::json line_json = nlohmann::json::parse(json_str);
             try {
                 JSONLRowHandler(line_json, column_vectors);

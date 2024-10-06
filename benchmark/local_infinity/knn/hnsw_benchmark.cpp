@@ -21,8 +21,6 @@ import hnsw_alg;
 import vec_store_type;
 import compilation_config;
 import virtual_store;
-import file_system;
-import file_system_type;
 import status;
 import hnsw_common;
 import infinity_exception;

@@ -31,7 +31,6 @@ import status;
 import logger;
 import third_party;
 import infinity_exception;
-import file_system;
 import internal_types;
 import segment_entry;
 import block_entry;

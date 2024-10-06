@@ -14,13 +14,14 @@
 
 module;
 
-#include <string>
-#include <fcntl.h>
-#include <unistd.h>
 #include <cerrno>
 #include <cstring>
+#include <fcntl.h>
 #include <filesystem>
+#include <string>
+#include <sys/mman.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 module virtual_store;
 
@@ -31,6 +32,7 @@ import logger;
 import infinity_exception;
 import default_values;
 import abstract_file_handle;
+import stream_reader;
 
 namespace infinity {
 
@@ -98,7 +100,7 @@ Status RemoteStore::UnInit() {
     return Status::OK();
 }
 
-Tuple<UniquePtr<LocalFileHandle>, Status> LocalStore::Open(const String& path, FileAccessMode access_mode) {
+Tuple<UniquePtr<LocalFileHandle>, Status> LocalStore::Open(const String &path, FileAccessMode access_mode) {
     i32 fd = -1;
     switch (access_mode) {
         case FileAccessMode::kRead: {
@@ -117,13 +119,21 @@ Tuple<UniquePtr<LocalFileHandle>, Status> LocalStore::Open(const String& path, F
             break;
         }
     }
-    if(fd == -1) {
+    if (fd == -1) {
         String error_message = fmt::format("File open failed: {}", strerror(errno));
         return {nullptr, Status::IOError(error_message)};
     }
     return {MakeUnique<LocalFileHandle>(fd, path, access_mode), Status::OK()};
 }
 
+UniquePtr<StreamReader> LocalStore::OpenStreamReader(const String& path) {
+    auto res = MakeUnique<StreamReader>();
+    Status status = res->Init(path);
+    if(!status.ok()) {
+        RecoverableError(status);
+    }
+    return res;
+}
 
 // For local disk filesystem, such as temp file, disk cache and WAL
 bool LocalStore::Exists(const String &path) {
@@ -162,8 +172,8 @@ Status LocalStore::DeleteFile(const String &file_name) {
 }
 
 Status LocalStore::MakeDirectory(const String &path) {
-    if(LocalStore::Exists(path)) {
-        if(std::filesystem::is_directory(path)) {
+    if (LocalStore::Exists(path)) {
+        if (std::filesystem::is_directory(path)) {
             return Status::OK();
         } else {
             String error_message = fmt::format("Exists file: {}", path);
@@ -302,20 +312,18 @@ Tuple<Vector<SharedPtr<DirEntry>>, Status> LocalStore::ListDirectory(const Strin
     return {file_array, Status::OK()};
 }
 
-SizeT LocalStore::GetFileSize(const String& path) {
-    if(!std::filesystem::path(path).is_absolute()) {
+SizeT LocalStore::GetFileSize(const String &path) {
+    if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
     }
     return std::filesystem::file_size(path);
 }
 
-String LocalStore::GetParentPath(const String& path) {
-    return Path(path).parent_path().string();
-}
+String LocalStore::GetParentPath(const String &path) { return Path(path).parent_path().string(); }
 
 SizeT LocalStore::GetDirectorySize(const String &path) {
-    if(!std::filesystem::path(path).is_absolute()) {
+    if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
     }
@@ -333,6 +341,67 @@ SizeT LocalStore::GetDirectorySize(const String &path) {
 String LocalStore::ConcatenatePath(const String &dir_path, const String &file_path) {
     std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
     return full_path.string();
+}
+
+std::mutex LocalStore::mtx_;
+HashMap<String, MmapInfo> LocalStore::mapped_files_;
+
+i32 LocalStore::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len) {
+    if (!std::filesystem::path(file_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", file_path);
+        UnrecoverableError(error_message);
+    }
+    data_ptr = nullptr;
+    data_len = 0;
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = mapped_files_.find(file_path);
+    if (it != mapped_files_.end()) {
+        auto &mmap_info = it->second;
+        data_ptr = mmap_info.data_ptr_;
+        data_len = mmap_info.data_len_;
+        mmap_info.rc_++;
+        return 0;
+    }
+    long len_f = std::filesystem::file_size(file_path);
+    if (len_f == 0)
+        return -1;
+    i32 f = open(file_path.c_str(), O_RDONLY);
+    void *tmpd = mmap(NULL, len_f, PROT_READ, MAP_SHARED, f, 0);
+    if (tmpd == MAP_FAILED)
+        return -1;
+    close(f);
+    i32 rc = madvise(tmpd,
+                     len_f,
+                     MADV_NORMAL
+#if defined(linux) || defined(__linux) || defined(__linux__)
+                         | MADV_DONTDUMP
+#endif
+    );
+    if (rc < 0)
+        return -1;
+    data_ptr = (u8 *)tmpd;
+    data_len = len_f;
+    mapped_files_.emplace(file_path, MmapInfo{data_ptr, data_len, 1});
+    return 0;
+}
+
+i32 LocalStore::MunmapFile(const String &file_path) {
+    if (!std::filesystem::path(file_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", file_path);
+        UnrecoverableError(error_message);
+    }
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = mapped_files_.find(file_path);
+    if (it == mapped_files_.end()) {
+        return -1;
+    }
+    auto &mmap_info = it->second;
+    mmap_info.rc_--;
+    if (mmap_info.rc_ == 0) {
+        munmap(mmap_info.data_ptr_, mmap_info.data_len_);
+        mapped_files_.erase(it);
+    }
+    return 0;
 }
 
 } // namespace infinity

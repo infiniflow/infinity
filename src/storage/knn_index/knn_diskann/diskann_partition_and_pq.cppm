@@ -21,8 +21,6 @@ export module diskann_partition_and_pq;
 
 import stl;
 import third_party;
-import file_system;
-import file_system_type;
 import infinity_exception;
 import index_base;
 import vector_distance;

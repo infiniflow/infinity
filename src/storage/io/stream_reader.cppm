@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,27 +16,25 @@ module;
 
 #include <fstream>
 
-export module stream_io;
+export module stream_reader;
 
 import stl;
 import status;
 
 namespace infinity {
 
-export class StreamIO {
+export class StreamReader {
 
 public:
-    StreamIO() = default;
-    ~StreamIO();
+    StreamReader() = default;
+    ~StreamReader();
 
-    void Init(const String& file_name, u8 flags);
+    Status Init(const String& file_name);
     bool ReadLine(String& line);
     void Close();
 
 private:
-    std::fstream file_;
-    bool reader_{false};
-    bool writer_{false};
+    std::ifstream file_;
 };
 
 } // namespace infinity

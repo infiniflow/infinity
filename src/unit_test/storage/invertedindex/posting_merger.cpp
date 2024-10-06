@@ -13,8 +13,6 @@ import column_inverter;
 import index_defines;
 import column_index_reader;
 import posting_iterator;
-import file_system;
-import file_system_type;
 import virtual_store;
 import file_writer;
 import term_meta;

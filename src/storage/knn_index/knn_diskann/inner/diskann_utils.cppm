@@ -22,17 +22,12 @@ import stl;
 import third_party;
 import default_values;
 import infinity_exception;
-import file_system;
 import logger;
 import third_party;
 
 export module diskann_utils;
 
 namespace infinity {
-export void FileHandlerSeek(FileHandler &fh, i64 offset) {
-    auto &fs = fh.file_system_;
-    fs.Seek(fh, offset);
-}
 
 export inline void AllocAligned(void **ptr, SizeT size, SizeT align) {
     *ptr = nullptr;
