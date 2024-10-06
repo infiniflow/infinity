@@ -20,7 +20,6 @@ import stl;
 import emvb_search;
 import emvb_product_quantization;
 import emvb_shared_vec;
-import file_system;
 import local_file_handle;
 
 namespace infinity {

@@ -33,7 +33,6 @@ import embedding_info;
 import create_index_info;
 import internal_types;
 import abstract_hnsw;
-import file_system_type;
 import virtual_store;
 import persistence_manager;
 import abstract_file_handle;

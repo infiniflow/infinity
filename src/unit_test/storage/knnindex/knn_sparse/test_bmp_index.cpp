@@ -22,8 +22,6 @@ import bmp_util;
 import sparse_util;
 import third_party;
 import compilation_config;
-import file_system;
-import file_system_type;
 import sparse_test_util;
 import infinity_exception;
 import virtual_store;

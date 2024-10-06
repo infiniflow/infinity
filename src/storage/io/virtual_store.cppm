@@ -22,6 +22,7 @@ import third_party;
 import local_file_handle;
 import virtual_storage_type;
 import abstract_file_handle;
+import local_file_system;
 
 namespace infinity {
 
@@ -57,6 +58,12 @@ public:
     static String GetParentPath(const String& path);
     static SizeT GetDirectorySize(const String &path);
     static String ConcatenatePath(const String &dir_path, const String &file_path);
+    static i32 MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len);
+    static i32 MunmapFile(const String &file_path);
+
+private:
+    static std::mutex mtx_;
+    static HashMap<String, MmapInfo> mapped_files_;
 };
 
 }

@@ -27,7 +27,6 @@ import bmp_util;
 import bmp_alg;
 import abstract_bmp;
 import virtual_store;
-import file_system_type;
 import persistence_manager;
 import abstract_file_handle;
 

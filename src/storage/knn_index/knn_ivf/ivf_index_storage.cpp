@@ -24,7 +24,6 @@ import status;
 import logger;
 import third_party;
 import index_ivf;
-import file_system;
 import column_vector;
 import internal_types;
 import logical_type;

@@ -25,7 +25,6 @@ import stl;
 import logger;
 import index_base;
 import local_file_handle;
-import file_system_type;
 import infinity_exception;
 import knn_result_handler;
 import logical_type;

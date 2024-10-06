@@ -21,8 +21,6 @@ module;
 module file_reader;
 
 import stl;
-import file_system;
-import file_system_type;
 import status;
 import infinity_exception;
 import third_party;

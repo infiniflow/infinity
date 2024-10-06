@@ -37,6 +37,7 @@ import logger;
 import persistence_manager;
 import infinity_context;
 import persist_result_handler;
+import virtual_store;
 
 namespace infinity {
 
@@ -64,7 +65,7 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
         // Empty posting
         return;
     }
-    int rc = fs_.MmapFile(posting_file, data_ptr_, data_len_);
+    i32 rc = LocalStore::MmapFile(posting_file, data_ptr_, data_len_);
     assert(rc == 0);
     if (rc != 0) {
         Status status = Status::MmapFileError(posting_file);
@@ -91,7 +92,7 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
     if (nullptr != pm) {
         posting_file = posting_file_obj_;
     }
-    int rc = fs_.MunmapFile(posting_file);
+    i32 rc = LocalStore::MunmapFile(posting_file);
     assert(rc == 0);
     if (rc != 0) {
         Status status = Status::MunmapFileError(posting_file);

@@ -30,7 +30,6 @@ import query_context;
 import operator_state;
 
 import profiler;
-import local_file_system;
 import file_writer;
 import table_def;
 import data_table;

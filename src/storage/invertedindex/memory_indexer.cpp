@@ -44,7 +44,6 @@ import invert_task;
 import third_party;
 import ring;
 import external_sort_merger;
-import local_file_system;
 import file_writer;
 import term_meta;
 import fst;
@@ -52,8 +51,6 @@ import posting_list_format;
 import dict_reader;
 import file_reader;
 import logger;
-import file_system;
-import file_system_type;
 import vector_with_lock;
 import infinity_exception;
 import mmap;
@@ -266,7 +263,6 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         CommitSync(100);
     }
 
-    LocalFileSystem fs;
     String posting_file = Path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));
     String dict_file = Path(index_dir_) / (base_name_ + DICT_SUFFIX + (spill ? SPILL_SUFFIX : ""));
     String column_length_file = Path(index_dir_) / (base_name_ + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : ""));
@@ -309,17 +305,16 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         posting_file_writer->Sync();
         dict_file_writer->Sync();
         fst_builder.Finish();
-        fs.AppendFile(tmp_dict_file, tmp_fst_file);
-        fs.DeleteFile(tmp_fst_file);
+        LocalStore::Merge(tmp_dict_file, tmp_fst_file);
+        LocalStore::DeleteFile(tmp_fst_file);
     }
-    auto [file_handle, status] = fs.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    auto [file_handle, status] = LocalStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
     Vector<u32> &column_length_array = column_lengths_.UnsafeVec();
-    fs.Write(*file_handle, &column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
-    fs.Close(*file_handle);
+    file_handle->Append(&column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
     if (use_object_cache) {
         PersistResultHandler handler(pm);
         PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);
@@ -394,7 +389,6 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     auto &term_tuple_list_queue = merger->TermTupleListQueue();
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
-    LocalFileSystem fs;
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
@@ -486,17 +480,16 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     posting_file_writer->Sync();
     dict_file_writer->Sync();
     fst_builder.Finish();
-    fs.AppendFile(tmp_dict_file, tmp_fst_file);
-    fs.DeleteFile(tmp_fst_file);
+    LocalStore::Merge(tmp_dict_file, tmp_fst_file);
+    LocalStore::DeleteFile(tmp_fst_file);
 
-    auto [file_handler, status] = fs.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    auto [file_handle, status] = LocalStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
     Vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
-    fs.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
-    fs.Close(*file_handler);
+    file_handle->Append(&unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
     if (use_object_cache) {
         PersistResultHandler handler(pm);
         PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);

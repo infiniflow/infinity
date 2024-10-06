@@ -21,7 +21,6 @@ export module hnsw_alg;
 
 import stl;
 import local_file_handle;
-import file_system_type;
 import infinity_exception;
 import knn_result_handler;
 import multivector_result_handler;

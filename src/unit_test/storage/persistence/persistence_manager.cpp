@@ -5,7 +5,6 @@ import persistence_manager;
 import virtual_store;
 import virtual_storage_type;
 import abstract_file_handle;
-import file_system_type;
 import third_party;
 import persist_result_handler;
 

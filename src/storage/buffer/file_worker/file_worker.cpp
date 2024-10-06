@@ -23,7 +23,6 @@ import utility;
 import infinity_exception;
 import local_file_handle;
 import third_party;
-import file_system_type;
 import defer_op;
 import status;
 import virtual_store;
