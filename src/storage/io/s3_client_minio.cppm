@@ -1,12 +1,11 @@
 module;
 
-#include <miniocpp/client.h>
-
 export module s3_client_minio;
 
 import stl;
 import s3_client;
 import status;
+import third_party;
 
 namespace infinity {
 

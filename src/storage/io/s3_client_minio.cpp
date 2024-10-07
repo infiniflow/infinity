@@ -1,6 +1,6 @@
 module;
 
-#include <miniocpp/client.h>
+#include <string>
 
 module s3_client_minio;
 
