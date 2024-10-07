@@ -49,21 +49,6 @@ export struct MmapInfo {
     SizeT rc_{};
 };
 
-// Only one instance;
-export class RemoteStore {
-public:
-    Status Init(StorageType storage_type, Map<String, String> &config);
-    Status UnInit();
-
-private:
-    // Using by minio
-    StorageType storage_type_{StorageType::kLocal};
-
-    UniquePtr<minio::s3::BaseUrl> minio_base_url_{};
-    UniquePtr<minio::creds::StaticProvider> minio_provider_{};
-    UniquePtr<minio::s3::Client> minio_client_{};
-};
-
 export class VirtualStore {
 public:
     static Tuple<UniquePtr<LocalFileHandle>, Status> Open(const String &path, FileAccessMode access_mode);
@@ -92,6 +77,9 @@ public:
                                   const String &secret_key = "minioadmin",
                                   const String &bucket = "infinity_bucket");
 
+    static Status UnInitRemoteStore();
+
+    static bool IsInit();
     static Status DownloadObject(const String &file_dir, const String& object_name);
     static Status UploadObject(const String &file_dir, const String& object_name);
     static Status RemoveObject(const String &object_name);

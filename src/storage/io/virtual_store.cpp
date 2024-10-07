@@ -116,70 +116,6 @@ String ToString(StorageType storage_type) {
     }
 }
 
-Status RemoteStore::Init(StorageType storage_type, Map<String, String> &config) {
-    // Init remote filesystem and local disk cache
-    storage_type_ = storage_type;
-    switch (storage_type) {
-        case StorageType::kMinio: {
-            auto iter = config.find("url");
-            if (iter == config.end()) {
-                return Status::InvalidConfig("Missing MINIO 'URL'");
-            }
-            String url = iter->second;
-
-            iter = config.find("access_key");
-            if (iter == config.end()) {
-                return Status::InvalidConfig("Missing MINIO 'access_key'");
-            }
-            String access_key = iter->second;
-
-            iter = config.find("secret_key");
-            if (iter == config.end()) {
-                return Status::InvalidConfig("Missing MINIO 'secret_key'");
-            }
-            String secret_key = iter->second;
-
-            iter = config.find("enable_https");
-            if (iter == config.end()) {
-                return Status::InvalidConfig("Missing MINIO 'enable_https'");
-            }
-            String enable_https_str = iter->second;
-            bool enable_https{false};
-            if (enable_https_str == "true") {
-                enable_https = true;
-            } else if (enable_https_str == "false") {
-                enable_https = false;
-            } else {
-                return Status::InvalidConfig(fmt::format("Invalid MINIO 'enable_https' value: {}", enable_https_str));
-            }
-
-            minio_base_url_ = MakeUnique<minio::s3::BaseUrl>(url, enable_https);
-            minio_provider_ = MakeUnique<minio::creds::StaticProvider>(access_key, secret_key);
-            minio_client_ = MakeUnique<minio::s3::Client>(*minio_base_url_, minio_provider_.get());
-            break;
-        }
-        default: {
-            return Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type)));
-        }
-    }
-    return Status::OK();
-}
-
-Status RemoteStore::UnInit() {
-    switch (storage_type_) {
-        case StorageType::kMinio: {
-            minio_base_url_.reset();
-            minio_provider_.reset();
-            minio_client_.reset();
-            break;
-        }
-        default: {
-            return Status::NotSupport(fmt::format("{} isn't support in virtual filesystem", ToString(storage_type_)));
-        }
-    }
-    return Status::OK();
-}
-
 Tuple<UniquePtr<LocalFileHandle>, Status> VirtualStore::Open(const String &path, FileAccessMode access_mode) {
     i32 fd = -1;
     switch (access_mode) {
@@ -485,7 +421,7 @@ i32 VirtualStore::MunmapFile(const String &file_path) {
 }
 
 // Remote storage
-StorageType VirtualStore::storage_type_ = StorageType::kMinio;
+StorageType VirtualStore::storage_type_ = StorageType::kInvalid;
 String VirtualStore::bucket_ = "infinity_bucket";
 UniquePtr<S3Client> VirtualStore::s3_client_ = nullptr;
 
@@ -497,6 +433,7 @@ Status VirtualStore::InitRemoteStore(StorageType storage_type,
                                    const String &bucket) {
     switch (storage_type) {
         case StorageType::kMinio: {
+            storage_type_ = StorageType::kMinio;
             s3_client_ = MakeUnique<S3ClientMinio>(URL, HTTPS, access_key, secret_key);
         }
         default: {
@@ -505,6 +442,16 @@ Status VirtualStore::InitRemoteStore(StorageType storage_type,
     }
     bucket_ = bucket;
     return Status::OK();
+}
+
+Status VirtualStore::UnInitRemoteStore() {
+    VirtualStore::storage_type_ = StorageType::kInvalid;
+    s3_client_.reset();
+    return Status::OK();
+}
+
+bool VirtualStore::IsInit() {
+    return s3_client_.get() != nullptr;
 }
 
 Status VirtualStore::DownloadObject(const String &file_path, const String &object_name) {
