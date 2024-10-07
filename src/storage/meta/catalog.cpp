@@ -109,8 +109,8 @@ Vector<SharedPtr<QueryProfiler>> ProfileHistory::GetElements() {
 // TODO Consider letting it commit as a transaction.
 Catalog::Catalog() : catalog_dir_(MakeShared<String>(CATALOG_FILE_DIR)), running_(true) {
     String abs_catalog_dir = Path(InfinityContext::instance().config()->DataDir()) / String(CATALOG_FILE_DIR);
-    if (!LocalStore::Exists(abs_catalog_dir)) {
-        LocalStore::MakeDirectory(abs_catalog_dir);
+    if (!VirtualStore::Exists(abs_catalog_dir)) {
+        VirtualStore::MakeDirectory(abs_catalog_dir);
     }
 
     ResizeProfileHistory(DEFAULT_PROFILER_HISTORY_SIZE);
@@ -551,7 +551,7 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
 UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info) {
     const auto &catalog_path = delta_ckp_info.path_;
 
-    auto [catalog_file_handle, status] = LocalStore::Open(catalog_path, FileAccessMode::kRead);
+    auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -934,7 +934,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
 UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
     const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / full_ckp_info.path_;
 
-    auto [catalog_file_handle, status] = LocalStore::Open(catalog_path, FileAccessMode::kRead);
+    auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -988,7 +988,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     // Save catalog to tmp file.
     // FIXME: Temp implementation, will be replaced by async task.
-    auto [catalog_file_handle, status] = LocalStore::Open(catalog_tmp_path, FileAccessMode::kWrite);
+    auto [catalog_file_handle, status] = VirtualStore::Open(catalog_tmp_path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -1000,7 +1000,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
     catalog_file_handle->Sync();
 
     // Rename temp file to regular catalog file
-    LocalStore::Rename(catalog_tmp_path, full_path);
+    VirtualStore::Rename(catalog_tmp_path, full_path);
 
     global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
 

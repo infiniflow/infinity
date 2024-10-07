@@ -36,7 +36,7 @@ TEST_F(VirtualStoreTest, file_write) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file2.abc";
 
-    auto [file_handle, status] = LocalStore::Open(path, FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -48,8 +48,8 @@ TEST_F(VirtualStoreTest, file_write) {
     }
     file_handle->Append(data_array.get(), len);
     file_handle->Sync();
-    LocalStore::DeleteFile(path);
-    EXPECT_FALSE(LocalStore::Exists(path));
+    VirtualStore::DeleteFile(path);
+    EXPECT_FALSE(VirtualStore::Exists(path));
 }
 
 TEST_F(VirtualStoreTest, dir_ops) {
@@ -57,9 +57,9 @@ TEST_F(VirtualStoreTest, dir_ops) {
     String dir = String(GetFullTmpDir()) + "/unit_test";
     String path = dir + "/test_file.test";
 
-    LocalStore::MakeDirectory(dir);
+    VirtualStore::MakeDirectory(dir);
 
-    auto [file_handle, status] = LocalStore::Open(path, FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -72,16 +72,16 @@ TEST_F(VirtualStoreTest, dir_ops) {
     file_handle->Append(data_array.get(), len);
     file_handle->Sync();
 
-    LocalStore::RemoveDirectory(dir);
-    EXPECT_FALSE(LocalStore::Exists(path));
-    EXPECT_FALSE(LocalStore::Exists(dir));
+    VirtualStore::RemoveDirectory(dir);
+    EXPECT_FALSE(VirtualStore::Exists(path));
+    EXPECT_FALSE(VirtualStore::Exists(dir));
 }
 
 TEST_F(VirtualStoreTest, TestRead) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file_read.abc";
 
-    auto [file_handle, open_write_status] = LocalStore::Open(path, FileAccessMode::kWrite);
+    auto [file_handle, open_write_status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!open_write_status.ok()) {
         UnrecoverableError(open_write_status.message());
     }
@@ -94,7 +94,7 @@ TEST_F(VirtualStoreTest, TestRead) {
     file_handle->Append(write_data.get(), len);
     file_handle->Sync();
 
-    auto [read_handle, open_read_status] = LocalStore::Open(path, FileAccessMode::kRead);
+    auto [read_handle, open_read_status] = VirtualStore::Open(path, FileAccessMode::kRead);
     if (!open_read_status.ok()) {
         UnrecoverableError(open_read_status.message());
     }
@@ -107,8 +107,8 @@ TEST_F(VirtualStoreTest, TestRead) {
     for (SizeT i = 0; i < len; ++i) {
         EXPECT_EQ(read_data[i], i + 1);
     }
-    LocalStore::DeleteFile(path);
-    EXPECT_FALSE(LocalStore::Exists(path));
+    VirtualStore::DeleteFile(path);
+    EXPECT_FALSE(VirtualStore::Exists(path));
 }
 
 TEST_F(VirtualStoreTest, TestRename) {
@@ -116,7 +116,7 @@ TEST_F(VirtualStoreTest, TestRename) {
     String old_path = String(GetFullTmpDir()) + "/test_file_old.abc";
     String new_path = String(GetFullTmpDir()) + "/test_file_new.abc";
 
-    auto [file_handle, status] = LocalStore::Open(old_path, FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(old_path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -129,20 +129,20 @@ TEST_F(VirtualStoreTest, TestRename) {
     file_handle->Append(data_array.get(), len);
     file_handle->Sync();
 
-    LocalStore::Rename(old_path, new_path);
+    VirtualStore::Rename(old_path, new_path);
 
-    EXPECT_FALSE(LocalStore::Exists(old_path));
-    EXPECT_TRUE(LocalStore::Exists(new_path));
+    EXPECT_FALSE(VirtualStore::Exists(old_path));
+    EXPECT_TRUE(VirtualStore::Exists(new_path));
 
-    LocalStore::DeleteFile(new_path);
-    EXPECT_FALSE(LocalStore::Exists(new_path));
+    VirtualStore::DeleteFile(new_path);
+    EXPECT_FALSE(VirtualStore::Exists(new_path));
 }
 
 TEST_F(VirtualStoreTest, TestTruncate) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file_truncate.abc";
 
-    auto [file_handle, status] = LocalStore::Open(path, FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -155,9 +155,9 @@ TEST_F(VirtualStoreTest, TestTruncate) {
     file_handle->Append(data_array.get(), initial_len);
     file_handle->Sync();
 
-    LocalStore::Truncate(path, 10);
+    VirtualStore::Truncate(path, 10);
 
-    auto [truncated_handle, truncate_status] = LocalStore::Open(path, FileAccessMode::kRead);
+    auto [truncated_handle, truncate_status] = VirtualStore::Open(path, FileAccessMode::kRead);
     if (!truncate_status.ok()) {
         UnrecoverableError(truncate_status.message());
     }
@@ -171,8 +171,8 @@ TEST_F(VirtualStoreTest, TestTruncate) {
         EXPECT_EQ(truncated_data[i], i + 1);
     }
 
-    LocalStore::DeleteFile(path);
-    EXPECT_FALSE(LocalStore::Exists(path));
+    VirtualStore::DeleteFile(path);
+    EXPECT_FALSE(VirtualStore::Exists(path));
 }
 
 TEST_F(VirtualStoreTest, TestAppend) {
@@ -180,7 +180,7 @@ TEST_F(VirtualStoreTest, TestAppend) {
     String dst_path = String(GetFullTmpDir()) + "/test_file_append_dst.abc";
     String src_path = String(GetFullTmpDir()) + "/test_file_append_src.abc";
 
-    auto [src_handler, src_status] = LocalStore::Open(src_path, FileAccessMode::kWrite);
+    auto [src_handler, src_status] = VirtualStore::Open(src_path, FileAccessMode::kWrite);
     if (!src_status.ok()) {
         UnrecoverableError(src_status.message());
     }
@@ -193,7 +193,7 @@ TEST_F(VirtualStoreTest, TestAppend) {
     src_handler->Append(src_data.get(), src_len);
     src_handler->Sync();
 
-    auto [dst_handler, dst_status] = LocalStore::Open(dst_path, FileAccessMode::kWrite);
+    auto [dst_handler, dst_status] = VirtualStore::Open(dst_path, FileAccessMode::kWrite);
     if (!dst_status.ok()) {
         UnrecoverableError(dst_status.message());
     }
@@ -206,9 +206,9 @@ TEST_F(VirtualStoreTest, TestAppend) {
     dst_handler->Append(dst_data.get(), dst_len);
     dst_handler->Sync();
 
-    LocalStore::Merge(dst_path, src_path);
+    VirtualStore::Merge(dst_path, src_path);
 
-    auto [appended_handle, append_status] = LocalStore::Open(dst_path, FileAccessMode::kRead);
+    auto [appended_handle, append_status] = VirtualStore::Open(dst_path, FileAccessMode::kRead);
     if (!append_status.ok()) {
         UnrecoverableError(append_status.message());
     }
@@ -225,10 +225,10 @@ TEST_F(VirtualStoreTest, TestAppend) {
         EXPECT_EQ(combined_data[i], i - dst_len + 1);
     }
 
-    LocalStore::DeleteFile(src_path);
-    LocalStore::DeleteFile(dst_path);
-    EXPECT_FALSE(LocalStore::Exists(src_path));
-    EXPECT_FALSE(LocalStore::Exists(dst_path));
+    VirtualStore::DeleteFile(src_path);
+    VirtualStore::DeleteFile(dst_path);
+    EXPECT_FALSE(VirtualStore::Exists(src_path));
+    EXPECT_FALSE(VirtualStore::Exists(dst_path));
 }
 
 TEST_F(VirtualStoreTest, TestCleanDir) {
@@ -237,9 +237,9 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
     String file_path1 = dir + "/file1.txt";
     String file_path2 = dir + "/file2.txt";
 
-    LocalStore::MakeDirectory(dir);
+    VirtualStore::MakeDirectory(dir);
 
-    auto [file_handler1, status1] = LocalStore::Open(file_path1, FileAccessMode::kWrite);
+    auto [file_handler1, status1] = VirtualStore::Open(file_path1, FileAccessMode::kWrite);
     if (!status1.ok()) {
         UnrecoverableError(status1.message());
     }
@@ -251,7 +251,7 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
     file_handler1->Append(data_array1.get(), len1);
     file_handler1->Sync();
 
-    auto [file_handler2, status2] = LocalStore::Open(file_path2, FileAccessMode::kWrite);
+    auto [file_handler2, status2] = VirtualStore::Open(file_path2, FileAccessMode::kWrite);
     if (!status2.ok()) {
         UnrecoverableError(status2.message());
     }
@@ -263,9 +263,9 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
     file_handler2->Append(data_array2.get(), len2);
     file_handler2->Sync();
 
-    LocalStore::CleanupDirectory(dir);
+    VirtualStore::CleanupDirectory(dir);
 
-    EXPECT_FALSE(LocalStore::Exists(file_path1));
-    EXPECT_FALSE(LocalStore::Exists(file_path2));
-    EXPECT_TRUE(LocalStore::Exists(dir));
+    EXPECT_FALSE(VirtualStore::Exists(file_path1));
+    EXPECT_FALSE(VirtualStore::Exists(file_path2));
+    EXPECT_TRUE(VirtualStore::Exists(dir));
 }

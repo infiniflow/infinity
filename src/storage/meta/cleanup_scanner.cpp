@@ -76,7 +76,7 @@ void CleanupScanner::Cleanup(CleanupInfoTracer *info_tracer) && {
 
 void CleanupScanner::CleanupDir(const String &abs_dir) {
     try {
-        LocalStore::RemoveDirectory(abs_dir);
+        VirtualStore::RemoveDirectory(abs_dir);
     } catch (const RecoverableException &e) {
         if (e.ErrorCode() == ErrorCode::kDirNotFound) {
             // this happens when delta checkpoint records "drop table/db/...", and cleanup is called.

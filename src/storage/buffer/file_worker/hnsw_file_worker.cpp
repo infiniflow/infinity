@@ -57,7 +57,7 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
     if (index_size == 0) {
 
         String index_path = GetFilePath();
-        auto [file_handle, status] = LocalStore::Open(index_path, FileAccessMode::kRead);
+        auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
         if (status.ok()) {
             // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
             index_size = file_handle->FileSize();

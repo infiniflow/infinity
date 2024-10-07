@@ -40,7 +40,7 @@ private:
     Vector<SharedPtr<DirEntry>> ListAllFile(const String &path) {
         Vector<SharedPtr<DirEntry>> res;
         std::function<void(const String &)> f = [&](const String &path) {
-            auto [entries, status] = LocalStore::ListDirectory(path);
+            auto [entries, status] = VirtualStore::ListDirectory(path);
             for (auto &entry : entries) {
                 if (entry->is_directory()) {
                     f(entry->path());
@@ -76,18 +76,18 @@ protected:
     }
 
     void ResetDir() {
-        LocalStore::RemoveDirectory(*data_dir_);
-        LocalStore::RemoveDirectory(*temp_dir_);
-        LocalStore::RemoveDirectory(*persistence_dir_);
-        LocalStore::MakeDirectory(*data_dir_);
-        LocalStore::MakeDirectory(*temp_dir_);
-        LocalStore::MakeDirectory(*persistence_dir_);
+        VirtualStore::RemoveDirectory(*data_dir_);
+        VirtualStore::RemoveDirectory(*temp_dir_);
+        VirtualStore::RemoveDirectory(*persistence_dir_);
+        VirtualStore::MakeDirectory(*data_dir_);
+        VirtualStore::MakeDirectory(*temp_dir_);
+        VirtualStore::MakeDirectory(*persistence_dir_);
     }
 
     void TearDown() override {
-        LocalStore::RemoveDirectory(*data_dir_);
-        LocalStore::RemoveDirectory(*temp_dir_);
-        LocalStore::RemoveDirectory(*persistence_dir_);
+        VirtualStore::RemoveDirectory(*data_dir_);
+        VirtualStore::RemoveDirectory(*temp_dir_);
+        VirtualStore::RemoveDirectory(*persistence_dir_);
 
         Logger::Shutdown();
     }

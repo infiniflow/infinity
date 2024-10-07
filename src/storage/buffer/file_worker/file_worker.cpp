@@ -46,7 +46,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         String write_path = Path(*data_dir_) / write_dir / *file_name_;
         String tmp_write_path = Path(*temp_dir_) / StringTransform(write_path, "/", "_");
 
-        auto [file_handle, status] = LocalStore::Open(tmp_write_path, FileAccessMode::kWrite);
+        auto [file_handle, status] = VirtualStore::Open(tmp_write_path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -69,12 +69,12 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         return all_save;
     } else {
         String write_dir = ChooseFileDir(to_spill);
-        if (!LocalStore::Exists(write_dir)) {
-            LocalStore::MakeDirectory(write_dir);
+        if (!VirtualStore::Exists(write_dir)) {
+            VirtualStore::MakeDirectory(write_dir);
         }
         String write_path = fmt::format("{}/{}", write_dir, *file_name_);
 
-        auto [file_handle, status] = LocalStore::Open(write_path, FileAccessMode::kWrite);
+        auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -113,7 +113,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
         read_path = persistence_manager_->GetObjPath(obj_addr_.obj_key_);
     }
     SizeT file_size = 0;
-    auto [file_handle, status] = LocalStore::Open(read_path, FileAccessMode::kRead);
+    auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -139,17 +139,17 @@ void FileWorker::MoveFile() {
     String dest_dir = ChooseFileDir(false);
     String dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
     if (persistence_manager_ == nullptr) {
-        if (!LocalStore::Exists(src_path)) {
+        if (!VirtualStore::Exists(src_path)) {
             Status status = Status::FileNotFound(src_path);
             RecoverableError(status);
         }
-        if (!LocalStore::Exists(dest_dir)) {
-            LocalStore::MakeDirectory(dest_dir);
+        if (!VirtualStore::Exists(dest_dir)) {
+            VirtualStore::MakeDirectory(dest_dir);
         }
         // if (fs.Exists(dest_path)) {
         //     UnrecoverableError(fmt::format("File {} was already been created before.", dest_path));
         // }
-        LocalStore::Rename(src_path, dest_path);
+        VirtualStore::Rename(src_path, dest_path);
     } else {
         PersistResultHandler handler(persistence_manager_);
         PersistWriteResult persist_result = persistence_manager_->Persist(dest_path, src_path);
@@ -177,16 +177,16 @@ void FileWorker::CleanupFile() const {
     }
 
     String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
-    if (LocalStore::Exists(path)) {
-        LocalStore::DeleteFile(path);
+    if (VirtualStore::Exists(path)) {
+        VirtualStore::DeleteFile(path);
         LOG_INFO(fmt::format("Cleaned file: {}", path));
     }
 }
 
 void FileWorker::CleanupTempFile() const {
     String path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
-    if (LocalStore::Exists(path)) {
-        LocalStore::DeleteFile(path);
+    if (VirtualStore::Exists(path)) {
+        VirtualStore::DeleteFile(path);
         LOG_INFO(fmt::format("Cleaned file: {}", path));
     } else {
         String error_message = fmt::format("Cleanup: File {} not found for deletion", path);

@@ -50,13 +50,13 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
     String version_path = String(GetFullDataDir()) + "/block_version_test";
 
     {
-        auto [local_file_handle, status] = LocalStore::Open(version_path, FileAccessMode::kWrite);
+        auto [local_file_handle, status] = VirtualStore::Open(version_path, FileAccessMode::kWrite);
         EXPECT_TRUE(status.ok());
         block_version.SpillToFile(local_file_handle.get());
     }
 
     {
-        auto [local_file_handle, status]  = LocalStore::Open(version_path, FileAccessMode::kRead);
+        auto [local_file_handle, status]  = VirtualStore::Open(version_path, FileAccessMode::kRead);
         EXPECT_TRUE(status.ok());
         auto block_version2 = BlockVersion::LoadFromFile(local_file_handle.get());
         ASSERT_EQ(block_version, *block_version2);

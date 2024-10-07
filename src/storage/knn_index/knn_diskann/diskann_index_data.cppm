@@ -250,7 +250,7 @@ public:
         this->sample_data_file_path_ = std::move(sample_data_file_path);
         this->pq_pivot_file_path_ = std::move(pq_pivot_file_path);
 
-        auto [data_file_handle, data_file_status] = LocalStore::Open(data_file_path_, FileAccessMode::kRead);
+        auto [data_file_handle, data_file_status] = VirtualStore::Open(data_file_path_, FileAccessMode::kRead);
         if (!data_file_status.ok()) {
             UnrecoverableError(data_file_status.message());
         }
@@ -281,12 +281,12 @@ public:
         // step 2. generate pq pivots and pq data
         {
             data_file_handle->Seek(0);
-            auto [pqCompressed_data_file_handle, pq_data_file_status] = LocalStore::Open(pqCompressed_data_file_path_, FileAccessMode::kWrite);
+            auto [pqCompressed_data_file_handle, pq_data_file_status] = VirtualStore::Open(pqCompressed_data_file_path_, FileAccessMode::kWrite);
             if (!pq_data_file_status.ok()) {
                 UnrecoverableError(pq_data_file_status.message());
             }
 
-            auto [pq_pivot_file_handle, pq_pivot_file_status] = LocalStore::Open(pq_pivot_file_path_, FileAccessMode::kWrite);
+            auto [pq_pivot_file_handle, pq_pivot_file_status] = VirtualStore::Open(pq_pivot_file_path_, FileAccessMode::kWrite);
             if (!pq_pivot_file_status.ok()) {
                 UnrecoverableError(pq_pivot_file_status.message());
             };
@@ -331,7 +331,7 @@ public:
         // step 3. build vamana graph
         {
             data_file_handle->Seek(0);
-            auto [mem_index_file_handle, mem_index_write_status] = LocalStore::Open(mem_index_file_path_, FileAccessMode::kWrite);
+            auto [mem_index_file_handle, mem_index_write_status] = VirtualStore::Open(mem_index_file_path_, FileAccessMode::kWrite);
             if (!mem_index_write_status.ok()) {
                 UnrecoverableError(mem_index_write_status.message());
             }
@@ -343,12 +343,12 @@ public:
         // step 4. create disk layout
         {
             data_file_handle->Seek(0);
-            auto [mem_index_file_handle, mem_index_read_status] = LocalStore::Open(mem_index_file_path_, FileAccessMode::kRead);
+            auto [mem_index_file_handle, mem_index_read_status] = VirtualStore::Open(mem_index_file_path_, FileAccessMode::kRead);
             if (!mem_index_read_status.ok()) {
                 UnrecoverableError(mem_index_read_status.message());
             }
 
-            auto [index_file_handle, index_file_status] = LocalStore::Open(index_file_path_, FileAccessMode::kWrite);
+            auto [index_file_handle, index_file_status] = VirtualStore::Open(index_file_path_, FileAccessMode::kWrite);
             if (!index_file_status.ok()) {
                 UnrecoverableError(index_file_status.message());
             }
@@ -362,12 +362,12 @@ public:
             data_file_handle->Seek(0);
             Path train_data_path = sample_data_file_path_ / "train_data.bin";
             Path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
-            auto [train_data_handle, train_data_status] = LocalStore::Open(train_data_path, FileAccessMode::kWrite);
+            auto [train_data_handle, train_data_status] = VirtualStore::Open(train_data_path, FileAccessMode::kWrite);
             if (!train_data_status.ok()) {
                 UnrecoverableError(train_data_status.message());
             }
 
-            auto [train_data_ids_handle, train_data_ids_status] = LocalStore::Open(train_data_ids_path, FileAccessMode::kWrite);
+            auto [train_data_ids_handle, train_data_ids_status] = VirtualStore::Open(train_data_ids_path, FileAccessMode::kWrite);
             if (!train_data_ids_status.ok()) {
                 UnrecoverableError(train_data_ids_status.message());
             }
@@ -375,7 +375,7 @@ public:
             SaveSampleData(*train_data_handle, *train_data_ids_handle, train_data, train_data_ids);
             // train_data.reset();
             // train_data_ids.reset();
-            LocalStore::DeleteFile(mem_index_file_path_); // delete mem index file
+            VirtualStore::DeleteFile(mem_index_file_path_); // delete mem index file
             LOG_TRACE(fmt::format("Finished saving sample data"));
         }
 
@@ -389,12 +389,12 @@ public:
         {
             Path train_data_path = sample_data_file_path_ / "train_data.bin";
             Path train_data_ids_path = sample_data_file_path_ / "train_ids.bin";
-            auto [train_data_handle, train_data_status] = LocalStore::Open(train_data_path, FileAccessMode::kRead);
+            auto [train_data_handle, train_data_status] = VirtualStore::Open(train_data_path, FileAccessMode::kRead);
             if (!train_data_status.ok()) {
                 UnrecoverableError(train_data_status.message());
             }
 
-            auto [train_data_ids_handle, train_data_ids_status] = LocalStore::Open(train_data_ids_path, FileAccessMode::kRead);
+            auto [train_data_ids_handle, train_data_ids_status] = VirtualStore::Open(train_data_ids_path, FileAccessMode::kRead);
             if (!train_data_ids_status.ok()) {
                 UnrecoverableError(train_data_ids_status.message());
             }
@@ -431,7 +431,7 @@ public:
                 }
                 fmt::print("\n");
             }
-            auto [pqCompressed_data_file_handle, pq_data_file_status] = LocalStore::Open(pqCompressed_data_file_path_, FileAccessMode::kRead);
+            auto [pqCompressed_data_file_handle, pq_data_file_status] = VirtualStore::Open(pqCompressed_data_file_path_, FileAccessMode::kRead);
             if (!pq_data_file_status.ok()) {
                 UnrecoverableError(pq_data_file_status.message());
             }

@@ -178,10 +178,10 @@ ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, c
 }
 
 Vector<String> BlockColumnEntry::FilePaths() const {
-    Vector<String> res = {LocalStore::ConcatenatePath(*FileDir(), *file_name_)};
+    Vector<String> res = {VirtualStore::ConcatenatePath(*FileDir(), *file_name_)};
     for (SizeT file_idx = 0; file_idx < outline_buffers_.size(); ++file_idx) {
         String outline_file_path = *OutlineFilename(file_idx);
-        res.push_back(LocalStore::ConcatenatePath(*FileDir(), outline_file_path));
+        res.push_back(VirtualStore::ConcatenatePath(*FileDir(), outline_file_path));
     }
     return res;
 }

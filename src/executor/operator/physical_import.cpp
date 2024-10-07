@@ -134,7 +134,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
 
-    auto [file_handle, status_open] = LocalStore::Open(file_path_, FileAccessMode::kRead);
+    auto [file_handle, status_open] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
     if (!status_open.ok()) {
         UnrecoverableError(status_open.message());
     }
@@ -242,7 +242,7 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
 
-    auto [file_handle, status_open] = LocalStore::Open(file_path_, FileAccessMode::kRead);
+    auto [file_handle, status_open] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
     if (!status_open.ok()) {
         UnrecoverableError(status_open.message());
     }
@@ -396,7 +396,7 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         RecoverableError(status);
     }
 
-    auto [file_handle, status] = LocalStore::Open(file_path_, FileAccessMode::kRead);
+    auto [file_handle, status] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -419,13 +419,13 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         String error_message = "Invalid CSR file format.";
         UnrecoverableError(error_message);
     }
-    auto [idx_file_handle, idx_status] = LocalStore::Open(file_path_, FileAccessMode::kRead);
+    auto [idx_file_handle, idx_status] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
     if (!idx_status.ok()) {
         UnrecoverableError(idx_status.message());
     }
 
     idx_file_handle->Seek(3 * sizeof(i64) + (nrow + 1) * sizeof(i64));
-    auto [data_file_handle, data_status] = LocalStore::Open(file_path_, FileAccessMode::kRead);
+    auto [data_file_handle, data_status] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
     if (!data_status.ok()) {
         UnrecoverableError(data_status.message());
     }
@@ -576,7 +576,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
 }
 
 void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
-    UniquePtr<StreamReader> stream_reader = LocalStore::OpenStreamReader(file_path_);
+    UniquePtr<StreamReader> stream_reader = VirtualStore::OpenStreamReader(file_path_);
 
     Txn *txn = query_context->GetTxn();
     u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
@@ -646,7 +646,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
 void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state) {
     nlohmann::json json_arr;
     {
-        auto [file_handle, status] = LocalStore::Open(file_path_, FileAccessMode::kRead);
+        auto [file_handle, status] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

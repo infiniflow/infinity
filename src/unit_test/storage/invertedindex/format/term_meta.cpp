@@ -54,7 +54,7 @@ public:
         ASSERT_EQ(term_meta.total_tf_, new_term_meta.total_tf_);
         ASSERT_EQ(term_meta.payload_, new_term_meta.payload_);
 
-        LocalStore::DeleteFile(file_name_);
+        VirtualStore::DeleteFile(file_name_);
     }
 
 protected:

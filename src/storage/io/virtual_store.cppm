@@ -64,7 +64,7 @@ private:
     UniquePtr<minio::s3::Client> minio_client_{};
 };
 
-export class LocalStore {
+export class VirtualStore {
 public:
     static Tuple<UniquePtr<LocalFileHandle>, Status> Open(const String &path, FileAccessMode access_mode);
     static UniquePtr<StreamReader> OpenStreamReader(const String &path);

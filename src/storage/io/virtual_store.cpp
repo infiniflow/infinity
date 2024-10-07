@@ -180,7 +180,7 @@ Status RemoteStore::UnInit() {
     return Status::OK();
 }
 
-Tuple<UniquePtr<LocalFileHandle>, Status> LocalStore::Open(const String &path, FileAccessMode access_mode) {
+Tuple<UniquePtr<LocalFileHandle>, Status> VirtualStore::Open(const String &path, FileAccessMode access_mode) {
     i32 fd = -1;
     switch (access_mode) {
         case FileAccessMode::kRead: {
@@ -206,7 +206,7 @@ Tuple<UniquePtr<LocalFileHandle>, Status> LocalStore::Open(const String &path, F
     return {MakeUnique<LocalFileHandle>(fd, path, access_mode), Status::OK()};
 }
 
-UniquePtr<StreamReader> LocalStore::OpenStreamReader(const String &path) {
+UniquePtr<StreamReader> VirtualStore::OpenStreamReader(const String &path) {
     auto res = MakeUnique<StreamReader>();
     Status status = res->Init(path);
     if (!status.ok()) {
@@ -216,7 +216,7 @@ UniquePtr<StreamReader> LocalStore::OpenStreamReader(const String &path) {
 }
 
 // For local disk filesystem, such as temp file, disk cache and WAL
-bool LocalStore::Exists(const String &path) {
+bool VirtualStore::Exists(const String &path) {
     std::error_code error_code;
     Path p{path};
     bool is_exists = std::filesystem::exists(p, error_code);
@@ -229,7 +229,7 @@ bool LocalStore::Exists(const String &path) {
     return false;
 }
 
-Status LocalStore::DeleteFile(const String &file_name) {
+Status VirtualStore::DeleteFile(const String &file_name) {
     if (!std::filesystem::path(file_name).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", file_name);
         UnrecoverableError(error_message);
@@ -251,8 +251,8 @@ Status LocalStore::DeleteFile(const String &file_name) {
     return Status::OK();
 }
 
-Status LocalStore::MakeDirectory(const String &path) {
-    if (LocalStore::Exists(path)) {
+Status VirtualStore::MakeDirectory(const String &path) {
+    if (VirtualStore::Exists(path)) {
         if (std::filesystem::is_directory(path)) {
             return Status::OK();
         } else {
@@ -273,7 +273,7 @@ Status LocalStore::MakeDirectory(const String &path) {
     return Status::OK();
 }
 
-Status LocalStore::RemoveDirectory(const String &path) {
+Status VirtualStore::RemoveDirectory(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
@@ -288,7 +288,7 @@ Status LocalStore::RemoveDirectory(const String &path) {
     return Status::OK();
 }
 
-Status LocalStore::CleanupDirectory(const String &path) {
+Status VirtualStore::CleanupDirectory(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
@@ -312,7 +312,7 @@ Status LocalStore::CleanupDirectory(const String &path) {
     return Status::OK();
 }
 
-Status LocalStore::Rename(const String &old_path, const String &new_path) {
+Status VirtualStore::Rename(const String &old_path, const String &new_path) {
     if (!std::filesystem::path(old_path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", old_path);
         UnrecoverableError(error_message);
@@ -328,7 +328,7 @@ Status LocalStore::Rename(const String &old_path, const String &new_path) {
     return Status::OK();
 }
 
-Status LocalStore::Truncate(const String &file_name, SizeT new_length) {
+Status VirtualStore::Truncate(const String &file_name, SizeT new_length) {
     if (!std::filesystem::path(file_name).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", file_name);
         UnrecoverableError(error_message);
@@ -342,7 +342,7 @@ Status LocalStore::Truncate(const String &file_name, SizeT new_length) {
     return Status::OK();
 }
 
-Status LocalStore::Merge(const String &dst_path, const String &src_path) {
+Status VirtualStore::Merge(const String &dst_path, const String &src_path) {
     if (!std::filesystem::path(dst_path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", dst_path);
         UnrecoverableError(error_message);
@@ -375,7 +375,7 @@ Status LocalStore::Merge(const String &dst_path, const String &src_path) {
     return Status::OK();
 }
 
-Tuple<Vector<SharedPtr<DirEntry>>, Status> LocalStore::ListDirectory(const String &path) {
+Tuple<Vector<SharedPtr<DirEntry>>, Status> VirtualStore::ListDirectory(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
@@ -392,7 +392,7 @@ Tuple<Vector<SharedPtr<DirEntry>>, Status> LocalStore::ListDirectory(const Strin
     return {file_array, Status::OK()};
 }
 
-SizeT LocalStore::GetFileSize(const String &path) {
+SizeT VirtualStore::GetFileSize(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
@@ -400,9 +400,9 @@ SizeT LocalStore::GetFileSize(const String &path) {
     return std::filesystem::file_size(path);
 }
 
-String LocalStore::GetParentPath(const String &path) { return Path(path).parent_path().string(); }
+String VirtualStore::GetParentPath(const String &path) { return Path(path).parent_path().string(); }
 
-SizeT LocalStore::GetDirectorySize(const String &path) {
+SizeT VirtualStore::GetDirectorySize(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
         UnrecoverableError(error_message);
@@ -418,15 +418,15 @@ SizeT LocalStore::GetDirectorySize(const String &path) {
     return totalSize;
 }
 
-String LocalStore::ConcatenatePath(const String &dir_path, const String &file_path) {
+String VirtualStore::ConcatenatePath(const String &dir_path, const String &file_path) {
     std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
     return full_path.string();
 }
 
-std::mutex LocalStore::mtx_;
-HashMap<String, MmapInfo> LocalStore::mapped_files_;
+std::mutex VirtualStore::mtx_;
+HashMap<String, MmapInfo> VirtualStore::mapped_files_;
 
-i32 LocalStore::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len) {
+i32 VirtualStore::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len) {
     if (!std::filesystem::path(file_path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", file_path);
         UnrecoverableError(error_message);
@@ -465,7 +465,7 @@ i32 LocalStore::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len
     return 0;
 }
 
-i32 LocalStore::MunmapFile(const String &file_path) {
+i32 VirtualStore::MunmapFile(const String &file_path) {
     if (!std::filesystem::path(file_path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", file_path);
         UnrecoverableError(error_message);
@@ -485,11 +485,11 @@ i32 LocalStore::MunmapFile(const String &file_path) {
 }
 
 // Remote storage
-StorageType LocalStore::storage_type_ = StorageType::kMinio;
-String LocalStore::bucket_ = "infinity_bucket";
-UniquePtr<S3Client> LocalStore::s3_client_ = nullptr;
+StorageType VirtualStore::storage_type_ = StorageType::kMinio;
+String VirtualStore::bucket_ = "infinity_bucket";
+UniquePtr<S3Client> VirtualStore::s3_client_ = nullptr;
 
-Status LocalStore::InitRemoteStore(StorageType storage_type,
+Status VirtualStore::InitRemoteStore(StorageType storage_type,
                                    const String &URL,
                                    bool HTTPS,
                                    const String &access_key,
@@ -507,13 +507,13 @@ Status LocalStore::InitRemoteStore(StorageType storage_type,
     return Status::OK();
 }
 
-Status LocalStore::DownloadObject(const String &file_path, const String &object_name) {
-    if (LocalStore::storage_type_ == StorageType::kLocal) {
+Status VirtualStore::DownloadObject(const String &file_path, const String &object_name) {
+    if (VirtualStore::storage_type_ == StorageType::kLocal) {
         return Status::OK();
     }
-    switch (LocalStore::storage_type_) {
+    switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            return s3_client_->DownloadObject(LocalStore::bucket_, object_name, file_path);
+            return s3_client_->DownloadObject(VirtualStore::bucket_, object_name, file_path);
             break;
         }
         default: {
@@ -524,13 +524,13 @@ Status LocalStore::DownloadObject(const String &file_path, const String &object_
     return Status::OK();
 }
 
-Status LocalStore::UploadObject(const String &file_path, const String &object_name) {
-    if (LocalStore::storage_type_ == StorageType::kLocal) {
+Status VirtualStore::UploadObject(const String &file_path, const String &object_name) {
+    if (VirtualStore::storage_type_ == StorageType::kLocal) {
         return Status::OK();
     }
-    switch (LocalStore::storage_type_) {
+    switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            return s3_client_->UploadObject(LocalStore::bucket_, object_name, file_path);
+            return s3_client_->UploadObject(VirtualStore::bucket_, object_name, file_path);
         }
         default: {
             return Status::NotSupport("Not support storage type");
@@ -540,13 +540,13 @@ Status LocalStore::UploadObject(const String &file_path, const String &object_na
     return Status::OK();
 }
 
-Status LocalStore::RemoveObject(const String &object_name) {
-    if (LocalStore::storage_type_ == StorageType::kLocal) {
+Status VirtualStore::RemoveObject(const String &object_name) {
+    if (VirtualStore::storage_type_ == StorageType::kLocal) {
         return Status::OK();
     }
-    switch (LocalStore::storage_type_) {
+    switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            return s3_client_->RemoveObject(LocalStore::bucket_, object_name);
+            return s3_client_->RemoveObject(VirtualStore::bucket_, object_name);
         }
         default: {
             return Status::NotSupport("Not support storage type");
@@ -555,13 +555,13 @@ Status LocalStore::RemoveObject(const String &object_name) {
 
     return Status::OK();
 }
-Status LocalStore::CopyObject(const String &src_object_name, const String &dst_object_name) {
-    if (LocalStore::storage_type_ == StorageType::kLocal) {
+Status VirtualStore::CopyObject(const String &src_object_name, const String &dst_object_name) {
+    if (VirtualStore::storage_type_ == StorageType::kLocal) {
         return Status::OK();
     }
-    switch (LocalStore::storage_type_) {
+    switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            return s3_client_->CopyObject(LocalStore::bucket_, src_object_name, LocalStore::bucket_, dst_object_name);
+            return s3_client_->CopyObject(VirtualStore::bucket_, src_object_name, VirtualStore::bucket_, dst_object_name);
         }
         default: {
             return Status::NotSupport("Not support storage type");

@@ -131,11 +131,11 @@ int main() {
 
     std::string sift_query_path = std::string(infinity::test_data_path()) + "/benchmark/sift_1m/sift_query.fvecs";
     std::string sift_groundtruth_path = std::string(infinity::test_data_path()) + "/benchmark/sift_1m/sift_groundtruth.ivecs";
-    if (!infinity::LocalStore::Exists(sift_query_path)) {
+    if (!infinity::VirtualStore::Exists(sift_query_path)) {
         std::cerr << "File: " << sift_query_path << " doesn't exist" << std::endl;
         exit(-1);
     }
-    if (!infinity::LocalStore::Exists(sift_groundtruth_path)) {
+    if (!infinity::VirtualStore::Exists(sift_groundtruth_path)) {
         std::cerr << "File: " << sift_groundtruth_path << " doesn't exist" << std::endl;
         exit(-1);
     }

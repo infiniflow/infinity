@@ -88,7 +88,7 @@ public:
 
             test_func(hnsw_index);
 
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -96,7 +96,7 @@ public:
         }
 
         {
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -159,14 +159,14 @@ public:
             }
             test_func(compress_hnsw);
 
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
             compress_hnsw->Save(*file_handle);
         }
         {
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }

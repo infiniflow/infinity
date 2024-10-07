@@ -163,7 +163,7 @@ TEST_F(BPReorderingTest, test2) {
     // GTEST_SKIP() << "Skip this test. This program is not a test but for preprocessing data.";
 
     Path dataset_path = Path(test_data_path()) / "benchmark" / "splade" / "base_small.csr";
-    auto [file_handle, status] = LocalStore::Open(dataset_path.string(), FileAccessMode::kRead);
+    auto [file_handle, status] = VirtualStore::Open(dataset_path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         std::cout << String(status.message()) << std::endl;
         return;
