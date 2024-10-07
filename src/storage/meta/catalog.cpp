@@ -1078,14 +1078,13 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
         UnrecoverableError(error_message);
     }
 
-    std::ofstream outfile = std::ofstream(full_path, std::ios::binary);
-    if (!outfile.is_open()) {
+    auto [out_file_handle, write_status] = VirtualStore::Open(full_path, FileAccessMode::kWrite);
+    if (!write_status.ok()) {
         String error_message = fmt::format("Failed to open delta catalog file: {}", full_path);
         UnrecoverableError(error_message);
     }
 
-    outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
-    outfile.close();
+    out_file_handle->Append((reinterpret_cast<const char *>(buf.data())), act_size);
 
     // {
     // log for delta op debug

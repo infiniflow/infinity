@@ -68,7 +68,7 @@ module;
 #include <arrow/array/array_primitive.h>
 #include <arrow/io/interfaces.h>
 #include <arrow/type.h>
-
+#include <miniocpp/client.h>
 #pragma clang diagnostic pop
 
 export module third_party;
