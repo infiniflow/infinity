@@ -71,7 +71,7 @@ void Infinity::Hello() { fmt::print("hello infinity\n"); }
 void Infinity::LocalInit(const String &path) {
 
     SharedPtr<String> config_path = MakeShared<String>(std::filesystem::absolute(path + "/infinity_conf.toml"));
-    if (LocalStore::Exists(*config_path)) {
+    if (VirtualStore::Exists(*config_path)) {
         InfinityContext::instance().Init(config_path);
     } else {
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();

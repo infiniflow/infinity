@@ -41,7 +41,7 @@ void PersistenceManagerTest::CheckObjData(const String& local_file_path, const S
     SizeT obj_file_size = fs::file_size(obj_fp);
     ASSERT_LE(obj_file_size, ObjSizeLimit);
 
-    auto [pm_file_handle, status] = LocalStore::Open(obj_path, FileAccessMode::kRead);
+    auto [pm_file_handle, status] = VirtualStore::Open(obj_path, FileAccessMode::kRead);
     EXPECT_TRUE(status.ok());
     status = pm_file_handle->Seek(obj_addr.part_offset_);
     EXPECT_TRUE(status.ok());

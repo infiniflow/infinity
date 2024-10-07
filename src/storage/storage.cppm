@@ -50,8 +50,6 @@ public:
 
     [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return persistence_manager_.get(); }
 
-    [[nodiscard]] inline RemoteStore *remote_store() noexcept { return remote_store_.get(); }
-
     [[nodiscard]] inline BGTaskProcessor *bg_processor() const noexcept { return bg_processor_.get(); }
 
     [[nodiscard]] inline PeriodicTriggerThread *periodic_trigger_thread() const noexcept { return periodic_trigger_thread_.get(); }
@@ -77,7 +75,6 @@ private:
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<PersistenceManager> persistence_manager_{};
-    UniquePtr<RemoteStore> remote_store_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};

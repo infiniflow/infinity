@@ -76,8 +76,8 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
         local_data_dir_ += '/';
     }
 
-    if (!LocalStore::Exists(workspace_)) {
-        LocalStore::MakeDirectory(workspace_);
+    if (!VirtualStore::Exists(workspace_)) {
+        VirtualStore::MakeDirectory(workspace_);
     }
 }
 

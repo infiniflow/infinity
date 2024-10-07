@@ -58,7 +58,7 @@ public:
         std::string pqCompressed_data_path = save_dir_ + "/pqCompressed_data.bin";
         std::string pq_pivot_data_path = save_dir_ + "/pq_pivot.bin";
         std::string sample_data_path = save_dir_;
-        auto [data_file_handle, status] = LocalStore::Open(data_file_path, FileAccessMode::kWrite);
+        auto [data_file_handle, status] = VirtualStore::Open(data_file_path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

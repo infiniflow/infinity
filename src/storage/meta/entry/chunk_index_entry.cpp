@@ -445,8 +445,8 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
             String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
             String absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
 
-            LocalStore::DeleteFile(absolute_posting_file);
-            LocalStore::DeleteFile(absolute_dict_file);
+            VirtualStore::DeleteFile(absolute_posting_file);
+            VirtualStore::DeleteFile(absolute_dict_file);
             LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}",
                                   index_prefix,
                                   absolute_posting_file,

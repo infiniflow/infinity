@@ -135,11 +135,11 @@ int main(int argc, char *argv[]) {
     std::cout << "query from: " << query_path << std::endl;
     std::cout << "groundtruth is: " << groundtruth_path << std::endl;
 
-    if (!LocalStore::Exists(query_path)) {
+    if (!VirtualStore::Exists(query_path)) {
         std::cerr << "File: " << query_path << " doesn't exist" << std::endl;
         exit(-1);
     }
-    if (!LocalStore::Exists(groundtruth_path)) {
+    if (!VirtualStore::Exists(groundtruth_path)) {
         std::cerr << "File: " << groundtruth_path << " doesn't exist" << std::endl;
         exit(-1);
     }

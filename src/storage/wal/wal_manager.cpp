@@ -96,8 +96,8 @@ void WalManager::Start() {
     bool changed = running_.compare_exchange_strong(expected, true);
     if (!changed)
         return;
-    if (!LocalStore::Exists(wal_dir_)) {
-        LocalStore::MakeDirectory(wal_dir_);
+    if (!VirtualStore::Exists(wal_dir_)) {
+        VirtualStore::MakeDirectory(wal_dir_);
     }
     // TODO: recovery from wal checkpoint
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
@@ -333,7 +333,7 @@ void WalManager::Flush() {
 
         // Check if the wal file is too large, swap to a new one.
         try {
-            auto file_size = LocalStore::GetFileSize(wal_path_);
+            auto file_size = VirtualStore::GetFileSize(wal_path_);
             if (file_size > cfg_wal_size_threshold_) {
                 this->SwapWalFile(max_commit_ts_);
             }
@@ -524,7 +524,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     LOG_INFO(fmt::format("Wal {} swap to new path: {}", wal_path_, new_file_path));
 
     // Rename the current wal file to a new one.
-    LocalStore::Rename(wal_path_, new_file_path);
+    VirtualStore::Rename(wal_path_, new_file_path);
 
     // Create a new wal file with the original name.
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);

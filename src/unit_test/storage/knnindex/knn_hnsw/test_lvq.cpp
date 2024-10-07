@@ -170,10 +170,10 @@ TEST_F(HnswLVQTest, test1) {
     {
         std::string file_path = file_dir_ + "/lvq_store1.bin";
 
-        LocalStore::CleanupDirectory(file_dir_);
+        VirtualStore::CleanupDirectory(file_dir_);
 
         {
-            auto [file_handle, status] = LocalStore::Open(file_path, FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kWrite);
             if(!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -189,7 +189,7 @@ TEST_F(HnswLVQTest, test1) {
             lvq_store.Save(*file_handle);
         }
         {
-            auto [file_handle, status] = LocalStore::Open(file_path, FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
             if(!status.ok()) {
                 UnrecoverableError(status.message());
             }

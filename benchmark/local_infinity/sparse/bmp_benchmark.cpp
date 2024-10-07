@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
             break;
         }
         case ModeType::kOptimize: {
-            auto [file_handler, status] = LocalStore::Open(opt.index_save_path_.string(), FileAccessMode::kRead);
+            auto [file_handler, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
             }
@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
                 index.Optimize(optimize_options);
                 std::cout << "Index built\n";
 
-                auto [file_handler, status] = LocalStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
+                auto [file_handler, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
                 }
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
 
                 std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
                 auto [file_handler, status] =
-                    LocalStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
+                    VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
                 }
@@ -154,7 +154,7 @@ int main(int argc, char *argv[]) {
             i32 thread_n = opt.thread_n_;
             BmpSearchOptions search_options{.alpha_ = opt.alpha_, .beta_ = opt.beta_, .use_tail_ = true, .use_lock_ = false};
 
-            auto [file_handle, status] = LocalStore::Open(opt.index_save_path_.string(), FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
             }

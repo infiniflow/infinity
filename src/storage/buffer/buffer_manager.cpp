@@ -92,11 +92,11 @@ BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, Share
 BufferManager::~BufferManager() = default;
 
 void BufferManager::Start() {
-    if (!LocalStore::Exists(*data_dir_)) {
-        LocalStore::MakeDirectory(*data_dir_);
+    if (!VirtualStore::Exists(*data_dir_)) {
+        VirtualStore::MakeDirectory(*data_dir_);
     }
 
-    LocalStore::CleanupDirectory(*temp_dir_);
+    VirtualStore::CleanupDirectory(*temp_dir_);
 }
 
 void BufferManager::Stop() { RemoveClean(); }

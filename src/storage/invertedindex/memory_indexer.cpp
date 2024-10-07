@@ -305,10 +305,10 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         posting_file_writer->Sync();
         dict_file_writer->Sync();
         fst_builder.Finish();
-        LocalStore::Merge(tmp_dict_file, tmp_fst_file);
-        LocalStore::DeleteFile(tmp_fst_file);
+        VirtualStore::Merge(tmp_dict_file, tmp_fst_file);
+        VirtualStore::DeleteFile(tmp_fst_file);
     }
-    auto [file_handle, status] = LocalStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -352,7 +352,7 @@ void MemoryIndexer::Load() {
     }
 
     String column_length_file = index_prefix + LENGTH_SUFFIX + SPILL_SUFFIX;
-    auto [file_handle, status] = LocalStore::Open(column_length_file, FileAccessMode::kRead);
+    auto [file_handle, status] = VirtualStore::Open(column_length_file, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -480,10 +480,10 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     posting_file_writer->Sync();
     dict_file_writer->Sync();
     fst_builder.Finish();
-    LocalStore::Merge(tmp_dict_file, tmp_fst_file);
-    LocalStore::DeleteFile(tmp_fst_file);
+    VirtualStore::Merge(tmp_dict_file, tmp_fst_file);
+    VirtualStore::DeleteFile(tmp_fst_file);
 
-    auto [file_handle, status] = LocalStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

@@ -35,7 +35,7 @@ TEST_F(StreamReaderTest, TestBasicStreamIO) {
     }
     file_writer.Sync();
 
-    UniquePtr<StreamReader> stream = LocalStore::OpenStreamReader(path);
+    UniquePtr<StreamReader> stream = VirtualStore::OpenStreamReader(path);
     i32 i = 0;
     String line;
     while (stream->ReadLine(line)) {

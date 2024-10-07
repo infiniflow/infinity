@@ -28,7 +28,7 @@ namespace benchmark {
 
 template <typename T>
 Tuple<SizeT, i32, UniquePtr<T[]>> DecodeFvecsDataset(const Path &path) {
-    auto [file_handle, status] = LocalStore::Open(path.string(), FileAccessMode::kRead);
+    auto [file_handle, status] = VirtualStore::Open(path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

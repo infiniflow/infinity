@@ -79,14 +79,14 @@ protected:
                 // EXPECT_NEAR(-res[0].first, gt_score[i], 1e-5);
             }
 
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
             hnsw_index->Save(*file_handle);
         }
         {
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }

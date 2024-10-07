@@ -115,7 +115,7 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
 
 Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
     toml::table config_toml{};
-    if (config_path.get() == nullptr || config_path->empty() || !LocalStore::Exists(std::filesystem::absolute(*config_path))) {
+    if (config_path.get() == nullptr || config_path->empty() || !VirtualStore::Exists(std::filesystem::absolute(*config_path))) {
         if (config_path.get() == nullptr || config_path->empty()) {
             fmt::print("No config file is given, use default configs.\n");
         } else {

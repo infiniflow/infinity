@@ -188,7 +188,7 @@ void Build(const BenchmarkOption &option) {
     std::cout << "Build time: " << profiler.ElapsedToString(1000) << std::endl;
 
     auto save = [&](auto &hnsw) {
-        auto [index_file, index_status] = LocalStore::Open(option.index_save_path_.string(), FileAccessMode::kWrite);
+        auto [index_file, index_status] = VirtualStore::Open(option.index_save_path_.string(), FileAccessMode::kWrite);
         if (!index_status.ok()) {
             UnrecoverableError(index_status.message());
         }
@@ -206,7 +206,7 @@ template <typename HnswT>
 void Query(const BenchmarkOption &option) {
     BaseProfiler profiler;
 
-    auto [index_file, index_status] = LocalStore::Open(option.index_save_path_.string(), FileAccessMode::kRead);
+    auto [index_file, index_status] = VirtualStore::Open(option.index_save_path_.string(), FileAccessMode::kRead);
     if (!index_status.ok()) {
         UnrecoverableError(index_status.message());
     }
@@ -270,7 +270,7 @@ void Compress(const BenchmarkOption &option) {
         UnrecoverableError("Compress only support plain build type");
     }
 
-    auto [index_file, index_status] = LocalStore::Open(option.index_save_path_.string(), FileAccessMode::kRead);
+    auto [index_file, index_status] = VirtualStore::Open(option.index_save_path_.string(), FileAccessMode::kRead);
     if (!index_status.ok()) {
         UnrecoverableError(index_status.message());
     }
@@ -280,7 +280,7 @@ void Compress(const BenchmarkOption &option) {
     Path new_index_save_path = option.index_dir_ / fmt::format("{}.bin", new_index_name);
 
     auto hnsw_lvq = std::move(*hnsw).CompressToLVQ();
-    auto [index_file_lvq, index_status_lvq] = LocalStore::Open(new_index_save_path.string(), FileAccessMode::kWrite);
+    auto [index_file_lvq, index_status_lvq] = VirtualStore::Open(new_index_save_path.string(), FileAccessMode::kWrite);
     if (!index_status_lvq.ok()) {
         UnrecoverableError(index_status_lvq.message());
     }

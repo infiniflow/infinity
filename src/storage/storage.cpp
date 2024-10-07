@@ -103,12 +103,13 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     break;
                 }
                 case StorageType::kMinio: {
-                    if (remote_store_ != nullptr) {
+                    if (VirtualStore::IsInit()) {
                         UnrecoverableError("remote storage system was initialized before.");
                     }
-                    Map<String, String> configs;
-                    configs.emplace("url", config_ptr_->ObjectStorageUrl());
-                    remote_store_->Init(StorageType::kMinio, configs);
+                    Status status = VirtualStore::InitRemoteStore(StorageType::kMinio, config_ptr_->ObjectStorageUrl());
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
                     break;
                 }
                 default: {
@@ -255,8 +256,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                         break;
                     }
                     case StorageType::kMinio: {
-                        remote_store_->UnInit();
-                        remote_store_.reset();
+                        VirtualStore::UnInitRemoteStore();
                         break;
                     }
                     default: {
@@ -340,8 +340,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                         break;
                     }
                     case StorageType::kMinio: {
-                        remote_store_->UnInit();
-                        remote_store_.reset();
+                        VirtualStore::UnInitRemoteStore();
                         break;
                     }
                     default: {

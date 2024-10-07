@@ -580,7 +580,7 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
     SharedPtr<String> relative_dir = MakeShared<String>(fmt::format("{}/blk_{}", parent_dir, block_id));
     String full_dir = Path(InfinityContext::instance().config()->DataDir()) / *relative_dir;
     if (InfinityContext::instance().persistence_manager() == nullptr) {
-        LocalStore::MakeDirectory(full_dir);
+        VirtualStore::MakeDirectory(full_dir);
     }
     return relative_dir;
 }

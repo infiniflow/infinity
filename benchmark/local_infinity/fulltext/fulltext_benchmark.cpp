@@ -123,7 +123,7 @@ void BenchmarkImport(SharedPtr<Infinity> infinity,
                      const String &db_name,
                      const String &table_name,
                      const String &import_from) {
-    if (!LocalStore::Exists(import_from)) {
+    if (!VirtualStore::Exists(import_from)) {
         LOG_ERROR(fmt::format("Data file doesn't exist: {}", import_from));
         return;
     }

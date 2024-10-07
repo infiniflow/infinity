@@ -51,7 +51,7 @@ TEST_F(FileWriteReadTest, test1) {
     file_reader.Read(read_str.data(), 4);
     EXPECT_STREQ(read_str.c_str(), "abca");
     EXPECT_FALSE(file_reader.Finished());
-    LocalStore::DeleteFile(path);
+    VirtualStore::DeleteFile(path);
 }
 
 // write vint then read vint
@@ -70,7 +70,7 @@ TEST_F(FileWriteReadTest, test2) {
         u32 a = file_reader.ReadVInt();
         EXPECT_EQ(a, i);
     }
-    LocalStore::DeleteFile(path);
+    VirtualStore::DeleteFile(path);
 }
 
 // hybrid datatype
@@ -104,7 +104,7 @@ TEST_F(FileWriteReadTest, test3) {
         u32 a = file_reader.ReadVInt();
         EXPECT_EQ(a, i);
     }
-    LocalStore::DeleteFile(path);
+    VirtualStore::DeleteFile(path);
 }
 
 // test total written bytes and GetFileSize()
