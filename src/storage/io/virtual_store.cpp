@@ -31,9 +31,9 @@ import logger;
 import infinity_exception;
 import default_values;
 import stream_reader;
+import s3_client_minio;
 
 namespace infinity {
-
 
 StorageType String2StorageType(const String &storage_type) {
     if (storage_type == "local") {
@@ -77,7 +77,6 @@ StorageType String2StorageType(const String &storage_type) {
 
     return StorageType::kInvalid;
 }
-
 
 String ToString(StorageType storage_type) {
     switch (storage_type) {
@@ -207,10 +206,10 @@ Tuple<UniquePtr<LocalFileHandle>, Status> LocalStore::Open(const String &path, F
     return {MakeUnique<LocalFileHandle>(fd, path, access_mode), Status::OK()};
 }
 
-UniquePtr<StreamReader> LocalStore::OpenStreamReader(const String& path) {
+UniquePtr<StreamReader> LocalStore::OpenStreamReader(const String &path) {
     auto res = MakeUnique<StreamReader>();
     Status status = res->Init(path);
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status);
     }
     return res;
@@ -483,6 +482,93 @@ i32 LocalStore::MunmapFile(const String &file_path) {
         mapped_files_.erase(it);
     }
     return 0;
+}
+
+// Remote storage
+StorageType LocalStore::storage_type_ = StorageType::kMinio;
+String LocalStore::bucket_ = "infinity_bucket";
+UniquePtr<S3Client> LocalStore::s3_client_ = nullptr;
+
+Status LocalStore::InitRemoteStore(StorageType storage_type,
+                                   const String &URL,
+                                   bool HTTPS,
+                                   const String &access_key,
+                                   const String &secret_key,
+                                   const String &bucket) {
+    switch (storage_type) {
+        case StorageType::kMinio: {
+            s3_client_ = MakeUnique<S3ClientMinio>(URL, HTTPS, access_key, secret_key);
+        }
+        default: {
+            return Status::NotSupport("Not support storage type");
+        }
+    }
+    bucket_ = bucket;
+    return Status::OK();
+}
+
+Status LocalStore::DownloadObject(const String &file_path, const String &object_name) {
+    if (LocalStore::storage_type_ == StorageType::kLocal) {
+        return Status::OK();
+    }
+    switch (LocalStore::storage_type_) {
+        case StorageType::kMinio: {
+            return s3_client_->DownloadObject(LocalStore::bucket_, object_name, file_path);
+            break;
+        }
+        default: {
+            return Status::NotSupport("Not support storage type");
+        }
+    }
+
+    return Status::OK();
+}
+
+Status LocalStore::UploadObject(const String &file_path, const String &object_name) {
+    if (LocalStore::storage_type_ == StorageType::kLocal) {
+        return Status::OK();
+    }
+    switch (LocalStore::storage_type_) {
+        case StorageType::kMinio: {
+            return s3_client_->UploadObject(LocalStore::bucket_, object_name, file_path);
+        }
+        default: {
+            return Status::NotSupport("Not support storage type");
+        }
+    }
+
+    return Status::OK();
+}
+
+Status LocalStore::RemoveObject(const String &object_name) {
+    if (LocalStore::storage_type_ == StorageType::kLocal) {
+        return Status::OK();
+    }
+    switch (LocalStore::storage_type_) {
+        case StorageType::kMinio: {
+            return s3_client_->RemoveObject(LocalStore::bucket_, object_name);
+        }
+        default: {
+            return Status::NotSupport("Not support storage type");
+        }
+    }
+
+    return Status::OK();
+}
+Status LocalStore::CopyObject(const String &src_object_name, const String &dst_object_name) {
+    if (LocalStore::storage_type_ == StorageType::kLocal) {
+        return Status::OK();
+    }
+    switch (LocalStore::storage_type_) {
+        case StorageType::kMinio: {
+            return s3_client_->CopyObject(LocalStore::bucket_, src_object_name, LocalStore::bucket_, dst_object_name);
+        }
+        default: {
+            return Status::NotSupport("Not support storage type");
+        }
+    }
+
+    return Status::OK();
 }
 
 } // namespace infinity
