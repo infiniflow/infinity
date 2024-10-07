@@ -16,6 +16,9 @@ public:
 
     virtual ~S3Client() = default;
 
+    virtual Status Init() = 0;
+    virtual Status UnInit() = 0;
+
     virtual Status DownloadObject(const String &bucket_name, const String &object_name, const String &file_path) = 0;
 
     virtual Status UploadObject(const String &bucket_name, const String &object_name, const String &file_path) = 0;

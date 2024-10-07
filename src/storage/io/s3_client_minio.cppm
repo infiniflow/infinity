@@ -17,18 +17,17 @@ public:
 
     ~S3ClientMinio() = default;
 
-    Status DownloadObject(const String &bucket_name, const String &object_name, const String &file_path);
+    Status Init() final;
+    Status UnInit() final;
 
-    Status UploadObject(const String &bucket_name, const String &object_name, const String &file_path);
-
-    Status RemoveObject(const String &bucket_name, const String &object_name);
-
-    Status CopyObject(const String &src_bucket_name, const String &src_object_name, const String &dst_bucket_name, const String &dst_object_name);
-
-    minio::s3::Client GetClient() { return minio::s3::Client(base_url, &provider); }
+    Status DownloadObject(const String &bucket_name, const String &object_name, const String &file_path) final;
+    Status UploadObject(const String &bucket_name, const String &object_name, const String &file_path) final;
+    Status RemoveObject(const String &bucket_name, const String &object_name) final;
+    Status CopyObject(const String &src_bucket_name, const String &src_object_name, const String &dst_bucket_name, const String &dst_object_name) final;
 
 private:
     minio::s3::BaseUrl base_url;
     minio::creds::StaticProvider provider;
+    UniquePtr<minio::s3::Client> client_{};
 };
 } // namespace infinity

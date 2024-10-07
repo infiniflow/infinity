@@ -7,12 +7,21 @@ module s3_client_minio;
 import stl;
 import infinity_exception;
 import status;
+import third_party;
+import logger;
 
 namespace infinity {
-Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &object_name, const String &file_path) {
-    // Create S3 client.
-    minio::s3::Client client = GetClient();
 
+Status S3ClientMinio::Init() {
+    client_ = MakeUnique<minio::s3::Client>(base_url, &provider);
+    return Status::OK();
+}
+Status S3ClientMinio::UnInit() {
+    client_.reset();
+    return Status::OK();
+}
+
+Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &object_name, const String &file_path) {
     // Create download object arguments.
     minio::s3::DownloadObjectArgs args;
     args.bucket = bucket_name;
@@ -20,11 +29,11 @@ Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &ob
     args.filename = file_path;
 
     // Call download object.
-    minio::s3::DownloadObjectResponse resp = client.DownloadObject(args);
+    minio::s3::DownloadObjectResponse resp = client_->DownloadObject(args);
 
     // Handle response.
     if (resp) {
-        std::cout << object_name << " is successfully downloaded to " << file_path << std::endl;
+        LOG_TRACE(fmt::format("{} downloaded to {} successfully", file_path, object_name));
     } else {
         UnrecoverableError("unable to download object; " + resp.Error().String());
     }
@@ -32,9 +41,6 @@ Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &ob
 }
 
 Status S3ClientMinio::UploadObject(const String &bucket_name, const String &object_name, const String &file_path) {
-    // Create S3 client.
-    minio::s3::Client client = GetClient();
-
     // Create upload object arguments.
     minio::s3::UploadObjectArgs args;
     args.bucket = bucket_name;
@@ -42,11 +48,11 @@ Status S3ClientMinio::UploadObject(const String &bucket_name, const String &obje
     args.filename = file_path;
 
     // Call upload object.
-    minio::s3::UploadObjectResponse resp = client.UploadObject(args);
+    minio::s3::UploadObjectResponse resp = client_->UploadObject(args);
 
     // Handle response.
     if (resp) {
-        std::cout << file_path << " is successfully uploaded to " << object_name << std::endl;
+        LOG_TRACE(fmt::format("{} uploaded to {} successfully", file_path, object_name));
     } else {
         UnrecoverableError("unable to upload object; " + resp.Error().String());
     }
@@ -54,19 +60,17 @@ Status S3ClientMinio::UploadObject(const String &bucket_name, const String &obje
 }
 
 Status S3ClientMinio::RemoveObject(const String &bucket_name, const String &object_name) {
-    // Create S3 client.
-    minio::s3::Client client = GetClient();
     // Create remove object arguments.
     minio::s3::RemoveObjectArgs args;
     args.bucket = bucket_name;
     args.object = object_name;
 
     // Call remove object.
-    minio::s3::RemoveObjectResponse resp = client.RemoveObject(args);
+    minio::s3::RemoveObjectResponse resp = client_->RemoveObject(args);
 
     // Handle response.
     if (resp) {
-        std::cout << object_name << " is removed successfully" << std::endl;
+        LOG_TRACE(fmt::format("{} is removed from {} successfully", object_name, bucket_name));
     } else {
         UnrecoverableError("unable to remove object; " + resp.Error().String());
     }
@@ -77,8 +81,6 @@ Status S3ClientMinio::CopyObject(const String &src_bucket_name,
                                  const String &src_object_name,
                                  const String &dst_bucket_name,
                                  const String &dst_object_name) {
-    // Create S3 client.
-    minio::s3::Client client = GetClient();
     // Create copy object arguments.
     minio::s3::CopyObjectArgs args;
     args.bucket = dst_bucket_name;
@@ -90,11 +92,11 @@ Status S3ClientMinio::CopyObject(const String &src_bucket_name,
     args.source = source;
 
     // Call copy object.
-    minio::s3::CopyObjectResponse resp = client.CopyObject(args);
+    minio::s3::CopyObjectResponse resp = client_->CopyObject(args);
 
     // Handle response.
     if (resp) {
-        std::cout << dst_object_name << " is successfully created from " << src_object_name << std::endl;
+        LOG_TRACE(fmt::format("{} is copied to {} successfully", src_object_name, dst_object_name));
     } else {
         UnrecoverableError("unable to do copy object; " + resp.Error().String());
     }
