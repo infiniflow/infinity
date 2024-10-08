@@ -365,6 +365,10 @@ class RemoteTable():
         self.query_builder.output(columns)
         return self
 
+    def highlight(self, columns: Optional[List[str]]):
+        self.query_builder.highlight(columns)
+        return self
+
     def filter(self, filter: Optional[str]):
         self.query_builder.filter(filter)
         return self

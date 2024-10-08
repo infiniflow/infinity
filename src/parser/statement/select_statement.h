@@ -54,6 +54,7 @@ public:
 
     BaseTableReference *table_ref_{nullptr};
     std::vector<ParsedExpr *> *select_list_{nullptr};
+    std::vector<ParsedExpr *> *highlight_list_{nullptr};
     bool select_distinct_{false};
     ParsedExpr *search_expr_{nullptr};
     ParsedExpr *where_expr_{nullptr};

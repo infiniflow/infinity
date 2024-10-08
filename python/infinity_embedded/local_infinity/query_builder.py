@@ -22,6 +22,7 @@ class Query(ABC):
     def __init__(
         self,
         columns: Optional[List[WrapParsedExpr]],
+        highlight: Optional[List[WrapParsedExpr]],
         search: Optional[WrapSearchExpr],
         filter: Optional[WrapParsedExpr],
         limit: Optional[WrapParsedExpr],
@@ -29,6 +30,7 @@ class Query(ABC):
         sort: Optional[WrapOrderByExpr]
     ):
         self.columns = columns
+        self.highlight = highlight
         self.search = search
         self.filter = filter
         self.limit = limit
@@ -40,13 +42,15 @@ class ExplainQuery(Query):
     def __init__(
         self,
         columns: Optional[List[WrapParsedExpr]],
+        highlight: Optional[List[WrapParsedExpr]],
         search: Optional[WrapSearchExpr],
         filter: Optional[WrapParsedExpr],
         limit: Optional[WrapParsedExpr],
         offset: Optional[WrapParsedExpr],
+        sort: Optional[WrapOrderByExpr],
         explain_type: Optional[BaseExplainType],
     ):
-        super().__init__(columns, search, filter, limit, offset, None)
+        super().__init__(columns, highlight, search, filter, limit, offset, sort)
         self.explain_type = explain_type
 
 
@@ -54,19 +58,21 @@ class InfinityLocalQueryBuilder(ABC):
     def __init__(self, table):
         self._table = table
         self._columns = None
+        self._highlight = None
         self._search = None
         self._filter = None
         self._limit = None
         self._offset = None
-        self._sort = []
+        self._sort = None
 
     def reset(self):
         self._columns = None
+        self._highlight = None
         self._search = None
         self._filter = None
         self._limit = None
         self._offset = None
-        self._sort = []
+        self._sort = None
 
     def match_dense(
         self,
@@ -436,6 +442,18 @@ class InfinityLocalQueryBuilder(ABC):
                     select_list.append(parsed_expr)
 
         self._columns = select_list
+        return self
+
+    def highlight(self, columns: Optional[list]) -> InfinityLocalQueryBuilder:
+        highlight_list: List[WrapParsedExpr] = []
+        for column in columns:
+            if isinstance(column, str):
+                column = column.lower()
+
+            parsed_expr = parse_expr(maybe_parse(column))
+            highlight_list.append(parsed_expr)
+
+        self._highlight = highlight_list
         return self
 
     def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityLocalQueryBuilder:

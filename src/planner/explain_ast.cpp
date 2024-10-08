@@ -308,6 +308,22 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         result->emplace_back(MakeShared<String>(projection_str));
     }
 
+    {
+        String highlight_str = String(intent_size, ' ') + "highlight: ";
+        SizeT highlight_count = select_statement->highlight_list_->size();
+        if (highlight_count == 0) {
+            String error_message = "No select list";
+            UnrecoverableError(error_message);
+        }
+        for (SizeT idx = 0; idx < highlight_count - 1; ++idx) {
+            ParsedExpr *expr = select_statement->highlight_list_->at(idx);
+            highlight_str += expr->ToString() + ", ";
+        }
+        highlight_str += select_statement->highlight_list_->back()->ToString();
+
+        result->emplace_back(MakeShared<String>(highlight_str));
+    }
+
     status = BuildBaseTableRef(select_statement->table_ref_, result, intent_size);
     if(!status.ok()) {
         return status;

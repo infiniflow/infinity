@@ -517,12 +517,12 @@ ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
     return nullptr;
 }
 
-OrderByExpr *WrapOrderByExpr::GetOrderByExpr(Status &status){
+OrderByExpr *WrapOrderByExpr::GetOrderByExpr(Status &status) {
     auto order_by_expr = new OrderByExpr();
     order_by_expr->expr_ = expr.GetParsedExpr(status);
-    if(asc){
+    if (asc) {
         order_by_expr->type_ = OrderType::kAsc;
-    }else{
+    } else {
         order_by_expr->type_ = OrderType::kDesc;
     }
     return order_by_expr;
@@ -1266,6 +1266,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
                            Vector<WrapParsedExpr> select_list,
+                           Vector<WrapParsedExpr> highlight_list,
                            Vector<WrapOrderByExpr> order_by_list,
                            WrapSearchExpr *wrap_search_expr,
                            WrapParsedExpr *where_expr,
@@ -1301,9 +1302,9 @@ WrapQueryResult WrapSearch(Infinity &instance,
     }
     Vector<ParsedExpr *> *output_columns = nullptr;
     DeferFn defer_fn3([&]() {
-        if(output_columns != nullptr) {
+        if (output_columns != nullptr) {
             SizeT output_column_len = output_columns->size();
-            for(SizeT i = 0; i < output_column_len; ++ i) {
+            for (SizeT i = 0; i < output_column_len; ++i) {
                 if ((*output_columns)[i] != nullptr) {
                     delete (*output_columns)[i];
                     (*output_columns)[i] = nullptr;
@@ -1319,6 +1320,32 @@ WrapQueryResult WrapSearch(Infinity &instance,
         for (SizeT i = 0; i < select_list.size(); ++i) {
             Status status;
             output_columns->emplace_back(select_list[i].GetParsedExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
+    Vector<ParsedExpr *> *highlight = nullptr;
+    DeferFn defer_fn7([&]() {
+        if (highlight != nullptr) {
+            SizeT highlight_column_len = highlight->size();
+            for (SizeT i = 0; i < highlight_column_len; ++i) {
+                if ((*highlight)[i] != nullptr) {
+                    delete (*highlight)[i];
+                    (*highlight)[i] = nullptr;
+                }
+            }
+        }
+    });
+    if (highlight_list.empty()) {
+        ;
+    } else {
+        highlight = new Vector<ParsedExpr *>();
+        highlight->reserve(highlight_list.size());
+        for (SizeT i = 0; i < highlight_list.size(); ++i) {
+            Status status;
+            highlight->emplace_back(highlight_list[i].GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
@@ -1357,9 +1384,9 @@ WrapQueryResult WrapSearch(Infinity &instance,
 
     Vector<OrderByExpr *> *order_by_exprs = nullptr;
     DeferFn defer_fn6([&]() {
-        if(order_by_exprs != nullptr) {
+        if (order_by_exprs != nullptr) {
             SizeT order_by_expr_len = order_by_exprs->size();
-            for(SizeT i = 0; i < order_by_expr_len; ++ i) {
+            for (SizeT i = 0; i < order_by_expr_len; ++i) {
                 if ((*order_by_exprs)[i] != nullptr) {
                     delete (*order_by_exprs)[i];
                     (*order_by_exprs)[i] = nullptr;
@@ -1383,7 +1410,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     }
 
-    auto query_result = instance.Search(db_name, table_name, search_expr, filter, limit, offset, output_columns, order_by_exprs);
+    auto query_result = instance.Search(db_name, table_name, search_expr, filter, limit, offset, output_columns, highlight, order_by_exprs);
     search_expr = nullptr;
     filter = nullptr;
     limit = nullptr;
@@ -1437,9 +1464,9 @@ WrapQueryResult WrapExplain(Infinity &instance,
     }
     Vector<ParsedExpr *> *output_columns = nullptr;
     DeferFn defer_fn3([&]() {
-        if(output_columns != nullptr) {
+        if (output_columns != nullptr) {
             SizeT output_column_len = output_columns->size();
-            for(SizeT i = 0; i < output_column_len; ++ i) {
+            for (SizeT i = 0; i < output_column_len; ++i) {
                 if ((*output_columns)[i] != nullptr) {
                     delete (*output_columns)[i];
                     (*output_columns)[i] = nullptr;
@@ -1461,7 +1488,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
         }
     }
 
-    auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, nullptr, nullptr, output_columns);
+    auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, nullptr, nullptr, output_columns, nullptr, nullptr);
     search_expr = nullptr;
     filter = nullptr;
     output_columns = nullptr;

@@ -894,7 +894,9 @@ QueryResult Infinity::Explain(const String &db_name,
                               ParsedExpr *filter,
                               ParsedExpr *limit,
                               ParsedExpr *offset,
-                              Vector<ParsedExpr *> *output_columns) {
+                              Vector<ParsedExpr *> *output_columns,
+                              Vector<ParsedExpr *> *highlight_columns,
+                              Vector<OrderByExpr *> *order_by_list) {
 
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<ExplainStatement> explain_statment = MakeUnique<ExplainStatement>();
@@ -914,10 +916,12 @@ QueryResult Infinity::Explain(const String &db_name,
 
     // TODO: to lower expression identifier string
     select_statement->select_list_ = output_columns;
+    select_statement->highlight_list_ = highlight_columns;
     select_statement->where_expr_ = filter;
     select_statement->search_expr_ = search_expr;
     select_statement->limit_expr_ = limit;
     select_statement->offset_expr_ = offset;
+    select_statement->order_by_list = order_by_list;
 
     explain_statment->statement_ = select_statement;
 
@@ -932,6 +936,7 @@ QueryResult Infinity::Search(const String &db_name,
                              ParsedExpr *limit,
                              ParsedExpr *offset,
                              Vector<ParsedExpr *> *output_columns,
+                             Vector<ParsedExpr *> *highlight_columns,
                              Vector<OrderByExpr *> *order_by_list) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<SelectStatement> select_statement = MakeUnique<SelectStatement>();
@@ -948,6 +953,7 @@ QueryResult Infinity::Search(const String &db_name,
 
     // TODO: to lower expression identifier string
     select_statement->select_list_ = output_columns;
+    select_statement->highlight_list_ = highlight_columns;
     select_statement->where_expr_ = filter;
     select_statement->search_expr_ = search_expr;
     select_statement->limit_expr_ = limit;

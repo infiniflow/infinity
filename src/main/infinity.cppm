@@ -175,7 +175,9 @@ public:
                         ParsedExpr *filter,
                         ParsedExpr *limit,
                         ParsedExpr *offset,
-                        Vector<ParsedExpr *> *output_columns);
+                        Vector<ParsedExpr *> *output_columns,
+                        Vector<ParsedExpr *> *highlight_columns,
+                        Vector<OrderByExpr *> *order_by_list);
 
     QueryResult Search(const String &db_name,
                        const String &table_name,
@@ -184,6 +186,7 @@ public:
                        ParsedExpr *limit,
                        ParsedExpr *offset,
                        Vector<ParsedExpr *> *output_columns,
+                       Vector<ParsedExpr *> *highlight_columns,
                        Vector<OrderByExpr *> *order_by_list);
 
     QueryResult Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_options = OptimizeOptions{});
