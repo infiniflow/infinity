@@ -809,6 +809,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     const auto &index_name = *table_index_entry_->GetIndexName();
     if (!TrySetOptimizing()) {
         LOG_INFO(fmt::format("Index {} segment {} is optimizing, skip optimize.", index_name, segment_id_));
+        return nullptr;
     }
     bool opt_success = false;
     DeferFn defer_fn([&] {
@@ -907,6 +908,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             BufferHandle handle = merged_chunk_index_entry->GetIndex();
             auto data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
             data_ptr->BuildIVFIndex(base_rowid, row_count, segment_entry, column_def, buffer_mgr);
+            break;
         }
         default: {
             String error_message = "RebuildChunkIndexEntries is not supported for this index type.";

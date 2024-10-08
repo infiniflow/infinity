@@ -44,6 +44,7 @@ import table_def;
 import internal_types;
 import column_vector;
 import query_result;
+import select_statement;
 
 namespace infinity {
 
@@ -174,6 +175,8 @@ private:
     static InExpr *GetInExprFromProto(Status &status, const infinity_thrift_rpc::InExpr &in_expr);
 
     static ParsedExpr *GetParsedExprFromProto(Status &status, const infinity_thrift_rpc::ParsedExpr &expr);
+
+    static OrderByExpr *GetOrderByExprFromProto(Status &status, const infinity_thrift_rpc::OrderByExpr &expr);
 
     static KnnDistanceType GetDistanceTypeFormProto(const infinity_thrift_rpc::KnnDistanceType::type &type);
 

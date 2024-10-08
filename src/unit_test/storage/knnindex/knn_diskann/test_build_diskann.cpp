@@ -20,13 +20,9 @@ import base_test;
 import infinity_exception;
 import knn_diskann;
 import internal_types;
-import file_system;
-import file_system_type;
 import virtual_store;
-import file_system_type;
 import index_base;
 import diskann_index_data;
-import abstract_file_handle;
 import local_file_handle;
 
 using namespace infinity;
@@ -62,7 +58,7 @@ public:
         std::string pqCompressed_data_path = save_dir_ + "/pqCompressed_data.bin";
         std::string pq_pivot_data_path = save_dir_ + "/pq_pivot.bin";
         std::string sample_data_path = save_dir_;
-        auto [data_file_handle, status] = LocalStore::Open(data_file_path, FileAccessMode::kWrite);
+        auto [data_file_handle, status] = VirtualStore::Open(data_file_path, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

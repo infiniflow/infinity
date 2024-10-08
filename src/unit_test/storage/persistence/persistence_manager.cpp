@@ -3,11 +3,9 @@ import base_test;
 import stl;
 import persistence_manager;
 import virtual_store;
-import virtual_storage_type;
-import abstract_file_handle;
-import file_system_type;
 import third_party;
 import persist_result_handler;
+import local_file_handle;
 
 using namespace infinity;
 namespace fs = std::filesystem;
@@ -43,7 +41,7 @@ void PersistenceManagerTest::CheckObjData(const String& local_file_path, const S
     SizeT obj_file_size = fs::file_size(obj_fp);
     ASSERT_LE(obj_file_size, ObjSizeLimit);
 
-    auto [pm_file_handle, status] = LocalStore::Open(obj_path, FileAccessMode::kRead);
+    auto [pm_file_handle, status] = VirtualStore::Open(obj_path, FileAccessMode::kRead);
     EXPECT_TRUE(status.ok());
     status = pm_file_handle->Seek(obj_addr.part_offset_);
     EXPECT_TRUE(status.ok());

@@ -24,7 +24,6 @@ import index_defines;
 import internal_types;
 import file_reader;
 
-import file_system;
 import third_party;
 
 module segment_posting;

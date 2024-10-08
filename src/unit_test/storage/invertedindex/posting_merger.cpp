@@ -13,8 +13,6 @@ import column_inverter;
 import index_defines;
 import column_index_reader;
 import posting_iterator;
-import file_system;
-import file_system_type;
 import virtual_store;
 import file_writer;
 import term_meta;
@@ -32,7 +30,7 @@ import logger;
 import infinity_context;
 import persistence_manager;
 import persist_result_handler;
-import abstract_file_handle;
+import local_file_handle;
 
 using namespace infinity;
 
@@ -159,7 +157,7 @@ TEST_P(PostingMergerTest, Basic) {
             }
             RowID base_row_id = row_ids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
-            auto [file_handle, status] = LocalStore::Open(real_column_len_file, FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(real_column_len_file, FileAccessMode::kRead);
             if (!status.ok()) {
                 String error_message = status.message();
                 UnrecoverableError(error_message);

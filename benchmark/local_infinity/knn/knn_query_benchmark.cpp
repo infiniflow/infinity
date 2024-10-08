@@ -135,11 +135,11 @@ int main(int argc, char *argv[]) {
     std::cout << "query from: " << query_path << std::endl;
     std::cout << "groundtruth is: " << groundtruth_path << std::endl;
 
-    if (!LocalStore::Exists(query_path)) {
+    if (!VirtualStore::Exists(query_path)) {
         std::cerr << "File: " << query_path << " doesn't exist" << std::endl;
         exit(-1);
     }
-    if (!LocalStore::Exists(groundtruth_path)) {
+    if (!VirtualStore::Exists(groundtruth_path)) {
         std::cerr << "File: " << groundtruth_path << " doesn't exist" << std::endl;
         exit(-1);
     }
@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
             auto select_rowid_expr = new FunctionExpr();
             select_rowid_expr->func_name_ = "row_id";
             output_columns->emplace_back(select_rowid_expr);
-            auto result = infinity->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns);
+            auto result = infinity->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr);
             {
                 auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
                 auto &column = *cv[0];

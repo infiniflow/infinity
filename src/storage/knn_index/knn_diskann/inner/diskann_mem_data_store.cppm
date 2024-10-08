@@ -26,7 +26,6 @@ module;
 export module diskann_mem_data_store;
 
 import stl;
-import file_system;
 import diskann_dist_func;
 import diskann_utils;
 import infinity_exception;

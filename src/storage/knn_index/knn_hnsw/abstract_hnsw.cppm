@@ -28,7 +28,6 @@ import data_store;
 import vec_store_type;
 import dist_func_l2;
 import dist_func_ip;
-import file_system;
 import hnsw_common;
 import column_def;
 import index_hnsw;

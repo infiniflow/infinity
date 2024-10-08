@@ -169,7 +169,7 @@ public:
 
     i32 GetAvailableCapacity();
 
-    String VersionFilePath() { return LocalStore::ConcatenatePath(*block_dir_, String(BlockVersion::PATH)); }
+    String VersionFilePath() { return VirtualStore::ConcatenatePath(*block_dir_, String(BlockVersion::PATH)); }
 
     const SharedPtr<DataType> GetColumnType(u64 column_id) const;
 

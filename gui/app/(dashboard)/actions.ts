@@ -131,4 +131,36 @@ export const showTable = async ({
   }
 };
 
+export const showConfigs = async () => {
+  try {
+    const x = await get(
+        `${ApiUrl.configs}`
+    );
+    return x;
+  } catch (error) {
+    console.log('🚀 ~ error:', error);
+  }
+};
+
+export const showVariables = async () => {
+  try {
+    const x = await get(
+        `${ApiUrl.variables}/global`
+    );
+    return x;
+  } catch (error) {
+    console.log('🚀 ~ error:', error);
+  }
+};
+
+export const showCurrentNode = async () => {
+  try {
+    const x = await get(
+        `${ApiUrl.variables}/global`
+    );
+    return x;
+  } catch (error) {
+    console.log('🚀 ~ error:', error);
+  }
+};
 //#endregion

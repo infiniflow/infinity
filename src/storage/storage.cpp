@@ -50,7 +50,6 @@ import cleanup_scanner;
 import persistence_manager;
 import extra_ddl_info;
 import virtual_store;
-import virtual_storage_type;
 
 namespace infinity {
 
@@ -98,18 +97,19 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
                 break;
             }
-            switch(config_ptr_->StorageType()) {
+            switch (config_ptr_->StorageType()) {
                 case StorageType::kLocal: {
                     // Not init remote store
                     break;
                 }
                 case StorageType::kMinio: {
-                    if (remote_store_ != nullptr) {
+                    if (VirtualStore::IsInit()) {
                         UnrecoverableError("remote storage system was initialized before.");
                     }
-                    Map<String, String> configs;
-                    configs.emplace("url", config_ptr_->ObjectStorageUrl());
-                    remote_store_->Init(StorageType::kMinio, configs);
+                    Status status = VirtualStore::InitRemoteStore(StorageType::kMinio, config_ptr_->ObjectStorageUrl());
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
                     break;
                 }
                 default: {
@@ -250,14 +250,13 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
-                switch(config_ptr_->StorageType()) {
+                switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
                         // Not init remote store
                         break;
                     }
                     case StorageType::kMinio: {
-                        remote_store_->UnInit();
-                        remote_store_.reset();
+                        VirtualStore::UnInitRemoteStore();
                         break;
                     }
                     default: {
@@ -335,14 +334,13 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
-                switch(config_ptr_->StorageType()) {
+                switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
                         // Not init remote store
                         break;
                     }
                     case StorageType::kMinio: {
-                        remote_store_->UnInit();
-                        remote_store_.reset();
+                        VirtualStore::UnInitRemoteStore();
                         break;
                     }
                     default: {

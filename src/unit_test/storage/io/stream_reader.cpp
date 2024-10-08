@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 import base_test;
 import infinity_exception;
 
@@ -10,38 +11,36 @@ import logger;
 import file_writer;
 import file_reader;
 import infinity_context;
-import stream_io;
-import file_system_type;
+import stream_reader;
+import virtual_store;
 
 using namespace infinity;
 
-class StreamIOTest : public BaseTest {};
+class StreamReaderTest : public BaseTest {};
 
-TEST_F(StreamIOTest, TestBasicStreamIO) {
+TEST_F(StreamReaderTest, TestBasicStreamIO) {
     String path = String(GetFullTmpDir()) + "/test_streamio.abc";
     FileWriter file_writer(path, 128);
 
     String lines[5];
-    lines[0] = "hahahahha"; 
+    lines[0] = "hahahahha";
     lines[1] = "xixixixiix";
     lines[2] = "huhuhuhu";
-    lines[3]= "xuxuxuxuxxu";
+    lines[3] = "xuxuxuxuxxu";
     lines[4] = "ddddd";
 
-    for(i64 i = 0; i < 5; i++) {
+    for (i64 i = 0; i < 5; i++) {
         file_writer.Write(lines[i].c_str(), lines[i].size());
         file_writer.Write("\n", 1);
     }
     file_writer.Sync();
 
-    StreamIO stream;
-    stream.Init(path, FileFlags::READ_FLAG);
+    UniquePtr<StreamReader> stream = VirtualStore::OpenStreamReader(path);
     i32 i = 0;
     String line;
-    while(stream.ReadLine(line)) {
+    while (stream->ReadLine(line)) {
         EXPECT_STREQ(line.c_str(), lines[i].c_str());
         i++;
     }
-    stream.Close();
     EXPECT_EQ(i, 5);
 }

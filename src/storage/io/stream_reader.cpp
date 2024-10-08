@@ -16,40 +16,29 @@ module;
 
 #include <fstream>
 
-module stream_io;
+module stream_reader;
 
 import stl;
 import logger;
 import status;
-import file_system_type;
 import infinity_exception;
 import third_party;
 
 namespace infinity {
 
-StreamIO::~StreamIO() = default;
-
-void StreamIO::Init(const String& file_name, u8 flags) {
-    bool reader_ = flags & FileFlags::READ_FLAG;
-    bool writer_ = flags & FileFlags::WRITE_FLAG;
-    if (reader_ && writer_) {
-        file_.open(file_name, std::ios::in | std::ios::out);
-    } else if (reader_) {
-        file_.open(file_name, std::ios::in);
-    } else if (writer_) {
-        file_.open(file_name, std::ios::out);
-    } else {
-        Status status = Status::InvalidCommand("Not reachable");
-        RecoverableError(status);
-    }
-
-    if (!file_.is_open()) {
-        Status status = Status::IOError(fmt::format("{} can't open", file_name));
-        RecoverableError(status);
-    }
+StreamReader::~StreamReader() {
+    Close();
 }
 
-bool StreamIO::ReadLine(String& line) {
+Status StreamReader::Init(const String& file_name) {
+    file_.open(file_name);
+    if (!file_.is_open()) {
+        return Status::IOError(fmt::format("{} can't open", file_name));
+    }
+    return Status::OK();
+}
+
+bool StreamReader::ReadLine(String& line) {
     if(getline(file_, line)) {
         return true;
     } else {
@@ -57,7 +46,7 @@ bool StreamIO::ReadLine(String& line) {
     }
 }
 
-void StreamIO::Close() {
+void StreamReader::Close() {
     file_.close();
 }
 

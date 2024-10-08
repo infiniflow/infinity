@@ -42,7 +42,7 @@ public:
         delete[] buffer;
     }
 
-    u8 *GetData(const ByteSliceList* list) {
+    u8 *GetData(const ByteSliceList *list) {
         u8 *buffer = new u8[list->GetTotalSize()];
         SizeT n = 0;
         ByteSlice *slice = list->GetHead();
@@ -56,15 +56,15 @@ public:
         return buffer;
     }
 
-    bool CheckListEq(const ByteSliceList* list_1, const ByteSliceList* list_2) {
-        if(list_1->GetTotalSize() != list_2->GetTotalSize()) {
+    bool CheckListEq(const ByteSliceList *list_1, const ByteSliceList *list_2) {
+        if (list_1->GetTotalSize() != list_2->GetTotalSize()) {
             return false;
         }
         auto buffer_1 = GetData(list_1);
         auto buffer_2 = GetData(list_2);
 
         bool eq = memcmp(buffer_1, buffer_2, list_1->GetTotalSize()) == 0;
-        
+
         delete[] buffer_1;
         delete[] buffer_2;
         return eq;
@@ -170,7 +170,6 @@ TEST_F(ByteSliceReaderWriterTest, TestDataConsistency) {
 //     using namespace infinity;
 //     LocalFileSystem local_file_system;
 //     String path = String(GetFullTmpDir()) + "/test_byteslice_dump";
-    
 
 //     ByteSliceWriter writer;
 
@@ -178,12 +177,12 @@ TEST_F(ByteSliceReaderWriterTest, TestDataConsistency) {
 //     for (i = 0; i < 10000; i++) {
 //         writer.WriteVLong(i);
 //     }
-    
+
 //     auto filewriter = MakeShared<FileWriter>(local_file_system, path, 128);
 
 //     std::cout << writer.GetSize() << std::endl;
 
-//     writer.Dump(filewriter); 
+//     writer.Dump(filewriter);
 //     filewriter->Sync();
 
 //     ByteSliceWriter loader;

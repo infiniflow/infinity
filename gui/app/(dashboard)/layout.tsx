@@ -32,6 +32,7 @@ import { SearchInput } from './search';
 import { User } from './user';
 import DatabaseIcon from '/public/database.svg';
 import Logo from '/public/logo.svg';
+import TableIcon from '/public/table.svg';
 
 export default function DashboardLayout({
   children
@@ -75,12 +76,12 @@ function DesktopNav() {
           <Home className="h-5 w-5" />
         </NavItem>
 
-        <NavItem href="/database" label="Database">
-          <DatabaseIcon className="h-5 w-5"></DatabaseIcon>
+        <NavItem href="/databases" label="Databases">
+          <DatabaseIcon className="h-5 w-5" />
         </NavItem>
 
-        <NavItem href="/products" label="Products">
-          <Package className="h-5 w-5" />
+        <NavItem href="/tables" label="Tables">
+          <TableIcon className="h-5 w-5" />
         </NavItem>
 
         <NavItem href="/customers" label="Customers">

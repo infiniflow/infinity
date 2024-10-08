@@ -299,6 +299,7 @@ SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(Txn *txn, TxnTableStore
 SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config) {
     switch (index_base_->index_type_) {
         case IndexType::kHnsw:
+        case IndexType::kIVF:
         case IndexType::kEMVB:
         case IndexType::kFullText:
         case IndexType::kSecondary:
@@ -386,10 +387,10 @@ void TableIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
         LOG_DEBUG(fmt::format("Cleaning up dir: {}", *index_dir_));
 
         String absolute_index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir_);
-        if (!LocalStore::Exists(absolute_index_dir)) {
+        if (!VirtualStore::Exists(absolute_index_dir)) {
             return;
         }
-        LocalStore::RemoveDirectory(absolute_index_dir);
+        VirtualStore::RemoveDirectory(absolute_index_dir);
         LOG_DEBUG(fmt::format("Cleaned dir: {}", absolute_index_dir));
         if (info_tracer != nullptr) {
             info_tracer->AddCleanupInfo(std::move(absolute_index_dir));

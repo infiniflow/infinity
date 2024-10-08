@@ -19,20 +19,18 @@
 import stl;
 import virtual_store;
 import infinity_exception;
-import file_system_type;
 import third_party;
 import infinity_exception;
 import sparse_util;
 import compilation_config;
 import bmp_util;
-import abstract_file_handle;
 
 using namespace infinity;
 
 namespace benchmark {
 
 SparseMatrix<f32, i32> DecodeSparseDataset(const Path &data_path) {
-    auto [file_handle, status] = LocalStore::Open(data_path.string(), FileAccessMode::kRead);
+    auto [file_handle, status] = VirtualStore::Open(data_path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", data_path.string(), status.message()));
     }
@@ -61,7 +59,7 @@ Vector<SizeT> ShuffleSparseMatrix(SparseMatrix<f32, i32> &mat) {
 }
 
 void SaveSparseMatrix(const SparseMatrix<f32, i32> &mat, const Path &data_path) {
-    auto [file_handle, status] = LocalStore::Open(data_path.string(), FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(data_path.string(), FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", data_path.string(), status.message()));
     }
@@ -69,7 +67,7 @@ void SaveSparseMatrix(const SparseMatrix<f32, i32> &mat, const Path &data_path) 
 }
 
 Tuple<u32, u32, UniquePtr<i32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path &groundtruth_path, bool meta) {
-    auto [file_handle, status] = LocalStore::Open(groundtruth_path.string(), FileAccessMode::kRead);
+    auto [file_handle, status] = VirtualStore::Open(groundtruth_path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", groundtruth_path.string(), status.message()));
     }
@@ -94,7 +92,7 @@ Tuple<u32, u32, UniquePtr<i32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path
 }
 
 void SaveGroundtruth(u32 top_k, u32 query_n, const i32 *indices, const f32 *scores, const Path &groundtruth_path) {
-    auto [file_handle, status] = LocalStore::Open(groundtruth_path.string(), FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(groundtruth_path.string(), FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", groundtruth_path.string(), status.message()));
     }

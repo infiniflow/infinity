@@ -24,6 +24,7 @@ import create_index_info;
 import update_statement;
 import explain_statement;
 import command_statement;
+import select_statement;
 import infinity;
 import data_type;
 import type_info;
@@ -144,6 +145,8 @@ export struct WrapIndexInfo {
 };
 
 export struct WrapParsedExpr;
+
+export struct WrapOrderByExpr;
 
 export struct WrapColumnExpr {
     WrapColumnExpr() = default;
@@ -271,6 +274,14 @@ export struct WrapParsedExpr {
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
+export struct WrapOrderByExpr{
+    WrapOrderByExpr(WrapParsedExpr expr, bool asc) : expr(expr), asc(asc) {}
+    WrapParsedExpr expr;
+    bool asc{true};
+
+    OrderByExpr *GetOrderByExpr(Status &status);
+};
+
 export struct WrapUpdateExpr {
     String column_name;
     WrapParsedExpr value;
@@ -394,6 +405,7 @@ export WrapQueryResult WrapSearch(Infinity &instance,
                                   const String &db_name,
                                   const String &table_name,
                                   Vector<WrapParsedExpr> select_list,
+                                  Vector<WrapOrderByExpr> order_by_list,
                                   WrapSearchExpr *wrap_search_expr = nullptr,
                                   WrapParsedExpr *where_expr = nullptr,
                                   WrapParsedExpr *limit_expr = nullptr,

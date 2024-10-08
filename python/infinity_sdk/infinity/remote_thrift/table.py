@@ -35,7 +35,7 @@ from infinity.remote_thrift.utils import (
     get_ordinary_info,
 )
 from infinity.table import ExplainType
-from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN, SortType
 from infinity.utils import deprecated_api
 
 
@@ -376,6 +376,19 @@ class RemoteTable():
     def offset(self, offset: Optional[int]):
         self.query_builder.offset(offset)
         return self
+    
+    def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
+        for order_by_expr in order_by_expr_list:
+            if len(order_by_expr) != 2:
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"order_by_expr_list must be a list of [column_name, sort_type]")
+            if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"sort_type must be SortType.Asc or SortType.Desc")
+            if order_by_expr[1] == SortType.Asc:
+                order_by_expr[1] = True
+            else :
+                order_by_expr[1] = False
+        self.query_builder.sort(order_by_expr_list)
+        return self
 
     def to_result(self):
         return self.query_builder.to_result()
@@ -421,7 +434,8 @@ class RemoteTable():
                                 where_expr=query.filter,
                                 group_by_list=None,
                                 limit_expr=query.limit,
-                                offset_expr=query.offset)
+                                offset_expr=query.offset,
+                                order_by_list=query.sort)
 
         # process the results
         if res.error_code == ErrorCode.OK:

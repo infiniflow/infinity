@@ -23,7 +23,6 @@ import index_ivf;
 import ivf_index_storage;
 import column_def;
 import index_base;
-import file_system;
 import embedding_info;
 import internal_types;
 import segment_entry;
@@ -37,6 +36,7 @@ import column_vector;
 import logger;
 import kmeans_partition;
 import logical_type;
+import ivf_index_util_func;
 
 namespace infinity {
 

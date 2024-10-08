@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SparseVector, InfinityException
+from infinity.common import VEC, SparseVector, InfinityException, SortType
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -45,12 +45,14 @@ class Query(ABC):
         filter: Optional[ParsedExpr],
         limit: Optional[ParsedExpr],
         offset: Optional[ParsedExpr],
+        sort:  Optional[List[OrderByExpr]],
     ):
         self.columns = columns
         self.search = search
         self.filter = filter
         self.limit = limit
         self.offset = offset
+        self.sort = sort
 
 
 class ExplainQuery(Query):
@@ -61,9 +63,10 @@ class ExplainQuery(Query):
         filter: Optional[ParsedExpr],
         limit: Optional[ParsedExpr],
         offset: Optional[ParsedExpr],
+        #sort:  Optional[List[OrderByExpr]],
         explain_type: Optional[ExplainType],
     ):
-        super().__init__(columns, search, filter, limit, offset)
+        super().__init__(columns, search, filter, limit, offset, None)
         self.explain_type = explain_type
 
 
@@ -75,6 +78,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._filter = None
         self._limit = None
         self._offset = None
+        self._sort = None
 
     def reset(self):
         self._columns = None
@@ -82,6 +86,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._filter = None
         self._limit = None
         self._offset = None
+        self._sort = None
 
     def match_dense(
         self,
@@ -340,6 +345,50 @@ class InfinityThriftQueryBuilder(ABC):
 
         self._columns = select_list
         return self
+    
+    def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityThriftQueryBuilder:
+        sort_list: List[OrderByExpr] = []
+        for order_by_expr in order_by_expr_list:
+            if isinstance(order_by_expr[0], str):
+                order_by_expr[0] = order_by_expr[0].lower()
+
+            match order_by_expr[0]:
+                case "*":
+                    column_expr = ColumnExpr(star=True, column_name=[])
+                    expr_type = ParsedExprType(column_expr=column_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    sort_list.append(order_by_expr)
+                case "_row_id":
+                    func_expr = FunctionExpr(function_name="row_id", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    sort_list.append(order_by_expr)
+                case "_score":
+                    func_expr = FunctionExpr(function_name="score", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    sort_list.append(order_by_expr)
+                case "_similarity":
+                    func_expr = FunctionExpr(function_name="similarity", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    sort_list.append(order_by_expr)
+                case "_distance":
+                    func_expr = FunctionExpr(function_name="distance", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    sort_list.append(order_by_expr)
+                case _:
+                    parsed_expr = parse_expr(maybe_parse(order_by_expr[0]))
+                    sort_list.append(OrderByExpr(expr = parsed_expr, asc = order_by_expr[1]))
+
+        self._sort = sort_list
+        return self
 
     def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any]]:
         query = Query(
@@ -348,6 +397,7 @@ class InfinityThriftQueryBuilder(ABC):
             filter=self._filter,
             limit=self._limit,
             offset=self._offset,
+            sort=self._sort,
         )
         self.reset()
         return self._table._execute_query(query)

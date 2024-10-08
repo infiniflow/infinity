@@ -23,7 +23,6 @@ import posting_byte_slice_reader;
 import posting_merger;
 import third_party;
 import virtual_store;
-import abstract_file_handle;
 import local_file_handle;
 import infinity_exception;
 import vector_with_lock;
@@ -104,7 +103,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
                 column_len_file = pm->GetObjPath(obj_addr.obj_key_);
             }
 
-            auto [file_handle, open_status] = LocalStore::Open(column_len_file, FileAccessMode::kRead);
+            auto [file_handle, open_status] = VirtualStore::Open(column_len_file, FileAccessMode::kRead);
             if (!open_status.ok()) {
                 UnrecoverableError(open_status.message());
             }
@@ -130,7 +129,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             }
         }
 
-        auto [file_handle, status] = LocalStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
+        auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -151,8 +150,8 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     dict_file_writer->Sync();
     posting_file_writer_->Sync();
     fst_builder.Finish();
-    LocalStore::Merge(tmp_dict_file, tmp_fst_file);
-    LocalStore::DeleteFile(tmp_fst_file);
+    VirtualStore::Merge(tmp_dict_file, tmp_fst_file);
+    VirtualStore::DeleteFile(tmp_fst_file);
     if (use_object_cache) {
         PersistResultHandler handler(pm);
         PersistWriteResult result1 = pm->Persist(dict_file, tmp_dict_file, false);

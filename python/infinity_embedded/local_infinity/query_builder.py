@@ -26,12 +26,14 @@ class Query(ABC):
         filter: Optional[WrapParsedExpr],
         limit: Optional[WrapParsedExpr],
         offset: Optional[WrapParsedExpr],
+        sort: Optional[WrapOrderByExpr]
     ):
         self.columns = columns
         self.search = search
         self.filter = filter
         self.limit = limit
         self.offset = offset
+        self.sort = sort
 
 
 class ExplainQuery(Query):
@@ -44,7 +46,7 @@ class ExplainQuery(Query):
         offset: Optional[WrapParsedExpr],
         explain_type: Optional[BaseExplainType],
     ):
-        super().__init__(columns, search, filter, limit, offset)
+        super().__init__(columns, search, filter, limit, offset, None)
         self.explain_type = explain_type
 
 
@@ -56,6 +58,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._filter = None
         self._limit = None
         self._offset = None
+        self._sort = []
 
     def reset(self):
         self._columns = None
@@ -63,6 +66,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._filter = None
         self._limit = None
         self._offset = None
+        self._sort = []
 
     def match_dense(
         self,
@@ -434,6 +438,74 @@ class InfinityLocalQueryBuilder(ABC):
         self._columns = select_list
         return self
 
+    def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityLocalQueryBuilder:
+        sort_list: List[WrapOrderByExpr] = []
+        for order_by_expr in order_by_expr_list:
+            if isinstance(order_by_expr[0], str):
+                order_by_expr[0] = order_by_expr[0].lower()
+
+            match order_by_expr[0]:
+                case "*":
+                    column_expr = WrapColumnExpr()
+                    column_expr.star = True
+
+                    parsed_expr = WrapParsedExpr(ParsedExprType.kColumn)
+                    parsed_expr.column_expr = column_expr
+
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    sort_list.append(order_by_expr)
+                case "_row_id":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "row_id"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    sort_list.append(order_by_expr)
+                case "_score":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "score"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    sort_list.append(order_by_expr)
+                case "_similarity":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "similarity"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    sort_list.append(order_by_expr)
+                case "_distance":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "distance"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    sort_list.append(order_by_expr)
+                case _:
+                    parsed_expr = parse_expr(maybe_parse(order_by_expr[0]))
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    sort_list.append(order_by_expr)
+
+        self._sort = sort_list
+        return self
+
     def to_result(self):
         query = Query(
             columns=self._columns,
@@ -441,6 +513,7 @@ class InfinityLocalQueryBuilder(ABC):
             filter=self._filter,
             limit=self._limit,
             offset=self._offset,
+            sort=self._sort,
         )
         self.reset()
         return self._table._execute_query(query)

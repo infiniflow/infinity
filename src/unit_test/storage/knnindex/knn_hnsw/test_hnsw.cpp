@@ -19,8 +19,6 @@ import base_test;
 
 import stl;
 import hnsw_alg;
-import file_system;
-import file_system_type;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
@@ -34,7 +32,7 @@ import vec_store_type;
 import hnsw_common;
 import infinity_exception;
 import virtual_store;
-import abstract_file_handle;
+import local_file_handle;
 
 using namespace infinity;
 
@@ -90,7 +88,7 @@ public:
 
             test_func(hnsw_index);
 
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -98,7 +96,7 @@ public:
         }
 
         {
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -161,14 +159,14 @@ public:
             }
             test_func(compress_hnsw);
 
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
             compress_hnsw->Save(*file_handle);
         }
         {
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }

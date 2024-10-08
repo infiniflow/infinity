@@ -16,8 +16,6 @@
 #include <random>
 import base_test;
 
-import file_system;
-import file_system_type;
 import dist_func_l2;
 import data_store;
 import vec_store_type;
@@ -26,7 +24,6 @@ import infinity_exception;
 import hnsw_common;
 import virtual_store;
 import local_file_handle;
-import abstract_file_handle;
 
 using namespace infinity;
 
@@ -173,10 +170,10 @@ TEST_F(HnswLVQTest, test1) {
     {
         std::string file_path = file_dir_ + "/lvq_store1.bin";
 
-        LocalStore::CleanupDirectory(file_dir_);
+        VirtualStore::CleanupDirectory(file_dir_);
 
         {
-            auto [file_handle, status] = LocalStore::Open(file_path, FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kWrite);
             if(!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -192,7 +189,7 @@ TEST_F(HnswLVQTest, test1) {
             lvq_store.Save(*file_handle);
         }
         {
-            auto [file_handle, status] = LocalStore::Open(file_path, FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
             if(!status.ok()) {
                 UnrecoverableError(status.message());
             }

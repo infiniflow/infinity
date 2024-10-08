@@ -51,10 +51,10 @@ TEST_F(FileWriteReadTest, test1) {
     file_reader.Read(read_str.data(), 4);
     EXPECT_STREQ(read_str.c_str(), "abca");
     EXPECT_FALSE(file_reader.Finished());
-    LocalStore::DeleteFile(path);
+    VirtualStore::DeleteFile(path);
 }
 
-//write vint then read vint
+// write vint then read vint
 TEST_F(FileWriteReadTest, test2) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file2.abc";
@@ -70,10 +70,10 @@ TEST_F(FileWriteReadTest, test2) {
         u32 a = file_reader.ReadVInt();
         EXPECT_EQ(a, i);
     }
-    LocalStore::DeleteFile(path);
+    VirtualStore::DeleteFile(path);
 }
 
-//hybrid datatype
+// hybrid datatype
 TEST_F(FileWriteReadTest, test3) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file3.abc";
@@ -104,18 +104,17 @@ TEST_F(FileWriteReadTest, test3) {
         u32 a = file_reader.ReadVInt();
         EXPECT_EQ(a, i);
     }
-    LocalStore::DeleteFile(path);
+    VirtualStore::DeleteFile(path);
 }
 
-
-//test total written bytes and GetFileSize()
-//plus exceed case for reader/writer buffer
+// test total written bytes and GetFileSize()
+// plus exceed case for reader/writer buffer
 TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
     FileWriter file_writer(path, 128);
 
-    for(i32 i = 0; i < 1024; ++i) {
+    for (i32 i = 0; i < 1024; ++i) {
         file_writer.WriteInt(i);
     }
 
@@ -137,15 +136,15 @@ TEST_F(FileWriteReadTest, TestExceedWriterTotalSize) {
     EXPECT_EQ(file_writer.TotalWrittenBytes(), 4 * 1024 + buffer.size());
 }
 
-//write byte in '0', '1'...'1023'
-//read to '254', get pointer a, finish the read
-//seek a, finish
+// write byte in '0', '1'...'1023'
+// read to '254', get pointer a, finish the read
+// seek a, finish
 TEST_F(FileWriteReadTest, TestFilePointerSeek) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
     FileWriter file_writer(path, 128);
 
-    for(i32 i = 0; i < 1024; i++) {
+    for (i32 i = 0; i < 1024; i++) {
         file_writer.WriteInt(i);
     }
     file_writer.Sync();
@@ -153,7 +152,7 @@ TEST_F(FileWriteReadTest, TestFilePointerSeek) {
     FileReader file_reader(path, 128);
     u64 a;
     for (i32 i = 0; i < 1024; ++i) {
-        if(i == 254) {
+        if (i == 254) {
             a = file_reader.GetFilePointer();
         }
         EXPECT_EQ(file_reader.ReadInt(), i);
@@ -162,21 +161,21 @@ TEST_F(FileWriteReadTest, TestFilePointerSeek) {
 
     file_reader.Seek(a);
     i32 exp = 254;
-    while(!file_reader.Finished()) { 
+    while (!file_reader.Finished()) {
         EXPECT_EQ(file_reader.ReadInt(), exp);
         exp++;
     }
     EXPECT_EQ(exp, 1024);
 }
 
-//test if ReFill works fine.
+// test if ReFill works fine.
 TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
     using namespace infinity;
     String path = String(GetFullTmpDir()) + "/test_file_write_bytes.abc";
     FileWriter file_writer(path, 128);
 
     String s;
-    for(i32 i = 0; i < 1000; i++) {
+    for (i32 i = 0; i < 1000; i++) {
         s += "abc";
     }
 
@@ -191,7 +190,7 @@ TEST_F(FileWriteReadTest, TestFileReadOverflowBuffer) {
     EXPECT_STREQ(s.c_str(), read_s.c_str());
 }
 
-//test all types of data of reader and writer
+// test all types of data of reader and writer
 TEST_F(FileWriteReadTest, TestFileIODataTypes) {
 
     using namespace infinity;

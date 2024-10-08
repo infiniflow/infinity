@@ -21,69 +21,12 @@ import index_ivf;
 import internal_types;
 import logical_type;
 import data_type;
-import knn_expr;
+import ivf_index_util_func;
 
 namespace infinity {
 
 class LocalFileHandle;
-
-template <EmbeddingDataType t>
-struct EmbeddingDataTypeToCppType;
-
-template <>
-struct EmbeddingDataTypeToCppType<EmbeddingDataType::kElemInt8> {
-    using type = i8;
-};
-
-template <>
-struct EmbeddingDataTypeToCppType<EmbeddingDataType::kElemUInt8> {
-    using type = u8;
-};
-
-template <>
-struct EmbeddingDataTypeToCppType<EmbeddingDataType::kElemDouble> {
-    using type = f64;
-};
-
-template <>
-struct EmbeddingDataTypeToCppType<EmbeddingDataType::kElemFloat> {
-    using type = f32;
-};
-
-template <>
-struct EmbeddingDataTypeToCppType<EmbeddingDataType::kElemFloat16> {
-    using type = Float16T;
-};
-
-template <>
-struct EmbeddingDataTypeToCppType<EmbeddingDataType::kElemBFloat16> {
-    using type = BFloat16T;
-};
-
-export template <EmbeddingDataType t>
-using EmbeddingDataTypeToCppTypeT = typename EmbeddingDataTypeToCppType<t>::type;
-
-export template <typename T>
-EmbeddingDataType CppTypeToEmbeddingDataTypeV = EmbeddingDataType::kElemInvalid;
-
-template <>
-EmbeddingDataType CppTypeToEmbeddingDataTypeV<u8> = EmbeddingDataType::kElemUInt8;
-
-template <>
-EmbeddingDataType CppTypeToEmbeddingDataTypeV<i8> = EmbeddingDataType::kElemInt8;
-
-template <>
-EmbeddingDataType CppTypeToEmbeddingDataTypeV<f64> = EmbeddingDataType::kElemDouble;
-
-template <>
-EmbeddingDataType CppTypeToEmbeddingDataTypeV<f32> = EmbeddingDataType::kElemFloat;
-
-template <>
-EmbeddingDataType CppTypeToEmbeddingDataTypeV<Float16T> = EmbeddingDataType::kElemFloat16;
-
-template <>
-EmbeddingDataType CppTypeToEmbeddingDataTypeV<BFloat16T> = EmbeddingDataType::kElemBFloat16;
-
+class KnnDistanceBase1;
 
 // always use float for centroids
 class IVF_Centroids_Storage {
@@ -124,9 +67,10 @@ public:
 
     virtual void AppendOneEmbedding(const void *embedding_ptr, SegmentOffset segment_offset, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
 
-    virtual void SearchIndex(KnnDistanceType knn_distance_type,
+    virtual void SearchIndex(const KnnDistanceBase1 *knn_distance,
                              const void *query_ptr,
                              EmbeddingDataType query_element_type,
+                             std::function<bool(SegmentOffset)> satisfy_filter_func,
                              std::function<void(f32, SegmentOffset)> add_result_func) const = 0;
 
     // only for unit-test, return f32 / i8 / u8 embedding data
@@ -161,10 +105,11 @@ public:
     void AddEmbeddingBatch(const SegmentOffset *segment_offset_ptr, const void *embedding_ptr, u32 embedding_num);
     void AddMultiVector(SegmentOffset segment_offset, const void *multi_vector_ptr, u32 embedding_num);
 
-    void SearchIndex(KnnDistanceType knn_distance_type,
+    void SearchIndex(const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      EmbeddingDataType query_element_type,
                      u32 nprobe,
+                     std::function<bool(SegmentOffset)> satisfy_filter_func,
                      std::function<void(f32, SegmentOffset)> add_result_func) const;
 
     void GetMemData(IVF_Index_Storage &&mem_data);

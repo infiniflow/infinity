@@ -24,7 +24,6 @@ import stl;
 import default_values;
 import index_base;
 import local_file_handle;
-import file_system_type;
 import infinity_exception;
 import third_party;
 import secondary_index_pgm;

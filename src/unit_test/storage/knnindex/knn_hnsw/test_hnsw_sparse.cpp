@@ -18,17 +18,14 @@ import base_test;
 import stl;
 import hnsw_alg;
 import vec_store_type;
-import file_system;
 import hnsw_common;
 import sparse_util;
-import file_system_type;
 import compilation_config;
 import infinity_exception;
 import third_party;
 import sparse_test_util;
 import virtual_store;
 import local_file_handle;
-import abstract_file_handle;
 
 using namespace infinity;
 
@@ -82,14 +79,14 @@ protected:
                 // EXPECT_NEAR(-res[0].first, gt_score[i], 1e-5);
             }
 
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
             hnsw_index->Save(*file_handle);
         }
         {
-            auto [file_handle, status] = LocalStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw_sparse.bin", FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }

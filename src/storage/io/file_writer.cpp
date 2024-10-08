@@ -21,7 +21,6 @@ module file_writer;
 import stl;
 import virtual_store;
 import local_file_handle;
-import abstract_file_handle;
 import infinity_exception;
 import logger;
 
@@ -30,7 +29,7 @@ namespace infinity {
 FileWriter::FileWriter(const String &path, SizeT buffer_size)
     : path_(path), data_(MakeUnique<char_t[]>(buffer_size)), offset_(0), total_written_(0), buffer_size_(buffer_size) {
     // Fixme: Open file out of constructor
-    auto [file_handle, status] = LocalStore::Open(path, FileAccessMode::kWrite);
+    auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if(!status.ok()) {
         UnrecoverableError(status.message());
     }

@@ -21,14 +21,11 @@ module;
 module file_reader;
 
 import stl;
-import file_system;
-import file_system_type;
 import status;
 import infinity_exception;
 import third_party;
 import logger;
 import virtual_store;
-import abstract_file_handle;
 
 namespace infinity {
 
@@ -38,7 +35,7 @@ FileReader::FileReader(const String &path, SizeT buffer_size)
     if (buffer_size != 0) {
         data_ = MakeUnique<char_t[]>(buffer_size);
     }
-    auto [file_handle, status] = LocalStore::Open(path, FileAccessMode::kRead);
+    auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kRead);
     if(!status.ok()) {
         UnrecoverableError(status.message());
     }

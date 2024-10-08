@@ -18,9 +18,10 @@ export module local_file_handle;
 
 import stl;
 import status;
-import abstract_file_handle;
 
 namespace infinity {
+
+export enum class FileAccessMode { kWrite, kRead, kMmapRead, kInvalid };
 
 export class LocalFileHandle {
 public:

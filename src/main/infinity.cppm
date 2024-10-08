@@ -32,6 +32,7 @@ import create_index_info;
 import update_statement;
 import explain_statement;
 import command_statement;
+import select_statement;
 import global_resource_usage;
 
 namespace infinity {
@@ -163,7 +164,8 @@ public:
                        ParsedExpr *filter,
                        ParsedExpr *limit,
                        ParsedExpr *offset,
-                       Vector<ParsedExpr *> *output_columns);
+                       Vector<ParsedExpr *> *output_columns,
+                       Vector<OrderByExpr *> *order_by_list);
 
     QueryResult Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_options = OptimizeOptions{});
 

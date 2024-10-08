@@ -17,7 +17,6 @@ module;
 export module block_version;
 
 import stl;
-import file_system;
 import local_file_handle;
 
 namespace infinity {

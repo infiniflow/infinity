@@ -1552,7 +1552,7 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
             String error_message = fmt::format("Found bad wal entry {}@{}", *it, bad_offset);
             LOG_WARN(error_message);
             if (bad_offset == 0) {
-                LocalStore::DeleteFile(*it);
+                VirtualStore::DeleteFile(*it);
                 error_message = fmt::format("Removed wal log {}", *it);
                 LOG_WARN(error_message);
                 ++it;
@@ -1561,7 +1561,7 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
                 }
                 file_num = 0;
             } else {
-                LocalStore::Truncate(*it, bad_offset);
+                VirtualStore::Truncate(*it, bad_offset);
                 error_message = fmt::format("Truncated {}@{}", *it, bad_offset);
                 LOG_WARN(error_message);
                 ++it;

@@ -20,7 +20,7 @@ import numpy as np
 from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity_embedded.embedded_infinity_ext import WrapIndexInfo, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions
-from infinity_embedded.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
+from infinity_embedded.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN, SortType
 from infinity_embedded.common import INSERT_DATA, VEC, SparseVector, InfinityException
 from infinity_embedded.errors import ErrorCode
 from infinity_embedded.index import IndexInfo
@@ -357,6 +357,19 @@ class LocalTable():
     def offset(self, offset: Optional[int]):
         self.query_builder.offset(offset)
         return self
+    
+    def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
+        for order_by_expr in order_by_expr_list:
+            if len(order_by_expr) != 2:
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"order_by_expr_list must be a list of [column_name, sort_type]")
+            if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"sort_type must be SortType.Asc or SortType.Desc")
+            if order_by_expr[1] == SortType.Asc:
+                order_by_expr[1] = True
+            else :
+                order_by_expr[1] = False
+        self.query_builder.sort(order_by_expr_list)
+        return self
 
     def to_df(self):
         return self.query_builder.to_df()
@@ -398,7 +411,8 @@ class LocalTable():
                                 where_expr=query.filter,
                                 group_by_list=None,
                                 limit_expr=query.limit,
-                                offset_expr=query.offset)
+                                offset_expr=query.offset,
+                                order_by_list=query.sort)
 
         # process the results
         if res.error_code == ErrorCode.OK:

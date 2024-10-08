@@ -23,11 +23,7 @@ import global_resource_usage;
 import third_party;
 import infinity_context;
 import block_version;
-import file_system;
 import virtual_store;
-import virtual_storage_type;
-import abstract_file_handle;
-import file_system_type;
 import buffer_manager;
 import version_file_worker;
 import column_vector;
@@ -35,6 +31,7 @@ import data_type;
 import logical_type;
 import persistence_manager;
 import default_values;
+import local_file_handle;
 
 using namespace infinity;
 
@@ -53,13 +50,13 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
     String version_path = String(GetFullDataDir()) + "/block_version_test";
 
     {
-        auto [local_file_handle, status] = LocalStore::Open(version_path, FileAccessMode::kWrite);
+        auto [local_file_handle, status] = VirtualStore::Open(version_path, FileAccessMode::kWrite);
         EXPECT_TRUE(status.ok());
         block_version.SpillToFile(local_file_handle.get());
     }
 
     {
-        auto [local_file_handle, status]  = LocalStore::Open(version_path, FileAccessMode::kRead);
+        auto [local_file_handle, status]  = VirtualStore::Open(version_path, FileAccessMode::kRead);
         EXPECT_TRUE(status.ok());
         auto block_version2 = BlockVersion::LoadFromFile(local_file_handle.get());
         ASSERT_EQ(block_version, *block_version2);

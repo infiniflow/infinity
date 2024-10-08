@@ -38,7 +38,7 @@ TEST_F(PositionListEncoderTest, test1) {
     position_encoder.Dump(file_writer);
     file_writer->Sync();
 
-    LocalStore::DeleteFile(file_);
+    VirtualStore::DeleteFile(file_);
 }
 
 TEST_F(PositionListEncoderTest, test2) {

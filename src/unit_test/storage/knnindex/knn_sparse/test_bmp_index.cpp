@@ -15,6 +15,7 @@
 #include <cassert>
 
 #include "gtest/gtest.h"
+
 import base_test;
 import stl;
 import bmp_alg;
@@ -22,12 +23,10 @@ import bmp_util;
 import sparse_util;
 import third_party;
 import compilation_config;
-import file_system;
-import file_system_type;
 import sparse_test_util;
 import infinity_exception;
 import virtual_store;
-import abstract_file_handle;
+import local_file_handle;
 
 using namespace infinity;
 
@@ -99,14 +98,14 @@ protected:
             index.Optimize(optimize_options);
             test_query(index);
 
-            auto [file_handle, status] = LocalStore::Open(save_path, FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(save_path, FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }
             index.Save(*file_handle);
         }
         {
-            auto [file_handle, status] = LocalStore::Open(save_path, FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(save_path, FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }

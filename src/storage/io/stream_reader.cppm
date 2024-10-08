@@ -14,28 +14,27 @@
 
 module;
 
-export module virtual_storage_type;
+#include <fstream>
+
+export module stream_reader;
 
 import stl;
+import status;
 
 namespace infinity {
 
-export enum class StorageType {
-    kInvalid,
-    kLocal,
-    kMinio,
-    kAwsS3,
-    kAzureBlob, // Azure object store
-    kGCS,       // Google cloud storage
-    kOSS,       // Aliyun OSS
-    kCOS,       // Tencent object store
-    kOBS,       // Huawei object store
-    kHDFS,
-    kNFS,
+export class StreamReader {
+
+public:
+    StreamReader() = default;
+    ~StreamReader();
+
+    Status Init(const String& file_name);
+    bool ReadLine(String& line);
+    void Close();
+
+private:
+    std::ifstream file_;
 };
-
-export StorageType String2StorageType(const String &storage_type);
-
-export String ToString(StorageType storage_type);
 
 } // namespace infinity

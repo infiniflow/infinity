@@ -18,16 +18,13 @@
 #include <stdexcept>
 
 import stl;
-import file_system;
 import virtual_store;
 import infinity_exception;
-import file_system_type;
 import compilation_config;
 import third_party;
 import profiler;
 import linscan_alg;
 import sparse_util;
-import abstract_file_handle;
 
 using namespace infinity;
 using namespace benchmark;
@@ -68,7 +65,7 @@ int main(int argc, char *argv[]) {
             data_mat.Clear();
             std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
 
-            auto [file_handle, status] = LocalStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", opt.index_save_path_.string(), status.message()));
             }
@@ -85,7 +82,7 @@ int main(int argc, char *argv[]) {
 
             auto [top_k, all_query_n, _1, _2] = DecodeGroundtruth(opt.groundtruth_path_, true);
             {
-                auto [file_handle, status] = LocalStore::Open(opt.index_save_path_.string(), FileAccessMode::kRead);
+                auto [file_handle, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kRead);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", opt.index_save_path_.string(), status.message()));
                 }

@@ -919,7 +919,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 
     // Check the file existence
     String to_write_path;
-    if (LocalStore::Exists(statement->file_path_)) {
+    if (VirtualStore::Exists(statement->file_path_)) {
         Status status = Status::DuplicatedFile(statement->file_path_);
         RecoverableError(status);
     }
@@ -1079,7 +1079,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
 
     // Check the file existence
     String to_write_path;
-    if (!LocalStore::Exists(statement->file_path_)) {
+    if (!VirtualStore::Exists(statement->file_path_)) {
         RecoverableError(Status::FileNotFound(statement->file_path_));
     }
 

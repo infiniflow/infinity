@@ -74,6 +74,9 @@ class ConflictType(object):
     Error = 1
     Replace = 2
 
+class SortType(object):
+    Asc = 0
+    Desc = 1
 
 class InfinityException(Exception):
     def __init__(self, error_code=0, error_message=None):
