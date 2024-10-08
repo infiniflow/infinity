@@ -14,6 +14,7 @@
 
 module;
 
+#include <vector>
 module ivf_index_data_in_mem;
 
 import stl;
@@ -37,26 +38,10 @@ import search_top_1;
 import column_vector;
 import ivf_index_data;
 import buffer_handle;
+import knn_scan_data;
+import ivf_index_util_func;
 
 namespace infinity {
-template <IsAnyOf<u8, i8, f64, f32, Float16T, BFloat16T> ColumnEmbeddingElementT>
-Pair<const f32 *, UniquePtr<f32[]>> GetF32Ptr(const ColumnEmbeddingElementT *src_data_ptr, const u32 src_data_cnt) {
-    Pair<const f32 *, UniquePtr<f32[]>> dst_data_ptr;
-    if constexpr (std::is_same_v<f32, ColumnEmbeddingElementT>) {
-        dst_data_ptr.first = src_data_ptr;
-    } else {
-        dst_data_ptr.second = MakeUniqueForOverwrite<f32[]>(src_data_cnt);
-        dst_data_ptr.first = dst_data_ptr.second.get();
-        for (u32 i = 0; i < src_data_cnt; ++i) {
-            if constexpr (std::is_same_v<f64, ColumnEmbeddingElementT>) {
-                dst_data_ptr.second[i] = static_cast<f32>(src_data_ptr[i]);
-            } else {
-                dst_data_ptr.second[i] = src_data_ptr[i];
-            }
-        }
-    }
-    return dst_data_ptr;
-}
 
 IVFIndexInMem::IVFIndexInMem(const RowID begin_row_id,
                              const IndexIVFOption &ivf_option,
@@ -169,6 +154,7 @@ public:
     }
 
     void BuildIndex() {
+        LOG_TRACE("Start building in-memory IVF index");
         if (have_ivf_index_.test(std::memory_order_acquire)) {
             UnrecoverableError("Already have index");
         }
@@ -210,11 +196,78 @@ public:
         return new_chunk_index_entry;
     }
 
-    void SearchIndexInMem(KnnDistanceType knn_distance_type,
+    void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,
                           const void *query_ptr,
-                          EmbeddingDataType query_element_type,
+                          const EmbeddingDataType query_element_type,
+                          std::function<bool(SegmentOffset)> satisfy_filter_func,
                           std::function<void(f32, SegmentOffset)> add_result_func) const override {
-        // TODO
+        auto ReturnT = [&]<EmbeddingDataType query_element_type> {
+            if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
+                          (query_element_type == embedding_data_type &&
+                           (query_element_type == EmbeddingDataType::kElemInt8 || query_element_type == EmbeddingDataType::kElemUInt8))) {
+                return SearchIndexInMemT<query_element_type>(knn_distance,
+                                                             static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr),
+                                                             satisfy_filter_func,
+                                                             add_result_func);
+            } else {
+                UnrecoverableError("Invalid Query EmbeddingDataType");
+            }
+        };
+        switch (query_element_type) {
+            case EmbeddingDataType::kElemFloat: {
+                return ReturnT.template operator()<EmbeddingDataType::kElemFloat>();
+            }
+            case EmbeddingDataType::kElemUInt8: {
+                return ReturnT.template operator()<EmbeddingDataType::kElemUInt8>();
+            }
+            case EmbeddingDataType::kElemInt8: {
+                return ReturnT.template operator()<EmbeddingDataType::kElemInt8>();
+            }
+            default: {
+                UnrecoverableError("Invalid EmbeddingDataType");
+            }
+        }
+    }
+
+    template <EmbeddingDataType query_element_type>
+    void SearchIndexInMemT(const KnnDistanceBase1 *knn_distance,
+                           const EmbeddingDataTypeToCppTypeT<query_element_type> *query_ptr,
+                           std::function<bool(SegmentOffset)> satisfy_filter_func,
+                           std::function<void(f32, SegmentOffset)> add_result_func) const {
+        using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
+        auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
+        if (!knn_distance_1) [[unlikely]] {
+            UnrecoverableError("Invalid KnnDistance1");
+        }
+        if constexpr (column_logical_type == LogicalType::kEmbedding) {
+            auto dist_func = knn_distance_1->dist_func_;
+            for (u32 i = 0; i < in_mem_storage_.source_offsets_.size(); ++i) {
+                const auto segment_offset = in_mem_storage_.source_offsets_[i];
+                if (!satisfy_filter_func(segment_offset)) {
+                    continue;
+                }
+                auto v_ptr = in_mem_storage_.raw_source_data_.data() + i * embedding_dimension();
+                auto [calc_ptr, _] = GetSearchCalcPtr<QueryDataType>(v_ptr, embedding_dimension());
+                auto d = dist_func(calc_ptr, query_ptr, embedding_dimension());
+                add_result_func(d, segment_offset);
+            }
+        } else if constexpr (column_logical_type == LogicalType::kMultiVector) {
+            for (u32 i = 0; i < in_mem_storage_.source_offsets_.size(); ++i) {
+                const auto segment_offset = in_mem_storage_.source_offsets_[i];
+                if (!satisfy_filter_func(segment_offset)) {
+                    continue;
+                }
+                auto mv_ptr = in_mem_storage_.raw_source_data_.data() + in_mem_storage_.multi_vector_data_start_pos_[i];
+                auto mv_num = in_mem_storage_.multi_vector_embedding_num_[i];
+                auto [calc_ptr, _] = GetSearchCalcPtr<QueryDataType>(mv_ptr, mv_num * embedding_dimension());
+                auto dists = knn_distance_1->Calculate(calc_ptr, mv_num, query_ptr, embedding_dimension());
+                for (const auto d : dists) {
+                    add_result_func(d, segment_offset);
+                }
+            }
+        } else {
+            static_assert(false);
+        }
     }
 };
 
@@ -267,16 +320,17 @@ SharedPtr<IVFIndexInMem> IVFIndexInMem::NewIVFIndexInMem(const ColumnDef *column
     return {};
 }
 
-void IVFIndexInMem::SearchIndex(const KnnDistanceType knn_distance_type,
+void IVFIndexInMem::SearchIndex(const KnnDistanceBase1 *knn_distance,
                                 const void *query_ptr,
                                 const EmbeddingDataType query_element_type,
                                 const u32 nprobe,
+                                std::function<bool(SegmentOffset)> satisfy_filter_func,
                                 std::function<void(f32, SegmentOffset)> add_result_func) const {
     std::shared_lock lock(rw_mutex_);
     if (have_ivf_index_.test(std::memory_order_acquire)) {
-        ivf_index_storage_->SearchIndex(knn_distance_type, query_ptr, query_element_type, nprobe, add_result_func);
+        ivf_index_storage_->SearchIndex(knn_distance, query_ptr, query_element_type, nprobe, satisfy_filter_func, add_result_func);
     } else {
-        SearchIndexInMem(knn_distance_type, query_ptr, query_element_type, add_result_func);
+        SearchIndexInMem(knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func);
     }
 }
 

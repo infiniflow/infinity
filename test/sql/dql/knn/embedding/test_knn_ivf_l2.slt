@@ -38,24 +38,24 @@ statement ok
 CREATE INDEX idx_ivf__l2 ON test_knn_ivf_l2 (c2) USING IVF WITH (metric = l2);
 
 # the query will return row 4 from block 1, 2 and 3
-#query I
-#SELECT c1 FROM test_knn_ivf_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
-#----
-#8
-#8
-#6
+query I
+SELECT c1 FROM test_knn_ivf_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+8
+8
+6
 
 # copy to create another new block
 statement ok
 COPY test_knn_ivf_l2 FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 # the query will return row 4 from block 1, 2 and 3
-#query I
-#SELECT c1 FROM test_knn_ivf_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
-#----
-#8
-#8
-#8
+query I
+SELECT c1 FROM test_knn_ivf_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+8
+8
+8
 
 statement ok
 DROP TABLE test_knn_ivf_l2;

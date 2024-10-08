@@ -40,19 +40,19 @@ SELECT c1 FROM test_knn_given_index_name SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2
 6
 4
 
-#query I
-#SELECT c1 FROM test_knn_given_index_name SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) USING INDEX (idx3);
-#----
-#8
-#6
-#4
+query I
+SELECT c1 FROM test_knn_given_index_name SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) USING INDEX (idx3);
+----
+8
+6
+4
 
-#query I
-#SELECT c1 FROM test_knn_given_index_name SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) USING INDEX (idx4);
-#----
-#8
-#6
-#4
+query I
+SELECT c1 FROM test_knn_given_index_name SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) USING INDEX (idx4);
+----
+8
+6
+4
 
 statement  error
 SELECT c1 FROM test_knn_given_index_name SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3) USING INDEX (idx5);
