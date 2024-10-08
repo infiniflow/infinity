@@ -55,22 +55,19 @@ const invoices = [
   }
 ];
 
-function InfinityTable() {
+async function InfinityTable() {
+  const tables = await listTable('default_db');
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[100px]">Name</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Default</TableHead>
+          <TableHead className="text-center">Name</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {invoices.map((invoice) => (
-          <TableRow key={invoice.invoice}>
-            <TableCell className="font-medium">{invoice.invoice}</TableCell>
-            <TableCell>{invoice.paymentStatus}</TableCell>
-            <TableCell>{invoice.paymentMethod}</TableCell>
+        {tables.tables.map((table: string) => (
+          <TableRow key={table}>
+            <TableCell className="font-medium">{table}</TableCell>
           </TableRow>
         ))}
       </TableBody>
