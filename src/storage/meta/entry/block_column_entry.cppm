@@ -64,13 +64,6 @@ public:
                                                                  const u64 last_chunk_offset,
                                                                  const TxnTimeStamp commit_ts);
 
-    static UniquePtr<BlockColumnEntry> ReplayDropBlockColumnEntry(const BlockEntry *block_entry,
-                                                                  ColumnID column_id,
-                                                                  BufferManager *buffer_manager,
-                                                                  const u32 next_outline_idx,
-                                                                  const u64 last_chunk_offset,
-                                                                  const TxnTimeStamp commit_ts);
-
     nlohmann::json Serialize();
 
     static UniquePtr<BlockColumnEntry> Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);

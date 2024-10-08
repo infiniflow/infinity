@@ -590,12 +590,19 @@ void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, Colum
     if (iter == columns_.end()) {
         columns_.emplace_back(std::move(column_entry));
     } else {
-        if (!column_entry->Deleted()) {
-            UnrecoverableError(fmt::format("BlockEntry::AddColumnReplay: column {} already exists", column_id));
-        }
-        dropped_columns_.emplace_back(std::move(column_entry));
-        columns_.erase(iter);
+        *iter = std::move(column_entry);
     }
+}
+
+void BlockEntry::DropColumnReplay(ColumnID column_id) {
+    auto iter = std::find_if(columns_.begin(), columns_.end(), [&](const auto &column) { return column->column_id() == column_id; });
+    if (iter == columns_.end()) {
+        String error_message = fmt::format("BlockEntry::AddColumnReplay: column_id {} not found", column_id);
+        UnrecoverableError(error_message);
+    }
+    BlockColumnEntry *entry = iter->get();
+    entry->DropColumn();
+    columns_.erase(iter);
 }
 
 void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {

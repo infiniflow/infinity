@@ -82,7 +82,7 @@ class TestAlter:
             ("test/data/config/restart_test/test_alter/2.toml", 2, True),
         ],
     )
-    def test_alter_2(
+    def test_alter_complex(
         self, infinity_runner: InfinityRunner, config: str, sleep: int, flush_mid: bool
     ):
         table_name = "test_alter2"
@@ -158,11 +158,15 @@ class TestAlter:
                     }
                 ),
             )
+            dropped_column_dirs = pathlib.Path("/var/infinity/data").rglob("1.col")
+            assert len(list(dropped_column_dirs)) == 0
+
+            db_obj.drop_table(table_name)
 
         part1()
         part2()
 
-    def test_alter_cleanup(self, infinity_runner: InfinityRunner):
+    def test_alter_cleanup_simple(self, infinity_runner: InfinityRunner):
         table_name = "test_alter3"
         config = "test/data/config/restart_test/test_alter/3.toml"
 

@@ -272,7 +272,11 @@ void BufferObj::SubObjRc() {
     if (obj_rc_ == 0) {
         UnrecoverableError(fmt::format("SubObjRc: obj_rc_ is 0, buffer: {}", GetFilename()));
     }
-    obj_rc_--;
+    --obj_rc_;
+    if (obj_rc_ == 0) {
+        status_ = BufferStatus::kClean;
+        buffer_mgr_->AddToCleanList(this, false/*do_free*/);
+    }
 }
 
 void BufferObj::CheckState() const {

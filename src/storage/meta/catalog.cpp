@@ -793,13 +793,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
                 if (merge_flag == MergeFlag::kDelete) {
-                    block_entry->AddColumnReplay(BlockColumnEntry::ReplayDropBlockColumnEntry(block_entry,
-                                                                                             column_id,
-                                                                                             buffer_mgr,
-                                                                                             next_outline_idx,
-                                                                                             last_chunk_offset,
-                                                                                             commit_ts),
-                                                 column_id);
+                    block_entry->DropColumnReplay(column_id);
                 } else if (merge_flag == MergeFlag::kNew) {
                     block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry,
                                                                                              column_id,
