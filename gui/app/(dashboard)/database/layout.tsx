@@ -8,7 +8,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { listDatabase, listTable } from '../actions';
-import { InfinityContextMenuContent } from './context-menu';
+import { InfinityContextMenuContent } from '../tables/context-menu';
 
 async function InfinityTable() {
   const tables = await listTable('default_db');
@@ -30,13 +30,15 @@ async function InfinityTable() {
   );
 }
 
-export default async function DatabasePage({
-  searchParams
+export default async function DatabaseLayout({
+  searchParams,
+  children
 }: {
   searchParams: { q: string; offset: string };
+  children: React.ReactNode;
 }) {
-  const search = searchParams.q ?? '';
-  const offset = searchParams.offset ?? 0;
+  const search = searchParams?.q ?? '';
+  const offset = searchParams?.offset ?? 0;
 
   const items: MenuItem[] = [
     {
@@ -79,9 +81,7 @@ export default async function DatabasePage({
           )}
         ></SideMenu>
       </section>
-      <section className="flex-1 text-center">
-        <InfinityTable></InfinityTable>
-      </section>
+      <section className="flex-1 text-center">{children}</section>
     </div>
   );
 }

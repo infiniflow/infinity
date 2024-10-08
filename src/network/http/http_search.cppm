@@ -29,6 +29,7 @@ import infinity;
 import internal_types;
 import constant_expr;
 import search_expr;
+import select_statement;
 
 namespace infinity {
 
@@ -48,6 +49,7 @@ public:
                         nlohmann::json &response);
 
     static Vector<ParsedExpr *> *ParseOutput(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static Vector<OrderByExpr *> *ParseSort(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static UniquePtr<ParsedExpr> ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static UniquePtr<SearchExpr> ParseSearchExpr(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static UniquePtr<FusionExpr> ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);

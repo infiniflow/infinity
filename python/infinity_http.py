@@ -4,7 +4,7 @@ import requests
 import logging
 import os
 from test_pysdk.common.common_data import *
-from infinity.common import ConflictType, InfinityException, SparseVector
+from infinity.common import ConflictType, InfinityException, SparseVector, SortType
 from test_pysdk.common import common_values
 import infinity
 from typing import Optional, Any
@@ -16,6 +16,7 @@ import polars as pl
 import pyarrow as pa
 from infinity.table import ExplainType
 from datetime import date, time, datetime
+from typing import Optional, Union, List, Any
 
 
 class infinity_http:
@@ -476,6 +477,8 @@ class infinity_http:
             tmp.update({"search": self._search_exprs})
         if len(self._output):
             tmp.update({"output":self._output})
+        if len(self._sort):
+            tmp.update({"sort":self._sort})
         #print(tmp)
         d = self.set_up_data([], tmp)
         r = self.request(url, "get", h, d)
@@ -552,6 +555,21 @@ class infinity_http:
         self._output = output
         self._filter = ""
         self._search_exprs = []
+        self._sort = []
+        return self
+    
+    def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
+        for order_by_expr in order_by_expr_list:
+            tmp = {}
+            if len(order_by_expr) != 2:
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"order_by_expr_list must be a list of [column_name, sort_type]")
+            if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"sort_type must be SortType.Asc or SortType.Desc")
+            if order_by_expr[1] == SortType.Asc:
+                tmp[order_by_expr[0]] = "asc"
+            else:
+                tmp[order_by_expr[0]] = "desc"
+            self._sort.append(tmp)
         return self
 
     def match_text(self, fields: str, query: str, topn: int, opt_params: Optional[dict] = None):
@@ -713,7 +731,7 @@ class infinity_http:
 
 class database_result(infinity_http):
     def __init__(self, list = [], error_code = ErrorCode.OK, database_name = "" ,columns=[], table_name = "",
-                 index_list = [], output = ["*"], filter="", fusion=[], knn={}, match = {}, match_tensor = {}, match_sparse = {}, output_res = []):
+                 index_list = [], output = ["*"], filter="", fusion=[], knn={}, match = {}, match_tensor = {}, match_sparse = {}, sort = [], output_res = []):
         self.db_names = list
         self.error_code = error_code
         self.database_name = database_name # get database
@@ -728,6 +746,7 @@ class database_result(infinity_http):
         self._match = match
         self._match_tensor = match_tensor
         self._match_sparse = match_sparse
+        self._sort = sort
         self.output_res = output_res
 
 

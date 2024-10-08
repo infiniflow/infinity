@@ -42,6 +42,7 @@ import value;
 import physical_import;
 import explain_statement;
 import internal_types;
+import select_statement;
 
 namespace infinity {
 
@@ -63,6 +64,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         UniquePtr<ParsedExpr> offset{};
         UniquePtr<SearchExpr> search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
+        Vector<OrderByExpr *> *order_by_list{nullptr};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
@@ -72,6 +74,17 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 output_columns = nullptr;
             }
         });
+
+        DeferFn defer_fn_order([&]() {
+            if (order_by_list != nullptr) {
+                for (auto &expr : *order_by_list) {
+                    delete expr;
+                }
+                delete order_by_list;
+                order_by_list = nullptr;
+            }
+        });
+
         for (const auto &elem : input_json.items()) {
             String key = elem.key();
             ToLower(key);
@@ -90,6 +103,24 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
 
                 output_columns = ParseOutput(output_list, http_status, response);
                 if (output_columns == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "sort")) {
+                if (order_by_list != nullptr) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one sort field.";
+                    return;
+                }
+
+                auto &list = elem.value();
+                if (!list.is_array()) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "Sort field should be array";
+                    return;
+                }
+
+                order_by_list = ParseSort(list, http_status, response);
+                if (order_by_list == nullptr) {
                     return;
                 }
             } else if (IsEqual(key, "filter")) {
@@ -143,9 +174,10 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         }
 
         const QueryResult result =
-            infinity_ptr->Search(db_name, table_name, search_expr.release(), filter.release(), limit.release(), offset.release(), output_columns, nullptr);
+            infinity_ptr->Search(db_name, table_name, search_expr.release(), filter.release(), limit.release(), offset.release(), output_columns, order_by_list);
 
         output_columns = nullptr;
+        order_by_list = nullptr;
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
@@ -412,6 +444,72 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
     // Avoiding DeferFN auto free the output expressions
     Vector<ParsedExpr *> *res = output_columns;
     output_columns = nullptr;
+    return res;
+}
+
+Vector<OrderByExpr *> *HTTPSearch::ParseSort(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+    Vector<OrderByExpr *> *order_by_list = new Vector<OrderByExpr *>();
+    DeferFn defer_fn([&]() {
+        if (order_by_list != nullptr) {
+            for (auto &expr : *order_by_list) {
+                delete expr;
+            }
+            delete order_by_list;
+            order_by_list = nullptr;
+        }
+    });
+
+    for(const auto &order_expr : json_object) {
+        for (const auto &expression : order_expr.items()) {
+            String key = expression.key();
+            ToLower(key);
+            auto order_by_expr = MakeUnique<OrderByExpr>();
+            if (key == "_row_id" or key == "_similarity" or key == "_distance" or key == "_score") {
+                auto parsed_expr = new FunctionExpr();
+                if (key == "_row_id") {
+                    parsed_expr->func_name_ = "row_id";
+                } else if (key == "_similarity") {
+                    parsed_expr->func_name_ = "similarity";
+                } else if (key == "_distance") {
+                    parsed_expr->func_name_ = "distance";
+                } else if (key == "_score") {
+                    parsed_expr->func_name_ = "score";
+                }
+                order_by_expr->expr_ = parsed_expr;
+                parsed_expr = nullptr;
+            } else {
+                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+                ExprParser expr_parser;
+                expr_parser.Parse(key, expr_parsed_result.get());
+                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() == 0) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = fmt::format("Invalid expression: {}", key);
+                    return nullptr;
+                }
+
+                order_by_expr->expr_ = expr_parsed_result->exprs_ptr_->at(0);
+                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+            }
+
+            String value = expression.value();
+            ToLower(value);
+            if (value == "asc") {
+                order_by_expr->type_ = OrderType::kAsc;
+            } else if (value == "desc") {
+                order_by_expr->type_ = OrderType::kDesc;
+            } else {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("Invalid expression: {}", value);
+                return nullptr;
+            }
+
+            order_by_list->emplace_back(order_by_expr.release());
+        }
+    }
+
+    // Avoiding DeferFN auto free the output expressions
+    Vector<OrderByExpr *> *res = order_by_list;
+    order_by_list = nullptr;
     return res;
 }
 
