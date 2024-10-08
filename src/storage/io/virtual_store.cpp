@@ -519,4 +519,20 @@ Status VirtualStore::CopyObject(const String &src_object_name, const String &dst
     return Status::OK();
 }
 
+bool VirtualStore::BucketExists() {
+    if (VirtualStore::storage_type_ == StorageType::kLocal) {
+        return false;
+    }
+    switch (VirtualStore::storage_type_) {
+        case StorageType::kMinio: {
+            return s3_client_->BucketExists(VirtualStore::bucket_);
+        }
+        default: {
+            return false;
+        }
+    }
+
+    return false;
+}
+
 } // namespace infinity
