@@ -32,6 +32,7 @@ import catalog_delta_entry;
 import default_values;
 import wal_manager;
 import bg_task;
+import defer_op;
 
 namespace infinity {
 
@@ -145,6 +146,12 @@ bool TxnManager::CheckConflict(Txn *txn) {
             checking_ts_.insert(min_checking_ts);
         }
     }
+    DeferFn defer_fn([&] {
+        if (min_checking_ts != UNCOMMIT_TS) {
+            std::lock_guard guard(locker_);
+            checking_ts_.erase(min_checking_ts);
+        }
+    });
     if (txn->CheckConflict(catalog_)) {
         return true;
     }
@@ -157,10 +164,6 @@ bool TxnManager::CheckConflict(Txn *txn) {
         if (txn->CheckConflict(candidate_txn.get())) {
             return true;
         }
-    }
-    if (min_checking_ts != UNCOMMIT_TS) {
-        std::lock_guard guard(locker_);
-        checking_ts_.erase(min_checking_ts);
     }
     return false;
 }
