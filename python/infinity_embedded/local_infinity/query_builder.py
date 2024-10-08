@@ -438,7 +438,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._columns = select_list
         return self
 
-    def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityThriftQueryBuilder:
+    def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityLocalQueryBuilder:
         sort_list: List[WrapOrderByExpr] = []
         for order_by_expr in order_by_expr_list:
             if isinstance(order_by_expr[0], str):
