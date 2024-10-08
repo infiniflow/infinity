@@ -517,6 +517,17 @@ ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
     return nullptr;
 }
 
+OrderByExpr *WrapOrderByExpr::GetOrderByExpr(Status &status){
+    auto order_by_expr = new OrderByExpr();
+    order_by_expr->expr_ = expr.GetParsedExpr(status);
+    if(asc){
+        order_by_expr->type_ = OrderType::kAsc;
+    }else{
+        order_by_expr->type_ = OrderType::kDesc;
+    }
+    return order_by_expr;
+}
+
 UpdateExpr *WrapUpdateExpr::GetUpdateExpr(Status &status) {
     auto update_expr = new UpdateExpr();
     update_expr->column_name = column_name;
@@ -1255,6 +1266,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
                            Vector<WrapParsedExpr> select_list,
+                           Vector<WrapOrderByExpr> order_by_list,
                            WrapSearchExpr *wrap_search_expr,
                            WrapParsedExpr *where_expr,
                            WrapParsedExpr *limit_expr,
@@ -1343,12 +1355,41 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     }
 
-    auto query_result = instance.Search(db_name, table_name, search_expr, filter, limit, offset, output_columns);
+    Vector<OrderByExpr *> *order_by_exprs = nullptr;
+    DeferFn defer_fn6([&]() {
+        if(order_by_exprs != nullptr) {
+            SizeT order_by_expr_len = order_by_exprs->size();
+            for(SizeT i = 0; i < order_by_expr_len; ++ i) {
+                if ((*order_by_exprs)[i] != nullptr) {
+                    delete (*order_by_exprs)[i];
+                    (*order_by_exprs)[i] = nullptr;
+                }
+            }
+            delete order_by_exprs;
+            order_by_exprs = nullptr;
+        }
+    });
+    if (order_by_list.empty()) {
+        ;
+    } else {
+        order_by_exprs = new Vector<OrderByExpr *>();
+        order_by_exprs->reserve(order_by_list.size());
+        for (SizeT i = 0; i < order_by_list.size(); ++i) {
+            Status status;
+            order_by_exprs->emplace_back(order_by_list[i].GetOrderByExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
+    auto query_result = instance.Search(db_name, table_name, search_expr, filter, limit, offset, output_columns, order_by_exprs);
     search_expr = nullptr;
     filter = nullptr;
     limit = nullptr;
     offset = nullptr;
     output_columns = nullptr;
+    order_by_exprs = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }

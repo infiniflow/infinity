@@ -1015,7 +1015,8 @@ QueryResult Infinity::Search(const String &db_name,
                              ParsedExpr *filter,
                              ParsedExpr *limit,
                              ParsedExpr *offset,
-                             Vector<ParsedExpr *> *output_columns) {
+                             Vector<ParsedExpr *> *output_columns,
+                             Vector<OrderByExpr *> *order_by_list) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -1041,6 +1042,7 @@ QueryResult Infinity::Search(const String &db_name,
     select_statement->search_expr_ = search_expr;
     select_statement->limit_expr_ = limit;
     select_statement->offset_expr_ = offset;
+    select_statement->order_by_list = order_by_list;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     return result;

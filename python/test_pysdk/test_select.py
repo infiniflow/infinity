@@ -10,7 +10,7 @@ import infinity.index as index
 import infinity_embedded
 from numpy import dtype
 from infinity.errors import ErrorCode
-from infinity.common import ConflictType
+from infinity.common import ConflictType, SortType
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
@@ -750,4 +750,40 @@ class TestInfinity:
         pd.testing.assert_frame_equal(table_obj.output(["-abs(num) - 1"]).filter("-abs(num) >= -2").to_df(),
                                       pd.DataFrame({"(-(ABS(num)) - 1)": (-2.0, -3.0)}))
         res = db_obj.drop_table("test_neg_func" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_sort(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+
+        # infinity
+        db_obj.drop_table("test_sort"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "test_sort"+suffix, {
+                "c1": {"type": "int", "constraints": ["primary key", "not null"]},
+                "c2": {"type": "int", "constraints": ["not null"]}}, ConflictType.Error)
+
+        assert table_obj is not None
+
+        res = table_obj.insert(
+            [{"c1": -3, "c2": 3}, {"c1": -2, "c2": 2}, {"c1": -1, "c2": 1}, {"c1": 0, "c2": 0}, {"c1": 1, "c2": 1},
+             {"c1": 2, "c2": 2}, {"c1": 3, "c2": 3}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.insert(
+            [{"c1": -8, "c2": 8}, {"c1": -7, "c2": 7}, {"c1": -6, "c2": 6}, {"c1": 7, "c2": 7}, {"c1": 8, "c2": 8},
+             {"c1": 9, "c2": 9}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Desc]]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, -1, 2, -2, 3, -3, -6, 7, -7, 8, -8, 9),
+                                                         'c2': (0, 1, 1, 2, 2, 3, 3, 6, 7, 7, 8, 8, 9)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Asc]]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, -1, 1, -2, 2, -3, 3, -6, -7, 7, -8, 8, 9),
+                                                         'c2': (0, 1, 1, 2, 2, 3, 3, 6, 7, 7, 8, 8, 9)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = db_obj.drop_table("test_sort"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

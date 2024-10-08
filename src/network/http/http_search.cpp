@@ -143,7 +143,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         }
 
         const QueryResult result =
-            infinity_ptr->Search(db_name, table_name, search_expr.release(), filter.release(), limit.release(), offset.release(), output_columns);
+            infinity_ptr->Search(db_name, table_name, search_expr.release(), filter.release(), limit.release(), offset.release(), output_columns, nullptr);
 
         output_columns = nullptr;
         if (result.IsOk()) {
