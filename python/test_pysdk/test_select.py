@@ -29,7 +29,7 @@ def http(request):
 
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
-    if 1:
+    if local_infinity:
         module = importlib.import_module("infinity_embedded.index")
         globals()["index"] = module
         module = importlib.import_module("infinity_embedded.common")
