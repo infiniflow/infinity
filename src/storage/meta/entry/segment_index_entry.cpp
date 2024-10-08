@@ -809,6 +809,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     const auto &index_name = *table_index_entry_->GetIndexName();
     if (!TrySetOptimizing()) {
         LOG_INFO(fmt::format("Index {} segment {} is optimizing, skip optimize.", index_name, segment_id_));
+        return nullptr;
     }
     bool opt_success = false;
     DeferFn defer_fn([&] {
