@@ -29,43 +29,43 @@ SELECT c1 FROM test_delete_with_ivf SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2
 statement ok
 CREATE INDEX idx1 ON test_delete_with_ivf (c2) USING IVF WITH (metric = l2);
 
-#query I
-#SELECT c1 FROM test_delete_with_ivf SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
-#----
-#6
-#6
-#4
+query I
+SELECT c1 FROM test_delete_with_ivf SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+6
+6
+4
 
 statement ok
 DELETE FROM test_delete_with_ivf WHERE c1 = 6;
 
-#query I
-#SELECT c1 FROM test_delete_with_ivf SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
-#----
-#4
-#4
-#2
+query I
+SELECT c1 FROM test_delete_with_ivf SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+4
+4
+2
 
 query I
 COPY test_delete_with_ivf FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',', FORMAT CSV);
 ----
 
-#query I
-#SELECT c1 FROM test_delete_with_ivf SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
-#----
-#8
-#6
-#4
+query I
+SELECT c1 FROM test_delete_with_ivf SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+8
+6
+4
 
 statement ok
 DELETE FROM test_delete_with_ivf WHERE c1 = 8;
 
-#query I
-#SELECT c1 FROM test_delete_with_ivf SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
-#----
-#6
-#4
-#4
+query I
+SELECT c1 FROM test_delete_with_ivf SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+6
+4
+4
 
 statement ok
 DROP TABLE test_delete_with_ivf;
