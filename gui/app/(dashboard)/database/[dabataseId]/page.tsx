@@ -1,3 +1,3 @@
 export default async function DatabasePage() {
-  return <div>DatabasePage</div>;
+  return <div>DatabasePage id</div>;
 }

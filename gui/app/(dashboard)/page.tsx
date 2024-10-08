@@ -31,7 +31,7 @@ export default async function ProductsPage({
   };
 
   return (
-    <div>
+    <div className="flex flex-col space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>Briefs</CardTitle>
