@@ -46,7 +46,7 @@ class ExplainQuery(Query):
         offset: Optional[WrapParsedExpr],
         explain_type: Optional[BaseExplainType],
     ):
-        super().__init__(columns, search, filter, limit, offset)
+        super().__init__(columns, search, filter, limit, offset, None)
         self.explain_type = explain_type
 
 
