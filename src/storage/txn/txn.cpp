@@ -583,7 +583,7 @@ void Txn::Rollback() {
 }
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { 
-    // std::lock_guard guard(txn_store_.mtx_);
+    std::lock_guard guard(txn_store_.mtx_); // TODO remove this line.
     auto state = txn_context_.GetTxnState();
     if (state != TxnState::kStarted) {
         auto begin_ts = BeginTS();
