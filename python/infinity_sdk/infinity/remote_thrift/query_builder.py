@@ -45,14 +45,14 @@ class Query(ABC):
         filter: Optional[ParsedExpr],
         limit: Optional[ParsedExpr],
         offset: Optional[ParsedExpr],
-        sort:  Optional[List[OrderByExpr]],
+        #sort:  Optional[List[OrderByExpr]],
     ):
         self.columns = columns
         self.search = search
         self.filter = filter
         self.limit = limit
         self.offset = offset
-        self.sort = sort
+        #self.sort = sort
 
 
 class ExplainQuery(Query):
