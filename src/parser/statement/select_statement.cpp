@@ -31,6 +31,14 @@ SelectStatement::~SelectStatement() {
         select_list_ = nullptr;
     }
 
+    if (highlight_list_ != nullptr) {
+        for (auto &expr_ptr : *highlight_list_) {
+            delete expr_ptr;
+        }
+        delete highlight_list_;
+        highlight_list_ = nullptr;
+    }
+
     if (search_expr_ != nullptr) {
         delete search_expr_;
         search_expr_ = nullptr;

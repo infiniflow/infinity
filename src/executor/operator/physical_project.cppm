@@ -27,6 +27,7 @@ import load_meta;
 import infinity_exception;
 import internal_types;
 import data_type;
+import highlighter;
 
 namespace infinity {
 
@@ -36,9 +37,10 @@ public:
                              u64 table_index,
                              UniquePtr<PhysicalOperator> left,
                              Vector<SharedPtr<BaseExpression>> expressions,
-                             SharedPtr<Vector<LoadMeta>> load_metas)
+                             SharedPtr<Vector<LoadMeta>> load_metas,
+                             Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns)
         : PhysicalOperator(PhysicalOperatorType::kProjection, std::move(left), nullptr, id, load_metas), expressions_(std::move(expressions)),
-          projection_table_index_(table_index) {}
+          projection_table_index_(table_index), highlight_columns_(std::move(highlight_columns)) {}
 
     ~PhysicalProject() override = default;
 
@@ -61,6 +63,7 @@ public:
 private:
     //    ExpressionExecutor executor;
     u64 projection_table_index_{};
+    Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns_{};
 };
 
 } // namespace infinity

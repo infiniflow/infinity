@@ -343,6 +343,10 @@ class LocalTable():
         self.query_builder.output(columns)
         return self
 
+    def highlight(self, columns: Optional[List[str]]):
+        self.query_builder.highlight(columns)
+        return self
+
     def to_result(self):
         return self.query_builder.to_result()
 

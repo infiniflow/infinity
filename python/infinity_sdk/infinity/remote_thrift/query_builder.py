@@ -41,6 +41,7 @@ class Query(ABC):
     def __init__(
         self,
         columns: Optional[List[ParsedExpr]],
+        highlight: Optional[List[ParsedExpr]],
         search: Optional[SearchExpr],
         filter: Optional[ParsedExpr],
         limit: Optional[ParsedExpr],
@@ -48,6 +49,7 @@ class Query(ABC):
         sort:  Optional[List[OrderByExpr]],
     ):
         self.columns = columns
+        self.highlight = highlight,
         self.search = search
         self.filter = filter
         self.limit = limit
@@ -59,14 +61,15 @@ class ExplainQuery(Query):
     def __init__(
         self,
         columns: Optional[List[ParsedExpr]],
+        highlight: Optional[List[ParsedExpr]],
         search: Optional[SearchExpr],
         filter: Optional[ParsedExpr],
         limit: Optional[ParsedExpr],
         offset: Optional[ParsedExpr],
-        #sort:  Optional[List[OrderByExpr]],
+        sort:  Optional[List[OrderByExpr]],
         explain_type: Optional[ExplainType],
     ):
-        super().__init__(columns, search, filter, limit, offset, None)
+        super().__init__(columns, highlight, search, filter, limit, offset, sort)
         self.explain_type = explain_type
 
 
@@ -74,6 +77,7 @@ class InfinityThriftQueryBuilder(ABC):
     def __init__(self, table):
         self._table = table
         self._columns = None
+        self._highlight = None
         self._search = None
         self._filter = None
         self._limit = None
@@ -82,6 +86,7 @@ class InfinityThriftQueryBuilder(ABC):
 
     def reset(self):
         self._columns = None
+        self._highlight = None
         self._search = None
         self._filter = None
         self._limit = None
@@ -345,7 +350,17 @@ class InfinityThriftQueryBuilder(ABC):
 
         self._columns = select_list
         return self
-    
+
+    def highlight(self, columns: Optional[list]) -> InfinityThriftQueryBuilder:
+        highlight_list: List[ParsedExpr] = []
+        for column in columns:
+            if isinstance(column, str):
+                column = column.lower()
+            highlight_list.append(parse_expr(maybe_parse(column)))
+
+        self._highlight = highlight_list
+        return self
+
     def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityThriftQueryBuilder:
         sort_list: List[OrderByExpr] = []
         for order_by_expr in order_by_expr_list:
