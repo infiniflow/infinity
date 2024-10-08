@@ -996,6 +996,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 break;
             }
             case IndexType::kHnsw:
+            case IndexType::kIVF:
             case IndexType::kEMVB:
             case IndexType::kSecondary:
             case IndexType::kBMP: {

@@ -40,14 +40,15 @@ import search_top_k;
 namespace infinity {
 
 export struct IVF_Search_Params {
-    KnnScanSharedData *knn_scan_shared_data_{};
+    const KnnDistanceBase1 *knn_distance_{};
+    const KnnScanSharedData *knn_scan_shared_data_{};
     i64 topk_{};
-    void *query_embedding_{};
+    const void *query_embedding_{};
     EmbeddingDataType query_elem_type_{EmbeddingDataType::kElemInvalid};
     KnnDistanceType knn_distance_type_{KnnDistanceType::kInvalid};
     i32 nprobe_{1};
 
-    static IVF_Search_Params Make(const KnnScanSharedData *knn_scan_shared_data);
+    static IVF_Search_Params Make(const KnnScanFunctionData *knn_scan_function_data);
 };
 
 export template <typename DistanceDataType>
@@ -81,14 +82,14 @@ template <>
 struct IVF_Filter<true> {
     BitmaskFilter<SegmentOffset> filter_;
     IVF_Filter(const Bitmask &bitmask, const SegmentOffset max_segment_offset) : filter_(bitmask) {}
-    bool operator()(const SegmentOffset &segment_offset) const { return filter_(segment_offset); }
+    bool operator()(const SegmentOffset segment_offset) const { return filter_(segment_offset); }
 };
 
 template <>
 struct IVF_Filter<false> {
     AppendFilter filter_;
     IVF_Filter(const Bitmask &bitmask, const SegmentOffset max_segment_offset) : filter_(max_segment_offset) {}
-    bool operator()(const SegmentOffset &segment_offset) const { return filter_(segment_offset); }
+    bool operator()(const SegmentOffset segment_offset) const { return filter_(segment_offset); }
 };
 
 template <LogicalType t,
@@ -98,6 +99,7 @@ template <LogicalType t,
           bool use_bitmask,
           typename MultiVectorInnerTopnIndexType = void>
 class IVF_Search_HandlerT final : public IVF_Search_Handler<DistanceDataType> {
+    static_assert(std::is_same_v<DistanceDataType, f32>); // KnnDistanceBase1 type?
     static_assert(t == LogicalType::kEmbedding || t == LogicalType::kMultiVector);
     static constexpr bool NEED_FLIP = !std::is_same_v<CompareMax<DistanceDataType, SegmentOffset>, C<DistanceDataType, SegmentOffset>>;
     using ResultHandler = std::conditional_t<t == LogicalType::kEmbedding,
@@ -113,20 +115,27 @@ public:
     void Begin() override { result_handler_.Begin(); }
     void Search(const IVFIndexInChunk *ivf_index_in_chunk) override {
         const auto *ivf_index_storage = ivf_index_in_chunk->GetIVFIndexStoragePtr();
-        ivf_index_storage->SearchIndex(this->ivf_params_.knn_distance_type_,
+        ivf_index_storage->SearchIndex(this->ivf_params_.knn_distance_,
                                        this->ivf_params_.query_embedding_,
                                        this->ivf_params_.query_elem_type_,
                                        this->ivf_params_.nprobe_,
+                                       std::bind(&IVF_Search_HandlerT::SatisfyFilter, this, std::placeholders::_1),
                                        std::bind(&IVF_Search_HandlerT::AddResult, this, std::placeholders::_1, std::placeholders::_2));
     }
     void Search(const IVFIndexInMem *ivf_index_in_mem) override {
-        ivf_index_in_mem->SearchIndex(this->ivf_params_.knn_distance_type_,
+        ivf_index_in_mem->SearchIndex(this->ivf_params_.knn_distance_,
                                       this->ivf_params_.query_embedding_,
                                       this->ivf_params_.query_elem_type_,
                                       this->ivf_params_.nprobe_,
+                                      std::bind(&IVF_Search_HandlerT::SatisfyFilter, this, std::placeholders::_1),
                                       std::bind(&IVF_Search_HandlerT::AddResult, this, std::placeholders::_1, std::placeholders::_2));
     }
+    bool SatisfyFilter(SegmentOffset i) { return filter_(i); }
     void AddResult(DistanceDataType d, SegmentOffset i) {
+        assert(SatisfyFilter(i));
+        if constexpr (NEED_FLIP) {
+            d = -d;
+        }
         if constexpr (t == LogicalType::kEmbedding) {
             result_handler_.AddResult(0, d, i);
         } else {
@@ -136,7 +145,13 @@ public:
     }
     SizeT EndWithoutSortAndGetResultSize() override {
         result_handler_.EndWithoutSort();
-        return result_handler_.GetSize(0);
+        const auto result_cnt = result_handler_.GetSize(0);
+        if constexpr (NEED_FLIP) {
+            for (u32 i = 0; i < result_cnt; ++i) {
+                this->distance_output_ptr_[i] = -(this->distance_output_ptr_[i]);
+            }
+        }
+        return result_cnt;
     }
 };
 
