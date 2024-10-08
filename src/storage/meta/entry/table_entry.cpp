@@ -34,7 +34,6 @@ import logger;
 import txn_store;
 import status;
 import infinity_exception;
-import index_ivfflat;
 import txn_manager;
 import index_base;
 import index_full_text;
@@ -46,7 +45,6 @@ import data_type;
 import default_values;
 import DBT_compaction_alg;
 import compact_statement;
-import local_file_system;
 import build_fast_rough_filter_task;
 import block_entry;
 import segment_index_entry;
@@ -398,6 +396,7 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
             case IndexType::kFullText:
             case IndexType::kSecondary:
             case IndexType::kEMVB:
+            case IndexType::kIVF:
             case IndexType::kHnsw:
             case IndexType::kBMP: {
                 // support realtime index
@@ -703,6 +702,7 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
             case IndexType::kHnsw:
             case IndexType::kFullText:
             case IndexType::kEMVB:
+            case IndexType::kIVF:
             case IndexType::kSecondary:
             case IndexType::kBMP: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {

@@ -21,7 +21,6 @@ module cleanup_scanner;
 import stl;
 import catalog;
 import base_entry;
-import local_file_system;
 import infinity_exception;
 import status;
 import logger;
@@ -29,6 +28,7 @@ import third_party;
 import infinity_context;
 import table_entry;
 import table_index_entry;
+import virtual_store;
 
 namespace infinity {
 
@@ -75,9 +75,8 @@ void CleanupScanner::Cleanup(CleanupInfoTracer *info_tracer) && {
 }
 
 void CleanupScanner::CleanupDir(const String &abs_dir) {
-    LocalFileSystem fs;
     try {
-        fs.DeleteDirectory(abs_dir);
+        VirtualStore::RemoveDirectory(abs_dir);
     } catch (const RecoverableException &e) {
         if (e.ErrorCode() == ErrorCode::kDirNotFound) {
             // this happens when delta checkpoint records "drop table/db/...", and cleanup is called.

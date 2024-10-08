@@ -30,9 +30,9 @@ import httputils
 
 
 class TestIndex(HttpTest):
-    def test_http_create_index_IVFFlat(self):
+    def test_http_create_index_IVF(self):
         db_name = "default_db"
-        table_name = "test_http_test_create_index_IVFFlat"
+        table_name = "test_http_test_create_index_IVF"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
@@ -46,8 +46,7 @@ class TestIndex(HttpTest):
                               "c1",
                           ],
                           {
-                              "type": "IVFFlat",
-                              "centroids_count": "128",
+                              "type": "IVF",
                               "metric": "l2",
                           })
         self.drop_index(db_name, table_name, idxname)
@@ -163,8 +162,7 @@ class TestIndex(HttpTest):
         ("$#%dfva", False),
         ((1, 2), False),
         ({"1": 2}, False),
-        (index.IndexType.Hnsw, False),
-        (index.IndexType.IVFFlat, True)
+        (index.IndexType.Hnsw, False)
     ])
     @pytest.mark.parametrize("params", [
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((1, 2), False), ({"1": 2}, False)
@@ -312,15 +310,14 @@ class TestIndex(HttpTest):
                 {"name": "c1", "type": "vector", "dimension": 3, "element_type": "float"}]
         )
         self.create_index(db_name, table_name, idxname,
-                          ["c1", ], {"type": "IVFFlat", "centroids_count": 128, "metric": "l2",
-                                     })
+                          ["c1", ], {"type": "IVF", "metric": "l2"})
         self.show_index(db_name, table_name, idxname, expect={
             "error_code": 0,
             "database_name": db_name,
             "table_name": table_name,
             "index_name": idxname,
-            "index_type": "IVFFlat",
-            "other_parameters": "metric = l2, centroids_count = 128",
+            "index_type": "IVF",
+            "other_parameters": "metric = l2",
         })
         self.drop_index(db_name, table_name, idxname)
         self.drop_table(db_name, table_name)

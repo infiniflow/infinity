@@ -37,7 +37,6 @@ import value;
 import table_def;
 import data_table;
 import third_party;
-import index_ivfflat;
 import index_base;
 import index_hnsw;
 import index_full_text;
@@ -48,7 +47,7 @@ import config;
 import session;
 import options;
 import status;
-import local_file_system;
+import virtual_store;
 import utility;
 import buffer_manager;
 import session_manager;
@@ -80,6 +79,7 @@ import global_resource_usage;
 import infinity_context;
 import peer_task;
 import cleanup_scanner;
+import obj_status;
 
 namespace infinity {
 
@@ -172,15 +172,15 @@ void PhysicalShow::Init() {
             output_names_->reserve(3);
             output_types_->reserve(3);
 
-            output_names_->emplace_back("column_name");
-            output_names_->emplace_back("column_type");
-            output_names_->emplace_back("constraint");
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("type");
             output_names_->emplace_back("default");
+//            output_names_->emplace_back("constraint");
 
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(varchar_type);
+//            output_types_->emplace_back(varchar_type);
             break;
         }
         case ShowType::kShowIndexes: {
@@ -1088,7 +1088,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
             const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
             u64 index_dir_size = 0;
             if (InfinityContext::instance().persistence_manager() == nullptr) {
-                index_dir_size = LocalFileSystem::GetFolderSizeByPath(table_dir);
+                index_dir_size = VirtualStore::GetDirectorySize(table_dir);
             } else {
                 // TODO: calculate the sum of object parts which's has the prefix table_dir
             }
@@ -1195,7 +1195,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
         ++column_id;
         {
-            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_segment_index_dir));
+            const auto &index_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_index_dir));
             Value value = Value::MakeVarchar(index_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1217,10 +1217,8 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
             switch (index_base->index_type_) {
-                case IndexType::kIVFFlat: {
-                    Status status3 = Status::InvalidIndexName(index_type_name);
-                    show_operator_state->status_ = status3;
-                    RecoverableError(status3);
+                case IndexType::kIVF: {
+                    chunk_index_entries = std::get<0>(segment_index_entry->GetIVFIndexSnapshot());
                     break;
                 }
                 case IndexType::kHnsw: {
@@ -1293,10 +1291,9 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_indexes;
     switch (index_base->index_type_) {
-        case IndexType::kIVFFlat: {
-            Status status3 = Status::InvalidIndexName(index_type_name);
-            show_operator_state->status_ = status3;
-            RecoverableError(status3);
+        case IndexType::kIVF: {
+            auto [chunk_index_entries, _] = segment_index_entry->GetIVFIndexSnapshot();
+            chunk_indexes = chunk_index_entries;
             break;
         }
         case IndexType::kHnsw: {
@@ -1791,10 +1788,10 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "column_name", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "column_type", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "constraint", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(3, varchar_type, "default", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "type", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "default", std::set<ConstraintType>()),
+//        MakeShared<ColumnDef>(3, varchar_type, "constraint", std::set<ConstraintType>())
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), column_defs);
@@ -1805,7 +1802,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         varchar_type,
         varchar_type,
         varchar_type,
-        varchar_type,
+//        varchar_type,
     };
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
@@ -1838,25 +1835,25 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
         ++output_column_idx;
         {
-            // Append column constraint to the third column
-            String column_constraint;
-            for (auto &constraint : column->constraints_) {
-                column_constraint += " " + ConstrainTypeToString(constraint);
-            }
-
-            Value value = Value::MakeVarchar(column_constraint);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
-        }
-
-        ++output_column_idx;
-        {
             // Append column default value to the fourth column
             String column_default = column->default_expr_->ToString();
             Value value = Value::MakeVarchar(column_default);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
+
+//        ++output_column_idx;
+//        {
+//            // Append column constraint to the third column
+//            String column_constraint;
+//            for (auto &constraint : column->constraints_) {
+//                column_constraint += " " + ConstrainTypeToString(constraint);
+//            }
+//
+//            Value value = Value::MakeVarchar(column_constraint);
+//            ValueExpression value_expr(value);
+//            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+//        }
 
         if (++row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
@@ -1916,7 +1913,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         ++column_id;
         {
             String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
-            const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_segment_dir));
+            const auto &seg_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             Value value = Value::MakeVarchar(seg_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1988,7 +1985,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         ++column_id;
         {
             String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
-            const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_segment_dir));
+            const auto &seg_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             Value value = Value::MakeVarchar(seg_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2091,7 +2088,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         ++column_id;
         {
             String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
-            const auto &blk_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_block_dir));
+            const auto &blk_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
             Value value = Value::MakeVarchar(blk_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2167,7 +2164,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
     ++column_id;
     {
-        const auto &blk_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_block_dir));
+        const auto &blk_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
         Value value = Value::MakeVarchar(blk_size);
         ValueExpression value_expr(value);
         value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

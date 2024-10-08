@@ -523,7 +523,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     auto result = MakeShared<ParserResult>();
 
     {
-        String input_sql = "CREATE INDEX ON t1 (a) USING IVFFlat;";
+        String input_sql = "CREATE INDEX ON t1 (a) USING IVF;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());
@@ -552,7 +552,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     }
 
     {
-        String input_sql = "CREATE INDEX idx1 ON t1 (a) USING IVFFlat;";
+        String input_sql = "CREATE INDEX idx1 ON t1 (a) USING IVF;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -569,17 +569,17 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
         IndexInfo * index_info = create_index_info->index_info_;
-        EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
+        EXPECT_EQ(index_info->index_type_, IndexType::kIVF);
         EXPECT_EQ(index_info->column_name_, "a");
         EXPECT_TRUE(index_info->index_param_list_->empty());
-        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFLAT");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVF");
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVF"), IndexType::kIVF);
 
         result->Reset();
     }
 
     {
-        String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (a) USING IVFFlat;";
+        String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (a) USING IVF;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -596,17 +596,17 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
         IndexInfo * index_info = create_index_info->index_info_;
-        EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
+        EXPECT_EQ(index_info->index_type_, IndexType::kIVF);
         EXPECT_EQ(index_info->column_name_, "a");
         EXPECT_TRUE(index_info->index_param_list_->empty());
-        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFLAT");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVF");
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVF"), IndexType::kIVF);
 
         result->Reset();
     }
 
     {
-        String input_sql = "CREATE INDEX idx1 ON db1.t1 (a) USING IVFFlat;";
+        String input_sql = "CREATE INDEX idx1 ON db1.t1 (a) USING IVF;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -623,17 +623,17 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
         IndexInfo * index_info = create_index_info->index_info_;
-        EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
+        EXPECT_EQ(index_info->index_type_, IndexType::kIVF);
         EXPECT_EQ(index_info->column_name_, "a");
         EXPECT_TRUE(index_info->index_param_list_->empty());
-        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFLAT");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVF");
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVF"), IndexType::kIVF);
 
         result->Reset();
     }
 
     {
-        String input_sql = "CREATE INDEX idx3 ON t1 (a) USING IVFFlat WITH (metric = l2);";
+        String input_sql = "CREATE INDEX idx3 ON t1 (a) USING IVF WITH (metric = l2);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -650,14 +650,14 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
         IndexInfo * index_info = create_index_info->index_info_;
-        EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
+        EXPECT_EQ(index_info->index_type_, IndexType::kIVF);
         EXPECT_EQ(index_info->column_name_, "a");
         EXPECT_EQ(index_info->index_param_list_->size(), 1u);
         EXPECT_EQ((*index_info->index_param_list_)[0]->param_name_, "metric");
         EXPECT_EQ((*index_info->index_param_list_)[0]->param_value_, "l2");
 
-        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFLAT");
-        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFLAT"), IndexType::kIVFFlat);
+        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVF");
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVF"), IndexType::kIVF);
 
         result->Reset();
     }
@@ -669,7 +669,7 @@ TEST_F(SQLParserTest, bad_create_index_1) {
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
     {
-        String input_sql = "CREATE INDEX IF NOT EXISTS ON t1 (a) USING IVFFlat;";
+        String input_sql = "CREATE INDEX IF NOT EXISTS ON t1 (a) USING IVF;";
         parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());

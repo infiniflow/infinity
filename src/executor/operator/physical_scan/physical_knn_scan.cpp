@@ -48,8 +48,6 @@ import embedding_info;
 import buffer_manager;
 import merge_knn;
 import knn_result_handler;
-import ann_ivf_flat;
-import annivfflat_index_data;
 import buffer_handle;
 import data_block;
 import roaring_bitmap;
@@ -63,6 +61,9 @@ import segment_entry;
 import abstract_hnsw;
 import physical_match_tensor_scan;
 import hnsw_alg;
+import ivf_index_data_in_mem;
+import ivf_index_data;
+import ivf_index_search;
 
 namespace infinity {
 
@@ -380,7 +381,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 }
                 // check index type
                 if (auto index_type = table_index_entry->index_base()->index_type_;
-                    index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
+                    index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                     LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
                     continue;
                 }
@@ -414,7 +415,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             }
             // check index type
             if (auto index_type = table_index_entry->index_base()->index_type_;
-                index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
+                index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                 LOG_ERROR("Invalid index type");
                 Status error_status = Status::InvalidIndexType("invalid index");
                 RecoverableError(std::move(error_status));
@@ -569,60 +570,29 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
 
         if (has_some_result) {
             switch (segment_index_entry->table_index_entry()->index_base()->index_type_) {
-                case IndexType::kIVFFlat: {
-                    if constexpr (!(t == LogicalType::kEmbedding && std::is_same_v<ColumnDataType, f32>)) {
-                        UnrecoverableError("Invalid data type");
-                    } else {
-                        BufferHandle index_handle = segment_index_entry->GetIndex();
-                        auto index = static_cast<const AnnIVFFlatIndexData<ColumnDataType> *>(index_handle.GetData());
-                        i32 n_probes = 1;
-                        auto IVFFlatScanTemplate = [&]<typename AnnIVFFlatType, typename... OptionalFilter>(OptionalFilter &&...filter) {
-                            AnnIVFFlatType ann_ivfflat_query(knn_query_ptr,
-                                                             knn_scan_shared_data->query_count_,
-                                                             knn_scan_shared_data->topk_,
-                                                             knn_scan_shared_data->dimension_,
-                                                             knn_scan_shared_data->query_elem_type_);
-                            ann_ivfflat_query.Begin();
-                            ann_ivfflat_query.Search(index, segment_id, n_probes, std::forward<OptionalFilter>(filter)...);
-                            ann_ivfflat_query.EndWithoutSort();
-                            auto dists = ann_ivfflat_query.GetDistances();
-                            auto row_ids = ann_ivfflat_query.GetIDs();
-                            // TODO: now only work for one query
-                            // FIXME: cant work for multiple queries
-                            auto result_count = std::lower_bound(dists,
-                                                                 dists + knn_scan_shared_data->topk_,
-                                                                 AnnIVFFlatType::InvalidValue(),
-                                                                 AnnIVFFlatType::CompareDist) -
-                                                dists;
-                            merge_heap->Search(dists, row_ids, result_count);
-                        };
-                        auto IVFFlatScan = [&]<typename... OptionalFilter>(OptionalFilter &&...filter) {
-                            switch (knn_scan_shared_data->knn_distance_type_) {
-                                case KnnDistanceType::kL2: {
-                                    IVFFlatScanTemplate.template operator()<AnnIVFFlatL2<ColumnDataType>>(std::forward<OptionalFilter>(filter)...);
-                                    break;
-                                }
-                                case KnnDistanceType::kInnerProduct: {
-                                    IVFFlatScanTemplate.template operator()<AnnIVFFlatIP<ColumnDataType>>(std::forward<OptionalFilter>(filter)...);
-                                    break;
-                                }
-                                case KnnDistanceType::kCosine: {
-                                    IVFFlatScanTemplate.template operator()<AnnIVFFlatCOS<ColumnDataType>>(std::forward<OptionalFilter>(filter)...);
-                                    break;
-                                }
-                                default: {
-                                    Status status = Status::NotSupport("Not implemented KNN distance");
-                                    RecoverableError(status);
-                                }
-                            }
-                        };
-                        if (use_bitmask) {
-                            BitmaskFilter<SegmentOffset> filter(bitmask);
-                            IVFFlatScan(filter);
-                        } else {
-                            IVFFlatScan();
+                case IndexType::kIVF: {
+                    const SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
+                    const auto ivf_search_params = IVF_Search_Params::Make(knn_scan_shared_data);
+                    auto ivf_result_handler =
+                        GetIVFSearchHandler<t, C, DistanceDataType>(ivf_search_params, use_bitmask, bitmask, max_segment_offset);
+                    ivf_result_handler->Begin();
+                    const auto [chunk_index_entries, memory_ivf_index] = segment_index_entry->GetIVFIndexSnapshot();
+                    for (auto &chunk_index_entry : chunk_index_entries) {
+                        if (chunk_index_entry->CheckVisible(txn)) {
+                            BufferHandle index_handle = chunk_index_entry->GetIndex();
+                            const auto *ivf_chunk = static_cast<const IVFIndexInChunk *>(index_handle.GetData());
+                            ivf_result_handler->Search(ivf_chunk);
                         }
                     }
+                    if (memory_ivf_index) {
+                        ivf_result_handler->Search(memory_ivf_index.get());
+                    }
+                    auto [result_n, d_ptr, offset_ptr] = ivf_result_handler->EndWithoutSort();
+                    auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
+                    for (SizeT i = 0; i < result_n; ++i) {
+                        row_ids[i] = RowID{segment_id, offset_ptr[i]};
+                    }
+                    merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                     break;
                 }
                 case IndexType::kHnsw: {

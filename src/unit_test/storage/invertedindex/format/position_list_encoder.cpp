@@ -11,7 +11,7 @@ import skiplist_writer;
 import posting_byte_slice_reader;
 import file_writer;
 import file_reader;
-import local_file_system;
+import virtual_store;
 
 using namespace infinity;
 
@@ -23,7 +23,6 @@ public:
 
 protected:
     String file_;
-    LocalFileSystem fs_;
 };
 
 TEST_F(PositionListEncoderTest, test1) {
@@ -35,11 +34,11 @@ TEST_F(PositionListEncoderTest, test1) {
         position_encoder.AddPosition(i);
     }
     position_encoder.EndDocument();
-    SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(fs_, file_, 128);
+    SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(file_, 128);
     position_encoder.Dump(file_writer);
     file_writer->Sync();
 
-    fs_.DeleteFile(file_);
+    VirtualStore::DeleteFile(file_);
 }
 
 TEST_F(PositionListEncoderTest, test2) {

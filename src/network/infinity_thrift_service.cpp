@@ -27,9 +27,6 @@ import infinity_thrift_types;
 import infinity;
 import stl;
 import infinity_context;
-import local_file_system;
-import file_system_type;
-import file_system;
 import file_writer;
 import value;
 import infinity_exception;
@@ -1726,8 +1723,8 @@ EmbeddingDataType InfinityThriftService::GetEmbeddingDataTypeFromProto(const inf
 
 IndexType InfinityThriftService::GetIndexTypeFromProto(const infinity_thrift_rpc::IndexType::type &type) {
     switch (type) {
-        case infinity_thrift_rpc::IndexType::IVFFlat:
-            return IndexType::kIVFFlat;
+        case infinity_thrift_rpc::IndexType::IVF:
+            return IndexType::kIVF;
         case infinity_thrift_rpc::IndexType::Hnsw:
             return IndexType::kHnsw;
         case infinity_thrift_rpc::IndexType::FullText:

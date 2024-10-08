@@ -14,9 +14,6 @@
 
 module;
 
-#include <boost/asio/detail/mutex.hpp>
-#include <cassert>
-#include <mutex>
 module ivf_index_data_in_mem;
 
 import stl;
@@ -31,118 +28,220 @@ import index_base;
 import index_ivf;
 import embedding_info;
 import logical_type;
-import multivector_util;
-import block_column_iter;
 import data_type;
 import infinity_exception;
 import status;
 import logger;
+import kmeans_partition;
+import search_top_1;
+import column_vector;
+import ivf_index_data;
+import buffer_handle;
 
 namespace infinity {
+template <IsAnyOf<u8, i8, f64, f32, Float16T, BFloat16T> ColumnEmbeddingElementT>
+Pair<const f32 *, UniquePtr<f32[]>> GetF32Ptr(const ColumnEmbeddingElementT *src_data_ptr, const u32 src_data_cnt) {
+    Pair<const f32 *, UniquePtr<f32[]>> dst_data_ptr;
+    if constexpr (std::is_same_v<f32, ColumnEmbeddingElementT>) {
+        dst_data_ptr.first = src_data_ptr;
+    } else {
+        dst_data_ptr.second = MakeUniqueForOverwrite<f32[]>(src_data_cnt);
+        dst_data_ptr.first = dst_data_ptr.second.get();
+        for (u32 i = 0; i < src_data_cnt; ++i) {
+            if constexpr (std::is_same_v<f64, ColumnEmbeddingElementT>) {
+                dst_data_ptr.second[i] = static_cast<f32>(src_data_ptr[i]);
+            } else {
+                dst_data_ptr.second[i] = src_data_ptr[i];
+            }
+        }
+    }
+    return dst_data_ptr;
+}
+
+IVFIndexInMem::IVFIndexInMem(const RowID begin_row_id,
+                             const IndexIVFOption &ivf_option,
+                             const LogicalType column_logical_type,
+                             const EmbeddingDataType embedding_data_type,
+                             const u32 embedding_dimension)
+    : begin_row_id_{begin_row_id},
+      ivf_index_storage_{new IVF_Index_Storage(ivf_option, column_logical_type, embedding_data_type, embedding_dimension)} {}
+
+IVFIndexInMem::~IVFIndexInMem() {
+    std::unique_lock lock(rw_mutex_);
+    if (own_ivf_index_storage_) {
+        delete ivf_index_storage_;
+    }
+    ivf_index_storage_ = nullptr;
+}
 
 u32 IVFIndexInMem::GetInputRowCount() const {
     std::shared_lock lock(rw_mutex_);
     return input_row_count_;
 }
 
-template <LogicalType column_logical_type, typename ColumnEmbeddingElementT>
-class IVFIndexInMemT final : public IVFIndexInMem {
-    const u32 source_embedding_dimension_ = 0;
+template <LogicalType column_logical_type, EmbeddingDataType embedding_data_type>
+struct InMemStorage;
+
+template <EmbeddingDataType embedding_data_type>
+struct InMemStorage<LogicalType::kEmbedding, embedding_data_type> {
+    using ColumnEmbeddingElementT = EmbeddingDataTypeToCppTypeT<embedding_data_type>;
     Vector<ColumnEmbeddingElementT> raw_source_data_{};
     Vector<SegmentOffset> source_offsets_{};
+};
+
+template <EmbeddingDataType embedding_data_type>
+struct InMemStorage<LogicalType::kMultiVector, embedding_data_type> {
+    using ColumnEmbeddingElementT = EmbeddingDataTypeToCppTypeT<embedding_data_type>;
+    Vector<ColumnEmbeddingElementT> raw_source_data_{};
+    Vector<SegmentOffset> source_offsets_{};
+    Vector<u32> multi_vector_data_start_pos_{};
+    Vector<u32> multi_vector_embedding_num_{};
+};
+
+template <LogicalType column_logical_type, EmbeddingDataType embedding_data_type>
+class IVFIndexInMemT final : public IVFIndexInMem {
+    using ColumnEmbeddingElementT = EmbeddingDataTypeToCppTypeT<embedding_data_type>;
+    InMemStorage<column_logical_type, embedding_data_type> in_mem_storage_;
+    u32 build_index_bar_embedding_num_ = 0;
 
 public:
-    IVFIndexInMemT(const RowID begin_row_id, const IndexIVFOption &ivf_option, const u32 source_embedding_dimension)
-        : IVFIndexInMem(begin_row_id, ivf_option), source_embedding_dimension_(source_embedding_dimension) {}
+    IVFIndexInMemT(const RowID begin_row_id, const IndexIVFOption &ivf_option, const u32 embedding_dimension)
+        : IVFIndexInMem(begin_row_id, ivf_option, column_logical_type, embedding_data_type, embedding_dimension) {
+        const auto mid = this->ivf_option().centroid_option_.centroids_num_ratio_ * this->ivf_option().centroid_option_.min_points_per_centroid_;
+        build_index_bar_embedding_num_ = std::ceil(mid * mid + 3);
+    }
 
     void InsertBlockData(const SegmentOffset block_offset,
                          BlockColumnEntry *block_column_entry,
                          BufferManager *buffer_manager,
                          const u32 row_offset,
                          const u32 row_count) override {
-        if constexpr (column_logical_type == LogicalType::kEmbedding) {
-            MemIndexInserterIter<ColumnEmbeddingElementT> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
-            InsertVecs(iter);
-        } else if constexpr (column_logical_type == LogicalType::kMultiVector) {
-            MemIndexInserterIter<MultiVectorRef<ColumnEmbeddingElementT>> iter(block_offset,
-                                                                               block_column_entry,
-                                                                               buffer_manager,
-                                                                               row_offset,
-                                                                               row_count);
-            InsertVecs(iter);
+        const auto column_vector = block_column_entry->GetConstColumnVector(buffer_manager);
+        std::unique_lock lock(rw_mutex_);
+        if (have_ivf_index_.test(std::memory_order_acquire)) {
+            if constexpr (column_logical_type == LogicalType::kEmbedding) {
+                const auto *column_embedding_ptr = reinterpret_cast<const ColumnEmbeddingElementT *>(column_vector.data());
+                ivf_index_storage_->AddEmbeddingBatch(block_offset + row_offset,
+                                                      column_embedding_ptr + row_offset * embedding_dimension(),
+                                                      row_count);
+                input_embedding_count_ += row_count;
+            } else if constexpr (column_logical_type == LogicalType::kMultiVector) {
+                for (u32 i = 0; i < row_count; ++i) {
+                    auto [raw_data, embedding_num] = column_vector.GetMultiVectorRaw(row_offset + i);
+                    ivf_index_storage_->AddMultiVector(block_offset + row_offset + i, raw_data.data(), embedding_num);
+                    input_embedding_count_ += embedding_num;
+                }
+            } else {
+                static_assert(false);
+            }
+            input_row_count_ += row_count;
         } else {
-            static_assert(false, "Wrong logical type!");
+            // no index now
+            if constexpr (column_logical_type == LogicalType::kEmbedding) {
+                const auto *column_embedding_ptr = reinterpret_cast<const ColumnEmbeddingElementT *>(column_vector.data());
+                in_mem_storage_.raw_source_data_.insert(in_mem_storage_.raw_source_data_.end(),
+                                                        column_embedding_ptr + row_offset * embedding_dimension(),
+                                                        column_embedding_ptr + (row_offset + row_count) * embedding_dimension());
+                const auto old_size = in_mem_storage_.source_offsets_.size();
+                in_mem_storage_.source_offsets_.resize(old_size + row_count);
+                std::iota(in_mem_storage_.source_offsets_.begin() + old_size, in_mem_storage_.source_offsets_.end(), block_offset + row_offset);
+                input_embedding_count_ += row_count;
+            } else if constexpr (column_logical_type == LogicalType::kMultiVector) {
+                for (u32 i = 0; i < row_count; ++i) {
+                    auto [raw_data, embedding_num] = column_vector.GetMultiVectorRaw(row_offset + i);
+                    const auto *mv_ptr = reinterpret_cast<const ColumnEmbeddingElementT *>(raw_data.data());
+                    in_mem_storage_.multi_vector_data_start_pos_.push_back(in_mem_storage_.raw_source_data_.size());
+                    in_mem_storage_.raw_source_data_.insert(in_mem_storage_.raw_source_data_.end(),
+                                                            mv_ptr,
+                                                            mv_ptr + embedding_num * embedding_dimension());
+                    in_mem_storage_.source_offsets_.push_back(block_offset + row_offset + i);
+                    in_mem_storage_.multi_vector_embedding_num_.push_back(embedding_num);
+                    input_embedding_count_ += embedding_num;
+                }
+            } else {
+                static_assert(false);
+            }
+            input_row_count_ += row_count;
+            if (input_embedding_count_ >= build_index_bar_embedding_num_) {
+                BuildIndex();
+            }
+        }
+    }
+
+    void BuildIndex() {
+        if (have_ivf_index_.test(std::memory_order_acquire)) {
+            UnrecoverableError("Already have index");
         }
         {
-            std::unique_lock lock(rw_mutex_);
-            input_row_count_ += row_count;
+            // train by f32
+            const auto [train_ptr, _] = GetF32Ptr(in_mem_storage_.raw_source_data_.data(), in_mem_storage_.raw_source_data_.size());
+            ivf_index_storage_->Train(input_embedding_count_, train_ptr);
         }
-    }
-
-    void InsertVecs(auto &iter) {
-        if (have_ivf_index_.test()) {
-            InsertVecsToIndex(iter);
+        // insert
+        if constexpr (column_logical_type == LogicalType::kEmbedding) {
+            ivf_index_storage_->AddEmbeddingBatch(in_mem_storage_.source_offsets_.data(),
+                                                  in_mem_storage_.raw_source_data_.data(),
+                                                  in_mem_storage_.source_offsets_.size());
+        } else if constexpr (column_logical_type == LogicalType::kMultiVector) {
+            for (u32 i = 0; i < in_mem_storage_.source_offsets_.size(); ++i) {
+                ivf_index_storage_->AddMultiVector(in_mem_storage_.source_offsets_[i],
+                                                   in_mem_storage_.raw_source_data_.data() + in_mem_storage_.multi_vector_data_start_pos_[i],
+                                                   in_mem_storage_.multi_vector_embedding_num_[i]);
+            }
         } else {
-            InsertVecsToRawData(iter);
+            static_assert(false);
         }
+        // fin
+        have_ivf_index_.test_and_set(std::memory_order_release);
     }
 
-    void InsertVecsToIndex(auto &iter) {
-        for (auto ret = iter.Next(); ret; ret = iter.Next()) {
-            auto &[embedding_raw_data_ptr, segment_offset] = *ret;
-            static_assert(std::is_same_v<ColumnEmbeddingElementT, std::decay_t<std::remove_pointer_t<decltype(embedding_raw_data_ptr)>>>);
-            std::unique_lock lock(rw_mutex_);
-            assert(source_offsets_.empty());
-            assert(raw_source_data_.empty());
-            // TODO
+    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) override {
+        std::unique_lock lock(rw_mutex_);
+        if (!have_ivf_index_.test(std::memory_order_acquire)) {
+            BuildIndex();
         }
+        auto new_chunk_index_entry = segment_index_entry->CreateIVFIndexChunkIndexEntry(begin_row_id_, input_row_count_, buffer_mgr);
+        BufferHandle handle = new_chunk_index_entry->GetIndex();
+        auto *data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
+        data_ptr->GetMemData(std::move(*ivf_index_storage_));
+        ivf_index_storage_ = data_ptr->GetIVFIndexStoragePtr();
+        own_ivf_index_storage_ = false;
+        dump_handle_ = std::move(handle);
+        return new_chunk_index_entry;
     }
 
-    void InsertVecsToRawData(auto &iter) {
-        for (auto ret = iter.Next(); ret; ret = iter.Next()) {
-            auto &[embedding_raw_data_ptr, segment_offset] = *ret;
-            static_assert(std::is_same_v<ColumnEmbeddingElementT, std::decay_t<std::remove_pointer_t<decltype(embedding_raw_data_ptr)>>>);
-            std::unique_lock lock(rw_mutex_);
-            assert(source_offsets_.size() == input_embedding_count_);
-            assert(raw_source_data_.size() == input_embedding_count_ * source_embedding_dimension_);
-            source_offsets_.push_back(segment_offset);
-            raw_source_data_.insert(raw_source_data_.end(), embedding_raw_data_ptr, embedding_raw_data_ptr + source_embedding_dimension_);
-            ++input_embedding_count_;
-        }
-    }
-
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const override {
+    void SearchIndexInMem(KnnDistanceType knn_distance_type,
+                          const void *query_ptr,
+                          EmbeddingDataType query_element_type,
+                          std::function<void(f32, SegmentOffset)> add_result_func) const override {
         // TODO
-        return {};
     }
 };
 
 template <LogicalType column_logical_type>
 SharedPtr<IVFIndexInMem> GetNewIVFIndexInMem(const DataType *column_data_type, const RowID begin_row_id, const IndexIVFOption &index_ivf_option) {
     const auto *embedding_info_ptr = static_cast<const EmbeddingInfo *>(column_data_type->type_info().get());
-    auto GetResult = [&]<typename ColumnEmbeddingElementT> {
-        return MakeShared<IVFIndexInMemT<column_logical_type, ColumnEmbeddingElementT>>(begin_row_id,
-                                                                                        index_ivf_option,
-                                                                                        embedding_info_ptr->Dimension());
+    auto GetResult = [&]<EmbeddingDataType embedding_data_type> {
+        return MakeShared<IVFIndexInMemT<column_logical_type, embedding_data_type>>(begin_row_id, index_ivf_option, embedding_info_ptr->Dimension());
     };
     switch (embedding_info_ptr->Type()) {
         case EmbeddingDataType::kElemInt8: {
-            return GetResult.template operator()<i8>();
+            return GetResult.template operator()<EmbeddingDataType::kElemInt8>();
         }
         case EmbeddingDataType::kElemUInt8: {
-            return GetResult.template operator()<u8>();
+            return GetResult.template operator()<EmbeddingDataType::kElemUInt8>();
         }
         case EmbeddingDataType::kElemFloat: {
-            return GetResult.template operator()<f32>();
+            return GetResult.template operator()<EmbeddingDataType::kElemFloat>();
         }
         case EmbeddingDataType::kElemFloat16: {
-            return GetResult.template operator()<Float16T>();
+            return GetResult.template operator()<EmbeddingDataType::kElemFloat16>();
         }
         case EmbeddingDataType::kElemBFloat16: {
-            return GetResult.template operator()<BFloat16T>();
+            return GetResult.template operator()<EmbeddingDataType::kElemBFloat16>();
         }
         case EmbeddingDataType::kElemDouble: {
-            return GetResult.template operator()<f64>();
+            return GetResult.template operator()<EmbeddingDataType::kElemDouble>();
         }
         case EmbeddingDataType::kElemBit:
         case EmbeddingDataType::kElemInt16:
@@ -166,6 +265,19 @@ SharedPtr<IVFIndexInMem> IVFIndexInMem::NewIVFIndexInMem(const ColumnDef *column
     }
     UnrecoverableError("IVFIndex can only apply to Embedding and multi-vector column");
     return {};
+}
+
+void IVFIndexInMem::SearchIndex(const KnnDistanceType knn_distance_type,
+                                const void *query_ptr,
+                                const EmbeddingDataType query_element_type,
+                                const u32 nprobe,
+                                std::function<void(f32, SegmentOffset)> add_result_func) const {
+    std::shared_lock lock(rw_mutex_);
+    if (have_ivf_index_.test(std::memory_order_acquire)) {
+        ivf_index_storage_->SearchIndex(knn_distance_type, query_ptr, query_element_type, nprobe, add_result_func);
+    } else {
+        SearchIndexInMem(knn_distance_type, query_ptr, query_element_type, add_result_func);
+    }
 }
 
 } // namespace infinity

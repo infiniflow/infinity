@@ -17,7 +17,7 @@ module;
 export module block_version;
 
 import stl;
-import file_system;
+import local_file_handle;
 
 namespace infinity {
 
@@ -33,9 +33,8 @@ struct CreateField {
 
     bool operator!=(const CreateField &rhs) const { return !(*this == rhs); }
 
-    void SaveToFile(FileHandler &file_handler) const;
-
-    static CreateField LoadFromFile(FileHandler &file_handler);
+    void SaveToFile(LocalFileHandle *file_handle) const;
+    static CreateField LoadFromFile(LocalFileHandle *file_handle);
 };
 
 export struct BlockVersion {
@@ -51,11 +50,11 @@ export struct BlockVersion {
 
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
 
-    void SaveToFile(TxnTimeStamp checkpoint_ts, FileHandler &file_handler) const;
+    void SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
-    void SpillToFile(FileHandler &file_handler) const;
+    void SpillToFile(LocalFileHandle *file_handle) const;
+    static UniquePtr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);
 
-    static UniquePtr<BlockVersion> LoadFromFile(FileHandler &file_handler);
 
     void GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const;
 

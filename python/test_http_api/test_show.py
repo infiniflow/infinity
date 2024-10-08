@@ -70,9 +70,9 @@ class TestShow(HttpTest):
         self.show_table_columns(db_name, table_name, {
             "error_code": 0,
             "columns": [
-                {'column_name': 'num', 'column_type': 'Integer', 'constraint': '', 'default': 'Null'},
-                {'column_name': 'body', 'column_type': 'Varchar', 'constraint': '', 'default': 'Null'},
-                {'column_name': 'vec', 'column_type': 'Embedding(float,5)', 'constraint': '', 'default': 'Null'}
+                {'name': 'num', 'type': 'Integer', 'default': 'Null'},
+                {'name': 'body', 'type': 'Varchar', 'default': 'Null'},
+                {'name': 'vec', 'type': 'Embedding(float,5)', 'default': 'Null'}
             ]
         })
 

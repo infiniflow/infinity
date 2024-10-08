@@ -12,7 +12,6 @@ import posting_list_format;
 import index_defines;
 import term_meta;
 import dict_reader;
-import local_file_system;
 import third_party;
 import infinity_context;
 import persistence_manager;
@@ -44,7 +43,7 @@ ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &
     }
 
     dict_reader_ = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag));
-    posting_file_ = MakeShared<FileReader>(fs_, posting_file, 1024);
+    posting_file_ = MakeShared<FileReader>(posting_file, 1024);
 
     doc_list_reader_ = MakeShared<ByteSliceReader>();
     if (format_option.HasPositionList()) {
@@ -60,8 +59,11 @@ ColumnIndexIterator::~ColumnIndexIterator() {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->PutObjCache(dict_file_path_);
-        pm->PutObjCache(posting_file_path_);
+        PersistResultHandler handler(pm);
+        PersistWriteResult res1 = pm->PutObjCache(dict_file_path_);
+        PersistWriteResult res2 = pm->PutObjCache(posting_file_path_);
+        handler.HandleWriteResult(res1);
+        handler.HandleWriteResult(res2);
     }
 }
 

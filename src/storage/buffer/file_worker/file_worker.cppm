@@ -19,7 +19,7 @@ module;
 export module file_worker;
 
 import stl;
-import file_system;
+import local_file_handle;
 import third_party;
 import file_worker_type;
 import persistence_manager;
@@ -81,6 +81,6 @@ public:
 
 protected:
     void *data_{nullptr};
-    UniquePtr<FileHandler> file_handler_{nullptr};
+    UniquePtr<LocalFileHandle> file_handle_{nullptr};
 };
 } // namespace infinity

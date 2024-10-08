@@ -24,7 +24,7 @@ module;
 export module sparse_vec_store;
 
 import stl;
-import file_system;
+import local_file_handle;
 import hnsw_common;
 import sparse_util;
 
@@ -46,11 +46,11 @@ public:
     static This Make(SizeT max_dim) { return This(max_dim); }
     static This Make(SizeT max_dim, bool) { return This(max_dim); }
 
-    void Save(FileHandler &file_handler) const { file_handler.Write(&max_dim_, sizeof(max_dim_)); }
+    void Save(LocalFileHandle &file_handle) const { file_handle.Append(&max_dim_, sizeof(max_dim_)); }
 
-    static This Load(FileHandler &file_handler) {
+    static This Load(LocalFileHandle &file_handle) {
         SizeT max_dim;
-        file_handler.Read(&max_dim, sizeof(max_dim));
+        file_handle.Read(&max_dim, sizeof(max_dim));
         return This(max_dim);
     }
 
@@ -85,12 +85,12 @@ public:
         return ret;
     }
 
-    void Save(FileHandler &file_handler, SizeT cur_vec_num, const Meta &meta) const {
+    void Save(LocalFileHandle &file_handle, SizeT cur_vec_num, const Meta &meta) const {
         SizeT nnz = 0;
         for (SizeT i = 0; i < cur_vec_num; ++i) {
             nnz += vecs_[i].nnz_;
         }
-        file_handler.Write(&nnz, sizeof(nnz));
+        file_handle.Append(&nnz, sizeof(nnz));
         auto indptr = MakeUniqueForOverwrite<i32[]>(cur_vec_num + 1);
         indptr[0] = 0;
         auto indice = MakeUniqueForOverwrite<IdxType[]>(nnz);
@@ -101,20 +101,20 @@ public:
             Copy(vec.data_.get(), vec.data_.get() + vec.nnz_, data.get() + indptr[i]);
             indptr[i + 1] = indptr[i] + vec.nnz_;
         }
-        file_handler.Write(indptr.get(), sizeof(i32) * (cur_vec_num + 1));
-        file_handler.Write(indice.get(), sizeof(IdxType) * nnz);
-        file_handler.Write(data.get(), sizeof(DataType) * nnz);
+        file_handle.Append(indptr.get(), sizeof(i32) * (cur_vec_num + 1));
+        file_handle.Append(indice.get(), sizeof(IdxType) * nnz);
+        file_handle.Append(data.get(), sizeof(DataType) * nnz);
     }
 
-    static This Load(FileHandler &file_handler, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+    static This Load(LocalFileHandle &file_handle, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
         SizeT nnz = 0;
-        file_handler.Read(&nnz, sizeof(nnz));
+        file_handle.Read(&nnz, sizeof(nnz));
         auto indptr = MakeUniqueForOverwrite<i32[]>(cur_vec_num + 1);
-        file_handler.Read(indptr.get(), sizeof(i32) * (cur_vec_num + 1));
+        file_handle.Read(indptr.get(), sizeof(i32) * (cur_vec_num + 1));
         auto indice = MakeUniqueForOverwrite<IdxType[]>(nnz);
-        file_handler.Read(indice.get(), sizeof(IdxType) * nnz);
+        file_handle.Read(indice.get(), sizeof(IdxType) * nnz);
         auto data = MakeUniqueForOverwrite<DataType[]>(nnz);
-        file_handler.Read(data.get(), sizeof(DataType) * nnz);
+        file_handle.Read(data.get(), sizeof(DataType) * nnz);
 
         This ret(max_vec_num, meta);
         mem_usage += sizeof(SparseVecEle) * max_vec_num;

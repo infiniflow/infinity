@@ -13,9 +13,7 @@ import column_inverter;
 import index_defines;
 import column_index_reader;
 import posting_iterator;
-import file_system;
-import file_system_type;
-import local_file_system;
+import virtual_store;
 import file_writer;
 import term_meta;
 import index_defines;
@@ -32,6 +30,7 @@ import logger;
 import infinity_context;
 import persistence_manager;
 import persist_result_handler;
+import local_file_handle;
 
 using namespace infinity;
 
@@ -142,39 +141,38 @@ TEST_P(PostingMergerTest, Basic) {
     VectorWithLock<u32> column_length_array;
     Vector<u32> &unsafe_column_length_array = column_length_array.UnsafeVec();
     {
-        LocalFileSystem fs;
         // prepare column length info
         // the indexes to be merged should be from the same segment
         // otherwise the range of row_id will be very large ( >= 2^32)
+        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        PersistResultHandler handler(pm);
         unsafe_column_length_array.clear();
         for (u32 i = 0; i < base_names.size(); ++i) {
             String column_len_file = (Path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
             String real_column_len_file = column_len_file;
-            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
             if (pm != nullptr) {
-                PersistResultHandler handler(pm);
                 PersistReadResult result = pm->GetObjCache(real_column_len_file);
                 const ObjAddr &obj_addr = handler.HandleReadResult(result);
                 real_column_len_file = pm->GetObjPath(obj_addr.obj_key_);
             }
             RowID base_row_id = row_ids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
-            auto [file_handler, status] = fs.OpenFile(real_column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handle, status] = VirtualStore::Open(real_column_len_file, FileAccessMode::kRead);
             if (!status.ok()) {
                 String error_message = status.message();
                 UnrecoverableError(error_message);
             }
-            const u32 file_size = fs.GetFileSize(*file_handler);
+            const i64 file_size = file_handle->FileSize();
             u32 file_read_array_len = file_size / sizeof(u32);
             unsafe_column_length_array.resize(id_offset + file_read_array_len);
-            const i64 read_count = fs.Read(*file_handler, unsafe_column_length_array.data() + id_offset, file_size);
-            file_handler->Close();
-            if (read_count != file_size) {
+            auto [read_count, _] = file_handle->Read(unsafe_column_length_array.data() + id_offset, file_size);
+            if (read_count != (SizeT)file_size) {
                 String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
                 UnrecoverableError(error_message);
             }
             if (pm != nullptr) {
-                pm->PutObjCache(column_len_file);
+                PersistWriteResult res = pm->PutObjCache(column_len_file);
+                handler.HandleWriteResult(res);
             }
         }
     }

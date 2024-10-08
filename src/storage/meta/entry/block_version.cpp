@@ -25,19 +25,32 @@ import third_party;
 import default_values;
 import column_vector;
 import serialize;
-import local_file_system;
+import local_file_handle;
+import status;
 
 namespace infinity {
 
-void CreateField::SaveToFile(FileHandler &file_handler) const {
-    file_handler.Write(&create_ts_, sizeof(create_ts_));
-    file_handler.Write(&row_count_, sizeof(row_count_));
+void CreateField::SaveToFile(LocalFileHandle *file_handle) const {
+    Status status = file_handle->Append((char*)(&create_ts_), sizeof(create_ts_));
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    status = file_handle->Append((char*)(&row_count_), sizeof(row_count_));
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
 }
 
-CreateField CreateField::LoadFromFile(FileHandler &file_handler) {
+CreateField CreateField::LoadFromFile(LocalFileHandle *file_handle) {
     CreateField create_field;
-    file_handler.Read(&create_field.create_ts_, sizeof(create_field.create_ts_));
-    file_handler.Read(&create_field.row_count_, sizeof(create_field.row_count_));
+    auto [size1, status1] = file_handle->Read(&create_field.create_ts_, sizeof(create_field.create_ts_));
+    if(!status1.ok()) {
+        UnrecoverableError(status1.message());
+    }
+    auto [size2, status2] = file_handle->Read(&create_field.row_count_, sizeof(create_field.row_count_));
+    if(!status2.ok()) {
+        UnrecoverableError(status2.message());
+    }
     return create_field;
 }
 
@@ -66,59 +79,68 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
     return iter->row_count_;
 }
 
-void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, FileHandler &file_handler) const {
+void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     BlockOffset create_size = created_.size();
     while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
         --create_size;
     }
 
-    file_handler.Write(&create_size, sizeof(create_size));
+    file_handle.Append(&create_size, sizeof(create_size));
     for (SizeT j = 0; j < create_size; ++j) {
-        created_[j].SaveToFile(file_handler);
+        created_[j].SaveToFile(&file_handle);
     }
 
     BlockOffset capacity = deleted_.size();
-    file_handler.Write(&capacity, sizeof(capacity));
+    file_handle.Append(&capacity, sizeof(capacity));
     TxnTimeStamp dump_ts = 0;
     u32 deleted_row_count = 0;
     for (const auto &ts : deleted_) {
         if (ts <= checkpoint_ts) {
-            file_handler.Write(&ts, sizeof(ts));
+            file_handle.Append(&ts, sizeof(ts));
         } else {
             ++ deleted_row_count;
-            file_handler.Write(&dump_ts, sizeof(dump_ts));
+            file_handle.Append(&dump_ts, sizeof(dump_ts));
         }
     }
     LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, 0 delete {}", checkpoint_ts, create_size, deleted_row_count));
 }
 
-void BlockVersion::SpillToFile(FileHandler &file_handler) const {
+void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
     BlockOffset create_size = created_.size();
-    file_handler.Write(&create_size, sizeof(create_size));
+    Status status = file_handle->Append(&create_size, sizeof(create_size));
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     for (const auto &create : created_) {
-        create.SaveToFile(file_handler);
+        create.SaveToFile(file_handle);
     }
 
     BlockOffset capacity = deleted_.size();
-    file_handler.Write(&capacity, sizeof(capacity));
-    file_handler.Write(deleted_.data(), capacity * sizeof(TxnTimeStamp));
+    status = file_handle->Append(&capacity, sizeof(capacity));
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    status = file_handle->Append(deleted_.data(), capacity * sizeof(TxnTimeStamp));
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
 }
 
-UniquePtr<BlockVersion> BlockVersion::LoadFromFile(FileHandler &file_handler) {
+UniquePtr<BlockVersion> BlockVersion::LoadFromFile(LocalFileHandle *file_handle) {
     auto block_version = MakeUnique<BlockVersion>();
 
     BlockOffset create_size;
-    file_handler.Read(&create_size, sizeof(create_size));
+    file_handle->Read(&create_size, sizeof(create_size));
     block_version->created_.reserve(create_size);
     for (BlockOffset i = 0; i < create_size; i++) {
-        block_version->created_.push_back(CreateField::LoadFromFile(file_handler));
+        block_version->created_.push_back(CreateField::LoadFromFile(file_handle));
     }
     LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
     BlockOffset capacity;
-    file_handler.Read(&capacity, sizeof(capacity));
+    file_handle->Read(&capacity, sizeof(capacity));
     block_version->deleted_.resize(capacity);
     for (BlockOffset i = 0; i < capacity; i++) {
-        file_handler.Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
+        file_handle->Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
     }
     return block_version;
 }

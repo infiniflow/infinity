@@ -23,7 +23,7 @@ import logger;
 import txn_manager;
 import txn;
 import storage;
-import local_file_system;
+import virtual_store;
 import third_party;
 import catalog;
 import table_entry_type;
@@ -96,9 +96,8 @@ void WalManager::Start() {
     bool changed = running_.compare_exchange_strong(expected, true);
     if (!changed)
         return;
-    LocalFileSystem fs;
-    if (!fs.Exists(wal_dir_)) {
-        fs.CreateDirectory(wal_dir_);
+    if (!VirtualStore::Exists(wal_dir_)) {
+        VirtualStore::MakeDirectory(wal_dir_);
     }
     // TODO: recovery from wal checkpoint
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
@@ -153,7 +152,6 @@ TxnTimeStamp WalManager::GetCheckpointedTS() { return last_ckp_ts_ == UNCOMMIT_T
 
 Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
 
-    LocalFileSystem fs;
     Vector<SharedPtr<String>> log_strings;
 
     Vector<String> wal_list{};
@@ -335,8 +333,7 @@ void WalManager::Flush() {
 
         // Check if the wal file is too large, swap to a new one.
         try {
-            LocalFileSystem fs;
-            auto file_size = fs.GetFileSizeByPath(wal_path_);
+            auto file_size = VirtualStore::GetFileSize(wal_path_);
             if (file_size > cfg_wal_size_threshold_) {
                 this->SwapWalFile(max_commit_ts_);
             }
@@ -527,8 +524,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     LOG_INFO(fmt::format("Wal {} swap to new path: {}", wal_path_, new_file_path));
 
     // Rename the current wal file to a new one.
-    LocalFileSystem fs;
-    fs.Rename(wal_path_, new_file_path);
+    VirtualStore::Rename(wal_path_, new_file_path);
 
     // Create a new wal file with the original name.
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
@@ -581,8 +577,6 @@ String WalManager::GetWalFilename() const { return wal_path_; }
  *
  */
 i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
-    LocalFileSystem fs;
-
     Vector<String> wal_list{};
     {
         auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
@@ -715,8 +709,6 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
 }
 
 Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::GetCatalogFiles() const {
-    LocalFileSystem fs;
-
     Vector<String> wal_list{};
     {
         auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
@@ -777,7 +769,6 @@ Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::Ge
 }
 
 Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
-    LocalFileSystem fs;
     Vector<SharedPtr<WalEntry>> wal_entries;
 
     Vector<String> wal_list{};
@@ -1191,8 +1182,6 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
         if (auto iter = index_by_segment.find(cmd.segment_id_); iter != index_by_segment.end()) {
             segment_index_entry = iter->second.get();
         } else {
-            auto create_index_param =
-                SegmentIndexEntry::GetCreateIndexParam(table_index_entry->table_index_def(), 0 /*segment_offset*/, table_index_entry->column_def());
             auto segment_index_entry_ptr = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
                                                                                          table_entry,
                                                                                          cmd.segment_id_,

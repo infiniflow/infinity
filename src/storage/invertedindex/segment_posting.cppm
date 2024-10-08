@@ -23,8 +23,6 @@ import index_defines;
 import internal_types;
 import file_reader;
 
-import file_system;
-
 export module segment_posting;
 
 namespace infinity {
@@ -80,7 +78,6 @@ private:
     TermMeta term_meta_;
     SharedPtr<PostingWriter> posting_writer_{nullptr};
     SharedPtr<FileReader> posting_reader_{nullptr};
-    FileSystem* fs_ = nullptr;
     String* path_ = nullptr;
     u64 pos_begin_ = 0;
     u64 pos_size_ = 0;

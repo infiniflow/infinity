@@ -28,7 +28,6 @@ import data_store;
 import vec_store_type;
 import dist_func_l2;
 import dist_func_ip;
-import file_system;
 import hnsw_common;
 import column_def;
 import index_hnsw;
@@ -42,6 +41,7 @@ import logger;
 import base_memindex;
 import memindex_tracer;
 import table_index_entry;
+import buffer_handle;
 
 namespace infinity {
 
@@ -198,6 +198,7 @@ private:
     SegmentIndexEntry *segment_index_entry_{};
     bool trace_{};
     bool own_memory_{};
+    BufferHandle chunk_handle_{};
 };
 
 } // namespace infinity

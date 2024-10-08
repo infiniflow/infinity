@@ -14,16 +14,16 @@ statement ok
 COPY sqllogic_test_index FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
 
 statement ok
-CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVF WITH (metric = l2);
 
 statement error
-CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVF WITH (metric = l2);
 
 statement ok
-CREATE INDEX IF NOT EXISTS idx1 ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX IF NOT EXISTS idx1 ON sqllogic_test_index (col1) USING IVF WITH (metric = l2);
 
 statement error
-CREATE INDEX ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX ON sqllogic_test_index (col1) USING IVF WITH (metric = l2);
 
 statement ok
 DROP INDEX idx1 ON sqllogic_test_index;
@@ -35,13 +35,13 @@ statement ok
 DROP INDEX IF EXISTS idx1 ON sqllogic_test_index;
 
 statement ok
-CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVF WITH (metric = l2);
 
 statement ok
 DROP INDEX idx1 ON sqllogic_test_index;
 
 statement ok
-CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVF WITH (metric = l2);
 
 statement ok
 DROP TABLE sqllogic_test_index;

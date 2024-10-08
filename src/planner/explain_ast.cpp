@@ -51,44 +51,39 @@ import logger;
 
 namespace infinity {
 
-void ExplainAST::Explain(const BaseStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size) {
+Status ExplainAST::Explain(const BaseStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size) {
     switch (statement->Type()) {
         case StatementType::kSelect: {
-            BuildSelect((SelectStatement *)statement, stmt_string, intent_size);
-            break;
+            return BuildSelect((SelectStatement *)statement, stmt_string, intent_size);
         }
         case StatementType::kCopy: {
-            BuildCopy((CopyStatement *)statement, stmt_string, intent_size);
-            break;
+            return BuildCopy((CopyStatement *)statement, stmt_string, intent_size);
         }
         case StatementType::kInsert: {
-            BuildInsert((InsertStatement *)statement, stmt_string, intent_size);
-            break;
+            return BuildInsert((InsertStatement *)statement, stmt_string, intent_size);
         }
         case StatementType::kUpdate:
             break;
         case StatementType::kDelete:
             break;
         case StatementType::kCreate: {
-            BuildCreate((CreateStatement *)statement, stmt_string, intent_size);
-            break;
+            return BuildCreate((CreateStatement *)statement, stmt_string, intent_size);
         }
         case StatementType::kDrop: {
-            BuildDrop((DropStatement *)statement, stmt_string, intent_size);
-            break;
+            return BuildDrop((DropStatement *)statement, stmt_string, intent_size);
         }
         case StatementType::kPrepare:
-            break;
+            return Status::NotSupport("Explain PREPARE statement isn't supported.");
         case StatementType::kExecute:
-            break;
+            return Status::NotSupport("Explain EXECUTE statement isn't supported.");
         case StatementType::kAlter:
             break;
         case StatementType::kShow: {
-            BuildShow((ShowStatement *)statement, stmt_string, intent_size);
+            return BuildShow((ShowStatement *)statement, stmt_string, intent_size);
             break;
         }
         case StatementType::kFlush: {
-            BuildFlush((FlushStatement *)statement, stmt_string, intent_size);
+            return BuildFlush((FlushStatement *)statement, stmt_string, intent_size);
             break;
         }
         default: {
@@ -96,10 +91,10 @@ void ExplainAST::Explain(const BaseStatement *statement, SharedPtr<Vector<Shared
             UnrecoverableError(error_message);
         }
     }
-    return;
+    return Status::OK();
 }
 
-void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
 
     switch (create_statement->ddl_type()) {
         case DDLType::kInvalid: {
@@ -168,15 +163,16 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             break;
         }
         case DDLType::kView: {
-            break;
+            return Status::NotSupport("Explain create view isn't supported");
         }
         case DDLType::kIndex: {
             break;
         }
     }
+    return Status::OK();
 }
 
-void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     result->emplace_back(MakeShared<String>("INSERT: "));
     intent_size += 2;
     String schema_name = String(intent_size, ' ') + "database: " + insert_statement->schema_name_;
@@ -205,9 +201,10 @@ void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<
         }
     }
     result->emplace_back(MakeShared<String>(values));
+    return Status::OK();
 }
 
-void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (drop_statement->ddl_type()) {
         case DDLType::kInvalid: {
             String error_message = "Invalid DDL type.";
@@ -251,18 +248,21 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             break;
         }
         case DDLType::kView: {
+            return Status::NotSupport("DROP VIEW: Not supported");
             break;
         }
         case DDLType::kIndex: {
             break;
         }
     }
+    return Status::OK();
 }
 
-void ExplainAST::BuildSelect(const SelectStatement *select_statement,
+Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
                              SharedPtr<Vector<SharedPtr<String>>> &result,
                              i64 intent_size,
                              SharedPtr<String> alias_ptr) {
+    Status status = Status::OK();
     if (alias_ptr.get() != nullptr) {
         String select_str = String(intent_size, ' ') + "SELECT AS " + *alias_ptr;
         result->emplace_back(MakeShared<String>(select_str));
@@ -283,7 +283,10 @@ void ExplainAST::BuildSelect(const SelectStatement *select_statement,
             for (SizeT idx = 0; idx < with_count; ++idx) {
                 auto *with_expr = select_statement->with_exprs_->at(idx);
                 SharedPtr<String> alias_str = MakeShared<String>(with_expr->alias_);
-                BuildSelect((SelectStatement *)with_expr->select_, result, intent_size, alias_ptr);
+                status = BuildSelect((SelectStatement *)with_expr->select_, result, intent_size, alias_ptr);
+                if(!status.ok()) {
+                    return status;
+                }
             }
             intent_size -= 2;
         }
@@ -305,7 +308,10 @@ void ExplainAST::BuildSelect(const SelectStatement *select_statement,
         result->emplace_back(MakeShared<String>(projection_str));
     }
 
-    BuildBaseTableRef(select_statement->table_ref_, result, intent_size);
+    status = BuildBaseTableRef(select_statement->table_ref_, result, intent_size);
+    if(!status.ok()) {
+        return status;
+    }
 
     if (select_statement->where_expr_ != nullptr) {
         String filter_str = String(intent_size, ' ') + "filter: " + select_statement->where_expr_->ToString();
@@ -383,11 +389,15 @@ void ExplainAST::BuildSelect(const SelectStatement *select_statement,
                 break;
             }
         }
-        BuildSelect(select_statement->nested_select_, result, intent_size);
+        status = BuildSelect(select_statement->nested_select_, result, intent_size);
+        if(!status.ok()) {
+            return status;
+        }
     }
+    return Status::OK();
 }
 
-void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String from_str;
     switch (base_table_ref->type_) {
         case TableRefType::kCrossProduct: {
@@ -467,9 +477,10 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             break;
         }
     }
+    return Status::OK();
 }
 
-void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
 
     switch (show_statement->show_type_) {
         case ShowStmtType::kDatabase: {
@@ -713,9 +724,10 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             break;
         }
     }
+    return Status::OK();
 }
 
-void ExplainAST::BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64) {
+Status ExplainAST::BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64) {
     switch (flush_statement->type_) {
         case FlushType::kData:
             result->emplace_back(MakeShared<String>("FLUSH DATA"));
@@ -727,13 +739,15 @@ void ExplainAST::BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vec
             result->emplace_back(MakeShared<String>("FLUSH BUFFER"));
             break;
     }
+    return Status::OK();
 }
 
-void ExplainAST::BuildOptimize(const OptimizeStatement *optimize_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64) {
-    result->emplace_back(MakeShared<String>("OPTIMIZE TSABLE"));
+Status ExplainAST::BuildOptimize(const OptimizeStatement *optimize_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64) {
+    result->emplace_back(MakeShared<String>("OPTIMIZE TABLE"));
+    return Status::OK();
 }
 
-void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     if (copy_statement->copy_from_) {
         // IMPORT
         result->emplace_back(MakeShared<String>("IMPORT DATA:"));
@@ -834,5 +848,6 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
             UnrecoverableError(error_message);
         }
     }
+    return Status::OK();
 }
 } // namespace infinity

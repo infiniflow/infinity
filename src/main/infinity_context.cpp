@@ -59,10 +59,8 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
     config_ = MakeUnique<Config>();
     auto status = config_->Init(config_path, default_config);
     if (!status.ok()) {
-        fmt::print("Error: {}", *status.msg_);
         std::exit(static_cast<int>(status.code()));
     }
-
     Logger::Initialize(config_.get());
 
     resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
@@ -74,7 +72,6 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
         UnrecoverableError(status.message());
         return;
     }
-
     if (admin_flag or config_->ServerMode() == "cluster") {
         // Admin mode or cluster start phase
         return;

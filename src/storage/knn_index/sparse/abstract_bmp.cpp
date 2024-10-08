@@ -156,6 +156,7 @@ SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_
     auto *data_ptr = static_cast<AbstractBMP *>(handle.GetDataMut());
     *data_ptr = bmp_;
     own_memory_ = false;
+    chunk_handle_ = std::move(handle);
     return new_chunk_index_entry;
 }
 

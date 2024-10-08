@@ -14,8 +14,6 @@ import column_inverter;
 import index_defines;
 import column_index_reader;
 import posting_iterator;
-import file_system;
-import local_file_system;
 import file_writer;
 import term_meta;
 import index_defines;

@@ -18,7 +18,7 @@ import base_test;
 
 import stl;
 import index_base;
-import index_ivfflat;
+import index_ivf;
 import index_hnsw;
 import index_full_text;
 
@@ -27,15 +27,15 @@ import statement_common;
 using namespace infinity;
 class IndexBaseTest : public BaseTest {};
 
-TEST_F(IndexBaseTest, ivfflat_readwrite) {
+TEST_F(IndexBaseTest, ivf_readwrite) {
     using namespace infinity;
 
-    Vector<String> columns{"col1", "col2"};
+    Vector<String> columns{"col1"};
     Vector<InitParameter *> parameters;
-    parameters.emplace_back(new InitParameter("centroids_count", "100"));
     parameters.emplace_back(new InitParameter("metric", "l2"));
+    parameters.emplace_back(new InitParameter("plain_storage_data_type", "float"));
 
-    auto index_base = IndexIVFFlat::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
+    SharedPtr<IndexBase> index_base = IndexIVF::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
 //    std::cout << "index_base: " << index_base->ToString() << std::endl;
     for (auto parameter : parameters) {
         delete parameter;

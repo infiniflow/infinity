@@ -18,10 +18,8 @@
 #include <stdexcept>
 
 import stl;
-import file_system;
-import local_file_system;
+import virtual_store;
 import infinity_exception;
-import file_system_type;
 import compilation_config;
 import third_party;
 import profiler;
@@ -48,7 +46,6 @@ int main(int argc, char *argv[]) {
     }
 
     BaseProfiler profiler;
-    LocalFileSystem fs;
 
     switch (opt.mode_type_) {
         case ModeType::kImport: {
@@ -68,12 +65,11 @@ int main(int argc, char *argv[]) {
             data_mat.Clear();
             std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
 
-            auto [file_handler, status] =
-                fs.OpenFile(opt.index_save_path_.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+            auto [file_handle, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", opt.index_save_path_.string(), status.message()));
             }
-            index.Save(*file_handler);
+            index.Save(*file_handle);
             break;
         }
         case ModeType::kQuery: {
@@ -86,11 +82,11 @@ int main(int argc, char *argv[]) {
 
             auto [top_k, all_query_n, _1, _2] = DecodeGroundtruth(opt.groundtruth_path_, true);
             {
-                auto [file_handler, status] = fs.OpenFile(opt.index_save_path_.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+                auto [file_handle, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kRead);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", opt.index_save_path_.string(), status.message()));
                 }
-                LinScan<f32, i32> index = LinScan<f32, i32>::Load(*file_handler);
+                LinScan<f32, i32> index = LinScan<f32, i32>::Load(*file_handle);
 
                 SparseMatrix<f32, i32> query_mat = DecodeSparseDataset(opt.query_path_);
                 if (all_query_n != query_mat.nrow_) {

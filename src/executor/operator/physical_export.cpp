@@ -32,10 +32,7 @@ import column_def;
 import block_entry;
 import column_vector;
 import value;
-import local_file_system;
-import file_system;
-import file_system_type;
-import defer_op;
+import virtual_store;
 import stl;
 import logical_type;
 import embedding_info;
@@ -44,6 +41,8 @@ import status;
 import buffer_manager;
 import default_values;
 import internal_types;
+import virtual_store;
+import local_file_handle;
 
 namespace infinity {
 
@@ -99,12 +98,18 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
     SizeT select_column_count = select_columns.size();
 
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+    String parent_path = VirtualStore::GetParentPath(file_path_);
+    if(!parent_path.empty()) {
+        Status create_status = VirtualStore::MakeDirectory(parent_path);
+        if(!create_status.ok()) {
+            RecoverableError(create_status);
+        }
+    }
+
+    auto [file_handle, status] = VirtualStore::Open(file_path_, FileAccessMode::kWrite);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
     if (header_) {
         // Output CSV header
@@ -135,7 +140,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 header += '\n';
             }
         }
-        fs.Write(*file_handler, header.c_str(), header.size());
+        file_handle->Append(header.c_str(), header.size());
     }
 
     SizeT offset = offset_;
@@ -217,17 +222,14 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
                 if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++file_no_;
-                    fs.Close(*file_handler);
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
-                    auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if (!result.second.ok()) {
-                        RecoverableError(result.second);
+                    auto [new_file_handle, new_status] = VirtualStore::Open(new_file_path, FileAccessMode::kWrite);
+                    if (!new_status.ok()) {
+                        RecoverableError(new_status);
                     }
-                    file_handler = std::move(result.first);
+                    file_handle = std::move(new_file_handle);
                 }
-
-                fs.Write(*file_handler, line.c_str(), line.size());
-
+                file_handle->Append(line.c_str(), line.size());
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
                     return row_count;
@@ -235,6 +237,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
             }
         }
     }
+
     LOG_DEBUG(fmt::format("Export to CSV, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
@@ -257,12 +260,18 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
 
     SizeT select_column_count = select_columns.size();
 
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+    String parent_path = VirtualStore::GetParentPath(file_path_);
+    if(!parent_path.empty()) {
+        Status create_status = VirtualStore::MakeDirectory(parent_path);
+        if(!create_status.ok()) {
+            RecoverableError(create_status);
+        }
+    }
+
+    auto [file_handle, status] = VirtualStore::Open(file_path_, FileAccessMode::kWrite);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
     SizeT offset = offset_;
     SizeT row_count{0};
@@ -347,18 +356,19 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 }
                 if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++file_no_;
-                    fs.Close(*file_handler);
+
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
-                    auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if (!result.second.ok()) {
-                        RecoverableError(result.second);
+                    auto [part_file_handle, part_status] = VirtualStore::Open(new_file_path, FileAccessMode::kWrite);
+                    if (!part_status.ok()) {
+                        RecoverableError(part_status);
                     }
-                    file_handler = std::move(result.first);
+                    file_handle = std::move(part_file_handle);
                 }
 
                 // LOG_DEBUG(line_json.dump());
                 String to_write = line_json.dump() + "\n";
-                fs.Write(*file_handler, to_write.c_str(), to_write.size());
+                file_handle->Append(to_write.c_str(), to_write.size());
+
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
                     return row_count;
@@ -399,12 +409,18 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
     i32 dimension = embedding_type_info->Dimension();
 
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+    String parent_path = VirtualStore::GetParentPath(file_path_);
+    if(!parent_path.empty()) {
+        Status create_status = VirtualStore::MakeDirectory(parent_path);
+        if(!create_status.ok()) {
+            RecoverableError(create_status);
+        }
+    }
+
+    auto [file_handle, status] = VirtualStore::Open(file_path_, FileAccessMode::kWrite);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
     SizeT offset = offset_;
     SizeT row_count{0};
@@ -438,17 +454,17 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
                 if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++file_no_;
-                    fs.Close(*file_handler);
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
-                    auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if (!result.second.ok()) {
-                        RecoverableError(result.second);
+                    auto [new_file_handle, new_status] = VirtualStore::Open(new_file_path, FileAccessMode::kWrite);
+                    if (!new_status.ok()) {
+                        RecoverableError(new_status);
                     }
-                    file_handler = std::move(result.first);
+                    file_handle = std::move(new_file_handle);
                 }
 
-                fs.Write(*file_handler, &dimension, sizeof(dimension));
-                fs.Write(*file_handler, embedding.data(), embedding.size_bytes());
+                file_handle->Append(&dimension, sizeof(dimension));
+                file_handle->Append(embedding.data(), embedding.size_bytes());
+
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
                     return row_count;
@@ -487,6 +503,14 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     SharedPtr<arrow::Schema> schema = ::arrow::schema(std::move(fields));
     SharedPtr<::arrow::io::FileOutputStream> file_stream;
     SharedPtr<::parquet::arrow::FileWriter> file_writer;
+
+    String parent_path = VirtualStore::GetParentPath(file_path_);
+    if(!parent_path.empty()) {
+        Status create_status = VirtualStore::MakeDirectory(parent_path);
+        if(!create_status.ok()) {
+            RecoverableError(create_status);
+        }
+    }
 
     file_stream = ::arrow::io::FileOutputStream::Open(file_path_, pool).ValueOrDie();
     file_writer = ::parquet::arrow::FileWriter::Open(*schema, pool, file_stream, ::parquet::default_writer_properties()).ValueOrDie();

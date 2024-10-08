@@ -1,0 +1,26 @@
+# name: test/sql/ddl/index/test_ivf.sql
+# description: Test create ivf index
+# group: [ddl, test_ivf]
+
+statement ok
+DROP TABLE IF EXISTS test_ivf;
+
+# Expecting IDENTIFIER or PRIMARY or UNIQUE
+statement ok
+CREATE TABLE test_ivf (col1 embedding(float,128));
+
+# import data from fvecs file
+statement ok
+COPY test_ivf FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
+
+statement ok
+CREATE INDEX idx1 ON test_ivf (col1) USING IVF WITH (metric = l2);
+
+statement ok
+DROP INDEX idx1 ON test_ivf;
+
+statement ok
+CREATE INDEX idx2 ON test_ivf (col1) USING IVF WITH (metric = l2);
+
+statement ok
+DROP TABLE test_ivf;

@@ -14,6 +14,8 @@
 
 module;
 
+#include <set>
+
 module bmp_index_file_worker;
 
 import index_bmp;
@@ -24,9 +26,9 @@ import internal_types;
 import bmp_util;
 import bmp_alg;
 import abstract_bmp;
-import local_file_system;
-import file_system_type;
+import virtual_store;
 import persistence_manager;
+import local_file_handle;
 
 namespace infinity {
 
@@ -46,13 +48,11 @@ BMPIndexFileWorker::BMPIndexFileWorker(SharedPtr<String> data_dir,
                       std::move(column_def),
                       persistence_manager) {
     if (index_size == 0) {
-        LocalFileSystem fs;
-
         String index_path = GetFilePath();
-        auto [file_handler, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
         if (status.ok()) {
             // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
-            index_size = fs.GetFileSize(*file_handler);
+            index_size = file_handle->FileSize();
         }
     }
     index_size_ = index_size;
@@ -104,7 +104,7 @@ bool BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 UnrecoverableError("Invalid index type.");
             } else {
-                index->Save(*file_handler_);
+                index->Save(*file_handle_);
             }
         },
         *bmp_index);
@@ -125,7 +125,7 @@ void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
                 UnrecoverableError("Invalid index type.");
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
-                index = new IndexT(IndexT::Load(*file_handler_));
+                index = new IndexT(IndexT::Load(*file_handle_));
             }
         },
         *bmp_index);

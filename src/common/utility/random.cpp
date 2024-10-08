@@ -22,9 +22,10 @@ module random;
 import stl;
 import third_party;
 import logger;
-import local_file_system;
+import virtual_store;
 import default_values;
 import infinity_context;
+import status;
 
 namespace infinity {
 
@@ -44,7 +45,6 @@ String RandomString(SizeT len) {
 
 SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &name) {
     assert(std::filesystem::path(parent_dir).is_absolute());
-    LocalFileSystem fs;
     String rand, temp, result;
     int cnt = 0;
     static bool initialized = false;
@@ -58,10 +58,15 @@ SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &
     do {
         rand = RandomString(DEFAULT_RANDOM_NAME_LEN);
         result = fmt::format("{}_{}", rand, name);
-        temp = LocalFileSystem::ConcatenateFilePath(parent_dir, result);
+        temp = VirtualStore::ConcatenatePath(parent_dir, result);
         ++cnt;
         if(!use_persistence_manager) {
-            created = fs.CreateDirectoryNoExp(temp);
+            Status status = VirtualStore::MakeDirectory(temp);
+            if(status.ok()) {
+                created = true;
+            } else {
+                created = false;
+            }
         } else {
             created = true;
         }

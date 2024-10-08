@@ -17,16 +17,49 @@ module;
 export module ivf_index_data;
 
 import stl;
-import index_base;
-import file_system;
-import file_system_type;
-import search_top_1;
-import kmeans_partition;
-import infinity_exception;
-import logger;
-import third_party;
-import status;
+import index_ivf;
+import ivf_index_storage;
+import column_def;
+import embedding_info;
+import internal_types;
+import logical_type;
+import local_file_handle;
 
 namespace infinity {
+
+class IndexBase;
+struct SegmentEntry;
+class BufferManager;
+
+export class IVFIndexInChunk : protected IVF_Index_Storage {
+    using IVF_Index_Storage::IVF_Index_Storage;
+
+public:
+    using IVF_Index_Storage::GetMemData;
+
+    IVF_Index_Storage *GetIVFIndexStoragePtr() { return this; }
+
+    const IVF_Index_Storage *GetIVFIndexStoragePtr() const { return this; }
+
+    void BuildIVFIndex(RowID base_rowid,
+                       u32 row_count,
+                       const SegmentEntry *segment_entry,
+                       const SharedPtr<ColumnDef> &column_def,
+                       BufferManager *buffer_mgr);
+
+    void SaveIndexInner(LocalFileHandle &file_handle) const;
+
+    void ReadIndexInner(LocalFileHandle &file_handle);
+
+    static IVFIndexInChunk *GetNewIVFIndexInChunk(const IndexBase *ivf_index, const ColumnDef *column_def);
+
+private:
+    template <LogicalType column_t, EmbeddingDataType embedding_t>
+    void BuildIVFIndexT(RowID base_rowid,
+                        u32 row_count,
+                        const SegmentEntry *segment_entry,
+                        const SharedPtr<ColumnDef> &column_def,
+                        BufferManager *buffer_mgr);
+};
 
 } // namespace infinity

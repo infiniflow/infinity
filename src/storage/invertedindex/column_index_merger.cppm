@@ -13,7 +13,6 @@ import term_meta;
 import index_full_text;
 import column_index_iterator;
 import segment_term_posting;
-import local_file_system;
 import internal_types;
 import vector_with_lock;
 
@@ -33,7 +32,6 @@ private:
     String index_dir_;
     optionflag_t flag_;
     SharedPtr<FileWriter> posting_file_writer_;
-    LocalFileSystem fs_;
 
     // for column length info
     VectorWithLock<u32> column_lengths_;

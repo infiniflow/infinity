@@ -9,7 +9,7 @@ from infinity.errors import ErrorCode
 
 
 class IndexType(Enum):
-    IVFFlat = 1
+    IVF = 1
     Hnsw = 2
     FullText = 3
     Secondary = 4
@@ -20,8 +20,8 @@ class IndexType(Enum):
     def to_ttype(self):
         from infinity.common import InfinityException
         match self:
-            case IndexType.IVFFlat:
-                return ttypes.IndexType.IVFFlat
+            case IndexType.IVF:
+                return ttypes.IndexType.IVF
             case IndexType.Hnsw:
                 return ttypes.IndexType.Hnsw
             case IndexType.FullText:
@@ -40,8 +40,8 @@ class IndexType(Enum):
     def to_local_type(self):
         from infinity_embedded.common import InfinityException
         match self:
-            case IndexType.IVFFlat:
-                return LocalIndexType.kIVFFlat
+            case IndexType.IVF:
+                return LocalIndexType.kIVF
             case IndexType.Hnsw:
                 return LocalIndexType.kHnsw
             case IndexType.FullText:

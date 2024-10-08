@@ -20,7 +20,6 @@ module;
 export module hnsw_common;
 
 import stl;
-import file_system;
 import infinity_exception;
 import sparse_util;
 

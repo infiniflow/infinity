@@ -22,7 +22,6 @@ export module sparse_test_util;
 
 import stl;
 import sparse_vector_distance;
-import file_system;
 import linscan_alg;
 import sparse_util;
 import infinity_exception;

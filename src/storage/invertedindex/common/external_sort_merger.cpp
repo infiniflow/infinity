@@ -28,7 +28,6 @@ module external_sort_merger;
 import stl;
 import third_party;
 import file_writer;
-import local_file_system;
 import profiler;
 import logger;
 import blocking_queue;

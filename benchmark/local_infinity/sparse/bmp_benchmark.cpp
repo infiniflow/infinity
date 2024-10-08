@@ -18,10 +18,8 @@
 #include <stdexcept>
 
 import stl;
-import file_system;
-import local_file_system;
+import virtual_store;
 import infinity_exception;
-import file_system_type;
 import compilation_config;
 import third_party;
 import profiler;
@@ -43,7 +41,6 @@ int main(int argc, char *argv[]) {
     }
 
     BaseProfiler profiler;
-    LocalFileSystem fs;
 
     switch (opt.mode_type_) {
         case ModeType::kShuffle: {
@@ -66,7 +63,7 @@ int main(int argc, char *argv[]) {
             break;
         }
         case ModeType::kOptimize: {
-            auto [file_handler, status] = fs.OpenFile(opt.index_save_path_.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handler, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
             }
@@ -76,7 +73,7 @@ int main(int argc, char *argv[]) {
                 index.Optimize(optimize_options);
                 std::cout << "Index built\n";
 
-                auto [file_handler, status] = fs.OpenFile(opt.index_save_path_.string(), FileFlags::WRITE_FLAG, FileLockType::kNoLock);
+                auto [file_handler, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
                 }
@@ -129,7 +126,7 @@ int main(int argc, char *argv[]) {
 
                 std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
                 auto [file_handler, status] =
-                    fs.OpenFile(opt.index_save_path_.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+                    VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kWrite);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
                 }
@@ -157,7 +154,7 @@ int main(int argc, char *argv[]) {
             i32 thread_n = opt.thread_n_;
             BmpSearchOptions search_options{.alpha_ = opt.alpha_, .beta_ = opt.beta_, .use_tail_ = true, .use_lock_ = false};
 
-            auto [file_handler, status] = fs.OpenFile(opt.index_save_path_.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handle, status] = VirtualStore::Open(opt.index_save_path_.string(), FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
             }
@@ -205,12 +202,12 @@ int main(int argc, char *argv[]) {
 
             switch (opt.type_) {
                 case BMPCompressType::kCompressed: {
-                    auto index = BMPAlg<f32, i16, BMPCompressType::kCompressed>::Load(*file_handler);
+                    auto index = BMPAlg<f32, i16, BMPCompressType::kCompressed>::Load(*file_handle);
                     inner(index);
                     break;
                 }
                 case BMPCompressType::kRaw: {
-                    auto index = BMPAlg<f32, i16, BMPCompressType::kRaw>::Load(*file_handler);
+                    auto index = BMPAlg<f32, i16, BMPCompressType::kRaw>::Load(*file_handle);
                     inner(index);
                     break;
                 }

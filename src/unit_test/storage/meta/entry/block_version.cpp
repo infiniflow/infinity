@@ -23,9 +23,7 @@ import global_resource_usage;
 import third_party;
 import infinity_context;
 import block_version;
-import file_system;
-import local_file_system;
-import file_system_type;
+import virtual_store;
 import buffer_manager;
 import version_file_worker;
 import column_vector;
@@ -33,6 +31,7 @@ import data_type;
 import logical_type;
 import persistence_manager;
 import default_values;
+import local_file_handle;
 
 using namespace infinity;
 
@@ -49,22 +48,17 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
     block_version.Delete(2, 30);
     block_version.Delete(5, 40);
     String version_path = String(GetFullDataDir()) + "/block_version_test";
-    LocalFileSystem fs;
 
     {
-        auto [file_handler, status] = fs.OpenFile(version_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        block_version.SpillToFile(*file_handler);
+        auto [local_file_handle, status] = VirtualStore::Open(version_path, FileAccessMode::kWrite);
+        EXPECT_TRUE(status.ok());
+        block_version.SpillToFile(local_file_handle.get());
     }
 
     {
-        auto [file_handler, status] = fs.OpenFile(version_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        auto block_version2 = BlockVersion::LoadFromFile(*file_handler);
+        auto [local_file_handle, status]  = VirtualStore::Open(version_path, FileAccessMode::kRead);
+        EXPECT_TRUE(status.ok());
+        auto block_version2 = BlockVersion::LoadFromFile(local_file_handle.get());
         ASSERT_EQ(block_version, *block_version2);
     }
 }

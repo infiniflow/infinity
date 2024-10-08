@@ -8778,8 +8778,8 @@ Return4:
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp((yyvsp[-1].str_value), "bmp") == 0) {
         index_type = infinity::IndexType::kBMP;
-    } else if (strcmp((yyvsp[-1].str_value), "ivfflat") == 0) {
-        index_type = infinity::IndexType::kIVFFlat;
+    } else if (strcmp((yyvsp[-1].str_value), "ivf") == 0) {
+        index_type = infinity::IndexType::kIVF;
     } else if (strcmp((yyvsp[-1].str_value), "emvb") == 0) {
         index_type = infinity::IndexType::kEMVB;
     } else if(strcmp((yyvsp[-1].str_value), "diskann") == 0){
