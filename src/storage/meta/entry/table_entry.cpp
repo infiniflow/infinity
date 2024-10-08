@@ -266,6 +266,7 @@ void TableEntry::UpdateEntryReplay(const SharedPtr<TableEntry> &table_entry) {
     txn_id_ = table_entry->txn_id_;
     begin_ts_ = table_entry->begin_ts_;
     commit_ts_.store(table_entry->commit_ts_);
+    columns_ = table_entry->columns_;
     row_count_ = table_entry->row_count();
     unsealed_id_ = table_entry->unsealed_id();
     next_segment_id_ = table_entry->next_segment_id();

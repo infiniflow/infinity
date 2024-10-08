@@ -590,7 +590,11 @@ void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, Colum
     if (iter == columns_.end()) {
         columns_.emplace_back(std::move(column_entry));
     } else {
-        *iter = std::move(column_entry);
+        if (!column_entry->Deleted()) {
+            UnrecoverableError(fmt::format("BlockEntry::AddColumnReplay: column {} already exists", column_id));
+        }
+        dropped_columns_.emplace_back(std::move(column_entry));
+        columns_.erase(iter);
     }
 }
 

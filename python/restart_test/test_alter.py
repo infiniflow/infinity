@@ -79,7 +79,7 @@ class TestAlter:
         [
             ("test/data/config/restart_test/test_alter/1.toml", 0, False),
             ("test/data/config/restart_test/test_alter/2.toml", 2, False),
-            # ("test/data/config/restart_test/test_alter/2.toml", 2, True),
+            ("test/data/config/restart_test/test_alter/2.toml", 2, True),
         ],
     )
     def test_alter_2(

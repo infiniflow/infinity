@@ -150,6 +150,43 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     return column_entry;
 }
 
+UniquePtr<BlockColumnEntry> BlockColumnEntry::ReplayDropBlockColumnEntry(const BlockEntry *block_entry,
+                                                                         ColumnID column_id,
+                                                                         BufferManager *buffer_manager,
+                                                                         const u32 next_outline_idx,
+                                                                         const u64 last_chunk_offset,
+                                                                         const TxnTimeStamp commit_ts) {
+    UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id);
+    column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
+    column_entry->column_type_ = nullptr;
+    column_entry->commit_ts_ = commit_ts;
+    column_entry->deleted_ = true;
+
+    auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                  MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                  block_entry->block_dir(),
+                                                  column_entry->file_name_,
+                                                  0, /*total_data_size*/
+                                                  buffer_manager->persistence_manager());
+
+    column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker), true /*restart*/);
+
+    if (next_outline_idx > 0) {
+        SizeT buffer_size = last_chunk_offset;
+        auto outline_buffer_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                    MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                    block_entry->block_dir(),
+                                                                    column_entry->OutlineFilename(0),
+                                                                    buffer_size,
+                                                                    buffer_manager->persistence_manager());
+        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker), true /*restart*/);
+        column_entry->outline_buffers_.push_back(buffer_obj);
+    }
+    column_entry->last_chunk_offset_ = last_chunk_offset;
+
+    return column_entry;
+}
+
 String BlockColumnEntry::FilePath() const { return Path(*block_entry_->block_dir()) / *file_name_; }
 
 SharedPtr<String> BlockColumnEntry::FileDir() const { return block_entry_->block_dir(); }
@@ -278,7 +315,7 @@ void BlockColumnEntry::FlushColumn(TxnTimeStamp checkpoint_ts) {
     BlockColumnEntry::Flush(this, 0, row_cnt);
 }
 
-void BlockColumnEntry::DropColumn() { 
+void BlockColumnEntry::DropColumn() {
     buffer_->SubObjRc();
     for (auto *outline_buffer : outline_buffers_) {
         outline_buffer->SubObjRc();

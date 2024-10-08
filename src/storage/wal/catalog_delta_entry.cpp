@@ -923,7 +923,10 @@ void AddColumnEntryOp::Merge(CatalogDeltaOperation &other) {
         String error_message = fmt::format("Merge failed, other type: {}", other.GetTypeStr());
         UnrecoverableError(error_message);
     }
-    *this = std::move(static_cast<AddColumnEntryOp &>(other));
+    auto &add_column_op = static_cast<AddColumnEntryOp &>(other);
+    MergeFlag flag = this->NextDeleteFlag(add_column_op.merge_flag_);
+    *this = std::move(add_column_op);
+    this->merge_flag_ = flag;
 }
 
 void AddTableIndexEntryOp::Merge(CatalogDeltaOperation &other) {
