@@ -58,7 +58,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._filter = None
         self._limit = None
         self._offset = None
-        self._sort = None
+        self._sort = []
 
     def reset(self):
         self._columns = None
@@ -66,7 +66,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._filter = None
         self._limit = None
         self._offset = None
-        self._sort = None
+        self._sort = []
 
     def match_dense(
         self,
