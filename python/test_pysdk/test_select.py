@@ -752,10 +752,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_neg_func" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-<<<<<<< HEAD
-=======
-    @pytest.mark.usefixtures("skip_if_http")
->>>>>>> upstream/main
     def test_sort(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
 
