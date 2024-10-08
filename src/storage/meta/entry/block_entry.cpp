@@ -89,6 +89,7 @@ UniquePtr<BlockEntry> BlockEntry::Clone(SegmentEntry *segment_entry) const {
 
 UniquePtr<BlockEntry>
 BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
+    const TableEntry *table_entry = segment_entry->GetTableEntry();
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, checkpoint_ts);
 
     block_entry->begin_ts_ = txn->BeginTS();
@@ -96,7 +97,9 @@ BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, T
 
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
     block_entry->columns_.reserve(column_count);
-    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+    for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
+        const SharedPtr<ColumnDef> column_def = table_entry->column_defs()[column_idx];
+        ColumnID column_id = column_def->id();
         auto column_entry = BlockColumnEntry::NewBlockColumnEntry(block_entry.get(), column_id, txn);
         block_entry->columns_.emplace_back(std::move(column_entry));
     }

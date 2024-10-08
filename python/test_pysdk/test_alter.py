@@ -144,6 +144,53 @@ class TestInfinity:
 
         db_obj.drop_table(table_name)
 
+    def test_insert_after_drop_columns(self):
+        #  Use infinity module to connect a remote server
+        # infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+
+        # 'default_db' is the default database
+        db_instance = self.infinity_obj.get_database("default_db")
+
+        # Drop my_table if it already exists
+        db_instance.drop_table("testing_table", infinity.common.ConflictType.Ignore)
+
+        # Create a table named "my_table"
+        table_instance = db_instance.create_table("testing_table", {
+            "num": {"type": "integer"},
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector,4,float"},
+        })
+
+        table_instance.add_columns({"column_name1": {"type": "integer", "default": 0}, "column_name2": {"type": "float", "default": 0.0}, "column_name3": {"type": "varchar", "default": ""}})
+        table_instance.drop_columns(["column_name1"])
+        # Insert 3 rows of data into the 'my_table'
+        table_instance.insert(
+            [
+                {
+                    "num": 1,
+                    "body": r"unnecessary and harmful",
+                    "vec": [1.0, 1.2, 0.8, 0.9],
+                },
+                {
+                    "num": 2,
+                    "body": r"Office for Harmful Blooms",
+                    "vec": [4.0, 4.2, 4.3, 4.5],
+                },
+                {
+                    "num": 3,
+                    "body": r"A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
+                    "vec": [4.0, 4.2, 4.3, 4.2],
+                },
+            ]
+        )
+
+        result = table_instance.output(["num", "vec", "_similarity"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float",
+                                                                                "cosine", 3).to_pl()
+        print(result)
+        self.infinity_obj.disconnect()
+
+        print('test done')
+
     def test_add_drop_column_with_index(self):
         table_name = "test_add_drop_column_with_index" + self.suffix
         db_obj = self.infinity_obj.get_database("default_db")
