@@ -74,9 +74,18 @@ class TestAlter:
         part1()
         part2()
 
-    def test_alter_with_deltalog(self, infinity_runner: InfinityRunner):
+    @pytest.mark.parametrize(
+        "config, sleep, flush_mid",
+        [
+            ("test/data/config/restart_test/test_alter/1.toml", 0, False),
+            ("test/data/config/restart_test/test_alter/2.toml", 2, False),
+            # ("test/data/config/restart_test/test_alter/2.toml", 2, True),
+        ],
+    )
+    def test_alter_2(
+        self, infinity_runner: InfinityRunner, config: str, sleep: int, flush_mid: bool
+    ):
         table_name = "test_alter2"
-        config = "test/data/config/restart_test/test_alter/2.toml"
 
         infinity_runner.clear()
         uri = common_values.TEST_LOCAL_HOST
@@ -102,6 +111,10 @@ class TestAlter:
 
             table_obj.insert([{"c1": 1, "c2": 2, "c3": "test"}])
 
+            if sleep > 0 and flush_mid:
+                print(f"sleep {sleep} seconds")
+                time.sleep(sleep)  # wait for delta log flush
+
             res = table_obj.add_columns({"c4": {"type": "varchar", "default": "tttt"}})
             assert res.error_code == ErrorCode.OK
 
@@ -116,7 +129,9 @@ class TestAlter:
             res = table_obj.add_columns({"c5": {"type": "int", "default": 0}})
             assert res.error_code == ErrorCode.OK
 
-            time.sleep(2)  # wait for delta log flush
+            if sleep > 0:
+                print(f"sleep {sleep} seconds")
+                time.sleep(sleep)  # wait for delta log flush
 
         @decorator
         def part2(infinity_obj):

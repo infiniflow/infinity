@@ -123,7 +123,7 @@ public:
 
     Status RenameTable(TableEntry *old_table_entry, const String &new_table_name);
 
-    Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values);
+    Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs);
 
     Status DropColumns(TableEntry *table_entry, const Vector<String> &column_names);
 

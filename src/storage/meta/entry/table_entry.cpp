@@ -58,6 +58,16 @@ import infinity_context;
 import persistence_manager;
 import bg_task;
 import defer_op;
+import bind_context;
+import value_expression;
+import expression_binder;
+import cast_function;
+import bound_cast_func;
+import base_expression;
+import cast_expression;
+import expression_evaluator;
+import column_vector;
+import expression_state;
 
 namespace infinity {
 
@@ -1221,7 +1231,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     SegmentID unsealed_id = table_entry_json["unsealed_id"];
     SegmentID next_segment_id = table_entry_json["next_segment_id"];
 
-    if(!table_entry_json.contains("next_column_id")) {
+    if (!table_entry_json.contains("next_column_id")) {
         String error_message = "No 'next_column_id in table entry of catalog file, maybe your catalog is generated before 0.4.0.'";
         UnrecoverableError(error_message);
     }
@@ -1450,7 +1460,35 @@ void TableEntry::SetUnlock() {
     locked_ = false;
 }
 
-void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values, TxnTableStore *txn_table_store) {
+void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs, TxnTableStore *txn_table_store) {
+    ExpressionBinder tmp_binder(nullptr);
+    Vector<Value> default_values;
+    for (const auto &column_def : column_defs) {
+        if (!column_def->has_default_value()) {
+            UnrecoverableError(fmt::format("Column {} has no default value", column_def->name()));
+        }
+        SharedPtr<ConstantExpr> default_expr = column_def->default_value();
+        auto expr = tmp_binder.BuildValueExpr(*default_expr, nullptr, 0, false);
+        auto *value_expr = static_cast<ValueExpression *>(expr.get());
+
+        const SharedPtr<DataType> &column_type = column_def->type();
+        if (value_expr->Type() == *column_type) {
+            default_values.push_back(value_expr->GetValue());
+        } else {
+            const SharedPtr<DataType> &column_type = column_def->type();
+
+            BoundCastFunc cast = CastFunction::GetBoundFunc(value_expr->Type(), *column_type);
+            SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, expr, *column_type);
+            SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(cast_expr);
+            SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(column_type);
+            output_column_vector->Initialize(ColumnVectorType::kConstant, 1);
+            ExpressionEvaluator evaluator;
+            evaluator.Init(nullptr);
+            evaluator.Execute(cast_expr, expr_state, output_column_vector);
+
+            default_values.push_back(output_column_vector->GetValue(0));
+        }
+    }
     Vector<Pair<ColumnID, const Value *>> columns_info;
     for (SizeT idx = 0; idx < column_defs.size(); ++idx) {
         const auto &column_def = column_defs[idx];

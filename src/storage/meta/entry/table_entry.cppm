@@ -354,7 +354,7 @@ private:
     SizeT write_txn_num_ = 0;
 
 public:
-    void AddColumns(const Vector<SharedPtr<ColumnDef>> &columns, const Vector<Value> &default_values, TxnTableStore *txn_store);
+    void AddColumns(const Vector<SharedPtr<ColumnDef>> &columns, TxnTableStore *txn_store);
 
     void DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store);
 };
