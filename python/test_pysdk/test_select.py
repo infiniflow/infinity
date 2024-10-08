@@ -752,7 +752,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_neg_func" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_sort(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
 
@@ -784,6 +783,11 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, -1, 1, -2, 2, -3, 3, -6, -7, 7, -8, 8, 9),
                                                          'c2': (0, 1, 1, 2, 2, 3, 3, 6, 7, 7, 8, 8, 9)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = table_obj.output(["_row_id"]).sort([["_row_id", SortType.Desc]]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'ROW_ID': (12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)})
+                                      .astype({'ROW_ID': dtype('int64')}))
+        print(res)
 
         res = db_obj.drop_table("test_sort"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

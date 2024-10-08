@@ -112,7 +112,14 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     return;
                 }
 
-                order_by_list = ParseSort(elem.value(), http_status, response);
+                auto &list = elem.value();
+                if (!list.is_array()) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "Sort field should be array";
+                    return;
+                }
+
+                order_by_list = ParseSort(list, http_status, response);
                 if (order_by_list == nullptr) {
                     return;
                 }
@@ -441,13 +448,7 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
 }
 
 Vector<OrderByExpr *> *HTTPSearch::ParseSort(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
-    if (!json_object.is_object()) {
-        response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = fmt::format("Sort expression must be a json object: {}", json_object);
-        return nullptr;
-    }
-
-    Vector<ParsedExpr *> *order_by_list = new Vector<OrderByExpr *>();
+    Vector<OrderByExpr *> *order_by_list = new Vector<OrderByExpr *>();
     DeferFn defer_fn([&]() {
         if (order_by_list != nullptr) {
             for (auto &expr : *order_by_list) {
@@ -458,52 +459,52 @@ Vector<OrderByExpr *> *HTTPSearch::ParseSort(const nlohmann::json &json_object, 
         }
     });
 
-    order_by_list->reserve(json_object.items().size());
+    for(const auto &order_expr : json_object) {
+        for (const auto &expression : order_expr.items()) {
+            String key = expression.key();
+            ToLower(key);
+            auto order_by_expr = MakeUnique<OrderByExpr>();
+            if (key == "_row_id" or key == "_similarity" or key == "_distance" or key == "_score") {
+                auto parsed_expr = new FunctionExpr();
+                if (key == "_row_id") {
+                    parsed_expr->func_name_ = "row_id";
+                } else if (key == "_similarity") {
+                    parsed_expr->func_name_ = "similarity";
+                } else if (key == "_distance") {
+                    parsed_expr->func_name_ = "distance";
+                } else if (key == "_score") {
+                    parsed_expr->func_name_ = "score";
+                }
+                order_by_expr->expr_ = parsed_expr;
+                parsed_expr = nullptr;
+            } else {
+                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+                ExprParser expr_parser;
+                expr_parser.Parse(key, expr_parsed_result.get());
+                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() == 0) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = fmt::format("Invalid expression: {}", key);
+                    return nullptr;
+                }
 
-    for (const auto &expression : json_object.items()) {
-        String key = expression.key();
-        ToLower(key);
-        auto order_by_expr = MakeUnique<OrderByExpr>();
-        if (key == "_row_id" or key == "_similarity" or key == "_distance" or key == "_score") {
-            auto parsed_expr = new FunctionExpr();
-            if (key == "_row_id") {
-                parsed_expr->func_name_ = "row_id";
-            } else if (key == "_similarity") {
-                parsed_expr->func_name_ = "similarity";
-            } else if (key == "_distance") {
-                parsed_expr->func_name_ = "distance";
-            } else if (key == "_score") {
-                parsed_expr->func_name_ = "score";
+                order_by_expr->expr_ = expr_parsed_result->exprs_ptr_->at(0);
+                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
             }
-            order_by_expr->expr_ = parsed_expr;
-            parsed_expr = nullptr;
-        } else {
-            UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-            ExprParser expr_parser;
-            expr_parser.Parse(key, expr_parsed_result.get());
-            if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() == 0) {
+
+            String value = expression.value();
+            ToLower(value);
+            if (value == "asc") {
+                order_by_expr->type_ = OrderType::kAsc;
+            } else if (value == "desc") {
+                order_by_expr->type_ = OrderType::kDesc;
+            } else {
                 response["error_code"] = ErrorCode::kInvalidExpression;
-                response["error_message"] = fmt::format("Invalid expression: {}", key);
+                response["error_message"] = fmt::format("Invalid expression: {}", value);
                 return nullptr;
             }
 
-            order_by_expr->expr_ = expr_parsed_result->exprs_ptr_->at(0);
-            expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+            order_by_list->emplace_back(order_by_expr.release());
         }
-
-        String value = expression.value();
-        ToLower(value);
-        if (value == "asc") {
-            order_by_expr->order_ = OrderType::kAsc;
-        } else if (value == "desc") {
-            order_by_expr->order_ = OrderType::kDesc;
-        } else {
-            response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Invalid expression: {}", value);
-            return nullptr;
-        }
-
-        order_by_list->emplace_back(order_by_expr.release());
     }
 
     // Avoiding DeferFN auto free the output expressions
