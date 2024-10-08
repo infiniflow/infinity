@@ -102,7 +102,7 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
     EXPECT_EQ(config.StorageType(), StorageType::kLocal);
     EXPECT_EQ(config.ObjectStorageUrl(), "0.0.0.0:9000");
-    EXPECT_EQ(config.ObjectStorageBucket(), "infinity_bucket");
+    EXPECT_EQ(config.ObjectStorageBucket(), "infinity");
     EXPECT_EQ(config.ObjectStorageAccessKey(), "minioadmin");
     EXPECT_EQ(config.ObjectStorageSecretKey(), "minioadmin");
     EXPECT_EQ(config.ObjectStorageHttps(), false);
