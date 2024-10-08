@@ -104,6 +104,30 @@ curl --request GET \
          ]
      } '
 
+# select num and year of 'tbl1' and order by num descending, year ascending
+echo -e '\n\n-- select num and year of tbl1 and order by num descending, year ascending'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "num",
+             "year"
+         ],
+         "sort" :
+         [
+            {
+                "num": "desc"
+            },
+            {
+                "year": "asc"
+            }
+         ]
+     } '
+
 
 # select num and year of 'tbl1' where num > 1 and year < 2023
 echo -e '\n\n-- select num and year of tbl1 where num > 1 and year < 2023 offset 1 limit 1'
