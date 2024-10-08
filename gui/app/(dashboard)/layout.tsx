@@ -79,7 +79,7 @@ function DesktopNav() {
           <DatabaseIcon className="h-5 w-5"></DatabaseIcon>
         </NavItem>
 
-        <NavItem href="/products" label="Products">
+        <NavItem href="/system" label="System">
           <Package className="h-5 w-5" />
         </NavItem>
 
