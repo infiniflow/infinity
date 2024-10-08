@@ -26,7 +26,10 @@ storage_type            = "local"
 
 [storage.object_storage]
 url                     = "0.0.0.0:9000"
-bucket_name             = "infinity"
+bucket_name             = "infinity_bucket"
+access_key              = "minioadmin"
+secret_key              = "minioadmin"
+enable_https            = false
 
 [buffer]
 buffer_manager_size     = "3GB"

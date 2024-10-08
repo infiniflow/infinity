@@ -435,6 +435,7 @@ Status VirtualStore::InitRemoteStore(StorageType storage_type,
         case StorageType::kMinio: {
             storage_type_ = StorageType::kMinio;
             s3_client_ = MakeUnique<S3ClientMinio>(URL, HTTPS, access_key, secret_key);
+            break;
         }
         default: {
             return Status::NotSupport("Not support storage type");
