@@ -17,10 +17,8 @@
 #include "CLI11.hpp"
 
 import stl;
-import file_system;
-import local_file_system;
+import virtual_store;
 import infinity_exception;
-import file_system_type;
 import third_party;
 import infinity_exception;
 import sparse_util;
@@ -32,12 +30,11 @@ using namespace infinity;
 namespace benchmark {
 
 SparseMatrix<f32, i32> DecodeSparseDataset(const Path &data_path) {
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(data_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+    auto [file_handle, status] = VirtualStore::Open(data_path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", data_path.string(), status.message()));
     }
-    return SparseMatrix<f32, i32>::Load(*file_handler);
+    return SparseMatrix<f32, i32>::Load(*file_handle);
 }
 
 Vector<SizeT> ShuffleSparseMatrix(SparseMatrix<f32, i32> &mat) {
@@ -62,26 +59,24 @@ Vector<SizeT> ShuffleSparseMatrix(SparseMatrix<f32, i32> &mat) {
 }
 
 void SaveSparseMatrix(const SparseMatrix<f32, i32> &mat, const Path &data_path) {
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(data_path.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+    auto [file_handle, status] = VirtualStore::Open(data_path.string(), FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", data_path.string(), status.message()));
     }
-    mat.Save(*file_handler);
+    mat.Save(*file_handle);
 }
 
 Tuple<u32, u32, UniquePtr<i32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path &groundtruth_path, bool meta) {
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(groundtruth_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+    auto [file_handle, status] = VirtualStore::Open(groundtruth_path.string(), FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", groundtruth_path.string(), status.message()));
     }
 
     u32 top_k = 0;
     u32 query_n = 0;
-    file_handler->Read(&query_n, sizeof(query_n));
-    file_handler->Read(&top_k, sizeof(top_k));
-    SizeT file_size = fs.GetFileSize(*file_handler);
+    file_handle->Read(&query_n, sizeof(query_n));
+    file_handle->Read(&top_k, sizeof(top_k));
+    SizeT file_size = file_handle->FileSize();
     if (file_size != sizeof(u32) * 2 + (sizeof(i32) + sizeof(float)) * (query_n * top_k)) {
         UnrecoverableError("Invalid groundtruth file format");
     }
@@ -90,22 +85,21 @@ Tuple<u32, u32, UniquePtr<i32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path
     }
 
     auto indices = MakeUnique<i32[]>(query_n * top_k);
-    file_handler->Read(indices.get(), sizeof(i32) * query_n * top_k);
+    file_handle->Read(indices.get(), sizeof(i32) * query_n * top_k);
     auto scores = MakeUnique<f32[]>(query_n * top_k);
-    file_handler->Read(scores.get(), sizeof(f32) * query_n * top_k);
+    file_handle->Read(scores.get(), sizeof(f32) * query_n * top_k);
     return {top_k, query_n, std::move(indices), std::move(scores)};
 }
 
 void SaveGroundtruth(u32 top_k, u32 query_n, const i32 *indices, const f32 *scores, const Path &groundtruth_path) {
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(groundtruth_path.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+    auto [file_handle, status] = VirtualStore::Open(groundtruth_path.string(), FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", groundtruth_path.string(), status.message()));
     }
-    file_handler->Write(&query_n, sizeof(query_n));
-    file_handler->Write(&top_k, sizeof(top_k));
-    file_handler->Write(indices, sizeof(i32) * query_n * top_k);
-    file_handler->Write(scores, sizeof(f32) * query_n * top_k);
+    file_handle->Append(&query_n, sizeof(query_n));
+    file_handle->Append(&top_k, sizeof(top_k));
+    file_handle->Append(indices, sizeof(i32) * query_n * top_k);
+    file_handle->Append(scores, sizeof(f32) * query_n * top_k);
 }
 
 const int kQueryLogInterval = 100;

@@ -37,7 +37,7 @@ import buffer_obj;
 import buffer_handle;
 import infinity_exception;
 import index_defines;
-import local_file_system;
+import virtual_store;
 import secondary_index_file_worker;
 import ivf_index_file_worker;
 import emvb_index_file_worker;
@@ -445,9 +445,8 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
             String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
             String absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
 
-            LocalFileSystem fs;
-            fs.DeleteFile(absolute_posting_file);
-            fs.DeleteFile(absolute_dict_file);
+            VirtualStore::DeleteFile(absolute_posting_file);
+            VirtualStore::DeleteFile(absolute_dict_file);
             LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}",
                                   index_prefix,
                                   absolute_posting_file,

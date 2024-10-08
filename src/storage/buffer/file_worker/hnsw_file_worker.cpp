@@ -14,6 +14,8 @@
 
 module;
 
+#include <set>
+
 module hnsw_file_worker;
 
 import infinity_exception;
@@ -31,9 +33,9 @@ import embedding_info;
 import create_index_info;
 import internal_types;
 import abstract_hnsw;
-import local_file_system;
-import file_system_type;
+import virtual_store;
 import persistence_manager;
+import local_file_handle;
 
 namespace infinity {
 
@@ -53,13 +55,12 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
                       std::move(column_def),
                       persistence_manager) {
     if (index_size == 0) {
-        LocalFileSystem fs;
 
         String index_path = GetFilePath();
-        auto [file_handler, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
         if (status.ok()) {
             // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
-            index_size = fs.GetFileSize(*file_handler);
+            index_size = file_handle->FileSize();
         }
     }
     index_size_ = index_size;
@@ -112,7 +113,7 @@ bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 UnrecoverableError("Invalid index type.");
             } else {
-                index->Save(*file_handler_);
+                index->Save(*file_handle_);
             }
         },
         *hnsw_index);
@@ -133,7 +134,7 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {
                 UnrecoverableError("Invalid index type.");
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
-                index = IndexT::Load(*file_handler_).release();
+                index = IndexT::Load(*file_handle_).release();
             }
         },
         *hnsw_index);

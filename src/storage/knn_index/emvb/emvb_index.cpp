@@ -31,7 +31,6 @@ import status;
 import logger;
 import third_party;
 import infinity_exception;
-import file_system;
 import internal_types;
 import segment_entry;
 import block_entry;
@@ -482,113 +481,113 @@ EMVBQueryResultType EMVBIndex::GetQueryResultT(const f32 *query_ptr, const u32 q
 }
 
 template <typename T>
-void Serialize(FileHandler &file_handler, const Vector<T> &val) {
+void Serialize(LocalFileHandle &file_handle, const Vector<T> &val) {
     const u32 size = val.size();
-    file_handler.Write(&size, sizeof(size));
-    file_handler.Write(val.data(), size * sizeof(T));
+    file_handle.Append(&size, sizeof(size));
+    file_handle.Append(val.data(), size * sizeof(T));
 }
 
 template <typename T>
-void DeSerialize(FileHandler &file_handler, Vector<T> &val) {
+void DeSerialize(LocalFileHandle &file_handle, Vector<T> &val) {
     u32 size = 0;
-    file_handler.Read(&size, sizeof(size));
+    file_handle.Read(&size, sizeof(size));
     val.resize(size);
-    file_handler.Read(val.data(), size * sizeof(T));
+    file_handle.Read(val.data(), size * sizeof(T));
 }
 
-void Serialize(FileHandler &file_handler, const EMVBSharedVec<u32> &val, const u32 expect_element_num) {
+void Serialize(LocalFileHandle &file_handle, const EMVBSharedVec<u32> &val, const u32 expect_element_num) {
     const auto [shared_u32_ptr, size] = val.GetData();
     if (size != expect_element_num) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect {}, got {}.", expect_element_num, size);
         UnrecoverableError(error_msg);
     }
-    file_handler.Write(&expect_element_num, sizeof(expect_element_num));
-    file_handler.Write(shared_u32_ptr.get(), expect_element_num * sizeof(u32));
+    file_handle.Append(&expect_element_num, sizeof(expect_element_num));
+    file_handle.Append(shared_u32_ptr.get(), expect_element_num * sizeof(u32));
 }
 
-void DeSerialize(FileHandler &file_handler, EMVBSharedVec<u32> &val, const u32 expect_element_num) {
+void DeSerialize(LocalFileHandle &file_handle, EMVBSharedVec<u32> &val, const u32 expect_element_num) {
     if (const auto [_, old_size] = val.GetData(); old_size > 0) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect 0, got {}.", old_size);
         UnrecoverableError(error_msg);
     }
     u32 size = 0;
-    file_handler.Read(&size, sizeof(size));
+    file_handle.Read(&size, sizeof(size));
     if (size != expect_element_num) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect {}, got {}.", expect_element_num, size);
         UnrecoverableError(error_msg);
     }
     const auto tmp_buffer = MakeUniqueForOverwrite<u32[]>(expect_element_num);
-    file_handler.Read(tmp_buffer.get(), expect_element_num * sizeof(u32));
+    file_handle.Read(tmp_buffer.get(), expect_element_num * sizeof(u32));
     val.PushBack(tmp_buffer.get(), tmp_buffer.get() + expect_element_num);
 }
 
-void Serialize(FileHandler &file_handler, const EMVBSharedVec<u32> &val) {
+void Serialize(LocalFileHandle &file_handle, const EMVBSharedVec<u32> &val) {
     const auto [shared_u32_ptr, size] = val.GetData();
     const u32 element_num = size;
-    file_handler.Write(&element_num, sizeof(element_num));
-    file_handler.Write(shared_u32_ptr.get(), size * sizeof(u32));
+    file_handle.Append(&element_num, sizeof(element_num));
+    file_handle.Append(shared_u32_ptr.get(), size * sizeof(u32));
 }
 
-void DeSerialize(FileHandler &file_handler, EMVBSharedVec<u32> &val) {
+void DeSerialize(LocalFileHandle &file_handle, EMVBSharedVec<u32> &val) {
     if (const auto [_, old_size] = val.GetData(); old_size > 0) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect 0, got {}.", old_size);
         UnrecoverableError(error_msg);
     }
     u32 element_num = 0;
-    file_handler.Read(&element_num, sizeof(element_num));
+    file_handle.Read(&element_num, sizeof(element_num));
     const auto tmp_buffer = MakeUniqueForOverwrite<u32[]>(element_num);
-    file_handler.Read(tmp_buffer.get(), element_num * sizeof(u32));
+    file_handle.Read(tmp_buffer.get(), element_num * sizeof(u32));
     val.PushBack(tmp_buffer.get(), tmp_buffer.get() + element_num);
 }
 
-void EMVBIndex::SaveIndexInner(FileHandler &file_handler) {
+void EMVBIndex::SaveIndexInner(LocalFileHandle &file_handle) {
     std::unique_lock lock(rw_mutex_);
     // write index data
-    file_handler.Write(&start_segment_offset_, sizeof(start_segment_offset_));
-    file_handler.Write(&embedding_dimension_, sizeof(embedding_dimension_));
-    file_handler.Write(&residual_pq_subspace_num_, sizeof(residual_pq_subspace_num_));
-    file_handler.Write(&residual_pq_subspace_bits_, sizeof(residual_pq_subspace_bits_));
-    file_handler.Write(&n_centroids_, sizeof(n_centroids_));
-    Serialize(file_handler, centroids_data_);
-    Serialize(file_handler, centroid_norms_neg_half_);
+    file_handle.Append(&start_segment_offset_, sizeof(start_segment_offset_));
+    file_handle.Append(&embedding_dimension_, sizeof(embedding_dimension_));
+    file_handle.Append(&residual_pq_subspace_num_, sizeof(residual_pq_subspace_num_));
+    file_handle.Append(&residual_pq_subspace_bits_, sizeof(residual_pq_subspace_bits_));
+    file_handle.Append(&n_centroids_, sizeof(n_centroids_));
+    Serialize(file_handle, centroids_data_);
+    Serialize(file_handle, centroid_norms_neg_half_);
     const u32 n_docs = n_docs_;
-    file_handler.Write(&n_docs, sizeof(n_docs));
-    file_handler.Write(&n_total_embeddings_, sizeof(n_total_embeddings_));
-    Serialize(file_handler, doc_lens_, n_docs);
-    Serialize(file_handler, doc_offsets_, n_docs);
-    Serialize(file_handler, centroid_id_assignments_, n_total_embeddings_);
+    file_handle.Append(&n_docs, sizeof(n_docs));
+    file_handle.Append(&n_total_embeddings_, sizeof(n_total_embeddings_));
+    Serialize(file_handle, doc_lens_, n_docs);
+    Serialize(file_handle, doc_offsets_, n_docs);
+    Serialize(file_handle, centroid_id_assignments_, n_total_embeddings_);
     for (u32 i = 0; i < n_centroids_; ++i) {
-        Serialize(file_handler, centroids_to_docid_[i]);
+        Serialize(file_handle, centroids_to_docid_[i]);
     }
     // write product quantizer
-    product_quantizer_->Save(file_handler);
+    product_quantizer_->Save(file_handle);
 }
 
-void EMVBIndex::ReadIndexInner(FileHandler &file_handler) {
+void EMVBIndex::ReadIndexInner(LocalFileHandle &file_handle) {
     std::unique_lock lock(rw_mutex_);
     // read index data
     {
         // check start_segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_
         u32 tmp_u32 = 0;
-        file_handler.Read(&tmp_u32, sizeof(tmp_u32));
+        file_handle.Read(&tmp_u32, sizeof(tmp_u32));
         if (tmp_u32 != start_segment_offset_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::ReadIndexInner: start_segment_offset_ mismatch: expect {}, got {}.", start_segment_offset_, tmp_u32);
             UnrecoverableError(error_msg);
         }
-        file_handler.Read(&tmp_u32, sizeof(tmp_u32));
+        file_handle.Read(&tmp_u32, sizeof(tmp_u32));
         if (tmp_u32 != embedding_dimension_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::ReadIndexInner: embedding_dimension_ mismatch: expect {}, got {}.", embedding_dimension_, tmp_u32);
             UnrecoverableError(error_msg);
         }
-        file_handler.Read(&tmp_u32, sizeof(tmp_u32));
+        file_handle.Read(&tmp_u32, sizeof(tmp_u32));
         if (tmp_u32 != residual_pq_subspace_num_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::ReadIndexInner: residual_pq_subspace_num_ mismatch: expect {}, got {}.", residual_pq_subspace_num_, tmp_u32);
             UnrecoverableError(error_msg);
         }
-        file_handler.Read(&tmp_u32, sizeof(tmp_u32));
+        file_handle.Read(&tmp_u32, sizeof(tmp_u32));
         if (tmp_u32 != residual_pq_subspace_bits_) {
             const auto error_msg = fmt::format("EMVBIndex::ReadIndexInner: residual_pq_subspace_bits_ mismatch: expect {}, got {}.",
                                                residual_pq_subspace_bits_,
@@ -596,22 +595,22 @@ void EMVBIndex::ReadIndexInner(FileHandler &file_handler) {
             UnrecoverableError(error_msg);
         }
     }
-    file_handler.Read(&n_centroids_, sizeof(n_centroids_));
-    DeSerialize(file_handler, centroids_data_);
-    DeSerialize(file_handler, centroid_norms_neg_half_);
+    file_handle.Read(&n_centroids_, sizeof(n_centroids_));
+    DeSerialize(file_handle, centroids_data_);
+    DeSerialize(file_handle, centroid_norms_neg_half_);
     u32 n_docs = 0;
-    file_handler.Read(&n_docs, sizeof(n_docs));
+    file_handle.Read(&n_docs, sizeof(n_docs));
     n_docs_ = n_docs;
-    file_handler.Read(&n_total_embeddings_, sizeof(n_total_embeddings_));
-    DeSerialize(file_handler, doc_lens_, n_docs);
-    DeSerialize(file_handler, doc_offsets_, n_docs);
-    DeSerialize(file_handler, centroid_id_assignments_, n_total_embeddings_);
+    file_handle.Read(&n_total_embeddings_, sizeof(n_total_embeddings_));
+    DeSerialize(file_handle, doc_lens_, n_docs);
+    DeSerialize(file_handle, doc_offsets_, n_docs);
+    DeSerialize(file_handle, centroid_id_assignments_, n_total_embeddings_);
     centroids_to_docid_ = MakeUnique<EMVBSharedVec<u32>[]>(n_centroids_);
     for (u32 i = 0; i < n_centroids_; ++i) {
-        DeSerialize(file_handler, centroids_to_docid_[i]);
+        DeSerialize(file_handle, centroids_to_docid_[i]);
     }
     // read product quantizer
-    product_quantizer_->Load(file_handler);
+    product_quantizer_->Load(file_handle);
 }
 
 EMVBIndex &EMVBIndex::operator=(EMVBIndex &&other) {

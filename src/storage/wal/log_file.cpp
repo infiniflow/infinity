@@ -19,14 +19,13 @@ module;
 module log_file;
 
 import stl;
-import virtual_storage;
+import virtual_store;
 import third_party;
 import infinity_exception;
 import logger;
 import default_values;
 import infinity_context;
 import status;
-import local_file_system;
 
 namespace infinity {
 
@@ -72,8 +71,7 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &c
     bool found = false;
     for (const auto &full_info : full_infos) {
         if (full_info.max_commit_ts_ < max_commit_ts) {
-            LocalFileSystem fs;
-            fs.DeleteFile(full_info.path_);
+            VirtualStore::DeleteFile(full_info.path_);
             LOG_DEBUG(fmt::format("WalManager::Checkpoint delete catalog file: {}", full_info.path_));
         } else if (full_info.max_commit_ts_ == max_commit_ts) {
             found = true;
@@ -85,16 +83,19 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &c
     }
     for (const auto &delta_info : delta_infos) {
         if (delta_info.max_commit_ts_ <= max_commit_ts) {
-            LocalFileSystem fs;
-            fs.DeleteFile(delta_info.path_);
+            VirtualStore::DeleteFile(delta_info.path_);
             LOG_DEBUG(fmt::format("WalManager::Checkpoint delete catalog file: {}", delta_info.path_));
         }
     }
 }
 
 Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::ParseCheckpointFilenames(const String &catalog_dir) {
-    LocalFileSystem fs;
-    const auto &entries = fs.ListDirectory(Path(InfinityContext::instance().config()->DataDir()) / catalog_dir);
+    auto [entries, status] = VirtualStore::ListDirectory(Path(InfinityContext::instance().config()->DataDir()) / catalog_dir);
+    if(!status.ok()) {
+        String error_message = fmt::format("Can't list directory: {}/{}", InfinityContext::instance().config()->DataDir(), catalog_dir);
+        UnrecoverableError(error_message);
+    }
+
     if (entries.empty()) {
         return {Vector<FullCatalogFileInfo>{}, Vector<DeltaCatalogFileInfo>{}};
     }
@@ -153,11 +154,11 @@ Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::Par
 
 Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(const String &wal_dir) {
 
-    if (!VirtualStorage::ExistsLocal(wal_dir)) {
+    if (!VirtualStore::Exists(wal_dir)) {
         return {None, Vector<WalFileInfo>{}};
     }
 
-    auto [entries, status] = VirtualStorage::ListDirectoryLocal(wal_dir);
+    auto [entries, status] = VirtualStore::ListDirectory(wal_dir);
     if(!status.ok()) {
         LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
@@ -222,7 +223,7 @@ void WalFile::RecycleWalFile(TxnTimeStamp max_commit_ts, const String &wal_dir) 
     auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
     for (const auto &wal_info : wal_infos) {
         if (wal_info.max_commit_ts_ <= max_commit_ts) {
-            VirtualStorage::DeleteFileLocal(wal_info.path_);
+            VirtualStore::DeleteFile(wal_info.path_);
             LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
         }
     }

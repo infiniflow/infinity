@@ -126,4 +126,53 @@ inline uint32_t UTF8SeqLength(const uint8_t first_octet) {
     return bits - 1 - first_zero;
 }
 
+static const uint8_t UTF8_BYTE_LENGTH_TABLE[256] = {
+        // start byte of 1-byte utf8 char: 0b0000'0000 ~ 0b0111'1111
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        // continuation byte: 0b1000'0000 ~ 0b1011'1111
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        // start byte of 2-byte utf8 char: 0b1100'0000 ~ 0b1101'1111
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        // start byte of 3-byte utf8 char: 0b1110'0000 ~ 0b1110'1111
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        // start byte of 4-byte utf8 char: 0b1111'0000 ~ 0b1111'0111
+        // invalid utf8 byte: 0b1111'1000~ 0b1111'1111
+        4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1};
+
+inline uint32_t UTF8Length(std::string const &str) {
+    uint32_t len = 0;
+    for (uint32_t i = 0, char_size = 0; i < str.size(); i += char_size) {
+        char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(str.data()[i])];
+        ++len;
+    }
+    return len;
+}
+
+static inline std::string UTF8Substr(const std::string &str, std::size_t start, std::size_t len) {
+    std::size_t str_len = str.length();
+    std::size_t i = 0;
+    std::size_t byte_index = 0;
+    std::size_t start_byte = 0;
+    std::size_t end_byte = 0;
+
+    while (byte_index < str_len && i < (start + len)) {
+        std::size_t char_len = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(str[byte_index])];
+        if (i >= start) {
+            if (i == start) {
+                start_byte = byte_index;
+            }
+            end_byte = byte_index + char_len;
+        }
+
+        byte_index += char_len;
+        i += 1;
+    }
+
+    return str.substr(start_byte, end_byte - start_byte);
+}
+
 } // namespace infinity

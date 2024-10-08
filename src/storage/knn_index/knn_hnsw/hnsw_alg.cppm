@@ -20,8 +20,7 @@ module;
 export module hnsw_alg;
 
 import stl;
-import file_system;
-import file_system_type;
+import local_file_handle;
 import infinity_exception;
 import knn_result_handler;
 import multivector_result_handler;
@@ -102,19 +101,19 @@ public:
 
     SizeT GetSizeInBytes() const { return sizeof(M_) + sizeof(ef_construction_) + data_store_.GetSizeInBytes(); }
 
-    void Save(FileHandler &file_handler) {
-        file_handler.Write(&M_, sizeof(M_));
-        file_handler.Write(&ef_construction_, sizeof(ef_construction_));
-        data_store_.Save(file_handler);
+    void Save(LocalFileHandle &file_handle) {
+        file_handle.Append(&M_, sizeof(M_));
+        file_handle.Append(&ef_construction_, sizeof(ef_construction_));
+        data_store_.Save(file_handle);
     }
 
-    static UniquePtr<This> Load(FileHandler &file_handler) {
+    static UniquePtr<This> Load(LocalFileHandle &file_handle) {
         SizeT M;
-        file_handler.Read(&M, sizeof(M));
+        file_handle.Read(&M, sizeof(M));
         SizeT ef_construction;
-        file_handler.Read(&ef_construction, sizeof(ef_construction));
+        file_handle.Read(&ef_construction, sizeof(ef_construction));
 
-        auto data_store = DataStore::Load(file_handler);
+        auto data_store = DataStore::Load(file_handle);
         Distance distance(data_store.dim());
 
         return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance), 0);

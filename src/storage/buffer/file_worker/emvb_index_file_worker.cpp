@@ -33,7 +33,6 @@ import internal_types;
 import file_worker_type;
 import third_party;
 import emvb_product_quantization;
-import file_system;
 
 namespace infinity {
 
@@ -88,7 +87,7 @@ void EMVBIndexFileWorker::FreeInMemory() {
 
 bool EMVBIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     auto *index = static_cast<EMVBIndex *>(data_);
-    index->SaveIndexInner(*file_handler_);
+    index->SaveIndexInner(*file_handle_);
     prepare_success = true;
     return true;
 }
@@ -104,7 +103,7 @@ void EMVBIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
     const auto residual_pq_subspace_bits = index_emvb->residual_pq_subspace_bits_;
     auto *index = new EMVBIndex(start_segment_offset_, column_embedding_dim, residual_pq_subspace_num, residual_pq_subspace_bits);
     data_ = static_cast<void *>(index);
-    index->ReadIndexInner(*file_handler_);
+    index->ReadIndexInner(*file_handle_);
 }
 
 const EmbeddingInfo *EMVBIndexFileWorker::GetEmbeddingInfo() const { return static_cast<EmbeddingInfo *>(column_def_->type()->type_info().get()); }

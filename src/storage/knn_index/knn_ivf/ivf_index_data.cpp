@@ -23,7 +23,6 @@ import index_ivf;
 import ivf_index_storage;
 import column_def;
 import index_base;
-import file_system;
 import embedding_info;
 import internal_types;
 import segment_entry;
@@ -250,9 +249,9 @@ void IVFIndexInChunk::BuildIVFIndexT(const RowID base_rowid,
     }
 }
 
-void IVFIndexInChunk::SaveIndexInner(FileHandler &file_handler) const { IVF_Index_Storage::Save(file_handler); }
+void IVFIndexInChunk::SaveIndexInner(LocalFileHandle &file_handle) const { IVF_Index_Storage::Save(file_handle); }
 
-void IVFIndexInChunk::ReadIndexInner(FileHandler &file_handler) { IVF_Index_Storage::Load(file_handler); }
+void IVFIndexInChunk::ReadIndexInner(LocalFileHandle &file_handle) { IVF_Index_Storage::Load(file_handle); }
 
 IVFIndexInChunk *IVFIndexInChunk::GetNewIVFIndexInChunk(const IndexBase *ivf_index, const ColumnDef *column_def) {
     const auto *ivf_index_ptr = static_cast<const IndexIVF *>(ivf_index);

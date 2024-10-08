@@ -23,7 +23,6 @@ import index_segment_reader;
 import dict_reader;
 import file_reader;
 import posting_list_format;
-import local_file_system;
 import internal_types;
 import term_meta;
 
@@ -44,7 +43,6 @@ private:
     String dict_file_{};
     u8 *data_ptr_{};
     SizeT data_len_{};
-    LocalFileSystem fs_{};
 };
 
 } // namespace infinity

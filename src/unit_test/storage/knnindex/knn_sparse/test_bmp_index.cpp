@@ -15,6 +15,7 @@
 #include <cassert>
 
 #include "gtest/gtest.h"
+
 import base_test;
 import stl;
 import bmp_alg;
@@ -22,11 +23,10 @@ import bmp_util;
 import sparse_util;
 import third_party;
 import compilation_config;
-import file_system;
-import local_file_system;
-import file_system_type;
 import sparse_test_util;
 import infinity_exception;
+import virtual_store;
+import local_file_handle;
 
 using namespace infinity;
 
@@ -53,7 +53,6 @@ protected:
         const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<DataType, IdxType>::GenerateGroundtruth(dataset, query_set, topk, false);
 
         String save_path = String(tmp_data_path()) + "/bmindex_test1.index";
-        LocalFileSystem fs;
 
         auto test_query = [&](const BMPAlg &index) {
             {
@@ -99,18 +98,18 @@ protected:
             index.Optimize(optimize_options);
             test_query(index);
 
-            auto [file_handler, status] = fs.OpenFile(save_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+            auto [file_handle, status] = VirtualStore::Open(save_path, FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }
-            index.Save(*file_handler);
+            index.Save(*file_handle);
         }
         {
-            auto [file_handler, status] = fs.OpenFile(save_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handle, status] = VirtualStore::Open(save_path, FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }
-            auto index = BMPAlg::Load(*file_handler);
+            auto index = BMPAlg::Load(*file_handle);
 
             test_query(index);
         }

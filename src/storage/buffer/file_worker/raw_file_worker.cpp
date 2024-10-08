@@ -13,13 +13,15 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
+#include <tuple>
 
 module raw_file_worker;
 
 import stl;
 import infinity_exception;
-import local_file_system;
+import local_file_handle;
 import third_party;
 import status;
 import logger;
@@ -64,10 +66,8 @@ void RawFileWorker::FreeInMemory() {
 
 bool RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     assert(data_ != nullptr && buffer_size_ > 0);
-    LocalFileSystem fs;
-    i64 nbytes = fs.Write(*file_handler_, data_, buffer_size_);
-    if (nbytes != (i64)buffer_size_) {
-        Status status = Status::DataIOError(fmt::format("Expect to write buffer with size: {}, but {} bytes is written", buffer_size_, nbytes));
+    auto status = file_handle_->Append(data_, buffer_size_);
+    if(!status.ok()) {
         RecoverableError(status);
     }
     prepare_success = true; // Not run defer_fn
@@ -75,11 +75,13 @@ bool RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
 }
 
 void RawFileWorker::ReadFromFileImpl(SizeT file_size) {
-    LocalFileSystem fs;
-    buffer_size_ = fs.GetFileSize(*file_handler_);
+    buffer_size_ = file_handle_->FileSize();
     data_ = static_cast<void *>(new char[buffer_size_]);
-    i64 nbytes = fs.Read(*file_handler_, data_, buffer_size_);
-    if (nbytes != (i64)buffer_size_) {
+    auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);
+    if(!status1.ok()) {
+        RecoverableError(status1);
+    }
+    if (nbytes != buffer_size_) {
         Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));
         RecoverableError(status);
     }

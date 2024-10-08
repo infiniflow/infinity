@@ -29,7 +29,6 @@ import wal_manager;
 import catalog;
 import txn_manager;
 import builtin_functions;
-import local_file_system;
 import third_party;
 import logger;
 
@@ -50,8 +49,7 @@ import memindex_tracer;
 import cleanup_scanner;
 import persistence_manager;
 import extra_ddl_info;
-import virtual_storage;
-import virtual_storage_type;
+import virtual_store;
 
 namespace infinity {
 
@@ -99,30 +97,25 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
                 break;
             }
-
-            // Construct virtual storage system;
-            if (virtual_storage_system_ != nullptr) {
-                UnrecoverableError("Virtual storage system was initialized before.");
-            }
-            virtual_storage_system_ = MakeUnique<VirtualStorage>();
-
             switch (config_ptr_->StorageType()) {
                 case StorageType::kLocal: {
-                    Map<String, String> configs;
-                    virtual_storage_system_->Init(StorageType::kLocal, configs);
+                    // Not init remote store
                     break;
                 }
                 case StorageType::kMinio: {
-                    Map<String, String> configs;
-                    configs.emplace("url", config_ptr_->ObjectStorageUrl());
-                    virtual_storage_system_->Init(StorageType::kMinio, configs);
+                    if (VirtualStore::IsInit()) {
+                        UnrecoverableError("remote storage system was initialized before.");
+                    }
+                    Status status = VirtualStore::InitRemoteStore(StorageType::kMinio, config_ptr_->ObjectStorageUrl());
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
                     break;
                 }
                 default: {
                     UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
                 }
             }
-
             // Construct persistence store
             String persistence_dir = config_ptr_->PersistenceDir();
             if (!persistence_dir.empty()) {
@@ -257,6 +250,20 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
+                switch (config_ptr_->StorageType()) {
+                    case StorageType::kLocal: {
+                        // Not init remote store
+                        break;
+                    }
+                    case StorageType::kMinio: {
+                        VirtualStore::UnInitRemoteStore();
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+                    }
+                }
+
                 wal_mgr_->Stop();
                 wal_mgr_.reset();
                 if (target_mode == StorageMode::kAdmin) {
@@ -326,6 +333,20 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 new_catalog_.reset();
 
                 memory_index_tracer_.reset();
+
+                switch (config_ptr_->StorageType()) {
+                    case StorageType::kLocal: {
+                        // Not init remote store
+                        break;
+                    }
+                    case StorageType::kMinio: {
+                        VirtualStore::UnInitRemoteStore();
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+                    }
+                }
 
                 wal_mgr_->Stop();
                 wal_mgr_.reset();

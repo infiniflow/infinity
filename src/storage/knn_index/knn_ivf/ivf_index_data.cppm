@@ -23,11 +23,11 @@ import column_def;
 import embedding_info;
 import internal_types;
 import logical_type;
+import local_file_handle;
 
 namespace infinity {
 
 class IndexBase;
-class FileHandler;
 struct SegmentEntry;
 class BufferManager;
 
@@ -37,7 +37,9 @@ export class IVFIndexInChunk : protected IVF_Index_Storage {
 public:
     using IVF_Index_Storage::GetMemData;
 
-    IVF_Index_Storage *BasePtr() { return this; }
+    IVF_Index_Storage *GetIVFIndexStoragePtr() { return this; }
+
+    const IVF_Index_Storage *GetIVFIndexStoragePtr() const { return this; }
 
     void BuildIVFIndex(RowID base_rowid,
                        u32 row_count,
@@ -45,9 +47,9 @@ public:
                        const SharedPtr<ColumnDef> &column_def,
                        BufferManager *buffer_mgr);
 
-    void SaveIndexInner(FileHandler &file_handler) const;
+    void SaveIndexInner(LocalFileHandle &file_handle) const;
 
-    void ReadIndexInner(FileHandler &file_handler);
+    void ReadIndexInner(LocalFileHandle &file_handle);
 
     static IVFIndexInChunk *GetNewIVFIndexInChunk(const IndexBase *ivf_index, const ColumnDef *column_def);
 

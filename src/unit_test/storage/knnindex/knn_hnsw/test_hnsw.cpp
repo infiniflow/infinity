@@ -19,10 +19,6 @@ import base_test;
 
 import stl;
 import hnsw_alg;
-import file_system;
-import file_system_type;
-import local_file_system;
-import file_system_type;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
@@ -35,6 +31,8 @@ import dist_func_cos;
 import vec_store_type;
 import hnsw_common;
 import infinity_exception;
+import virtual_store;
+import local_file_handle;
 
 using namespace infinity;
 
@@ -83,7 +81,6 @@ public:
             EXPECT_GE(correct_rate, 0.95);
         };
 
-        LocalFileSystem fs;
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
@@ -91,22 +88,20 @@ public:
 
             test_func(hnsw_index);
 
-            u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-            auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            hnsw_index->Save(*file_handler);
+            hnsw_index->Save(*file_handle);
         }
 
         {
-            u8 file_flags = FileFlags::READ_FLAG;
-            auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
 
-            auto hnsw_index = Hnsw::Load(*file_handler);
+            auto hnsw_index = Hnsw::Load(*file_handle);
 
             test_func(hnsw_index);
         }
@@ -148,7 +143,6 @@ public:
             EXPECT_GE(correct_rate, 0.95);
         };
 
-        LocalFileSystem fs;
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
 
@@ -165,21 +159,19 @@ public:
             }
             test_func(compress_hnsw);
 
-            u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-            auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            compress_hnsw->Save(*file_handler);
+            compress_hnsw->Save(*file_handle);
         }
         {
-            u8 file_flags = FileFlags::READ_FLAG;
-            auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
 
-            auto compress_hnsw = CompressedHnsw::Load(*file_handler);
+            auto compress_hnsw = CompressedHnsw::Load(*file_handle);
 
             test_func(compress_hnsw);
         }
@@ -204,7 +196,6 @@ public:
             data[i] = distrib_real(rng);
         }
 
-        LocalFileSystem fs;
         auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
 
         std::atomic<bool> stop = false;

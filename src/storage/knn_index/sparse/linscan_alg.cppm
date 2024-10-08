@@ -21,7 +21,7 @@ export module linscan_alg;
 
 import stl;
 import sparse_util;
-import file_system;
+import local_file_handle;
 import knn_result_handler;
 import serialize;
 import infinity_exception;
@@ -134,20 +134,20 @@ public:
 
     u32 row_num() const { return row_num_; }
 
-    void Save(FileHandler &file_handler) const {
+    void Save(LocalFileHandle &file_handle) const {
         SizeT bytes = GetSizeInBytes();
         auto buffer = MakeUnique<char[]>(sizeof(bytes) + bytes);
         char *p = buffer.get();
         WriteBufAdv<SizeT>(p, bytes);
         WriteAdv(p);
-        file_handler.Write(buffer.get(), sizeof(bytes) + bytes);
+        file_handle.Append(buffer.get(), sizeof(bytes) + bytes);
     }
 
-    static LinScan Load(FileHandler &file_handler) {
+    static LinScan Load(LocalFileHandle &file_handle) {
         SizeT bytes;
-        file_handler.Read(&bytes, sizeof(bytes));
+        file_handle.Read(&bytes, sizeof(bytes));
         auto buffer = MakeUnique<char[]>(bytes);
-        file_handler.Read(buffer.get(), bytes);
+        file_handle.Read(buffer.get(), bytes);
         const char *buffer_ptr = buffer.get();
         return ReadAdv(buffer_ptr);
     }

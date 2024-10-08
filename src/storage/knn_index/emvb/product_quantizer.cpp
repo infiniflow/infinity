@@ -27,7 +27,7 @@ import index_base;
 import third_party;
 import logger;
 import infinity_exception;
-import file_system;
+import local_file_handle;
 import eigen_svd;
 
 namespace infinity {
@@ -356,7 +356,7 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetMultipleIPDistance(const u32 em
 }
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
-void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Save(FileHandler &file_handler) {
+void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Save(LocalFileHandle &file_handle) {
     std::unique_lock lock(this->rw_mutex_);
     const u32 subspace_centroid_data_size = this->subspace_centroid_num_ * this->subspace_dimension_;
     for (const auto &centroids_v : this->subspace_centroids_) {
@@ -364,10 +364,10 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Save(FileHandler &file_handler) {
             const auto error_info = fmt::format("centroids size {} not equal to expected size {}", centroids_v.size(), subspace_centroid_data_size);
             UnrecoverableError(error_info);
         }
-        file_handler.Write(centroids_v.data(), subspace_centroid_data_size * sizeof(typename std::decay_t<decltype(centroids_v)>::value_type));
+        file_handle.Append(centroids_v.data(), subspace_centroid_data_size * sizeof(typename std::decay_t<decltype(centroids_v)>::value_type));
     }
     for (const auto &norms_v : this->subspace_centroid_norms_neg_half) {
-        file_handler.Write(norms_v.data(), norms_v.size() * sizeof(typename std::decay_t<decltype(norms_v)>::value_type));
+        file_handle.Append(norms_v.data(), norms_v.size() * sizeof(typename std::decay_t<decltype(norms_v)>::value_type));
     }
     const u32 encoded_embedding_data_size = this->encoded_embedding_data_.size();
     if (encoded_embedding_data_size != this->next_embedding_id_) {
@@ -375,42 +375,42 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Save(FileHandler &file_handler) {
             fmt::format("encoded_embedding_data size {} not equal to expected size {}", encoded_embedding_data_size, this->next_embedding_id_);
         UnrecoverableError(error_info);
     }
-    file_handler.Write(&encoded_embedding_data_size, sizeof(encoded_embedding_data_size));
+    file_handle.Append(&encoded_embedding_data_size, sizeof(encoded_embedding_data_size));
     for (const auto &encoded_embedding : this->encoded_embedding_data_) {
-        file_handler.Write(encoded_embedding.data(),
+        file_handle.Append(encoded_embedding.data(),
                            encoded_embedding.size() * sizeof(typename std::decay_t<decltype(encoded_embedding)>::value_type));
     }
-    file_handler.Write(&this->next_embedding_id_, sizeof(this->next_embedding_id_));
+    file_handle.Append(&this->next_embedding_id_, sizeof(this->next_embedding_id_));
     // save matrix R
-    file_handler.Write(matrix_R_.get(), this->dimension_ * this->dimension_ * sizeof(typename decltype(matrix_R_)::element_type));
+    file_handle.Append(matrix_R_.get(), this->dimension_ * this->dimension_ * sizeof(typename decltype(matrix_R_)::element_type));
 }
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
-void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Load(FileHandler &file_handler) {
+void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Load(LocalFileHandle &file_handle) {
     std::unique_lock lock(this->rw_mutex_);
     const u32 subspace_centroid_data_size = this->subspace_centroid_num_ * this->subspace_dimension_;
     for (auto &centroids_v : this->subspace_centroids_) {
         centroids_v.resize(subspace_centroid_data_size);
-        file_handler.Read(centroids_v.data(), subspace_centroid_data_size * sizeof(typename std::decay_t<decltype(centroids_v)>::value_type));
+        file_handle.Read(centroids_v.data(), subspace_centroid_data_size * sizeof(typename std::decay_t<decltype(centroids_v)>::value_type));
     }
     for (auto &norms_v : this->subspace_centroid_norms_neg_half) {
-        file_handler.Read(norms_v.data(), norms_v.size() * sizeof(typename std::decay_t<decltype(norms_v)>::value_type));
+        file_handle.Read(norms_v.data(), norms_v.size() * sizeof(typename std::decay_t<decltype(norms_v)>::value_type));
     }
     u32 encoded_embedding_data_size = 0;
-    file_handler.Read(&encoded_embedding_data_size, sizeof(encoded_embedding_data_size));
+    file_handle.Read(&encoded_embedding_data_size, sizeof(encoded_embedding_data_size));
     this->encoded_embedding_data_.resize(encoded_embedding_data_size);
     for (auto &encoded_embedding : this->encoded_embedding_data_) {
-        file_handler.Read(encoded_embedding.data(),
+        file_handle.Read(encoded_embedding.data(),
                           encoded_embedding.size() * sizeof(typename std::decay_t<decltype(encoded_embedding)>::value_type));
     }
-    file_handler.Read(&this->next_embedding_id_, sizeof(this->next_embedding_id_));
+    file_handle.Read(&this->next_embedding_id_, sizeof(this->next_embedding_id_));
     if (encoded_embedding_data_size != this->next_embedding_id_) {
         const auto error_info =
             fmt::format("encoded_embedding_data size {} not equal to expected size {}", encoded_embedding_data_size, this->next_embedding_id_);
         UnrecoverableError(error_info);
     }
     // load matrix R
-    file_handler.Read(matrix_R_.get(), this->dimension_ * this->dimension_ * sizeof(typename decltype(matrix_R_)::element_type));
+    file_handle.Read(matrix_R_.get(), this->dimension_ * this->dimension_ * sizeof(typename decltype(matrix_R_)::element_type));
 }
 
 constexpr u32 current_max_subspace_num = 128;

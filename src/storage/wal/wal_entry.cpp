@@ -37,11 +37,11 @@ import segment_entry;
 import segment_index_entry;
 import chunk_index_entry;
 import block_version;
-import local_file_system;
 import index_defines;
 import create_index_info;
 import persistence_manager;
 import infinity_context;
+import virtual_store;
 
 namespace infinity {
 
@@ -1551,9 +1551,8 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
         if (bad_offset != i64(-1)) {
             String error_message = fmt::format("Found bad wal entry {}@{}", *it, bad_offset);
             LOG_WARN(error_message);
-            LocalFileSystem fs;
             if (bad_offset == 0) {
-                fs.DeleteFile(*it);
+                VirtualStore::DeleteFile(*it);
                 error_message = fmt::format("Removed wal log {}", *it);
                 LOG_WARN(error_message);
                 ++it;
@@ -1562,7 +1561,7 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
                 }
                 file_num = 0;
             } else {
-                fs.Truncate(*it, bad_offset);
+                VirtualStore::Truncate(*it, bad_offset);
                 error_message = fmt::format("Truncated {}@{}", *it, bad_offset);
                 LOG_WARN(error_message);
                 ++it;

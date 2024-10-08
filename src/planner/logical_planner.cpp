@@ -64,7 +64,7 @@ import logical_command;
 import explain_logical_plan;
 import explain_ast;
 
-import local_file_system;
+import virtual_store;
 
 import status;
 import default_values;
@@ -918,10 +918,8 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     }
 
     // Check the file existence
-    LocalFileSystem fs;
-
     String to_write_path;
-    if (fs.Exists(statement->file_path_)) {
+    if (VirtualStore::Exists(statement->file_path_)) {
         Status status = Status::DuplicatedFile(statement->file_path_);
         RecoverableError(status);
     }
@@ -1080,10 +1078,8 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     }
 
     // Check the file existence
-    LocalFileSystem fs;
-
     String to_write_path;
-    if (!fs.Exists(statement->file_path_)) {
+    if (!VirtualStore::Exists(statement->file_path_)) {
         RecoverableError(Status::FileNotFound(statement->file_path_));
     }
 

@@ -21,10 +21,11 @@ import index_ivf;
 import internal_types;
 import logical_type;
 import data_type;
+import knn_expr;
 
 namespace infinity {
 
-class FileHandler;
+class LocalFileHandle;
 
 template <EmbeddingDataType t>
 struct EmbeddingDataTypeToCppType;
@@ -62,6 +63,28 @@ struct EmbeddingDataTypeToCppType<EmbeddingDataType::kElemBFloat16> {
 export template <EmbeddingDataType t>
 using EmbeddingDataTypeToCppTypeT = typename EmbeddingDataTypeToCppType<t>::type;
 
+export template <typename T>
+EmbeddingDataType CppTypeToEmbeddingDataTypeV = EmbeddingDataType::kElemInvalid;
+
+template <>
+EmbeddingDataType CppTypeToEmbeddingDataTypeV<u8> = EmbeddingDataType::kElemUInt8;
+
+template <>
+EmbeddingDataType CppTypeToEmbeddingDataTypeV<i8> = EmbeddingDataType::kElemInt8;
+
+template <>
+EmbeddingDataType CppTypeToEmbeddingDataTypeV<f64> = EmbeddingDataType::kElemDouble;
+
+template <>
+EmbeddingDataType CppTypeToEmbeddingDataTypeV<f32> = EmbeddingDataType::kElemFloat;
+
+template <>
+EmbeddingDataType CppTypeToEmbeddingDataTypeV<Float16T> = EmbeddingDataType::kElemFloat16;
+
+template <>
+EmbeddingDataType CppTypeToEmbeddingDataTypeV<BFloat16T> = EmbeddingDataType::kElemBFloat16;
+
+
 // always use float for centroids
 class IVF_Centroids_Storage {
     u32 embedding_dimension_ = 0;
@@ -74,8 +97,8 @@ public:
     const f32 *data() const { return centroids_data_.data(); }
     u32 embedding_dimension() const { return embedding_dimension_; }
     u32 centroids_num() const { return centroids_num_; }
-    void Save(FileHandler &file_handler) const;
-    void Load(FileHandler &file_handler);
+    void Save(LocalFileHandle &file_handle) const;
+    void Load(LocalFileHandle &file_handle);
 };
 
 class IVF_Part_Storage {
@@ -96,10 +119,15 @@ public:
     u32 embedding_num() const { return embedding_num_; }
     SegmentOffset embedding_segment_offset(const u32 embedding_index) const { return embedding_segment_offsets_[embedding_index]; }
 
-    virtual void Save(FileHandler &file_handler) const;
-    virtual void Load(FileHandler &file_handler);
+    virtual void Save(LocalFileHandle &file_handle) const;
+    virtual void Load(LocalFileHandle &file_handle);
 
     virtual void AppendOneEmbedding(const void *embedding_ptr, SegmentOffset segment_offset, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
+
+    virtual void SearchIndex(KnnDistanceType knn_distance_type,
+                             const void *query_ptr,
+                             EmbeddingDataType query_element_type,
+                             std::function<void(f32, SegmentOffset)> add_result_func) const = 0;
 
     // only for unit-test, return f32 / i8 / u8 embedding data
     virtual Pair<const void *, SharedPtr<void>> GetDataForTest(u32 embedding_id) const = 0;
@@ -133,9 +161,15 @@ public:
     void AddEmbeddingBatch(const SegmentOffset *segment_offset_ptr, const void *embedding_ptr, u32 embedding_num);
     void AddMultiVector(SegmentOffset segment_offset, const void *multi_vector_ptr, u32 embedding_num);
 
+    void SearchIndex(KnnDistanceType knn_distance_type,
+                     const void *query_ptr,
+                     EmbeddingDataType query_element_type,
+                     u32 nprobe,
+                     std::function<void(f32, SegmentOffset)> add_result_func) const;
+
     void GetMemData(IVF_Index_Storage &&mem_data);
-    void Save(FileHandler &file_handler) const;
-    void Load(FileHandler &file_handler);
+    void Save(LocalFileHandle &file_handle) const;
+    void Load(LocalFileHandle &file_handle);
 
 private:
     template <EmbeddingDataType embedding_data_type>

@@ -2,12 +2,10 @@
 import base_test;
 import stl;
 import persistence_manager;
-import virtual_storage;
-import virtual_storage_type;
-import abstract_file_handle;
-import file_system_type;
+import virtual_store;
 import third_party;
 import persist_result_handler;
+import local_file_handle;
 
 using namespace infinity;
 namespace fs = std::filesystem;
@@ -43,13 +41,7 @@ void PersistenceManagerTest::CheckObjData(const String& local_file_path, const S
     SizeT obj_file_size = fs::file_size(obj_fp);
     ASSERT_LE(obj_file_size, ObjSizeLimit);
 
-    VirtualStorage virtual_storage;
-    Map<String, String> configs;
-    virtual_storage.Init(StorageType::kLocal, configs);
-    auto [pm_file_handle, status] = virtual_storage.BuildFileHandle();
-    EXPECT_TRUE(status.ok());
-
-    status = pm_file_handle->Open(obj_path, FileAccessMode::kRead);
+    auto [pm_file_handle, status] = VirtualStore::Open(obj_path, FileAccessMode::kRead);
     EXPECT_TRUE(status.ok());
     status = pm_file_handle->Seek(obj_addr.part_offset_);
     EXPECT_TRUE(status.ok());
@@ -58,7 +50,6 @@ void PersistenceManagerTest::CheckObjData(const String& local_file_path, const S
     auto [nread, read_status] = pm_file_handle->Read(buffer.get(), file_size);
     EXPECT_TRUE(read_status.ok());
     ASSERT_EQ(String(buffer.get(), file_size), data);
-    pm_file_handle->Close();
 
     PersistWriteResult res = pm_->PutObjCache(local_file_path);
     handler_->HandleWriteResult(res);

@@ -14,11 +14,12 @@
 
 module;
 
+#include <tuple>
+
 module data_file_worker;
 
 import stl;
 import infinity_exception;
-import local_file_system;
 import third_party;
 import status;
 import logger;
@@ -64,7 +65,6 @@ void DataFileWorker::FreeInMemory() {
 
 // FIXME: to_spill
 bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    LocalFileSystem fs;
     // File structure:
     // - header: magic number
     // - header: buffer size
@@ -72,28 +72,24 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
     // - footer: checksum
 
     u64 magic_number = 0x00dd3344;
-    u64 nbytes = fs.Write(*file_handler_, &magic_number, sizeof(magic_number));
-    if (nbytes != sizeof(magic_number)) {
-        Status status = Status::DataIOError(fmt::format("Write magic number which length is {}.", nbytes));
+    Status status = file_handle_->Append(&magic_number, sizeof(magic_number));
+    if(!status.ok()) {
         RecoverableError(status);
     }
 
-    nbytes = fs.Write(*file_handler_, const_cast<SizeT *>(&buffer_size_), sizeof(buffer_size_));
-    if (nbytes != sizeof(buffer_size_)) {
-        Status status = Status::DataIOError(fmt::format("Write buffer length field which length is {}.", nbytes));
+    status = file_handle_->Append(const_cast<SizeT *>(&buffer_size_), sizeof(buffer_size_));
+    if(!status.ok()) {
         RecoverableError(status);
     }
 
-    nbytes = fs.Write(*file_handler_, data_, buffer_size_);
-    if (nbytes != buffer_size_) {
-        Status status = Status::DataIOError(fmt::format("Expect to write buffer with size: {}, but {} bytes is written", buffer_size_, nbytes));
+    status = file_handle_->Append(data_, buffer_size_);
+    if(!status.ok()) {
         RecoverableError(status);
     }
 
     u64 checksum{};
-    nbytes = fs.Write(*file_handler_, &checksum, sizeof(checksum));
-    if (nbytes != sizeof(checksum)) {
-        Status status = Status::DataIOError(fmt::format("Write buffer length field which length is {}.", nbytes));
+    status = file_handle_->Append(&checksum, sizeof(checksum));
+    if(!status.ok()) {
         RecoverableError(status);
     }
     prepare_success = true; // Not run defer_fn
@@ -101,7 +97,6 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
 }
 
 void DataFileWorker::ReadFromFileImpl(SizeT file_size) {
-    LocalFileSystem fs;
 
     if (file_size < sizeof(u64) * 3) {
         Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
@@ -110,22 +105,26 @@ void DataFileWorker::ReadFromFileImpl(SizeT file_size) {
 
     // file header: magic number, buffer_size
     u64 magic_number{0};
-    u64 nbytes = fs.Read(*file_handler_, &magic_number, sizeof(magic_number));
-    if (nbytes != sizeof(magic_number)) {
-        Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes));
+    auto [nbytes1, status1] = file_handle_->Read(&magic_number, sizeof(magic_number));
+    if(!status1.ok()) {
+        RecoverableError(status1);
+    }
+    if (nbytes1 != sizeof(magic_number)) {
+        Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes1));
         RecoverableError(status);
     }
     if (magic_number != 0x00dd3344) {
-        Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes));
+        Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes1));
         RecoverableError(status);
     }
 
     u64 buffer_size_{};
-    nbytes = fs.Read(*file_handler_, &buffer_size_, sizeof(buffer_size_));
-    if (nbytes != sizeof(buffer_size_)) {
-        Status status = Status::DataIOError(fmt::format("Unmatched buffer length: {} / {}", nbytes, buffer_size_));
-        RecoverableError(status);
+    auto [nbytes2, status2] = file_handle_->Read(&buffer_size_, sizeof(buffer_size_));
+    if (nbytes2 != sizeof(buffer_size_)) {
+        Status status = Status::DataIOError(fmt::format("Unmatched buffer length: {} / {}", nbytes2, buffer_size_));
+        RecoverableError(status2);
     }
+
     if (file_size != buffer_size_ + 3 * sizeof(u64)) {
         Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
         RecoverableError(status);
@@ -133,17 +132,17 @@ void DataFileWorker::ReadFromFileImpl(SizeT file_size) {
 
     // file body
     data_ = static_cast<void *>(new char[buffer_size_]);
-    nbytes = fs.Read(*file_handler_, data_, buffer_size_);
-    if (nbytes != buffer_size_) {
-        Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));
+    auto [nbytes3, status3] = file_handle_->Read(data_, buffer_size_);
+    if (nbytes3 != buffer_size_) {
+        Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes3));
         RecoverableError(status);
     }
 
     // file footer: checksum
     u64 checksum{0};
-    nbytes = fs.Read(*file_handler_, &checksum, sizeof(checksum));
-    if (nbytes != sizeof(checksum)) {
-        Status status = Status::DataIOError(fmt::format("Incorrect file checksum length: {}.", nbytes));
+    auto [nbytes4, status4] = file_handle_->Read(&checksum, sizeof(checksum));
+    if (nbytes4 != sizeof(checksum)) {
+        Status status = Status::DataIOError(fmt::format("Incorrect file checksum length: {}.", nbytes4));
         RecoverableError(status);
     }
 }

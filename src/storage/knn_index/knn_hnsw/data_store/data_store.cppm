@@ -22,7 +22,7 @@ export module data_store;
 
 import stl;
 import hnsw_common;
-import file_system;
+import local_file_handle;
 import vec_store_type;
 import graph_store;
 import infinity_exception;
@@ -143,36 +143,36 @@ public:
         return size;
     }
 
-    void Save(FileHandler &file_handler) const {
+    void Save(LocalFileHandle &file_handle) const {
         SizeT cur_vec_num = this->cur_vec_num();
         auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
 
-        file_handler.Write(&chunk_size_, sizeof(chunk_size_));
-        file_handler.Write(&max_chunk_n_, sizeof(max_chunk_n_));
+        file_handle.Append(&chunk_size_, sizeof(chunk_size_));
+        file_handle.Append(&max_chunk_n_, sizeof(max_chunk_n_));
 
-        file_handler.Write(&cur_vec_num, sizeof(cur_vec_num));
-        vec_store_meta_.Save(file_handler);
-        graph_store_meta_.Save(file_handler);
+        file_handle.Append(&cur_vec_num, sizeof(cur_vec_num));
+        vec_store_meta_.Save(file_handle);
+        graph_store_meta_.Save(file_handle);
         for (SizeT i = 0; i < chunk_num; ++i) {
             SizeT chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
-            inners_[i].Save(file_handler, chunk_size, vec_store_meta_, graph_store_meta_);
+            inners_[i].Save(file_handle, chunk_size, vec_store_meta_, graph_store_meta_);
         }
     }
 
-    static This Load(FileHandler &file_handler, SizeT max_chunk_n = 0) {
+    static This Load(LocalFileHandle &file_handle, SizeT max_chunk_n = 0) {
         SizeT chunk_size;
-        file_handler.Read(&chunk_size, sizeof(chunk_size));
+        file_handle.Read(&chunk_size, sizeof(chunk_size));
         SizeT max_chunk_n1;
-        file_handler.Read(&max_chunk_n1, sizeof(max_chunk_n1));
+        file_handle.Read(&max_chunk_n1, sizeof(max_chunk_n1));
         if (max_chunk_n == 0) {
             max_chunk_n = max_chunk_n1;
         }
         assert(max_chunk_n >= max_chunk_n1);
 
         SizeT cur_vec_num;
-        file_handler.Read(&cur_vec_num, sizeof(cur_vec_num));
-        VecStoreMeta vec_store_meta = VecStoreMeta::Load(file_handler);
-        GraphStoreMeta graph_store_meta = GraphStoreMeta::Load(file_handler);
+        file_handle.Read(&cur_vec_num, sizeof(cur_vec_num));
+        VecStoreMeta vec_store_meta = VecStoreMeta::Load(file_handle);
+        GraphStoreMeta graph_store_meta = GraphStoreMeta::Load(file_handle);
 
         This ret = This(chunk_size, max_chunk_n, std::move(vec_store_meta), std::move(graph_store_meta));
         ret.cur_vec_num_ = cur_vec_num;
@@ -181,7 +181,7 @@ public:
         auto [chunk_num, last_chunk_size] = ret.ChunkInfo(cur_vec_num);
         for (SizeT i = 0; i < chunk_num; ++i) {
             SizeT cur_chunk_size = (i < chunk_num - 1) ? chunk_size : last_chunk_size;
-            ret.inners_[i] = Inner::Load(file_handler, cur_chunk_size, chunk_size, ret.vec_store_meta_, ret.graph_store_meta_, mem_usage);
+            ret.inners_[i] = Inner::Load(file_handle, cur_chunk_size, chunk_size, ret.vec_store_meta_, ret.graph_store_meta_, mem_usage);
         }
         ret.mem_usage_.store(mem_usage);
         return ret;
@@ -409,22 +409,22 @@ public:
         return size;
     }
 
-    void Save(FileHandler &file_handler, SizeT cur_vec_num, const VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) const {
-        vec_store_inner_.Save(file_handler, cur_vec_num, vec_store_meta);
-        graph_store_inner_.Save(file_handler, cur_vec_num, graph_store_meta);
-        file_handler.Write(labels_.get(), sizeof(LabelType) * cur_vec_num);
+    void Save(LocalFileHandle &file_handle, SizeT cur_vec_num, const VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) const {
+        vec_store_inner_.Save(file_handle, cur_vec_num, vec_store_meta);
+        graph_store_inner_.Save(file_handle, cur_vec_num, graph_store_meta);
+        file_handle.Append(labels_.get(), sizeof(LabelType) * cur_vec_num);
     }
 
-    static This Load(FileHandler &file_handler,
+    static This Load(LocalFileHandle &file_handle,
                      SizeT cur_vec_num,
                      SizeT chunk_size,
                      VecStoreMeta &vec_store_meta,
                      GraphStoreMeta &graph_store_meta,
                      SizeT &mem_usage) {
-        auto vec_store_inner = VecStoreInner::Load(file_handler, cur_vec_num, chunk_size, vec_store_meta, mem_usage);
-        auto graph_store_iner = GraphStoreInner::Load(file_handler, cur_vec_num, chunk_size, graph_store_meta, mem_usage);
+        auto vec_store_inner = VecStoreInner::Load(file_handle, cur_vec_num, chunk_size, vec_store_meta, mem_usage);
+        auto graph_store_iner = GraphStoreInner::Load(file_handle, cur_vec_num, chunk_size, graph_store_meta, mem_usage);
         This ret(chunk_size, std::move(vec_store_inner), std::move(graph_store_iner));
-        file_handler.Read(ret.labels_.get(), sizeof(LabelType) * cur_vec_num);
+        file_handle.Read(ret.labels_.get(), sizeof(LabelType) * cur_vec_num);
         return ret;
     }
 

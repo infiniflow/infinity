@@ -21,7 +21,7 @@ import infinity_exception;
 import third_party;
 import status;
 import compilation_config;
-import virtual_storage_type;
+import virtual_store;
 
 using namespace infinity;
 class ConfigTest : public BaseTest {};
@@ -100,7 +100,7 @@ TEST_F(ConfigTest, test2) {
     // Storage
     EXPECT_EQ(config.DataDir(), "/var/infinity/data");
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
-    EXPECT_EQ(config.StorageType(), StorageType::kMinio);
+    EXPECT_EQ(config.StorageType(), StorageType::kLocal);
     EXPECT_EQ(config.ObjectStorageUrl(), "0.0.0.0:9000");
     EXPECT_EQ(config.ObjectStorageBucket(), "infinity");
 

@@ -42,7 +42,7 @@ import knn_expr;
 import column_def;
 import statement_common;
 import data_type;
-import virtual_storage;
+import virtual_store;
 
 using namespace infinity;
 
@@ -84,7 +84,7 @@ int main() {
 
     String path = "/var/infinity";
 
-    VirtualStorage::CleanupDirectoryLocal(path);
+    VirtualStore::CleanupDirectory(path);
 
     Infinity::LocalInit(path);
 
@@ -373,7 +373,7 @@ int main() {
         auto r2 = infinity->CreateTable(db_name, table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
 
         std::string sift_base_path = std::string(test_data_path()) + "/benchmark/sift/base.fvecs";
-        if (!VirtualStorage::ExistsLocal(sift_base_path)) {
+        if (!VirtualStore::Exists(sift_base_path)) {
             std::cout << "File: " << sift_base_path << " doesn't exist" << std::endl;
             break;
         }

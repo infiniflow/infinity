@@ -37,7 +37,7 @@ import knn_expr;
 import column_def;
 import statement_common;
 import data_type;
-import virtual_storage;
+import virtual_store;
 
 using namespace infinity;
 
@@ -59,10 +59,10 @@ int main(int argc, char *argv[]) {
         data_path = std::string(argv[3]);
     }
 
-    if (VirtualStorage::ExistsLocal(data_path)) {
+    if (VirtualStore::Exists(data_path)) {
         std::cout << "Data path: " << data_path << " is already existed." << std::endl;
     } else {
-        VirtualStorage::MakeDirectoryLocal(data_path);
+        VirtualStore::MakeDirectory(data_path);
         std::cout << "Data path: " << data_path << " is created." << std::endl;
     }
 
@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
 
 //        auto [ table, status2 ] = data_base->GetTable(table_name);
 
-        if (!VirtualStorage::ExistsLocal(base_path)) {
+        if (!VirtualStore::Exists(base_path)) {
             std::cout << "File: " << base_path << " doesn't exist" << std::endl;
             break;
         }

@@ -27,7 +27,7 @@ import compilation_config;
 import infinity;
 
 import profiler;
-import local_file_system;
+import virtual_store;
 import third_party;
 import query_options;
 import query_result;
@@ -102,7 +102,6 @@ int main(int argc, char *argv[]) {
     if (argc >= 6) {
         path = std::string(argv[5]);
     }
-    LocalFileSystem fs;
 
     Infinity::LocalInit(path);
 
@@ -136,11 +135,11 @@ int main(int argc, char *argv[]) {
     std::cout << "query from: " << query_path << std::endl;
     std::cout << "groundtruth is: " << groundtruth_path << std::endl;
 
-    if (!fs.Exists(query_path)) {
+    if (!VirtualStore::Exists(query_path)) {
         std::cerr << "File: " << query_path << " doesn't exist" << std::endl;
         exit(-1);
     }
-    if (!fs.Exists(groundtruth_path)) {
+    if (!VirtualStore::Exists(groundtruth_path)) {
         std::cerr << "File: " << groundtruth_path << " doesn't exist" << std::endl;
         exit(-1);
     }

@@ -33,7 +33,6 @@ import infinity_exception;
 import defer_op;
 import buffer_handle;
 import logger;
-import local_file_system;
 
 import txn_store;
 import segment_iter;

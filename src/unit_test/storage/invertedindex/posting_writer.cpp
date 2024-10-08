@@ -21,7 +21,6 @@ import posting_list_format;
 import data_type;
 import file_writer;
 import file_reader;
-import local_file_system;
 import posting_writer;
 import term_meta;
 import internal_types;
@@ -45,7 +44,6 @@ protected:
     String file_;
     optionflag_t flag_{OPTION_FLAG_ALL};
     PostingFormat posting_format_{flag_};
-    LocalFileSystem fs_;
     String config_path_{};
 };
 
@@ -66,14 +64,14 @@ TEST_P(PostingWriterTest, test1) {
             posting->EndDocument(expected[i], 0);
         }
 
-        SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(fs_, file_, 128000);
+        SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(file_, 128000);
         TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
         posting->Dump(file_writer, term_meta, true);
         file_writer->Sync();
     }
     {
         SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(posting_format_, column_length_array);
-        SharedPtr<FileReader> file_reader = MakeShared<FileReader>(fs_, file_, 128000);
+        SharedPtr<FileReader> file_reader = MakeShared<FileReader>(file_, 128000);
         posting->Load(file_reader);
 
         docid_t docid = 10;

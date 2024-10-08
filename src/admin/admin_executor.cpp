@@ -35,7 +35,7 @@ import data_block;
 import value;
 import value_expression;
 import logical_node;
-import local_file_system;
+import virtual_store;
 import wal_entry;
 import buffer_manager;
 import catalog;
@@ -279,8 +279,7 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
         file_path = wal_infos[file_index - 1].path_;
     }
 
-    LocalFileSystem fs;
-    SizeT file_size = fs.GetFileSizeByPath(file_path);
+    SizeT file_size = VirtualStore::GetFileSize(file_path);
     UniquePtr<WalEntryIterator> wal_iterator = WalEntryIterator::Make(file_path, false);
     Vector<SharedPtr<WalEntry>> wal_entries = wal_iterator->GetAllEntries();
     bool is_wal_good = wal_iterator->IsGood();
@@ -792,9 +791,8 @@ QueryResult AdminExecutor::ShowCatalog(QueryContext *query_context, const AdminS
 
             ++column_id;
             {
-                LocalFileSystem fs;
                 String file_path = fmt::format("{}/{}", checkpoint_cmd->catalog_path_, checkpoint_cmd->catalog_name_);
-                SizeT file_size = fs.GetFileSizeByPath(file_path);
+                SizeT file_size = VirtualStore::GetFileSize(file_path);
                 Value value = Value::MakeVarchar(std::to_string(file_size));
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

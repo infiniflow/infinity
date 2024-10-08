@@ -22,7 +22,6 @@ import data_type;
 import third_party;
 import buffer_manager;
 import column_vector;
-import local_file_system;
 import vector_buffer;
 import txn;
 import internal_types;

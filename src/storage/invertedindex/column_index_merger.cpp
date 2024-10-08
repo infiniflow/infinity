@@ -22,8 +22,8 @@ import internal_types;
 import posting_byte_slice_reader;
 import posting_merger;
 import third_party;
-import file_system;
-import file_system_type;
+import virtual_store;
+import local_file_handle;
 import infinity_exception;
 import vector_with_lock;
 import logger;
@@ -68,9 +68,9 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
         tmp_fst_file = temp_dir / StringTransform(tmp_fst_file, "/", "_");
     }
 
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs_, tmp_dict_file, 1024);
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(tmp_dict_file, 1024);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
-    posting_file_writer_ = MakeShared<FileWriter>(fs_, tmp_posting_file, 1024);
+    posting_file_writer_ = MakeShared<FileWriter>(tmp_posting_file, 1024);
     std::ofstream ofs(tmp_fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
@@ -103,18 +103,20 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
                 column_len_file = pm->GetObjPath(obj_addr.obj_key_);
             }
 
-            auto [file_handler, status] = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
+            auto [file_handle, open_status] = VirtualStore::Open(column_len_file, FileAccessMode::kRead);
+            if (!open_status.ok()) {
+                UnrecoverableError(open_status.message());
             }
 
-            const u32 file_size = fs_.GetFileSize(*file_handler);
+            const u32 file_size = file_handle->FileSize();
             u32 file_read_array_len = file_size / sizeof(u32);
             if (unsafe_column_lengths.size() < id_offset + file_read_array_len) {
                 unsafe_column_lengths.resize(id_offset + file_read_array_len);
             }
-            const i64 read_count = fs_.Read(*file_handler, unsafe_column_lengths.data() + id_offset, file_size);
-            file_handler->Close();
+            auto [read_count, read_status] = file_handle->Read(unsafe_column_lengths.data() + id_offset, file_size);
+            if(!read_status.ok()) {
+                UnrecoverableError(read_status.message());
+            }
             if (read_count != file_size) {
                 String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
                 UnrecoverableError(error_message);
@@ -127,12 +129,11 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             }
         }
 
-        auto [file_handler, status] = fs_.OpenFile(tmp_column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+        auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        fs_.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
-        fs_.Close(*file_handler);
+        file_handle->Append(&unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
     }
 
     while (!term_posting_queue.Empty()) {
@@ -149,8 +150,8 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     dict_file_writer->Sync();
     posting_file_writer_->Sync();
     fst_builder.Finish();
-    fs_.AppendFile(tmp_dict_file, tmp_fst_file);
-    fs_.DeleteFile(tmp_fst_file);
+    VirtualStore::Merge(tmp_dict_file, tmp_fst_file);
+    VirtualStore::DeleteFile(tmp_fst_file);
     if (use_object_cache) {
         PersistResultHandler handler(pm);
         PersistWriteResult result1 = pm->Persist(dict_file, tmp_dict_file, false);

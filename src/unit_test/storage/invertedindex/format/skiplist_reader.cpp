@@ -9,8 +9,6 @@ import byte_slice;
 import index_defines;
 import skiplist_writer;
 import file_writer;
-import file_system;
-import local_file_system;
 import posting_field;
 import posting_byte_slice_reader;
 import skiplist_reader;

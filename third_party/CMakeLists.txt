@@ -88,6 +88,9 @@ add_library(inih STATIC
 add_subdirectory(curl)
 
 add_subdirectory(re2)
+
+add_subdirectory(wordnet)
+
 target_compile_options(
         inih
         PRIVATE

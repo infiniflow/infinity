@@ -252,6 +252,7 @@ export namespace std {
     using std::filesystem::is_directory;
     using std::filesystem::is_regular_file;
     using std::filesystem::is_symlink;
+    using std::filesystem::recursive_directory_iterator;
     }
 
     namespace this_thread {

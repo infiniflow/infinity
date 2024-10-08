@@ -12,7 +12,6 @@ import posting_list_format;
 import index_defines;
 import term_meta;
 import dict_reader;
-import local_file_system;
 namespace infinity {
 
 export class ColumnIndexIterator {
@@ -41,7 +40,6 @@ private:
     TermMeta term_meta_;
 
     SharedPtr<PostingDecoder> posting_decoder_;
-    LocalFileSystem fs_;
 };
 
 } // namespace infinity

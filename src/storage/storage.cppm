@@ -26,7 +26,7 @@ import periodic_trigger_thread;
 import log_file;
 import memindex_tracer;
 import persistence_manager;
-import virtual_storage;
+import virtual_store;
 
 export module storage;
 
@@ -50,8 +50,6 @@ public:
 
     [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return persistence_manager_.get(); }
 
-    [[nodiscard]] inline VirtualStorage *virtual_storage() noexcept { return virtual_storage_system_.get(); }
-
     [[nodiscard]] inline BGTaskProcessor *bg_processor() const noexcept { return bg_processor_.get(); }
 
     [[nodiscard]] inline PeriodicTriggerThread *periodic_trigger_thread() const noexcept { return periodic_trigger_thread_.get(); }
@@ -68,6 +66,7 @@ public:
     Config *config() const { return config_ptr_; }
 
     void CreateDefaultDB();
+
 private:
     Config *config_ptr_{};
     UniquePtr<Catalog> new_catalog_{};
@@ -76,7 +75,6 @@ private:
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<PersistenceManager> persistence_manager_{};
-    UniquePtr<VirtualStorage> virtual_storage_system_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
