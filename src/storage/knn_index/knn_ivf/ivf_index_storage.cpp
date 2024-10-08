@@ -32,6 +32,8 @@ import kmeans_partition;
 import search_top_1;
 import search_top_k;
 import column_vector;
+import knn_scan_data;
+import ivf_index_util_func;
 
 namespace infinity {
 
@@ -149,11 +151,62 @@ public:
         ++embedding_num_;
     }
 
-    void SearchIndex(KnnDistanceType knn_distance_type,
+    void SearchIndex(const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
-                     EmbeddingDataType query_element_type,
+                     const EmbeddingDataType query_element_type,
+                     std::function<bool(SegmentOffset)> satisfy_filter_func,
                      std::function<void(f32, SegmentOffset)> add_result_func) const override {
-        // TODO
+        auto ReturnT = [&]<EmbeddingDataType query_element_type> {
+            if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
+                          (query_element_type == src_embedding_data_type &&
+                           (query_element_type == EmbeddingDataType::kElemInt8 || query_element_type == EmbeddingDataType::kElemUInt8))) {
+                return SearchIndexT<query_element_type>(knn_distance,
+                                                        static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr),
+                                                        satisfy_filter_func,
+                                                        add_result_func);
+
+            } else {
+                UnrecoverableError("Invalid Query EmbeddingDataType");
+            }
+        };
+        switch (query_element_type) {
+            case EmbeddingDataType::kElemFloat: {
+                return ReturnT.template operator()<EmbeddingDataType::kElemFloat>();
+            }
+            case EmbeddingDataType::kElemUInt8: {
+                return ReturnT.template operator()<EmbeddingDataType::kElemUInt8>();
+            }
+            case EmbeddingDataType::kElemInt8: {
+                return ReturnT.template operator()<EmbeddingDataType::kElemInt8>();
+            }
+            default: {
+                UnrecoverableError("Invalid EmbeddingDataType");
+            }
+        }
+    }
+
+    template <EmbeddingDataType query_element_type>
+    void SearchIndexT(const KnnDistanceBase1 *knn_distance,
+                      const EmbeddingDataTypeToCppTypeT<query_element_type> *query_ptr,
+                      std::function<bool(SegmentOffset)> satisfy_filter_func,
+                      std::function<void(f32, SegmentOffset)> add_result_func) const {
+        using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
+        auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
+        if (!knn_distance_1) [[unlikely]] {
+            UnrecoverableError("Invalid KnnDistance1");
+        }
+        auto dist_func = knn_distance_1->dist_func_;
+        const auto total_embedding_num = embedding_num();
+        for (u32 i = 0; i < total_embedding_num; ++i) {
+            const auto segment_offset = embedding_segment_offset(i);
+            if (!satisfy_filter_func(segment_offset)) {
+                continue;
+            }
+            auto v_ptr = data_.data() + i * embedding_dimension();
+            auto [calc_ptr, _] = GetSearchCalcPtr<QueryDataType>(v_ptr, embedding_dimension());
+            auto d = dist_func(calc_ptr, query_ptr, embedding_dimension());
+            add_result_func(d, segment_offset);
+        }
     }
 
     // only for unit-test, return f32 / i8 / u8 embedding data
@@ -355,25 +408,6 @@ void IVF_Index_Storage::AddMultiVector(const SegmentOffset segment_offset, const
         [] {});
 }
 
-template <IsAnyOf<u8, i8, f64, f32, Float16T, BFloat16T> ColumnEmbeddingElementT>
-Pair<const f32 *, UniquePtr<f32[]>> GetF32Ptr(const ColumnEmbeddingElementT *src_data_ptr, const u32 src_data_cnt) {
-    Pair<const f32 *, UniquePtr<f32[]>> dst_data_ptr;
-    if constexpr (std::is_same_v<f32, ColumnEmbeddingElementT>) {
-        dst_data_ptr.first = src_data_ptr;
-    } else {
-        dst_data_ptr.second = MakeUniqueForOverwrite<f32[]>(src_data_cnt);
-        dst_data_ptr.first = dst_data_ptr.second.get();
-        for (u32 i = 0; i < src_data_cnt; ++i) {
-            if constexpr (std::is_same_v<f64, ColumnEmbeddingElementT>) {
-                dst_data_ptr.second[i] = static_cast<f32>(src_data_ptr[i]);
-            } else {
-                dst_data_ptr.second[i] = src_data_ptr[i];
-            }
-        }
-    }
-    return dst_data_ptr;
-}
-
 template <EmbeddingDataType embedding_data_type>
 void IVF_Index_Storage::AddEmbeddingT(const SegmentOffset segment_offset, const EmbeddingDataTypeToCppTypeT<embedding_data_type> *embedding_ptr) {
     return AddEmbeddingBatchT<embedding_data_type>(segment_offset, embedding_ptr, 1);
@@ -447,10 +481,11 @@ void IVF_Index_Storage::AddMultiVectorT(const SegmentOffset segment_offset,
     ++row_count_;
 }
 
-void IVF_Index_Storage::SearchIndex(const KnnDistanceType knn_distance_type,
+void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
                                     const void *query_ptr,
                                     const EmbeddingDataType query_element_type,
                                     u32 nprobe,
+                                    std::function<bool(SegmentOffset)> satisfy_filter_func,
                                     std::function<void(f32, SegmentOffset)> add_result_func) const {
     const auto dimension = embedding_dimension();
     const auto centroids_num = ivf_centroids_storage_.centroids_num();
@@ -470,7 +505,7 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceType knn_distance_type,
         search_top_k_with_dis(nprobe, dimension, 1, query_f32_ptr, centroids_num, centroids_data, nprobe_result.data(), centroid_dists.get(), false);
     }
     for (const auto part_id : nprobe_result) {
-        ivf_part_storages_[part_id]->SearchIndex(knn_distance_type, query_ptr, query_element_type, add_result_func);
+        ivf_part_storages_[part_id]->SearchIndex(knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func);
     }
 }
 
