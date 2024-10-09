@@ -794,7 +794,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
                 if (merge_flag == MergeFlag::kDelete) {
                     block_entry->DropColumnReplay(column_id);
-                } else if (merge_flag == MergeFlag::kNew) {
+                } else if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kUpdate) {
                     block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry,
                                                                                              column_id,
                                                                                              buffer_mgr,
@@ -802,8 +802,6 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                                                                                              last_chunk_offset,
                                                                                              commit_ts),
                                                  column_id);
-                } else if (merge_flag == MergeFlag::kUpdate) {
-                    // do nothing
                 } else {
                     UnrecoverableError(fmt::format("Unsupported merge flag {} for column entry {}", (i8)merge_flag, column_id));
                 }
