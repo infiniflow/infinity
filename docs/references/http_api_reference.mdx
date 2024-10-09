@@ -2371,3 +2371,167 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 </Tabs>
 
 ---
+
+## Show buffer
+
+**GET** `/instance/buffer`
+
+List the cached buffer objects in database.
+
+### Request
+
+- Method: GET
+- URL: `/instance/buffer`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/instance/buffer \
+     --header 'accept: application/json'
+```
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "buffer": [
+        {
+            "buffered_type": "Persistent",
+            "path": "/var/infinity/data/nlAn5spku9_db_default_db/sNzUhKy3er_table_table1/seg_0/blk_0/0.col",
+            "size": "32768",
+            "status": "Freed",
+            "type": "data"
+        },
+        {
+            "buffered_type": "Persistent",
+            "path": "/var/infinity/data/nlAn5spku9_db_default_db/sNzUhKy3er_table_table1/seg_0/blk_0/2.col",
+            "size": "131072",
+            "status": "Freed",
+            "type": "data"
+        },
+        {
+            "buffered_type": "Persistent",
+            "path": "/var/infinity/data/nlAn5spku9_db_default_db/sNzUhKy3er_table_table1/seg_0/blk_0/version",
+            "size": "65536",
+            "status": "Freed",
+            "type": "version data"
+        }
+    ],
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 2005,
+    "error_message": "Not support in maintenance mode"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Show profiles
+
+**GET** `/instance/profiles`
+
+When set session variable 'enable_profiling', Infinity will record query profile information. This command is to list recorded queries profile.
+
+### Request
+
+- Method: GET
+- URL: `/instance/profiles`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/instance/profiles \
+     --header 'accept: application/json'
+```
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "profiles": [
+        {
+            "command parsing": "250us",
+            "commit": "0ns",
+            "execution": "380us",
+            "logical plan building": "133us",
+            "physical plan building": "44us",
+            "pipeline building": "38us",
+            "plan optimizing": "1000ns",
+            "record_no": "0",
+            "rollback": "35us",
+            "task building": "70us",
+            "total_cost": "951us"
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 2005,
+    "error_message": "Not support in maintenance mode"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
