@@ -175,6 +175,23 @@ public:
 
     QueryResult Cleanup();
 
+    // Admin interface
+    QueryResult AdminShowCatalogs();
+    QueryResult AdminShowCatalog(i64 index);
+    QueryResult AdminShowLogs();
+    QueryResult AdminShowLog(i64 index);
+    QueryResult AdminShowConfigs();
+    QueryResult AdminShowVariables();
+    QueryResult AdminShowVariable(String var_name);
+    QueryResult AdminShowNodes();
+    QueryResult AdminShowNode(String var_name);
+    QueryResult AdminShowCurrentNode();
+    QueryResult AdminSetAdmin();
+    QueryResult AdminSetStandalone();
+    QueryResult AdminSetLeader(String node_name);
+    QueryResult AdminSetFollower(String node_name, const String& leader_address);
+    QueryResult AdminSetLearner(String node_name, const String& leader_address);
+
 private:
     SharedPtr<BaseSession> session_{};
 };
