@@ -988,11 +988,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
                                                                           TxnTimeStamp commit_ts,
                                                                           TxnTimeStamp deprecate_ts,
                                                                           BufferManager *buffer_mgr) {
-    if (chunk_id != next_chunk_id_) {
-        UnrecoverableError(fmt::format("Chunk id: {} is not equal to next chunk id: {}", chunk_id, next_chunk_id_));
-    }
     auto ret = this->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    ++next_chunk_id_;
     return ret;
 }
 
@@ -1006,16 +1002,20 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
                                                                        BufferManager *buffer_mgr) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    bool add = false;
+    bool added = false;
     for (auto &chunk : chunk_index_entries_) {
         if (chunk->chunk_id_ == chunk_id) {
             chunk = chunk_index_entry;
-            add = true;
+            added = true;
             break;
         }
     }
-    if (!add) {
-        chunk_index_entries_.push_back(chunk_index_entry);
+    if (!added) {
+        auto iter = std::find_if(chunk_index_entries_.begin(), chunk_index_entries_.end(), [&](const auto &chunk) {
+            return chunk->chunk_id_ > chunk_id;
+        });
+        chunk_index_entries_.insert(iter, chunk_index_entry);
+        next_chunk_id_ = std::max(next_chunk_id_, chunk_id + 1);
     }
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
         try {
