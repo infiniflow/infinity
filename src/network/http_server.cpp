@@ -60,6 +60,7 @@ import status;
 import constant_expr;
 import command_statement;
 import physical_import;
+import peer_task;
 
 namespace {
 
@@ -3312,6 +3313,72 @@ public:
     }
 };
 
+class ShowCurrentNodeHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+        http_status = HTTPStatus::CODE_200;
+        json_response["error_code"] = ErrorCode::kOk;
+        json_response["node_role"] = ToString(InfinityContext::instance().GetServerRole());
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowNodeByNameHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+        String node_name = request->getPathVariable("node_name");
+        infinity::Status status;
+        SharedPtr<NodeInfo> nodeinfo;
+        std::tie(status, nodeinfo) = InfinityContext::instance().cluster_manager()->GetNodeInfoPtrByName(node_name);
+        if (status.ok()) { 
+            http_status = HTTPStatus::CODE_200; 
+            json_response["error_code"] = ErrorCode::kOk;
+            json_response["node_role"] = ToString(nodeinfo->node_role_);
+        } else {
+            http_status = HTTPStatus::CODE_500;
+            json_response["error_code"] = status.code();
+            json_response["error_msg"] = status.message();
+        } 
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ListAllNodesHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+        nlohmann::json nodes_json;
+
+        Vector<SharedPtr<NodeInfo>> nodes = InfinityContext::instance().cluster_manager()->ListNodes();
+        for(const auto& ptr : nodes) {
+            nodes_json.push_back({ptr->node_name_, ToString(ptr->node_role_)});
+        }
+
+        http_status = HTTPStatus::CODE_200;
+        json_response["error_code"] = ErrorCode::kOk;
+        json_response["nodes"] = nodes_json;
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
 
 } // namespace
 
@@ -3389,6 +3456,11 @@ void HTTPServer::Start(const String& ip_address, u16 port) {
     router->route("GET", "/variables/session", MakeShared<ShowSessionVariablesHandler>());
     router->route("GET", "/variables/session/{variable_name}", MakeShared<ShowSessionVariableHandler>());
     router->route("SET", "/variables/session", MakeShared<SetSessionVariableHandler>());
+
+    //admin
+    router->route("GET", "/admin/node/current", MakeShared<ShowCurrentNodeHandler>());
+    router->route("GET", "/admin/node/{node_name}", MakeShared<ShowNodeByNameHandler>());
+    router->route("GET", "/admin/nodes", MakeShared<ListAllNodesHandler>());
 
     SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({ip_address, port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler = HttpConnectionHandler::createShared(router);

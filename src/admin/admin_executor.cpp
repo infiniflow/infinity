@@ -3720,10 +3720,12 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     output_block_ptr->Init(column_types);
 
     String node_name = admin_statement->node_name_.value();
-    SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->GetNodeInfoPtrByName(node_name);
-    if(server_node == nullptr) {
+    Status status;
+    SharedPtr<NodeInfo> server_node;
+    std::tie(status, server_node) = InfinityContext::instance().cluster_manager()->GetNodeInfoPtrByName(node_name);
+    if(!status.ok()) {
         query_result.result_table_ = nullptr;
-        query_result.status_ = Status::NotFound(fmt::format("No node: {} isn't found", node_name));
+        query_result.status_ = std::move(status);
         return query_result;
     }
 
