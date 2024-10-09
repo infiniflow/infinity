@@ -396,7 +396,7 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
-%token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
+%token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 %token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
@@ -1736,10 +1736,10 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kQueries;
 }
-| SHOW QUERY SESSION LONG_VALUE {
+| SHOW QUERY LONG_VALUE {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kQuery;
-    $$->session_id_ = $4;
+    $$->session_id_ = $3;
 }
 | SHOW TRANSACTIONS {
     $$ = new infinity::ShowStatement();
@@ -2016,7 +2016,7 @@ command_statement: USE IDENTIFIER {
     $$->command_info_ = std::make_shared<infinity::UseCmd>($2);
     free($2);
 }
-| EXPORT PROFILE LONG_VALUE file_path {
+| EXPORT PROFILES LONG_VALUE file_path {
     $$ = new infinity::CommandStatement();
     $$->command_info_ = std::make_shared<infinity::ExportCmd>($4, infinity::ExportType::kProfileRecord, $3);
     free($4);

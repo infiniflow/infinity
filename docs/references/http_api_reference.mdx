@@ -2489,7 +2489,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/instance/profiles`
 
-When set session variable 'enable_profiling', Infinity will record query profile information. This command is to list recorded queries profile.
+When set session variable 'profile', Infinity will record query profile information. This command is to list recorded queries profile.
 
 ### Request
 
@@ -2562,3 +2562,79 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 </Tabs>
 
 ---
+
+## Show queries
+
+**GET** `/instance/queries`
+
+Show running queries, only valid when config: record_running_query is set.
+
+### Request
+
+- Method: GET
+- URL: `/instance/queries`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/instance/queries \
+     --header 'accept: application/json'
+```
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0,
+    "queries": [
+        {
+            "query_id": "1928",
+            "query_kind": "COPY",
+            "session_id": "63",
+            "start_time": "21:22:49:708:989:0",
+            "time_consumption": "2s"
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 2005,
+    "error_message": "Not support in maintenance mode"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+
+
+
