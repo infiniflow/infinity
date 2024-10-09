@@ -879,7 +879,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                         using IndexT = std::decay_t<decltype(*index)>;
                         using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
 
-                        OneColumnIterator<SparseRefT, true /*check_ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                        CappedOneColumnIterator<SparseRefT, true /*check_ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts, row_count);
                         index->AddDocs(std::move(iter));
                     }
                 },
