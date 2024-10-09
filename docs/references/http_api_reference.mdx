@@ -822,7 +822,7 @@ Creates an index on a specified table. If an index with the same name exists, th
 
 #### Request example
 
-- Creates an HNSW index on a dense vector column:
+- Creates an HNSW index on a dense vector or a multivector column:
 
 ```shell
 curl --request POST \
@@ -902,7 +902,7 @@ curl --request POST \
      {
           "fields": 
           [
-              "sparse_column"
+              "varchar_column"
           ],
           "index": 
           {
