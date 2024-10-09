@@ -568,7 +568,7 @@ Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
     return result;
 }
 
-SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
+Tuple<Status, SharedPtr<NodeInfo>> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);
 
     if (this_node_->node_role_ == NodeRole::kAdmin or this_node_->node_role_ == NodeRole::kStandalone or
@@ -580,20 +580,20 @@ SharedPtr<NodeInfo> ClusterManager::GetNodeInfoPtrByName(const String &node_name
     if (this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
         if (node_name == leader_node_->node_name_) {
             // Show leader
-            return leader_node_;
+            return {Status::OK(), leader_node_};
         }
     }
 
     if (node_name == this_node_->node_name_) {
         // Show this node
-        return this_node_;
+        return {Status::OK(), this_node_};
     }
 
     auto iter = other_node_map_.find(node_name);
     if (iter == other_node_map_.end()) {
-        return nullptr;
+        return {Status::NotExistNode(node_name), nullptr};
     }
-    return iter->second;
+    return {Status::OK(), iter->second};
 }
 
 SharedPtr<NodeInfo> ClusterManager::ThisNode() const {
