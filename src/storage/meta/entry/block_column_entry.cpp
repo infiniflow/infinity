@@ -278,7 +278,7 @@ void BlockColumnEntry::FlushColumn(TxnTimeStamp checkpoint_ts) {
     BlockColumnEntry::Flush(this, 0, row_cnt);
 }
 
-void BlockColumnEntry::DropColumn() { 
+void BlockColumnEntry::DropColumn() {
     buffer_->SubObjRc();
     for (auto *outline_buffer : outline_buffers_) {
         outline_buffer->SubObjRc();

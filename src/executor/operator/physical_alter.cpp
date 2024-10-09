@@ -25,17 +25,7 @@ import txn;
 import status;
 import infinity_exception;
 import value;
-import bind_context;
-import value_expression;
-import expression_binder;
 import defer_op;
-import cast_function;
-import bound_cast_func;
-import base_expression;
-import cast_expression;
-import expression_evaluator;
-import column_vector;
-import expression_state;
 
 namespace infinity {
 
@@ -61,35 +51,7 @@ bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *ope
 
     Txn *txn = query_context->GetTxn();
 
-    ExpressionBinder tmp_binder(nullptr);
-    Vector<Value> values;
-    for (const auto &column_def : column_defs_) {
-        if (!column_def->has_default_value()) {
-            UnrecoverableError(fmt::format("Column {} has no default value", column_def->name()));
-        }
-        SharedPtr<ConstantExpr> default_expr = column_def->default_value();
-        auto expr = tmp_binder.BuildValueExpr(*default_expr, nullptr, 0, false);
-        auto *value_expr = static_cast<ValueExpression *>(expr.get());
-
-        const SharedPtr<DataType> &column_type = column_def->type();
-        if (value_expr->Type() == *column_type) {
-            values.push_back(value_expr->GetValue());
-        } else {
-            const SharedPtr<DataType> &column_type = column_def->type();
-
-            BoundCastFunc cast = CastFunction::GetBoundFunc(value_expr->Type(), *column_type);
-            SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, expr, *column_type);
-            SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(cast_expr);
-            SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(column_type);
-            output_column_vector->Initialize(ColumnVectorType::kConstant, 1);
-            ExpressionEvaluator evaluator;
-            evaluator.Init(nullptr);
-            evaluator.Execute(cast_expr, expr_state, output_column_vector);
-
-            values.push_back(output_column_vector->GetValue(0));
-        }
-    }
-    auto status = txn->AddColumns(table_entry_, column_defs_, values);
+    auto status = txn->AddColumns(table_entry_, column_defs_);
     if (!status.ok()) {
         RecoverableError(status);
     }
