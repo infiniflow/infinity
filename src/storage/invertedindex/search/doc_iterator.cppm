@@ -26,7 +26,6 @@ namespace infinity {
 export enum class EarlyTermAlgo { kNaive, kBMM, kBMW, kCompare };
 
 export enum class DocIteratorType : u8 {
-    kDocIterator,
     kTermDocIterator,
     kPhraseIterator,
     kAndIterator,
@@ -43,7 +42,7 @@ public:
 
     virtual ~DocIterator();
 
-    RowID DocID() { return doc_id_; }
+    RowID DocID() const { return doc_id_; }
 
     inline u32 GetDF() const { return doc_freq_; }
 
@@ -62,7 +61,7 @@ public:
 
     /* virtual methods */
 
-    virtual DocIteratorType GetType() const { return DocIteratorType::kDocIterator; }
+    virtual DocIteratorType GetType() const = 0;
     virtual String Name() const = 0;
 
     // Update doc_id_ to one no less than given doc_id.
@@ -72,6 +71,10 @@ public:
     virtual float BM25Score() = 0;
 
     virtual void UpdateScoreThreshold(float threshold) = 0;
+
+    // for minimum_should_match parameter
+    virtual u32 LeafCount() const = 0;
+    virtual u32 MatchCount() const = 0;
 
     // print the query tree, for debugging
     virtual void PrintTree(std::ostream &os, const String &prefix = "", bool is_final = true) const = 0;

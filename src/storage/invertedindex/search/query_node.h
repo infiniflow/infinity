@@ -38,7 +38,6 @@ enum class QueryNodeType : char {
     AND_NOT,
     OR,
     // unimplemented:
-    WAND,
     PREFIX_TERM,
     SUFFIX_TERM,
     SUBSTRING_TERM,

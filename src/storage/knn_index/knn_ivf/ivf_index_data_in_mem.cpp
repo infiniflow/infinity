@@ -199,8 +199,8 @@ public:
     void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,
                           const void *query_ptr,
                           const EmbeddingDataType query_element_type,
-                          std::function<bool(SegmentOffset)> satisfy_filter_func,
-                          std::function<void(f32, SegmentOffset)> add_result_func) const override {
+                          const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                          const std::function<void(f32, SegmentOffset)> &add_result_func) const override {
         auto ReturnT = [&]<EmbeddingDataType query_element_type> {
             if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
                           (query_element_type == embedding_data_type &&
@@ -232,8 +232,8 @@ public:
     template <EmbeddingDataType query_element_type>
     void SearchIndexInMemT(const KnnDistanceBase1 *knn_distance,
                            const EmbeddingDataTypeToCppTypeT<query_element_type> *query_ptr,
-                           std::function<bool(SegmentOffset)> satisfy_filter_func,
-                           std::function<void(f32, SegmentOffset)> add_result_func) const {
+                           const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                           const std::function<void(f32, SegmentOffset)> &add_result_func) const {
         using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
         auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
         if (!knn_distance_1) [[unlikely]] {
@@ -324,8 +324,8 @@ void IVFIndexInMem::SearchIndex(const KnnDistanceBase1 *knn_distance,
                                 const void *query_ptr,
                                 const EmbeddingDataType query_element_type,
                                 const u32 nprobe,
-                                std::function<bool(SegmentOffset)> satisfy_filter_func,
-                                std::function<void(f32, SegmentOffset)> add_result_func) const {
+                                const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                                const std::function<void(f32, SegmentOffset)> &add_result_func) const {
     std::shared_lock lock(rw_mutex_);
     if (have_ivf_index_.test(std::memory_order_acquire)) {
         ivf_index_storage_->SearchIndex(knn_distance, query_ptr, query_element_type, nprobe, satisfy_filter_func, add_result_func);

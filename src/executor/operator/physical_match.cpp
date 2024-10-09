@@ -67,6 +67,7 @@ import roaring_bitmap;
 import segment_entry;
 import knn_filter;
 import highlighter;
+import parse_fulltext_options;
 
 namespace infinity {
 
@@ -100,6 +101,10 @@ public:
     float BM25Score() override { return query_iterator_->BM25Score(); }
 
     void UpdateScoreThreshold(float threshold) override { query_iterator_->UpdateScoreThreshold(threshold); }
+
+    // for minimum_should_match parameter
+    u32 LeafCount() const override { return query_iterator_->LeafCount(); }
+    u32 MatchCount() const override { return query_iterator_->MatchCount(); }
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
         os << prefix;
@@ -181,17 +186,19 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
     }
 }
 
-void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt) {
-    // et_iter is nullptr if fulltext index is present but there's no data
-    if (et_iter == nullptr) {
-        LOG_DEBUG(fmt::format("et_iter is nullptr"));
-        return;
-    }
+template <bool use_minimum_should_match>
+void ExecuteFTSearchT(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt, const u32 minimum_should_match) {
     while (true) {
         ++blockmax_loop_cnt;
         bool ok = et_iter->Next();
         if (!ok) [[unlikely]] {
             break;
+        }
+        if constexpr (use_minimum_should_match) {
+            assert(minimum_should_match >= 2);
+            if (et_iter->MatchCount() < minimum_should_match) {
+                continue;
+            }
         }
         RowID id = et_iter->DocID();
         float et_score = et_iter->BM25Score();
@@ -209,6 +216,30 @@ void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &r
         if (blockmax_loop_cnt % 10 == 0) {
             LOG_DEBUG(fmt::format("ExecuteFTSearch has evaluated {} candidates", blockmax_loop_cnt));
         }
+    }
+}
+
+void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter,
+                     FullTextScoreResultHeap &result_heap,
+                     u32 &blockmax_loop_cnt,
+                     const MinimumShouldMatchOption &minimum_should_match_option) {
+    // et_iter is nullptr if fulltext index is present but there's no data
+    if (et_iter == nullptr) {
+        LOG_DEBUG(fmt::format("et_iter is nullptr"));
+        return;
+    }
+    u32 minimum_should_match_val = 0;
+    if (!minimum_should_match_option.empty()) {
+        const auto leaf_count = et_iter->LeafCount();
+        minimum_should_match_val = GetMinimumShouldMatchParameter(minimum_should_match_option, leaf_count);
+    }
+    if (minimum_should_match_val <= 1) {
+        // no need for minimum_should_match
+        return ExecuteFTSearchT<false>(et_iter, result_heap, blockmax_loop_cnt, 0);
+    } else {
+        // now minimum_should_match_val >= 2
+        // use minimum_should_match
+        return ExecuteFTSearchT<true>(et_iter, result_heap, blockmax_loop_cnt, minimum_should_match_val);
     }
 }
 
@@ -300,7 +331,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 #ifdef INFINITY_DEBUG
         auto blockmax_begin_ts = std::chrono::high_resolution_clock::now();
 #endif
-        ExecuteFTSearch(et_iter, result_heap, blockmax_loop_cnt);
+        ExecuteFTSearch(et_iter, result_heap, blockmax_loop_cnt, minimum_should_match_option_);
         result_heap.Sort();
         blockmax_result_count = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG
@@ -315,7 +346,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 #ifdef INFINITY_DEBUG
         auto ordinary_begin_ts = std::chrono::high_resolution_clock::now();
 #endif
-        ExecuteFTSearch(doc_iterator, result_heap, ordinary_loop_cnt);
+        ExecuteFTSearch(doc_iterator, result_heap, ordinary_loop_cnt, minimum_should_match_option_);
         result_heap.Sort();
         ordinary_result_count = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG
@@ -471,11 +502,13 @@ PhysicalMatch::PhysicalMatch(u64 id,
                              EarlyTermAlgo early_term_algo,
                              u32 top_n,
                              const SharedPtr<CommonQueryFilter> &common_query_filter,
+                             MinimumShouldMatchOption &&minimum_should_match_option,
                              u64 match_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, load_metas), table_index_(match_table_index),
+    : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, std::move(load_metas)), table_index_(match_table_index),
       base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), index_reader_(index_reader), query_tree_(std::move(query_tree)),
-      begin_threshold_(begin_threshold), early_term_algo_(early_term_algo), top_n_(top_n), common_query_filter_(common_query_filter) {}
+      begin_threshold_(begin_threshold), early_term_algo_(early_term_algo), top_n_(top_n), common_query_filter_(common_query_filter),
+      minimum_should_match_option_(std::move(minimum_should_match_option)){}
 
 PhysicalMatch::~PhysicalMatch() = default;
 

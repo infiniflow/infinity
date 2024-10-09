@@ -552,8 +552,6 @@ std::string QueryNodeTypeToString(QueryNodeType type) {
             return "OR";
         case QueryNodeType::NOT:
             return "NOT";
-        case QueryNodeType::WAND:
-            return "WAND";
         case QueryNodeType::PHRASE:
             return "PHRASE";
         case QueryNodeType::PREFIX_TERM:

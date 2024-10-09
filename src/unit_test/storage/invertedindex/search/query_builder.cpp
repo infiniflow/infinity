@@ -42,7 +42,7 @@ public:
     }
     ~MockVectorDocIterator() override = default;
 
-    DocIteratorType GetType() const override { return DocIteratorType::kDocIterator; }
+    DocIteratorType GetType() const override { return DocIteratorType::kTermDocIterator; }
     String Name() const override { return "MockVectorDocIterator"; }
 
     bool Next(RowID doc_id) override {
@@ -60,6 +60,9 @@ public:
     float BM25Score() override { return 0.1f; }
 
     void UpdateScoreThreshold(float threshold) override {}
+
+    u32 LeafCount() const override { return 1; }
+    u32 MatchCount() const override { return DocID() != INVALID_ROWID; }
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final = true) const override {
         os << prefix;
