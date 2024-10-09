@@ -124,15 +124,19 @@ void AndIterator::UpdateScoreThreshold(float threshold) {
     }
 }
 
+u32 AndIterator::LeafCount() const {
+    return std::accumulate(children_.begin(), children_.end(), static_cast<u32>(0), [](const u32 cnt, const auto &it) {
+        return cnt + it->LeafCount();
+    });
+}
+
 u32 AndIterator::MatchCount() const {
     if (DocID() == INVALID_ROWID) {
         return 0;
     }
-    u32 result = fixed_match_count_;
-    for (const auto id : dyn_match_ids_) {
-        result += children_[id]->MatchCount();
-    }
-    return result;
+    return std::accumulate(dyn_match_ids_.begin(), dyn_match_ids_.end(), fixed_match_count_, [&](const u32 cnt, const u32 id) {
+        return cnt + children_[id]->MatchCount();
+    });
 }
 
 } // namespace infinity

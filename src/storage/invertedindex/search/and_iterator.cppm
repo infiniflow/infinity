@@ -39,6 +39,8 @@ public:
 
     void UpdateScoreThreshold(float threshold) override;
 
+    u32 LeafCount() const override;
+
     u32 MatchCount() const override;
 
 private:

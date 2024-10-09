@@ -61,6 +61,7 @@ public:
 
     void UpdateScoreThreshold(float threshold) override {}
 
+    u32 LeafCount() const override { return 1; }
     u32 MatchCount() const override { return DocID() != INVALID_ROWID; }
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final = true) const override {
