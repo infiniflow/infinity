@@ -7,6 +7,11 @@ on:
       - "v*.*.*"                  # normal release
       - "nightly"                 # mutable tag
       - "slow-test"               # mutable tag
+  pull_request:
+    types: [ opened, synchronize, reopened, labeled ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
@@ -16,6 +21,7 @@ concurrency:
 jobs:
   slow_tests:
     name: run slow test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'invalid') }}
     runs-on: ["self-hosted", "slow-test" ]
     steps:
 
