@@ -41,6 +41,8 @@ public:
 
     float BM25Score() override;
 
+    u32 LeafCount() const override;
+
     u32 MatchCount() const override;
 
 private:

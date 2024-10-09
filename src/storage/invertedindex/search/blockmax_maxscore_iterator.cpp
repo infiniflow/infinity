@@ -105,6 +105,11 @@ void BlockMaxMaxscoreIterator::UpdateScoreThreshold(const float threshold) {
     threshold_ = threshold;
 }
 
+u32 BlockMaxMaxscoreIterator::LeafCount() const {
+    UnrecoverableError("BMM not supported now");
+    return 0;
+}
+
 u32 BlockMaxMaxscoreIterator::MatchCount() const {
     UnrecoverableError("BMM not supported now");
     return 0;
