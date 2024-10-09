@@ -33,6 +33,6 @@ SELECT * FROM table1;
 1 test
 2 test2
 
-# statement ok
-# DROP TABLE table1;
+statement ok
+DROP TABLE table1;
 

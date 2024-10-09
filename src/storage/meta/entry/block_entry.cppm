@@ -95,6 +95,8 @@ public:
 
     void AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id);
 
+    void DropColumnReplay(ColumnID column_id);
+
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
@@ -146,7 +148,7 @@ public:
     // Relative to the `data_dir` config item
     const SharedPtr<String> &block_dir() const { return block_dir_; }
 
-    BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
+    BlockColumnEntry *GetColumnBlockEntry(SizeT column_idx) const { return columns_[column_idx].get(); }
 
     FastRoughFilter *GetFastRoughFilter() { return fast_rough_filter_.get(); }
 

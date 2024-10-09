@@ -144,6 +144,84 @@ class TestInfinity:
 
         db_obj.drop_table(table_name)
 
+    def test_insert_after_drop_columns(self):
+        table_name = "testing_table" + self.suffix
+        db_obj = self.infinity_obj.get_database("default_db")
+
+        db_obj.drop_table(table_name, infinity.common.ConflictType.Ignore)
+
+        table_obj = db_obj.create_table(
+            table_name,
+            {
+                "num": {"type": "integer"},
+                "body": {"type": "varchar"},
+                "vec": {"type": "vector,4,float"},
+            },
+        )
+
+        table_obj.add_columns(
+            {
+                "column_name1": {"type": "integer", "default": 0},
+                "column_name2": {"type": "float", "default": 0.0},
+                "column_name3": {"type": "varchar", "default": ""},
+            }
+        )
+        table_obj.drop_columns(["column_name1"])
+        table_obj.insert(
+            [
+                {
+                    "num": 1,
+                    "body": "unnecessary and harmful",
+                    "vec": [1.0, 1.2, 0.8, 0.9],
+                },
+                {
+                    "num": 2,
+                    "body": "Office for Harmful Blooms",
+                    "vec": [4.0, 4.2, 4.3, 4.5],
+                },
+                {
+                    "num": 3,
+                    "body": "A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
+                    "vec": [4.0, 4.2, 4.3, 4.2],
+                },
+            ]
+        )
+
+        result = table_obj.output(["*"]).to_df()
+        print(result)
+        pd.testing.assert_frame_equal(
+            result,
+            pd.DataFrame(
+                {
+                    "num": [1, 2, 3],
+                    "body": [
+                        "unnecessary and harmful",
+                        "Office for Harmful Blooms",
+                        "A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
+                    ],
+                    "vec": [
+                        [1.0, 1.2, 0.8, 0.9],
+                        [4.0, 4.2, 4.3, 4.5],
+                        [4.0, 4.2, 4.3, 4.2],
+                    ],
+                    "column_name2": [0.0, 0.0, 0.0],
+                    "column_name3": ["", "", ""],
+                }
+            ).astype(
+                {
+                    "num": dtype("int32"),
+                    "body": dtype("object"),
+                    "vec": dtype("object"),
+                    "column_name2": dtype("float32"),
+                    "column_name3": dtype("object"),
+                }
+            ),
+        )
+        db_obj.drop_table(table_name)
+        self.infinity_obj.disconnect()
+
+        print("test done")
+
     def test_add_drop_column_with_index(self):
         table_name = "test_add_drop_column_with_index" + self.suffix
         db_obj = self.infinity_obj.get_database("default_db")
