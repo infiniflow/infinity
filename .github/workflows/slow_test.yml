@@ -51,7 +51,9 @@ jobs:
 
       - name: Install pysdk for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && cd python/infinity_sdk/ && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && cd python/infinity_sdk/ && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
@@ -72,7 +74,7 @@ jobs:
           sudo chmod +x scripts/timeout_kill.sh
           sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
           if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
+            echo "Failed to kill infinity release version"
             exit 1
           fi
 
