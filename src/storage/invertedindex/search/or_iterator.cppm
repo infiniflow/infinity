@@ -49,6 +49,8 @@ export class OrIterator : public MultiDocIterator {
 public:
     OrIterator(Vector<UniquePtr<DocIterator>> iterators);
 
+    DocIteratorType GetType() const override { return DocIteratorType::kOrIterator; }
+
     String Name() const override { return "OrIterator"; }
 
     /* pure virtual methods implementation */
@@ -57,6 +59,8 @@ public:
     float BM25Score() override;
 
     void UpdateScoreThreshold(float threshold) override;
+
+    u32 MatchCount() const override;
 
 private:
     DocIterator *GetDocIterator(u32 i) { return children_[i].get(); }

@@ -27,6 +27,8 @@ export class AndNotIterator : public MultiDocIterator {
 public:
     AndNotIterator(Vector<UniquePtr<DocIterator>> iterators);
 
+    DocIteratorType GetType() const override { return DocIteratorType::kAndNotIterator; }
+
     String Name() const override { return "AndNotIterator"; }
 
     /* pure virtual methods implementation */
@@ -35,5 +37,8 @@ public:
     float BM25Score() override;
 
     void UpdateScoreThreshold(float threshold) override;
+
+    u32 MatchCount() const override;
+
 };
 } // namespace infinity

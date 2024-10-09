@@ -60,4 +60,6 @@ float AndNotIterator::BM25Score() { return children_[0]->BM25Score(); }
 
 void AndNotIterator::UpdateScoreThreshold(float threshold) { children_[0]->UpdateScoreThreshold(threshold); }
 
+u32 AndNotIterator::MatchCount() const { return children_[0]->MatchCount(); }
+
 } // namespace infinity

@@ -257,4 +257,14 @@ float BlockMaxWandIterator::BM25Score() {
     return sum_score;
 }
 
+u32 BlockMaxWandIterator::MatchCount() const {
+    u32 count = 0;
+    if (const auto current_doc_id = DocID(); current_doc_id != INVALID_ROWID) {
+        for (u32 i = 0; i < sorted_iterators_.size() && sorted_iterators_[i]->DocID() == current_doc_id; ++i) {
+            count += sorted_iterators_[i]->MatchCount();
+        }
+    }
+    return count;
+}
+
 } // namespace infinity

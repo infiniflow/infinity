@@ -16,6 +16,7 @@ module;
 
 export module blockmax_maxscore_iterator;
 import stl;
+import doc_iterator;
 import term_doc_iterator;
 import multi_doc_iterator;
 import internal_types;
@@ -30,6 +31,8 @@ public:
 
     ~BlockMaxMaxscoreIterator() override;
 
+    DocIteratorType GetType() const override { return DocIteratorType::kBMMIterator; }
+
     String Name() const override { return "BlockMaxMaxscoreIterator"; }
 
     void UpdateScoreThreshold(float threshold) override;
@@ -37,6 +40,8 @@ public:
     bool Next(RowID doc_id) override;
 
     float BM25Score() override;
+
+    u32 MatchCount() const override;
 
 private:
     void Init();

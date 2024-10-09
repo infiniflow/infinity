@@ -17,6 +17,7 @@ module;
 export module blockmax_wand_iterator;
 import stl;
 import index_defines;
+import doc_iterator;
 import term_doc_iterator;
 import multi_doc_iterator;
 import internal_types;
@@ -30,6 +31,8 @@ public:
 
     ~BlockMaxWandIterator() override;
 
+    DocIteratorType GetType() const override { return DocIteratorType::kBMWIterator; }
+
     String Name() const override { return "BlockMaxWandIterator"; }
 
     void UpdateScoreThreshold(float threshold) override;
@@ -37,6 +40,8 @@ public:
     bool Next(RowID doc_id) override;
 
     float BM25Score() override;
+
+    u32 MatchCount() const override;
 
 private:
     // block max info

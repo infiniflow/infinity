@@ -47,6 +47,8 @@ public:
             threshold_ = threshold;
     }
 
+    u32 MatchCount() const override { return DocID() != INVALID_ROWID; }
+
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
 
     // debug info

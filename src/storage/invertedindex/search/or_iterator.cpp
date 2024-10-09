@@ -107,4 +107,15 @@ void OrIterator::UpdateScoreThreshold(float threshold) {
     }
 }
 
+u32 OrIterator::MatchCount() const {
+    u32 count = 0;
+    if (const auto current_doc_id = DocID(); current_doc_id != INVALID_ROWID) {
+        for (u32 i = 0; i < children_.size(); ++i) {
+            if (children_[i]->DocID() == current_doc_id)
+                count += children_[i]->MatchCount();
+        }
+    }
+    return count;
+}
+
 } // namespace infinity

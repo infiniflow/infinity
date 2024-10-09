@@ -101,6 +101,9 @@ public:
 
     void UpdateScoreThreshold(float threshold) override { query_iterator_->UpdateScoreThreshold(threshold); }
 
+    // for minimum_should_match parameter
+    u32 MatchCount() const override { return query_iterator_->MatchCount(); }
+
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
         os << prefix;
         os << (is_final ? "└──" : "├──");
