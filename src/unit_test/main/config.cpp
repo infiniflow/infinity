@@ -103,6 +103,9 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.StorageType(), StorageType::kLocal);
     EXPECT_EQ(config.ObjectStorageUrl(), "0.0.0.0:9000");
     EXPECT_EQ(config.ObjectStorageBucket(), "infinity");
+    EXPECT_EQ(config.ObjectStorageAccessKey(), "minioadmin");
+    EXPECT_EQ(config.ObjectStorageSecretKey(), "minioadmin");
+    EXPECT_EQ(config.ObjectStorageHttps(), false);
 
     // buffer
     EXPECT_EQ(config.BufferManagerSize(), 3 * 1024l * 1024l * 1024l);

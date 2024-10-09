@@ -75,7 +75,7 @@ public:
                                   bool HTTPS = false,
                                   const String &access_key = "minioadmin",
                                   const String &secret_key = "minioadmin",
-                                  const String &bucket = "infinity_bucket");
+                                  const String &bucket = "infinity");
 
     static Status UnInitRemoteStore();
 
@@ -84,6 +84,8 @@ public:
     static Status UploadObject(const String &file_dir, const String& object_name);
     static Status RemoveObject(const String &object_name);
     static Status CopyObject(const String &src_object_name, const String &dst_object_name);
+    //
+    static bool BucketExists();
 
 private:
     static std::mutex mtx_;

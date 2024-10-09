@@ -103,4 +103,21 @@ Status S3ClientMinio::CopyObject(const String &src_bucket_name,
     return Status::OK();
 }
 
+bool S3ClientMinio::BucketExists(const String &bucket_name) {
+    // Create bucket exists arguments.
+    minio::s3::BucketExistsArgs args;
+    args.bucket = bucket_name;
+
+    // Call bucket exists.
+    minio::s3::BucketExistsResponse resp = client_->BucketExists(args);
+    // Handle response.
+    if (resp && resp.exist) {
+        return true;
+    } else {
+        return false;
+    }
+
+    return false;
+}
+
 } // namespace infinity

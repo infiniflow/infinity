@@ -1405,6 +1405,51 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                         global_options_.AddOption(std::move(object_bucket_option));
                                         break;
                                     }
+                                    case GlobalOptionIndex::kObjectStorageAccessKey: {
+                                        String object_storage_access_key_str;
+                                        if (elem.second.is_string()) {
+                                            Optional<String> str_optional = elem.second.value<std::string>();
+                                            if (!str_optional.has_value()) {
+                                                return Status::InvalidConfig("'access_key' field in [storage.object_storage] isn't string");
+                                            }
+                                            object_storage_access_key_str = *str_optional;
+                                        } else {
+                                            return Status::InvalidConfig("'access_key' field in [storage.object_storage] isn't string");
+                                        }
+                                        auto object_storage_access_key_option = MakeUnique<StringOption>(OBJECT_STORAGE_ACCESS_KEY_OPTION_NAME, object_storage_access_key_str);
+                                        global_options_.AddOption(std::move(object_storage_access_key_option));
+                                        break;
+                                    }
+                                    case GlobalOptionIndex::kObjectStorageSecretKey: {
+                                        String object_storage_secret_key_str;
+                                        if (elem.second.is_string()) {
+                                            Optional<String> str_optional = elem.second.value<std::string>();
+                                            if (!str_optional.has_value()) {
+                                                return Status::InvalidConfig("'secret_key' field in [storage.object_storage] isn't string");
+                                            }
+                                            object_storage_secret_key_str = *str_optional;
+                                        } else {
+                                            return Status::InvalidConfig("'secret_key' field in [storage.object_storage] isn't string");
+                                        }
+                                        auto object_storage_secret_key_option = MakeUnique<StringOption>(OBJECT_STORAGE_SECRET_KEY_OPTION_NAME, object_storage_secret_key_str);
+                                        global_options_.AddOption(std::move(object_storage_secret_key_option));
+                                        break;
+                                    }
+                                    case GlobalOptionIndex::kObjectStorageHttps: {
+                                        bool https = false;
+                                        if (elem.second.is_boolean()) {
+                                            https = elem.second.value_or(https);
+                                        } else {
+                                            return Status::InvalidConfig("'enable_https' field isn't boolean.");
+                                        }
+
+                                        UniquePtr<BooleanOption> object_storage_https_option = MakeUnique<BooleanOption>(OBJECT_STORAGE_ENABLE_HTTPS_OPTION_NAME, https);
+                                        Status status = global_options_.AddOption(std::move(object_storage_https_option));
+                                        if(!status.ok()) {
+                                            UnrecoverableError(status.message());
+                                        }
+                                        break;
+                                    }
                                     default: {
                                         return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage.object_storage' field", var_name));
                                     }
@@ -1420,6 +1465,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                 if (!status.ok()) {
                                     UnrecoverableError(status.message());
                                 }
+                            }
+                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageAccessKey) == nullptr) {
+                                return Status::InvalidConfig("No 'access_key' field in [storage.object_storage]");
+                            }
+                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageSecretKey) == nullptr) {
+                                return Status::InvalidConfig("No 'secret_key' field in [storage.object_storage]");
+                            }
+                            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kObjectStorageHttps) == nullptr) {
+                                return Status::InvalidConfig("No 'enable_https' field in [storage.object_storage]");
                             }
                             break;
                         }
@@ -2161,6 +2215,21 @@ String Config::ObjectStorageBucket() {
     return global_options_.GetStringValue(GlobalOptionIndex::kObjectStorageBucket);
 }
 
+String Config::ObjectStorageAccessKey() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kObjectStorageAccessKey);
+}
+
+String Config::ObjectStorageSecretKey() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kObjectStorageSecretKey);
+}
+
+bool Config::ObjectStorageHttps() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetBoolValue(GlobalOptionIndex::kObjectStorageHttps);
+}
+
 // Persistence
 String Config::PersistenceDir() {
     std::lock_guard<std::mutex> guard(mutex_);
@@ -2317,6 +2386,10 @@ void Config::PrintAll() {
         case StorageType::kMinio: {
             fmt::print(" - object_storage_url: {}\n", ObjectStorageUrl());
             fmt::print(" - object_storage_bucket: {}\n", ObjectStorageBucket());
+            fmt::print(" - object_storage_access_key: {}\n", ObjectStorageAccessKey());
+            fmt::print(" - object_storage_secret_key: {}\n", ObjectStorageSecretKey());
+            fmt::print(" - object_storage_enable_https: {}\n", ObjectStorageHttps());
+            break;
         }
         default: {
             break;
