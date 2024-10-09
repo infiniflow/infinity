@@ -70,8 +70,8 @@ public:
     virtual void SearchIndex(const KnnDistanceBase1 *knn_distance,
                              const void *query_ptr,
                              EmbeddingDataType query_element_type,
-                             std::function<bool(SegmentOffset)> satisfy_filter_func,
-                             std::function<void(f32, SegmentOffset)> add_result_func) const = 0;
+                             const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                             const std::function<void(f32, SegmentOffset)> &add_result_func) const = 0;
 
     // only for unit-test, return f32 / i8 / u8 embedding data
     virtual Pair<const void *, SharedPtr<void>> GetDataForTest(u32 embedding_id) const = 0;
@@ -109,8 +109,8 @@ public:
                      const void *query_ptr,
                      EmbeddingDataType query_element_type,
                      u32 nprobe,
-                     std::function<bool(SegmentOffset)> satisfy_filter_func,
-                     std::function<void(f32, SegmentOffset)> add_result_func) const;
+                     const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                     const std::function<void(f32, SegmentOffset)> &add_result_func) const;
 
     void GetMemData(IVF_Index_Storage &&mem_data);
     void Save(LocalFileHandle &file_handle) const;

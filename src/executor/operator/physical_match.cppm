@@ -35,6 +35,7 @@ import logger;
 import column_index_reader;
 import query_node;
 import doc_iterator;
+import parse_fulltext_options;
 
 namespace infinity {
 
@@ -44,11 +45,12 @@ public:
                            SharedPtr<BaseTableRef> base_table_ref,
                            SharedPtr<MatchExpression> match_expr,
                            IndexReader index_reader,
-                           UniquePtr<QueryNode>&& query_tree,
+                           UniquePtr<QueryNode> &&query_tree,
                            float begin_threshold,
                            EarlyTermAlgo early_term_algo,
                            u32 top_n,
                            const SharedPtr<CommonQueryFilter> &common_query_filter,
+                           MinimumShouldMatchOption &&minimum_should_match_option,
                            u64 match_table_index,
                            SharedPtr<Vector<LoadMeta>> load_metas);
 
@@ -56,11 +58,11 @@ public:
 
     void Init() override;
 
-    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SharedPtr<Vector<String>> GetOutputNames() const final;
+    SharedPtr<Vector<String>> GetOutputNames() const override;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
 
     SizeT TaskletCount() override {
         return 1;
@@ -94,6 +96,8 @@ private:
 
     // for filter
     SharedPtr<CommonQueryFilter> common_query_filter_;
+    // for minimum_should_match
+    MinimumShouldMatchOption minimum_should_match_option_{};
 
     bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
     bool ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state);
