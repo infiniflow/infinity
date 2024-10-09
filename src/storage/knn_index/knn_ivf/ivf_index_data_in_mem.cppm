@@ -23,7 +23,6 @@ import ivf_index_storage;
 import column_def;
 import logical_type;
 import buffer_handle;
-import knn_expr;
 
 namespace infinity {
 
@@ -32,6 +31,7 @@ class BufferManager;
 class ChunkIndexEntry;
 class SegmentIndexEntry;
 class IndexBase;
+class KnnDistanceBase1;
 
 export class IVFIndexInMem {
 protected:
@@ -61,17 +61,19 @@ public:
                                  u32 row_offset,
                                  u32 row_count) = 0;
     virtual SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) = 0;
-    void SearchIndex(KnnDistanceType knn_distance_type,
+    void SearchIndex(const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      EmbeddingDataType query_element_type,
                      u32 nprobe,
+                     std::function<bool(SegmentOffset)> satisfy_filter_func,
                      std::function<void(f32, SegmentOffset)> add_result_func) const;
     static SharedPtr<IVFIndexInMem> NewIVFIndexInMem(const ColumnDef *column_def, const IndexBase *index_base, RowID begin_row_id);
 
 private:
-    virtual void SearchIndexInMem(KnnDistanceType knn_distance_type,
+    virtual void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,
                                   const void *query_ptr,
                                   EmbeddingDataType query_element_type,
+                                  std::function<bool(SegmentOffset)> satisfy_filter_func,
                                   std::function<void(f32, SegmentOffset)> add_result_func) const = 0;
 };
 

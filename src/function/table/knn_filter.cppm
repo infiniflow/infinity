@@ -39,7 +39,7 @@ export class AppendFilter final : public FilterBase<SegmentOffset> {
 public:
     AppendFilter(SegmentOffset max_segment_offset) : max_segment_offset_(max_segment_offset) {}
 
-    bool operator()(const SegmentOffset &segment_offset) const final { return segment_offset <= max_segment_offset_; }
+    bool operator()(const SegmentOffset &segment_offset) const final { return segment_offset < max_segment_offset_; }
 
 private:
     const SegmentOffset max_segment_offset_;

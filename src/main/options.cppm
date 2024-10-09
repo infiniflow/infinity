@@ -155,8 +155,11 @@ export enum class GlobalOptionIndex : i8 {
     kObjectStorage = 39,
     kObjectStorageUrl = 40,
     kObjectStorageBucket = 41,
+    kObjectStorageAccessKey = 42,
+    kObjectStorageSecretKey = 43,
+    kObjectStorageHttps = 44,
 
-    kInvalid = 42,
+    kInvalid = 45,
 };
 
 export struct GlobalOptions {

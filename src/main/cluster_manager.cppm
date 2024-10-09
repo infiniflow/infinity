@@ -82,7 +82,7 @@ public:
     Vector<SharedPtr<NodeInfo>> ListNodes() const;
 
     // Used by all nodes ADMIN SHOW NODE node_name;
-    SharedPtr<NodeInfo> GetNodeInfoPtrByName(const String &node_name) const;
+    Tuple<Status, SharedPtr<NodeInfo>> GetNodeInfoPtrByName(const String &node_name) const;
 
     // Used by all nodes / all mode ADMIN SHOW NODE;
     SharedPtr<NodeInfo> ThisNode() const;

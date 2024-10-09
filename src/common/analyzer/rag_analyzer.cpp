@@ -29,6 +29,7 @@ import term;
 import stemmer;
 import analyzer;
 import darts_trie;
+import lemmatizer;
 
 namespace fs = std::filesystem;
 
@@ -37,6 +38,7 @@ namespace infinity {
 static const String DICT_PATH = "rag/huqie.txt";
 static const String POS_DEF_PATH = "rag/pos-id.def";
 static const String TRIE_PATH = "rag/huqie.trie";
+static const String WORDNET_PATH = "wordnet";
 
 static const String REGEX_SPLIT_CHAR = R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#";
 
@@ -178,12 +180,13 @@ bool IsChinese(const String &str) {
 
 RAGAnalyzer::RAGAnalyzer(const String &path) : dict_path_(path) {}
 
-RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other) : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_) {}
+RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other) : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_) {}
 
 RAGAnalyzer::~RAGAnalyzer() {
     if (own_dict_) {
         delete trie_;
         delete pos_table_;
+        delete lemma_;
     }
 }
 
@@ -240,6 +243,12 @@ Status RAGAnalyzer::Load() {
         }
         trie_->Save(trie_path.string());
     }
+
+    fs::path lemma_path(root / WORDNET_PATH);
+    if (!fs::exists(lemma_path)) {
+        return Status::InvalidAnalyzerFile(lemma_path);
+    }
+    lemma_ = new Lemmatizer(lemma_path.string());
 
     return Status::OK();
 }
@@ -470,8 +479,9 @@ String RAGAnalyzer::Merge(const String &tks_str) {
 }
 
 String RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
+    String strline = StrQ2B(line);
     Vector<String> arr;
-    Split(line, REGEX_SPLIT_CHAR, arr, true);
+    Split(strline, REGEX_SPLIT_CHAR, arr, true);
     for (const auto &L : arr) {
         if (UTF8Length(L) < 2 || RegexMatch(L, "[a-z\\.-]+$") || RegexMatch(L, "[0-9\\.-]+$")) {
             res.push_back(L);

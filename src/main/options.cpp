@@ -63,6 +63,9 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(OBJECT_STORAGE_OPTION_NAME)] = GlobalOptionIndex::kObjectStorage;
     name2index_[String(OBJECT_STORAGE_URL_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageUrl;
     name2index_[String(OBJECT_STORAGE_BUCKET_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageBucket;
+    name2index_[String(OBJECT_STORAGE_ACCESS_KEY_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageAccessKey;
+    name2index_[String(OBJECT_STORAGE_SECRET_KEY_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageSecretKey;
+    name2index_[String(OBJECT_STORAGE_ENABLE_HTTPS_OPTION_NAME)] = GlobalOptionIndex::kObjectStorageHttps;
 
     name2index_[String(BUFFER_MANAGER_SIZE_OPTION_NAME)] = GlobalOptionIndex::kBufferManagerSize;
     name2index_[String(LRU_NUM_OPTION_NAME)] = GlobalOptionIndex::kLRUNum;

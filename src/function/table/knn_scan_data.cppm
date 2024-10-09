@@ -82,7 +82,7 @@ class KnnDistance1 : public KnnDistanceBase1 {
 public:
     KnnDistance1(KnnDistanceType dist_type);
 
-    Vector<DistType> Calculate(const QueryDataType *datas, SizeT data_count, const QueryDataType *query, SizeT dim) {
+    Vector<DistType> Calculate(const QueryDataType *datas, SizeT data_count, const QueryDataType *query, SizeT dim) const {
         Vector<DistType> res(data_count);
         for (SizeT i = 0; i < data_count; ++i) {
             res[i] = dist_func_(query, datas + i * dim, dim);
@@ -90,7 +90,7 @@ public:
         return res;
     }
 
-    Vector<DistType> Calculate(const QueryDataType *datas, SizeT data_count, const QueryDataType *query, SizeT dim, Bitmask &bitmask) {
+    Vector<DistType> Calculate(const QueryDataType *datas, SizeT data_count, const QueryDataType *query, SizeT dim, Bitmask &bitmask) const {
         Vector<DistType> res(data_count);
         for (SizeT i = 0; i < data_count; ++i) {
             if (bitmask.IsTrue(i)) {

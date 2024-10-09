@@ -629,7 +629,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 auto db_name = String(decodes[0]);
                 auto table_name = MakeShared<String>(decodes[1]);
                 const auto &table_entry_dir = add_table_entry_op->table_entry_dir_;
-                auto column_defs = add_table_entry_op->column_defs_;
+                const auto &column_defs = add_table_entry_op->column_defs_;
                 auto entry_type = add_table_entry_op->table_entry_type_;
                 auto row_count = add_table_entry_op->row_count_;
                 SegmentID unsealed_id = add_table_entry_op->unsealed_id_;
@@ -792,9 +792,21 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
-                block_entry->AddColumnReplay(
-                    BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, last_chunk_offset, commit_ts),
-                    column_id);
+                if (merge_flag == MergeFlag::kDelete) {
+                    block_entry->DropColumnReplay(column_id);
+                } else if (merge_flag == MergeFlag::kNew) {
+                    block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry,
+                                                                                             column_id,
+                                                                                             buffer_mgr,
+                                                                                             next_outline_idx,
+                                                                                             last_chunk_offset,
+                                                                                             commit_ts),
+                                                 column_id);
+                } else if (merge_flag == MergeFlag::kUpdate) {
+                    // do nothing
+                } else {
+                    UnrecoverableError(fmt::format("Unsupported merge flag {} for column entry {}", (i8)merge_flag, column_id));
+                }
                 break;
             }
 

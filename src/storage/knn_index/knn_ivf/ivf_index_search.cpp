@@ -33,8 +33,11 @@ import ivf_index_storage;
 
 namespace infinity {
 
-IVF_Search_Params IVF_Search_Params::Make(const KnnScanSharedData *knn_scan_shared_data) {
+IVF_Search_Params IVF_Search_Params::Make(const KnnScanFunctionData *knn_scan_function_data) {
     IVF_Search_Params params;
+    params.knn_distance_ = knn_scan_function_data->knn_distance_.get();
+    const auto *knn_scan_shared_data = knn_scan_function_data->knn_scan_shared_data_;
+    params.knn_scan_shared_data_ = knn_scan_shared_data;
     if (knn_scan_shared_data->query_count_ != 1) {
         RecoverableError(Status::SyntaxError(fmt::format("Invalid query_count: {} which is not 1.", knn_scan_shared_data->query_count_)));
     }

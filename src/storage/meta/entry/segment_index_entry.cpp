@@ -908,6 +908,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             BufferHandle handle = merged_chunk_index_entry->GetIndex();
             auto data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
             data_ptr->BuildIVFIndex(base_rowid, row_count, segment_entry, column_def, buffer_mgr);
+            break;
         }
         default: {
             String error_message = "RebuildChunkIndexEntries is not supported for this index type.";
