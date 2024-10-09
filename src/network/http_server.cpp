@@ -3590,32 +3590,11 @@ public:
         } else if (role == "standalone") {
             status = InfinityContext::instance().ChangeRole(NodeRole::kStandalone);
         } else if (role == "leader") {
-            if (!http_body_json.contains("name") or !http_body_json["name"].is_string()) {
-                status = infinity::Status::InvalidCommand("name must be set to string!");
-            }
             status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, http_body_json["name"]);
         } else if (role == "follower") {
-            if (!http_body_json.contains("name") or !http_body_json["name"].is_string()) {
-                status = infinity::Status::InvalidCommand("name must be set to string!");
-            }
-            if (!http_body_json.contains("address") or !http_body_json["address"].is_string()) { 
-                status = infinity::Status::InvalidCommand("address must be set to string!");
-            }
-            if (!http_body_json.contains("port") or !http_body_json["port"].is_number()) {
-                status = infinity::Status::InvalidCommand("port must be set to number!");
-            }
             String node_name = http_body_json["name"];
             status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, http_body_json["name"], http_body_json["address"], http_body_json["port"]);
         } else if (role == "learner") {
-            if (!http_body_json.contains("name") or !http_body_json["name"].is_string()) {
-                status = infinity::Status::InvalidCommand("name must be set to string!");
-            }
-            if (!http_body_json.contains("address") or !http_body_json["address"].is_string()) { 
-                status = infinity::Status::InvalidCommand("address must be set to string!");
-            }
-            if (!http_body_json.contains("port") or !http_body_json["port"].is_number()) {
-                status = infinity::Status::InvalidCommand("port must be set to number!");
-            }
             String node_name = http_body_json["name"];
             status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, http_body_json["name"], http_body_json["address"], http_body_json["port"]);
         } else {
@@ -3644,7 +3623,7 @@ public:
         HTTPStatus http_status;
         nlohmann::json json_response;
 
-        auto result = infinity->ShowVariables(SetScope::kGlobal);
+        auto result = infinity->AdminShowVariables();
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
@@ -3677,7 +3656,7 @@ public:
         HTTPStatus http_status;
         nlohmann::json json_response;
 
-        auto result = infinity->ShowConfigs();
+        auto result = infinity->AdminShowConfigs();
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
@@ -3708,7 +3687,7 @@ public:
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
         auto variable_name = request->getPathVariable("variable_name");
-        auto result = infinity->ShowVariable(variable_name, SetScope::kGlobal);
+        auto result = infinity->AdminShowVariable(variable_name);
 
         HTTPStatus http_status;
         nlohmann::json json_response;

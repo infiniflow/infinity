@@ -2536,7 +2536,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-##Admin set node role
+## Admin set node role
 
 **POST** `/admin/node/current`
 
@@ -2546,7 +2546,9 @@ Set a node role.
 
 - Method: POST
 - URL: `/admin/node/current`
-- Headers: `accept: application/json`
+- Headers:
+  - `accept: application/json`
+  - `content-type: application/json`
 
 #### Request example
 
@@ -2616,6 +2618,128 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 </TabItem>
 </Tabs>
+
+---
+
+## Admin show node variables
+
+**GET** `/admin/variables`
+
+Show all node variables in admin mode.
+
+### Request
+
+- Method: GET
+- URL: `/admin/variables`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/admin/variables \
+    --header 'accept: application/json'
+```
+
+#### Request parameters
+
+None.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "role":"admin"
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</Tabs>
+---
+
+## Admin show node configs
+
+**GET** `/admin/configs`
+
+Show all node configs in admin mode.
+
+### Request
+
+- Method: GET
+- URL: `/admin/configs`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/admin/configs \
+    --header 'accept: application/json'
+```
+
+#### Request parameters
+
+None.
+
+### Response
+
+#### Status Code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "buffer_manager_size":"4294967296",
+    "cleanup_interval":"60",
+    "client_port":"23818",
+    "compact_interval":"120",
+    "connection_pool_size":"128",
+    "cpu_limit":"16",
+    "data_dir":"/var/infinity/leader/data",
+    "delta_checkpoint_interval":"60",
+    "delta_checkpoint_threshold":"67108864",
+    "error_code":0,
+    "full_checkpoint_interval":"86400",
+    "http_port":"23821",
+    "log_dir":"/var/infinity/leader/log",
+    "log_file_max_size":"10737418240",
+    "log_file_rotate_count":"10",
+    "log_filename":"infinity.log",
+    "log_level":"Debug",
+    "log_to_stdout":"true",
+    "mem_index_capacity":"1048576",
+    "optimize_interval":"10",
+    "peer_server_connection_pool_size":"64",
+    "postgres_port":"5433",
+    "record_running_query":"false",
+    "resource_dir":"/var/infinity/leader/resource",
+    "server_address":"0.0.0.0",
+    "temp_dir":"/var/infinity/leader/tmp",
+    "time_zone":"UTC-8",
+    "version":"0.4.0",
+    "wal_compact_threshold":"1073741824",
+    "wal_dir":"/var/infinity/leader/wal",
+    "wal_flush":"FlushAtOnce"
+}
+```
+
+</Tabs>
+
+---
+
+## Admin show node variable
 
 ---
 
