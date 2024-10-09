@@ -3316,16 +3316,28 @@ public:
 class ShowCurrentNodeHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto result = infinity->AdminShowCurrentNode();
 
         nlohmann::json json_response;
         HTTPStatus http_status;
 
-        http_status = HTTPStatus::CODE_200;
-        json_response["error_code"] = ErrorCode::kOk;
-        json_response["node_role"] = ToString(InfinityContext::instance().GetServerRole());
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+            Value value = data_block->GetValue(1, 0);
+            const String &variable_value = value.ToString();
+            json_response["role"] = variable_value;
 
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };

@@ -48,6 +48,7 @@ import delete_statement;
 import optimize_statement;
 import alter_statement;
 import statement_common;
+import admin_statement;
 
 import create_schema_info;
 import drop_schema_info;
@@ -1124,6 +1125,250 @@ QueryResult Infinity::Cleanup() {
     command_statement->command_info_ = MakeUnique<CleanupCmd>();
 
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminShowCatalogs() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kListCatalogs;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminShowCatalog(i64 index) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kShowCatalog;
+    admin_statement->catalog_file_index_ = index;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminShowLogs() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kListLogFiles;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminShowLog(i64 index) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kShowLogFile;
+    admin_statement->log_file_index_ = index;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminShowConfigs() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kListConfigs;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminShowVariables() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kListVariables;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminShowVariable(String var_name) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kShowVariable;
+    ToLower(var_name);
+    admin_statement->variable_name_ = var_name;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminShowNodes() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kListNodes;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminShowNode(String node_name) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kShowNode;
+    ToLower(node_name);
+    admin_statement->node_name_ = node_name;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminShowCurrentNode() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kShowCurrentNode;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminSetAdmin() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kSetRole;
+    admin_statement->admin_node_role_ = AdminNodeRole::kAdmin;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminSetStandalone() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kSetRole;
+    admin_statement->admin_node_role_ = AdminNodeRole::kStandalone;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminSetLeader(String node_name) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kSetRole;
+    admin_statement->admin_node_role_ = AdminNodeRole::kLeader;
+    ToLower(node_name);
+    admin_statement->node_name_ = node_name;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminSetFollower(String node_name, const String& leader_address) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kSetRole;
+    admin_statement->admin_node_role_ = AdminNodeRole::kFollower;
+    admin_statement->leader_address_ = leader_address;
+    ToLower(node_name);
+    admin_statement->node_name_ = node_name;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
+QueryResult Infinity::AdminSetLearner(String node_name, const String& leader_address) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    admin_statement->admin_type_ = AdminStmtType::kSetRole;
+    admin_statement->admin_node_role_ = AdminNodeRole::kLearner;
+    admin_statement->leader_address_ = leader_address;
+    ToLower(node_name);
+    admin_statement->node_name_ = node_name;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
 
