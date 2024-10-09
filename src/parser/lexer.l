@@ -160,7 +160,6 @@ POINT           { return POINT; }
 POLYGON         { return POLYGON; }
 PREPARE         { return PREPARE; }
 PRIMARY         { return PRIMARY; }
-PROFILE         { return PROFILE; }
 PROFILES        { return PROFILES; }
 PROPERTIES      { return PROPERTIES; }
 QUERIES         { return QUERIES; }
