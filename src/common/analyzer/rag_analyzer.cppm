@@ -20,6 +20,7 @@ import stl;
 import term;
 import status;
 import darts_trie;
+import lemmatizer;
 
 namespace infinity {
 
@@ -71,5 +72,7 @@ public:
     DartsTrie *trie_{nullptr};
 
     POSTable *pos_table_{nullptr};
+
+    Lemmatizer *lemma_{nullptr};
 };
 } // namespace infinity

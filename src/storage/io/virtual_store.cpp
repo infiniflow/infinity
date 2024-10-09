@@ -422,7 +422,7 @@ i32 VirtualStore::MunmapFile(const String &file_path) {
 
 // Remote storage
 StorageType VirtualStore::storage_type_ = StorageType::kInvalid;
-String VirtualStore::bucket_ = "infinity_bucket";
+String VirtualStore::bucket_ = "infinity";
 UniquePtr<S3Client> VirtualStore::s3_client_ = nullptr;
 
 Status VirtualStore::InitRemoteStore(StorageType storage_type,
@@ -435,6 +435,7 @@ Status VirtualStore::InitRemoteStore(StorageType storage_type,
         case StorageType::kMinio: {
             storage_type_ = StorageType::kMinio;
             s3_client_ = MakeUnique<S3ClientMinio>(URL, HTTPS, access_key, secret_key);
+            break;
         }
         default: {
             return Status::NotSupport("Not support storage type");
@@ -516,6 +517,22 @@ Status VirtualStore::CopyObject(const String &src_object_name, const String &dst
     }
 
     return Status::OK();
+}
+
+bool VirtualStore::BucketExists() {
+    if (VirtualStore::storage_type_ == StorageType::kLocal) {
+        return false;
+    }
+    switch (VirtualStore::storage_type_) {
+        case StorageType::kMinio: {
+            return s3_client_->BucketExists(VirtualStore::bucket_);
+        }
+        default: {
+            return false;
+        }
+    }
+
+    return false;
 }
 
 } // namespace infinity

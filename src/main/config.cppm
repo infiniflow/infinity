@@ -97,6 +97,9 @@ public:
     StorageType StorageType();
     String ObjectStorageUrl();
     String ObjectStorageBucket();
+    String ObjectStorageAccessKey();
+    String ObjectStorageSecretKey();
+    bool ObjectStorageHttps();
 
     // Persistence
     String PersistenceDir();
