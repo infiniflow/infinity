@@ -15,12 +15,14 @@
 module;
 
 #include <cassert>
+#include <vector>
 module and_iterator;
 
 import stl;
 import doc_iterator;
 import multi_doc_iterator;
 import internal_types;
+import infinity_exception;
 
 namespace infinity {
 
@@ -33,6 +35,26 @@ AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIte
         const auto &it = children_[i];
         doc_freq_ = std::min(doc_freq_, it->GetDF());
         bm25_score_upper_bound_ += children_[i]->BM25ScoreUpperBound();
+        // for minimum_should_match parameter
+        switch (it->GetType()) {
+            case DocIteratorType::kTermDocIterator:
+            case DocIteratorType::kPhraseIterator: {
+                ++fixed_match_count_;
+                break;
+            }
+            case DocIteratorType::kAndIterator:
+            case DocIteratorType::kAndNotIterator:
+            case DocIteratorType::kFilterIterator: {
+                UnrecoverableError("Wrong optimization result");
+                break;
+            }
+            case DocIteratorType::kOrIterator:
+            case DocIteratorType::kBMMIterator:
+            case DocIteratorType::kBMWIterator: {
+                dyn_match_ids_.push_back(i);
+                break;
+            }
+        }
     }
 }
 
@@ -41,7 +63,7 @@ bool AndIterator::Next(RowID doc_id) {
     if (doc_id_ != INVALID_ROWID && doc_id_ >= doc_id)
         return true;
     RowID target_doc_id = doc_id;
-    do {
+    while (true) {
         for (SizeT i = 0; i < children_.size(); i++) {
             const auto &it = children_[i];
             bool ok = it->Next(target_doc_id);
@@ -71,9 +93,9 @@ bool AndIterator::Next(RowID doc_id) {
                 bm25_score_cache_docid_ = doc_id_;
                 return true;
             }
-            target_doc_id++;
+            ++target_doc_id;
         }
-    } while (1);
+    }
 }
 
 float AndIterator::BM25Score() {
@@ -100,6 +122,21 @@ void AndIterator::UpdateScoreThreshold(float threshold) {
         float new_threshold = std::max(0.0f, base_threshold + it->BM25ScoreUpperBound());
         it->UpdateScoreThreshold(new_threshold);
     }
+}
+
+u32 AndIterator::LeafCount() const {
+    return std::accumulate(children_.begin(), children_.end(), static_cast<u32>(0), [](const u32 cnt, const auto &it) {
+        return cnt + it->LeafCount();
+    });
+}
+
+u32 AndIterator::MatchCount() const {
+    if (DocID() == INVALID_ROWID) {
+        return 0;
+    }
+    return std::accumulate(dyn_match_ids_.begin(), dyn_match_ids_.end(), fixed_match_count_, [&](const u32 cnt, const u32 id) {
+        return cnt + children_[id]->MatchCount();
+    });
 }
 
 } // namespace infinity

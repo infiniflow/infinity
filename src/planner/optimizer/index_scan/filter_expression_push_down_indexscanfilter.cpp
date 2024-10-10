@@ -54,6 +54,7 @@ import search_options;
 import doc_iterator;
 import search_driver;
 import status;
+import parse_fulltext_options;
 
 namespace infinity {
 
@@ -457,6 +458,7 @@ private:
                 auto index_reader = table_entry_ptr_->GetFullTextIndexReader(query_context_->GetTxn());
                 EarlyTermAlgo early_term_algo = EarlyTermAlgo::kNaive;
                 UniquePtr<QueryNode> query_tree;
+                MinimumShouldMatchOption minimum_should_match_option;
                 {
                     const Map<String, String> &column2analyzer = index_reader.GetColumn2Analyzer();
                     SearchOptions search_ops(filter_fulltext_expr->options_text_);
@@ -505,6 +507,11 @@ private:
                         }
                     }
 
+                    // option: minimum_should_match
+                    if (iter = search_ops.options_.find("minimum_should_match"); iter != search_ops.options_.end()) {
+                        minimum_should_match_option = ParseMinimumShouldMatchOption(iter->second);
+                    }
+
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
                     if (!query_tree) {
@@ -515,7 +522,8 @@ private:
                                                                 table_entry_ptr_,
                                                                 early_term_algo,
                                                                 std::move(index_reader),
-                                                                std::move(query_tree));
+                                                                std::move(query_tree),
+                                                                std::move(minimum_should_match_option));
             }
             case Enum::kAndExpr: {
                 Vector<UniquePtr<IndexFilterEvaluator>> candidates;

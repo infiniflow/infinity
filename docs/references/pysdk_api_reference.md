@@ -37,7 +37,7 @@ The `uri` here can be either a local directory in `str` format or a `NetworkAddr
 
 :::tip IMPORTANT
 - When setting `uri` as `"/absolute/path/to/save/to"`, ensure you:
-  - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.4.0.dev1_OR_HIGHER>`
+  - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.4.0.dev3_OR_HIGHER>`
   - Import the `infinity_embedded` module: `import infinity_embedded`.
 - When setting `uri` as `NetworkAddress`, ensure you:
   - Install the Infinity SDK: `pip install infinity==<VERSION>`
@@ -54,7 +54,7 @@ When connecting to Infinity in client-server mode, ensure that the client versio
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
 | v0.3.0             | v0.3.0             |
-| v0.4.0.dev2        | v0.4.0.dev2        |
+| v0.4.0.dev3        | v0.4.0.dev3        |
 
 If the versions do not match, please update your client or server to ensure compatibility.
 
@@ -74,7 +74,7 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 ### Returns
 
-- Success: An `infinity.local_infinity.infinity.LocalInfinityConnection` object in Python module mode or an `infinity.remote_thrift.infinity.RemoteThriftInfinityConnection` object in client-server mode.
+- Success: An `infinity.local_infinity.infinity.LocalInfinityConnection` object in embedded mode or an `infinity.remote_thrift.infinity.RemoteThriftInfinityConnection` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -83,7 +83,7 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 #### Connect to the local directory of Infinity
 
-From v0.4.0.dev1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
+From v0.4.0.dev3 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev3_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
 ```python
 import infinity_embedded
@@ -169,7 +169,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: An `infinity.local_infinity.db.LocalDatabase` object in Python module mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
+- Success: An `infinity.local_infinity.db.LocalDatabase` object in embedded mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -265,7 +265,7 @@ infinity_object.drop_database("my_database", ConflictType.Ignore)
 ## list_databases
 
 ```python
-Infinity.list_databases()
+infinity_object.list_databases()
 ```
 
 Retrieves a list of all available databases within the Infinity system.
@@ -293,7 +293,7 @@ print(res.db_names) # ['my_database', 'database_1']
 ## get_database
 
 ```python
-Infinity.get_database(database_name)
+infinity_object.get_database(database_name)
 ```
 
 Retrieves a database object by its name.
@@ -306,7 +306,7 @@ A non-empty string indicating the name of the database to retrieve.
 
 ### Returns
 
-- Success: An `infinity.local_infinity.db.LocalDatabase` object in Python module mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
+- Success: An `infinity.local_infinity.db.LocalDatabase` object in embedded mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -449,7 +449,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`:
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -501,7 +501,7 @@ You can build a HNSW index on the vector column to speed up the match_dense sear
 # - `vector`: The column is a vector column
 # - `128`: The vector dimension
 # - `float`: The primitive data type of the vectors. Can be `float`/`float32`, `float16`, `bfloat16`, `uint8` or `int8`
-db_object.create_table("my_table", {"c1": {"type": "vector,128,float"}}, None)
+db_object.create_table("my_table", {"c1": {"type": "vector,128,float"}})
 
 ```
 
@@ -516,7 +516,7 @@ You can build an HNSW index on the multi-vector column to accelerate match_dense
 # - `multivector`: The column is a multi-vector column
 # - `128`: The basic vector dimension
 # - `float`: The primitive data type of the basic vectors. Can be `float`/`float32`, `float16`, `bfloat16`, `uint8` or `int8`
-db_object.create_table("my_table", {"c1": {"type": "multivector,128,float"}}, None)
+db_object.create_table("my_table", {"c1": {"type": "multivector,128,float"}})
 
 ```
 
@@ -625,6 +625,91 @@ db_object.drop_table("my_table", ConflictType.Ignore)
 
 ---
 
+## add_columns
+
+```python
+table_object.add_columns(column_defs)
+```
+
+### Parameters
+
+#### column_defs: `dict[str, dict[str, Any]]`, *Required*
+
+A dictionary defining the columns to add. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value. See the description of `create_table()`'s `columns_definition` for all available settings.
+
+:::caution NOTE
+You must specify a default value each time you add a column.
+:::
+
+### Examples
+
+#### Add an Integer column, a float column, and a varchar/string column at once
+
+```python
+table_obj.add_columns({"column_name1": {"type": "integer", "default": 0}, "column_name2": {"type": "float", "default": 0.0}, "column_name3": {"type": "varchar", "default": ""}})
+```
+
+#### Add a dense vector column
+
+```python
+table_obj.add_columns({"column_name1": {"type": "vector,4,float", "default": [1.0, 1.2, 2.4, 4.6]}})
+```
+
+#### Add a multivector column
+
+```python
+table_obj.add_columns({"column_name1": {"type": "multivector,4,float", "default": [[1.0, 0.0, 0.0, 0.0], [1.2, 0.0, 0.0, 0.0]]}})
+```
+
+#### Add a tensor column
+
+```python
+table_obj.add_columns({"column_name1": {"type": "tensor,4,float", "default": [[1.0, 0.0, 0.0, 0.0], [1.2, 0.0, 0.0, 0.0]]}})
+```
+
+#### Add a sparse column
+
+```python
+from infinity.common import SparseVector
+table_obj.add_columns({"column_name1": {"type": "sparse,128,float,int", "default": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])}})
+```
+
+Or, you can set the default value in a different format:
+
+```python
+table_obj.add_columns({"column_name1": {"type": "sparse,128,float,int", "default": {"10":1.1, "20":2.2, "30": 3.3}}})
+```
+
+---
+
+## drop_columns
+
+```python
+table_object.drop_columns(column_names)
+```
+
+### Parameters
+
+#### column_names: `list[str]`, *Required*
+
+A list of strings representing the names of the columns to drop.
+
+### Examples
+
+#### Remove one column from the table
+
+```python
+table_object.drop_columns(["column_name"])
+```
+
+#### Remove two columns at once
+
+```python
+table_object.drop_columns(["column_name1", "column_name2"])
+```
+
+---
+
 ## get_table
 
 ```python
@@ -641,7 +726,7 @@ A non-empty string indicating the name of the table to retrieve.
 
 ### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`:
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -716,7 +801,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
   The name of the column to build index on. Must not be empty.  
 - **index_type**: `IndexType`, *Required*  
   Index type. You may want to import `infinity.index` to set `IndexType`: `from infinity.index import IndexType`  
-  - `Hnsw`: An HNSW index.
+  - `Hnsw`: An HNSW index. Works with dense vectors, and multivectors only.
   - `FullText`: A full-text index.  
   - `Secondary`: A secondary index. Works with structured data only.
   - `BMP`: A Block-Max Pruning index. Works with sparse vectors only.
@@ -787,24 +872,24 @@ A structure containing these attributes:
 
 ### Examples
 
-#### Create an HNSW index
+#### Create an HNSW index on a dense vector column
 
 ```python {1}
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
-table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
+table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}})
 # Create an HNSW index named "my_index" on column "c1" with default parameter settings:
 # - "M": "16", 
 # - "ef_construction": "50",
 # - "encode": "plain"
 # Only the "metric" parameter (required) is explicitly set to L2 distance. 
-table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}), None)
+table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}))
 ```
 
 ```python {1}
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
-table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
+table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}})
 # Create an HNSW index named "my_index" on column "c1"
 # Settings for "M", "ef_construction", and "metric" are the same as above, except:
 # "encoding" is set to "lvq" 
@@ -824,12 +909,26 @@ table_object.create_index(
 )
 ```
 
+#### Create an HNSW index on a multi-vector column
+
+```python
+from infinity.index import IndexInfo, IndexType
+# Create a table named "test_index_hnsw" with a 4-dimensional float multivector column "c1"
+table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "multivector,4,float"}})
+# Create an HNSW index named "my_index" on column "c1" with default parameter settings:
+# - "M": "16", 
+# - "ef_construction": "50",
+# - "encode": "plain"
+# Only the "metric" parameter (required) is explicitly set to L2 distance. 
+table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}))
+```
+
 #### Create a full-text index
 
 ```python
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_fulltext" with a varchar column "body"
-table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
+table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}})
 # Create a full-text index named "my_index" on column "body" with default parameter settings:
 # - "ANALYZER": "standard"
 table_object.create_index(
@@ -845,7 +944,7 @@ table_object.create_index(
 ```python
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_fulltext" with a varchar column "body"
-table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
+table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "varchar"}})
 # Create a full-text index named "my_index" on column "body"
 # Setting "ANALYZER" to "standard" (same as the above)
 table_object.create_index(
@@ -866,7 +965,7 @@ table_object.create_index(
 ```python {11}
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_secondary" with a varchar column "body"
-table_object = db_object.create_table("test_index_secondary", {"c1": {"type": "varchar"}}, None)
+table_object = db_object.create_table("test_index_secondary", {"c1": {"type": "varchar"}})
 # Create a secondary index named "my_index" on column "c1"
 table_object.create_index(
     "my_index",
@@ -883,7 +982,7 @@ table_object.create_index(
 ```python {13}
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
-table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
+table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}})
 # Create a BMP index named "my_index" on column "c1" with default parameter settings:
 # - "block_size": "16"
 # - "compress_type": "compress"
@@ -900,7 +999,7 @@ table_object.create_index(
 ```python {13,14}
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
-table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
+table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}})
 # Create a BMP index named "my_index" on column "c1"
 # Settings for "block_size" and "compress_type" are the same as above
 table_object.create_index(
@@ -1055,7 +1154,7 @@ table_instance = db_instance.create_table("primitive_table", {
 table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
 ```
 
-#### Insert vectors
+#### Insert dense vectors
 
 ```python
 # Create a table with a integer column and a 3-d vector column:
@@ -1377,7 +1476,7 @@ The list must contain at least one element. Empty lists are not allowed.
   
 ### Returns
 
-An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
 :::tip NOTE
 This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
@@ -1467,7 +1566,7 @@ Currently, only 'and' and 'or' logical expressions are supported.
 
 ### Returns
 
-An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
 :::tip NOTE
 This method specifies a filtering condition for the rows in the current table but does not directly produce displayable data. To display the query results, use `filter()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
@@ -1537,7 +1636,7 @@ A dictionary representing additional KNN or ANN search parameters. Currently onl
 
 ### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -1642,7 +1741,7 @@ A dictionary representing additional parameters for the sparse vector search. Fo
 
 ### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -1764,7 +1863,7 @@ An optional dictionary specifying the following search options:
 
 ### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -1857,7 +1956,7 @@ A dictionary representing additional options for the selected reranking method:
 
 ### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -1914,52 +2013,6 @@ table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_
             .filter("year < 2024")
             .fusion("match_tensor", 2, {"field": "tensor", "element_type": "float", "query_tensor": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
             .to_pl()
-```
-
----
-
-## add_columns
-
-```python
-table_object.add_columns(column_defs)
-```
-
-### Parameters
-
-#### column_defs: `dict[str, dict[str, Any]]`, *Required*
-
-A dictionary defining the columns to add. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value. See the description of `create_table()`'s `columns_definition` for all available settings. 
-
-:::caution NOTE
-You must specify a default value each time you add a column.
-:::
-
-
-#### Examples
-```python
-# Add an integer column and a varchar column at once
-table_obj.add_columns({"new_column_name1": {"type": "integer", "default": 0}, "new_column_name2": {"type": "varchar", "default": ""}})
-```
-
----
-
-# drop_columns
-
-```python
-table_object.drop_columns(column_names)
-```
-
-### Parameters
-
-#### column_names: `list[str]`, *Required*
-
-A list of strings representing the names of the columns to drop.
-
-#### Examples
-
-```python
-# Remove two columns at once
-table_object.drop_columns(["column_name1", "column_name2"])
 ```
 
 ---

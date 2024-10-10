@@ -12,24 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-#include <map>
-#include <string>
-#include <utility>
+module;
+
+export module parse_fulltext_options;
+
+import stl;
+
 namespace infinity {
 
-class SearchOptions {
-public:
-    explicit SearchOptions(const std::string &options_str);
-    bool operator==(const SearchOptions &other) const;
-    bool operator!=(const SearchOptions &other) const { return !(*this == other); }
-
-    std::string ToString();
-    size_t size() const { return options_.size(); }
-    std::map<std::string, std::string> options_;
-
-private:
-    static std::pair<std::string, std::string> ParseOption(const std::string_view &option);
+// parse minimum_should_match
+struct MinimumShouldMatchCount {
+    i32 value_ = 0;
 };
+
+struct MinimumShouldMatchPercentage {
+    i8 value_ = 0;
+};
+
+using SingleMinimumShouldMatchOption = Pair<u32, std::variant<MinimumShouldMatchCount, MinimumShouldMatchPercentage>>;
+
+export using MinimumShouldMatchOption = Vector<SingleMinimumShouldMatchOption>;
+
+export MinimumShouldMatchOption ParseMinimumShouldMatchOption(std::string_view input_str);
+
+export u32 GetMinimumShouldMatchParameter(const MinimumShouldMatchOption &option_vec, u32 leaf_count);
 
 } // namespace infinity

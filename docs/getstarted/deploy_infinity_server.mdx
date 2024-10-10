@@ -30,7 +30,7 @@ This approach allows you to call Infinity as an embedded Python module. To deplo
 ### Install Infinity as a module
 
 ```
-pip install infinity-embedded-sdk==0.4.0.dev2
+pip install infinity-embedded-sdk==0.4.0.dev3
 ```
 
 ### Create an Infinity object
@@ -41,8 +41,8 @@ import infinity_embedded
 infinity_obj = infinity_embedded.connect("absolute/path/to/save/to")
 ```
 
-:::note
-For detailed information about the Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
+:::tip NOTE
+For detailed information about the capabilities and usage of Infinity's Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
 :::
 
 
@@ -98,7 +98,7 @@ If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using 
 ### Install Infinity client
 
 ```
-pip install infinity-sdk==0.4.0.dev2
+pip install infinity-sdk==0.4.0.dev3
 ```
 
 ### Connect to Infinity Server and run a dense vector search
@@ -117,8 +117,8 @@ res = table_object.output(["*"])
 print(res)
 ```
 
-:::note
-For detailed information about the Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
+:::tip NOTE
+For detailed information about the capabilities and usage of Infinity's Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
 :::
 
 ## Deploy Infinity using binary
@@ -148,7 +148,7 @@ This section provides instructions on deploying Infinity using binary package on
 
 Fedora/RHEL/CentOS/OpenSUSE
 ```bash
-sudo rpm -i infinity-0.4.0.dev2-x86_64.rpm
+sudo rpm -i infinity-0.4.0.dev3-x86_64.rpm
 ```
 
 ```bash
@@ -159,7 +159,7 @@ sudo systemctl start infinity
   <TabItem value="ubuntu">
 
 ```bash
-sudo dpkg -i infinity-0.4.0.dev2-x86_64.deb
+sudo dpkg -i infinity-0.4.0.dev3-x86_64.deb
 ```
 
 ```bash
@@ -172,7 +172,7 @@ sudo systemctl start infinity
 ### Install Infinity client
 
 ```
-pip install infinity-sdk==0.4.0.dev2
+pip install infinity-sdk==0.4.0.dev3
 ```
 
 ### Connect to Infinity Server and run a dense vector search
@@ -180,7 +180,7 @@ pip install infinity-sdk==0.4.0.dev2
 ```python
 import infinity
 
-infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+infinity_object = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
 db_object = infinity_object.get_database("default_db")
 table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
 table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
@@ -191,7 +191,7 @@ res = table_object.output(["*"])
 print(res)
 ```
 
-:::note
-For detailed information about the Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
+:::tip NOTE
+For detailed information about the capabilities and usage of Infinity's Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
 :::
 

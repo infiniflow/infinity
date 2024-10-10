@@ -31,6 +31,7 @@ import common_query_filter;
 import column_index_reader;
 import doc_iterator;
 import query_node;
+import parse_fulltext_options;
 
 namespace infinity {
 
@@ -64,6 +65,7 @@ public:
     u32 top_n_{1};
 
     SharedPtr<CommonQueryFilter> common_query_filter_{};
+    MinimumShouldMatchOption minimum_should_match_option_{};
 };
 
 } // namespace infinity

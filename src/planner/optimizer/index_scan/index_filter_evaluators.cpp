@@ -54,7 +54,8 @@ void AddToFulltextEvaluator(UniquePtr<IndexFilterEvaluatorFulltext> &target_full
     if (!target_fulltext_evaluator) {
         target_fulltext_evaluator = std::move(input);
     } else {
-        if (target_fulltext_evaluator->early_term_algo_ != input->early_term_algo_) {
+        if (target_fulltext_evaluator->HaveMinimumShouldMatchOption() || input->HaveMinimumShouldMatchOption() ||
+            (target_fulltext_evaluator->early_term_algo_ != input->early_term_algo_)) {
             // put into others
             other_children_evaluators.push_back(std::move(input));
         } else {
@@ -456,9 +457,26 @@ Bitmask IndexFilterEvaluatorFulltext::Evaluate(const SegmentID segment_id, const
     const RowID begin_rowid(segment_id, 0);
     const RowID end_rowid(segment_id, segment_row_count);
     if (const auto ft_iter = query_tree_->CreateSearch(table_entry_, index_reader_, early_term_algo_); ft_iter && ft_iter->Next(begin_rowid)) {
-        while (ft_iter->DocID() < end_rowid) {
-            result.SetTrue(ft_iter->DocID().segment_offset_);
-            ft_iter->Next();
+        u32 minimum_should_match_val = 0;
+        if (!minimum_should_match_option_.empty()) {
+            const auto leaf_count = ft_iter->LeafCount();
+            minimum_should_match_val = GetMinimumShouldMatchParameter(minimum_should_match_option_, leaf_count);
+        }
+        if (minimum_should_match_val <= 1) {
+            // no need for minimum_should_match
+            while (ft_iter->DocID() < end_rowid) {
+                result.SetTrue(ft_iter->DocID().segment_offset_);
+                ft_iter->Next();
+            }
+        } else {
+            // now minimum_should_match_val >= 2
+            // use minimum_should_match
+            while (ft_iter->DocID() < end_rowid) {
+                if (ft_iter->MatchCount() >= minimum_should_match_val) {
+                    result.SetTrue(ft_iter->DocID().segment_offset_);
+                }
+                ft_iter->Next();
+            }
         }
     }
     result.RunOptimize();

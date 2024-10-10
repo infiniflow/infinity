@@ -951,6 +951,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
                                      logical_match->early_term_algo_,
                                      logical_match->top_n_,
                                      logical_match->common_query_filter_,
+                                     std::move(logical_match->minimum_should_match_option_),
                                      logical_match->TableIndex(),
                                      logical_operator->load_metas());
 }

@@ -24,6 +24,7 @@ import multi_doc_iterator;
 import internal_types;
 import logger;
 import third_party;
+import infinity_exception;
 
 namespace infinity {
 
@@ -102,6 +103,16 @@ void BlockMaxMaxscoreIterator::UpdateScoreThreshold(const float threshold) {
     if (threshold <= threshold_)
         return;
     threshold_ = threshold;
+}
+
+u32 BlockMaxMaxscoreIterator::LeafCount() const {
+    UnrecoverableError("BMM not supported now");
+    return 0;
+}
+
+u32 BlockMaxMaxscoreIterator::MatchCount() const {
+    UnrecoverableError("BMM not supported now");
+    return 0;
 }
 
 } // namespace infinity

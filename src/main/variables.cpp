@@ -50,7 +50,7 @@ void VarUtil::InitVariablesMap() {
     session_name_map_[TOTAL_COMMIT_COUNT_VAR_NAME.data()] = SessionVariable::kTotalCommitCount;
     session_name_map_[TOTAL_ROLLBACK_COUNT_VAR_NAME.data()] = SessionVariable::kTotalRollbackCount;
     session_name_map_[CONNECTED_TS_VAR_NAME.data()] = SessionVariable::kConnectedTime;
-    session_name_map_["enable_profile"] = SessionVariable::kEnableProfile;
+    session_name_map_["profile"] = SessionVariable::kEnableProfile;
 }
 
 HashMap<String, GlobalVariable> VarUtil::global_name_map_;
