@@ -2741,6 +2741,71 @@ The response includes a JSON object like the following:
 
 ## Admin show node variable
 
+**GET** `/admin/variables/{variable_name}`
+
+Retrieves the value of a global variable in admin mode.
+
+### Request
+
+- Method: GET
+- URL: `/admin/variables/{variable_name}`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/admin/variables/{variable_name} \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `variable_name`: (*Path parameter*)  
+  The name of the variable.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "server_role":"admin"
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code" : 3027,
+    "error_message":"variable does not exist : role."
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
 ---
 
 ## Admin show current node

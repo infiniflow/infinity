@@ -3686,7 +3686,7 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto variable_name = request->getPathVariable("variable_name");
+        String variable_name = request->getPathVariable("variable_name");
         auto result = infinity->AdminShowVariable(variable_name);
 
         HTTPStatus http_status;
@@ -3695,6 +3695,12 @@ public:
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+            if (data_block->row_count() == 0) {
+                json_response["error_code"] = ErrorCode::kNoSuchSystemVar;
+                json_response["error_message"] = fmt::format("variable does not exist : {}.", variable_name);
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
             Value value = data_block->GetValue(0, 0);
             const String &variable_value = value.ToString();
             json_response[variable_name] = variable_value;
