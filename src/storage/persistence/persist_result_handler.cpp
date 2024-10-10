@@ -22,6 +22,8 @@ module persist_result_handler;
 import infinity_exception;
 import third_party;
 import virtual_store;
+import infinity_context;
+import peer_task;
 
 namespace fs = std::filesystem;
 
@@ -30,7 +32,9 @@ namespace infinity {
 void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
     for (const String &persist_key : result.persist_keys_) {
         String persist_path = pm_->GetObjPath(persist_key);
-        VirtualStore::UploadObject(persist_path, persist_path);
+        if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader){
+            VirtualStore::UploadObject(persist_path, persist_path);
+        }
     }
     for (const String &drop_key : result.drop_keys_) {
         String drop_path = pm_->GetObjPath(drop_key);
