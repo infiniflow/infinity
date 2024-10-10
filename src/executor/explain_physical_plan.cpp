@@ -1302,7 +1302,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_column_db_str));
 
             String show_column_table_str = String(intent_size, ' ') + " - table/collection: ";
-            show_column_table_str += show_node->object_name();
+            show_column_table_str += *(show_node->object_name());
             result->emplace_back(MakeShared<String>(show_column_table_str));
 
             String output_columns_str = String(intent_size, ' ') + " - output columns: [column_name, column_type, constraint]";
@@ -1324,7 +1324,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_column_db_str));
 
             String show_column_table_str = String(intent_size, ' ') + " - table/collection: ";
-            show_column_table_str += show_node->object_name();
+            show_column_table_str += *(show_node->object_name());
             result->emplace_back(MakeShared<String>(show_column_table_str));
 
             String output_columns_str = String(intent_size, ' ') + " - output columns: [index_name, method_type, column_names, other_parameters]";

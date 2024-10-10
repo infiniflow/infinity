@@ -33,7 +33,7 @@ public:
     explicit LogicalShow(u64 node_id,
                          ShowStmtType type,
                          String schema_name,
-                         String object_name,
+                         Optional<String> object_name,
                          u64 table_index,
                          Optional<SegmentID> segment_id = None,
                          Optional<BlockID> block_id = None,
@@ -63,7 +63,7 @@ public:
 
     [[nodiscard]] inline const String &schema_name() const { return schema_name_; }
 
-    [[nodiscard]] inline const String &object_name() const { return object_name_; }
+    [[nodiscard]] inline const Optional<String> object_name() const { return object_name_; }
 
     [[nodiscard]] inline const Optional<u64> session_id() const { return session_id_; }
 
@@ -84,7 +84,7 @@ public:
 private:
     ShowStmtType show_type_{ShowStmtType::kInvalid};
     String schema_name_;
-    String object_name_; // It could be table/collection/view name
+    Optional<String> object_name_; // It could be table/collection/view name
     u64 table_index_{};
 
     Optional<SegmentID> segment_id_{};

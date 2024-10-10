@@ -814,7 +814,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    auto [table_info, status] = txn->GetTableInfo(db_name_, object_name_);
+    auto [table_info, status] = txn->GetTableInfo(db_name_, *object_name_);
 
     if (!status.ok()) {
         RecoverableError(status);
@@ -935,7 +935,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, object_name_, index_name_.value());
+    auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, *object_name_, index_name_.value());
 
     if (!status.ok()) {
         RecoverableError(status);
@@ -974,7 +974,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(object_name_);
+            Value value = Value::MakeVarchar(*object_name_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1126,13 +1126,13 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    auto [table_entry, status1] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status1] = txn->GetTableByName(db_name_, *object_name_);
     if (!status1.ok()) {
         RecoverableError(status1);
         return;
     }
 
-    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, object_name_, index_name_.value());
+    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
     if (!status2.ok()) {
         RecoverableError(status2);
         return;
@@ -1266,13 +1266,13 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    auto [table_entry, status1] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status1] = txn->GetTableByName(db_name_, *object_name_);
     if (!status1.ok()) {
         RecoverableError(status1);
         return;
     }
 
-    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, object_name_, index_name_.value());
+    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
     if (!status2.ok()) {
         RecoverableError(status2);
         return;
@@ -1778,7 +1778,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -1872,7 +1872,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -1937,7 +1937,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     auto txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2047,7 +2047,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
     auto txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2119,7 +2119,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     auto txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2213,7 +2213,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     auto txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -3125,7 +3125,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, table_status] = txn->GetTableByName(db_name_, *object_name_);
     if (!table_status.ok()) {
         show_operator_state->status_ = table_status;
         //        Error<UnrecoverableException>(table_status.message());
@@ -3294,7 +3294,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
     SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
-    SessionVariable session_var = VarUtil::GetSessionVarByName(object_name_);
+    SessionVariable session_var = VarUtil::GetSessionVarByName(*object_name_);
     BaseSession *session_ptr = query_context->current_session();
     switch (session_var) {
         case SessionVariable::kQueryCount: {
@@ -3393,7 +3393,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
             break;
         }
         default: {
-            operator_state->status_ = Status::NoSysVar(object_name_);
+            operator_state->status_ = Status::NoSysVar(*object_name_);
             RecoverableError(operator_state->status_);
             return;
         }
@@ -3556,7 +3556,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
     SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
-    GlobalVariable global_var = VarUtil::GetGlobalVarByName(object_name_);
+    GlobalVariable global_var = VarUtil::GetGlobalVarByName(*object_name_);
     switch (global_var) {
         case GlobalVariable::kQueryCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
@@ -4010,7 +4010,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         default: {
-            operator_state->status_ = Status::NoSysVar(object_name_);
+            operator_state->status_ = Status::NoSysVar(*object_name_);
             RecoverableError(operator_state->status_);
             return;
         }
@@ -4561,13 +4561,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
 
 void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorState *operator_state) {
     Config *global_config = query_context->global_config();
-    auto [base_option, status] = global_config->GetConfigByName(object_name_);
+    auto [base_option, status] = global_config->GetConfigByName(*object_name_);
     if (!status.ok()) {
         operator_state->status_ = status;
         return;
     }
-    if (object_name_ == "time_zone_bias") {
-        operator_state->status_ = Status::InvalidConfig(fmt::format("Option: {} doesn't exist.", object_name_));
+    if (*object_name_ == "time_zone_bias") {
+        operator_state->status_ = Status::InvalidConfig(fmt::format("Option: {} doesn't exist.", *object_name_));
         return;
     }
 
@@ -4610,7 +4610,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
 
             StringOption *string_option = static_cast<StringOption *>(base_option);
             String value_str;
-            if (object_name_ == "time_zone") {
+            if (*object_name_ == "time_zone") {
                 auto [time_zone_bias, _] = global_config->GetConfigByName("time_zone_bias");
 
                 IntegerOption *time_zone_bias_int = static_cast<IntegerOption *>(time_zone_bias);
@@ -5589,9 +5589,9 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
     }
 
     HashMap<String, ObjStat> object_map = persistence_manager->GetAllObjects();
-    auto iter = object_map.find(object_name_);
+    auto iter = object_map.find(*object_name_);
     if(iter == object_map.end()) {
-        Status status = Status::FileNotFound(object_name_);
+        Status status = Status::FileNotFound(*object_name_);
         RecoverableError(status);
     }
 

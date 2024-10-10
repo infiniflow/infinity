@@ -1335,10 +1335,10 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
         case ShowStmtType::kIndexSegment: {
             String show_str;
             if (intent_size != 0) {
-            show_str = String(intent_size - 2, ' ');
-            show_str += "-> SHOW INDEX SEGMENT ";
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW INDEX SEGMENT ";
             } else {
-            show_str = "SHOW INDEX SEGMENT ";
+                show_str = "SHOW INDEX SEGMENT ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
@@ -1353,10 +1353,10 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
         case ShowStmtType::kIndexChunk: {
             String show_str;
             if (intent_size != 0) {
-            show_str = String(intent_size - 2, ' ');
-            show_str += "-> SHOW INDEX CHUNK ";
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW INDEX CHUNK ";
             } else {
-            show_str = "SHOW INDEX CHUNK ";
+                show_str = "SHOW INDEX CHUNK ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
@@ -1424,7 +1424,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
 
             String show_column_table_str = String(intent_size, ' ');
             show_column_table_str += " - table/collection: ";
-            show_column_table_str += show_node->object_name();
+            show_column_table_str += *(show_node->object_name());
             result->emplace_back(MakeShared<String>(show_column_table_str));
 
             String output_columns_str = String(intent_size, ' ');
@@ -1756,7 +1756,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
 
             String output_columns_str = String(intent_size, ' ');
-            output_columns_str += fmt::format(" - variable: {}", show_node->object_name());
+            output_columns_str += fmt::format(" - variable: {}", *(show_node->object_name()));
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
@@ -1788,7 +1788,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
 
             String output_columns_str = String(intent_size, ' ');
-            output_columns_str += fmt::format(" - variable: {}", show_node->object_name());
+            output_columns_str += fmt::format(" - variable: {}", *(show_node->object_name()));
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
@@ -1820,7 +1820,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
 
             String output_columns_str = String(intent_size, ' ');
-            output_columns_str += fmt::format(" - config: {}", show_node->object_name());
+            output_columns_str += fmt::format(" - config: {}", *(show_node->object_name()));
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
@@ -2287,7 +2287,7 @@ Status ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<V
             result->emplace_back(file_type);
             break;
         }
-        case CopyFileType::kPARQUET : {
+        case CopyFileType::kPARQUET: {
             SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: PARQUET", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
