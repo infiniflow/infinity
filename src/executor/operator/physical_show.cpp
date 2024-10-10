@@ -175,12 +175,12 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("name");
             output_names_->emplace_back("type");
             output_names_->emplace_back("default");
-//            output_names_->emplace_back("constraint");
+            //            output_names_->emplace_back("constraint");
 
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
-//            output_types_->emplace_back(varchar_type);
+            //            output_types_->emplace_back(varchar_type);
             break;
         }
         case ShowStmtType::kIndexes: {
@@ -562,6 +562,13 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
+        case ShowStmtType::kFunction: {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             RecoverableError(status);
@@ -720,6 +727,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kMemoryAllocation: {
             ExecuteShowMemoryAllocation(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kFunction: {
+            ExecuteShowFunction(query_context, show_operator_state);
             break;
         }
         default: {
@@ -1791,7 +1802,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(1, varchar_type, "type", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(2, varchar_type, "default", std::set<ConstraintType>()),
-//        MakeShared<ColumnDef>(3, varchar_type, "constraint", std::set<ConstraintType>())
+        //        MakeShared<ColumnDef>(3, varchar_type, "constraint", std::set<ConstraintType>())
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), column_defs);
@@ -1802,7 +1813,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         varchar_type,
         varchar_type,
         varchar_type,
-//        varchar_type,
+        //        varchar_type,
     };
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
@@ -1842,18 +1853,18 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
 
-//        ++output_column_idx;
-//        {
-//            // Append column constraint to the third column
-//            String column_constraint;
-//            for (auto &constraint : column->constraints_) {
-//                column_constraint += " " + ConstrainTypeToString(constraint);
-//            }
-//
-//            Value value = Value::MakeVarchar(column_constraint);
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
-//        }
+        //        ++output_column_idx;
+        //        {
+        //            // Append column constraint to the third column
+        //            String column_constraint;
+        //            for (auto &constraint : column->constraints_) {
+        //                column_constraint += " " + ConstrainTypeToString(constraint);
+        //            }
+        //
+        //            Value value = Value::MakeVarchar(column_constraint);
+        //            ValueExpression value_expr(value);
+        //            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+        //        }
 
         if (++row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
@@ -1912,9 +1923,14 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
-            const auto &seg_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
-            Value value = Value::MakeVarchar(seg_size);
+            String segment_size = "N/A";
+            if (InfinityContext::instance().persistence_manager() == nullptr) {
+                String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
+                segment_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
+            } else {
+                ; // TODO: Get size of segments
+            }
+            Value value = Value::MakeVarchar(segment_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -4506,7 +4522,6 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
 #endif
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-
                 }
                 {
                     // option description
@@ -4517,8 +4532,8 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 break;
             }
             case GlobalVariable::kFollowerNum: {
-                if(InfinityContext::instance().IsClusterRole()
-                && InfinityContext::instance().cluster_manager()->ThisNode()->node_role_ == NodeRole::kLeader) {
+                if (InfinityContext::instance().IsClusterRole() &&
+                    InfinityContext::instance().cluster_manager()->ThisNode()->node_role_ == NodeRole::kLeader) {
                     {
                         // option name
                         Value value = Value::MakeVarchar(var_name);
@@ -5419,8 +5434,8 @@ void PhysicalShow::ExecuteShowPersistenceFiles(QueryContext *query_context, Show
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    PersistenceManager* persistence_manager = query_context->persistence_manager();
-    if(persistence_manager == nullptr) {
+    PersistenceManager *persistence_manager = query_context->persistence_manager();
+    if (persistence_manager == nullptr) {
         Status status = Status::FunctionIsDisable("Persistence");
         RecoverableError(status);
     }
@@ -5498,8 +5513,8 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    PersistenceManager* persistence_manager = query_context->persistence_manager();
-    if(persistence_manager == nullptr) {
+    PersistenceManager *persistence_manager = query_context->persistence_manager();
+    if (persistence_manager == nullptr) {
         Status status = Status::FunctionIsDisable("Persistence");
         RecoverableError(status);
     }
@@ -5582,21 +5597,21 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    PersistenceManager* persistence_manager = query_context->persistence_manager();
-    if(persistence_manager == nullptr) {
+    PersistenceManager *persistence_manager = query_context->persistence_manager();
+    if (persistence_manager == nullptr) {
         Status status = Status::FunctionIsDisable("Persistence");
         RecoverableError(status);
     }
 
     HashMap<String, ObjStat> object_map = persistence_manager->GetAllObjects();
     auto iter = object_map.find(*object_name_);
-    if(iter == object_map.end()) {
+    if (iter == object_map.end()) {
         Status status = Status::FileNotFound(*object_name_);
         RecoverableError(status);
     }
 
-    Set<Range>& deleted_ranges = iter->second.deleted_ranges_;
-    for(auto& range: deleted_ranges) {
+    Set<Range> &deleted_ranges = iter->second.deleted_ranges_;
+    for (auto &range : deleted_ranges) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -5621,7 +5636,6 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
             output_block_ptr = nullptr;
             row_count = 0;
         }
-
     }
 
     output_block_ptr->Finalize();
@@ -5693,7 +5707,7 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
     std::unordered_map<String, i64> object_map = GlobalResourceUsage::GetObjectClones();
     SizeT row_count = 0;
 
-    for(auto& object_pair: object_map) {
+    for (auto &object_pair : object_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -5741,7 +5755,7 @@ void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, Show
     std::unordered_map<String, i64> raw_memory_map = GlobalResourceUsage::GetRawMemoryClone();
     SizeT row_count = 0;
 
-    for(auto& raw_memory_pair: raw_memory_map) {
+    for (auto &raw_memory_pair : raw_memory_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -5768,6 +5782,49 @@ void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, Show
             output_block_ptr = nullptr;
             row_count = 0;
         }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteShowFunction(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    String function_name = *function_name_;
+    ToLower(function_name);
+    if (function_name == "server_version") {
+
+        String version_info =
+            fmt::format("{}.{}.{} {} {} {}", version_major(), version_minor(), version_patch(), system_build_time(), build_type(), git_commit_id());
+        {
+            // name
+            Value value = Value::MakeVarchar(version_info);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        fmt::print("Release: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
+                   version_major(),
+                   version_minor(),
+                   version_patch(),
+                   system_build_time(),
+                   build_type(),
+                   git_branch_name(),
+                   git_commit_id());
+    } else {
+        Status status = Status::Unknown(fmt::format("function: {}", function_name));
+        RecoverableError(status);
     }
 
     output_block_ptr->Finalize();
