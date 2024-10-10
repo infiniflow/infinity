@@ -84,7 +84,7 @@ jobs:
         run: |
           sudo rm -f test/data/benchmark/enwiki-10w.csv
           failure="${{ steps.run_restart_test.outcome == 'failure'}}"
-          sudo python3 scripts/collect_restart_log.py --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -215,6 +215,7 @@ jobs:
     
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
+        id: run_restart_test
         run : sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && python3 tools/run_restart_test.py --infinity_path=cmake-build-release/src/infinity"
 
       - name: Collect restart test output
@@ -223,7 +224,8 @@ jobs:
         # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
           sudo rm -f test/data/benchmark/enwiki-10w.csv
-          find . -name "restart_test.log.*" -exec cat {} \;
+          failure="${{ steps.run_restart_test.outcome == 'failure'}}"
+          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}

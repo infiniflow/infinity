@@ -10,6 +10,12 @@ import string
 
 parser = argparse.ArgumentParser(description="Python restart test for infinity")
 parser.add_argument(
+    "--executable_path",
+    type=str,
+    required=True,
+    help="Path to the executable file",
+)
+parser.add_argument(
     "--output_dir",
     type=str,
     required=True,
@@ -18,6 +24,7 @@ parser.add_argument(
 parser.add_argument("--failure", type=str, required=True, help="If the test failured")
 args = parser.parse_args()
 
+executable_path = args.executable_path
 output_dir = args.output_dir
 failure = args.failure == "true" or args.failure == "True"
 
@@ -50,3 +57,9 @@ for log_file, i in log_files:
             lines = f.readlines()
             for line in lines[-show_lines:]:
                 print(line.strip())
+
+if not os.path.isfile(executable_path):
+    print("Error: Executable file not found")
+else:
+    if failure:
+        shutil.copy(executable_path, f"{output_dir}/{random_name}.exe")

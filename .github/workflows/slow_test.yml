@@ -114,7 +114,7 @@ jobs:
         run: |
           sudo rm -f test/data/benchmark/enwiki-10w.csv
           failure="${{ steps.run_restart_test.outcome == 'failure'}}"
-          sudo python3 scripts/collect_restart_log.py --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
