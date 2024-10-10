@@ -100,10 +100,12 @@ jobs:
     
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
+        id: run_restart_test
         run : |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pytest python/restart_test/test_insert.py -k "test_data[infinity_runner0-columns5-gen-1000000-test/data/config/restart_test/test_insert/1.toml]" -s --infinity_path=cmake-build-release/src/infinity"
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pytest python/restart_test/test_insert.py -k "test_index[infinity_runner0-columns2-indexes2-gen-1000000-test/data/config/restart_test/test_insert/1.toml]" -s --infinity_path=cmake-build-release/src/infinity"
+        #   sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_restart_test.py --infinity_path=cmake-build-release/src/infinity --slow=true"
 
       - name: Collect restart test output
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
@@ -111,7 +113,8 @@ jobs:
         # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
           sudo rm -f test/data/benchmark/enwiki-10w.csv
-          find . -name "restart_test.log.*" -exec cat {} \;
+          failure="${{ steps.run_restart_test.outcome == 'failure'}}"
+          sudo python3 scripts/collect_restart_log.py --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
