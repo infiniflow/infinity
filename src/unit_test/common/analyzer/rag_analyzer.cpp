@@ -25,13 +25,47 @@ import analyzer;
 import rag_analyzer;
 import darts_trie;
 import darts;
+import lemmatizer;
 
 using namespace infinity;
 
 namespace fs = std::filesystem;
 
 class RAGAnalyzerTest : public BaseTest {};
-typedef DoubleArrayImpl<void, void, int, void> DoubleArray;
+
+TEST_F(RAGAnalyzerTest, test0) {
+#if 0
+    fs::path executablePath = "/proc/self/exe";
+    std::error_code ec;
+    // Resolve the symlink to get the actual path
+    executablePath = fs::canonical(executablePath, ec);
+    if (ec) {
+        std::cerr << "Error resolving the path: " << executablePath << " " << ec.message() << std::endl;
+        return;
+    }
+
+    fs::path ROOT_PATH = executablePath.parent_path().parent_path().parent_path().parent_path() / "resource";
+
+    if (!fs::exists(ROOT_PATH)) {
+        std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
+        return;
+    }
+    fs::path LEMMA_PATH = ROOT_PATH / "wordnet";
+    std::cout << "Lemma resource directory: " << LEMMA_PATH << std::endl;
+    Lemmatizer lemma(LEMMA_PATH.string());
+    lemma.Load();
+    String str = lemma.Lemmatize("dogs");
+    std::cout << str << std::endl;
+    str = lemma.Lemmatize("churches");
+    std::cout << str << std::endl;
+    str = lemma.Lemmatize("aardwolves");
+    std::cout << str << std::endl;
+    str = lemma.Lemmatize("abaci");
+    std::cout << str << std::endl;
+    str = lemma.Lemmatize("hardrock");
+    std::cout << str << std::endl;
+#endif
+}
 
 TEST_F(RAGAnalyzerTest, test1) {
     // Get the path to the executable using the /proc/self/exe symlink
@@ -50,7 +84,7 @@ TEST_F(RAGAnalyzerTest, test1) {
         std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
         return;
     }
-#if 0    
+#if 1
 
     RAGAnalyzer analyzer(ROOT_PATH.string());
     analyzer.Load();
@@ -65,13 +99,15 @@ TEST_F(RAGAnalyzerTest, test1) {
         R"#(涡轮增压发动机num最大功率,不像别的共享买车锁电子化的手段,我们接过来是否有意义,黄黄爱美食,不过，今天阿奇要讲到的这家农贸市场，说实话，还真蛮有特色的！不仅环境好，还打出了)#",
         R"#(这周日你去吗？这周日你有空吗？)#",
         R"#(Unity3D开发经验 测试开发工程师 c++双11双11 985 211)#",
+        R"#(The encoder structure we selected is VitDet [17] (base version with about 80M parameters) due to its local attention can greatly reduce the computational cost of high-resolution images. We follow the Vary-tiny setting [46] to design the last two layers of the encoder, which will transfer a 1024×1024×3 input image to 256×1024 image tokens. Then, these image tokens are projected into language model (OPT-125M [53]) dimension via a 1024×768 linear layer. Unlike the Vary encoder which only focuses on a single document task under a relatively unitary input shape, we incorporated natural scenes and cropped slices during our pre-training. In the pre-processing stage, images of each shape are directly resized to 1024×1024 squares, as square shapes can be used to adapt to images of various aspect ratios with a compromise.)#"
         R"#(数据分析项目经理|数据分析挖掘|数据分析方向|商品数据分析|搜索数据分析 sql python hive tableau Cocos2d-)#"};
 
     for (auto &query : queries) { // TermList term_list;
         // analyzer.Analyze(query, term_list);
         Vector<String> tokens;
         String ret = analyzer.Tokenize(query, tokens);
-        ret = analyzer.FineGrainedTokenize();
+        ret = analyzer.FineGrainedTokenize(ret);
+        std::cout << ret << std::endl;
         //         for (unsigned i = 0; i < term_list.size(); ++i) {
         //             std::cout << "\t" << i << "#" << term_list[i].text_ << "@" << term_list[i].word_offset_ << "#";
         //         }

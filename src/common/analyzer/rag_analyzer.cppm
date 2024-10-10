@@ -14,6 +14,8 @@
 
 module;
 
+#include <re2/re2.h>
+
 export module rag_analyzer;
 
 import stl;
@@ -21,19 +23,24 @@ import term;
 import status;
 import darts_trie;
 import lemmatizer;
+import stemmer;
+import analyzer;
 
+class OpenCC;
 namespace infinity {
 
 // C++ reimplementation of
 // https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py
 
-export class RAGAnalyzer {
+export class RAGAnalyzer : public Analyzer {
 public:
     RAGAnalyzer(const String &path);
 
     RAGAnalyzer(const RAGAnalyzer &other);
 
     ~RAGAnalyzer();
+
+    void InitStemmer(Language language) { stemmer_->Init(language); }
 
     Status Load();
 
@@ -64,7 +71,11 @@ private:
 
     String Merge(const String &tokens);
 
+    Vector<String> EnglishNormalize(const Vector<String> &tokens);
+
 public:
+    static const SizeT term_string_buffer_limit_ = 4096 * 3;
+
     String dict_path_;
 
     bool own_dict_{};
@@ -74,5 +85,11 @@ public:
     POSTable *pos_table_{nullptr};
 
     Lemmatizer *lemma_{nullptr};
+
+    Stemmer *stemmer_{nullptr};
+
+    OpenCC *opencc_{nullptr};
+
+    Vector<char> lowercase_string_buffer_;
 };
 } // namespace infinity

@@ -31,8 +31,6 @@ namespace fs = std::filesystem;
 namespace infinity {
 static const String OPENCC_PATH = "opencc";
 
-namespace fs = std::filesystem;
-
 TraditionalChineseAnalyzer::TraditionalChineseAnalyzer(const String &path) : ChineseAnalyzer(path) {}
 
 TraditionalChineseAnalyzer::TraditionalChineseAnalyzer(const TraditionalChineseAnalyzer &other) : ChineseAnalyzer(other) { own_opencc_ = false; }
