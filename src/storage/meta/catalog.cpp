@@ -60,6 +60,7 @@ import chunk_index_entry;
 import log_file;
 import persist_result_handler;
 import local_file_handle;
+import peer_task;
 
 namespace infinity {
 
@@ -551,6 +552,10 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
 UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info) {
     const auto &catalog_path = delta_ckp_info.path_;
 
+    if(!VirtualStore::Exists(catalog_path)){
+        VirtualStore::DownloadObject(catalog_path, catalog_path);
+    }
+
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -944,6 +949,10 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
 UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
     const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / full_ckp_info.path_;
 
+    if(!VirtualStore::Exists(catalog_path)){
+        VirtualStore::DownloadObject(catalog_path, catalog_path);
+    }
+
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -1011,6 +1020,9 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     // Rename temp file to regular catalog file
     VirtualStore::Rename(catalog_tmp_path, full_path);
+    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader){
+        VirtualStore::UploadObject(full_path, full_path);
+    }
 
     global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
 
@@ -1095,7 +1107,10 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
     }
 
     out_file_handle->Append((reinterpret_cast<const char *>(buf.data())), act_size);
-
+    out_file_handle->Sync();
+    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader){
+        VirtualStore::UploadObject(full_path, full_path);
+    }
     // {
     // log for delta op debug
     //     std::stringstream ss;

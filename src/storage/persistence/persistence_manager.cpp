@@ -99,7 +99,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         std::lock_guard<std::mutex> lock(mtx_);
         auto it = local_path_obj_.find(local_path);
         if (it != local_path_obj_.end()) {
-            CleanupNoLock(it->second, result.persist_keys_, result.drop_keys_);
+            CleanupNoLock(it->second, result.persist_keys_, result.drop_keys_, result.drop_from_remote_keys_);
             LOG_TRACE(fmt::format("Persist deleted mapping from local path {} to ObjAddr({}, {}, {})",
                                   local_path,
                                   it->second.obj_key_,
@@ -237,6 +237,14 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
     result.obj_addr_ = it->second;
     if (ObjStat *obj_stat = objects_->Get(it->second.obj_key_); obj_stat != nullptr) {
         LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
+        if(!obj_stat->cached_){
+            String read_path = GetObjPath(result.obj_addr_.obj_key_);
+            VirtualStore::DownloadObject(read_path, read_path);
+            if(VirtualStore::Exists(read_path)){
+                LOG_TRACE(fmt::format("GetObjCache download object {}", read_path));
+                obj_stat->cached_ = true;
+            }
+        }
         result.cached_ = obj_stat->cached_;
     } else {
         if (it->second.obj_key_ != current_object_key_) {
@@ -284,7 +292,7 @@ PersistWriteResult PersistenceManager::PutObjCache(const String &file_path) {
     if (it->second.part_size_ == 0) {
         UnrecoverableError(fmt::format("PutObjCache object {} part size is 0", it->second.obj_key_));
     }
-    ObjStat *obj_stat = objects_->Release(it->second.obj_key_, result.drop_keys_); 
+    ObjStat *obj_stat = objects_->Release(it->second.obj_key_, result.drop_keys_);
     if (obj_stat == nullptr) {
         if (it->second.obj_key_ != current_object_key_) {
             UnrecoverableError(fmt::format("PutObjCache object {} not found", it->second.obj_key_));
@@ -332,7 +340,11 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
     dstFile.close();
 }
 
-void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, Vector<String> &persist_keys, Vector<String> &drop_keys, bool check_ref_count) {
+void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
+                                       Vector<String> &persist_keys,
+                                       Vector<String> &drop_keys,
+                                       Vector<String> &drop_from_remote_keys,
+                                       bool check_ref_count) {
     ObjStat *obj_stat = objects_->GetNoCount(object_addr.obj_key_);
     if (obj_stat == nullptr) {
         if (object_addr.obj_key_ == current_object_key_) {
@@ -412,7 +424,7 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr, Vector<String
             String error_message = fmt::format("Failed to find object key");
             UnrecoverableError(error_message);
         }
-        drop_keys.emplace_back(object_addr.obj_key_);
+        drop_from_remote_keys.emplace_back(object_addr.obj_key_);
         objects_->Invalidate(object_addr.obj_key_);
         LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
     }
@@ -483,7 +495,7 @@ PersistWriteResult PersistenceManager::Cleanup(const String &file_path) {
         LOG_WARN(error_message);
         return result;
     }
-    CleanupNoLock(it->second, result.persist_keys_, result.drop_keys_, true);
+    CleanupNoLock(it->second, result.persist_keys_, result.drop_keys_, result.drop_from_remote_keys_, true);
     LOG_TRACE(fmt::format("Deleted mapping from local path {} to ObjAddr({}, {}, {})",
                           local_path,
                           it->second.obj_key_,
