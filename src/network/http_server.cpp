@@ -87,9 +87,9 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
 
         SharedPtr<DataType> column_type{nullptr};
         SharedPtr<TypeInfo> type_info{nullptr};
-        try{
+        try {
             if (tokens[0] == "vector" || tokens[0] == "multivector" || tokens[0] == "tensor" || tokens[0] == "tensorarray") {
-                if(tokens.size() != 3) {
+                if (tokens.size() != 3) {
                     return infinity::Status::ParserError("vector / multivector / tensor / tensorarray type syntax error");
                 }
                 SizeT dimension = std::stoull(tokens[1]);
@@ -125,7 +125,7 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
                 }
                 column_type = std::make_shared<DataType>(logical_type_v, type_info);
             } else if (tokens[0] == "sparse") {
-                if(tokens.size() != 4) {
+                if (tokens.size() != 4) {
                     return infinity::Status::ParserError("sparse type syntax error");
                 }
                 SizeT dimension = std::stoull(tokens[1]);
@@ -167,7 +167,7 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
             } else {
                 return infinity::Status::ParserError(fmt::format("{} isn't supported.", tokens[0]));
             }
-        } catch(std::exception &e) {
+        } catch (std::exception &e) {
             return infinity::Status::ParserError("type syntax error");
         }
 
@@ -184,7 +184,7 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
                 switch (column_type->type()) {
                     case LogicalType::kSparse: {
                         default_expr = BuildConstantSparseExprFromJson(field_element["default"],
-                                                                        dynamic_cast<const SparseInfo *>(column_type->type_info().get()));
+                                                                       dynamic_cast<const SparseInfo *>(column_type->type_info().get()));
                         break;
                     }
                     default: {
@@ -461,7 +461,7 @@ public:
             }
         }
 
-        if(json_response["error_code"] == 0) {
+        if (json_response["error_code"] == 0) {
             auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
             if (result.IsOk()) {
                 json_response["error_code"] = 0;
@@ -632,10 +632,9 @@ public:
                 export_options.copy_file_type_ = CopyFileType::kCSV;
             } else if (file_type_str == "jsonl") {
                 export_options.copy_file_type_ = CopyFileType::kJSONL;
-            } else if (file_type_str == "fvecs"){
+            } else if (file_type_str == "fvecs") {
                 export_options.copy_file_type_ = CopyFileType::kFVECS;
-            }
-            else {
+            } else {
                 json_response["error_code"] = ErrorCode::kNotSupported;
                 json_response["error_message"] = fmt::format("Not supported file type {}", file_type_str);
                 return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -682,24 +681,24 @@ public:
             if (http_body_json.contains("columns")) {
                 export_columns = new Vector<ParsedExpr *>();
 
-                for(const auto& column: http_body_json["columns"]) {
-                    if(column.is_string()) {
+                for (const auto &column : http_body_json["columns"]) {
+                    if (column.is_string()) {
                         String column_name = column;
                         ToLower(column_name);
-                        if(column_name == "_row_id") {
-                            FunctionExpr* expr = new FunctionExpr();
+                        if (column_name == "_row_id") {
+                            FunctionExpr *expr = new FunctionExpr();
                             expr->func_name_ = "row_id";
                             export_columns->emplace_back(expr);
-                        } else if(column_name == "_create_timestamp") {
-                            FunctionExpr* expr = new FunctionExpr();
+                        } else if (column_name == "_create_timestamp") {
+                            FunctionExpr *expr = new FunctionExpr();
                             expr->func_name_ = "create_timestamp";
                             export_columns->emplace_back(expr);
-                        } else if(column_name == "_delete_timestamp") {
-                            FunctionExpr* expr = new FunctionExpr();
+                        } else if (column_name == "_delete_timestamp") {
+                            FunctionExpr *expr = new FunctionExpr();
                             expr->func_name_ = "delete_timestamp";
                             export_columns->emplace_back(expr);
                         } else {
-                            ColumnExpr* expr = new ColumnExpr();
+                            ColumnExpr *expr = new ColumnExpr();
                             expr->names_.emplace_back(column_name);
                             export_columns->emplace_back(expr);
                         }
@@ -978,7 +977,6 @@ public:
                                         }
                                     });
 
-
                                     for (SizeT idx = 0; idx < dimension; ++idx) {
                                         const auto &value_ref = value[idx];
                                         const auto &value_type = value_ref.type();
@@ -1014,7 +1012,6 @@ public:
                                         }
                                     });
 
-
                                     for (SizeT idx = 0; idx < dimension; ++idx) {
                                         const auto &value_ref = value[idx];
                                         const auto &value_type = value_ref.type();
@@ -1029,12 +1026,12 @@ public:
                                     values_row->emplace_back(const_expr);
                                     const_expr = nullptr;
 
-                                } else if(first_elem_type == nlohmann::json::value_t::array) {
-                                    //std::cout<<"tensor"<<std::endl;
+                                } else if (first_elem_type == nlohmann::json::value_t::array) {
+                                    // std::cout<<"tensor"<<std::endl;
                                     auto first_elem_first_elem = first_elem[0];
                                     auto first_elem_first_elem_type = first_elem_first_elem.type();
-                                    if(first_elem_first_elem_type == nlohmann::json::value_t::number_integer or
-                                    first_elem_first_elem_type == nlohmann::json::value_t::number_unsigned) {
+                                    if (first_elem_first_elem_type == nlohmann::json::value_t::number_integer or
+                                        first_elem_first_elem_type == nlohmann::json::value_t::number_unsigned) {
                                         infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kSubArrayArray);
                                         DeferFn defer_free_tensor_array([&]() {
                                             if (const_expr != nullptr) {
@@ -1059,7 +1056,7 @@ public:
                                                 }
                                             });
                                             const_expr_2->long_array_.reserve(subdimension);
-                                            for(SizeT subidx = 0; subidx < subdimension; ++subidx) {
+                                            for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
                                                 const auto &value_ref = array[subidx];
                                                 const auto &value_type = value_ref.type();
                                                 switch (value_type) {
@@ -1073,7 +1070,8 @@ public:
                                                     }
                                                     default: {
                                                         json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                        json_response["error_message"] = fmt::format("Tensor Embedding element type should be integer");
+                                                        json_response["error_message"] =
+                                                            fmt::format("Tensor Embedding element type should be integer");
                                                         return ResponseFactory::createResponse(http_status, json_response.dump());
                                                     }
                                                 }
@@ -1083,7 +1081,7 @@ public:
                                         }
                                         values_row->emplace_back(const_expr);
                                         const_expr = nullptr;
-                                    } else if(first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
+                                    } else if (first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
                                         infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kSubArrayArray);
                                         DeferFn defer_free_tensor_array([&]() {
                                             if (const_expr != nullptr) {
@@ -1108,7 +1106,7 @@ public:
                                                 }
                                             });
                                             const_expr_2->double_array_.reserve(subdimension);
-                                            for(SizeT subidx = 0; subidx < subdimension; ++subidx) {
+                                            for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
                                                 const auto &value_ref = array[subidx];
                                                 const auto &value_type = value_ref.type();
                                                 switch (value_type) {
@@ -1128,12 +1126,12 @@ public:
                                         }
                                         values_row->emplace_back(const_expr);
                                         const_expr = nullptr;
-                                    }  else if(first_elem_first_elem_type == nlohmann::json::value_t::array) {
-                                        //std::cout<<"tensorarray"<<std::endl;
+                                    } else if (first_elem_first_elem_type == nlohmann::json::value_t::array) {
+                                        // std::cout<<"tensorarray"<<std::endl;
                                         auto first_elem_first_elem_first_elem = first_elem_first_elem[0];
                                         auto first_elem_first_elem_first_elem_type = first_elem_first_elem_first_elem.type();
-                                        if(first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_integer or
-                                        first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_unsigned) {
+                                        if (first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_integer or
+                                            first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_unsigned) {
                                             infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kSubArrayArray);
                                             DeferFn defer_free_tensor_array([&]() {
                                                 if (const_expr != nullptr) {
@@ -1158,7 +1156,7 @@ public:
                                                     }
                                                 });
                                                 const_expr_2->sub_array_array_.reserve(subdimension);
-                                                for(SizeT subidx = 0; subidx < subdimension; ++subidx) {
+                                                for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
                                                     const auto &subarray = array[subidx];
                                                     auto subsubdimension = subarray.size();
                                                     if (subsubdimension == 0) {
@@ -1174,7 +1172,7 @@ public:
                                                         }
                                                     });
                                                     const_expr_3->long_array_.reserve(subsubdimension);
-                                                    for(SizeT subsubidx = 0; subsubidx < subsubdimension; ++subsubidx) {
+                                                    for (SizeT subsubidx = 0; subsubidx < subsubdimension; ++subsubidx) {
                                                         const auto &value_ref = subarray[subsubidx];
                                                         const auto &value_type = value_ref.type();
                                                         switch (value_type) {
@@ -1188,7 +1186,8 @@ public:
                                                             }
                                                             default: {
                                                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                                json_response["error_message"] = fmt::format("Tensor Embedding element type should be integer");
+                                                                json_response["error_message"] =
+                                                                    fmt::format("Tensor Embedding element type should be integer");
                                                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                                                             }
                                                         }
@@ -1201,7 +1200,7 @@ public:
                                             }
                                             values_row->emplace_back(const_expr);
                                             const_expr = nullptr;
-                                        } else if(first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
+                                        } else if (first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
                                             infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kSubArrayArray);
                                             DeferFn defer_free_tensor_array([&]() {
                                                 if (const_expr != nullptr) {
@@ -1226,7 +1225,7 @@ public:
                                                     }
                                                 });
                                                 const_expr_2->sub_array_array_.reserve(subdimension);
-                                                for(SizeT subidx = 0; subidx < subdimension; ++subidx) {
+                                                for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
                                                     const auto &subarray = array[subidx];
                                                     auto subsubdimension = subarray.size();
                                                     if (subsubdimension == 0) {
@@ -1242,7 +1241,7 @@ public:
                                                         }
                                                     });
                                                     const_expr_3->double_array_.reserve(subsubdimension);
-                                                    for(SizeT subsubidx = 0; subsubidx < subsubdimension; ++subsubidx) {
+                                                    for (SizeT subsubidx = 0; subsubidx < subsubdimension; ++subsubidx) {
                                                         const auto &value_ref = subarray[subsubidx];
                                                         const auto &value_type = value_ref.type();
                                                         switch (value_type) {
@@ -1252,7 +1251,8 @@ public:
                                                             }
                                                             default: {
                                                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                                json_response["error_message"] = fmt::format("Tensor Embedding element type should be float");
+                                                                json_response["error_message"] =
+                                                                    fmt::format("Tensor Embedding element type should be float");
                                                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                                                             }
                                                         }
@@ -1277,7 +1277,8 @@ public:
                                     }
                                 } else {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Embedding element type can only be integer or float or tensor or tensor array");
+                                    json_response["error_message"] =
+                                        fmt::format("Embedding element type can only be integer or float or tensor or tensor array");
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
 
@@ -1508,12 +1509,12 @@ public:
 
                                     (*values_row)[column_id] = const_expr;
                                     const_expr = nullptr;
-                                } else if(first_elem_type == nlohmann::json::value_t::array) {
-                                    //std::cout<<"tensor"<<std::endl;
+                                } else if (first_elem_type == nlohmann::json::value_t::array) {
+                                    // std::cout<<"tensor"<<std::endl;
                                     auto first_elem_first_elem = first_elem[0];
                                     auto first_elem_first_elem_type = first_elem_first_elem.type();
-                                    if(first_elem_first_elem_type == nlohmann::json::value_t::number_integer or
-                                    first_elem_first_elem_type == nlohmann::json::value_t::number_unsigned) {
+                                    if (first_elem_first_elem_type == nlohmann::json::value_t::number_integer or
+                                        first_elem_first_elem_type == nlohmann::json::value_t::number_unsigned) {
                                         infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kSubArrayArray);
                                         DeferFn defer_free_tensor_array([&]() {
                                             if (const_expr != nullptr) {
@@ -1538,7 +1539,7 @@ public:
                                                 }
                                             });
                                             const_expr_2->long_array_.reserve(subdimension);
-                                            for(SizeT subidx = 0; subidx < subdimension; ++subidx) {
+                                            for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
                                                 const auto &value_ref = array[subidx];
                                                 const auto &value_type = value_ref.type();
                                                 switch (value_type) {
@@ -1552,7 +1553,8 @@ public:
                                                     }
                                                     default: {
                                                         json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                        json_response["error_message"] = fmt::format("Tensor Embedding element type should be integer");
+                                                        json_response["error_message"] =
+                                                            fmt::format("Tensor Embedding element type should be integer");
                                                         return ResponseFactory::createResponse(http_status, json_response.dump());
                                                     }
                                                 }
@@ -1562,7 +1564,7 @@ public:
                                         }
                                         (*values_row)[column_id] = const_expr;
                                         const_expr = nullptr;
-                                    } else if(first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
+                                    } else if (first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
                                         infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kSubArrayArray);
                                         DeferFn defer_free_tensor_array([&]() {
                                             if (const_expr != nullptr) {
@@ -1587,7 +1589,7 @@ public:
                                                 }
                                             });
                                             const_expr_2->double_array_.reserve(subdimension);
-                                            for(SizeT subidx = 0; subidx < subdimension; ++subidx) {
+                                            for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
                                                 const auto &value_ref = array[subidx];
                                                 const auto &value_type = value_ref.type();
                                                 switch (value_type) {
@@ -1607,12 +1609,12 @@ public:
                                         }
                                         (*values_row)[column_id] = const_expr;
                                         const_expr = nullptr;
-                                    }  else if(first_elem_first_elem_type == nlohmann::json::value_t::array) {
-                                        //std::cout<<"tensorarray"<<std::endl;
+                                    } else if (first_elem_first_elem_type == nlohmann::json::value_t::array) {
+                                        // std::cout<<"tensorarray"<<std::endl;
                                         auto first_elem_first_elem_first_elem = first_elem_first_elem[0];
                                         auto first_elem_first_elem_first_elem_type = first_elem_first_elem_first_elem.type();
-                                        if(first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_integer or
-                                        first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_unsigned) {
+                                        if (first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_integer or
+                                            first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_unsigned) {
                                             infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kSubArrayArray);
                                             DeferFn defer_free_tensor_array([&]() {
                                                 if (const_expr != nullptr) {
@@ -1637,7 +1639,7 @@ public:
                                                     }
                                                 });
                                                 const_expr_2->sub_array_array_.reserve(subdimension);
-                                                for(SizeT subidx = 0; subidx < subdimension; ++subidx) {
+                                                for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
                                                     const auto &subarray = array[subidx];
                                                     auto subsubdimension = subarray.size();
                                                     if (subsubdimension == 0) {
@@ -1653,7 +1655,7 @@ public:
                                                         }
                                                     });
                                                     const_expr_3->long_array_.reserve(subsubdimension);
-                                                    for(SizeT subsubidx = 0; subsubidx < subsubdimension; ++subsubidx) {
+                                                    for (SizeT subsubidx = 0; subsubidx < subsubdimension; ++subsubidx) {
                                                         const auto &value_ref = subarray[subsubidx];
                                                         const auto &value_type = value_ref.type();
                                                         switch (value_type) {
@@ -1667,7 +1669,8 @@ public:
                                                             }
                                                             default: {
                                                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                                json_response["error_message"] = fmt::format("Tensor Embedding element type should be integer");
+                                                                json_response["error_message"] =
+                                                                    fmt::format("Tensor Embedding element type should be integer");
                                                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                                                             }
                                                         }
@@ -1680,7 +1683,7 @@ public:
                                             }
                                             (*values_row)[column_id] = const_expr;
                                             const_expr = nullptr;
-                                        } else if(first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
+                                        } else if (first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
                                             infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kSubArrayArray);
                                             DeferFn defer_free_tensor_array([&]() {
                                                 if (const_expr != nullptr) {
@@ -1705,7 +1708,7 @@ public:
                                                     }
                                                 });
                                                 const_expr_2->sub_array_array_.reserve(subdimension);
-                                                for(SizeT subidx = 0; subidx < subdimension; ++subidx) {
+                                                for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
                                                     const auto &subarray = array[subidx];
                                                     auto subsubdimension = subarray.size();
                                                     if (subsubdimension == 0) {
@@ -1721,7 +1724,7 @@ public:
                                                         }
                                                     });
                                                     const_expr_3->double_array_.reserve(subsubdimension);
-                                                    for(SizeT subsubidx = 0; subsubidx < subsubdimension; ++subsubidx) {
+                                                    for (SizeT subsubidx = 0; subsubidx < subsubdimension; ++subsubidx) {
                                                         const auto &value_ref = subarray[subsubidx];
                                                         const auto &value_type = value_ref.type();
                                                         switch (value_type) {
@@ -1731,7 +1734,8 @@ public:
                                                             }
                                                             default: {
                                                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                                json_response["error_message"] = fmt::format("Tensor Embedding element type should be float");
+                                                                json_response["error_message"] =
+                                                                    fmt::format("Tensor Embedding element type should be float");
                                                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                                                             }
                                                         }
@@ -1898,7 +1902,7 @@ public:
             nlohmann::json http_body_json = nlohmann::json::parse(data_body);
 
             const String filter_string = http_body_json["filter"];
-            if(filter_string != "") {
+            if (filter_string != "") {
                 UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
                 ExprParser expr_parser;
                 expr_parser.Parse(filter_string, expr_parsed_result.get());
@@ -1927,8 +1931,7 @@ public:
                     json_response["error_message"] = result.ErrorMsg();
                     http_status = HTTPStatus::CODE_500;
                 }
-            }
-            else {
+            } else {
                 auto database_name = request->getPathVariable("database_name");
                 auto table_name = request->getPathVariable("table_name");
                 const QueryResult result = infinity->Delete(database_name, table_name, nullptr);
@@ -2059,7 +2062,7 @@ public:
                             for (SizeT idx = 0; idx < dimension; ++idx) {
                                 const auto &value_ref = value[idx];
                                 const auto &value_type = value_ref.type();
-                                
+
                                 switch (value_type) {
                                     case nlohmann::json::value_t::number_integer: {
                                         const_expr->long_array_.emplace_back(value_ref.template get<i64>());
@@ -2416,7 +2419,7 @@ public:
             }
         }
 
-        if(json_response["error_code"] == 0) {
+        if (json_response["error_code"] == 0) {
             auto result = infinity->DropIndex(database_name, table_name, index_name, options);
             if (result.IsOk()) {
                 json_response["error_code"] = 0;
@@ -2477,7 +2480,7 @@ public:
 
         auto index_info = new IndexInfo();
         DeferFn release_index_info([&]() {
-            if(index_info != nullptr) {
+            if (index_info != nullptr) {
                 delete index_info;
                 index_info = nullptr;
             }
@@ -2487,7 +2490,7 @@ public:
             ToLower(index_info->column_name_);
             auto index_param_list = new Vector<InitParameter *>();
             DeferFn release_index_param_list([&]() {
-                if(index_param_list != nullptr) {
+                if (index_param_list != nullptr) {
                     for (auto &index_param_ptr : *index_param_list) {
                         delete index_param_ptr;
                     }
@@ -2523,7 +2526,7 @@ public:
             index_param_list = nullptr;
         }
 
-        if(json_response["error_code"] == 0) {
+        if (json_response["error_code"] == 0) {
             auto result = infinity->CreateIndex(database_name, table_name, index_name, index_info, options);
             index_info = nullptr;
             if (result.IsOk()) {
@@ -2560,13 +2563,13 @@ public:
         OptimizeOptions optimize_options;
         optimize_options.index_name_ = index_name;
         if (body_info_json.contains("optimize_options")) {
-            if(body_info_json["optimize_options"].type() != nlohmann::json::value_t::object) {
+            if (body_info_json["optimize_options"].type() != nlohmann::json::value_t::object) {
                 json_response["error_code"] = ErrorCode::kInvalidParameterValue;
                 json_response["error_message"] = "Optimize options should be key value pairs!";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
-            for(const auto &option : body_info_json["optimize_options"].items()) {
+            for (const auto &option : body_info_json["optimize_options"].items()) {
                 const auto &key = option.key();
                 const auto &value = option.value();
                 auto *init_param = new InitParameter();
@@ -2893,7 +2896,6 @@ public:
     }
 };
 
-
 class ShowConfigsHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -2912,7 +2914,7 @@ public:
             for (int row = 0; row < row_count; ++row) {
                 // config name
                 Value name_value = data_block->GetValue(0, row);
-                const String& config_name = name_value.ToString();
+                const String &config_name = name_value.ToString();
                 // config value
                 Value value = data_block->GetValue(1, row);
                 const String &config_value = value.ToString();
@@ -2969,12 +2971,13 @@ public:
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
+            DataBlock *data_block =
+                result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
             auto row_count = data_block->row_count();
             for (int row = 0; row < row_count; ++row) {
                 // variable name
                 Value name_value = data_block->GetValue(0, row);
-                const String& config_name = name_value.ToString();
+                const String &config_name = name_value.ToString();
                 // variable value
                 Value value = data_block->GetValue(1, row);
                 const String &config_value = value.ToString();
@@ -3033,7 +3036,7 @@ public:
         try {
 
             nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-            if(http_body_json.size() != 1) {
+            if (http_body_json.size() != 1) {
                 json_response["error_code"] = 3076;
                 json_response["error_message"] = "No variable will be set";
                 http_status = HTTPStatus::CODE_500;
@@ -3109,12 +3112,13 @@ public:
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
+            DataBlock *data_block =
+                result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
             auto row_count = data_block->row_count();
             for (int row = 0; row < row_count; ++row) {
                 // variable name
                 Value name_value = data_block->GetValue(0, row);
-                const String& config_name = name_value.ToString();
+                const String &config_name = name_value.ToString();
                 // variable value
                 Value value = data_block->GetValue(1, row);
                 const String &config_value = value.ToString();
@@ -3173,7 +3177,7 @@ public:
         try {
 
             nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-            if(http_body_json.size() != 1) {
+            if (http_body_json.size() != 1) {
                 json_response["error_code"] = 3076;
                 json_response["error_message"] = "No variable will be set";
                 http_status = HTTPStatus::CODE_500;
@@ -3250,7 +3254,7 @@ public:
         try {
 
             nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-            if(http_body_json.size() != 1) {
+            if (http_body_json.size() != 1) {
                 json_response["error_code"] = 3076;
                 json_response["error_message"] = "No config will be set";
                 http_status = HTTPStatus::CODE_500;
@@ -3511,15 +3515,15 @@ public:
         infinity::Status status;
         SharedPtr<NodeInfo> nodeinfo;
         std::tie(status, nodeinfo) = InfinityContext::instance().cluster_manager()->GetNodeInfoPtrByName(node_name);
-        if (status.ok()) { 
-            http_status = HTTPStatus::CODE_200; 
+        if (status.ok()) {
+            http_status = HTTPStatus::CODE_200;
             json_response["error_code"] = ErrorCode::kOk;
             json_response["node_role"] = ToString(nodeinfo->node_role_);
         } else {
             http_status = HTTPStatus::CODE_500;
             json_response["error_code"] = status.code();
             json_response["error_msg"] = status.message();
-        } 
+        }
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
@@ -3536,7 +3540,7 @@ public:
         nlohmann::json nodes_json;
 
         Vector<SharedPtr<NodeInfo>> nodes = InfinityContext::instance().cluster_manager()->ListNodes();
-        for(const auto& ptr : nodes) {
+        for (const auto &ptr : nodes) {
             nodes_json.push_back({ptr->node_name_, ToString(ptr->node_role_)});
         }
 
@@ -3548,13 +3552,175 @@ public:
     }
 };
 
+class AdminSetNodeRoleHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+        infinity::Status status;
+
+        String data_body = request->readBodyToString();
+        nlohmann::json http_body_json;
+        try {
+            http_body_json = nlohmann::json::parse(data_body);
+        }
+        catch (nlohmann::json::exception &e) {
+            http_status = HTTPStatus::CODE_500;
+            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+            json_response["error_message"] = e.what();
+            return ResponseFactory::createResponse(http_status, json_response.dump());
+        }
+
+        if (!http_body_json.contains("role") or !http_body_json["role"].is_string()) {
+            http_status = HTTPStatus::CODE_500;
+            json_response["error_code"] = ErrorCode::kInvalidCommand;
+            json_response["error_message"] = "field 'role' is required to be set to string!";
+            return ResponseFactory::createResponse(http_status, json_response.dump());
+        }
+
+        String role = http_body_json["role"];
+        ToLower(role);
+        if (role == "uninitialized") {
+            status = InfinityContext::instance().ChangeRole(NodeRole::kUnInitialized);
+        } else if (role == "admin") {
+            status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+        } else if (role == "standalone") {
+            status = InfinityContext::instance().ChangeRole(NodeRole::kStandalone);
+        } else if (role == "leader") {
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, http_body_json["name"]);
+        } else if (role == "follower") {
+            String node_name = http_body_json["name"];
+            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, http_body_json["name"], http_body_json["address"], http_body_json["port"]);
+        } else if (role == "learner") {
+            String node_name = http_body_json["name"];
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, http_body_json["name"], http_body_json["address"], http_body_json["port"]);
+        } else {
+            status = infinity::Status::InvalidNodeRole("invalid node role");
+        }
+
+        if (status.ok()) {
+            http_status = HTTPStatus::CODE_200;
+            json_response["error_code"] = ErrorCode::kOk;
+        } else {
+            http_status = HTTPStatus::CODE_500;
+            json_response["error_code"] = status.code();
+            json_response["error_code"] = status.message();
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class AdminShowNodeVariablesHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        auto result = infinity->AdminShowVariables();
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
+            auto row_count = data_block->row_count();
+            for (int row = 0; row < row_count; ++row) {
+                // variable name
+                Value name_value = data_block->GetValue(0, row);
+                const String &config_name = name_value.ToString();
+                // variable value
+                Value value = data_block->GetValue(1, row);
+                const String &config_value = value.ToString();
+                json_response[config_name] = config_value;
+            }
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class AdminShowNodeConfigsHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        auto result = infinity->AdminShowConfigs();
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
+            auto row_count = data_block->row_count();
+            for (int row = 0; row < row_count; ++row) {
+                // config name
+                Value name_value = data_block->GetValue(0, row);
+                const String &config_name = name_value.ToString();
+                // config value
+                Value value = data_block->GetValue(1, row);
+                const String &config_value = value.ToString();
+                json_response[config_name] = config_value;
+            }
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class AdminShowNodeVariableHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String variable_name = request->getPathVariable("variable_name");
+        auto result = infinity->AdminShowVariable(variable_name);
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+            if (data_block->row_count() == 0) {
+                json_response["error_code"] = ErrorCode::kNoSuchSystemVar;
+                json_response["error_message"] = fmt::format("variable does not exist : {}.", variable_name);
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+            Value value = data_block->GetValue(0, 0);
+            const String &variable_value = value.ToString();
+            json_response[variable_name] = variable_value;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 } // namespace
 
 namespace infinity {
 
-void HTTPServer::Start(const String& ip_address, u16 port) {
-    if(started_) {
-        return ;
+void HTTPServer::Start(const String &ip_address, u16 port) {
+    if (started_) {
+        return;
     }
 
     WebEnvironment::init();
@@ -3588,8 +3754,12 @@ void HTTPServer::Start(const String& ip_address, u16 port) {
     // index
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<ShowTableIndexDetailHandler>());
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}", MakeShared<ShowTableIndexSegmentHandler>());
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id}", MakeShared<ShowTableIndexChunkHandler>());
+    router->route("GET",
+                  "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}",
+                  MakeShared<ShowTableIndexSegmentHandler>());
+    router->route("GET",
+                  "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id}",
+                  MakeShared<ShowTableIndexChunkHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<DropIndexHandler>());
     router->route("POST", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<CreateIndexHandler>());
     router->route("PUT", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<OptimizeIndexHandler>());
@@ -3631,7 +3801,11 @@ void HTTPServer::Start(const String& ip_address, u16 port) {
     router->route("GET", "/variables/session/{variable_name}", MakeShared<ShowSessionVariableHandler>());
     router->route("SET", "/variables/session", MakeShared<SetSessionVariableHandler>());
 
-    //admin
+    // admin
+    router->route("POST", "/admin/node/current", MakeShared<AdminSetNodeRoleHandler>());
+    router->route("GET", "/admin/variables", MakeShared<AdminShowNodeVariablesHandler>());
+    router->route("GET", "/admin/configs", MakeShared<AdminShowNodeConfigsHandler>());
+    router->route("GET", "/admin/variables/{variable_name}", MakeShared<AdminShowNodeVariableHandler>());
     router->route("GET", "/admin/node/current", MakeShared<ShowCurrentNodeHandler>());
     router->route("GET", "/admin/node/{node_name}", MakeShared<ShowNodeByNameHandler>());
     router->route("GET", "/admin/nodes", MakeShared<ListAllNodesHandler>());
@@ -3649,7 +3823,7 @@ void HTTPServer::Start(const String& ip_address, u16 port) {
 }
 
 void HTTPServer::Shutdown() {
-    if(started_) {
+    if (started_) {
         server_->stop();
         WebEnvironment::destroy();
         started_ = false;
