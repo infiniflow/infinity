@@ -155,6 +155,7 @@ public:
     QueryResult ShowMemory();
     QueryResult ShowMemoryObjects();
     QueryResult ShowMemoryAllocations();
+    QueryResult ShowFunction(const String& function_name);
 
     QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
 

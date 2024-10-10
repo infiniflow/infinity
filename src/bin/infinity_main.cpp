@@ -156,7 +156,7 @@ auto main(int argc, char **argv) -> int {
                version_major(),
                version_minor(),
                version_patch(),
-               current_system_time(),
+               system_build_time(),
                build_type(),
                git_branch_name(),
                git_commit_id());

@@ -778,6 +778,15 @@ QueryResult Infinity::ShowMemoryAllocations() {
     return result;
 }
 
+QueryResult Infinity::ShowFunction(const String& function_name) {
+    UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->show_type_ = ShowStmtType::kFunction;
+    show_statement->function_name_ = function_name;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
 QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<InsertStatement> insert_statement = MakeUnique<InsertStatement>();

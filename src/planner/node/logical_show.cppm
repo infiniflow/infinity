@@ -22,58 +22,18 @@ import column_binding;
 import logical_node;
 import data_type;
 import internal_types;
+import show_statement;
 
 namespace infinity {
 
-export enum class ShowType {
-    kInvalid,
-    kShowDatabase,
-    kShowTable,
-    kShowIndex,
-    kShowIndexSegment,
-    kShowIndexChunk,
-    kShowDatabases,
-    kShowTables,
-    kShowViews,
-    kShowColumn,
-    kShowConfigs,
-    kShowProfiles,
-    kShowQueries,
-    kShowQuery,
-    kShowTransactions,
-    kShowTransaction,
-    kShowIndexes,
-    kShowSegments,
-    kShowSegment,
-    kShowBlocks,
-    kShowBlock,
-    kShowBlockColumn,
-    kShowSessionVariable,
-    kShowSessionVariables,
-    kShowGlobalVariable,
-    kShowGlobalVariables,
-    kShowConfig,
-    kShowBuffer,
-    kShowMemIndex,
-    kShowLogs,
-    kShowDeltaLogs,
-    kShowCatalogs,
-    kShowPersistenceFiles,
-    kShowPersistenceObjects,
-    kShowPersistenceObject,
-    kShowMemory,
-    kShowMemoryObjects,
-    kShowMemoryAllocation,
-};
-
-export String ToString(ShowType type);
+export String ToString(ShowStmtType type);
 
 export class LogicalShow : public LogicalNode {
 public:
     explicit LogicalShow(u64 node_id,
-                         ShowType type,
+                         ShowStmtType type,
                          String schema_name,
-                         String object_name,
+                         Optional<String> object_name,
                          u64 table_index,
                          Optional<SegmentID> segment_id = None,
                          Optional<BlockID> block_id = None,
@@ -81,9 +41,11 @@ public:
                          Optional<ColumnID> column_id = None,
                          Optional<String> index_name = None,
                          Optional<TransactionID> session_id = None,
-                         Optional<u64> txn_id = None)
+                         Optional<u64> txn_id = None,
+                         Optional<String> function_name = None)
         : LogicalNode(node_id, LogicalNodeType::kShow), show_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
-          table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id), index_name_(index_name), session_id_(session_id), txn_id_(txn_id) {}
+          table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id),
+          index_name_(index_name), session_id_(session_id), txn_id_(txn_id), function_name_(function_name) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -95,13 +57,13 @@ public:
 
     inline String name() final { return "LogicalShow"; }
 
-    [[nodiscard]] ShowType show_type() const { return show_type_; }
+    [[nodiscard]] ShowStmtType show_type() const { return show_type_; }
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
     [[nodiscard]] inline const String &schema_name() const { return schema_name_; }
 
-    [[nodiscard]] inline const String &object_name() const { return object_name_; }
+    [[nodiscard]] inline const Optional<String> object_name() const { return object_name_; }
 
     [[nodiscard]] inline const Optional<u64> session_id() const { return session_id_; }
 
@@ -117,10 +79,12 @@ public:
 
     [[nodiscard]] inline const Optional<String> index_name() const { return index_name_; }
 
+    [[nodiscard]] inline const Optional<String> function_name() const { return function_name_; }
+
 private:
-    ShowType show_type_{ShowType::kInvalid};
+    ShowStmtType show_type_{ShowStmtType::kInvalid};
     String schema_name_;
-    String object_name_; // It could be table/collection/view name
+    Optional<String> object_name_; // It could be table/collection/view name
     u64 table_index_{};
 
     Optional<SegmentID> segment_id_{};
@@ -130,6 +94,7 @@ private:
     Optional<String> index_name_{};
     Optional<u64> session_id_{};
     Optional<TransactionID> txn_id_{};
+    Optional<String> function_name_{};
 };
 
 } // namespace infinity

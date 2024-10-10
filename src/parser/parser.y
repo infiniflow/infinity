@@ -1955,6 +1955,12 @@ show_statement: SHOW DATABASES {
 | SHOW MEMORY ALLOCATION {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kMemoryAllocation;
+}
+| SHOW IDENTIFIER '(' ')' {
+      $$ = new infinity::ShowStatement();
+      $$->show_type_ = infinity::ShowStmtType::kFunction;
+      $$->function_name_ = $2;
+      free($2);
 };
 
 /*

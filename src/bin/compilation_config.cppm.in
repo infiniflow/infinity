@@ -45,7 +45,7 @@ export int version_patch() {
     return VERSION_PATCH;
 }
 
-export char* current_system_time() {
+export char* system_build_time() {
     return (char*)BUILD_TIME;
 }
 

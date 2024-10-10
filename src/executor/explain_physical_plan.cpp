@@ -92,6 +92,7 @@ import flush_statement;
 import common_query_filter;
 import table_entry;
 import logger;
+import show_statement;
 
 namespace infinity {
 
@@ -1134,7 +1135,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node, Share
 
 void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (show_node->show_type()) {
-        case ShowType::kShowDatabase: {
+        case ShowStmtType::kDatabase: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1152,7 +1153,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowTable: {
+        case ShowStmtType::kTable: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1170,7 +1171,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowIndex: {
+        case ShowStmtType::kCollections: {
+            String error_message = "Show collections are not supported now";
+            UnrecoverableError(error_message);
+            break;
+        }
+        case ShowStmtType::kIndex: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1188,7 +1194,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowIndexSegment: {
+        case ShowStmtType::kIndexSegment: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1206,7 +1212,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowIndexChunk: {
+        case ShowStmtType::kIndexChunk: {
             String show_str;
             if (intent_size != 0) {
             show_str = String(intent_size - 2, ' ');
@@ -1224,7 +1230,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowTables: {
+        case ShowStmtType::kTables: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ') + "-> SHOW TABLES ";
@@ -1239,7 +1245,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowBuffer: {
+        case ShowStmtType::kBuffer: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ') + "-> SHOW BUFFER ";
@@ -1253,7 +1259,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowMemIndex: {
+        case ShowStmtType::kMemIndex: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ') + "-> SHOW MEM INDEX ";
@@ -1267,7 +1273,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowViews: {
+        case ShowStmtType::kViews: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ') + "-> SHOW VIEWS ";
@@ -1281,7 +1287,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowColumn: {
+        case ShowStmtType::kColumns: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ') + "-> SHOW COLUMN ";
@@ -1296,14 +1302,14 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_column_db_str));
 
             String show_column_table_str = String(intent_size, ' ') + " - table/collection: ";
-            show_column_table_str += show_node->object_name();
+            show_column_table_str += *(show_node->object_name());
             result->emplace_back(MakeShared<String>(show_column_table_str));
 
             String output_columns_str = String(intent_size, ' ') + " - output columns: [column_name, column_type, constraint]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowIndexes: {
+        case ShowStmtType::kIndexes: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ') + "-> SHOW INDEXES ";
@@ -1318,14 +1324,14 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_column_db_str));
 
             String show_column_table_str = String(intent_size, ' ') + " - table/collection: ";
-            show_column_table_str += show_node->object_name();
+            show_column_table_str += *(show_node->object_name());
             result->emplace_back(MakeShared<String>(show_column_table_str));
 
             String output_columns_str = String(intent_size, ' ') + " - output columns: [index_name, method_type, column_names, other_parameters]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowDatabases: {
+        case ShowStmtType::kDatabases: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1343,7 +1349,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowConfigs: {
+        case ShowStmtType::kConfigs: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1361,7 +1367,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowProfiles: {
+        case ShowStmtType::kProfiles: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1380,7 +1386,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowQueries: {
+        case ShowStmtType::kQueries: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1398,7 +1404,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowQuery: {
+        case ShowStmtType::kQuery: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1417,7 +1423,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             break;
         }
 
-        case ShowType::kShowTransactions: {
+        case ShowStmtType::kTransactions: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1435,7 +1441,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowTransaction: {
+        case ShowStmtType::kTransaction: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1453,7 +1459,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowSegments: {
+        case ShowStmtType::kSegments: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1471,7 +1477,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowSegment: {
+        case ShowStmtType::kSegment: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1490,7 +1496,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowBlocks: {
+        case ShowStmtType::kBlocks: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1508,7 +1514,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowBlock: {
+        case ShowStmtType::kBlock: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1526,7 +1532,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowBlockColumn: {
+        case ShowStmtType::kBlockColumn: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1544,7 +1550,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowSessionVariable: {
+        case ShowStmtType::kSessionVariable: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1562,7 +1568,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowSessionVariables: {
+        case ShowStmtType::kSessionVariables: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1580,7 +1586,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowGlobalVariable: {
+        case ShowStmtType::kGlobalVariable: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1598,7 +1604,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowGlobalVariables: {
+        case ShowStmtType::kGlobalVariables: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1616,7 +1622,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowConfig: {
+        case ShowStmtType::kConfig: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1634,7 +1640,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowLogs: {
+        case ShowStmtType::kLogs: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1652,7 +1658,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowDeltaLogs: {
+        case ShowStmtType::kDeltaLogs: {
             String show_str;
             if (intent_size != 0) {
             show_str = String(intent_size - 2, ' ');
@@ -1670,7 +1676,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowCatalogs: {
+        case ShowStmtType::kCatalogs: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1688,7 +1694,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowPersistenceFiles: {
+        case ShowStmtType::kPersistenceFiles: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1706,7 +1712,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowPersistenceObjects: {
+        case ShowStmtType::kPersistenceObjects: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1724,7 +1730,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowPersistenceObject: {
+        case ShowStmtType::kPersistenceObject: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1742,7 +1748,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowMemory: {
+        case ShowStmtType::kMemory: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1760,7 +1766,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowMemoryObjects: {
+        case ShowStmtType::kMemoryObjects: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1778,7 +1784,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowMemoryAllocation: {
+        case ShowStmtType::kMemoryAllocation: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1796,7 +1802,25 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kInvalid: {
+        case ShowStmtType::kFunction: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW FUNCTION";
+            } else {
+                show_str = "SHOW FUNCTION";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowStmtType::kInvalid: {
             String error_message = "Invalid show type";
             UnrecoverableError(error_message);
         }
