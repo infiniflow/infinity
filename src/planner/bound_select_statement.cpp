@@ -85,6 +85,7 @@ import doc_iterator;
 import status;
 import default_values;
 import parse_fulltext_options;
+import highlighter;
 
 namespace infinity {
 
@@ -144,14 +145,20 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             root = limit;
         }
 
-        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
+        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                  projection_expressions_,
+                                                  projection_index_,
+                                                  Map<SizeT, SharedPtr<HighlightInfo>>());
         project->set_left_node(root);
         root = project;
 
         if (!pruned_expression_.empty()) {
             String error_message = "Projection method changed!";
             UnrecoverableError(error_message);
-            auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), pruned_expression_, result_index_);
+            auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                             pruned_expression_,
+                                                             result_index_,
+                                                             Map<SizeT, SharedPtr<HighlightInfo>>());
             pruned_project->set_left_node(root);
             root = pruned_project;
         }
@@ -261,6 +268,30 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         RecoverableError(status);
                     }
 
+                    // Initialize highlight info
+                    if (!highlight_columns_.empty()) {
+                        Vector<String> columns, terms;
+                        query_tree->GetQueryColumnsTerms(columns, terms);
+
+                        // Deduplicate columns
+                        std::sort(columns.begin(), columns.end());
+                        columns.erase(std::unique(columns.begin(), columns.end()), columns.end());
+
+                        for (auto &column_name : columns) {
+                            for (auto &[highlight_column_id, highlight_info] : highlight_columns_) {
+                                if (column_name == projection_expressions_[highlight_column_id]->Name()) {
+                                    highlight_info->query_terms_.insert(highlight_info->query_terms_.end(), terms.begin(), terms.end());
+                                    const auto &it = column2analyzer.find(column_name);
+                                    if (it == column2analyzer.end()) {
+                                        highlight_info->analyzer_ = "standard";
+                                    } else {
+                                        highlight_info->analyzer_ = it->second;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     match_node->query_tree_ = std::move(query_tree);
                     match_knn_nodes.push_back(std::move(match_node));
                     break;
@@ -341,7 +372,20 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             root = limit;
         }
 
-        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
+        // Finalize highlight info
+        if (!highlight_columns_.empty()) {
+            for (auto &[highlight_column_id, highlight_info] : highlight_columns_) {
+                // Deduplicate terms
+                std::sort(highlight_info->query_terms_.begin(), highlight_info->query_terms_.end());
+                highlight_info->query_terms_.erase(std::unique(highlight_info->query_terms_.begin(), highlight_info->query_terms_.end()),
+                                                   highlight_info->query_terms_.end());
+            }
+        }
+
+        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                  projection_expressions_,
+                                                  projection_index_,
+                                                  std::move(highlight_columns_));
         project->set_left_node(root);
         root = std::move(project);
 

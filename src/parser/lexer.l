@@ -103,6 +103,7 @@ GLOBAL          { return GLOBAL; }
 GROUP           { return GROUP; }
 HAVING          { return HAVING; }
 HEADER          { return HEADER; }
+HIGHLIGHT       { return HIGHLIGHT; }
 HOUR            { return HOUR; }
 HOURS           { return HOURS; }
 HUGEINT         { return HUGEINT; }
