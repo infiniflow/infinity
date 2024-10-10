@@ -3574,11 +3574,15 @@ QueryResult AdminExecutor::ShowVariable(QueryContext *query_context, const Admin
     String variable_name = admin_statement->variable_name_.value();
     ToLower(variable_name);
 
-    if (variable_name == "server_role") {
+    if (variable_name == "role") {
         output_block_ptr->Init(output_column_types);
         Value value = Value::MakeVarchar(ToString(InfinityContext::instance().GetServerRole()));
         ValueExpression value_expr(value);
         value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+    } else {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::NoSysVar(variable_name);
+        return query_result;
     }
     output_block_ptr->Finalize();
     query_result.result_table_->Append(std::move(output_block_ptr));

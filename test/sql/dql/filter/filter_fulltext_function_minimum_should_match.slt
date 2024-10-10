@@ -1,0 +1,114 @@
+
+statement ok
+DROP TABLE IF EXISTS ft_in_filter_minimum_should_match;
+
+statement ok
+CREATE TABLE ft_in_filter_minimum_should_match(num int, doc varchar);
+
+# copy data from csv file
+statement ok
+COPY ft_in_filter_minimum_should_match FROM '/var/infinity/test_data/fulltext_delete.csv' WITH ( DELIMITER '\t', FORMAT CSV );
+
+statement ok
+INSERT INTO ft_in_filter_minimum_should_match VALUES (4, 'another second text'), (5, 'another multiple');
+
+statement ok
+CREATE INDEX ft_index ON ft_in_filter_minimum_should_match(doc) USING FULLTEXT;
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match;
+----
+1 first text
+2 second text multiple
+3 third text many words
+4 another second text
+5 another multiple
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text');
+----
+1 first text
+2 second text multiple
+3 third text many words
+4 another second text
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text', 'minimum_should_match=50%');
+----
+1 first text
+2 second text multiple
+3 third text many words
+4 another second text
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text', 'minimum_should_match=2');
+----
+2 second text multiple
+4 another second text
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text', 'minimum_should_match=-49%');
+----
+2 second text multiple
+4 another second text
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text', 'minimum_should_match=2<-49%');
+----
+2 second text multiple
+4 another second text
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=2');
+----
+2 second text multiple
+4 another second text
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=-1');
+----
+2 second text multiple
+4 another second text
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=-34%');
+----
+2 second text multiple
+4 another second text
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=-33%');
+----
+2 second text multiple
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=3');
+----
+2 second text multiple
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=1<50% 2<-1%');
+----
+2 second text multiple
+
+query I
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=1<50% 2<-1%') OR filter_fulltext('doc', 'first');
+----
+1 first text
+2 second text multiple
+
+statement error
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=101%');
+
+statement error
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=-101%');
+
+statement error
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=0.1%');
+
+statement error
+SELECT * FROM ft_in_filter_minimum_should_match WHERE filter_fulltext('doc', 'second text multiple', 'minimum_should_match=0.1');
+
+# Clean up
+statement ok
+DROP TABLE ft_in_filter_minimum_should_match;

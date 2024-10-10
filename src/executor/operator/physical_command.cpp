@@ -144,6 +144,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     GlobalOptionIndex config_index = config->GetOptionIndex(set_command->var_name());
                     switch(config_index) {
                         case GlobalOptionIndex::kLogLevel: {
+                            if (set_command->value_type() != SetVarType::kString) {
+                                Status status = Status::DataTypeMismatch("String", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
                             if (set_command->value_str() == "trace") {
                                 SetLogLevel(LogLevel::kTrace);
                                 config->SetLogLevel(LogLevel::kTrace);
@@ -185,6 +189,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         case GlobalOptionIndex::kRecordRunningQuery: {
+                            if (set_command->value_type() != SetVarType::kBool) {
+                                Status status = Status::DataTypeMismatch("Boolean", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
                             bool flag = set_command->value_bool();
                             if(config->RecordRunningQuery() && !flag) {
                                 // turn off the query recording and clean all query record.
@@ -194,6 +202,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         case GlobalOptionIndex::kCleanupInterval: {
+                            if (set_command->value_type() != SetVarType::kInteger) {
+                                Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
                             i64 interval = set_command->value_int();
                             if(interval < 0) {
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set cleanup interval: {}", interval));
@@ -204,6 +216,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         case GlobalOptionIndex::kFullCheckpointInterval: {
+                            if (set_command->value_type() != SetVarType::kInteger) {
+                                Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
                             i64 interval = set_command->value_int();
                             if(interval < 0) {
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set full checkpoint interval: {}", interval));
@@ -214,6 +230,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         case GlobalOptionIndex::kDeltaCheckpointInterval: {
+                            if (set_command->value_type() != SetVarType::kInteger) {
+                                Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
                             i64 interval = set_command->value_int();
                             if(interval < 0) {
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set delta checkpoint interval: {}", interval));
@@ -224,6 +244,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         case GlobalOptionIndex::kCompactInterval: {
+                            if (set_command->value_type() != SetVarType::kInteger) {
+                                Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
                             i64 interval = set_command->value_int();
                             if(interval < 0) {
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set compact segment interval: {}", interval));
@@ -234,6 +258,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         case GlobalOptionIndex::kOptimizeIndexInterval: {
+                            if (set_command->value_type() != SetVarType::kInteger) {
+                                Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
                             i64 interval = set_command->value_int();
                             if(interval < 0) {
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set optimize interval interval: {}", interval));

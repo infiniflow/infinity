@@ -343,7 +343,7 @@ TEST_F(InfinityTest, test2) {
     }
 
     {
-        QueryResult result = infinity->ShowVariable("enable_profile", SetScope::kSession);
+        QueryResult result = infinity->ShowVariable("profile", SetScope::kSession);
         EXPECT_EQ(result.IsOk(), true);
     }
 

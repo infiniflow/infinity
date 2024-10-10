@@ -65,16 +65,16 @@ public:
                      const void *query_ptr,
                      EmbeddingDataType query_element_type,
                      u32 nprobe,
-                     std::function<bool(SegmentOffset)> satisfy_filter_func,
-                     std::function<void(f32, SegmentOffset)> add_result_func) const;
+                     const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                     const std::function<void(f32, SegmentOffset)> &add_result_func) const;
     static SharedPtr<IVFIndexInMem> NewIVFIndexInMem(const ColumnDef *column_def, const IndexBase *index_base, RowID begin_row_id);
 
 private:
     virtual void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,
                                   const void *query_ptr,
                                   EmbeddingDataType query_element_type,
-                                  std::function<bool(SegmentOffset)> satisfy_filter_func,
-                                  std::function<void(f32, SegmentOffset)> add_result_func) const = 0;
+                                  const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                                  const std::function<void(f32, SegmentOffset)> &add_result_func) const = 0;
 };
 
 } // namespace infinity

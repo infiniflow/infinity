@@ -84,6 +84,7 @@ import query_node;
 import doc_iterator;
 import status;
 import default_values;
+import parse_fulltext_options;
 
 namespace infinity {
 
@@ -245,6 +246,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         } else {
                             RecoverableError(Status::SyntaxError(R"(operator option must be "and" or "or".)"));
                         }
+                    }
+
+                    // option: minimum_should_match
+                    if (iter = search_ops.options_.find("minimum_should_match"); iter != search_ops.options_.end()) {
+                        match_node->minimum_should_match_option_ = ParseMinimumShouldMatchOption(iter->second);
                     }
 
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);

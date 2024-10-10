@@ -154,8 +154,8 @@ public:
     void SearchIndex(const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      const EmbeddingDataType query_element_type,
-                     std::function<bool(SegmentOffset)> satisfy_filter_func,
-                     std::function<void(f32, SegmentOffset)> add_result_func) const override {
+                     const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                     const std::function<void(f32, SegmentOffset)> &add_result_func) const override {
         auto ReturnT = [&]<EmbeddingDataType query_element_type> {
             if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
                           (query_element_type == src_embedding_data_type &&
@@ -188,8 +188,8 @@ public:
     template <EmbeddingDataType query_element_type>
     void SearchIndexT(const KnnDistanceBase1 *knn_distance,
                       const EmbeddingDataTypeToCppTypeT<query_element_type> *query_ptr,
-                      std::function<bool(SegmentOffset)> satisfy_filter_func,
-                      std::function<void(f32, SegmentOffset)> add_result_func) const {
+                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                      const std::function<void(f32, SegmentOffset)> &add_result_func) const {
         using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
         auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
         if (!knn_distance_1) [[unlikely]] {
@@ -485,8 +485,8 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
                                     const void *query_ptr,
                                     const EmbeddingDataType query_element_type,
                                     u32 nprobe,
-                                    std::function<bool(SegmentOffset)> satisfy_filter_func,
-                                    std::function<void(f32, SegmentOffset)> add_result_func) const {
+                                    const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                                    const std::function<void(f32, SegmentOffset)> &add_result_func) const {
     const auto dimension = embedding_dimension();
     const auto centroids_num = ivf_centroids_storage_.centroids_num();
     const auto *centroids_data = ivf_centroids_storage_.data();
