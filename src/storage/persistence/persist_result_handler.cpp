@@ -44,6 +44,10 @@ void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
 }
 
 ObjAddr PersistResultHandler::HandleReadResult(const PersistReadResult &result) {
+    if(!result.cached_ and result.obj_addr_.Valid()){
+        String read_path = pm_->GetObjPath(result.obj_addr_.obj_key_);
+        VirtualStore::DownloadObject(read_path, read_path);
+    }
     if (!result.cached_) {
         UnrecoverableError(fmt::format("HandleReadResult: object {} is not cached", result.obj_addr_.obj_key_));
     }
