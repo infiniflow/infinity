@@ -44,15 +44,17 @@ export struct ObjAddr {
 };
 
 export struct PersistWriteResult {
-    ObjAddr obj_addr_; // where data is persisted, only returned by Persist
-    Vector<String> persist_keys_; // object that should be persisted to local disk. because of cleanup current_object
-    Vector<String> drop_keys_; // object that should be removed from local disk. because of 1. disk used over limit (TODO) 2. object's all parts are deleted
+    ObjAddr obj_addr_;                     // where data is persisted, only returned by Persist
+    Vector<String> persist_keys_;          // object that should be persisted to local disk. because of cleanup current_object
+    Vector<String> drop_keys_;             // object that should be removed from local disk. because of 1. disk used over limit
+    Vector<String> drop_from_remote_keys_; // object that should be removed from remote storage. because of object's all parts are deleted
 };
 
 export struct PersistReadResult {
-    ObjAddr obj_addr_; // where data should read from
-    bool cached_; // whether the object is in localdisk cache
-    Vector<String> drop_keys_;
+    ObjAddr obj_addr_;                     // where data should read from
+    bool cached_;                          // whether the object is in localdisk cache
+    Vector<String> drop_keys_;             // object that should be removed from local disk. because of 1. disk used over limit
+    Vector<String> drop_from_remote_keys_; // object that should be removed from remote storage. because of object's all parts are deleted
 };
 
 export class PersistenceManager {
@@ -104,7 +106,11 @@ private:
     void CurrentObjFinalizeNoLock(Vector<String> &persist_keys, Vector<String> &drop_keys);
 
     // Cleanup
-    void CleanupNoLock(const ObjAddr &object_addr, Vector<String> &persist_keys, Vector<String> &drop_keys ,bool check_ref_count = false);
+    void CleanupNoLock(const ObjAddr &object_addr,
+                       Vector<String> &persist_keys,
+                       Vector<String> &drop_keys,
+                       Vector<String> &drop_from_remote_keys,
+                       bool check_ref_count = false);
 
     String RemovePrefix(const String &path);
 
@@ -125,7 +131,7 @@ private:
     mutable std::mutex mtx_;
     // HashMap<String, ObjStat> objects_;        // obj_key -> ObjStat
     UniquePtr<ObjectStatAccessorBase> objects_; // obj_key -> ObjStat
-    HashMap<String, ObjAddr> local_path_obj_; // local_file_path -> ObjAddr
+    HashMap<String, ObjAddr> local_path_obj_;   // local_file_path -> ObjAddr
     // Current unsealed object key
     String current_object_key_;
     SizeT current_object_size_ = 0;
@@ -141,7 +147,7 @@ export struct AddrSerializer {
     void InitializeValid(PersistenceManager *persistence_manager);
 
     SizeT GetSizeInBytes() const;
- 
+
     void WriteBufAdv(char *&buf) const;
 
     Vector<String> ReadBufAdv(const char *&buf);
