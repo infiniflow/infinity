@@ -1,5 +1,3 @@
-
-
 import argparse
 import os
 import random
@@ -63,3 +61,14 @@ if not os.path.isfile(executable_path):
 else:
     if failure:
         shutil.copy(executable_path, f"{output_dir}/{random_name}.exe")
+
+if failure:
+    # copy file in /var/infinity/data/catalog/FULL.*.json
+    for root, dirs, files in os.walk("/var/infinity/data/catalog/"):
+        for file in files:
+            match = re.match(r"FULL\.(\d+)\.json", file)
+            print(f"Full checkpoint file: {file}")
+            if match:
+                shutil.copy(
+                    os.path.join(root, file), f"{output_dir}/{random_name}_{file}"
+                )
