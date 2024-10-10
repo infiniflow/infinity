@@ -165,6 +165,8 @@ public:
         return std::make_pair(v_ptr, multi_vector_segment_offset_);
     }
 
+    SizeT offset() const { return segment_iter_.offset(); }
+
 private:
     SegmentIter<CheckTS> segment_iter_;
     SizeT ele_size_;
@@ -197,6 +199,8 @@ public:
 
         return std::make_pair(sparse_vec_ref, offset);
     }
+
+    SizeT offset() const { return segment_iter_.offset(); }
 
 private:
     SegmentIter<CheckTS> segment_iter_;

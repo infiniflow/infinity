@@ -1,12 +1,21 @@
 name: slow_tests
 
 on:
+  # Schedule the workflow to run at 00:30 UTC+8 every day
+  # https://docs.github.com/zh/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule
+  schedule:
+    - cron: '30 16 * * *' # 00:30 - 8 = 16:30
   # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
   create:
     tags:
       - "v*.*.*"                  # normal release
       - "nightly"                 # mutable tag
       - "slow-test"               # mutable tag
+  pull_request:
+    types: [ opened, synchronize, reopened, labeled ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
@@ -16,6 +25,7 @@ concurrency:
 jobs:
   slow_tests:
     name: run slow test
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'invalid') }}
     runs-on: ["self-hosted", "slow-test" ]
     steps:
 
@@ -51,28 +61,30 @@ jobs:
 
       - name: Install pysdk for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && cd python/infinity_sdk/ && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && cd python/infinity_sdk/ && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Start infinity release version
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() && !failure() && !contains(github.event.pull_request.labels.*.name, 'invalid')}}
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_continuous_conf.toml > release.log 2> release_error.log" &
 
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version continously
-        if: ${{ !cancelled() && !failure() }}
+        if: ${{ !cancelled() && !failure() && !contains(github.event.pull_request.labels.*.name, 'invalid')}}
         id: run_py_tests
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel_continuous.py" && sleep 1s
 
       - name: Stop infinity release
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && !contains(github.event.pull_request.labels.*.name, 'invalid')}}
         id: stop_py_tests
         run: |
           pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
           sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
           if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
+            echo "Failed to kill infinity release version"
             exit 1
           fi
 
@@ -92,10 +104,12 @@ jobs:
     
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
+        id: run_restart_test
         run : |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pytest python/restart_test/test_insert.py -k "test_data[infinity_runner0-columns5-gen-1000000-test/data/config/restart_test/test_insert/1.toml]" -s --infinity_path=cmake-build-release/src/infinity"
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pytest python/restart_test/test_insert.py -k "test_index[infinity_runner0-columns2-indexes2-gen-1000000-test/data/config/restart_test/test_insert/1.toml]" -s --infinity_path=cmake-build-release/src/infinity"
+        #   sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_restart_test.py --infinity_path=cmake-build-release/src/infinity --slow=true"
 
       - name: Collect restart test output
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
@@ -103,7 +117,8 @@ jobs:
         # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
           sudo rm -f test/data/benchmark/enwiki-10w.csv
-          find . -name "restart_test.log.*" -exec cat {} \;
+          failure="${{ steps.run_restart_test.outcome == 'failure'}}"
+          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed

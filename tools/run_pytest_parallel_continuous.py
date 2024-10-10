@@ -6,7 +6,7 @@ import argparse
 
 
 LOG_PATH = "/var/infinity/log/infinity.log"
-TEST_SEC = 3600
+TEST_SEC = 900
 
 
 def clear_infinity_log():
