@@ -102,6 +102,8 @@ String ToString(ShowType type) {
             return "Show memory objects";
         case ShowType::kShowMemoryAllocation:
             return "Show memory allocation";
+        case ShowType::kShowFunction:
+            return "Show function";
         case ShowType::kInvalid: {
             String error_message = "Invalid chunk scan type";
             UnrecoverableError(error_message);

@@ -64,6 +64,7 @@ export enum class ShowType {
     kShowMemory,
     kShowMemoryObjects,
     kShowMemoryAllocation,
+    kShowFunction,
 };
 
 export String ToString(ShowType type);
@@ -81,9 +82,11 @@ public:
                          Optional<ColumnID> column_id = None,
                          Optional<String> index_name = None,
                          Optional<TransactionID> session_id = None,
-                         Optional<u64> txn_id = None)
+                         Optional<u64> txn_id = None,
+                         Optional<String> function_name = None)
         : LogicalNode(node_id, LogicalNodeType::kShow), show_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
-          table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id), index_name_(index_name), session_id_(session_id), txn_id_(txn_id) {}
+          table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id),
+          index_name_(index_name), session_id_(session_id), txn_id_(txn_id), function_name_(function_name) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -117,6 +120,8 @@ public:
 
     [[nodiscard]] inline const Optional<String> index_name() const { return index_name_; }
 
+    [[nodiscard]] inline const Optional<String> function_name() const { return function_name_; }
+
 private:
     ShowType show_type_{ShowType::kInvalid};
     String schema_name_;
@@ -130,6 +135,7 @@ private:
     Optional<String> index_name_{};
     Optional<u64> session_id_{};
     Optional<TransactionID> txn_id_{};
+    Optional<String> function_name_{};
 };
 
 } // namespace infinity

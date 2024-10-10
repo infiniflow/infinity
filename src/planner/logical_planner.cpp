@@ -1362,6 +1362,9 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kMemoryAllocation: {
             return BuildShowMemoryAllocation(statement, bind_context_ptr);
         }
+        case ShowStmtType::kFunction: {
+            return BuildShowFunction(statement, bind_context_ptr);
+        }
         default: {
             String error_message = "Unexpected show statement type.";
             UnrecoverableError(error_message);
@@ -1796,6 +1799,25 @@ Status LogicalPlanner::BuildShowMemoryAllocation(const ShowStatement *statement,
                                                                   "",
                                                                   "",
                                                                   bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowFunction(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowFunction,
+                                                                  "",
+                                                                  "",
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  statement->function_name_);
 
     this->logical_plan_ = logical_show;
     return Status::OK();

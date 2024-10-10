@@ -723,6 +723,10 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             result->emplace_back(MakeShared<String>("SHOW MEMORY ALLOCATION"));
             break;
         }
+        case ShowStmtType::kFunction: {
+            result->emplace_back(MakeShared<String>("SHOW FUNCTION"));
+            break;
+        }
     }
     return Status::OK();
 }

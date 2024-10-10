@@ -172,6 +172,10 @@ std::string ShowStatement::ToString() const {
             ss << "Show memory allocation";
             break;
         }
+        case ShowStmtType::kFunction: {
+            ss << "Show function";
+            break;
+        }
     }
     return ss.str();
 }
