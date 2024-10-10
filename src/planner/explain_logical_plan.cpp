@@ -79,6 +79,7 @@ import statement_common;
 import flush_statement;
 import optimize_statement;
 import logger;
+import show_statement;
 
 namespace infinity {
 
@@ -1267,7 +1268,12 @@ Status ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vecto
 
 Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (show_node->show_type()) {
-        case ShowType::kShowDatabase: {
+        case ShowStmtType::kInvalid: {
+            String error_message = "Invalid show statement type";
+            UnrecoverableError(error_message);
+            break;
+        }
+        case ShowStmtType::kDatabase: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1285,7 +1291,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowTable: {
+        case ShowStmtType::kTable: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1303,7 +1309,12 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowIndex: {
+        case ShowStmtType::kCollections: {
+            String error_message = "Show collections are not supported now";
+            UnrecoverableError(error_message);
+            break;
+        }
+        case ShowStmtType::kIndex: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1321,7 +1332,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowIndexSegment: {
+        case ShowStmtType::kIndexSegment: {
             String show_str;
             if (intent_size != 0) {
             show_str = String(intent_size - 2, ' ');
@@ -1339,7 +1350,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowIndexChunk: {
+        case ShowStmtType::kIndexChunk: {
             String show_str;
             if (intent_size != 0) {
             show_str = String(intent_size - 2, ' ');
@@ -1357,7 +1368,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowTables: {
+        case ShowStmtType::kTables: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1375,7 +1386,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowViews: {
+        case ShowStmtType::kViews: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1393,7 +1404,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowColumn: {
+        case ShowStmtType::kColumns: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1421,7 +1432,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowDatabases: {
+        case ShowStmtType::kDatabases: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1439,7 +1450,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowConfigs: {
+        case ShowStmtType::kConfigs: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1457,7 +1468,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowBuffer: {
+        case ShowStmtType::kBuffer: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1475,7 +1486,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowMemIndex: {
+        case ShowStmtType::kMemIndex: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1493,7 +1504,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowProfiles: {
+        case ShowStmtType::kProfiles: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1512,7 +1523,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowQueries: {
+        case ShowStmtType::kQueries: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1530,7 +1541,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowQuery: {
+        case ShowStmtType::kQuery: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1548,7 +1559,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowTransactions: {
+        case ShowStmtType::kTransactions: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1566,7 +1577,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowTransaction: {
+        case ShowStmtType::kTransaction: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1584,7 +1595,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowIndexes: {
+        case ShowStmtType::kIndexes: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1602,7 +1613,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowSegments: {
+        case ShowStmtType::kSegments: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1632,7 +1643,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowSegment: {
+        case ShowStmtType::kSegment: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1655,7 +1666,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowBlocks: {
+        case ShowStmtType::kBlocks: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1679,7 +1690,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowBlock: {
+        case ShowStmtType::kBlock: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1701,7 +1712,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowBlockColumn: {
+        case ShowStmtType::kBlockColumn: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1731,7 +1742,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowSessionVariable: {
+        case ShowStmtType::kSessionVariable: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1749,7 +1760,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowSessionVariables: {
+        case ShowStmtType::kSessionVariables: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1763,7 +1774,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowGlobalVariable: {
+        case ShowStmtType::kGlobalVariable: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1781,7 +1792,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowGlobalVariables: {
+        case ShowStmtType::kGlobalVariables: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1795,7 +1806,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowConfig: {
+        case ShowStmtType::kConfig: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1813,7 +1824,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowLogs: {
+        case ShowStmtType::kLogs: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1827,7 +1838,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowDeltaLogs: {
+        case ShowStmtType::kDeltaLogs: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1841,7 +1852,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowCatalogs: {
+        case ShowStmtType::kCatalogs: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1855,7 +1866,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowPersistenceFiles: {
+        case ShowStmtType::kPersistenceFiles: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1869,7 +1880,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowPersistenceObjects: {
+        case ShowStmtType::kPersistenceObjects: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1883,7 +1894,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowPersistenceObject: {
+        case ShowStmtType::kPersistenceObject: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1897,7 +1908,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowMemory: {
+        case ShowStmtType::kMemory: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1911,7 +1922,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowMemoryObjects: {
+        case ShowStmtType::kMemoryObjects: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1925,7 +1936,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowMemoryAllocation: {
+        case ShowStmtType::kMemoryAllocation: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1939,7 +1950,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
             break;
         }
-        case ShowType::kShowFunction: {
+        case ShowStmtType::kFunction: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1956,10 +1967,6 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             output_columns_str += " - output columns: [value]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
-        }
-        case ShowType::kInvalid: {
-            String error_message = "Invalid show type";
-            UnrecoverableError(error_message);
         }
     }
     return Status::OK();

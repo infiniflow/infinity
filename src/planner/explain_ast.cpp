@@ -727,6 +727,10 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             result->emplace_back(MakeShared<String>("SHOW FUNCTION"));
             break;
         }
+        case ShowStmtType::kInvalid: {
+            String error_message = "Invalid show statement type";
+            UnrecoverableError(error_message);
+        }
     }
     return Status::OK();
 }

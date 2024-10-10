@@ -91,7 +91,7 @@ void PhysicalShow::Init() {
     output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
 
     switch (show_type_) {
-        case ShowType::kShowDatabase: {
+        case ShowStmtType::kDatabase: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -100,7 +100,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowTable: {
+        case ShowStmtType::kTable: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -109,7 +109,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowIndex: {
+        case ShowStmtType::kIndex: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -118,7 +118,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowIndexSegment: {
+        case ShowStmtType::kIndexSegment: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -127,7 +127,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowIndexChunk: {
+        case ShowStmtType::kIndexChunk: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -136,14 +136,14 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowDatabases: {
+        case ShowStmtType::kDatabases: {
             output_names_->reserve(1);
             output_types_->reserve(1);
             output_names_->emplace_back("database");
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowTables: {
+        case ShowStmtType::kTables: {
 
             output_names_->reserve(8);
             output_types_->reserve(8);
@@ -167,7 +167,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
-        case ShowType::kShowColumn: {
+        case ShowStmtType::kColumns: {
 
             output_names_->reserve(3);
             output_types_->reserve(3);
@@ -183,7 +183,7 @@ void PhysicalShow::Init() {
 //            output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowIndexes: {
+        case ShowStmtType::kIndexes: {
 
             output_names_->reserve(7);
             output_types_->reserve(7);
@@ -205,7 +205,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowConfigs: {
+        case ShowStmtType::kConfigs: {
 
             output_names_->reserve(3);
             output_types_->reserve(3);
@@ -219,7 +219,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowProfiles: {
+        case ShowStmtType::kProfiles: {
 
             output_names_->reserve(9);
             output_types_->reserve(9);
@@ -249,7 +249,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowSegments: {
+        case ShowStmtType::kSegments: {
             output_names_->reserve(3);
             output_types_->reserve(3);
 
@@ -262,7 +262,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowSegment: {
+        case ShowStmtType::kSegment: {
             output_names_->reserve(10);
             output_types_->reserve(10);
 
@@ -290,7 +290,7 @@ void PhysicalShow::Init() {
             break;
         }
 
-        case ShowType::kShowBlocks: {
+        case ShowStmtType::kBlocks: {
             output_names_->reserve(3);
             output_types_->reserve(3);
 
@@ -304,7 +304,7 @@ void PhysicalShow::Init() {
             break;
         }
 
-        case ShowType::kShowBlock: {
+        case ShowStmtType::kBlock: {
             output_names_->reserve(8);
             output_types_->reserve(8);
 
@@ -328,7 +328,7 @@ void PhysicalShow::Init() {
             break;
         }
 
-        case ShowType::kShowBlockColumn: {
+        case ShowStmtType::kBlockColumn: {
             output_names_->reserve(2);
             output_types_->reserve(2);
 
@@ -340,21 +340,21 @@ void PhysicalShow::Init() {
             break;
         }
 
-        case ShowType::kShowSessionVariable: {
+        case ShowStmtType::kSessionVariable: {
             output_names_->reserve(1);
             output_types_->reserve(1);
             output_names_->emplace_back("value");
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowGlobalVariable: {
+        case ShowStmtType::kGlobalVariable: {
             output_names_->reserve(1);
             output_types_->reserve(1);
             output_names_->emplace_back("value");
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowSessionVariables: {
+        case ShowStmtType::kSessionVariables: {
 
             output_names_->reserve(3);
             output_types_->reserve(3);
@@ -368,7 +368,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowGlobalVariables: {
+        case ShowStmtType::kGlobalVariables: {
 
             output_names_->reserve(3);
             output_types_->reserve(3);
@@ -382,14 +382,14 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowConfig: {
+        case ShowStmtType::kConfig: {
             output_names_->reserve(1);
             output_types_->reserve(1);
             output_names_->emplace_back("value");
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowBuffer: {
+        case ShowStmtType::kBuffer: {
             output_names_->reserve(5);
             output_types_->reserve(5);
             output_names_->emplace_back("path");
@@ -404,7 +404,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowMemIndex: {
+        case ShowStmtType::kMemIndex: {
             output_names_->reserve(5);
             output_types_->reserve(5);
             output_names_->emplace_back("index_name");
@@ -419,7 +419,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
-        case ShowType::kShowQueries: {
+        case ShowStmtType::kQueries: {
             output_names_->reserve(5);
             output_types_->reserve(5);
             output_names_->emplace_back("session_id");
@@ -434,7 +434,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowQuery: {
+        case ShowStmtType::kQuery: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -443,7 +443,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowTransactions: {
+        case ShowStmtType::kTransactions: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("transaction_id");
@@ -452,7 +452,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowTransaction: {
+        case ShowStmtType::kTransaction: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -461,7 +461,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowLogs: {
+        case ShowStmtType::kLogs: {
             output_names_->reserve(4);
             output_types_->reserve(4);
             output_names_->emplace_back("commit_ts");
@@ -474,7 +474,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowDeltaLogs: {
+        case ShowStmtType::kDeltaLogs: {
             output_names_->reserve(5);
             output_types_->reserve(5);
             output_names_->emplace_back("begin_ts");
@@ -489,7 +489,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowCatalogs: {
+        case ShowStmtType::kCatalogs: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("max_commit_timestamp");
@@ -498,7 +498,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowPersistenceFiles: {
+        case ShowStmtType::kPersistenceFiles: {
             output_names_->reserve(4);
             output_types_->reserve(4);
             output_names_->emplace_back("file_name");
@@ -511,7 +511,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
-        case ShowType::kShowPersistenceObjects: {
+        case ShowStmtType::kPersistenceObjects: {
             output_names_->reserve(5);
             output_types_->reserve(5);
             output_names_->emplace_back("name");
@@ -526,7 +526,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowPersistenceObject: {
+        case ShowStmtType::kPersistenceObject: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("start");
@@ -535,7 +535,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
-        case ShowType::kShowMemory: {
+        case ShowStmtType::kMemory: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -544,7 +544,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowMemoryObjects: {
+        case ShowStmtType::kMemoryObjects: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -553,7 +553,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
-        case ShowType::kShowMemoryAllocation: {
+        case ShowStmtType::kMemoryAllocation: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -574,151 +574,151 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
     DeferFn defer_fn([&]() { show_operator_state->SetComplete(); });
 
     switch (show_type_) {
-        case ShowType::kShowDatabase: {
+        case ShowStmtType::kDatabase: {
             ExecuteShowDatabase(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowTable: {
+        case ShowStmtType::kTable: {
             ExecuteShowTable(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowIndex: {
+        case ShowStmtType::kIndex: {
             ExecuteShowIndex(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowIndexSegment: {
+        case ShowStmtType::kIndexSegment: {
             ExecuteShowIndexSegment(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowIndexChunk: {
+        case ShowStmtType::kIndexChunk: {
             ExecuteShowIndexChunk(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowDatabases: {
+        case ShowStmtType::kDatabases: {
             ExecuteShowDatabases(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowTables: {
+        case ShowStmtType::kTables: {
             ExecuteShowTables(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowColumn: {
+        case ShowStmtType::kColumns: {
             ExecuteShowColumns(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowIndexes: {
+        case ShowStmtType::kIndexes: {
             ExecuteShowIndexes(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowConfigs: {
+        case ShowStmtType::kConfigs: {
             ExecuteShowConfigs(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowProfiles: {
+        case ShowStmtType::kProfiles: {
             ExecuteShowProfiles(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowSegments: {
+        case ShowStmtType::kSegments: {
             ExecuteShowSegments(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowSegment: {
+        case ShowStmtType::kSegment: {
             ExecuteShowSegmentDetail(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowBlocks: {
+        case ShowStmtType::kBlocks: {
             ExecuteShowBlocks(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowBlock: {
+        case ShowStmtType::kBlock: {
             ExecuteShowBlockDetail(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowBlockColumn: {
+        case ShowStmtType::kBlockColumn: {
             ExecuteShowBlockColumn(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowViews: {
+        case ShowStmtType::kViews: {
             ExecuteShowViews(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowSessionVariable: {
+        case ShowStmtType::kSessionVariable: {
             ExecuteShowSessionVariable(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowGlobalVariable: {
+        case ShowStmtType::kGlobalVariable: {
             ExecuteShowGlobalVariable(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowSessionVariables: {
+        case ShowStmtType::kSessionVariables: {
             ExecuteShowSessionVariables(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowGlobalVariables: {
+        case ShowStmtType::kGlobalVariables: {
             ExecuteShowGlobalVariables(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowConfig: {
+        case ShowStmtType::kConfig: {
             ExecuteShowConfig(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowBuffer: {
+        case ShowStmtType::kBuffer: {
             ExecuteShowBuffer(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowMemIndex: {
+        case ShowStmtType::kMemIndex: {
             ExecuteShowMemIndex(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowQueries: {
+        case ShowStmtType::kQueries: {
             ExecuteShowQueries(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowQuery: {
+        case ShowStmtType::kQuery: {
             ExecuteShowQuery(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowTransactions: {
+        case ShowStmtType::kTransactions: {
             ExecuteShowTransactions(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowTransaction: {
+        case ShowStmtType::kTransaction: {
             ExecuteShowTransaction(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowLogs: {
+        case ShowStmtType::kLogs: {
             ExecuteShowLogs(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowDeltaLogs: {
+        case ShowStmtType::kDeltaLogs: {
             ExecuteShowDeltaLogs(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowCatalogs: {
+        case ShowStmtType::kCatalogs: {
             ExecuteShowCatalogs(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowPersistenceFiles: {
+        case ShowStmtType::kPersistenceFiles: {
             ExecuteShowPersistenceFiles(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowPersistenceObjects: {
+        case ShowStmtType::kPersistenceObjects: {
             ExecuteShowPersistenceObjects(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowPersistenceObject: {
+        case ShowStmtType::kPersistenceObject: {
             ExecuteShowPersistenceObject(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowMemory: {
+        case ShowStmtType::kMemory: {
             ExecuteShowMemory(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowMemoryObjects: {
+        case ShowStmtType::kMemoryObjects: {
             ExecuteShowMemoryObjects(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowMemoryAllocation: {
+        case ShowStmtType::kMemoryAllocation: {
             ExecuteShowMemoryAllocation(query_context, show_operator_state);
             break;
         }

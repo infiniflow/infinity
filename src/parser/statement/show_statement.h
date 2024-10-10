@@ -20,6 +20,7 @@
 namespace infinity {
 
 enum class ShowStmtType {
+    kInvalid,
     kDatabase,
     kTable,
     kIndex,

@@ -26,85 +26,87 @@ import logger;
 
 namespace infinity {
 
-String ToString(ShowType type) {
+String ToString(ShowStmtType type) {
     switch (type) {
-        case ShowType::kShowDatabase:
+        case ShowStmtType::kDatabase:
             return "Show database";
-        case ShowType::kShowTable:
+        case ShowStmtType::kTable:
             return "Show table";
-        case ShowType::kShowIndex:
+        case ShowStmtType::kIndex:
             return "Show index";
-        case ShowType::kShowIndexSegment:
+        case ShowStmtType::kIndexSegment:
             return "Show index segment";
-        case ShowType::kShowIndexChunk:
+        case ShowStmtType::kIndexChunk:
             return "Show index chunk";
-        case ShowType::kShowTables:
+        case ShowStmtType::kTables:
             return "Show tables";
-        case ShowType::kShowViews:
+        case ShowStmtType::kViews:
             return "Show views";
-        case ShowType::kShowColumn:
+        case ShowStmtType::kColumns:
             return "Show column";
-        case ShowType::kShowIndexes:
+        case ShowStmtType::kIndexes:
             return "Show indexes";
-        case ShowType::kShowDatabases:
+        case ShowStmtType::kDatabases:
             return "Show databases";
-        case ShowType::kShowConfigs:
+        case ShowStmtType::kConfigs:
             return "Show configs";
-        case ShowType::kShowProfiles:
+        case ShowStmtType::kProfiles:
             return "Show profiles";
-        case ShowType::kShowSegments:
+        case ShowStmtType::kSegments:
             return "Show segments";
-        case ShowType::kShowSegment:
+        case ShowStmtType::kSegment:
             return "Show segment";
-        case ShowType::kShowBlocks:
+        case ShowStmtType::kBlocks:
             return "Show blocks";
-        case ShowType::kShowBlock:
+        case ShowStmtType::kBlock:
             return "Show block";
-        case ShowType::kShowBlockColumn:
+        case ShowStmtType::kBlockColumn:
             return "Show block column";
-        case ShowType::kShowSessionVariable:
+        case ShowStmtType::kSessionVariable:
             return "Show session variable";
-        case ShowType::kShowSessionVariables:
+        case ShowStmtType::kSessionVariables:
             return "Show session variables";
-        case ShowType::kShowGlobalVariable:
+        case ShowStmtType::kGlobalVariable:
             return "Show global variable";
-        case ShowType::kShowGlobalVariables:
+        case ShowStmtType::kGlobalVariables:
             return "Show global variables";
-        case ShowType::kShowConfig:
+        case ShowStmtType::kConfig:
             return "Show config";
-        case ShowType::kShowBuffer:
+        case ShowStmtType::kBuffer:
             return "Show buffer";
-        case ShowType::kShowMemIndex:
+        case ShowStmtType::kMemIndex:
             return "Sow memindex";
-        case ShowType::kShowQueries:
+        case ShowStmtType::kQueries:
             return "Show queries";
-        case ShowType::kShowQuery:
+        case ShowStmtType::kQuery:
             return "Show query";
-        case ShowType::kShowTransactions:
+        case ShowStmtType::kTransactions:
             return "Show transactions";
-        case ShowType::kShowTransaction:
+        case ShowStmtType::kTransaction:
             return "Show transaction";
-        case ShowType::kShowLogs:
+        case ShowStmtType::kLogs:
             return "Show logs";
-        case ShowType::kShowDeltaLogs:
+        case ShowStmtType::kDeltaLogs:
             return "Show delta logs";
-        case ShowType::kShowCatalogs:
+        case ShowStmtType::kCatalogs:
             return "Show catalogs";
-        case ShowType::kShowPersistenceFiles:
+        case ShowStmtType::kPersistenceFiles:
             return "Show persistence files";
-        case ShowType::kShowPersistenceObjects:
+        case ShowStmtType::kPersistenceObjects:
             return "Show persistence objects";
-        case ShowType::kShowPersistenceObject:
+        case ShowStmtType::kPersistenceObject:
             return "Show persistence object";
-        case ShowType::kShowMemory:
+        case ShowStmtType::kMemory:
             return "Show memory";
-        case ShowType::kShowMemoryObjects:
+        case ShowStmtType::kMemoryObjects:
             return "Show memory objects";
-        case ShowType::kShowMemoryAllocation:
+        case ShowStmtType::kMemoryAllocation:
             return "Show memory allocation";
-        case ShowType::kShowFunction:
+        case ShowStmtType::kFunction:
             return "Show function";
-        case ShowType::kInvalid: {
+        case ShowStmtType::kCollections:
+            return "Show collection";
+        case ShowStmtType::kInvalid: {
             String error_message = "Invalid chunk scan type";
             UnrecoverableError(error_message);
         }

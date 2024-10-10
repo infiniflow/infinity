@@ -22,57 +22,16 @@ import column_binding;
 import logical_node;
 import data_type;
 import internal_types;
+import show_statement;
 
 namespace infinity {
 
-export enum class ShowType {
-    kInvalid,
-    kShowDatabase,
-    kShowTable,
-    kShowIndex,
-    kShowIndexSegment,
-    kShowIndexChunk,
-    kShowDatabases,
-    kShowTables,
-    kShowViews,
-    kShowColumn,
-    kShowConfigs,
-    kShowProfiles,
-    kShowQueries,
-    kShowQuery,
-    kShowTransactions,
-    kShowTransaction,
-    kShowIndexes,
-    kShowSegments,
-    kShowSegment,
-    kShowBlocks,
-    kShowBlock,
-    kShowBlockColumn,
-    kShowSessionVariable,
-    kShowSessionVariables,
-    kShowGlobalVariable,
-    kShowGlobalVariables,
-    kShowConfig,
-    kShowBuffer,
-    kShowMemIndex,
-    kShowLogs,
-    kShowDeltaLogs,
-    kShowCatalogs,
-    kShowPersistenceFiles,
-    kShowPersistenceObjects,
-    kShowPersistenceObject,
-    kShowMemory,
-    kShowMemoryObjects,
-    kShowMemoryAllocation,
-    kShowFunction,
-};
-
-export String ToString(ShowType type);
+export String ToString(ShowStmtType type);
 
 export class LogicalShow : public LogicalNode {
 public:
     explicit LogicalShow(u64 node_id,
-                         ShowType type,
+                         ShowStmtType type,
                          String schema_name,
                          String object_name,
                          u64 table_index,
@@ -98,7 +57,7 @@ public:
 
     inline String name() final { return "LogicalShow"; }
 
-    [[nodiscard]] ShowType show_type() const { return show_type_; }
+    [[nodiscard]] ShowStmtType show_type() const { return show_type_; }
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
@@ -123,7 +82,7 @@ public:
     [[nodiscard]] inline const Optional<String> function_name() const { return function_name_; }
 
 private:
-    ShowType show_type_{ShowType::kInvalid};
+    ShowStmtType show_type_{ShowStmtType::kInvalid};
     String schema_name_;
     String object_name_; // It could be table/collection/view name
     u64 table_index_{};

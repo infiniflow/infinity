@@ -32,13 +32,14 @@ import data_type;
 import variables;
 import data_block;
 import logger;
+import show_statement;
 
 namespace infinity {
 
 export class PhysicalShow : public PhysicalOperator {
 public:
     explicit PhysicalShow(u64 id,
-                          ShowType type,
+                          ShowStmtType type,
                           String db_name,
                           String object_name,
                           u64 table_index,
@@ -70,7 +71,7 @@ public:
         return 0;
     }
 
-    inline ShowType show_type() const { return show_type_; }
+    inline ShowStmtType show_type() const { return show_type_; }
 
     inline const String &db_name() const { return db_name_; };
 
@@ -156,7 +157,7 @@ private:
     void ExecuteShowMemoryAllocation(QueryContext *query_context, ShowOperatorState *operator_state);
 
 private:
-    ShowType show_type_{ShowType::kInvalid};
+    ShowStmtType show_type_{ShowStmtType::kInvalid};
     String db_name_{};
     String object_name_{};
     u64 table_index_{};
