@@ -26,7 +26,7 @@ import internal_types;
 namespace infinity {
 
 class BufferManager;
-class BlockColumnEntry;
+struct BlockColumnEntry;
 class VarcharNextCharIterator;
 
 export struct FixHeapManager {

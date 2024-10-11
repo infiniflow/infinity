@@ -28,8 +28,8 @@ namespace infinity {
 
 struct BlockColumnEntry;
 class BufferManager;
-class ChunkIndexEntry;
-class SegmentIndexEntry;
+struct ChunkIndexEntry;
+struct SegmentIndexEntry;
 class IndexBase;
 class KnnDistanceBase1;
 

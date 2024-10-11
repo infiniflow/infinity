@@ -21,6 +21,7 @@ import serialize;
 import third_party;
 import obj_status;
 import obj_stat_accessor;
+import status;
 
 // A view means a logical plan
 namespace infinity {
@@ -75,6 +76,8 @@ public:
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
     [[nodiscard]] PersistReadResult GetObjCache(const String &local_path);
 
+    Tuple<SizeT, Status> GetFileSize(const String &file_path);
+
     ObjAddr GetObjCacheWithoutCnt(const String &local_path);
 
     [[nodiscard]] PersistWriteResult PutObjCache(const String &file_path);
@@ -99,7 +102,7 @@ private:
     int CurrentObjRoomNoLock();
 
     // Append file to the current object.
-    // It finalize current object if new size exceeds the size limit.
+    // It finalizes current object if new size exceeds the size limit.
     void CurrentObjAppendNoLock(const String &tmp_file_path, SizeT file_size);
 
     // Finalize current object.

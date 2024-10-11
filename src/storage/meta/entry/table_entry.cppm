@@ -120,7 +120,7 @@ public:
 
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 
-    MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
+    MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() const { return index_meta_map_.GetMetaMap(); }
 
     void AddIndexMetaNoLock(const String& table_meta_name, UniquePtr<TableIndexMeta> table_index_meta);
 
@@ -141,7 +141,7 @@ public:
 
     TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Vector<TableIndexEntry *> TableIndexes(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Vector<TableIndexEntry *> TableIndexes(TransactionID txn_id, TxnTimeStamp begin_ts) const;
 
     void AddSegmentReplayWalImport(SharedPtr<SegmentEntry> segment_entry);
 
@@ -336,6 +336,8 @@ public:
     void PickCleanup(CleanupScanner *scanner) override;
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
+
+    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
 
 public:
     Status AddWriteTxnNum(Txn *txn);
