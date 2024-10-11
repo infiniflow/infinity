@@ -64,29 +64,29 @@ void ObjectStorageProcess::Process() {
                 }
                 case ObjectStorageTaskType::kDownload: {
                     LOG_DEBUG("Download task");
-                    DownloadTask *download_task = static_cast<DownloadTask *>(object_storage_task.get());
-                    assert(download_task != nullptr);
+//                    DownloadTask *download_task = static_cast<DownloadTask *>(object_storage_task.get());
+//                    assert(download_task != nullptr);
                     LOG_DEBUG("Download task done");
                     break;
                 }
                 case ObjectStorageTaskType::kUpload: {
                     LOG_DEBUG("Upload task");
-                    UploadTask *upload_task = static_cast<UploadTask *>(object_storage_task.get());
-                    assert(upload_task != nullptr);
+//                    UploadTask *upload_task = static_cast<UploadTask *>(object_storage_task.get());
+//                    assert(upload_task != nullptr);
                     LOG_DEBUG("Upload task done");
                     break;
                 }
                 case ObjectStorageTaskType::kCopy: {
                     LOG_DEBUG("Copy task");
-                    CopyTask *copy_task = static_cast<CopyTask *>(object_storage_task.get());
-                    assert(copy_task != nullptr);
+//                    CopyTask *copy_task = static_cast<CopyTask *>(object_storage_task.get());
+//                    assert(copy_task != nullptr);
                     LOG_DEBUG("Copy task done");
                     break;
                 }
                 case ObjectStorageTaskType::kRemove: {
                     LOG_DEBUG("Remove task");
-                    RemoveTask *remove_task = static_cast<RemoveTask *>(object_storage_task.get());
-                    assert(remove_task != nullptr);
+//                    RemoveTask *remove_task = static_cast<RemoveTask *>(object_storage_task.get());
+//                    assert(remove_task != nullptr);
                     LOG_DEBUG("Remove task done");
                     break;
                 }
