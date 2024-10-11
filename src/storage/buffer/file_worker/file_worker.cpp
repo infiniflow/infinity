@@ -52,7 +52,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         }
         file_handle_ = std::move(file_handle);
         DeferFn defer_fn([&]() {
-            file_handler_ = nullptr;
+            file_handle_ = nullptr;
         });
 
         bool prepare_success = false;
@@ -84,7 +84,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         }
         file_handle_ = std::move(file_handle);
         DeferFn defer_fn([&]() {
-            file_handler_ = nullptr;
+            file_handle_ = nullptr;
         });
 
         if (to_spill) {
