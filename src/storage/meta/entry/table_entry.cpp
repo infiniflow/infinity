@@ -974,9 +974,11 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_, index_fulltext->flag_);
                     column_index_merger.Merge(base_names, base_rowids, dst_base_name);
 
+                    Vector<ChunkID> old_ids;
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
                         old_chunks.push_back(chunk_index_entry.get());
+                        old_ids.push_back(chunk_index_entry->chunk_id_);
                     }
                     ChunkID chunk_id = segment_index_entry->GetNextChunkID();
                     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
@@ -992,6 +994,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
                     table_index_entry->UpdateFulltextSegmentTs(ts);
                     LOG_INFO(fmt::format("done merging {} {}", index_name, dst_base_name));
+
+                    segment_index_entry->AddWalIndexDump(merged_chunk_index_entry.get(), txn, std::move(old_ids));
                 }
                 break;
             }
