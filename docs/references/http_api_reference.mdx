@@ -2635,7 +2635,150 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
+## Show transactions
 
+**GET** `/instance/transactions`
+
+Shows running transactions on database.
+
+### Request
+
+- Method: GET
+- URL: `/instance/transactions`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/instance/transactions \
+     --header 'accept: application/json'
+```
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "transactions": [
+        {
+            "transaction_id":"27275",
+            "transaction_text":""
+        },
+        {
+            "transaction_id":"27274",
+            "transaction_text":""
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 2005,
+    "error_message": "Not support in maintenance mode"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Show transaction
+
+**GET** `/instance/transactions/{trasaction_id}`
+
+Shows running transactions on database by transaction_id.
+
+### Request
+
+- Method: GET
+- URL: `/instance/transactions`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/instance/transactions/{transaction_id} \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `transaction_id`: (*Path parameter*)
+  The id of the running transaction.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "transaction": {
+        "transaction_id":"27275",
+        "transaction_text":""
+    }
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 2005,
+    "error_message": "Not support in maintenance mode"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
 
 ## Admin set node role
 

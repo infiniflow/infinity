@@ -889,6 +889,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildShow(const SharedPtr<LogicalNo
                                     logical_show->index_name(),
                                     logical_show->session_id(),
                                     logical_show->transaction_id(),
+                                    logical_show->function_name(),
                                     logical_operator->load_metas());
 }
 

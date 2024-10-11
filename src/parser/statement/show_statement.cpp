@@ -20,6 +20,10 @@ namespace infinity {
 std::string ShowStatement::ToString() const {
     std::stringstream ss;
     switch (show_type_) {
+        case ShowStmtType::kInvalid: {
+            ParserError("Invalid show statement");
+            break;
+        }
         case ShowStmtType::kDatabase: {
             ss << "Show database, database: " << schema_name_;
             break;
@@ -170,6 +174,10 @@ std::string ShowStatement::ToString() const {
         }
         case ShowStmtType::kMemoryAllocation: {
             ss << "Show memory allocation";
+            break;
+        }
+        case ShowStmtType::kFunction: {
+            ss << "Show function";
             break;
         }
     }

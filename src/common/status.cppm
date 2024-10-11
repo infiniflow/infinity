@@ -135,6 +135,7 @@ export enum class ErrorCode : long {
     kNotFound = 3088,
     kErrorInit = 3089,
     kFileIsOpen = 3090,
+    kUnknown = 3091,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -300,6 +301,7 @@ public:
     static Status NotFound(const String &detailed_info);
     static Status ErrorInit(const String &detailed_info);
     static Status FileIsOpen(const String &filename);
+    static Status Unknown(const String &name);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");
