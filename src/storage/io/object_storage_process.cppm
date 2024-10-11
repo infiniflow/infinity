@@ -18,13 +18,13 @@ import blocking_queue;
 import stl;
 import object_storage_task;
 
-export module object_storage_processor;
+export module object_storage_process;
 
 namespace infinity {
 
-export class ObjectStorageProcessor {
+export class ObjectStorageProcess {
 public:
-    explicit ObjectStorageProcessor() = default;
+    explicit ObjectStorageProcess() = default;
 
     void Start();
     void Stop();

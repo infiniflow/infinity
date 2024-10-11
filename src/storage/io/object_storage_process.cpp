@@ -16,7 +16,7 @@ module;
 
 #include <cassert>
 
-module object_storage_processor;
+module object_storage_process;
 
 import stl;
 import object_storage_task;
@@ -27,26 +27,26 @@ import third_party;
 
 namespace infinity {
 
-void ObjectStorageProcessor::Start() {
+void ObjectStorageProcess::Start() {
     processor_thread_ = Thread([this] { Process(); });
     LOG_INFO("Object storage processor is started.");
 }
 
-void ObjectStorageProcessor::Stop() {
+void ObjectStorageProcess::Stop() {
     LOG_INFO("Object storage processor is stopping.");
-    SharedPtr<StopObjectStorageProcessorTask> stop_task = MakeShared<StopObjectStorageProcessorTask>();
+    SharedPtr<StopObjectStorageProcessTask> stop_task = MakeShared<StopObjectStorageProcessTask>();
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
     LOG_INFO("Object storage processor is stopped.");
 }
 
-void ObjectStorageProcessor::Submit(SharedPtr<BaseObjectStorageTask> object_storage_task) {
+void ObjectStorageProcess::Submit(SharedPtr<BaseObjectStorageTask> object_storage_task) {
     ++task_count_;
     task_queue_.Enqueue(std::move(object_storage_task));
 }
 
-void ObjectStorageProcessor::Process() {
+void ObjectStorageProcess::Process() {
     bool running{true};
     Deque<SharedPtr<BaseObjectStorageTask>> tasks;
     while (running) {

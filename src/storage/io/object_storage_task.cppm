@@ -84,10 +84,10 @@ export struct RemoveTask final : public BaseObjectStorageTask {
     String ToString() const final { return "Remove Task"; }
 };
 
-export struct StopObjectStorageProcessorTask final : public BaseObjectStorageTask {
-    StopObjectStorageProcessorTask() : BaseObjectStorageTask(ObjectStorageTaskType::kStopProcessor) {}
+export struct StopObjectStorageProcessTask final : public BaseObjectStorageTask {
+    StopObjectStorageProcessTask() : BaseObjectStorageTask(ObjectStorageTaskType::kStopProcessor) {}
 
-    ~StopObjectStorageProcessorTask() = default;
+    ~StopObjectStorageProcessTask() = default;
 
     String ToString() const final { return "Stop processor"; }
 };

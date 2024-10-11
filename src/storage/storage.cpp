@@ -37,6 +37,7 @@ import infinity_exception;
 import status;
 import background_process;
 import compaction_process;
+import object_storage_process;
 import status;
 import bg_task;
 import periodic_trigger_thread;
@@ -120,7 +121,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     if (object_storage_processor_ != nullptr) {
                         UnrecoverableError("Object storage processor was initialized before.");
                     }
-                    object_storage_processor_ = MakeUnique<ObjectStorageProcessor>();
+                    object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
                     break;
                 }
                 default: {
