@@ -1,77 +1,27 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-'''
-This example is about connecting to the local infinity instance, creating table, inserting data, and searching data
-'''
-
-# import infinity_embedded as infinity
-import infinity
+import importlib
 import sys
+import os
+import infinity
+import infinity_embedded
+from infinity.errors import ErrorCode
+from infinity.common import ConflictType, InfinityException
+from infinity import NetworkAddress
 
-try:
-    # Use infinity_embedded module to open a local directory
-    # infinity_instance = infinity.connect("/var/infinity")
+def test_import_exceeding_rows():
+    infinity_obj = infinity.connect(NetworkAddress("127.0.0.1", 23817))
+    db_obj = infinity_obj.get_database("default_db")
+    db_obj.drop_table("test_import_exceeding_rows", ConflictType.Ignore)
+    table_obj = db_obj.create_table("test_import_exceeding_rows",
+                                    {"c1": {"type": "int"}, "c2": {"type": "varchar"}})
 
-    #  Use infinity module to connect a remote server
-    for i in range(100):
-        print(i)
-        infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
+    test_csv_dir = "/var/infinity/test_data/" + "pysdk_test_big_varchar_rows.csv"
+    res = table_obj.import_data(test_csv_dir)
+    assert res.error_code == ErrorCode.OK
 
-        # 'default_db' is the default database
-        db_instance = infinity_instance.get_database("default_db")
+    res = table_obj.output(["count(*)"]).to_pl()
+    assert res.height == 1 and res.width == 1 and res.item(0, 0) == 1024 * 8192
+    db_obj.drop_table("test_import_exceeding_rows", ConflictType.Error)
 
-        # Drop my_table if it already exists
-        db_instance.drop_table(f"my_table{i}", infinity.common.ConflictType.Ignore)
+    infinity_obj.disconnect()
 
-        # Create a table named "my_table"
-        table_instance = db_instance.create_table(f"my_table{i}", {
-            "num": {"type": "integer", },
-            "body": {"type": "varchar"},
-            "vec": {"type": "vector, 4, float"},
-        })
-
-        # Insert 3 rows of data into the 'my_table'
-        for _ in range(1000):
-            print(_)
-            table_instance.insert(
-                [
-                    {
-                        "num": 1,
-                        "body": r"unnecessary and harmful",
-                        "vec": [1.0, 1.2, 0.8, 0.9],
-                    },
-                    {
-                        "num": 2,
-                        "body": r"Office for Harmful Blooms",
-                        "vec": [4.0, 4.2, 4.3, 4.5],
-                    },
-                    {
-                        "num": 3,
-                        "body": r"A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
-                        "vec": [4.0, 4.2, 4.3, 4.5],
-                    },
-                ]
-            )
-
-        #res = table_instance.output(["num", "body", "vec"]).to_pl()
-        #print(res)
-
-        infinity_instance.disconnect()
-
-        print(i)
-    sys.exit(0)
-except Exception as e:
-    print(str(e))
-    sys.exit(-1)
+test_import_exceeding_rows()

@@ -429,7 +429,7 @@ class TestInfinity:
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == data_size
         db_obj.drop_table("test_import_with_different_size"+suffix, ConflictType.Ignore)
 
-    @pytest.mark.skip(reason="s3")
+    #@pytest.mark.skip(reason="s3")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_varchar_rows.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_exceeding_rows(self, check_data, suffix):
