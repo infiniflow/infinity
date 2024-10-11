@@ -165,6 +165,10 @@ void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String blo
     }
 }
 
+BlockColumnEntry *BlockEntry::GetColumnBlockEntry(SizeT column_idx) const {
+    return columns_[column_idx].get();
+}
+
 SizeT BlockEntry::row_count(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
     if (check_ts >= max_row_ts_)
@@ -589,11 +593,11 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
 }
 
 void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id) {
-    auto iter = std::find_if(columns_.begin(), columns_.end(), [&](const auto &column) { return column->column_id() == column_id; });
-    if (iter == columns_.end()) {
-        columns_.emplace_back(std::move(column_entry));
-    } else {
+    auto iter = std::lower_bound(columns_.begin(), columns_.end(), column_id, [&](const auto &column, ColumnID column_id) { return column->column_id() < column_id; });
+    if (iter != columns_.end() && (*iter)->column_id() == column_id) {
         *iter = std::move(column_entry);
+    } else {
+        columns_.insert(iter, std::move(column_entry));
     }
 }
 
