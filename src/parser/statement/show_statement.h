@@ -20,6 +20,7 @@
 namespace infinity {
 
 enum class ShowStmtType {
+    kInvalid,
     kDatabase,
     kTable,
     kIndex,
@@ -58,6 +59,7 @@ enum class ShowStmtType {
     kMemory,
     kMemoryObjects,
     kMemoryAllocation,
+    kFunction
 };
 
 class ShowStatement : public BaseStatement {
@@ -71,6 +73,7 @@ public:
     std::string table_name_{};
     std::optional<std::string> index_name_{};
     std::optional<std::string> file_name_{};
+    std::optional<std::string> function_name_{};
     std::optional<int64_t> segment_id_{};
     std::optional<int64_t> block_id_{};
     std::optional<int64_t> chunk_id_{};

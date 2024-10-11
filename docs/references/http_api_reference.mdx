@@ -2635,7 +2635,473 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
+## Show transactions
 
+**GET** `/instance/transactions`
+
+Shows running transactions on database.
+
+### Request
+
+- Method: GET
+- URL: `/instance/transactions`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/instance/transactions \
+     --header 'accept: application/json'
+```
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "transactions": [
+        {
+            "transaction_id":"27275",
+            "transaction_text":""
+        },
+        {
+            "transaction_id":"27274",
+            "transaction_text":""
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 2005,
+    "error_message": "Not support in maintenance mode"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Show transaction
+
+**GET** `/instance/transactions/{trasaction_id}`
+
+Shows running transactions on database by transaction_id.
+
+### Request
+
+- Method: GET
+- URL: `/instance/transactions`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/instance/transactions/{transaction_id} \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `transaction_id`: (*Path parameter*)
+  The id of the running transaction.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "transaction": {
+        "transaction_id":"27275",
+        "transaction_text":""
+    }
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 2005,
+    "error_message": "Not support in maintenance mode"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Show logs
+
+**GET** `/instance/logs`
+
+Shows logs.
+
+### Request
+
+- Method: GET
+- URL: `/instance/logs`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/logs \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "logs":[
+        {
+            "command_type":"CHECKPOINT",
+            "commit_ts":"1",
+            "text":"catalog path: catalog/FULL.82192.json\nmax commit ts: 82192\nis full checkpoint: 1\n",
+            "transaction_id":"82195"
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show delta checkpoints
+
+**GET** `/instance/delta_checkpoint`
+
+Shows delta logs.
+
+### Request
+
+- Method: GET
+- URL: `/instance/delta_checkpoint`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/delta_checkpoint \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show full checkpoints
+
+**GET** `/instance/global_checkpoint`
+
+Shows delta logs.
+
+### Request
+
+- Method: GET
+- URL: `/instance/global_checkpoint`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/global_checkpoint \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "full_checkpoint":[
+        {
+            "file_path":"/var/infinity/data/catalog/FULL.82192.json",
+            "max_commit_timestamp":"82192"
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show objects
+
+**GET** `/instance/objects`
+
+Shows persistence objects.
+
+### Request
+
+- Method: GET
+- URL: `/instance/objects`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/objects \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0, 
+    "objects": [
+        {
+            "deleted_ranges": "", 
+            "name": "01927642-6491-79d8-8891-5f91d7960cdf", 
+            "parts": "4", 
+            "reference_count": "0", 
+            "size": "262236"
+        }, 
+        {
+            "deleted_ranges": "[0, 426120) ", 
+            "name": "019275ce-9eaf-7950-8bf0-b451cb15e6e1", 
+            "parts": "0", 
+            "reference_count": "0", 
+            "size": "0"
+        }, 
+        {
+            "deleted_ranges": "", 
+            "name": "01927641-793c-7a30-b20c-b9089b6c0a9b", 
+            "parts": "9", 
+            "reference_count": "0", 
+            "size": "426188"
+        }, 
+        {
+            "deleted_ranges": "[0, 65722552) ", 
+            "name": "019275cd-7310-7b40-a46a-cb12db4a391b", 
+            "parts": "0", 
+            "reference_count": "0", 
+            "size": "0"
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show object
+
+**GET** `/instance/objects/{object_name}`
+
+Shows persistence object by its name.
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23820/instance/objects/{object_name} \
+    --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `object_name`: Required (*Path parameter*)
+  The object name.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0, 
+    "object": [
+        {
+            "end": "426120", 
+            "start": "0"
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 7008, 
+    "error_message": "File: {object_name} isn't found@src/executor/operator/physical_show.cpp:5631@src/scheduler/fragment_context.cpp:1417"
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Show files
+
+**GET** `/instance/files`
+
+Shows files in persistent manager.
+
+### Request
+
+- Method: GET
+- URL: `/instance/files`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/files \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0, 
+    "files": [
+        {
+            "file_name": "FC5WLAHAam_db_default_db/o3qQcKBZuI_table_hr_data_mix_remote/seg_0/blk_4/0.col", 
+            "object_name": "01927a51-068a-7ba8-8d80-4d89bd6391de", 
+            "offset": "78660", 
+            "size": "131096"
+        }, 
+        {
+            "file_name": "FC5WLAHAam_db_default_db/o3qQcKBZuI_table_hr_data_mix_remote/seg_0/blk_0/col_1_out_0", 
+            "object_name": "01927a4f-c82c-7ba8-b135-80dd3cfb2d87", 
+            "offset": "340852", 
+            "size": "11435869"
+        }, 
+        {
+            "file_name": "FC5WLAHAam_db_default_db/o3qQcKBZuI_table_hr_data_mix_remote/seg_0/blk_3/1.col", 
+            "object_name": "01927a50-dd6d-7138-9665-9e21502390a6", 
+            "offset": "209756", 
+            "size": "131096"
+        }, 
+        {
+            "file_name": "FC5WLAHAam_db_default_db/o3qQcKBZuI_table_hr_data_mix_remote/seg_0/blk_0/0.col", 
+            "object_name": "01927a4f-c82c-7ba8-b135-80dd3cfb2d87", 
+            "offset": "78660", 
+            "size": "131096"
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
 
 ## Admin set node role
 
