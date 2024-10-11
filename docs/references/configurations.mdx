@@ -126,7 +126,7 @@ cleanup_interval         = "60s"
 compact_interval         = "120s"
 # The threshold for flushing a single in-memory index to disk,
 # when the number of rows the index includes exceeds this threshold,
-# The system performs a flush operation for that in-memory index.
+# The system performs a flush operation for that in-memory index
 # Range : [8192, 8388608]
 mem_index_capacity       = 1048576
 
@@ -138,16 +138,16 @@ buffer_manager_size      = "4GB"
 # Range : [1, 100]
 lru_num                  = 7
 # When the required memory exceeds the size of the free memory in the buffer manager,
-# the buffer manager dumps some of the its in-use memory to a temporary storage path specified by temp_dir.
+# the buffer manager dumps some of the its in-use memory to a temporary storage path specified by temp_dir
 temp_dir                 = "/var/infinity/tmp"
-# The global memory index threshold triggers a flush to disk.
-# When the memory used by all existing in-memory indices in the system exceeds this threshold
-# The system performs a flush operation for all in-memory indices.
+# The global memory index threshold for triggering a flush to disk
+# When the memory used by all existing in-memory indices in the system exceeds this threshold,
+# The system performs a flush operation for all in-memory indices
 memindex_memory_quota   = "1GB"
 
 # WAL configuration
 [wal]
-# directory of WAL files
+# Directory for the WAL files
 wal_dir                       = "/var/infinity/wal"
 # Interval between periodically full checkpoints
 # Range : ["0s", "720h"]
@@ -157,7 +157,7 @@ full_checkpoint_interval      = "86400s"
 delta_checkpoint_interval     = "60s"
 
 # Size threshold for triggering a compaction on a WAL file
-# After a WAL file exceeds this threshold, the system will perform a compaction on it
+# When a WAL file exceeds this threshold, the system will perform a compaction on it
 # Range : ["1KB", "1024GB"]
 wal_compact_threshold         = "1GB"
 
