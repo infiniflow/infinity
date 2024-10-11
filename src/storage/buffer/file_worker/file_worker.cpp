@@ -51,6 +51,10 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
             UnrecoverableError(status.message());
         }
         file_handle_ = std::move(file_handle);
+        DeferFn defer_fn([&]() {
+            file_handler_ = nullptr;
+        });
+
         bool prepare_success = false;
 
         bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
@@ -79,6 +83,9 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
             UnrecoverableError(status.message());
         }
         file_handle_ = std::move(file_handle);
+        DeferFn defer_fn([&]() {
+            file_handler_ = nullptr;
+        });
 
         if (to_spill) {
             LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
@@ -130,6 +137,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
             PersistWriteResult res = persistence_manager_->PutObjCache(read_path);
             handler.HandleWriteResult(res);
         }
+        file_handle_ = nullptr;
     });
     ReadFromFileImpl(file_size);
 }
