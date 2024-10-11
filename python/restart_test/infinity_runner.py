@@ -48,6 +48,8 @@ class InfinityRunner:
         self.i += 1
 
     def uninit(self):
+        if self.process is None:
+            return
         timeout = 60
         pids = []
         for child in psutil.Process(self.process.pid).children(recursive=True):
@@ -57,6 +59,10 @@ class InfinityRunner:
         ret = os.system(f"bash {self.script_path} {timeout} {' '.join(map(str, pids))}")
         if ret != 0:
             raise Exception("An error occurred.")
+        self.process = None
+
+    def connected(self):
+        return self.process is not None
 
     @staticmethod
     def connect(uri: str):
