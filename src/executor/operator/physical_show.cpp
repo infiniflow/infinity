@@ -5641,13 +5641,13 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
             // start
             Value value = Value::MakeBigInt(range.start_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
         {
             // end
             Value value = Value::MakeBigInt(range.end_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
 
         ++row_count;
