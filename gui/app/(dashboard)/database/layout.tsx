@@ -1,4 +1,4 @@
-import SideMenu, { MenuItem } from '@/components/ui/side-menu';
+import { MenuItem } from '@/components/ui/side-menu';
 import {
   Table,
   TableBody,
@@ -8,7 +8,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { listDatabase, listTable } from '../actions';
-import { InfinityContextMenuContent } from '../tables/context-menu';
+import AsyncTree from './tree';
 
 async function InfinityTable() {
   const tables = await listTable('default_db');
@@ -70,16 +70,17 @@ export default async function DatabaseLayout({
   }
 
   return (
-    <div className="flex divide-x ">
-      <section className="w-40">
-        <SideMenu
+    <div className="flex divide-x h-full">
+      <section className="w-1/4">
+        {/* <SideMenu
           items={items}
           contextMenuContent={(key: string) => (
             <InfinityContextMenuContent
               databaseName={key}
             ></InfinityContextMenuContent>
           )}
-        ></SideMenu>
+        ></SideMenu> */}
+        <AsyncTree></AsyncTree>
       </section>
       <section className="flex-1 text-center">{children}</section>
     </div>
