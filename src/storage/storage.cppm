@@ -21,6 +21,7 @@ import txn_manager;
 import buffer_manager;
 import wal_manager;
 import background_process;
+import object_storage_process;
 import compaction_process;
 import periodic_trigger_thread;
 import log_file;
@@ -76,6 +77,7 @@ private:
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<PersistenceManager> persistence_manager_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
+    UniquePtr<ObjectStorageProcess> object_storage_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
     UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
