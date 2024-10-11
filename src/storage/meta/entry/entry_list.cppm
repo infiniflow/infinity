@@ -32,9 +32,9 @@ import txn_state;
 
 namespace infinity {
 
-class DBEntry;
-class TableEntry;
-class TableIndexEntry;
+struct DBEntry;
+struct TableEntry;
+struct TableIndexEntry;
 
 enum class FindResult : u8 {
     kFound,

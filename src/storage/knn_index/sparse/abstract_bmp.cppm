@@ -34,9 +34,9 @@ import buffer_handle;
 namespace infinity {
 
 class BufferManager;
-class ChunkIndexEntry;
-class SegmentIndexEntry;
-class BlockColumnEntry;
+struct ChunkIndexEntry;
+struct SegmentIndexEntry;
+struct BlockColumnEntry;
 
 export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompressed> *,
                                         BMPAlg<f32, i32, BMPCompressType::kRaw> *,

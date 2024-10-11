@@ -25,7 +25,7 @@ namespace infinity {
 
 class TxnManager;
 
-class DBEntry;
+struct DBEntry;
 
 export struct ViewMeta {
 public:

@@ -56,7 +56,7 @@ export struct PopulateEntireConfig {
     bool check_ts_;
 };
 
-export class SegmentIndexEntry : public BaseEntry {
+export struct SegmentIndexEntry : public BaseEntry {
 public:
     static Vector<std::string_view> DecodeIndex(std::string_view encode);
 

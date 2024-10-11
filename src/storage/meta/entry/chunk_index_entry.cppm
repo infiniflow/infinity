@@ -33,13 +33,13 @@ import buffer_obj;
 
 namespace infinity {
 
-class SegmentIndexEntry;
+struct SegmentIndexEntry;
 struct BlockEntry;
 class BufferManager;
 struct SegmentEntry;
 
 // ChunkIndexEntry is an immutable chunk of SegmentIndexEntry. MemIndexer(for fulltext) is the mutable chunk of SegmentIndexEntry.
-export class ChunkIndexEntry : public BaseEntry {
+export struct ChunkIndexEntry : public BaseEntry {
 public:
     static Vector<std::string_view> DecodeIndex(std::string_view encode);
 

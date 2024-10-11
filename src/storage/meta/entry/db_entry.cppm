@@ -37,7 +37,7 @@ class TxnManager;
 class Txn;
 class DBMeta;
 
-export class DBEntry final : public BaseEntry {
+export struct DBEntry final : public BaseEntry {
     friend struct Catalog;
 
 public:

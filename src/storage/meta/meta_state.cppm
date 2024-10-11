@@ -22,7 +22,7 @@ namespace infinity {
 
 struct SegmentEntry;
 struct BlockEntry;
-class BlockColumnEntry;
+struct BlockColumnEntry;
 class DataBlock;
 class ColumnVector;
 
