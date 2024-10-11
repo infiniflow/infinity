@@ -24,7 +24,7 @@ This document provides instructions for loading configuration file for Infinity 
 
 To load a configuration file when you start up Infinity using Docker:
 
-1. Map the configuration file path to inside the Docker container.
+1. Mount the directory for the configuration file to inside the Docker container using the `-v` option.
 2. When running Docker, specify the configuration file path using the `-f` option. For example: 
 
    ```bash
@@ -46,14 +46,6 @@ Infinity embedded does not have an *explicit* configuration file. Its configurat
 
 </TabItem>
 </Tabs>
-
-
-## Overriding
-
-Infinity loads all configurations when starting: 
-
-- If you do not specify a configuration file, Infinity will load all the default settings.
-- If you specify a configuration file when starting Infinity, the settings in your configuration file override the corresponding default settings.
 
 ## A configuration file example
 
