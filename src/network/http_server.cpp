@@ -3473,7 +3473,124 @@ public:
     }
 };
 
-class ShowCurrentNodeHandler final : public HttpRequestHandler {
+class ShowLogsHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->ShowLogs();
+
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_table;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_table[column_name] = column_value;
+                    }
+                    json_response["logs"].push_back(json_table);
+                }
+            }
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowDeltaCheckpointHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->ShowDeltaCheckpoint();
+
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_table;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_table[column_name] = column_value;
+                    }
+                    json_response["delta_checkpoint"].push_back(json_table);
+                }
+            }
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowFullCheckpointHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->ShowFullCheckpoint();
+
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_table;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_table[column_name] = column_value;
+                    }
+                    json_response["global_checkpoint"].push_back(json_table);
+                }
+            }
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class AdminShowCurrentNodeHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
 
@@ -3488,7 +3605,7 @@ public:
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-            Value value = data_block->GetValue(1, 0);
+            Value value = data_block->GetValue(1, 1);
             const String &variable_value = value.ToString();
             json_response["role"] = variable_value;
 
@@ -3502,7 +3619,7 @@ public:
     }
 };
 
-class ShowNodeByNameHandler final : public HttpRequestHandler {
+class AdminShowNodeByNameHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
         auto infinity = Infinity::RemoteConnect();
@@ -3512,24 +3629,27 @@ public:
         HTTPStatus http_status;
 
         String node_name = request->getPathVariable("node_name");
-        infinity::Status status;
-        SharedPtr<NodeInfo> nodeinfo;
-        std::tie(status, nodeinfo) = InfinityContext::instance().cluster_manager()->GetNodeInfoPtrByName(node_name);
-        if (status.ok()) {
-            http_status = HTTPStatus::CODE_200;
+        QueryResult result = infinity->AdminShowNode(node_name);
+
+        if (result.IsOk()) {
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+            Value value = data_block->GetValue(1, 1);
+            const String &node_role = value.ToString();
+
             json_response["error_code"] = ErrorCode::kOk;
-            json_response["node_role"] = ToString(nodeinfo->node_role_);
+            json_response["role"] = node_role;
+            http_status = HTTPStatus::CODE_200;
         } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_msg"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
-            json_response["error_code"] = status.code();
-            json_response["error_msg"] = status.message();
         }
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
 
-class ListAllNodesHandler final : public HttpRequestHandler {
+class AdminListAllNodesHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
         auto infinity = Infinity::RemoteConnect();
@@ -3539,15 +3659,26 @@ public:
         nlohmann::json json_response;
         nlohmann::json nodes_json;
 
-        Vector<SharedPtr<NodeInfo>> nodes = InfinityContext::instance().cluster_manager()->ListNodes();
-        for (const auto &ptr : nodes) {
-            nodes_json.push_back({ptr->node_name_, ToString(ptr->node_role_)});
+        QueryResult result = infinity->AdminShowNodes();
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+                    String node_name = data_block->GetValue(0, row).ToString();
+                    String node_role = data_block->GetValue(1, row).ToString();
+                    nodes_json.push_back({node_name, node_role});
+                }
+            }
+            http_status = HTTPStatus::CODE_200;
+            json_response["error_code"] = ErrorCode::kOk;
+            json_response["nodes"] = nodes_json;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
         }
-
-        http_status = HTTPStatus::CODE_200;
-        json_response["error_code"] = ErrorCode::kOk;
-        json_response["nodes"] = nodes_json;
-
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
@@ -3566,8 +3697,7 @@ public:
         nlohmann::json http_body_json;
         try {
             http_body_json = nlohmann::json::parse(data_body);
-        }
-        catch (nlohmann::json::exception &e) {
+        } catch (nlohmann::json::exception &e) {
             http_status = HTTPStatus::CODE_500;
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
@@ -3582,32 +3712,32 @@ public:
         }
 
         String role = http_body_json["role"];
+        QueryResult result;
         ToLower(role);
-        if (role == "uninitialized") {
-            status = InfinityContext::instance().ChangeRole(NodeRole::kUnInitialized);
-        } else if (role == "admin") {
-            status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+        if (role == "admin") {
+            result = infinity->AdminSetAdmin();
         } else if (role == "standalone") {
-            status = InfinityContext::instance().ChangeRole(NodeRole::kStandalone);
+            result = infinity->AdminSetStandalone();
         } else if (role == "leader") {
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, http_body_json["name"]);
+            result = infinity->AdminSetLeader(http_body_json["name"]);
         } else if (role == "follower") {
-            String node_name = http_body_json["name"];
-            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, http_body_json["name"], http_body_json["address"], http_body_json["port"]);
+            result = infinity->AdminSetFollower(http_body_json["name"], http_body_json["address"]);
         } else if (role == "learner") {
-            String node_name = http_body_json["name"];
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, http_body_json["name"], http_body_json["address"], http_body_json["port"]);
+            result = infinity->AdminSetLearner(http_body_json["name"], http_body_json["address"]);
         } else {
-            status = infinity::Status::InvalidNodeRole("invalid node role");
+            http_status = HTTPStatus::CODE_500;
+            json_response["error_code"] = ErrorCode::kInvalidNodeRole;
+            json_response["error_code"] = "invalid node role";
+            return ResponseFactory::createResponse(http_status, json_response.dump());
         }
 
-        if (status.ok()) {
+        if (result.IsOk()) {
             http_status = HTTPStatus::CODE_200;
             json_response["error_code"] = ErrorCode::kOk;
         } else {
             http_status = HTTPStatus::CODE_500;
-            json_response["error_code"] = status.code();
-            json_response["error_code"] = status.message();
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_code"] = result.ErrorMsg();
         }
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3626,7 +3756,8 @@ public:
         auto result = infinity->AdminShowVariables();
         if (result.IsOk()) {
             json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
+            DataBlock *data_block =
+                result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
             auto row_count = data_block->row_count();
             for (int row = 0; row < row_count; ++row) {
                 // variable name
@@ -3792,6 +3923,9 @@ void HTTPServer::Start(const String &ip_address, u16 port) {
     router->route("GET", "/instance/profiles", MakeShared<ShowProfilesHandler>());
     router->route("GET", "/instance/memindex", MakeShared<ShowMemIndexHandler>());
     router->route("GET", "/instance/queries", MakeShared<ShowQueriesHandler>());
+    router->route("GET", "/instance/logs", MakeShared<ShowLogsHandler>());
+    router->route("GET", "/instance/delta_checkpoint", MakeShared<ShowDeltaCheckpointHandler>());
+    router->route("GET", "/instance/global_checkpoint", MakeShared<ShowFullCheckpointHandler>()); 
 
     // variable
     router->route("GET", "/variables/global", MakeShared<ShowGlobalVariablesHandler>());
@@ -3806,9 +3940,9 @@ void HTTPServer::Start(const String &ip_address, u16 port) {
     router->route("GET", "/admin/variables", MakeShared<AdminShowNodeVariablesHandler>());
     router->route("GET", "/admin/configs", MakeShared<AdminShowNodeConfigsHandler>());
     router->route("GET", "/admin/variables/{variable_name}", MakeShared<AdminShowNodeVariableHandler>());
-    router->route("GET", "/admin/node/current", MakeShared<ShowCurrentNodeHandler>());
-    router->route("GET", "/admin/node/{node_name}", MakeShared<ShowNodeByNameHandler>());
-    router->route("GET", "/admin/nodes", MakeShared<ListAllNodesHandler>());
+    router->route("GET", "/admin/node/current", MakeShared<AdminShowCurrentNodeHandler>());
+    router->route("GET", "/admin/node/{node_name}", MakeShared<AdminShowNodeByNameHandler>());
+    router->route("GET", "/admin/nodes", MakeShared<AdminListAllNodesHandler>());
 
     SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({ip_address, port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler = HttpConnectionHandler::createShared(router);
