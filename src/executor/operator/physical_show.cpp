@@ -947,7 +947,12 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     Txn *txn = query_context->GetTxn();
 
     auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, *object_name_, index_name_.value());
+    if (!status.ok()) {
+        RecoverableError(status);
+        return;
+    }
 
+    auto [table_index_entry, index_status] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
     if (!status.ok()) {
         RecoverableError(status);
         return;
@@ -1097,11 +1102,20 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         ++column_id;
         {
             const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
-            String index_size_str = "N/A";
+            String index_size_str;
             if (query_context->persistence_manager() == nullptr) {
                 index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
             } else {
-                // TODO: calculate the sum of object parts which has the prefix table_dir
+                Vector<String> paths = table_index_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                SizeT index_size = 0;
+                for (const String &path : paths) {
+                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
+                    index_size += file_size;
+                }
+                index_size_str = Utility::FormatByteSize(index_size);
             }
             Value value = Value::MakeVarchar(index_size_str);
             ValueExpression value_expr(value);
@@ -1205,14 +1219,23 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
         ++column_id;
         {
-            String index_size = "N/A";
+            String index_size_str;
             if (query_context->persistence_manager() == nullptr) {
-                index_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_index_dir));
+                index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_index_dir));
             } else {
-                // TODO: calculate the sum of object parts
+                Vector<String> paths = segment_index_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                SizeT index_segment_size = 0;
+                for (const String &path : paths) {
+                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
+                    index_segment_size += file_size;
+                }
+                index_size_str = Utility::FormatByteSize(index_segment_size);
             }
 
-            Value value = Value::MakeVarchar(index_size);
+            Value value = Value::MakeVarchar(index_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
