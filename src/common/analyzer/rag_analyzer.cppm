@@ -41,6 +41,7 @@ public:
 
     String FineGrainedTokenize(const String &tokens);
 
+protected:
 private:
     static constexpr float DENOMINATOR = 1000000;
 

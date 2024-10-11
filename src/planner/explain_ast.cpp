@@ -308,7 +308,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         result->emplace_back(MakeShared<String>(projection_str));
     }
 
-    {
+    if (select_statement->highlight_list_ != nullptr) {
         String highlight_str = String(intent_size, ' ') + "highlight: ";
         SizeT highlight_count = select_statement->highlight_list_->size();
         if (highlight_count == 0) {
