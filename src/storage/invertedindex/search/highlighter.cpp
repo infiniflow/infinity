@@ -18,6 +18,8 @@ module;
 #include <iostream>
 #include <vector>
 
+#include <re2/re2.h>
+
 #include "common/analyzer/string_utils.h"
 
 module highlighter;
@@ -28,6 +30,20 @@ import analyzer;
 import term;
 
 namespace infinity {
+
+String Join(const Vector<String> &tokens, int start, int end, const String &delim = " ") {
+    std::ostringstream oss;
+    if (end > (int)tokens.size())
+        std::cout << "token.size() " << tokens.size() << " start " << start << " end " << end << std::endl;
+    for (int i = start; i < end; ++i) {
+        if (i > start)
+            oss << delim;
+        oss << tokens[i];
+    }
+    return oss.str();
+}
+
+String Join(const Vector<String> &tokens, int start, const String &delim = " ") { return Join(tokens, start, tokens.size(), delim); }
 
 Highlighter::Highlighter() {
     Set<String> patterns;
@@ -102,6 +118,7 @@ void Highlighter::GetHighlightWithStemmer(const Vector<String> &query, const Str
     analyzer->SetCharOffset(true);
     TermList term_list;
     analyzer->Analyze(raw_text, term_list);
+
     std::sort(term_list.begin(), term_list.end(), [](const Term &lhs, const Term &rhs) noexcept { return lhs.text_ < rhs.text_; });
 
     TermList hit_list;
@@ -136,6 +153,8 @@ void Highlighter::GetHighlightWithStemmer(const Vector<String> &query, const Str
             last_position = r.position + r.length;
         }
     }
+    if (0 == num_results)
+        sentence_boundaries.push_back(raw_text.size());
 
     std::size_t last_sentence_pos = 0;
     std::size_t last_term_pos = 0;
@@ -147,26 +166,26 @@ void Highlighter::GetHighlightWithStemmer(const Vector<String> &query, const Str
 
         if (last_sentence_iter == sentence_boundaries.end()) {
             last_sentence_pos = 0;
-            output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - term.text_.size() - last_sentence_pos));
+            output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - last_sentence_pos));
         } else {
             std::size_t distance = it - last_sentence_iter;
             if (distance > 1) {
                 output.append("...");
                 last_sentence_pos = *(it - 1);
-                output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - term.text_.size() - last_sentence_pos));
+                output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - last_sentence_pos));
             } else if (distance == 1) {
                 last_sentence_pos = *(it - 1);
-                output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - term.text_.size() - last_sentence_pos));
+                output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - last_sentence_pos));
             } else {
                 // multiple terms hit in one sentence
-                output.append(raw_text.substr(last_term_pos, term.word_offset_ - term.text_.size() - last_term_pos));
+                output.append(raw_text.substr(last_term_pos, term.word_offset_ - last_term_pos));
             }
         }
 
         output.append("<em>");
-        output.append(raw_text.substr(term.word_offset_ - term.text_.size(), term.text_.size()));
+        output.append(raw_text.substr(term.word_offset_, term.end_offset_ - term.word_offset_));
         output.append("</em>");
-        last_term_pos = term.word_offset_;
+        last_term_pos = term.end_offset_;
         last_sentence_iter = it;
         last_sentence_pos = *it;
     }

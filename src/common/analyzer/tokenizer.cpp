@@ -89,6 +89,7 @@ bool Tokenizer::NextToken() {
     if (output_buffer_cursor_ >= output_buffer_size_) {
         GrowOutputBuffer();
     }
+    token_start_cursor_ = input_cursor_;
     output_buffer_[output_buffer_cursor_++] = input_->at(input_cursor_);
     if (table_.GetType(input_->at(input_cursor_)) == DELIMITER_CHR) {
         ++input_cursor_;

@@ -33,7 +33,28 @@ namespace fs = std::filesystem;
 
 class RAGAnalyzerTest : public BaseTest {};
 
+void RegexTokenize(const String &input, Vector<String> &result) {
+    // static String pattern("('s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+    //                       "?[^\\s\\p{L}\\p{N}]+|\\s+\\(?!\\S\\)|\\s+)");
+    static String pattern =
+        R"(((?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|(?=[^\(\"\`{\[:;&\#\*@\)}\]\-,])\S+?(?=\s|$|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|,(?=$|\s|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)))|\S))";
+    std::cout << pattern << std::endl;
+    re2::StringPiece input_str(input);
+    re2::StringPiece match;
+
+    while (RE2::FindAndConsume(&input_str, pattern, &match)) {
+        std::cout << match.as_string() << std::endl;
+        result.emplace_back(match.as_string());
+    }
+}
+
 TEST_F(RAGAnalyzerTest, test0) {
+    String line =
+        R"#(The encoder structure we selected is VitDet [17] (base version with about 80M parameters) due to its local attention can greatly reduce the computational cost of high-resolution images. We follow the Vary-tiny setting [46] to design the last two layers of the encoder, which will transfer a 1024×1024×3 input image to 256×1024 image tokens. Then, these image tokens are projected into language model (OPT-125M [53]) dimension via a 1024×768 linear layer. Unlike the Vary encoder which only focuses on a single document task under a relatively unitary input shape, we incorporated natural scenes and cropped slices during our pre-training. In the pre-processing stage, images of each shape are directly resized to 1024×1024 squares, as square shapes can be used to adapt to images of various aspect ratios with a compromise.)#";
+
+    Vector<String> result;
+    RegexTokenize(line, result);
+
 #if 0
     fs::path executablePath = "/proc/self/exe";
     std::error_code ec;

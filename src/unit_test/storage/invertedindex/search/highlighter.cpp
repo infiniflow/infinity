@@ -16,6 +16,7 @@
 
 #include <deque>
 #include <iostream>
+#include <vector>
 
 import base_test;
 import stl;
@@ -46,7 +47,7 @@ TEST_F(HighlighterTest, test2) {
     analyzer.InitStemmer(STEM_LANG_ENGLISH);
     analyzer.SetExtractEngStem(true);
     analyzer.SetCharOffset(true);
-    String query_str("Dog 你好");
+    String query_str("你好 Dog");
     TermList term_list;
     analyzer.Analyze(query_str, term_list);
     Vector<String> query;
@@ -56,6 +57,26 @@ TEST_F(HighlighterTest, test2) {
 once upon a time there lives an dog.this is a sentence,That is another.你好 世界 dog 你好 dog
 真的好么？
     )##";
+    String output;
+    Highlighter::instance().GetHighlightWithStemmer(query, raw_text, output, &analyzer);
+    std::cout << output << std::endl;
+}
+
+TEST_F(HighlighterTest, test3) {
+    StandardAnalyzer analyzer;
+    analyzer.InitStemmer(STEM_LANG_ENGLISH);
+    analyzer.SetExtractEngStem(true);
+    analyzer.SetStemOnly(true);
+    analyzer.SetCharOffset(true);
+    String query_str("harmful chemical anarchism");
+    TermList term_list;
+    analyzer.Analyze(query_str, term_list);
+    Vector<String> query;
+    for (auto &term : term_list) {
+        query.push_back(term.text_);
+    }
+    String raw_text = R"##(Anarchism)##";
+
     String output;
     Highlighter::instance().GetHighlightWithStemmer(query, raw_text, output, &analyzer);
     std::cout << output << std::endl;
