@@ -13,6 +13,10 @@ class InfinityRunner:
         self.default_config_path = "./conf/infinity_conf.toml"
         self.script_path = "./scripts/timeout_kill.sh"
         self.infinity_path = infinity_path
+
+        if not os.access(self.infinity_path, os.X_OK):
+            raise Exception(f"{self.infinity_path} is not executable.")
+
         self.i = 0
 
     def clear(self):
