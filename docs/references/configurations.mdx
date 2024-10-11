@@ -24,7 +24,7 @@ This document provides instructions for loading configuration file for Infinity 
 
 To load a configuration file when you start up Infinity using Docker:
 
-1. Mount the directory for the configuration file to inside the Docker container using the `-v` option.
+1. Mount the directory for the configuration file to inside the Docker container.
 2. When running Docker, specify the configuration file path using the `-f` option. For example: 
 
    ```bash
@@ -97,7 +97,8 @@ log_level               = "info"
 # Storage configuration
 [storage]
 # The working directory of the persistence manager
-# The persistence manager maps block and index files to remote stored objects and manages the local cache
+# - It holds the data that Infintiy saves when using the local disk for storage
+# - It caches the accessed object files when using minio/s3 for object storage
 persistence_dir          = "/var/infinity/persistence"
 
 # Periodically activates garbage collection:
