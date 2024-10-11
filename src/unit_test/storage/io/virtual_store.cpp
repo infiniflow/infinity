@@ -27,6 +27,7 @@ import file_reader;
 import infinity_context;
 import virtual_store;
 import local_file_handle;
+import compilation_config;
 
 using namespace infinity;
 
@@ -272,7 +273,8 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
 
 TEST_F(VirtualStoreTest, minio_upload) {
     using namespace infinity;
-
+    auto config_path = MakeShared<String>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
+    infinity::InfinityContext::instance().Init(config_path);
     VirtualStore::InitRemoteStore(StorageType::kMinio, "192.168.200.165:9000", false, "minioadmin", "minioadmin", "infinity");
 
     if(VirtualStore::BucketExists()){
@@ -302,11 +304,13 @@ TEST_F(VirtualStoreTest, minio_upload) {
     }
 
     VirtualStore::UnInitRemoteStore();
+    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_F(VirtualStoreTest, minio_download) {
     using namespace infinity;
-
+    auto config_path = MakeShared<String>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
+    infinity::InfinityContext::instance().Init(config_path);
     VirtualStore::InitRemoteStore(StorageType::kMinio, "192.168.200.165:9000", false, "minioadmin", "minioadmin", "infinity");
 
     if(VirtualStore::BucketExists()){
@@ -340,4 +344,5 @@ TEST_F(VirtualStoreTest, minio_download) {
     }
 
     VirtualStore::UnInitRemoteStore();
+    infinity::InfinityContext::instance().UnInit();
 }

@@ -1,7 +1,7 @@
 [general]
 version                  = "0.4.0"
 time_zone                = "utc-8"
-server_mode              = "cluster"
+server_mode              = "standalone"
 
 [network]
 server_address           = "0.0.0.0"

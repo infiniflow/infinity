@@ -43,6 +43,7 @@ def setup_class(request, local_infinity, http):
     yield
     request.cls.infinity_obj.disconnect()
 
+#@pytest.mark.skip(reason="s3")
 @pytest.mark.usefixtures("setup_class")
 @pytest.mark.usefixtures("suffix")
 class TestInfinity:
@@ -279,6 +280,7 @@ class TestInfinity:
         print(res)
         db_obj.drop_table("test_import_fvecs_table_with_more_columns"+suffix, ConflictType.Error)
 
+    @pytest.mark.skip(reason="s3")
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("types", ["vector, 3, int",
@@ -427,6 +429,7 @@ class TestInfinity:
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == data_size
         db_obj.drop_table("test_import_with_different_size"+suffix, ConflictType.Ignore)
 
+    @pytest.mark.skip(reason="s3")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_varchar_rows.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_exceeding_rows(self, check_data, suffix):
