@@ -1,0 +1,165 @@
+---
+sidebar_position: 5
+slug: /configurations
+---
+
+# Configurations
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+This document provides instructions for loading configuration file for Infinity and descriptions of each configuration entry.
+
+
+## Load configuration file
+
+
+<Tabs
+  defaultValue="docker"
+  values={[
+    {label: 'Docker', value: 'docker'},
+    {label: 'DEB/RPM', value: 'binary'},
+    {label: 'Embedded Infinity', value: 'embedded'},
+  ]}>
+  <TabItem value="docker">
+
+To load a configuration file when you start up Infinity using Docker:
+
+1. Mount the directory for the configuration file to inside the Docker container using the `-v` option.
+2. When running Docker, specify the configuration file path using the `-f` option. For example: 
+
+   ```bash
+   docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly -f /var/infinity/infinity_conf.toml
+   ```
+
+</TabItem>
+  <TabItem value="binary">
+
+If you start up Infinity from DEB or RPM, the configuration file will be in the `/usr/etc` directory. When the Infinity service starts, it will load this configuration file.
+
+</TabItem>
+  <TabItem value="embedded">
+
+Infinity embedded does not have an *explicit* configuration file. Its configuration file should meet the following requirements:
+
+- It is in the local folder where Infinity embedded is saved (the path that you specify when calling `connect()`), for example `/var/infinity/`:
+- Its name must exactly matche **infinity_conf.toml**.
+
+</TabItem>
+</Tabs>
+
+## A configuration file example
+
+
+```toml
+[general]
+# Version of the Infinity Server
+version                  = "0.4.0"
+# Timezone
+time_zone                = "utc-8"
+# Number of worker threads. Defaults to the number of the CPU cores
+# Range : [1, 16384]
+cpu_limit                = 8
+
+# Network configuration
+[network]
+# IP address of the Infinity server
+server_address           = "0.0.0.0"
+
+# Port of the Postgres server
+postgres_port            = 5432
+# Port of the HTTP server
+http_port                = 23820
+# Port of the Python SDK server
+client_port              = 23817
+# The maximum number of connections. Defaults to 256
+# Range : [1, 65536]
+connection_pool_size     = 128
+
+# Log configuration
+[log]
+# Filename of log files
+log_filename             = "infinity.log"
+# Directory for the log files
+log_dir                  = "/var/infinity/log"
+# Controls if the log should be printed to standard output
+# Range : {true|false} 
+log_to_stdout            = false
+# The maximum size of each log file. Defaults to 1GB
+# Range : at least 1GB
+log_file_max_size        = "10GB"
+# The number of rotating log files. Defaults to 8
+# Range : [1, 655636]
+log_file_rotate_count    = 10
+# The output log level. Defaults to "info"
+# Range : {"trace"/"debug"/"info"/"warning"/"error"/"critical"}
+log_level               = "info"
+
+# Storage configuration
+[storage]
+# The working directory of the persistence manager
+# The persistence manager maps block and index files to remote stored objects and manages the local cache
+persistence_dir          = "/var/infinity/persistence"
+
+# Periodically activates garbage collection:
+# Use "number + unit of time" to specify intervals
+# - s for seconds. "60s": 60 seconds
+# - m for minutes. "60m": 60 minutes
+# - h for hours. "1h": one hour
+# To disable a specific periodic task, set the corresponding variable to "0s"
+
+# Interval between index optimization tasks
+# Range : ["10s", "720h"]
+optimize_interval        = "10s"
+# Interval between cleanup tasks
+# Range : ["10s", "720h"]
+cleanup_interval         = "60s"
+# Interval between compaction tasks
+# Range : ["10s", "720h"]
+compact_interval         = "120s"
+# The threshold for flushing a single in-memory index to disk,
+# when the number of rows the index includes exceeds this threshold,
+# The system performs a flush operation for that in-memory index
+# Range : [8192, 8388608]
+mem_index_capacity       = 1048576
+
+# Buffer manager configuration
+[buffer]
+# The size of memory that buffer manager holds. Defaults to 8GB
+buffer_manager_size      = "4GB"
+# The number of LRU caches in buffer manager
+# Range : [1, 100]
+lru_num                  = 7
+# When the required memory exceeds the size of the free memory in the buffer manager,
+# the buffer manager dumps some of the its in-use memory to a temporary storage path specified by temp_dir
+temp_dir                 = "/var/infinity/tmp"
+# The global memory index threshold for triggering a flush to disk
+# When the memory used by all existing in-memory indices in the system exceeds this threshold,
+# The system performs a flush operation for all in-memory indices
+memindex_memory_quota   = "1GB"
+
+# WAL configuration
+[wal]
+# Directory for the WAL files
+wal_dir                       = "/var/infinity/wal"
+# Interval between periodically full checkpoints
+# Range : ["0s", "720h"]
+full_checkpoint_interval      = "86400s"
+# Interval between periodically delta (incremental) checkpoints
+# Range : ["0s", "720h"]
+delta_checkpoint_interval     = "60s"
+
+# Size threshold for triggering a compaction on a WAL file
+# When a WAL file exceeds this threshold, the system will perform a compaction on it
+# Range : ["1KB", "1024GB"]
+wal_compact_threshold         = "1GB"
+
+# Controls how the WAL manager flushes its logs to the disk
+# - "only_write": (Default) write log, OS control when to flush the log
+# - "flush_at_once": write and flush log each commit
+# - "flush_per_second": logs are written after each commit and flushed to disk per second
+wal_flush                     = "only_write"
+
+[resource]
+# Directory for Infinity's resource files, including the dictionary files used by the analyzer
+resource_dir                  = "/var/infinity/resource"
+```
