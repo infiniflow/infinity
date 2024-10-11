@@ -1206,7 +1206,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         ++column_id;
         {
             String index_size = "N/A";
-            if (InfinityContext::instance().persistence_manager() == nullptr) {
+            if (query_context->persistence_manager() == nullptr) {
                 index_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_index_dir));
             } else {
                 // TODO: calculate the sum of object parts
@@ -1928,14 +1928,24 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            String segment_size = "N/A";
-            if (InfinityContext::instance().persistence_manager() == nullptr) {
-                String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
-                segment_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
+            String segment_size_str = "N/A";
+
+            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
+            if (query_context->persistence_manager() == nullptr) {
+                segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             } else {
-                ; // TODO: Get size of segments
+                Vector<String> paths = segment_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                SizeT segment_size = 0;
+                for (const String &path : paths) {
+                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
+                    segment_size += file_size;
+                };
+                segment_size_str = Utility::FormatByteSize(segment_size);
             }
-            Value value = Value::MakeVarchar(segment_size);
+            Value value = Value::MakeVarchar(segment_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2007,10 +2017,19 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         {
             String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
             String seg_size = "N/A";
-            if (InfinityContext::instance().persistence_manager() == nullptr) {
+            if (query_context->persistence_manager() == nullptr) {
                 seg_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             } else {
-                ; // TODO: Get the size
+                Vector<String> paths = segment_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                SizeT segment_size = 0;
+                for (const String &path : paths) {
+                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
+                    segment_size += file_size;
+                };
+                seg_size = Utility::FormatByteSize(segment_size);
             }
             Value value = Value::MakeVarchar(seg_size);
             ValueExpression value_expr(value);
@@ -2114,7 +2133,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         ++column_id;
         {
             String block_size = "N/A";
-            if (InfinityContext::instance().persistence_manager() == nullptr) {
+            if (query_context->persistence_manager() == nullptr) {
                 String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
                 block_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
             } else {
@@ -2196,7 +2215,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     ++column_id;
     {
         String block_size = "N/A";
-        if (InfinityContext::instance().persistence_manager() == nullptr) {
+        if (query_context->persistence_manager() == nullptr) {
             block_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
         } else {
             ; // TODO: to get block size
