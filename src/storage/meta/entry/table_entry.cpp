@@ -308,7 +308,7 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
     return index_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
-Vector<TableIndexEntry *> TableEntry::TableIndexes(TransactionID txn_id, TxnTimeStamp begin_ts) {
+Vector<TableIndexEntry *> TableEntry::TableIndexes(TransactionID txn_id, TxnTimeStamp begin_ts) const {
     Vector<TableIndexEntry *> results;
     auto map_guard = index_meta_map_.GetMetaMap();
     results.reserve((*map_guard).size());
@@ -1387,6 +1387,25 @@ void TableEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
             info_tracer->AddCleanupInfo(std::move(full_table_dir));
         }
     }
+}
+
+Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+    Vector<TableIndexEntry *> table_index_entries = TableIndexes(txn_id, begin_ts);
+    Vector<String> res;
+    res.reserve(table_index_entries.size());
+    for(const auto& table_index_entry: table_index_entries) {
+        Vector<String> index_files = table_index_entry->GetFilePath(txn_id, begin_ts);
+        res.insert(res.end(), index_files.begin(), index_files.end());
+    }
+
+    std::shared_lock lock(rw_locker_);
+    res.reserve(res.size() + segment_map_.size());
+    for(const auto& segment_pair: segment_map_) {
+        const SegmentEntry* segment_entry = segment_pair.second.get();
+        Vector<String> segment_files = segment_entry->GetFilePath(txn_id, begin_ts);
+        res.insert(res.end(), segment_files.begin(), segment_files.end());
+    }
+    return res;
 }
 
 IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_->GetIndexReader(txn); }

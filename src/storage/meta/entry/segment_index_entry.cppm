@@ -56,7 +56,7 @@ export struct PopulateEntireConfig {
     bool check_ts_;
 };
 
-export struct SegmentIndexEntry : public BaseEntry {
+export struct SegmentIndexEntry final : public BaseEntry {
 public:
     static Vector<std::string_view> DecodeIndex(std::string_view encode);
 
@@ -97,6 +97,8 @@ public:
     void CommitIndex(TxnTimeStamp commit_ts);
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) final;
+
+    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
 
     void PickCleanup(CleanupScanner *scanner) final;
 

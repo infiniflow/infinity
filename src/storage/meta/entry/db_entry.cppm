@@ -144,6 +144,8 @@ private: // TODO: remote it
 public:
     void PickCleanup(CleanupScanner *scanner) override;
 
+    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
+
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     void MemIndexCommit();

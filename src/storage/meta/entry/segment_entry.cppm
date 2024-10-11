@@ -66,7 +66,7 @@ export String ToString(SegmentStatus segment_status) {
     }
 }
 
-export struct SegmentEntry : public BaseEntry {
+export struct SegmentEntry final : public BaseEntry {
 public:
     friend class BlockEntryIter;
     friend struct TableEntry;
@@ -274,6 +274,8 @@ public:
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     void PickCleanup(CleanupScanner *scanner) override;
+
+    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
 
     void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
 

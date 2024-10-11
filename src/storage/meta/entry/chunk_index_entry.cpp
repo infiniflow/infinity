@@ -461,6 +461,16 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
+Vector<String> ChunkIndexEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+    Vector<String> res;
+    res.reserve(part_buffer_objs_.size() + 1);
+    res.emplace_back(buffer_obj_->GetFilename());
+    for (auto *buffer_obj : part_buffer_objs_) {
+        res.emplace_back(buffer_obj->GetFilename());
+    }
+    return res;
+}
+
 void ChunkIndexEntry::SaveIndexFile() {
     if (buffer_obj_ == nullptr) {
         return;
