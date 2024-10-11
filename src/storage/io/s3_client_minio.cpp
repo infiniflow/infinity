@@ -48,6 +48,8 @@ Status S3ClientMinio::UploadObject(const String &bucket_name, const String &obje
     args.filename = file_path;
 
     // Call upload object.
+    LOG_INFO(fmt::format("{} upload to {}", file_path, object_name));
+    client_->Debug(true);
     minio::s3::UploadObjectResponse resp = client_->UploadObject(args);
 
     // Handle response.
