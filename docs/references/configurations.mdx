@@ -7,7 +7,7 @@ slug: /configurations
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This document provides instructions for loading Infinity's configuration file and descriptions of each entry in it.
+This document provides instructions for loading configuration file for Infinity and descriptions of each configuration entry.
 
 
 ## Load configuration file
@@ -24,8 +24,8 @@ This document provides instructions for loading Infinity's configuration file an
 
 To load a configuration file when you start up Infinity using Docker:
 
-1. Map the directory for the configuration file path to inside the Docker container.
-2. When running Docker, specify the path to the configuration file using the `-f` option. For example: 
+1. Map the configuration file path to inside the Docker container.
+2. When running Docker, specify the configuration file path using the `-f` option. For example: 
 
    ```bash
    docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly -f /var/infinity/infinity_conf.toml
