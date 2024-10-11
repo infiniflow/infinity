@@ -276,6 +276,7 @@ TEST_F(VirtualStoreTest, minio_upload) {
     auto test = [&]() {
         if (VirtualStore::BucketExists()) {
             String path = String(GetFullTmpDir()) + "/test_minio_upload.abc";
+            String object_name = "test_minio_upload.abc";
             auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
