@@ -163,7 +163,6 @@ void Highlighter::GetHighlightWithStemmer(const Vector<String> &query, const Str
         auto it = std::lower_bound(sentence_boundaries.begin(), sentence_boundaries.end(), term.word_offset_, [](auto element, auto value) {
             return element < value;
         });
-
         if (last_sentence_iter == sentence_boundaries.end()) {
             last_sentence_pos = 0;
             output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - last_sentence_pos));
@@ -186,8 +185,10 @@ void Highlighter::GetHighlightWithStemmer(const Vector<String> &query, const Str
         output.append(raw_text.substr(term.word_offset_, term.end_offset_ - term.word_offset_));
         output.append("</em>");
         last_term_pos = term.end_offset_;
-        last_sentence_iter = it;
-        last_sentence_pos = *it;
+        if (it != sentence_boundaries.end()) {
+            last_sentence_iter = it;
+            last_sentence_pos = *it;
+        }
     }
     if (last_term_pos < last_sentence_pos)
         output.append(raw_text.substr(last_term_pos, last_sentence_pos - last_term_pos));
