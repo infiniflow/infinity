@@ -91,7 +91,7 @@ void PhysicalShow::Init() {
     output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
 
     switch (show_type_) {
-        case ShowType::kShowDatabase: {
+        case ShowStmtType::kDatabase: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -100,7 +100,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowTable: {
+        case ShowStmtType::kTable: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -109,7 +109,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowIndex: {
+        case ShowStmtType::kIndex: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -118,7 +118,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowIndexSegment: {
+        case ShowStmtType::kIndexSegment: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -127,7 +127,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowIndexChunk: {
+        case ShowStmtType::kIndexChunk: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -136,14 +136,14 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowDatabases: {
+        case ShowStmtType::kDatabases: {
             output_names_->reserve(1);
             output_types_->reserve(1);
             output_names_->emplace_back("database");
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowTables: {
+        case ShowStmtType::kTables: {
 
             output_names_->reserve(8);
             output_types_->reserve(8);
@@ -167,7 +167,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
-        case ShowType::kShowColumn: {
+        case ShowStmtType::kColumns: {
 
             output_names_->reserve(3);
             output_types_->reserve(3);
@@ -175,15 +175,15 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("name");
             output_names_->emplace_back("type");
             output_names_->emplace_back("default");
-//            output_names_->emplace_back("constraint");
+            //            output_names_->emplace_back("constraint");
 
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
-//            output_types_->emplace_back(varchar_type);
+            //            output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowIndexes: {
+        case ShowStmtType::kIndexes: {
 
             output_names_->reserve(7);
             output_types_->reserve(7);
@@ -205,7 +205,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowConfigs: {
+        case ShowStmtType::kConfigs: {
 
             output_names_->reserve(3);
             output_types_->reserve(3);
@@ -219,7 +219,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowProfiles: {
+        case ShowStmtType::kProfiles: {
 
             output_names_->reserve(9);
             output_types_->reserve(9);
@@ -249,7 +249,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowSegments: {
+        case ShowStmtType::kSegments: {
             output_names_->reserve(3);
             output_types_->reserve(3);
 
@@ -262,7 +262,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowSegment: {
+        case ShowStmtType::kSegment: {
             output_names_->reserve(10);
             output_types_->reserve(10);
 
@@ -290,7 +290,7 @@ void PhysicalShow::Init() {
             break;
         }
 
-        case ShowType::kShowBlocks: {
+        case ShowStmtType::kBlocks: {
             output_names_->reserve(3);
             output_types_->reserve(3);
 
@@ -304,7 +304,7 @@ void PhysicalShow::Init() {
             break;
         }
 
-        case ShowType::kShowBlock: {
+        case ShowStmtType::kBlock: {
             output_names_->reserve(8);
             output_types_->reserve(8);
 
@@ -328,7 +328,7 @@ void PhysicalShow::Init() {
             break;
         }
 
-        case ShowType::kShowBlockColumn: {
+        case ShowStmtType::kBlockColumn: {
             output_names_->reserve(2);
             output_types_->reserve(2);
 
@@ -340,21 +340,21 @@ void PhysicalShow::Init() {
             break;
         }
 
-        case ShowType::kShowSessionVariable: {
+        case ShowStmtType::kSessionVariable: {
             output_names_->reserve(1);
             output_types_->reserve(1);
             output_names_->emplace_back("value");
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowGlobalVariable: {
+        case ShowStmtType::kGlobalVariable: {
             output_names_->reserve(1);
             output_types_->reserve(1);
             output_names_->emplace_back("value");
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowSessionVariables: {
+        case ShowStmtType::kSessionVariables: {
 
             output_names_->reserve(3);
             output_types_->reserve(3);
@@ -368,7 +368,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowGlobalVariables: {
+        case ShowStmtType::kGlobalVariables: {
 
             output_names_->reserve(3);
             output_types_->reserve(3);
@@ -382,14 +382,14 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowConfig: {
+        case ShowStmtType::kConfig: {
             output_names_->reserve(1);
             output_types_->reserve(1);
             output_names_->emplace_back("value");
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowBuffer: {
+        case ShowStmtType::kBuffer: {
             output_names_->reserve(5);
             output_types_->reserve(5);
             output_names_->emplace_back("path");
@@ -404,7 +404,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowMemIndex: {
+        case ShowStmtType::kMemIndex: {
             output_names_->reserve(5);
             output_types_->reserve(5);
             output_names_->emplace_back("index_name");
@@ -419,7 +419,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
-        case ShowType::kShowQueries: {
+        case ShowStmtType::kQueries: {
             output_names_->reserve(5);
             output_types_->reserve(5);
             output_names_->emplace_back("session_id");
@@ -434,7 +434,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowQuery: {
+        case ShowStmtType::kQuery: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -443,7 +443,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowTransactions: {
+        case ShowStmtType::kTransactions: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("transaction_id");
@@ -452,7 +452,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowTransaction: {
+        case ShowStmtType::kTransaction: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -461,7 +461,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowLogs: {
+        case ShowStmtType::kLogs: {
             output_names_->reserve(4);
             output_types_->reserve(4);
             output_names_->emplace_back("commit_ts");
@@ -474,7 +474,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowDeltaLogs: {
+        case ShowStmtType::kDeltaLogs: {
             output_names_->reserve(5);
             output_types_->reserve(5);
             output_names_->emplace_back("begin_ts");
@@ -489,7 +489,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowCatalogs: {
+        case ShowStmtType::kCatalogs: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("max_commit_timestamp");
@@ -498,7 +498,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowPersistenceFiles: {
+        case ShowStmtType::kPersistenceFiles: {
             output_names_->reserve(4);
             output_types_->reserve(4);
             output_names_->emplace_back("file_name");
@@ -511,7 +511,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
-        case ShowType::kShowPersistenceObjects: {
+        case ShowStmtType::kPersistenceObjects: {
             output_names_->reserve(5);
             output_types_->reserve(5);
             output_names_->emplace_back("name");
@@ -526,7 +526,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowPersistenceObject: {
+        case ShowStmtType::kPersistenceObject: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("start");
@@ -535,7 +535,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
-        case ShowType::kShowMemory: {
+        case ShowStmtType::kMemory: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -544,7 +544,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowType::kShowMemoryObjects: {
+        case ShowStmtType::kMemoryObjects: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -553,13 +553,20 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             break;
         }
-        case ShowType::kShowMemoryAllocation: {
+        case ShowStmtType::kMemoryAllocation: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
             output_names_->emplace_back("total_size");
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
+            break;
+        }
+        case ShowStmtType::kFunction: {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
             break;
         }
         default: {
@@ -574,152 +581,156 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
     DeferFn defer_fn([&]() { show_operator_state->SetComplete(); });
 
     switch (show_type_) {
-        case ShowType::kShowDatabase: {
+        case ShowStmtType::kDatabase: {
             ExecuteShowDatabase(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowTable: {
+        case ShowStmtType::kTable: {
             ExecuteShowTable(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowIndex: {
+        case ShowStmtType::kIndex: {
             ExecuteShowIndex(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowIndexSegment: {
+        case ShowStmtType::kIndexSegment: {
             ExecuteShowIndexSegment(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowIndexChunk: {
+        case ShowStmtType::kIndexChunk: {
             ExecuteShowIndexChunk(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowDatabases: {
+        case ShowStmtType::kDatabases: {
             ExecuteShowDatabases(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowTables: {
+        case ShowStmtType::kTables: {
             ExecuteShowTables(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowColumn: {
+        case ShowStmtType::kColumns: {
             ExecuteShowColumns(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowIndexes: {
+        case ShowStmtType::kIndexes: {
             ExecuteShowIndexes(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowConfigs: {
+        case ShowStmtType::kConfigs: {
             ExecuteShowConfigs(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowProfiles: {
+        case ShowStmtType::kProfiles: {
             ExecuteShowProfiles(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowSegments: {
+        case ShowStmtType::kSegments: {
             ExecuteShowSegments(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowSegment: {
+        case ShowStmtType::kSegment: {
             ExecuteShowSegmentDetail(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowBlocks: {
+        case ShowStmtType::kBlocks: {
             ExecuteShowBlocks(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowBlock: {
+        case ShowStmtType::kBlock: {
             ExecuteShowBlockDetail(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowBlockColumn: {
+        case ShowStmtType::kBlockColumn: {
             ExecuteShowBlockColumn(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowViews: {
+        case ShowStmtType::kViews: {
             ExecuteShowViews(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowSessionVariable: {
+        case ShowStmtType::kSessionVariable: {
             ExecuteShowSessionVariable(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowGlobalVariable: {
+        case ShowStmtType::kGlobalVariable: {
             ExecuteShowGlobalVariable(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowSessionVariables: {
+        case ShowStmtType::kSessionVariables: {
             ExecuteShowSessionVariables(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowGlobalVariables: {
+        case ShowStmtType::kGlobalVariables: {
             ExecuteShowGlobalVariables(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowConfig: {
+        case ShowStmtType::kConfig: {
             ExecuteShowConfig(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowBuffer: {
+        case ShowStmtType::kBuffer: {
             ExecuteShowBuffer(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowMemIndex: {
+        case ShowStmtType::kMemIndex: {
             ExecuteShowMemIndex(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowQueries: {
+        case ShowStmtType::kQueries: {
             ExecuteShowQueries(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowQuery: {
+        case ShowStmtType::kQuery: {
             ExecuteShowQuery(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowTransactions: {
+        case ShowStmtType::kTransactions: {
             ExecuteShowTransactions(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowTransaction: {
+        case ShowStmtType::kTransaction: {
             ExecuteShowTransaction(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowLogs: {
+        case ShowStmtType::kLogs: {
             ExecuteShowLogs(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowDeltaLogs: {
+        case ShowStmtType::kDeltaLogs: {
             ExecuteShowDeltaLogs(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowCatalogs: {
+        case ShowStmtType::kCatalogs: {
             ExecuteShowCatalogs(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowPersistenceFiles: {
+        case ShowStmtType::kPersistenceFiles: {
             ExecuteShowPersistenceFiles(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowPersistenceObjects: {
+        case ShowStmtType::kPersistenceObjects: {
             ExecuteShowPersistenceObjects(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowPersistenceObject: {
+        case ShowStmtType::kPersistenceObject: {
             ExecuteShowPersistenceObject(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowMemory: {
+        case ShowStmtType::kMemory: {
             ExecuteShowMemory(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowMemoryObjects: {
+        case ShowStmtType::kMemoryObjects: {
             ExecuteShowMemoryObjects(query_context, show_operator_state);
             break;
         }
-        case ShowType::kShowMemoryAllocation: {
+        case ShowStmtType::kMemoryAllocation: {
             ExecuteShowMemoryAllocation(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kFunction: {
+            ExecuteShowFunction(query_context, show_operator_state);
             break;
         }
         default: {
@@ -814,7 +825,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    auto [table_info, status] = txn->GetTableInfo(db_name_, object_name_);
+    auto [table_info, status] = txn->GetTableInfo(db_name_, *object_name_);
 
     if (!status.ok()) {
         RecoverableError(status);
@@ -935,7 +946,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, object_name_, index_name_.value());
+    auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, *object_name_, index_name_.value());
 
     if (!status.ok()) {
         RecoverableError(status);
@@ -974,7 +985,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(object_name_);
+            Value value = Value::MakeVarchar(*object_name_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1086,14 +1097,13 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         ++column_id;
         {
             const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
-            u64 index_dir_size = 0;
+            String index_size_str = "N/A";
             if (InfinityContext::instance().persistence_manager() == nullptr) {
-                index_dir_size = VirtualStore::GetDirectorySize(table_dir);
+                index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
             } else {
-                // TODO: calculate the sum of object parts which's has the prefix table_dir
+                // TODO: calculate the sum of object parts which has the prefix table_dir
             }
-            const auto &index_size = Utility::FormatByteSize(index_dir_size);
-            Value value = Value::MakeVarchar(index_size);
+            Value value = Value::MakeVarchar(index_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1126,13 +1136,13 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    auto [table_entry, status1] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status1] = txn->GetTableByName(db_name_, *object_name_);
     if (!status1.ok()) {
         RecoverableError(status1);
         return;
     }
 
-    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, object_name_, index_name_.value());
+    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
     if (!status2.ok()) {
         RecoverableError(status2);
         return;
@@ -1195,7 +1205,13 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
         ++column_id;
         {
-            const auto &index_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_index_dir));
+            String index_size = "N/A";
+            if (InfinityContext::instance().persistence_manager() == nullptr) {
+                index_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_index_dir));
+            } else {
+                // TODO: calculate the sum of object parts
+            }
+
             Value value = Value::MakeVarchar(index_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1266,13 +1282,13 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    auto [table_entry, status1] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status1] = txn->GetTableByName(db_name_, *object_name_);
     if (!status1.ok()) {
         RecoverableError(status1);
         return;
     }
 
-    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, object_name_, index_name_.value());
+    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
     if (!status2.ok()) {
         RecoverableError(status2);
         return;
@@ -1778,7 +1794,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -1791,7 +1807,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(1, varchar_type, "type", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(2, varchar_type, "default", std::set<ConstraintType>()),
-//        MakeShared<ColumnDef>(3, varchar_type, "constraint", std::set<ConstraintType>())
+        //        MakeShared<ColumnDef>(3, varchar_type, "constraint", std::set<ConstraintType>())
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), column_defs);
@@ -1802,7 +1818,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         varchar_type,
         varchar_type,
         varchar_type,
-//        varchar_type,
+        //        varchar_type,
     };
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
@@ -1842,18 +1858,18 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
 
-//        ++output_column_idx;
-//        {
-//            // Append column constraint to the third column
-//            String column_constraint;
-//            for (auto &constraint : column->constraints_) {
-//                column_constraint += " " + ConstrainTypeToString(constraint);
-//            }
-//
-//            Value value = Value::MakeVarchar(column_constraint);
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
-//        }
+        //        ++output_column_idx;
+        //        {
+        //            // Append column constraint to the third column
+        //            String column_constraint;
+        //            for (auto &constraint : column->constraints_) {
+        //                column_constraint += " " + ConstrainTypeToString(constraint);
+        //            }
+        //
+        //            Value value = Value::MakeVarchar(column_constraint);
+        //            ValueExpression value_expr(value);
+        //            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+        //        }
 
         if (++row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
@@ -1872,7 +1888,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -1912,9 +1928,14 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
-            const auto &seg_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
-            Value value = Value::MakeVarchar(seg_size);
+            String segment_size = "N/A";
+            if (InfinityContext::instance().persistence_manager() == nullptr) {
+                String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
+                segment_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
+            } else {
+                ; // TODO: Get size of segments
+            }
+            Value value = Value::MakeVarchar(segment_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1937,7 +1958,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     auto txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -1985,7 +2006,12 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         ++column_id;
         {
             String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
-            const auto &seg_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
+            String seg_size = "N/A";
+            if (InfinityContext::instance().persistence_manager() == nullptr) {
+                seg_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
+            } else {
+                ; // TODO: Get the size
+            }
             Value value = Value::MakeVarchar(seg_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2047,7 +2073,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
     auto txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2087,9 +2113,14 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
-            const auto &blk_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
-            Value value = Value::MakeVarchar(blk_size);
+            String block_size = "N/A";
+            if (InfinityContext::instance().persistence_manager() == nullptr) {
+                String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
+                block_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
+            } else {
+                ; // TODO: to get block size
+            }
+            Value value = Value::MakeVarchar(block_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2119,7 +2150,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     auto txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2164,8 +2195,14 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
     ++column_id;
     {
-        const auto &blk_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
-        Value value = Value::MakeVarchar(blk_size);
+        String block_size = "N/A";
+        if (InfinityContext::instance().persistence_manager() == nullptr) {
+            block_size = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
+        } else {
+            ; // TODO: to get block size
+        }
+
+        Value value = Value::MakeVarchar(block_size);
         ValueExpression value_expr(value);
         value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
     }
@@ -2213,7 +2250,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     auto txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -3125,7 +3162,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, table_status] = txn->GetTableByName(db_name_, *object_name_);
     if (!table_status.ok()) {
         show_operator_state->status_ = table_status;
         //        Error<UnrecoverableException>(table_status.message());
@@ -3294,7 +3331,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
     SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
-    SessionVariable session_var = VarUtil::GetSessionVarByName(object_name_);
+    SessionVariable session_var = VarUtil::GetSessionVarByName(*object_name_);
     BaseSession *session_ptr = query_context->current_session();
     switch (session_var) {
         case SessionVariable::kQueryCount: {
@@ -3393,7 +3430,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
             break;
         }
         default: {
-            operator_state->status_ = Status::NoSysVar(object_name_);
+            operator_state->status_ = Status::NoSysVar(*object_name_);
             RecoverableError(operator_state->status_);
             return;
         }
@@ -3556,7 +3593,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
     SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
-    GlobalVariable global_var = VarUtil::GetGlobalVarByName(object_name_);
+    GlobalVariable global_var = VarUtil::GetGlobalVarByName(*object_name_);
     switch (global_var) {
         case GlobalVariable::kQueryCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
@@ -4010,7 +4047,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         default: {
-            operator_state->status_ = Status::NoSysVar(object_name_);
+            operator_state->status_ = Status::NoSysVar(*object_name_);
             RecoverableError(operator_state->status_);
             return;
         }
@@ -4506,7 +4543,6 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
 #endif
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-
                 }
                 {
                     // option description
@@ -4517,8 +4553,8 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 break;
             }
             case GlobalVariable::kFollowerNum: {
-                if(InfinityContext::instance().IsClusterRole()
-                && InfinityContext::instance().cluster_manager()->ThisNode()->node_role_ == NodeRole::kLeader) {
+                if (InfinityContext::instance().IsClusterRole() &&
+                    InfinityContext::instance().cluster_manager()->ThisNode()->node_role_ == NodeRole::kLeader) {
                     {
                         // option name
                         Value value = Value::MakeVarchar(var_name);
@@ -4561,13 +4597,13 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
 
 void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorState *operator_state) {
     Config *global_config = query_context->global_config();
-    auto [base_option, status] = global_config->GetConfigByName(object_name_);
+    auto [base_option, status] = global_config->GetConfigByName(*object_name_);
     if (!status.ok()) {
         operator_state->status_ = status;
         return;
     }
-    if (object_name_ == "time_zone_bias") {
-        operator_state->status_ = Status::InvalidConfig(fmt::format("Option: {} doesn't exist.", object_name_));
+    if (*object_name_ == "time_zone_bias") {
+        operator_state->status_ = Status::InvalidConfig(fmt::format("Option: {} doesn't exist.", *object_name_));
         return;
     }
 
@@ -4610,7 +4646,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
 
             StringOption *string_option = static_cast<StringOption *>(base_option);
             String value_str;
-            if (object_name_ == "time_zone") {
+            if (*object_name_ == "time_zone") {
                 auto [time_zone_bias, _] = global_config->GetConfigByName("time_zone_bias");
 
                 IntegerOption *time_zone_bias_int = static_cast<IntegerOption *>(time_zone_bias);
@@ -5419,8 +5455,8 @@ void PhysicalShow::ExecuteShowPersistenceFiles(QueryContext *query_context, Show
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    PersistenceManager* persistence_manager = query_context->persistence_manager();
-    if(persistence_manager == nullptr) {
+    PersistenceManager *persistence_manager = query_context->persistence_manager();
+    if (persistence_manager == nullptr) {
         Status status = Status::FunctionIsDisable("Persistence");
         RecoverableError(status);
     }
@@ -5498,8 +5534,8 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    PersistenceManager* persistence_manager = query_context->persistence_manager();
-    if(persistence_manager == nullptr) {
+    PersistenceManager *persistence_manager = query_context->persistence_manager();
+    if (persistence_manager == nullptr) {
         Status status = Status::FunctionIsDisable("Persistence");
         RecoverableError(status);
     }
@@ -5582,21 +5618,21 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    PersistenceManager* persistence_manager = query_context->persistence_manager();
-    if(persistence_manager == nullptr) {
+    PersistenceManager *persistence_manager = query_context->persistence_manager();
+    if (persistence_manager == nullptr) {
         Status status = Status::FunctionIsDisable("Persistence");
         RecoverableError(status);
     }
 
     HashMap<String, ObjStat> object_map = persistence_manager->GetAllObjects();
-    auto iter = object_map.find(object_name_);
-    if(iter == object_map.end()) {
-        Status status = Status::FileNotFound(object_name_);
+    auto iter = object_map.find(*object_name_);
+    if (iter == object_map.end()) {
+        Status status = Status::FileNotFound(*object_name_);
         RecoverableError(status);
     }
 
-    Set<Range>& deleted_ranges = iter->second.deleted_ranges_;
-    for(auto& range: deleted_ranges) {
+    Set<Range> &deleted_ranges = iter->second.deleted_ranges_;
+    for (auto &range : deleted_ranges) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -5621,7 +5657,6 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
             output_block_ptr = nullptr;
             row_count = 0;
         }
-
     }
 
     output_block_ptr->Finalize();
@@ -5693,7 +5728,7 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
     std::unordered_map<String, i64> object_map = GlobalResourceUsage::GetObjectClones();
     SizeT row_count = 0;
 
-    for(auto& object_pair: object_map) {
+    for (auto &object_pair : object_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -5741,7 +5776,7 @@ void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, Show
     std::unordered_map<String, i64> raw_memory_map = GlobalResourceUsage::GetRawMemoryClone();
     SizeT row_count = 0;
 
-    for(auto& raw_memory_pair: raw_memory_map) {
+    for (auto &raw_memory_pair : raw_memory_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -5768,6 +5803,49 @@ void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, Show
             output_block_ptr = nullptr;
             row_count = 0;
         }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteShowFunction(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    String function_name = *function_name_;
+    ToLower(function_name);
+    if (function_name == "server_version") {
+
+        String version_info =
+            fmt::format("{}.{}.{} {} {} {}", version_major(), version_minor(), version_patch(), system_build_time(), build_type(), git_commit_id());
+        {
+            // name
+            Value value = Value::MakeVarchar(version_info);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        fmt::print("Release: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
+                   version_major(),
+                   version_minor(),
+                   version_patch(),
+                   system_build_time(),
+                   build_type(),
+                   git_branch_name(),
+                   git_commit_id());
+    } else {
+        Status status = Status::Unknown(fmt::format("function: {}", function_name));
+        RecoverableError(status);
     }
 
     output_block_ptr->Finalize();

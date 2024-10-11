@@ -34,6 +34,7 @@ import explain_statement;
 import command_statement;
 import select_statement;
 import global_resource_usage;
+import query_context;
 
 namespace infinity {
 
@@ -138,6 +139,24 @@ public:
     QueryResult
     ShowBlockColumn(const String &db_name, const String &table_name, const SegmentID &segment_id, const BlockID &block_id, const SizeT &column_id);
 
+    // Metrics
+    QueryResult ShowBuffer();
+    QueryResult ShowProfiles();
+    QueryResult ShowMemindex();
+    QueryResult ShowQueries();
+    QueryResult ShowQuery(u64 query_index);
+    QueryResult ShowTransactions();
+    QueryResult ShowLogs();
+    QueryResult ShowDeltaCheckpoint();
+    QueryResult ShowFullCheckpoint();
+    QueryResult ShowObjects();
+    QueryResult ShowObject(const String& object_name);
+    QueryResult ShowFilesInObject();
+    QueryResult ShowMemory();
+    QueryResult ShowMemoryObjects();
+    QueryResult ShowMemoryAllocations();
+    QueryResult ShowFunction(const String& function_name);
+
     QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
 
     QueryResult Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
@@ -175,6 +194,9 @@ public:
 
     QueryResult Cleanup();
 
+    QueryResult ForceCheckpoint();
+    QueryResult CompactTable(const String &db_name, const String& table_name);
+
     // Admin interface
     QueryResult AdminShowCatalogs();
     QueryResult AdminShowCatalog(i64 index);
@@ -193,6 +215,8 @@ public:
     QueryResult AdminSetLearner(String node_name, const String& leader_address);
 
 private:
+    UniquePtr<QueryContext> GetQueryContext() const;
+
     SharedPtr<BaseSession> session_{};
 };
 

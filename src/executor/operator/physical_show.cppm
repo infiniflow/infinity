@@ -32,15 +32,16 @@ import data_type;
 import variables;
 import data_block;
 import logger;
+import show_statement;
 
 namespace infinity {
 
 export class PhysicalShow : public PhysicalOperator {
 public:
     explicit PhysicalShow(u64 id,
-                          ShowType type,
+                          ShowStmtType type,
                           String db_name,
-                          String object_name,
+                          Optional<String> object_name,
                           u64 table_index,
                           Optional<SegmentID> segment_id,
                           Optional<BlockID> block_id,
@@ -49,10 +50,11 @@ public:
                           Optional<String> index_name,
                           Optional<u64> session_id,
                           Optional<TransactionID> txn_id,
+                          Optional<String> function_name,
                           SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), show_type_(type), db_name_(std::move(db_name)),
-          object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id),
-          index_name_(index_name), session_id_(session_id), txn_id_(txn_id) {}
+          object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id),
+          column_id_(column_id), index_name_(index_name), session_id_(session_id), txn_id_(txn_id), function_name_(function_name) {}
 
     ~PhysicalShow() override = default;
 
@@ -70,11 +72,11 @@ public:
         return 0;
     }
 
-    inline ShowType show_type() const { return show_type_; }
+    inline ShowStmtType show_type() const { return show_type_; }
 
     inline const String &db_name() const { return db_name_; };
 
-    inline const String &object_name() const { return object_name_; };
+    inline const Optional<String> object_name() const { return object_name_; };
 
 private:
     void ExecuteShowViewDetail(QueryContext *query_context,
@@ -126,7 +128,7 @@ private:
     void ExecuteShowConfig(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowBuffer(QueryContext *query_context, ShowOperatorState *operator_state);
-    
+
     void ExecuteShowMemIndex(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowQueries(QueryContext *query_context, ShowOperatorState *operator_state);
@@ -155,10 +157,12 @@ private:
 
     void ExecuteShowMemoryAllocation(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowFunction(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
-    ShowType show_type_{ShowType::kInvalid};
+    ShowStmtType show_type_{ShowStmtType::kInvalid};
     String db_name_{};
-    String object_name_{};
+    Optional<String> object_name_{};
     u64 table_index_{};
 
     Optional<SegmentID> segment_id_{};
@@ -168,6 +172,7 @@ private:
     Optional<String> index_name_{};
     Optional<u64> session_id_{};
     Optional<TransactionID> txn_id_{};
+    Optional<String> function_name_{};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

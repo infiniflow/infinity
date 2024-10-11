@@ -2635,13 +2635,156 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
+## Show transactions
 
+**GET** `/instance/transactions`
+
+Shows running transactions on database.
+
+### Request
+
+- Method: GET
+- URL: `/instance/transactions`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/instance/transactions \
+     --header 'accept: application/json'
+```
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "transactions": [
+        {
+            "transaction_id":"27275",
+            "transaction_text":""
+        },
+        {
+            "transaction_id":"27274",
+            "transaction_text":""
+        }
+    ]
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 2005,
+    "error_message": "Not support in maintenance mode"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
+## Show transaction
+
+**GET** `/instance/transactions/{trasaction_id}`
+
+Shows running transactions on database by transaction_id.
+
+### Request
+
+- Method: GET
+- URL: `/instance/transactions`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+     --url http://localhost:23820/instance/transactions/{transaction_id} \
+     --header 'accept: application/json'
+```
+
+#### Request parameters
+
+- `transaction_id`: (*Path parameter*)
+  The id of the running transaction.
+
+### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "transaction": {
+        "transaction_id":"27275",
+        "transaction_text":""
+    }
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 2005,
+    "error_message": "Not support in maintenance mode"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
 
 ## Admin set node role
 
 **POST** `/admin/node/current`
 
-Set a node role.
+Sets role for a node.
 
 ### Request
 
@@ -2662,8 +2805,7 @@ curl --request POST \
     '{
         "role" : "follower",
         "name" : "following",
-        "address" : "0.0.0.0",
-        "port" : 23851
+        "address" : "0.0.0.0:23851"
     }'
 ```
 
@@ -2677,7 +2819,6 @@ curl --request POST \
     - Parameter settings for setting a node to `follower` or `learner`:
         - "name" Required : Name of the node in the cluster.
         - "address" Required : Peer server address of the leader in the cluster.
-        - "port" Required : Peer server port of the leader in the cluster.
 
 ### Response
 
@@ -2726,7 +2867,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/admin/variables`
 
-Show all node variables in admin mode.
+Shows all node variables in admin mode.
 
 ### Request
 
@@ -2748,12 +2889,7 @@ None.
 
 ### Response
 
-<Tabs
-  defaultValue="s200"
-  values={[
-    {label: 'Status code 200', value: 's200'},
-  ]}>
-  <TabItem value="s200">
+#### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -2767,14 +2903,13 @@ The response includes a JSON object like the following:
 - `"error_code"`: `integer`  
   `0`: The operation succeeds.
 
-</Tabs>
 ---
 
 ## Admin show node configs
 
 **GET** `/admin/configs`
 
-Show all node configs in admin mode.
+Shows all node configs in admin mode.
 
 ### Request
 
@@ -2835,8 +2970,6 @@ The response includes a JSON object like the following:
     "wal_flush":"FlushAtOnce"
 }
 ```
-
-</Tabs>
 
 ---
 
@@ -2913,7 +3046,7 @@ The response includes a JSON object like the following:
 
 **GET** `/admin/node/current`
 
-Get information about the currently connected node.
+Gets information about the currently connected node.
 
 ### Request
 
@@ -2934,12 +3067,8 @@ curl --request GET \
 None.
 
 ### Response
-<Tabs
-  defaultValue="s200"
-  values={[
-    {label: 'Status code 200', value: 's200'},
-  ]}>
-  <TabItem value="s200">
+
+#### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -2955,16 +3084,13 @@ The response includes a JSON object like the following:
 - `"node_role": string`
   The role of querying node.
 
-</TabItem>
-</Tabs>
-
 ---
 
 ## Admin show node
 
 **GET** `/admin/node/{node_name}`
 
-Get information about a node in the cluster.
+Gets information about a node in the cluster.
 
 ### Request
 
@@ -3033,7 +3159,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/admin/nodes`
 
-List all nodes in the cluster.
+Lists all nodes in the cluster.
 
 ### Request
 
@@ -3055,12 +3181,7 @@ None.
 
 ### Response
 
-<Tabs
-  defaultValue="s200"
-  values={[
-    {label: 'Status code 200', value: 's200'},
-  ]}>
-  <TabItem value="s200">
+#### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -3079,9 +3200,6 @@ The response includes a JSON object like the following:
   `0`: The operation succeeds.
 - `"nodes" : array` : 
   Each element is in `[nodename, noderole]` format.
-
-</TabItem>
-</Tabs>
 
 ---
 
