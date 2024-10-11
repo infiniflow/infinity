@@ -193,12 +193,12 @@ auto main(int argc, char **argv) -> int {
 #elif THRIFT_SERVER_TYPE == 1
 
         i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
-        non_block_pool_thrift_server.Init(thrift_server_port, thrift_server_pool_size);
+        non_block_pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
         non_block_pool_thrift_thread = infinity::Thread([&]() { non_block_pool_thrift_server.Start(); });
 
 #else
 
-        threaded_thrift_server.Init(thrift_server_port);
+        threaded_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port);
         threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
 
 #endif

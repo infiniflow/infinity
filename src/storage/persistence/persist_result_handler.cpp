@@ -33,7 +33,8 @@ void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
     for (const String &persist_key : result.persist_keys_) {
         String persist_path = pm_->GetObjPath(persist_key);
         if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader){
-            VirtualStore::UploadObject(persist_path, persist_path);
+            String object_name = fs::path(persist_path).filename().string();
+            VirtualStore::UploadObject(persist_path, object_name);
         }
     }
     for (const String &drop_key : result.drop_keys_) {

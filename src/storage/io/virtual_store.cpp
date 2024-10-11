@@ -462,7 +462,6 @@ Status VirtualStore::DownloadObject(const String &file_path, const String &objec
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
             return s3_client_->DownloadObject(VirtualStore::bucket_, object_name, file_path);
-            break;
         }
         default: {
             return Status::NotSupport("Not support storage type");

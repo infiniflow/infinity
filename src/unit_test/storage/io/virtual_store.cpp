@@ -273,33 +273,39 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
 TEST_F(VirtualStoreTest, minio_upload) {
     using namespace infinity;
 
+    auto test = [&]() {
+        if (VirtualStore::BucketExists()) {
+            String path = String(GetFullTmpDir()) + "/test_minio_upload.abc";
+            auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            SizeT len = 10;
+            UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
+            for (SizeT i = 0; i < len; ++i) {
+                data_array[i] = i + 1;
+            }
+            file_handle->Append(data_array.get(), len);
+            file_handle->Sync();
+
+            auto status1 = VirtualStore::UploadObject(path, object_name);
+            EXPECT_TRUE(status1.ok());
+
+            status1 = VirtualStore::RemoveObject(path);
+            EXPECT_TRUE(status1.ok());
+
+            VirtualStore::DeleteFile(path);
+            EXPECT_FALSE(VirtualStore::Exists(path));
+        } else {
+            LOG_INFO("bucket existence check failed, skip the test");
+        }
+    };
+
     VirtualStore::InitRemoteStore();
-
-    if(VirtualStore::BucketExists()){
-        String path = String(GetFullTmpDir()) + "/test_minio_upload.abc";
-        auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        SizeT len = 10;
-        UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
-        for (SizeT i = 0; i < len; ++i) {
-            data_array[i] = i + 1;
-        }
-        file_handle->Append(data_array.get(), len);
-        file_handle->Sync();
-
-        auto status1 = VirtualStore::UploadObject(path, path);
-        EXPECT_TRUE(status1.ok());
-
-        status1 = VirtualStore::RemoveObject(path);
-        EXPECT_TRUE(status1.ok());
-
-        VirtualStore::DeleteFile(path);
-        EXPECT_FALSE(VirtualStore::Exists(path));
-    } else {
-        LOG_INFO("bucket existence check failed, skip the test");
-    }
-
+    test();
     VirtualStore::UnInitRemoteStore();
-}
+
+    VirtualStore::InitRemoteStore(StorageType::kMinio, "192.168.200.165:9000", false, "minioadmin", "minioadmin", "infinity");
+    test();
+    VirtualStore::UnInitRemoteStore();
+};
