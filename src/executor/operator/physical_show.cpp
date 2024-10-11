@@ -1087,7 +1087,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
         {
             const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
             u64 index_dir_size = 0;
-            if (InfinityContext::instance().persistence_manager() == nullptr) {
+            if (query_context->persistence_manager() == nullptr) {
                 index_dir_size = VirtualStore::GetDirectorySize(table_dir);
             } else {
                 // TODO: calculate the sum of object parts which's has the prefix table_dir
@@ -2780,7 +2780,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
     }
 
-    if (InfinityContext::instance().persistence_manager() != nullptr) {
+    if (query_context->persistence_manager() != nullptr) {
         {
             {
                 // option name
@@ -5566,8 +5566,8 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(1, bigint_type, "start", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(2, bigint_type, "end", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, bigint_type, "delete_start", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, bigint_type, "delete_end", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_persistence_object"), column_defs);
@@ -5605,13 +5605,13 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
             // start
             Value value = Value::MakeBigInt(range.start_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
         {
             // end
             Value value = Value::MakeBigInt(range.end_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
 
         ++row_count;
