@@ -69,7 +69,7 @@ jobs:
         run: |
           RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
           echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-          sudo mkdir -p test/data/benchmark && sudo rm test/data/benchmark/enwiki-10w.csv && sudo cp ${RUNNER_WORKSPACE_PREFIX}/benchmark/enwiki/enwiki-10w.csv test/data/benchmark/enwiki-10w.csv
+          sudo mkdir -p test/data/benchmark && sudo rm -f test/data/benchmark/enwiki-10w.csv && sudo cp ${RUNNER_WORKSPACE_PREFIX}/benchmark/enwiki/enwiki-10w.csv test/data/benchmark/enwiki-10w.csv
           echo `ls -l test/data/benchmark/enwiki-10w.csv`
 
       - name: Run restart test
@@ -210,7 +210,7 @@ jobs:
         run: |
           RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
           echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-          sudo mkdir -p test/data/benchmark && sudo rm test/data/benchmark/enwiki-10w.csv && sudo cp ${RUNNER_WORKSPACE_PREFIX}/benchmark/enwiki/enwiki-10w.csv test/data/benchmark/enwiki-10w.csv
+          sudo mkdir -p test/data/benchmark && sudo rm -f test/data/benchmark/enwiki-10w.csv && sudo cp ${RUNNER_WORKSPACE_PREFIX}/benchmark/enwiki/enwiki-10w.csv test/data/benchmark/enwiki-10w.csv
           echo `ls -l test/data/benchmark/enwiki-10w.csv`
     
       - name: Run restart test
