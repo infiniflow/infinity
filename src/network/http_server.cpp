@@ -3575,7 +3575,7 @@ public:
                         const String &column_value = value.ToString();
                         json_table[column_name] = column_value;
                     }
-                    json_response["global_checkpoint"].push_back(json_table);
+                    json_response["full_checkpoint"].push_back(json_table);
                 }
             }
             json_response["error_code"] = 0;
@@ -3590,10 +3590,9 @@ public:
     }
 };
 
-
 class ShowQueryHandler final : public HttpRequestHandler {
 public:
-SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
@@ -3601,7 +3600,7 @@ SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) fi
         nlohmann::json json_table;
         HTTPStatus http_status;
         String query_id = request->getPathVariable("query_id");
-        QueryResult result = infinity->Query(fmt::format("show query {}", query_id)); 
+        QueryResult result = infinity->Query(fmt::format("show query {}", query_id));
 
         if (result.IsOk()) {
             DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
@@ -3627,7 +3626,7 @@ SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) fi
 
 class ShowTransactionsHandler final : public HttpRequestHandler {
 public:
-SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
@@ -3666,7 +3665,7 @@ SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) fi
 
 class ShowTransactionHandler final : public HttpRequestHandler {
 public:
-SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
@@ -3686,7 +3685,7 @@ SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) fi
                 json_table[column_name] = column_value;
             }
             json_response["error_code"] = 0;
-            json_response["transaction"]= json_table;
+            json_response["transaction"] = json_table;
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
@@ -3698,7 +3697,117 @@ SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) fi
     }
 };
 
+class ShowObjectsHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->ShowObjects();
+
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_table;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_table[column_name] = column_value;
+                    }
+                    json_response["objects"].push_back(json_table);
+                }
+            }
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowObjectHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        nlohmann::json json_table;
+        HTTPStatus http_status;
+        String object_name = request->getPathVariable("object_name");
+        QueryResult result = infinity->ShowObject(object_name);
+
+        if (result.IsOk()) {
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+            auto column_cnt = result.result_table_->ColumnCount();
+            for (SizeT col = 0; col < column_cnt; ++col) {
+                const String &column_name = result.result_table_->GetColumnNameById(col);
+                Value value = data_block->GetValue(col, 0);
+                const String &column_value = value.ToString();
+                json_table[column_name] = column_value;
+            }
+            json_response["error_code"] = 0;
+            json_response["object"] = json_table;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowFilesHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->ShowFilesInObject();
+
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_table;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_table[column_name] = column_value;
+                    }
+                    json_response["files"].push_back(json_table);
+                }
+            }
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
 
 class AdminShowCurrentNodeHandler final : public HttpRequestHandler {
 public:
@@ -4035,10 +4144,13 @@ void HTTPServer::Start(const String &ip_address, u16 port) {
     router->route("GET", "/instance/queries", MakeShared<ShowQueriesHandler>());
     router->route("GET", "/instance/logs", MakeShared<ShowLogsHandler>());
     router->route("GET", "/instance/delta_checkpoint", MakeShared<ShowDeltaCheckpointHandler>());
-    router->route("GET", "/instance/global_checkpoint", MakeShared<ShowFullCheckpointHandler>()); 
+    router->route("GET", "/instance/global_checkpoint", MakeShared<ShowFullCheckpointHandler>());
     router->route("GET", "/instance/queries/{query_id}", MakeShared<ShowQueryHandler>());
     router->route("GET", "/instance/transactions", MakeShared<ShowTransactionsHandler>());
     router->route("GET", "/instance/transactions/{transaction_id}", MakeShared<ShowTransactionHandler>());
+    router->route("GET", "/instance/objects", MakeShared<ShowObjectsHandler>());
+    router->route("GET", "/instance/objects/{object_name}", MakeShared<ShowObjectHandler>());
+    router->route("GET", "/instance/files", MakeShared<ShowFilesHandler>());
 
     // variable
     router->route("GET", "/variables/global", MakeShared<ShowGlobalVariablesHandler>());
