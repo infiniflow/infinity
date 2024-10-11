@@ -18,12 +18,13 @@ class TestFullText:
         "config",
         [
             "test/data/config/restart_test/test_fulltext/1.toml",
-            # "test/data/config/restart_test/test_fulltext/2.toml",
-            # "test/data/config/restart_test/test_fulltext/3.toml",
+            "test/data/config/restart_test/test_fulltext/2.toml",
+            "test/data/config/restart_test/test_fulltext/3.toml",
         ],
     )
     def test_fulltext(self, infinity_runner: InfinityRunner, config: str):
-        enwiki_path = "test/data/csv/enwiki-10w.csv"
+        # should add symbolic link in advance
+        enwiki_path = "test/data/benchmark/enwiki-10w.csv"
         enwiki_size = 100000
 
         table_name = "test_fulltext"
@@ -59,8 +60,8 @@ class TestFullText:
             },
             ConflictType.Error,
         )
-        enwiki_gen1 = EnwikiGenerator.gen_factory(enwiki_path)
-        for id, (title, date, body) in enumerate(enwiki_gen1(enwiki_size)):
+        enwiki_gen1 = EnwikiGenerator.gen_factory(enwiki_path)(enwiki_size)
+        for id, (title, date, body) in enumerate(enwiki_gen1):
             gt_table_obj.insert(
                 [{"id": id, "title": title, "date": date, "body": body}]
             )

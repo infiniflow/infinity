@@ -25,6 +25,7 @@ class InfinityRunner:
         )
         os.system(f"rm -rf restart_test.log.*")
         print(f"clear {self.data_dir}")
+        self.i = 0
 
     def init(self, config_path: str | None = None):
         init_timeout = 60
