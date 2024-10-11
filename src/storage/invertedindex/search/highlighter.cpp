@@ -18,8 +18,6 @@ module;
 #include <iostream>
 #include <vector>
 
-#include <re2/re2.h>
-
 #include "common/analyzer/string_utils.h"
 
 module highlighter;
@@ -30,20 +28,6 @@ import analyzer;
 import term;
 
 namespace infinity {
-
-String Join(const Vector<String> &tokens, int start, int end, const String &delim = " ") {
-    std::ostringstream oss;
-    if (end > (int)tokens.size())
-        std::cout << "token.size() " << tokens.size() << " start " << start << " end " << end << std::endl;
-    for (int i = start; i < end; ++i) {
-        if (i > start)
-            oss << delim;
-        oss << tokens[i];
-    }
-    return oss.str();
-}
-
-String Join(const Vector<String> &tokens, int start, const String &delim = " ") { return Join(tokens, start, tokens.size(), delim); }
 
 Highlighter::Highlighter() {
     Set<String> patterns;
