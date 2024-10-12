@@ -275,6 +275,8 @@ public:
 
     void PickCleanup(CleanupScanner *scanner) override;
 
+    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const override;
+
     void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
 
     void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);

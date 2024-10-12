@@ -644,6 +644,17 @@ void SegmentEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
+Vector<String> SegmentEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+    std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
+    Vector<String> res;
+    res.reserve(block_entries_.size());
+    for(const auto& block_entry: block_entries_) {
+        Vector<String> files = block_entry->GetFilePath(txn_id, begin_ts);
+        res.insert(res.end(), files.begin(), files.end());
+    }
+    return res;
+}
+
 void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}
 
 // used in:

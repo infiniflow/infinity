@@ -40,7 +40,7 @@ export enum class BGTaskType {
 };
 
 class BaseMemIndex;
-class ChunkIndexEntry;
+struct ChunkIndexEntry;
 
 export struct BGTask {
     BGTask(BGTaskType type, bool async) : type_(type), async_(async) {}

@@ -22,7 +22,7 @@ import infinity_context;
 
 namespace infinity {
 
-class TableIndexEntry;
+struct TableIndexEntry;
 
 export class BaseMemIndex {
 public:

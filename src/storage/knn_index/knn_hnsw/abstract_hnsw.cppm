@@ -46,9 +46,9 @@ import buffer_handle;
 namespace infinity {
 
 class BufferManager;
-class ChunkIndexEntry;
-class SegmentIndexEntry;
-class BlockColumnEntry;
+struct ChunkIndexEntry;
+struct SegmentIndexEntry;
+struct BlockColumnEntry;
 
 export using AbstractHnsw = std::variant<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset> *,
                                          KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset> *,

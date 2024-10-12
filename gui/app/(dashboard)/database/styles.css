@@ -1,0 +1,47 @@
+@keyframes spinner {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-icon {
+  animation: spinner 1.5s linear infinite;
+  margin-left: 5px;
+}
+
+.visually-hidden {
+  position: absolute;
+  clip-path: circle(0);
+  border: 0;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  width: 1px;
+  white-space: nowrap;
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.tree-node:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tree-node--focused {
+  background-color: #d7d7d7;
+}
+
+.arrow--open {
+  transform: rotate(90deg);
+}
+
+.name {
+  margin-left: 6px;
+}

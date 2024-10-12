@@ -79,7 +79,12 @@ public:
         }
         return *this;
     }
-    ~MemVamana() = default;
+    ~MemVamana() {
+        if (!query_scratch_.Empty()) {
+            ScratchStoreManager<InMemQueryScratch> manager(query_scratch_);
+            manager.Destroy();
+        }
+    }
 
     static This Make(SizeT L, SizeT R, SizeT dim, SizeT point_num) {
         This ret(L, R, dim, point_num);

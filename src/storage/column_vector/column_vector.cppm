@@ -45,7 +45,7 @@ import sparse_util;
 namespace infinity {
 
 class BufferManager;
-class BlockColumnEntry;
+struct BlockColumnEntry;
 
 export enum class ColumnVectorTipe : i8 {
     kReadWrite,
