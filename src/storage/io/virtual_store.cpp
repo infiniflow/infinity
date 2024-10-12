@@ -32,6 +32,8 @@ import infinity_exception;
 import default_values;
 import stream_reader;
 import s3_client_minio;
+import infinity_context;
+import object_storage_task;
 
 namespace infinity {
 
@@ -461,7 +463,10 @@ Status VirtualStore::DownloadObject(const String &file_path, const String &objec
     }
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            return s3_client_->DownloadObject(VirtualStore::bucket_, object_name, file_path);
+            auto download_task = MakeShared<DownloadTask>(file_path, object_name);
+            auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
+            object_storage_processor->Submit(download_task);
+            download_task->Wait();
             break;
         }
         default: {
@@ -478,7 +483,11 @@ Status VirtualStore::UploadObject(const String &file_path, const String &object_
     }
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            return s3_client_->UploadObject(VirtualStore::bucket_, object_name, file_path);
+            auto upload_task = MakeShared<UploadTask>(file_path, object_name);
+            auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
+            object_storage_processor->Submit(upload_task);
+            upload_task->Wait();
+            break;
         }
         default: {
             return Status::NotSupport("Not support storage type");
@@ -494,7 +503,11 @@ Status VirtualStore::RemoveObject(const String &object_name) {
     }
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            return s3_client_->RemoveObject(VirtualStore::bucket_, object_name);
+            auto remove_task = MakeShared<RemoveTask>(object_name);
+            auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
+            object_storage_processor->Submit(remove_task);
+            remove_task->Wait();
+            break;
         }
         default: {
             return Status::NotSupport("Not support storage type");
@@ -509,7 +522,11 @@ Status VirtualStore::CopyObject(const String &src_object_name, const String &dst
     }
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
-            return s3_client_->CopyObject(VirtualStore::bucket_, src_object_name, VirtualStore::bucket_, dst_object_name);
+            auto copy_task = MakeShared<CopyTask>(src_object_name, dst_object_name);
+            auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
+            object_storage_processor->Submit(copy_task);
+            copy_task->Wait();
+            break;
         }
         default: {
             return Status::NotSupport("Not support storage type");

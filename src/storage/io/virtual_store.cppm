@@ -22,6 +22,7 @@ import third_party;
 import local_file_handle;
 import stream_reader;
 import s3_client;
+import object_storage_process;
 
 namespace infinity {
 
@@ -94,6 +95,8 @@ private:
     static StorageType storage_type_;
     static String bucket_;
     static UniquePtr<S3Client> s3_client_;
+
+friend class ObjectStorageProcess;
 };
 
 } // namespace infinity
