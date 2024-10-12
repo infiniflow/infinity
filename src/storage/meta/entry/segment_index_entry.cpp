@@ -1034,8 +1034,9 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
                                                                           TxnTimeStamp deprecate_ts,
                                                                           BufferManager *buffer_mgr) {
     if (chunk_id < next_chunk_id_) {
-        String error_message = fmt::format("Chunk ID: {} < next chunk ID: {}", chunk_id, next_chunk_id_);
-        UnrecoverableError(error_message);
+        String error_message = fmt::format("Wal Chunk ID: {} < next chunk ID: {}. ignore", chunk_id, next_chunk_id_);
+        LOG_WARN(error_message);
+        return nullptr; // this happen when wal write latter than delta log which is possible in dump index.
     }
     LOG_INFO(fmt::format("AddChunkIndexEntryReplayWal chunk_id: {} deprecate_ts: {}, base_rowid: {}, row_count: {} to to segment: {}",
                           chunk_id,
