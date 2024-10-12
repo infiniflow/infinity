@@ -1,7 +1,12 @@
-import { ITableColumns } from '@/lib/databse-interface';
+import { ITableColumns, ITableIndex } from '@/lib/databse-interface';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { listDatabase, listTable, showTableColumns } from '../actions';
+import {
+  listDatabase,
+  listTable,
+  showTableColumns,
+  showTableIndexes
+} from '../actions';
 import { initialData } from './constants';
 import { DatabaseRouteParams, TreeNode, TreeParentId } from './interface';
 import { buildLeafData, getParentIdById, updateTreeData } from './utils';
@@ -164,4 +169,26 @@ export const useFetchTableColumns = ({
   }, [fetchTableColumns]);
 
   return { tableColumns };
+};
+
+export const useFetchTableIndexes = ({
+  databaseId,
+  tableId
+}: DatabaseRouteParams['params']) => {
+  const [tableIndexes, setTableIndexes] = useState<ITableIndex[]>([]);
+
+  const fetchTableColumns = useCallback(async () => {
+    const data = await showTableIndexes({
+      database_name: databaseId,
+      table_name: tableId
+    });
+
+    setTableIndexes(data);
+  }, []);
+
+  useEffect(() => {
+    fetchTableColumns();
+  }, [fetchTableColumns]);
+
+  return { tableColumns: tableIndexes };
 };

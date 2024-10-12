@@ -3,6 +3,7 @@ export const ApiUrl = {
   database: 'database',
   tables: 'tables',
   columns: 'columns',
+  indexes: 'indexes',
   configs: 'configs',
   variables: 'variables'
 };
