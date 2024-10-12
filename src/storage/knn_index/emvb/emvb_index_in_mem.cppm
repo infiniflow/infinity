@@ -24,8 +24,8 @@ namespace infinity {
 struct BlockColumnEntry;
 class BufferManager;
 class ColumnDef;
-class ChunkIndexEntry;
-class SegmentIndexEntry;
+struct ChunkIndexEntry;
+struct SegmentIndexEntry;
 struct SegmentEntry;
 class IndexBase;
 class EMVBIndex;

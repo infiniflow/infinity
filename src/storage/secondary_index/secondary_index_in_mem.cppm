@@ -25,8 +25,8 @@ struct RowID;
 struct BlockColumnEntry;
 class BufferManager;
 class ColumnDef;
-class ChunkIndexEntry;
-class SegmentIndexEntry;
+struct ChunkIndexEntry;
+struct SegmentIndexEntry;
 
 export class SecondaryIndexInMem {
 public:

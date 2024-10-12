@@ -31,9 +31,9 @@ import column_def;
 
 namespace infinity {
 
-class BlockEntry;
+struct BlockEntry;
 struct SegmentEntry;
-class ChunkIndexEntry;
+struct ChunkIndexEntry;
 enum class SegmentStatus;
 
 export enum class WalCommandType : i8 {

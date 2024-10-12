@@ -33,13 +33,13 @@ import buffer_obj;
 
 namespace infinity {
 
-class SegmentIndexEntry;
+struct SegmentIndexEntry;
 struct BlockEntry;
 class BufferManager;
 struct SegmentEntry;
 
 // ChunkIndexEntry is an immutable chunk of SegmentIndexEntry. MemIndexer(for fulltext) is the mutable chunk of SegmentIndexEntry.
-export class ChunkIndexEntry : public BaseEntry {
+export struct ChunkIndexEntry final : public BaseEntry {
 public:
     static Vector<std::string_view> DecodeIndex(std::string_view encode);
 
@@ -132,6 +132,8 @@ public:
     virtual void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
     virtual void PickCleanup(CleanupScanner *scanner) override {}
+
+    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
 
     void SaveIndexFile();
 

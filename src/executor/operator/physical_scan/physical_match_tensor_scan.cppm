@@ -34,7 +34,7 @@ namespace infinity {
 struct LoadMeta;
 struct BlockIndex;
 struct BlockColumnEntry;
-class SegmentIndexEntry;
+struct SegmentIndexEntry;
 
 export class PhysicalMatchTensorScan final : public PhysicalFilterScanBase {
 public:

@@ -46,7 +46,7 @@ struct TableEntry;
 class DataBlock;
 
 /// class BlockEntry
-export struct BlockEntry : public BaseEntry {
+export struct BlockEntry final : public BaseEntry {
 public:
     friend struct TableEntry;
     friend struct SegmentEntry;
@@ -100,6 +100,8 @@ public:
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
+
+    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
 
     void Flush(TxnTimeStamp checkpoint_ts);
 

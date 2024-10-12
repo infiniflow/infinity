@@ -72,7 +72,7 @@ public:
     void Insert(const Neighbor &nbr) {
         if (size_ == capacity_ && data_[size_ - 1] < nbr)
             return;
-        
+
         auto it = std::lower_bound(data_.begin(), data_.begin() + size_, nbr);
         // if (it != data_.start()+size_ && (*it).id == nbr.id) {
         //     return;
@@ -315,7 +315,7 @@ public:
         return ret;
     }
 
-    bool Empty() { return (this->size() == 0); }
+    bool Empty() { return (this->Size() == 0); }
 
     // PUSH BACK
     void Push(T &new_val) {
@@ -380,17 +380,23 @@ public:
     T *ScratchSpace() { return scratch_; }
 
     ~ScratchStoreManager() {
-        scratch_->Clear();
-        scratch_pool_.Push(scratch_);
-        scratch_pool_.PushNotifyAll();
+        if (scratch_ != nullptr) {
+            scratch_->Clear();
+            scratch_pool_.Push(scratch_);
+            scratch_pool_.PushNotifyAll();
+        }
     }
 
     void Destroy() {
+        if (scratch_!= nullptr) {
+            delete scratch_;
+            scratch_ = nullptr;
+        }
         while (!scratch_pool_.Empty()) {
-            auto scratch = scratch_pool_.pop();
+            auto scratch = scratch_pool_.Pop();
             while (scratch == nullptr) {
                 scratch_pool_.WaitForPushNotify();
-                scratch = scratch_pool_.pop();
+                scratch = scratch_pool_.Pop();
             }
             delete scratch;
         }

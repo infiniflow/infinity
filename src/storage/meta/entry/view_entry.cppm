@@ -54,6 +54,8 @@ public:
 
     inline const SharedPtr<String> &view_name() const { return view_name_; }
 
+    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final { return Vector<String>(); }
+
 private:
     std::shared_mutex rw_locker_{};
 

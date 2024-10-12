@@ -305,6 +305,10 @@ void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer, [[maybe_unused]] 
     }
 }
 
+Vector<String> BlockColumnEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+    return FilePaths();
+}
+
 nlohmann::json BlockColumnEntry::Serialize() {
     nlohmann::json json_res;
     json_res["column_id"] = this->column_id_;
