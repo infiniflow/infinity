@@ -9,15 +9,15 @@ import { DatabaseRouteParams } from 'app/(dashboard)/database/interface';
 export const columns: ColumnDef<ITableSegment>[] = [
   {
     accessorKey: 'id',
-    header: 'id'
+    header: 'Id'
   },
   {
     accessorKey: 'size',
-    header: 'size'
+    header: 'Size'
   },
   {
     accessorKey: 'status',
-    header: 'status'
+    header: 'Status'
   }
 ];
 

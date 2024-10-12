@@ -45,23 +45,30 @@ export const useBuildTreeData = () => {
   const loadedAlertElement = useRef(null);
   const [data, setData] = useState<TreeNode[]>(initialData);
   const [nodesAlreadyLoaded, setNodesAlreadyLoaded] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const fetchDatabases = useCallback(async () => {
-    const ret = await listDatabase();
-    if (ret.databases.length > 0) {
-      setData((value) =>
-        updateTreeData(
-          value,
-          0,
-          ret.databases.map((x: string) => ({
-            name: x,
-            children: [],
-            id: x,
-            parent: 0,
-            isBranch: true
-          }))
-        )
-      );
+    try {
+      setLoading(true);
+      const ret = await listDatabase();
+      if (ret.databases.length > 0) {
+        setData((value) =>
+          updateTreeData(
+            value,
+            0,
+            ret.databases.map((x: string) => ({
+              name: x,
+              children: [],
+              id: x,
+              parent: 0,
+              isBranch: true
+            }))
+          )
+        );
+      }
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
     }
   }, []);
 
@@ -147,7 +154,7 @@ export const useBuildTreeData = () => {
     }
   };
 
-  return { wrappedOnLoadData, data, loadedAlertElement };
+  return { wrappedOnLoadData, data, loadedAlertElement, loading };
 };
 
 export const useFetchTableColumns = ({
