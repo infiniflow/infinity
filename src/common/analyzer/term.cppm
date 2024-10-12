@@ -55,7 +55,7 @@ public:
 
 export class TermList : public Deque<Term> {
 public:
-    void Add(const char *text, const u32 len, const u32 offset, const u32 end_offset, const u8 and_or_bit, const u8 level) {
+    void Add(const char *text, const u32 len, const u32 offset, const u32 end_offset, const u8 and_or_bit = Term::AND, const u8 level = 0) {
         push_back(global_temporary_);
         back().text_.assign(text, len);
         back().word_offset_ = offset;
@@ -67,6 +67,20 @@ public:
         push_back(global_temporary_);
         std::swap(back().text_, cut_word.word);
         back().word_offset_ = cut_word.offset;
+    }
+
+    void Add(const String &token, const u32 offset, const u32 end_offset) {
+        push_back(global_temporary_);
+        back().text_ = token;
+        back().word_offset_ = offset;
+        back().end_offset_ = end_offset;
+    }
+
+    void Add(String &token, const u32 offset, const u32 end_offset) {
+        push_back(global_temporary_);
+        std::swap(back().text_, token);
+        back().word_offset_ = offset;
+        back().end_offset_ = end_offset;
     }
 
 private:

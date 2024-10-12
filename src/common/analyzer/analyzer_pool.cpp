@@ -133,7 +133,7 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
         }
         case Str2Int(RAG.data()): {
             // rag-{coarse|fine}
-            Analyzer *prototype = cache_[CHINESE].get();
+            Analyzer *prototype = cache_[RAG].get();
             if (prototype == nullptr) {
                 String path;
                 Config *config = InfinityContext::instance().config();

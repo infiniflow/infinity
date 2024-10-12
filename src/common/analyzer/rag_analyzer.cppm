@@ -32,6 +32,7 @@ namespace infinity {
 // C++ reimplementation of
 // https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py
 
+class RegexTokenizer;
 export class RAGAnalyzer : public Analyzer {
 public:
     RAGAnalyzer(const String &path);
@@ -98,5 +99,7 @@ public:
     Vector<char> lowercase_string_buffer_;
 
     bool fine_grained_{false};
+
+    UniquePtr<RegexTokenizer> regex_tokenizer_;
 };
 } // namespace infinity
