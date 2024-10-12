@@ -244,7 +244,7 @@ target_sources(infinity_core
         ${network_cppm}
 )
 
-add_dependencies(infinity_core thrift thriftnb parquet_static snappy re2)
+add_dependencies(infinity_core thrift thriftnb parquet_static snappy re2 pcre2-8-static)
 target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
@@ -349,6 +349,7 @@ target_link_libraries(infinity
         ssl.a
         crypto.a
         re2.a
+        pcre2-8-static
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -360,6 +361,7 @@ target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(infinity PUBLIC "/usr/local/openssl30/lib64")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -417,6 +419,7 @@ if (SKBUILD)
             ssl.a
             crypto.a
             re2.a
+            pcre2-8-static
     )
 
     # WARN: python modules shall not link to static libstdc++!!!
@@ -537,7 +540,7 @@ add_executable(unit_test
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2)
+add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static)
 
 target_link_libraries(unit_test
         gtest
@@ -565,6 +568,7 @@ target_link_libraries(unit_test
         event.a
         miniocpp.a
         re2.a
+        pcre2-8-static
         pugixml-static
         curlpp_static
         inih.a
@@ -582,6 +586,7 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixm
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(unit_test PUBLIC "/usr/local/openssl30/lib64")
 
@@ -610,7 +615,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cur
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
-
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
