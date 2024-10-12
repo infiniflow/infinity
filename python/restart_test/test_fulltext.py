@@ -90,7 +90,7 @@ class TestFullText:
 
         def work_func(table_obj, gt_table_obj):
             nonlocal cur_insert_n, end, qu
-            while True:
+            while not end:
                 r = random.randint(0, 500 - 1)
                 try:
                     if r < 499:
@@ -125,7 +125,6 @@ class TestFullText:
                         )
 
                         def t1():
-                            time.sleep(search_after_insert)
                             print(f"search at {cur_insert_n}")
 
                             res = (
@@ -145,8 +144,8 @@ class TestFullText:
                                 print(f"diff: {data_dict} {gt_data_dict}")
                             else:
                                 print("same")
-
-                        qu.put(t1)
+                        search_time = time.time() + search_after_insert
+                        qu.put((t1, search_time))
 
                 except Exception as e:
                     print(e)
@@ -156,7 +155,9 @@ class TestFullText:
         def search_thread():
             nonlocal qu, shutdown
             while True:
-                f = qu.get()
+                (f, search_time) = qu.get()
+                while time.time() < search_time:
+                    time.sleep(0.1)
                 try:
                     f()
                 except Exception as e:

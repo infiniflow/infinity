@@ -1033,8 +1033,8 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
                                                                           TxnTimeStamp commit_ts,
                                                                           TxnTimeStamp deprecate_ts,
                                                                           BufferManager *buffer_mgr) {
-    if (chunk_id != next_chunk_id_) {
-        String error_message = fmt::format("Chunk ID: {} is not equal to next chunk ID: {}", chunk_id, next_chunk_id_);
+    if (chunk_id < next_chunk_id_) {
+        String error_message = fmt::format("Chunk ID: {} < next chunk ID: {}", chunk_id, next_chunk_id_);
         UnrecoverableError(error_message);
     }
     LOG_INFO(fmt::format("AddChunkIndexEntryReplayWal chunk_id: {} deprecate_ts: {}, base_rowid: {}, row_count: {} to to segment: {}",
@@ -1047,7 +1047,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
     chunk_index_entries_.push_back(chunk_index_entry);
-    next_chunk_id_++;
+    next_chunk_id_ = chunk_id + 1;
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
         try {
             u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();

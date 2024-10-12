@@ -37,3 +37,4 @@ if __name__ == "__main__":
         except Exception as e:
             print(e)
             test_fail = True
+            raise e
