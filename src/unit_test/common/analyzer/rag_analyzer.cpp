@@ -11,9 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+#define PCRE2_CODE_UNIT_WIDTH 8
 #include "gtest/gtest.h"
 #include <filesystem>
+#include <pcre2.h>
 #include <re2/re2.h>
 #include <vector>
 
@@ -33,19 +34,58 @@ namespace fs = std::filesystem;
 
 class RAGAnalyzerTest : public BaseTest {};
 
-void RegexTokenize(const String &input, Vector<String> &result) {
-    // static String pattern("('s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
-    //                       "?[^\\s\\p{L}\\p{N}]+|\\s+\\(?!\\S\\)|\\s+)");
-    static String pattern =
-        R"(((?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|(?=[^\(\"\`{\[:;&\#\*@\)}\]\-,])\S+?(?=\s|$|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|,(?=$|\s|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)))|\S))";
-    std::cout << pattern << std::endl;
-    re2::StringPiece input_str(input);
-    re2::StringPiece match;
+void RegexTokenize(const String &input, Vector<String> &tokens) {
 
-    while (RE2::FindAndConsume(&input_str, pattern, &match)) {
-        std::cout << match.as_string() << std::endl;
-        result.emplace_back(match.as_string());
+    std::string pattern =
+        R"((?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|(?=[^\(\"\`{\[:;&\#\*@\)}\]\-,])\S+?(?=\s|$|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|,(?=$|\s|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)))|\S)";
+
+    int errorcode = 0;
+    PCRE2_SIZE erroffset = 0;
+
+    pcre2_code_8 *re =
+        pcre2_compile((PCRE2_SPTR)(pattern.c_str()), PCRE2_ZERO_TERMINATED, PCRE2_MULTILINE | PCRE2_UTF, &errorcode, &erroffset, nullptr);
+
+    if (re == nullptr) {
+        std::cerr << "PCRE2 compilation failed at offset " << erroffset << ": error code " << errorcode << std::endl;
+        return ; // Return empty vector on failure
     }
+
+    // Create the subject string
+    PCRE2_SPTR subject = (PCRE2_SPTR)input.c_str();
+    PCRE2_SIZE subject_length = input.length();
+
+    // Create match data
+    pcre2_match_data_8 *match_data = pcre2_match_data_create_8(1024, nullptr);
+
+    PCRE2_SIZE start_offset = 0; // Start searching at the beginning of the string
+
+    while (start_offset < subject_length) {
+        int res = pcre2_match(re, subject, subject_length, start_offset, 0, match_data, nullptr);
+
+        if (res < 0) {
+            if (res == PCRE2_ERROR_NOMATCH) {
+                break; // No more matches
+            } else {
+                std::cerr << "Matching error code: " << res << std::endl;
+                break; // Other error
+            }
+        }
+
+        // Extract matched substring
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+        for (int i = 0; i < res; ++i) {
+            PCRE2_SIZE start = ovector[2 * i];
+            PCRE2_SIZE end = ovector[2 * i + 1];
+            tokens.emplace_back(input.substr(start, end - start));
+        }
+
+        // Update the start offset for the next search
+        start_offset = ovector[1]; // Move to the end of the last match
+    }
+
+    // Free memory
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
 }
 
 TEST_F(RAGAnalyzerTest, test0) {
@@ -54,6 +94,9 @@ TEST_F(RAGAnalyzerTest, test0) {
 
     Vector<String> result;
     RegexTokenize(line, result);
+    for(auto&t:result)
+        std::cout<<t<<" ";
+    std::cout<<std::endl;
 
 #if 0
     fs::path executablePath = "/proc/self/exe";
