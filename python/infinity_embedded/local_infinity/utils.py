@@ -543,6 +543,8 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.logical_type = LogicalType.kTime
                     case "datetime":
                         proto_column_type.logical_type = LogicalType.kDateTime
+                    case "timestamp":
+                        proto_column_type.logical_type = LogicalType.kTimestamp
                     case _:
                         raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
                 proto_column_def.column_type = proto_column_type

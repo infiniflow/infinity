@@ -663,16 +663,7 @@ class infinity_http:
                     df_dict[k] = ()
                 tup = df_dict[k]
                 if res[k].isdigit() or is_float(res[k]):
-                    new_tup = tup + (eval(res[k]), )
-                elif is_time(res[k]):
-                    new_tup = tup + (datetime.strptime(res[k], "%H:%M:%S").time(), )
-                    print("time!")
-                elif is_datetime(res[k]):
-                    new_tup = tup + (datetime.strptime(res[k], "%Y-%m-%d %H:%M:%S"), )
-                    print("datetime!")
-                elif is_date(res[k]):
-                    new_tup = tup + (datetime.strptime(res[k], "%Y-%m-%d").date(), )
-                    print("date!")
+                    new_tup = tup + (eval(res[k]), ) 
                 elif is_list(res[k]):
                     new_tup = tup + (ast.literal_eval(res[k]), )
                 elif is_sparse(res[k]):# sparse vector
