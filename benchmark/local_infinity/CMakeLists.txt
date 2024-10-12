@@ -29,6 +29,8 @@ target_link_libraries(
     snappy.a
     ${JEMALLOC_STATIC_LIB}
     miniocpp.a
+    re2.a
+    pcre2-8-static
     pugixml-static
     curlpp_static
     inih.a
@@ -44,6 +46,8 @@ target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_par
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(infinity_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
@@ -80,6 +84,8 @@ target_link_libraries(
     snappy.a
     ${JEMALLOC_STATIC_LIB}
     miniocpp.a
+    re2.a
+    pcre2-8-static
     pugixml-static
     curlpp_static
     inih.a
@@ -95,6 +101,8 @@ target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_p
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(knn_import_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
@@ -127,6 +135,8 @@ target_link_libraries(
     snappy.a
     ${JEMALLOC_STATIC_LIB}
     miniocpp.a
+    re2.a
+    pcre2-8-static
     pugixml-static
     curlpp_static
     inih.a
@@ -142,6 +152,8 @@ target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_pa
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(knn_query_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
@@ -176,6 +188,8 @@ target_link_libraries(
     snappy.a
     ${JEMALLOC_STATIC_LIB}
     miniocpp.a
+    re2.a
+    pcre2-8-static
     pugixml-static
     curlpp_static
     inih.a
@@ -191,6 +205,8 @@ target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_par
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(fulltext_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
@@ -223,6 +239,8 @@ target_link_libraries(
     snappy.a
     ${JEMALLOC_STATIC_LIB}
     miniocpp.a
+    re2.a
+    pcre2-8-static
     pugixml-static
     curlpp_static
     inih.a
@@ -238,6 +256,8 @@ target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(sparse_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
@@ -269,6 +289,8 @@ target_link_libraries(
     snappy.a
     ${JEMALLOC_STATIC_LIB}
     miniocpp.a
+    re2.a
+    pcre2-8-static
     pugixml-static
     curlpp_static
     inih.a
@@ -315,6 +337,8 @@ target_link_libraries(
     snappy.a
     ${JEMALLOC_STATIC_LIB}
     miniocpp.a
+    re2.a
+    pcre2-8-static
     pugixml-static
     curlpp_static
     inih.a
@@ -330,6 +354,8 @@ target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/m
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(hnsw_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
