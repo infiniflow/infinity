@@ -64,35 +64,35 @@ void ObjectStorageProcess::Process() {
                     break;
                 }
                 case ObjectStorageTaskType::kDownload: {
-                    LOG_DEBUG("Download task");
+                    LOG_TRACE("Download task");
                     DownloadTask *download_task = static_cast<DownloadTask *>(object_storage_task.get());
                     assert(download_task != nullptr);
                     VirtualStore::s3_client_->DownloadObject(VirtualStore::bucket_, download_task->object_name, download_task->file_dir);
-                    LOG_DEBUG("Download task done");
+                    LOG_TRACE("Download task done");
                     break;
                 }
                 case ObjectStorageTaskType::kUpload: {
-                    LOG_DEBUG("Upload task");
+                    LOG_TRACE("Upload task");
                     UploadTask *upload_task = static_cast<UploadTask *>(object_storage_task.get());
                     assert(upload_task != nullptr);
                     VirtualStore::s3_client_->UploadObject(VirtualStore::bucket_, upload_task->object_name, upload_task->file_dir);
-                    LOG_DEBUG("Upload task done");
+                    LOG_TRACE("Upload task done");
                     break;
                 }
                 case ObjectStorageTaskType::kCopy: {
-                    LOG_DEBUG("Copy task");
+                    LOG_TRACE("Copy task");
                     CopyTask *copy_task = static_cast<CopyTask *>(object_storage_task.get());
                     assert(copy_task != nullptr);
                     VirtualStore::s3_client_->CopyObject(VirtualStore::bucket_, copy_task->src_object_name, VirtualStore::bucket_, copy_task->dst_object_name);
-                    LOG_DEBUG("Copy task done");
+                    LOG_TRACE("Copy task done");
                     break;
                 }
                 case ObjectStorageTaskType::kRemove: {
-                    LOG_DEBUG("Remove task");
+                    LOG_TRACE("Remove task");
                     RemoveTask *remove_task = static_cast<RemoveTask *>(object_storage_task.get());
                     assert(remove_task != nullptr);
                     VirtualStore::s3_client_->RemoveObject(VirtualStore::bucket_, remove_task->object_name);
-                    LOG_DEBUG("Remove task done");
+                    LOG_TRACE("Remove task done");
                     break;
                 }
                 default: {
