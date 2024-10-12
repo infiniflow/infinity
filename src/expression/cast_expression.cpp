@@ -134,6 +134,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 case LogicalType::kDate:
                 case LogicalType::kTime:
                 case LogicalType::kDateTime:
+                case LogicalType::kTimestamp:
                 case LogicalType::kInterval:
                 case LogicalType::kVarchar:
                     return true;
@@ -145,6 +146,14 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
             switch (target.type()) {
                 case LogicalType::kVarchar:
                 case LogicalType::kEmbedding:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        case LogicalType::kSparse: {
+            switch (target.type()) {
+                case LogicalType::kSparse:
                     return true;
                 default:
                     return false;
