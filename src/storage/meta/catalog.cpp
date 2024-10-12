@@ -1022,7 +1022,8 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     // Rename temp file to regular catalog file
     VirtualStore::Rename(catalog_tmp_path, full_path);
-    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader){
+    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader or
+       InfinityContext::instance().GetServerRole() == NodeRole::kStandalone){
         VirtualStore::UploadObject(full_path, full_path);
     }
 
@@ -1110,7 +1111,8 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 
     out_file_handle->Append((reinterpret_cast<const char *>(buf.data())), act_size);
     out_file_handle->Sync();
-    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader){
+    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader or
+       InfinityContext::instance().GetServerRole() == NodeRole::kStandalone){
         VirtualStore::UploadObject(full_path, full_path);
     }
     // {
