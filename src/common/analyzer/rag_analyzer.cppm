@@ -49,7 +49,7 @@ public:
 
     String Tokenize(const String &line);
 
-    String FineGrainedTokenize(const String &tokens);
+    void FineGrainedTokenize(const String &tokens, Vector<String> &result);
 
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;

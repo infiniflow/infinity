@@ -672,7 +672,7 @@ String RAGAnalyzer::Tokenize(const String &line) {
     return ret;
 }
 
-String RAGAnalyzer::FineGrainedTokenize(const String &tokens) {
+void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &result) {
     Vector<String> tks;
     Split(tokens, "( )", tks);
     Vector<String> res;
@@ -691,11 +691,11 @@ String RAGAnalyzer::FineGrainedTokenize(const String &tokens) {
             std::istringstream iss(token);
             String sub_token;
             while (std::getline(iss, sub_token, '/')) {
-                res.push_back(sub_token);
+                result.push_back(sub_token);
             }
         }
-        String ret = Join(res, 0);
-        return ret;
+        // String ret = Join(res, 0);
+        return;
     }
 
     for (auto &token : tks) {
@@ -734,10 +734,9 @@ String RAGAnalyzer::FineGrainedTokenize(const String &tokens) {
         }
         res.push_back(s_token);
     }
-    Vector<String> normalize_res;
-    EnglishNormalize(res, normalize_res);
-    String ret = Join(normalize_res, 0);
-    return ret;
+    EnglishNormalize(res, result);
+    // String ret = Join(normalize_res, 0);
+    // return ret;
 }
 
 int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
@@ -745,9 +744,9 @@ int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     Vector<String> tokens;
     String output = Tokenize(input.text_.c_str());
     if (fine_grained_) {
-        output = FineGrainedTokenize(output);
-    }
-    Split(output, "( )", tokens);
+        FineGrainedTokenize(output, tokens);
+    } else
+        Split(output, "( )", tokens);
     unsigned offset = 0;
     for (auto &t : tokens) {
         func(data, t.c_str(), t.size(), offset++, 0, Term::AND, level, false);

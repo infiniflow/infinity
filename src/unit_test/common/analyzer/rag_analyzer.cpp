@@ -48,7 +48,7 @@ TEST_F(RAGAnalyzerTest, test1) {
         std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
         return;
     }
-#if 1
+#if 0
 
     RAGAnalyzer analyzer(ROOT_PATH.string());
     analyzer.Load();
@@ -73,7 +73,7 @@ TEST_F(RAGAnalyzerTest, test1) {
         // ret = analyzer.FineGrainedTokenize(ret);
         // std::cout << ret << std::endl;
         for (unsigned i = 0; i < term_list.size(); ++i) {
-            std::cout << " " << term_list[i].text_;
+            std::cout << " " << term_list[i].text_ << "@" << term_list[i].word_offset_;
         }
         std::cout << std::endl;
     }
