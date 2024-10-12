@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
+import { ITableColumns } from '@/lib/databse-interface';
 import {
   ColumnDef,
   flexRender,
@@ -15,43 +16,26 @@ import {
   getPaginationRowModel,
   useReactTable
 } from '@tanstack/react-table';
+import { useFetchTableColumns } from 'app/(dashboard)/database/hooks';
 import { DatabaseRouteParams } from 'app/(dashboard)/database/interface';
-import { DataTablePagination } from 'app/(dashboard)/database/pagination';
+import { DataTableColumnHeader } from 'app/(dashboard)/database/table-column-header';
+import { DataTablePagination } from 'app/(dashboard)/database/table-pagination';
 
-// This type is used to define the shape of our data.
-// You can use a Zod schema here if you want.
-export type Payment = {
-  id: string;
-  amount: number;
-  status: 'pending' | 'processing' | 'success' | 'failed';
-  email: string;
-};
-
-async function getData(): Promise<Payment[]> {
-  // Fetch data from your API here.
-  return [
-    {
-      id: '728ed52f',
-      amount: 100,
-      status: 'pending',
-      email: 'm@example.com'
+export const columns: ColumnDef<ITableColumns>[] = [
+  {
+    accessorKey: 'name',
+    header: 'Name'
+  },
+  {
+    accessorKey: 'type',
+    header: 'Type'
+  },
+  {
+    accessorKey: 'default',
+    // header: 'Default'
+    header({ column }) {
+      return <DataTableColumnHeader column={column} title="Default" />;
     }
-    // ...
-  ];
-}
-
-export const columns: ColumnDef<Payment>[] = [
-  {
-    accessorKey: 'status',
-    header: 'Status'
-  },
-  {
-    accessorKey: 'email',
-    header: 'Email'
-  },
-  {
-    accessorKey: 'amount',
-    header: 'Amount'
   }
 ];
 
@@ -130,15 +114,15 @@ function DataTable<TData, TValue>({
   );
 }
 
-export async function TableColumns({
+export function TableColumns({
   tableId,
   databaseId
 }: DatabaseRouteParams['params']) {
-  const data = await getData();
+  const { tableColumns } = useFetchTableColumns({ tableId, databaseId });
 
   return (
     <div className="container mx-auto py-10">
-      <DataTable columns={columns} data={data} />
+      <DataTable columns={columns} data={tableColumns} />
     </div>
   );
 }

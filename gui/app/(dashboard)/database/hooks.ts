@@ -1,8 +1,9 @@
+import { ITableColumns } from '@/lib/databse-interface';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { listDatabase, listTable } from '../actions';
+import { listDatabase, listTable, showTableColumns } from '../actions';
 import { initialData } from './constants';
-import { TreeNode, TreeParentId } from './interface';
+import { DatabaseRouteParams, TreeNode, TreeParentId } from './interface';
 import { buildLeafData, getParentIdById, updateTreeData } from './utils';
 
 export const useHandleClickTreeName = () => {
@@ -141,4 +142,26 @@ export const useBuildTreeData = () => {
   };
 
   return { wrappedOnLoadData, data, loadedAlertElement };
+};
+
+export const useFetchTableColumns = ({
+  databaseId,
+  tableId
+}: DatabaseRouteParams['params']) => {
+  const [tableColumns, setTableColumns] = useState<ITableColumns[]>([]);
+
+  const fetchTableColumns = useCallback(async () => {
+    const data = await showTableColumns({
+      database_name: databaseId,
+      table_name: tableId
+    });
+
+    setTableColumns(data);
+  }, []);
+
+  useEffect(() => {
+    fetchTableColumns();
+  }, [fetchTableColumns]);
+
+  return { tableColumns };
 };
