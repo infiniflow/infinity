@@ -439,9 +439,15 @@ Response Request::execute() {
 
     requests.fdset(&fdread, &fdwrite, &fdexcep, &maxfd);
 
-    if (select(maxfd + 1, &fdread, &fdwrite, &fdexcep, nullptr) < 0) {
-      std::cerr << "select() failed; this should not happen" << std::endl;
-      std::terminate();
+    //std::cerr << "max fd: " << maxfd << std::endl;
+    if(maxfd == -1) {
+        std::cerr << "maxfd -1" << std::endl;
+    } else {
+        if (select(maxfd + 1, &fdread, &fdwrite, &fdexcep, nullptr) < 0) {
+            std::cerr << "select() failed; this should not happen" << std::endl;
+            std::terminate();
+
+        }
     }
     while (!requests.perform(&left)) {
     }

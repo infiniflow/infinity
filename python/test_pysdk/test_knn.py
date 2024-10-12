@@ -56,7 +56,6 @@ def setup_class(request, local_infinity, http):
     yield
     request.cls.infinity_obj.disconnect()
 
-#@pytest.mark.skip(reason="s3")
 @pytest.mark.usefixtures("setup_class")
 @pytest.mark.usefixtures("suffix")
 class TestInfinity:
@@ -568,7 +567,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_various_topn"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    #@pytest.mark.skip(reason="s3")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("index_column_name", ["gender_vector",
@@ -624,7 +622,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_with_index"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="s3")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("index_column_name", ["gender_vector",
@@ -1153,7 +1150,6 @@ class TestInfinity:
     # create index my_index on test_with_various_fulltext_match_http(body) using fulltext with(analyzer=standard);
     # copy test_with_various_fulltext_match_http from '/home/huikong/Code/work/infinity/test/data/csv/enwiki_embedding_99_commas.csv' with(delimiter ',', format csv);
     # select * from test_with_various_fulltext_match_http search match text('body','"black white"', 'topn=1'),match vector(vec,[3.0,2.8,2.7,3.1],'float','ip',1),fusion('rrf');
-    @pytest.mark.skip(reason="s3")
     @pytest.mark.parametrize("fields_and_matching_text", [
         ["body", "black"],
         ["body^5", "black"],

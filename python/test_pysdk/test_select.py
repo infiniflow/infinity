@@ -566,7 +566,6 @@ class TestInfinity:
             "test_select_embedding_float"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason = "s3")
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_select_big_embedding(self, check_data, suffix):
