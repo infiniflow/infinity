@@ -49,7 +49,7 @@ class Query(ABC):
         sort:  Optional[List[OrderByExpr]],
     ):
         self.columns = columns
-        self.highlight = highlight,
+        self.highlight:List[ParsedExpr] = highlight
         self.search = search
         self.filter = filter
         self.limit = limit

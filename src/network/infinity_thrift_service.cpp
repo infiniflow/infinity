@@ -495,34 +495,36 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     }
 
     // highlight list
-    Vector<ParsedExpr *> *highlight_columns = new Vector<ParsedExpr *>();
-    DeferFn defer_fn11([&]() {
-        if (highlight_columns != nullptr) {
-            for (auto &expr_ptr : *highlight_columns) {
-                delete expr_ptr;
-                expr_ptr = nullptr;
-            }
-            delete highlight_columns;
-            highlight_columns = nullptr;
-        }
-    });
-    highlight_columns->reserve(request.highlight_list.size());
-
-    for (auto &expr : request.highlight_list) {
-        auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
-        DeferFn defer_fn4([&]() {
-            if (parsed_expr != nullptr) {
-                delete parsed_expr;
-                parsed_expr = nullptr;
+    Vector<ParsedExpr *> *highlight_columns = nullptr;
+    if (!request.highlight_list.empty()) {
+        Vector<ParsedExpr *> *highlight_columns = new Vector<ParsedExpr *>();
+        DeferFn defer_fn11([&]() {
+            if (highlight_columns != nullptr) {
+                for (auto &expr_ptr : *highlight_columns) {
+                    delete expr_ptr;
+                    expr_ptr = nullptr;
+                }
+                delete highlight_columns;
+                highlight_columns = nullptr;
             }
         });
+        highlight_columns->reserve(request.highlight_list.size());
+        for (auto &expr : request.highlight_list) {
+            auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
+            DeferFn defer_fn4([&]() {
+                if (parsed_expr != nullptr) {
+                    delete parsed_expr;
+                    parsed_expr = nullptr;
+                }
+            });
 
-        if (!parsed_expr_status.ok()) {
-            ProcessStatus(response, parsed_expr_status);
-            return;
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
+            highlight_columns->emplace_back(parsed_expr);
+            parsed_expr = nullptr;
         }
-        highlight_columns->emplace_back(parsed_expr);
-        parsed_expr = nullptr;
     }
 
     // search expr
@@ -751,34 +753,37 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     }
 
     // highlight list
-    Vector<ParsedExpr *> *highlight_columns = new Vector<ParsedExpr *>();
-    DeferFn defer_fn11([&]() {
-        if (highlight_columns != nullptr) {
-            for (auto &expr_ptr : *highlight_columns) {
-                delete expr_ptr;
-                expr_ptr = nullptr;
-            }
-            delete highlight_columns;
-            highlight_columns = nullptr;
-        }
-    });
-    highlight_columns->reserve(request.highlight_list.size());
-
-    for (auto &expr : request.highlight_list) {
-        auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
-        DeferFn defer_fn4([&]() {
-            if (parsed_expr != nullptr) {
-                delete parsed_expr;
-                parsed_expr = nullptr;
+    Vector<ParsedExpr *> *highlight_columns = nullptr;
+    if (!request.highlight_list.empty()) {
+        highlight_columns = new Vector<ParsedExpr *>();
+        DeferFn defer_fn11([&]() {
+            if (highlight_columns != nullptr) {
+                for (auto &expr_ptr : *highlight_columns) {
+                    delete expr_ptr;
+                    expr_ptr = nullptr;
+                }
+                delete highlight_columns;
+                highlight_columns = nullptr;
             }
         });
+        highlight_columns->reserve(request.highlight_list.size());
 
-        if (!parsed_expr_status.ok()) {
-            ProcessStatus(response, parsed_expr_status);
-            return;
+        for (auto &expr : request.highlight_list) {
+            auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
+            DeferFn defer_fn4([&]() {
+                if (parsed_expr != nullptr) {
+                    delete parsed_expr;
+                    parsed_expr = nullptr;
+                }
+            });
+
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
+            highlight_columns->emplace_back(parsed_expr);
+            parsed_expr = nullptr;
         }
-        highlight_columns->emplace_back(parsed_expr);
-        parsed_expr = nullptr;
     }
 
     // search expr
