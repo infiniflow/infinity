@@ -35,7 +35,6 @@ void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
         String persist_path = pm_->GetObjPath(persist_key);
         if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader or
            InfinityContext::instance().GetServerRole() == NodeRole::kStandalone){
-            persist_path = "/home/weilongma/Desktop/token.txt";
             VirtualStore::UploadObject(persist_path, persist_path);
         }
     }
