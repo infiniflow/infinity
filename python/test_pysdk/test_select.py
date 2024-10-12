@@ -244,50 +244,59 @@ class TestInfinity:
             "test_select_datetime"+suffix, {
                 "c1": {"type": "date"},
                 "c2": {"type": "time"},
-                "c3" : {"type": "datetime"}}, ConflictType.Error)
+                "c3" : {"type": "datetime"},
+                "c4" : {"type" : "timestamp"}},
+                ConflictType.Error)
 
         assert table_obj is not None
 
         d_list = list()
         t_list = list()
         dt_list = list()
+        ts_list = list()
 
-        d_list.append(date(2024, 9, 23))
-        t_list.append(time(20, 45, 11))
-        dt_list.append(datetime(2024, 9, 23, 20, 45, 11))
+        d_list.append("2024-09-23")
+        t_list.append("20:45:11")
+        dt_list.append("2024-09-23 20:45:11")
+        ts_list.append("2024-09-23 20:45:11")
         res = table_obj.insert(
-            {"c1" : d_list[0], "c2" : t_list[0], "c3" : dt_list[0]}
+            {"c1" : d_list[0], "c2" : t_list[0], "c3" : dt_list[0], "c4" : ts_list[0]}
         )
         assert res.error_code == ErrorCode.OK
 
-        d_list.append(date(2022, 5, 26))
-        t_list.append(time(21, 44, 33))
-        dt_list.append(datetime(2022, 5, 26, 21, 44, 33))
+        d_list.append("2022-05-26")
+        t_list.append("21:44:33")
+        dt_list.append("2022-05-26 21:44:33")
+        ts_list.append("2022-05-26 21:44:33")
         res = table_obj.insert(
-            {"c1" : d_list[1], "c2" : t_list[1], "c3" : dt_list[1]}
+            {"c1" : d_list[1], "c2" : t_list[1], "c3" : dt_list[1], "c4" : ts_list[1]}
         )
         assert res.error_code == ErrorCode.OK
 
-        d_list.append(date(2021, 3, 4))
-        t_list.append(time(20, 58, 59))
-        dt_list.append(datetime(2021, 3, 4, 20, 58, 59))
+        d_list.append("2021-03-04")
+        t_list.append("20:58:59")
+        dt_list.append("2021-03-04 20:58:59")
+        ts_list.append("2021-03-04 20:58:59")
         res = table_obj.insert(
-            {"c1" : d_list[2], "c2" : t_list[2], "c3" : dt_list[2]}
+            {"c1" : d_list[2], "c2" : t_list[2], "c3" : dt_list[2], "c4" : ts_list[2]}
         )
         assert res.error_code == ErrorCode.OK
  
         res = table_obj.output(["*"]).to_pl()
         for i in range(3) :
-            assert res.item(i, 0) == d_list[i] and res.item(i, 1) == t_list[i] and res.item(i, 2) == dt_list[i]
+            assert res.item(i, 0) == d_list[i] and res.item(i, 1) == t_list[i] and res.item(i, 2) == dt_list[i] and res.item(i, 3) == ts_list[i]
 
         res = table_obj.output(["c1", "c2"]).filter("c1='2024-09-23'").to_pl()
         assert res.item(0, 0) == d_list[0] and res.item(0, 1) == t_list[0]
 
         res = table_obj.output(["*"]).filter("c2='21:44:33'").to_pl()
-        assert res.item(0, 0) == d_list[1] and res.item(0, 1) == t_list[1] and res.item(0, 2) == dt_list[1]
+        assert res.item(0, 0) == d_list[1] and res.item(0, 1) == t_list[1] and res.item(0, 2) == dt_list[1] and res.item(0, 3) == ts_list[1]
 
         res = table_obj.output(["*"]).filter("c3='2021-03-04 20:58:59'").to_pl()
-        assert res.item(0, 0) == d_list[2] and res.item(0, 1) == t_list[2] and res.item(0, 2) == dt_list[2]
+        assert res.item(0, 0) == d_list[2] and res.item(0, 1) == t_list[2] and res.item(0, 2) == dt_list[2] and res.item(0, 3) == ts_list[2]
+
+        res = table_obj.output(["*"]).filter("c4='2021-03-04 20:58:59'").to_pl()
+        assert res.item(0, 0) == d_list[2] and res.item(0, 1) == t_list[2] and res.item(0, 2) == dt_list[2] and res.item(0, 3) == ts_list[2]
 
         res = db_obj.drop_table("test_select_datetime"+suffix, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
