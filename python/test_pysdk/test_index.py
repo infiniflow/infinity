@@ -3,7 +3,6 @@ import sys
 import os
 import infinity
 import infinity_embedded
-import os
 import time
 import infinity.index as index
 import pandas
@@ -642,6 +641,14 @@ class TestInfinity:
         res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
             "body^5", "harmful chemical", 3).to_pl()
         assert not res.is_empty()
+        print(res)
+
+        # Check if hightlight work
+        res = table_obj.output(["doctitle", "docdate", "body", "_row_id", "_score"]).highlight(["body"]).match_text(
+            "body^5", "harmful chemical", 3).to_pl()
+        assert not res.is_empty()
+        for body in res["body"].to_list():
+            assert body.find("<em>")!= -1
         print(res)
 
         res = db_obj.drop_table(
