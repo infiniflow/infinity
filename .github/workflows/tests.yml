@@ -69,8 +69,6 @@ jobs:
         run: |
           RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
           echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-          sudo mkdir -p test/data/benchmark && sudo rm -f test/data/benchmark/enwiki-10w.csv && sudo cp ${RUNNER_WORKSPACE_PREFIX}/benchmark/enwiki/enwiki-10w.csv test/data/benchmark/enwiki-10w.csv
-          echo `ls -l test/data/benchmark/enwiki-10w.csv`
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
@@ -79,10 +77,7 @@ jobs:
 
       - name: Collect restart test output
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # remove symbolic link
-        # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
-          sudo rm -f test/data/benchmark/enwiki-10w.csv
           failure="${{ steps.run_restart_test.outcome == 'failure'}}"
           sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
@@ -210,8 +205,6 @@ jobs:
         run: |
           RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
           echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-          sudo mkdir -p test/data/benchmark && sudo rm -f test/data/benchmark/enwiki-10w.csv && sudo cp ${RUNNER_WORKSPACE_PREFIX}/benchmark/enwiki/enwiki-10w.csv test/data/benchmark/enwiki-10w.csv
-          echo `ls -l test/data/benchmark/enwiki-10w.csv`
     
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
@@ -220,10 +213,7 @@ jobs:
 
       - name: Collect restart test output
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # remove symbolic link
-        # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
-          sudo rm -f test/data/benchmark/enwiki-10w.csv
           failure="${{ steps.run_restart_test.outcome == 'failure'}}"
           sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
