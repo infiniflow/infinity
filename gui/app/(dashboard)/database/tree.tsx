@@ -8,6 +8,7 @@ import { Leaf, LeafIconMap } from './constants';
 import DatabaseIcon from '/public/database.svg';
 import TableIcon from '/public/table.svg';
 
+import { Spinner } from '@/components/ui/spinner';
 import { useBuildTreeData, useHandleClickTreeName } from './hooks';
 import './styles.css';
 
@@ -23,79 +24,77 @@ const renderIcon = (level: number, name: string) => {
 };
 
 function AsyncTree() {
-  const { data, loadedAlertElement, wrappedOnLoadData } = useBuildTreeData();
+  const { data, loadedAlertElement, wrappedOnLoadData, loading } =
+    useBuildTreeData();
   const { handleClickTreeName } = useHandleClickTreeName();
 
-  return (
-    <>
-      <div className="async-tree">
-        <div
-          className="visually-hidden"
-          ref={loadedAlertElement}
-          role="alert"
-          aria-live="polite"
-        ></div>
-        <TreeView
-          data={data}
-          aria-label="Checkbox tree"
-          onLoadData={wrappedOnLoadData}
-          propagateSelect
-          togglableSelect
-          propagateSelectUpwards
-          nodeRenderer={({
-            element,
-            isBranch,
-            isExpanded,
-            isSelected,
-            isHalfSelected,
-            getNodeProps,
-            level,
-            handleSelect,
-            handleExpand
-          }) => {
-            const branchNode = (isExpanded: any, element: any) => {
-              return isExpanded && element.children.length === 0 ? (
-                <>
-                  <span
-                    role="alert"
-                    aria-live="assertive"
-                    className="visually-hidden"
-                  >
-                    loading {element.name}
-                  </span>
-                  <AiOutlineLoading
-                    aria-hidden={true}
-                    className="loading-icon"
-                  />
-                </>
-              ) : (
-                <ArrowIcon isOpen={isExpanded} />
-              );
-            };
-            return (
-              <div
-                {...getNodeProps({ onClick: handleExpand })}
-                style={{ marginLeft: 40 * (level - 1) }}
-              >
-                {isBranch && branchNode(isExpanded, element)}
-                <div
-                  className="flex items-center ml-1"
-                  onClick={handleClickTreeName({
-                    level,
-                    name: element.name,
-                    parent: element.parent,
-                    data
-                  })}
+  return loading ? (
+    <Spinner />
+  ) : (
+    <div className="async-tree">
+      <div
+        className="visually-hidden"
+        ref={loadedAlertElement}
+        role="alert"
+        aria-live="polite"
+      ></div>
+      <TreeView
+        data={data}
+        aria-label="Checkbox tree"
+        onLoadData={wrappedOnLoadData}
+        propagateSelect
+        togglableSelect
+        propagateSelectUpwards
+        nodeRenderer={({
+          element,
+          isBranch,
+          isExpanded,
+          isSelected,
+          isHalfSelected,
+          getNodeProps,
+          level,
+          handleSelect,
+          handleExpand
+        }) => {
+          const branchNode = (isExpanded: any, element: any) => {
+            return isExpanded && element.children.length === 0 ? (
+              <>
+                <span
+                  role="alert"
+                  aria-live="assertive"
+                  className="visually-hidden"
                 >
-                  {renderIcon(level, element.name)}
-                  <span className="name">{element.name}</span>
-                </div>
-              </div>
+                  loading {element.name}
+                </span>
+                <AiOutlineLoading aria-hidden={true} className="loading-icon" />
+              </>
+            ) : (
+              <ArrowIcon isOpen={isExpanded} />
             );
-          }}
-        />
-      </div>
-    </>
+          };
+          return (
+            <div
+              {...getNodeProps({ onClick: handleExpand })}
+              style={{ marginLeft: 40 * (level - 1) }}
+            >
+              {isBranch && branchNode(isExpanded, element)}
+              <div
+                className="flex items-center ml-1"
+                onClick={handleClickTreeName({
+                  level,
+                  name: element.name,
+                  parent: element.parent,
+                  data
+                })}
+              >
+                {renderIcon(level, element.name)}
+                <span className="name">{element.name}</span>
+              </div>
+            </div>
+          );
+        }}
+      />
+    </div>
   );
 }
 

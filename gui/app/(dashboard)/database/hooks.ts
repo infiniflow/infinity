@@ -1,7 +1,13 @@
-import { ITableColumns } from '@/lib/databse-interface';
+import { ITableColumns, ITableIndex } from '@/lib/databse-interface';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { listDatabase, listTable, showTableColumns } from '../actions';
+import {
+  listDatabase,
+  listTable,
+  showTableColumns,
+  showTableIndexes,
+  showTableSegments
+} from '../actions';
 import { initialData } from './constants';
 import { DatabaseRouteParams, TreeNode, TreeParentId } from './interface';
 import { buildLeafData, getParentIdById, updateTreeData } from './utils';
@@ -39,23 +45,30 @@ export const useBuildTreeData = () => {
   const loadedAlertElement = useRef(null);
   const [data, setData] = useState<TreeNode[]>(initialData);
   const [nodesAlreadyLoaded, setNodesAlreadyLoaded] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const fetchDatabases = useCallback(async () => {
-    const ret = await listDatabase();
-    if (ret.databases.length > 0) {
-      setData((value) =>
-        updateTreeData(
-          value,
-          0,
-          ret.databases.map((x: string) => ({
-            name: x,
-            children: [],
-            id: x,
-            parent: 0,
-            isBranch: true
-          }))
-        )
-      );
+    try {
+      setLoading(true);
+      const ret = await listDatabase();
+      if (ret.databases.length > 0) {
+        setData((value) =>
+          updateTreeData(
+            value,
+            0,
+            ret.databases.map((x: string) => ({
+              name: x,
+              children: [],
+              id: x,
+              parent: 0,
+              isBranch: true
+            }))
+          )
+        );
+      }
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
     }
   }, []);
 
@@ -141,7 +154,7 @@ export const useBuildTreeData = () => {
     }
   };
 
-  return { wrappedOnLoadData, data, loadedAlertElement };
+  return { wrappedOnLoadData, data, loadedAlertElement, loading };
 };
 
 export const useFetchTableColumns = ({
@@ -164,4 +177,48 @@ export const useFetchTableColumns = ({
   }, [fetchTableColumns]);
 
   return { tableColumns };
+};
+
+export const useFetchTableIndexes = ({
+  databaseId,
+  tableId
+}: DatabaseRouteParams['params']) => {
+  const [tableIndexes, setTableIndexes] = useState<ITableIndex[]>([]);
+
+  const fetchTableIndexes = useCallback(async () => {
+    const data = await showTableIndexes({
+      database_name: databaseId,
+      table_name: tableId
+    });
+
+    setTableIndexes(data);
+  }, []);
+
+  useEffect(() => {
+    fetchTableIndexes();
+  }, [fetchTableIndexes]);
+
+  return { tableIndexes };
+};
+
+export const useFetchTableSegments = ({
+  databaseId,
+  tableId
+}: DatabaseRouteParams['params']) => {
+  const [tableSegments, setTableSegments] = useState<any[]>([]);
+
+  const fetchTableSegments = useCallback(async () => {
+    const data = await showTableSegments({
+      database_name: databaseId,
+      table_name: tableId
+    });
+
+    setTableSegments(data);
+  }, []);
+
+  useEffect(() => {
+    fetchTableSegments();
+  }, [fetchTableSegments]);
+
+  return { tableSegments };
 };
