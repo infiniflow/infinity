@@ -148,7 +148,7 @@ class TestFullText:
 
                 except Exception as e:
                     print(e)
-                    assert shutdown == True
+                    assert shutdown
                     break
 
         def search_thread():
@@ -159,11 +159,12 @@ class TestFullText:
                     f()
                 except Exception as e:
                     print(e)
-                    assert shutdown == True
+                    assert shutdown
                     break
 
         def shutdown_func():
             nonlocal shutdown
+            shutdown = False
             time.sleep(shutdown_interval)
 
             shutdown = True
@@ -179,7 +180,6 @@ class TestFullText:
             table_obj = db_obj.get_table(table_name)
             gt_table_obj = db_obj.get_table(gt_table_name)
 
-            shutdown = False
             t1 = threading.Thread(target=shutdown_func)
             t1.start()
 
