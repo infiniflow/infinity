@@ -496,18 +496,18 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
 
     // highlight list
     Vector<ParsedExpr *> *highlight_columns = nullptr;
-    if (!request.highlight_list.empty()) {
-        Vector<ParsedExpr *> *highlight_columns = new Vector<ParsedExpr *>();
-        DeferFn defer_fn11([&]() {
-            if (highlight_columns != nullptr) {
-                for (auto &expr_ptr : *highlight_columns) {
-                    delete expr_ptr;
-                    expr_ptr = nullptr;
-                }
-                delete highlight_columns;
-                highlight_columns = nullptr;
+    DeferFn defer_fn11([&]() {
+        if (highlight_columns != nullptr) {
+            for (auto &expr_ptr : *highlight_columns) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
             }
-        });
+            delete highlight_columns;
+            highlight_columns = nullptr;
+        }
+    });
+    if (!request.highlight_list.empty()) {
+        highlight_columns = new Vector<ParsedExpr *>();
         highlight_columns->reserve(request.highlight_list.size());
         for (auto &expr : request.highlight_list) {
             auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
@@ -629,7 +629,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     }
 
     // order by
-    Vector<OrderByExpr *> *order_by_list = new Vector<OrderByExpr *>();
+    Vector<OrderByExpr *> *order_by_list = nullptr;
     DeferFn defer_fn9([&]() {
         if (order_by_list != nullptr) {
             for (auto &expr_ptr : *order_by_list) {
@@ -640,24 +640,27 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             order_by_list = nullptr;
         }
     });
-    order_by_list->reserve(request.order_by_list.size());
+    if (!request.order_by_list.empty()) {
+        order_by_list = new Vector<OrderByExpr *>();
+        order_by_list->reserve(request.order_by_list.size());
 
-    Status order_by_status;
-    for (auto &expr : request.order_by_list) {
-        auto order_by_expr = GetOrderByExprFromProto(order_by_status, expr);
-        DeferFn defer_fn4([&]() {
-            if (order_by_expr != nullptr) {
-                delete order_by_expr;
-                order_by_expr = nullptr;
+        Status order_by_status;
+        for (auto &expr : request.order_by_list) {
+            auto order_by_expr = GetOrderByExprFromProto(order_by_status, expr);
+            DeferFn defer_fn4([&]() {
+                if (order_by_expr != nullptr) {
+                    delete order_by_expr;
+                    order_by_expr = nullptr;
+                }
+            });
+
+            if (!order_by_status.ok()) {
+                ProcessStatus(response, order_by_status);
+                return;
             }
-        });
-
-        if (!order_by_status.ok()) {
-            ProcessStatus(response, order_by_status);
-            return;
+            order_by_list->emplace_back(order_by_expr);
+            order_by_expr = nullptr;
         }
-        order_by_list->emplace_back(order_by_expr);
-        order_by_expr = nullptr;
     }
 
     // auto end2 = std::chrono::steady_clock::now();
@@ -754,18 +757,18 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
     // highlight list
     Vector<ParsedExpr *> *highlight_columns = nullptr;
+    DeferFn defer_fn11([&]() {
+        if (highlight_columns != nullptr) {
+            for (auto &expr_ptr : *highlight_columns) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
+            delete highlight_columns;
+            highlight_columns = nullptr;
+        }
+    });
     if (!request.highlight_list.empty()) {
         highlight_columns = new Vector<ParsedExpr *>();
-        DeferFn defer_fn11([&]() {
-            if (highlight_columns != nullptr) {
-                for (auto &expr_ptr : *highlight_columns) {
-                    delete expr_ptr;
-                    expr_ptr = nullptr;
-                }
-                delete highlight_columns;
-                highlight_columns = nullptr;
-            }
-        });
         highlight_columns->reserve(request.highlight_list.size());
 
         for (auto &expr : request.highlight_list) {
@@ -891,7 +894,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     }
 
     // order by
-    Vector<OrderByExpr *> *order_by_list = new Vector<OrderByExpr *>();
+    Vector<OrderByExpr *> *order_by_list = nullptr;
     DeferFn defer_fn9([&]() {
         if (order_by_list != nullptr) {
             for (auto &expr_ptr : *order_by_list) {
@@ -902,24 +905,27 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             order_by_list = nullptr;
         }
     });
-    order_by_list->reserve(request.order_by_list.size());
+    if (!request.order_by_list.empty()) {
+        order_by_list = new Vector<OrderByExpr *>();
+        order_by_list->reserve(request.order_by_list.size());
 
-    Status order_by_status;
-    for (auto &expr : request.order_by_list) {
-        auto order_by_expr = GetOrderByExprFromProto(order_by_status, expr);
-        DeferFn defer_fn4([&]() {
-            if (order_by_expr != nullptr) {
-                delete order_by_expr;
-                order_by_expr = nullptr;
+        Status order_by_status;
+        for (auto &expr : request.order_by_list) {
+            auto order_by_expr = GetOrderByExprFromProto(order_by_status, expr);
+            DeferFn defer_fn4([&]() {
+                if (order_by_expr != nullptr) {
+                    delete order_by_expr;
+                    order_by_expr = nullptr;
+                }
+            });
+
+            if (!order_by_status.ok()) {
+                ProcessStatus(response, order_by_status);
+                return;
             }
-        });
-
-        if (!order_by_status.ok()) {
-            ProcessStatus(response, order_by_status);
-            return;
+            order_by_list->emplace_back(order_by_expr);
+            order_by_expr = nullptr;
         }
-        order_by_list->emplace_back(order_by_expr);
-        order_by_expr = nullptr;
     }
 
     // Explain type

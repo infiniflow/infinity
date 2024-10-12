@@ -87,7 +87,7 @@ try:
     ]
     for question in questions:
         qb_result = (
-            table_instance.output(["num", "body", "_score"])
+            table_instance.output(["num", "body", "_score"]).highlight(["body"])
             .match_text("body", question, 10)
             .to_pl()
         )
