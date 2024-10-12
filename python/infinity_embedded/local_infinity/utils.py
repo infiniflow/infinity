@@ -293,16 +293,7 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
                     constant_expression.f64_array_value = [float(v) for v in value.values()]
                 case _:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                            f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
-        case datetime():
-            constant_expression.literal_type = LiteralType.kDateTime
-            constant_expression.str_value = value.strftime("%Y-%m-%d %H:%M:%S")
-        case date():
-            constant_expression.literal_type = LiteralType.kDate
-            constant_expression.str_value = value.strftime("%Y-%m-%d")
-        case time():
-            constant_expression.literal_type = LiteralType.kTime
-            constant_expression.str_value = value.strftime("%H:%M:%S")
+                                            f"Invalid sparse vector value type: {type(next(iter(value.values())))}") 
 
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
