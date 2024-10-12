@@ -15,6 +15,7 @@
 from infinity_embedded.errors import ErrorCode as PyErrorCode
 from infinity_embedded.common import LOCAL_INFINITY_PATH
 from infinity_embedded.embedded_infinity_ext import *
+from typing import List
 
 
 class LocalQueryResult:
@@ -171,11 +172,11 @@ class LocalInfinityClient:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.Export(db_name, table_name, columns, file_name, export_options))
 
-    def select(self, db_name: str, table_name: str, select_list: list[WrapParsedExpr], highlight_list: list[WrapParsedExpr] | None, search_expr,
-               where_expr, limit_expr, offset_expr, order_by_list: list[WrapOrderByExpr], group_by_list=None):
+    def select(self, db_name: str, table_name: str, select_list: List[WrapParsedExpr], highlight_list: List[WrapParsedExpr] | None, search_expr,
+               where_expr, limit_expr, offset_expr, order_by_list: List[WrapOrderByExpr] | None, group_by_list=None):
         if self.client is None:
             raise Exception("Local infinity is not connected")
-        return self.convert_res(self.client.Search(db_name, table_name, select_list, highlight_list,
+        return self.convert_res(self.client.Search(db_name, table_name, select_list, highlight_list=highlight_list,
                                                    order_by_list=order_by_list,
                                                    wrap_search_expr=search_expr, where_expr=where_expr,
                                                    limit_expr=limit_expr, offset_expr=offset_expr, ),
