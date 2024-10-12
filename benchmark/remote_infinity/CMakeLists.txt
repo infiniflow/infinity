@@ -45,7 +45,7 @@ target_link_libraries(
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
         re2.a
-        pcre2.a
+        pcre2-8-static
         pugixml-static
         curlpp_static
         inih.a
