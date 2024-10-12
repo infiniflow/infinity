@@ -1266,8 +1266,8 @@ WrapQueryResult WrapSearch(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
                            Vector<WrapParsedExpr> select_list,
-                           Vector<WrapParsedExpr> highlight_list,
-                           Vector<WrapOrderByExpr> order_by_list,
+                           Vector<WrapParsedExpr> *highlight_list,
+                           Vector<WrapOrderByExpr> *order_by_list,
                            WrapSearchExpr *wrap_search_expr,
                            WrapParsedExpr *where_expr,
                            WrapParsedExpr *limit_expr,
@@ -1338,14 +1338,12 @@ WrapQueryResult WrapSearch(Infinity &instance,
             }
         }
     });
-    if (highlight_list.empty()) {
-        ;
-    } else {
+    if (highlight_list != nullptr) {
         highlight = new Vector<ParsedExpr *>();
-        highlight->reserve(highlight_list.size());
-        for (SizeT i = 0; i < highlight_list.size(); ++i) {
+        highlight->reserve(highlight_list->size());
+        for (SizeT i = 0; i < highlight_list->size(); ++i) {
             Status status;
-            highlight->emplace_back(highlight_list[i].GetParsedExpr(status));
+            highlight->emplace_back(highlight_list->at(i).GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
@@ -1396,14 +1394,12 @@ WrapQueryResult WrapSearch(Infinity &instance,
             order_by_exprs = nullptr;
         }
     });
-    if (order_by_list.empty()) {
-        ;
-    } else {
+    if (order_by_list != nullptr) {
         order_by_exprs = new Vector<OrderByExpr *>();
-        order_by_exprs->reserve(order_by_list.size());
-        for (SizeT i = 0; i < order_by_list.size(); ++i) {
+        order_by_exprs->reserve(order_by_list->size());
+        for (SizeT i = 0; i < order_by_list->size(); ++i) {
             Status status;
-            order_by_exprs->emplace_back(order_by_list[i].GetOrderByExpr(status));
+            order_by_exprs->emplace_back(order_by_list->at(i).GetOrderByExpr(status));
             if (status.code_ != ErrorCode::kOk) {
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
