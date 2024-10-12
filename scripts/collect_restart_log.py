@@ -4,6 +4,7 @@ import random
 import re
 import shutil
 import string
+import glob
 
 
 parser = argparse.ArgumentParser(description="Python restart test for infinity")
@@ -63,12 +64,12 @@ else:
         shutil.copy(executable_path, f"{output_dir}/{random_name}.exe")
 
 if failure:
-    # copy file in /var/infinity/data/catalog/FULL.*.json
-    for root, dirs, files in os.walk("/var/infinity/data/catalog/"):
-        for file in files:
-            match = re.match(r"FULL\.(\d+)\.json", file)
-            print(f"Full checkpoint file: {file}")
-            if match:
-                shutil.copy(
-                    os.path.join(root, file), f"{output_dir}/{random_name}_{file}"
-                )
+    # copy file in /var/infinity/../FULL.*.json
+    copy_n = 0
+    for filepath in glob.iglob(f"/var/infinity/**/FULL.*.json", recursive=True):
+        print(filepath)
+        filename = filepath.split("/")[-1]
+        shutil.copy(filepath, f"./{filename}")
+        copy_n += 1
+    if copy_n == 0:
+        print("No FULL.*.json file found")

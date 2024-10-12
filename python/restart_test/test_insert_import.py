@@ -58,7 +58,10 @@ class TestInsertImport:
                             except StopIteration:
                                 insert_finish = True
                                 break
-                        table_obj.insert(insert_data)
+                        if len(insert_data) > 0:
+                            table_obj.insert(insert_data)
+                        else:
+                            cur_n = total_n
                         cur_n += insert_batch_size
                     else:
                         abs_import_file = os.path.abspath(import_file)

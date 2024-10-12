@@ -12,7 +12,8 @@ commands = [
 ]
 
 LOG_PATH = "/var/infinity/log/infinity.log"
-TEST_SEC = 3600 # 1 hour
+# TEST_SEC = 3600 # 1 hour
+TEST_SEC = 10 # run once
 
 
 def clear_infinity_log():

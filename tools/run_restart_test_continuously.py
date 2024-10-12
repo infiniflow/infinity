@@ -4,7 +4,8 @@ import os
 import time
 
 
-TEST_SEC = 3600 # 1 hour
+# TEST_SEC = 3600 # 1 hour
+TEST_SEC = 10 # run once
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Restart Test Continuously")

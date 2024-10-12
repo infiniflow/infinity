@@ -31,8 +31,8 @@ class TestInsert:
             batch_size = 10
 
             while cur_insert_n < insert_n:
+                insert_data = []
                 try:
-                    insert_data = []
                     # get `batch_size` data in data_gen one time
                     for i in range(batch_size):
                         try:
@@ -43,12 +43,15 @@ class TestInsert:
                             insert_data.append(data_line)
                         except StopIteration:
                             break
-                    table_obj.insert(insert_data)
+                    if len(insert_data) > 0:
+                        table_obj.insert(insert_data)
+                    else:
+                        cur_insert_n = insert_n
                 except Exception as e:
                     print(f"insert error at {cur_insert_n}")
                     assert shutdown
                     break
-                cur_insert_n += batch_size
+                cur_insert_n += len(insert_data)
 
         shutdown_time = 0
 

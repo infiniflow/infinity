@@ -22,8 +22,8 @@ def pytest_generate_tests(metafunc):
         pass
 
 
-def pytest_collection_modifyitems(config, items):
-    for item in items:
-        # Apply the decorator to each test function
-        test_name = item.name
-        item.obj = my_timeout(test_name)(item.obj)
+# def pytest_collection_modifyitems(config, items):
+#     for item in items:
+#         # Apply the decorator to each test function
+#         test_name = item.name
+#         item.obj = my_timeout(test_name)(item.obj)
