@@ -4,13 +4,13 @@ import SegmentIcon from '/public/segment.svg';
 
 export enum Leaf {
   Columns = 'Columns',
-  Index = 'Index',
+  Indexes = 'Indexes',
   Segments = 'Segments'
 }
 
 export const LeafIconMap = {
   [Leaf.Columns]: <ColumnIcon className="h-4 w-4"></ColumnIcon>,
-  [Leaf.Index]: <IndexIcon className="h-4 w-4"></IndexIcon>,
+  [Leaf.Indexes]: <IndexIcon className="h-4 w-4"></IndexIcon>,
   [Leaf.Segments]: <SegmentIcon className="h-4 w-4"></SegmentIcon>
 };
 

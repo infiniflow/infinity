@@ -25,7 +25,12 @@ export const buildLeafData = (parent: string) => {
       id: `${Leaf.Columns}-${parent}`,
       parent
     },
-    { name: Leaf.Index, children: [], id: `${Leaf.Index}-${parent}`, parent },
+    {
+      name: Leaf.Indexes,
+      children: [],
+      id: `${Leaf.Indexes}-${parent}`,
+      parent
+    },
     {
       name: Leaf.Segments,
       children: [],
