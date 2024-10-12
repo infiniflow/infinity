@@ -54,16 +54,16 @@ static const String NLTK_TOKENIZE_PATTERN =
     R"((?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|(?=[^\(\"\`{\[:;&\#\*@\)}\]\-,])\S+?(?=\s|$|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|,(?=$|\s|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)))|\S)";
 
 static inline i32 Encode(i32 freq, i32 idx) {
-    u32 encodedValue = 0;
+    u32 encoded_value = 0;
     if (freq < 0) {
-        encodedValue |= (u32)(-freq);
-        encodedValue |= (1U << 23);
+        encoded_value |= (u32)(-freq);
+        encoded_value |= (1U << 23);
     } else {
-        encodedValue = (u32)(freq & 0x7FFFFF);
+        encoded_value = (u32)(freq & 0x7FFFFF);
     }
 
-    encodedValue |= (u32)idx << 24;
-    return (i32)encodedValue;
+    encoded_value |= (u32)idx << 24;
+    return (i32)encoded_value;
 }
 
 static inline i32 DecodeFreq(i32 value) {
@@ -108,8 +108,6 @@ bool RegexMatch(const String &str, const String &pattern) { return RE2::PartialM
 
 String Join(const Vector<String> &tokens, int start, int end, const String &delim = " ") {
     std::ostringstream oss;
-    if (end > (int)tokens.size())
-        std::cout << "token.size() " << tokens.size() << " start " << start << " end " << end << std::endl;
     for (int i = start; i < end; ++i) {
         if (i > start)
             oss << delim;
@@ -119,6 +117,16 @@ String Join(const Vector<String> &tokens, int start, int end, const String &deli
 }
 
 String Join(const Vector<String> &tokens, int start, const String &delim = " ") { return Join(tokens, start, tokens.size(), delim); }
+
+String Join(const TermList &tokens, int start, int end, const String &delim = " ") {
+    std::ostringstream oss;
+    for (int i = start; i < end; ++i) {
+        if (i > start)
+            oss << delim;
+        oss << tokens[i].text_;
+    }
+    return oss.str();
+}
 
 std::wstring UTF8ToWide(const String &utf8) {
     std::wstring result;
@@ -410,7 +418,6 @@ void RAGAnalyzer::SortTokens(const Vector<Vector<Pair<String, int>>> &token_list
         res.emplace_back(tks, score);
     }
 
-    // Sort the results in descending order based on the score
     std::sort(res.begin(), res.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
 }
 
@@ -564,8 +571,7 @@ String RAGAnalyzer::Merge(const String &tks_str) {
     return Join(res, 0, res.size());
 }
 
-Vector<String> RAGAnalyzer::EnglishNormalize(const Vector<String> &tokens) {
-    Vector<String> res;
+void RAGAnalyzer::EnglishNormalize(const Vector<String> &tokens, Vector<String> &res) {
     for (auto &t : tokens) {
         if (RegexMatch(t, "[a-zA-Z_-]+$")) {
             String lemma_term = lemma_->Lemmatize(t);
@@ -578,13 +584,13 @@ Vector<String> RAGAnalyzer::EnglishNormalize(const Vector<String> &tokens) {
             res.push_back(t);
         }
     }
-    return res;
 }
 
-String RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
+String RAGAnalyzer::Tokenize(const String &line) {
     String str1 = StrQ2B(line);
     String strline;
     opencc_->convert(str1, strline);
+    Vector<String> res;
     std::size_t zh_num = 0;
     int len = UTF8Length(strline);
     for (int i = 0; i < len; ++i) {
@@ -619,18 +625,6 @@ String RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
         auto [tks, s] = MaxForward(L);
         auto [tks1, s1] = MaxBackward(L);
 
-        /*
-                std::cout << "[FW] ";
-                for (auto &token : tks) {
-                    std::cout << token << " ";
-                }
-                std::cout << s << std::endl;
-                std::cout << "[BW] ";
-                for (auto &token : tks1) {
-                    std::cout << token << " ";
-                }
-                std::cout << s1 << std::endl;
-        */
         Vector<int> diff(std::max(tks.size(), tks1.size()), 0);
         for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
             if (tks[i] != tks1[i]) {
@@ -671,10 +665,10 @@ String RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
         }
     }
 
-    Vector<String> normalize_res = EnglishNormalize(res);
+    Vector<String> normalize_res;
+    EnglishNormalize(res, normalize_res);
     String r = Join(normalize_res, 0);
     String ret = Merge(r);
-    // std::cout << "[TKS]" << ret << std::endl;
     return ret;
 }
 
@@ -740,7 +734,8 @@ String RAGAnalyzer::FineGrainedTokenize(const String &tokens) {
         }
         res.push_back(s_token);
     }
-    Vector<String> normalize_res = EnglishNormalize(res);
+    Vector<String> normalize_res;
+    EnglishNormalize(res, normalize_res);
     String ret = Join(normalize_res, 0);
     return ret;
 }
@@ -748,14 +743,14 @@ String RAGAnalyzer::FineGrainedTokenize(const String &tokens) {
 int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     unsigned level = 0;
     Vector<String> tokens;
-    String output = Tokenize(input.text_.c_str(), tokens);
+    String output = Tokenize(input.text_.c_str());
     if (fine_grained_) {
         output = FineGrainedTokenize(output);
-        tokens.clear();
-        Split(output, "( )", tokens);
     }
+    Split(output, "( )", tokens);
+    unsigned offset = 0;
     for (auto &t : tokens) {
-        func(data, t.c_str(), t.size(), 0, 0, Term::AND, level, false);
+        func(data, t.c_str(), t.size(), offset++, 0, Term::AND, level, false);
     }
     return 0;
 }

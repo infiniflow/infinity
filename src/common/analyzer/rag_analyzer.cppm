@@ -47,7 +47,7 @@ public:
 
     void SetFineGrained(bool fine_grained) { fine_grained_ = fine_grained; }
 
-    String Tokenize(const String &line, Vector<String> &res);
+    String Tokenize(const String &line);
 
     String FineGrainedTokenize(const String &tokens);
 
@@ -77,7 +77,7 @@ private:
 
     String Merge(const String &tokens);
 
-    Vector<String> EnglishNormalize(const Vector<String> &tokens);
+    void EnglishNormalize(const Vector<String> &tokens, Vector<String> &res);
 
 public:
     static const SizeT term_string_buffer_limit_ = 4096 * 3;
