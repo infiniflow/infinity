@@ -30,7 +30,7 @@ class Query(ABC):
         sort: Optional[WrapOrderByExpr]
     ):
         self.columns = columns
-        self.highlight = highlight
+        self.highlight = highlight if highlight is not None else []
         self.search = search
         self.filter = filter
         self.limit = limit
@@ -240,7 +240,7 @@ class InfinityLocalQueryBuilder(ABC):
                 sparse_expr.f64_array_value = values
             case SparseVector([int(), *_], None):
                 raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE,
-                                        f"No values! Sparse data does not support bool value type now")
+                                        "No values! Sparse data does not support bool value type now")
             case dict():
                 if len(sparse_data) == 0:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
@@ -527,6 +527,7 @@ class InfinityLocalQueryBuilder(ABC):
     def to_result(self):
         query = Query(
             columns=self._columns,
+            highlight=self._highlight,
             search=self._search,
             filter=self._filter,
             limit=self._limit,

@@ -13,12 +13,10 @@
 # limitations under the License.
 import functools
 import inspect
-from abc import ABC
 from typing import Optional, Union, List, Any
 
-import numpy as np
 from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflictType
-from infinity_embedded.embedded_infinity_ext import WrapIndexInfo, ImportOptions, CopyFileType, WrapParsedExpr, \
+from infinity_embedded.embedded_infinity_ext import ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions
 from infinity_embedded.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN, SortType
 from infinity_embedded.common import INSERT_DATA, VEC, SparseVector, InfinityException
@@ -72,7 +70,7 @@ class LocalTable():
         elif conflict_type == ConflictType.Replace:
             create_index_conflict = LocalConflictType.kReplace
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
         index_info_to_use = index_info.to_local_type()
 
@@ -95,7 +93,7 @@ class LocalTable():
         elif conflict_type == ConflictType.Ignore:
             drop_index_conflict = LocalConflictType.kIgnore
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name, conflict_type=drop_index_conflict)
@@ -365,9 +363,9 @@ class LocalTable():
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
         for order_by_expr in order_by_expr_list:
             if len(order_by_expr) != 2:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"order_by_expr_list must be a list of [column_name, sort_type]")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, "order_by_expr_list must be a list of [column_name, sort_type]")
             if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"sort_type must be SortType.Asc or SortType.Desc")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, "sort_type must be SortType.Asc or SortType.Desc")
             if order_by_expr[1] == SortType.Asc:
                 order_by_expr[1] = True
             else :
@@ -411,6 +409,7 @@ class LocalTable():
         res = self._conn.select(db_name=self._db_name,
                                 table_name=self._table_name,
                                 select_list=query.columns,
+                                highlight_list=query.highlight,
                                 search_expr=query.search,
                                 where_expr=query.filter,
                                 group_by_list=None,
@@ -429,6 +428,7 @@ class LocalTable():
                                  table_name=self._table_name,
                                  explain_type=query.explain_type.to_local_ttype(),
                                  select_list=query.columns,
+                                 highlight_list=query.highlight,
                                  search_expr=query.search,
                                  where_expr=query.filter,
                                  group_by_list=None,

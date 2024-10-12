@@ -13,9 +13,6 @@
 # limitations under the License.
 import functools
 import inspect
-import os
-import numpy as np
-from abc import ABC
 from typing import Optional, Union, List, Any
 
 from sqlglot import condition
@@ -78,7 +75,7 @@ class RemoteTable():
         elif conflict_type == ConflictType.Replace:
             create_index_conflict = ttypes.CreateConflict.Replace
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,
@@ -99,7 +96,7 @@ class RemoteTable():
         elif conflict_type == ConflictType.Ignore:
             drop_index_conflict = ttypes.DropConflict.Ignore
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name, conflict_type=drop_index_conflict)
@@ -384,9 +381,9 @@ class RemoteTable():
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
         for order_by_expr in order_by_expr_list:
             if len(order_by_expr) != 2:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"order_by_expr_list must be a list of [column_name, sort_type]")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, "order_by_expr_list must be a list of [column_name, sort_type]")
             if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"sort_type must be SortType.Asc or SortType.Desc")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, "sort_type must be SortType.Asc or SortType.Desc")
             if order_by_expr[1] == SortType.Asc:
                 order_by_expr[1] = True
             else :
@@ -434,6 +431,7 @@ class RemoteTable():
         res = self._conn.select(db_name=self._db_name,
                                 table_name=self._table_name,
                                 select_list=query.columns,
+                                highlight_list=query.highlight,
                                 search_expr=query.search,
                                 where_expr=query.filter,
                                 group_by_list=None,
@@ -451,6 +449,7 @@ class RemoteTable():
         res = self._conn.explain(db_name=self._db_name,
                                  table_name=self._table_name,
                                  select_list=query.columns,
+                                 highlight_list=query.highlight,
                                  search_expr=query.search,
                                  where_expr=query.filter,
                                  group_by_list=None,

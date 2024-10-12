@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from thrift.protocol import TBinaryProtocol
-from thrift.protocol import TCompactProtocol
 from thrift.transport import TSocket
 from thrift.transport.TTransport import TTransportException
 
@@ -199,12 +198,13 @@ class ThriftInfinityClient:
                                                 file_name=file_name,
                                                 export_option=export_options))
 
-    def select(self, db_name: str, table_name: str, select_list, search_expr,
+    def select(self, db_name: str, table_name: str, select_list, highlight_list, search_expr,
                where_expr, group_by_list, limit_expr, offset_expr, order_by_list):
         return self.client.Select(SelectRequest(session_id=self.session_id,
                                                 db_name=db_name,
                                                 table_name=table_name,
                                                 select_list=select_list,
+                                                highlight_list=highlight_list,
                                                 search_expr=search_expr,
                                                 where_expr=where_expr,
                                                 group_by_list=group_by_list,
@@ -213,12 +213,13 @@ class ThriftInfinityClient:
                                                 order_by_list=order_by_list
                                                 ))
 
-    def explain(self, db_name: str, table_name: str, select_list, search_expr,
+    def explain(self, db_name: str, table_name: str, select_list, highlight_list, search_expr,
                 where_expr, group_by_list, limit_expr, offset_expr, explain_type):
         return self.client.Explain(ExplainRequest(session_id=self.session_id,
                                                   db_name=db_name,
                                                   table_name=table_name,
                                                   select_list=select_list,
+                                                  highlight_list=highlight_list,
                                                   search_expr=search_expr,
                                                   where_expr=where_expr,
                                                   group_by_list=group_by_list,

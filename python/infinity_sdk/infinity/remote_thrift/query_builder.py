@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SparseVector, InfinityException, SortType
+from infinity.common import VEC, SparseVector, InfinityException
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -49,7 +49,7 @@ class Query(ABC):
         sort:  Optional[List[OrderByExpr]],
     ):
         self.columns = columns
-        self.highlight = highlight,
+        self.highlight = highlight if highlight is not None else [],
         self.search = search
         self.filter = filter
         self.limit = limit
@@ -408,6 +408,7 @@ class InfinityThriftQueryBuilder(ABC):
     def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any]]:
         query = Query(
             columns=self._columns,
+            highlight=self._highlight,
             search=self._search,
             filter=self._filter,
             limit=self._limit,
