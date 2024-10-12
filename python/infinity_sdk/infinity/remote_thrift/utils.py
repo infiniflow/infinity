@@ -316,12 +316,6 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
                 case _:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                             f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
-        case datetime():
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DateTime, str_value=value.strftime("%Y-%m-%d %H:%M:%S"))
-        case date():
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Date, str_value=value.strftime("%Y-%m-%d"))
-        case time():
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Time, str_value=value.strftime("%H:%M:%S"))
 
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")

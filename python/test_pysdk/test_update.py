@@ -10,7 +10,7 @@ from common import common_values
 import infinity
 import infinity_embedded
 from infinity.errors import ErrorCode
-from infinity.common import ConflictType, InfinityException
+from infinity.common import ConflictType, InfinityException, SparseVector
 from common.utils import trace_expected_exceptions
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -35,6 +35,8 @@ def setup_class(request, local_infinity, http):
         globals()['ConflictType'] = func
         func = getattr(module, 'InfinityException')
         globals()['InfinityException'] = func
+        func = getattr(module, 'SparseVector')
+        globals()['SparseVector'] = func
         uri = common_values.TEST_LOCAL_PATH
         request.cls.infinity_obj = infinity_embedded.connect(uri)
     elif http:
@@ -504,4 +506,38 @@ class TestInfinity:
         print(delete_res)
 
         res = db_obj.drop_table("test_invalid_filter_expression"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_update_sparse_vector(self, suffix):
+        # connect
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_update_sparse_vector"+suffix, ConflictType.Ignore)
+        table_instance = db_obj.create_table("test_update_sparse_vector"+suffix, {
+            "id": {"type": "integer"},
+            "name": {"type": "varchar"},
+            "content": {"type": "varchar"},
+            "content_demo_dense": {"type": "vector,4,float"},
+            "content_demo_sparse": {"type": "sparse,100,float,int"}
+        })
+
+        table_instance.insert([
+            {
+                "id":1,
+                "name":"good",
+                "content":"new content",
+                "content_demo_dense":[1.1, 1.2, 1.3, 1.4],
+                "content_demo_sparse":SparseVector([1, 2, 3], [1.13, 1.56, 2.78])
+            }
+        ])
+
+        res = table_instance.output(["*"]).to_pl()
+        print(res)
+
+        table_instance.update("id = 1", {"content_demo_sparse":SparseVector([1, 2, 3], [1.1, 1.1, 1.1])})
+
+        res = table_instance.output(["*"]).to_pl()
+        print(res)
+
+        res = db_obj.drop_table("test_update_sparse_vector"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
