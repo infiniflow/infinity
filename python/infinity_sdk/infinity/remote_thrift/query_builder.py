@@ -44,14 +44,16 @@ class Query(ABC):
         highlight: Optional[List[ParsedExpr]],
         search: Optional[SearchExpr],
         filter: Optional[ParsedExpr],
+        groupby: Optional[List[ParsedExpr]],
         limit: Optional[ParsedExpr],
         offset: Optional[ParsedExpr],
         sort:  Optional[List[OrderByExpr]],
     ):
         self.columns = columns
-        self.highlight:List[ParsedExpr] = highlight
+        self.highlight = highlight
         self.search = search
         self.filter = filter
+        self.groupby = groupby
         self.limit = limit
         self.offset = offset
         self.sort = sort
@@ -64,12 +66,13 @@ class ExplainQuery(Query):
         highlight: Optional[List[ParsedExpr]],
         search: Optional[SearchExpr],
         filter: Optional[ParsedExpr],
+        groupby: Optional[List[ParsedExpr]],
         limit: Optional[ParsedExpr],
         offset: Optional[ParsedExpr],
         sort:  Optional[List[OrderByExpr]],
         explain_type: Optional[ExplainType],
     ):
-        super().__init__(columns, highlight, search, filter, limit, offset, sort)
+        super().__init__(columns, highlight, search, filter, groupby, limit, offset, sort)
         self.explain_type = explain_type
 
 
@@ -80,6 +83,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._highlight = None
         self._search = None
         self._filter = None
+        self._groupby = None
         self._limit = None
         self._offset = None
         self._sort = None
@@ -89,6 +93,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._highlight = None
         self._search = None
         self._filter = None
+        self._groupby = None
         self._limit = None
         self._offset = None
         self._sort = None
@@ -411,6 +416,7 @@ class InfinityThriftQueryBuilder(ABC):
             highlight=self._highlight,
             search=self._search,
             filter=self._filter,
+            groupby=self._groupby,
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,
