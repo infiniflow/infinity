@@ -643,7 +643,7 @@ class TestInfinity:
         assert not res.is_empty()
         print(res)
 
-        # Check if hightlight work
+        # Check if highlight work
         res = table_obj.output(["doctitle", "docdate", "body", "_row_id", "_score"]).highlight(["body"]).match_text(
             "body^5", "harmful chemical", 3).to_pl()
         assert not res.is_empty()

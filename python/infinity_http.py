@@ -2,11 +2,8 @@ import re
 
 import requests
 import logging
-import os
 from test_pysdk.common.common_data import *
 from infinity.common import ConflictType, InfinityException, SparseVector, SortType
-from test_pysdk.common import common_values
-import infinity
 from typing import Optional, Any
 from infinity.errors import ErrorCode
 from infinity.utils import deprecated_api
@@ -16,7 +13,7 @@ import polars as pl
 import pyarrow as pa
 from infinity.table import ExplainType
 from datetime import date, time, datetime
-from typing import Optional, Union, List, Any
+from typing import List
 
 
 class infinity_http:
@@ -477,6 +474,8 @@ class infinity_http:
             tmp.update({"search": self._search_exprs})
         if len(self._output):
             tmp.update({"output":self._output})
+        if len(self._highlight):
+            tmp.update({"highlight":self._highlight})
         if len(self._sort):
             tmp.update({"sort":self._sort})
         #print(tmp)
@@ -508,6 +507,8 @@ class infinity_http:
             tmp.update({"match_sparse": self._match_sparse})
         if len(self._output):
             tmp.update({"output": self._output})
+        if len(self._highlight):
+            tmp.update({"highlight": self._highlight})
         tmp.update({"explain_type":ExplainType_transfrom(ExplainType)})
         # print(tmp)
         d = self.set_up_data([], tmp)
@@ -553,18 +554,26 @@ class infinity_http:
     ):
         self.output_res = []
         self._output = output
+        self._highlight = []
         self._filter = ""
         self._search_exprs = []
         self._sort = []
         return self
     
+    def highlight(
+        self,
+        highlight=[],
+    ):
+        self._highlight = highlight
+        return self
+
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
         for order_by_expr in order_by_expr_list:
             tmp = {}
             if len(order_by_expr) != 2:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"order_by_expr_list must be a list of [column_name, sort_type]")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, "order_by_expr_list must be a list of [column_name, sort_type]")
             if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"sort_type must be SortType.Asc or SortType.Desc")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, "sort_type must be SortType.Asc or SortType.Desc")
             if order_by_expr[1] == SortType.Asc:
                 tmp[order_by_expr[0]] = "asc"
             else:
