@@ -4,6 +4,7 @@ export const ApiUrl = {
   tables: 'tables',
   columns: 'columns',
   indexes: 'indexes',
+  segments: 'segments',
   configs: 'configs',
   variables: 'variables'
 };

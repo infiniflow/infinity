@@ -5,7 +5,8 @@ import {
   listDatabase,
   listTable,
   showTableColumns,
-  showTableIndexes
+  showTableIndexes,
+  showTableSegments
 } from '../actions';
 import { initialData } from './constants';
 import { DatabaseRouteParams, TreeNode, TreeParentId } from './interface';
@@ -177,7 +178,7 @@ export const useFetchTableIndexes = ({
 }: DatabaseRouteParams['params']) => {
   const [tableIndexes, setTableIndexes] = useState<ITableIndex[]>([]);
 
-  const fetchTableColumns = useCallback(async () => {
+  const fetchTableIndexes = useCallback(async () => {
     const data = await showTableIndexes({
       database_name: databaseId,
       table_name: tableId
@@ -187,8 +188,30 @@ export const useFetchTableIndexes = ({
   }, []);
 
   useEffect(() => {
-    fetchTableColumns();
-  }, [fetchTableColumns]);
+    fetchTableIndexes();
+  }, [fetchTableIndexes]);
 
-  return { tableColumns: tableIndexes };
+  return { tableIndexes };
+};
+
+export const useFetchTableSegments = ({
+  databaseId,
+  tableId
+}: DatabaseRouteParams['params']) => {
+  const [tableSegments, setTableSegments] = useState<any[]>([]);
+
+  const fetchTableSegments = useCallback(async () => {
+    const data = await showTableSegments({
+      database_name: databaseId,
+      table_name: tableId
+    });
+
+    setTableSegments(data);
+  }, []);
+
+  useEffect(() => {
+    fetchTableSegments();
+  }, [fetchTableSegments]);
+
+  return { tableSegments };
 };

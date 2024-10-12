@@ -25,11 +25,11 @@ export function TableIndexes({
   tableId,
   databaseId
 }: DatabaseRouteParams['params']) {
-  const { tableColumns } = useFetchTableIndexes({ tableId, databaseId });
+  const { tableIndexes } = useFetchTableIndexes({ tableId, databaseId });
 
   return (
     <div className="container mx-auto py-10">
-      <DataTable columns={columns} data={tableColumns} />
+      <DataTable columns={columns} data={tableIndexes} />
     </div>
   );
 }

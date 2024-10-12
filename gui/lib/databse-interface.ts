@@ -13,3 +13,9 @@ export interface ITableIndex {
   index_name: string;
   index_type: string;
 }
+
+export interface ITableSegment {
+  id: string;
+  size: string;
+  status: string;
+}
