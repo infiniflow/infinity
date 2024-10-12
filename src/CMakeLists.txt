@@ -280,6 +280,8 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts/")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
+target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
+
 
 if (NOT SUPPORT_FMA EQUAL 0)
     message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -435,6 +437,7 @@ if (SKBUILD)
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
     target_link_directories(embedded_infinity_ext PUBLIC "/usr/local/openssl30/lib64")
     nanobind_disable_stack_protector(embedded_infinity_ext)
@@ -615,6 +618,8 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cur
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
+target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
+
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
