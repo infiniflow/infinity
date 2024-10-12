@@ -151,6 +151,14 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                     return false;
             }
         }
+        case LogicalType::kSparse: {
+            switch (target.type()) {
+                case LogicalType::kSparse:
+                    return true;
+                default:
+                    return false;
+            }
+        }
         default: {
             String error_message = "Invalid data type";
             UnrecoverableError(error_message);
