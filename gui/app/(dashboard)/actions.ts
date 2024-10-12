@@ -2,6 +2,11 @@
 
 import { ApiUrl } from '@/lib/constant/api';
 import { CreateOption, DropOption } from '@/lib/constant/common';
+import {
+  ITableColumns,
+  ITableIndex,
+  ITableSegment
+} from '@/lib/databse-interface';
 import { drop, get, post } from '@/lib/request';
 
 export const listDatabase = async () => {
@@ -155,6 +160,66 @@ export const showCurrentNode = async () => {
     return x;
   } catch (error) {
     console.log('🚀 ~ error:', error);
+  }
+};
+
+export const showTableColumns = async ({
+  database_name,
+  table_name
+}: {
+  database_name: string;
+  table_name: string;
+}): Promise<ITableColumns[]> => {
+  try {
+    const x = await get(
+      `${ApiUrl.databases}/${database_name}/${ApiUrl.tables}/${table_name}/${ApiUrl.columns}`
+    );
+    if (x.error_code === 0) {
+      return x.columns;
+    }
+    return [];
+  } catch (error) {
+    return [];
+  }
+};
+
+export const showTableIndexes = async ({
+  database_name,
+  table_name
+}: {
+  database_name: string;
+  table_name: string;
+}): Promise<ITableIndex[]> => {
+  try {
+    const x = await get(
+      `${ApiUrl.databases}/${database_name}/${ApiUrl.tables}/${table_name}/${ApiUrl.indexes}`
+    );
+    if (x.error_code === 0) {
+      return x.indexes;
+    }
+    return [];
+  } catch (error) {
+    return [];
+  }
+};
+
+export const showTableSegments = async ({
+  database_name,
+  table_name
+}: {
+  database_name: string;
+  table_name: string;
+}): Promise<ITableSegment[]> => {
+  try {
+    const x = await get(
+      `${ApiUrl.databases}/${database_name}/${ApiUrl.tables}/${table_name}/${ApiUrl.segments}`
+    );
+    if (x.error_code === 0) {
+      return x?.segments ?? [];
+    }
+    return [];
+  } catch (error) {
+    return [];
   }
 };
 //#endregion

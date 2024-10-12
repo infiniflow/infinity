@@ -252,7 +252,7 @@ def parse_date_bytes(column_vector):
     date_list = []
     epoch = date(1970, 1, 1)
     for value in parsed_list: 
-        date_list.append(epoch + timedelta(days = value))
+        date_list.append((epoch + timedelta(days = value)).strftime('%Y-%m-%d'))
     return date_list
 
 def parse_time_bytes(column_vector):
@@ -262,7 +262,7 @@ def parse_time_bytes(column_vector):
         hours = (value // 3600) % 24
         minutes = (value % 3600) // 60
         seconds = value % 60
-        time_list.append(time(hour=hours, minute=minutes, second=seconds))
+        time_list.append(time(hour=hours, minute=minutes, second=seconds).strftime('%H:%M:%S'))
     return time_list
 
 def parse_datetime_bytes(column_vector):
@@ -271,7 +271,7 @@ def parse_datetime_bytes(column_vector):
     epoch = datetime(1970, 1, 1)
     for i in range(0, len(parsed_list), 2):
         if i + 1 < len(parsed_list):
-            datetime_list.append(epoch + timedelta(days = parsed_list[i], seconds = parsed_list[i + 1]));
+            datetime_list.append((epoch + timedelta(days = parsed_list[i], seconds = parsed_list[i + 1])).strftime('%Y-%m-%d %H:%M:%S'));
     return datetime_list
 
 def parse_interval_bytes(column_vector):
