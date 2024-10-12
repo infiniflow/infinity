@@ -115,6 +115,7 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
 
 Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
     toml::table config_toml{};
+    LOG_INFO(fmt::format("Config file: {}", *config_path));
     if (config_path.get() == nullptr || config_path->empty() || !VirtualStore::Exists(std::filesystem::absolute(*config_path))) {
         if (config_path.get() == nullptr || config_path->empty()) {
             fmt::print("No config file is given, use default configs.\n");
@@ -2377,7 +2378,7 @@ void Config::PrintAll() {
     fmt::print(" - cleanup_interval: {}\n", Utility::FormatTimeInfo(CleanupInterval()));
     fmt::print(" - compact_interval: {}\n", Utility::FormatTimeInfo(CompactInterval()));
     fmt::print(" - optimize_index_interval: {}\n", Utility::FormatTimeInfo(OptimizeIndexInterval()));
-    fmt::print(" - memindex_capacity: {}\n", Utility::FormatByteSize(MemIndexCapacity()));
+    fmt::print(" - memindex_capacity: {}\n", MemIndexCapacity()); // mem index capacity is line number
     fmt::print(" - storage_type: {}\n", ToString(StorageType()));
     switch(StorageType() ) {
         case StorageType::kLocal:  {

@@ -98,6 +98,12 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
                 break;
             }
+
+            i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
+            i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
+            i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+            i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
+            i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
             switch (config_ptr_->StorageType()) {
                 case StorageType::kLocal: {
                     // Not init remote store
@@ -157,6 +163,12 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 LOG_INFO(fmt::format("Init a new catalog"));
                 new_catalog_ = Catalog::NewCatalog();
             }
+            if (compact_interval > 0) {
+                LOG_INFO(fmt::format("Init compaction alg"));
+                new_catalog_->InitCompactionAlg(system_start_ts);
+            } else {
+                LOG_INFO(fmt::format("Skip init compaction alg"));
+            }
 
             BuiltinFunctions builtin_functions(new_catalog_);
             builtin_functions.Init();
@@ -208,12 +220,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("periodic trigger was initialized before.");
             }
             periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
-
-            i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
-            i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-            i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-            i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-            i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
 
             if (target_mode == StorageMode::kWritable) {
                 periodic_trigger_thread_->full_checkpoint_trigger_ =

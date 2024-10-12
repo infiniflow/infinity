@@ -638,7 +638,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
                 // replay_entries.clear();
                 break;
             }
-            LOG_TRACE(wal_entry->ToString());
+            // LOG_TRACE(wal_entry->ToString());
 
             if (wal_entry->commit_ts_ > max_commit_ts) {
                 replay_entries.push_back(wal_entry);

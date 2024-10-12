@@ -584,7 +584,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
     auto *pm = InfinityContext::instance().persistence_manager();
     for (auto &op : delta_ops) {
         auto type = op->GetType();
-        LOG_INFO(fmt::format("Load delta op {}", op->ToString()));
+        // LOG_INFO(fmt::format("Load delta op {}", op->ToString()));
         auto commit_ts = op->commit_ts_;
         auto txn_id = op->txn_id_;
         auto begin_ts = op->begin_ts_;
@@ -1128,6 +1128,17 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry)); }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
+
+void Catalog::InitCompactionAlg(TxnTimeStamp system_start_ts) {
+    TransactionID txn_id = 0; // fake txn id
+    Vector<DBEntry *> db_entries = this->Databases(txn_id, system_start_ts);
+    for (auto *db_entry : db_entries) {
+        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, system_start_ts);
+        for (auto *table_entry : table_entries) {
+            table_entry->InitCompactionAlg(system_start_ts);
+        }
+    }
+}
 
 void Catalog::MemIndexCommit() {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();
