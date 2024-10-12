@@ -441,10 +441,13 @@ class InfinityThriftQueryBuilder(ABC):
     def explain(self, explain_type=ExplainType.Physical) -> Any:
         query = ExplainQuery(
             columns=self._columns,
+            highlight=self._highlight,
             search=self._search,
             filter=self._filter,
+            groupby=self._groupby,
             limit=self._limit,
             offset=self._offset,
+            sort = self._sort,
             explain_type=explain_type,
         )
         return self._table._explain_query(query)
