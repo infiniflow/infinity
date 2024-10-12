@@ -1163,6 +1163,7 @@ void WalManager::WalCmdOptimizeReplay(WalCmdOptimize &cmd, TransactionID txn_id,
 }
 
 void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    LOG_INFO(fmt::format("Replaying dump index: {}", cmd.ToString()));
     auto [table_index_entry, status] = storage_->catalog()->GetIndexByName(cmd.db_name_, cmd.table_name_, cmd.index_name_, txn_id, commit_ts);
     auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
     auto *buffer_mgr = storage_->buffer_manager();
@@ -1207,6 +1208,8 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
         auto *old_chunk = segment_index_entry->GetChunkIndexEntry(old_chunk_id);
         if (old_chunk != nullptr) {
             old_chunk->DeprecateChunk(commit_ts);
+        } else {
+            LOG_WARN(fmt::format("WalCmdDumpIndexReplay: cannot find chunk id: {} in segment: {}", old_chunk_id, cmd.segment_id_));
         }
     }
 }

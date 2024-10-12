@@ -143,6 +143,8 @@ class TestFullText:
                             gt_data_dict, _ = gt_res
                             if data_dict != gt_data_dict:
                                 print(f"diff: {data_dict} {gt_data_dict}")
+                            else:
+                                print("same")
 
                         qu.put(t1)
 

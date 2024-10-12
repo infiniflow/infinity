@@ -5,6 +5,7 @@ time_zone = "utc-8"
 [network]
 [log]
 log_to_stdout = true
+log_level = "debug"
 
 [storage]
 optimize_interval = "1s"
