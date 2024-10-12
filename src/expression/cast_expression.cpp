@@ -151,7 +151,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
             }
         }
         default: {
-            String error_message = "Invalid data type";
+            String error_message = fmt::format("Invalid cast from {} to {}", source.ToString(), target.ToString());
             UnrecoverableError(error_message);
         }
     }

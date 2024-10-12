@@ -642,6 +642,11 @@ WrapQueryResult WrapShowConfigs(Infinity &instance) {
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
+WrapQueryResult WrapShowInfo(Infinity &instance, const String &info_name) {
+    auto query_result = instance.ShowFunction(info_name);
+    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+}
+
 WrapQueryResult WrapQuery(Infinity &instance, const String &query_text) {
     auto query_result = instance.Query(query_text);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
@@ -1266,12 +1271,14 @@ WrapQueryResult WrapSearch(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
                            Vector<WrapParsedExpr> select_list,
-                           Vector<WrapParsedExpr> *highlight_list,
-                           Vector<WrapOrderByExpr> *order_by_list,
+                           Vector<WrapParsedExpr> highlight_list,
+                           Vector<WrapOrderByExpr> order_by_list,
+                           Vector<WrapParsedExpr> group_by_list,
                            WrapSearchExpr *wrap_search_expr,
-                           WrapParsedExpr *where_expr,
+                           WrapParsedExpr *filter_expr,
                            WrapParsedExpr *limit_expr,
                            WrapParsedExpr *offset_expr) {
+
     SearchExpr *search_expr = nullptr;
     DeferFn defer_fn1([&]() {
         if (search_expr != nullptr) {
@@ -1293,9 +1300,9 @@ WrapQueryResult WrapSearch(Infinity &instance,
             filter = nullptr;
         }
     });
-    if (where_expr != nullptr) {
+    if (filter_expr != nullptr) {
         Status status;
-        filter = where_expr->GetParsedExpr(status);
+        filter = filter_expr->GetParsedExpr(status);
         if (status.code_ != ErrorCode::kOk) {
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
@@ -1319,7 +1326,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
         output_columns->reserve(select_list.size());
         for (SizeT i = 0; i < select_list.size(); ++i) {
             Status status;
-            output_columns->emplace_back(select_list[i].GetParsedExpr(status));
+            output_columns->emplace_back(select_list.at(i).GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
@@ -1338,12 +1345,12 @@ WrapQueryResult WrapSearch(Infinity &instance,
             }
         }
     });
-    if (highlight_list != nullptr) {
+    if (!highlight_list.empty()) {
         highlight = new Vector<ParsedExpr *>();
-        highlight->reserve(highlight_list->size());
-        for (SizeT i = 0; i < highlight_list->size(); ++i) {
+        highlight->reserve(highlight_list.size());
+        for (SizeT i = 0; i < highlight_list.size(); ++i) {
             Status status;
-            highlight->emplace_back(highlight_list->at(i).GetParsedExpr(status));
+            highlight->emplace_back(highlight_list.at(i).GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
@@ -1394,12 +1401,12 @@ WrapQueryResult WrapSearch(Infinity &instance,
             order_by_exprs = nullptr;
         }
     });
-    if (order_by_list != nullptr) {
+    if (!order_by_list.empty()) {
         order_by_exprs = new Vector<OrderByExpr *>();
-        order_by_exprs->reserve(order_by_list->size());
-        for (SizeT i = 0; i < order_by_list->size(); ++i) {
+        order_by_exprs->reserve(order_by_list.size());
+        for (SizeT i = 0; i < order_by_list.size(); ++i) {
             Status status;
-            order_by_exprs->emplace_back(order_by_list->at(i).GetOrderByExpr(status));
+            order_by_exprs->emplace_back(order_by_list.at(i).GetOrderByExpr(status));
             if (status.code_ != ErrorCode::kOk) {
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
@@ -1427,9 +1434,15 @@ WrapQueryResult WrapExplain(Infinity &instance,
                             const String &db_name,
                             const String &table_name,
                             ExplainType explain_type,
-                            Vector<WrapParsedExpr> wrap_output_columns,
+                            Vector<WrapParsedExpr> select_list,
+                            Vector<WrapParsedExpr> highlight_list,
+                            Vector<WrapOrderByExpr> order_by_list,
+                            Vector<WrapParsedExpr> group_by_list,
                             WrapSearchExpr *wrap_search_expr,
-                            WrapParsedExpr *wrap_filter) {
+                            WrapParsedExpr *filter_expr,
+                            WrapParsedExpr *limit_expr,
+                            WrapParsedExpr *offset_expr) {
+
     SearchExpr *search_expr = nullptr;
     DeferFn defer_fn1([&]() {
         if (search_expr != nullptr) {
@@ -1451,9 +1464,9 @@ WrapQueryResult WrapExplain(Infinity &instance,
             filter = nullptr;
         }
     });
-    if (wrap_filter != nullptr) {
+    if (filter_expr != nullptr) {
         Status status;
-        filter = wrap_filter->GetParsedExpr(status);
+        filter = filter_expr->GetParsedExpr(status);
         if (status.code_ != ErrorCode::kOk) {
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
@@ -1470,24 +1483,51 @@ WrapQueryResult WrapExplain(Infinity &instance,
             }
         }
     });
-    if (wrap_output_columns.empty()) {
+    if (select_list.empty()) {
         return WrapQueryResult(ErrorCode::kEmptySelectFields, "[error] Select fields are empty");
     } else {
         output_columns = new Vector<ParsedExpr *>();
-        output_columns->reserve(wrap_output_columns.size());
-        for (SizeT i = 0; i < wrap_output_columns.size(); ++i) {
+        output_columns->reserve(select_list.size());
+        for (SizeT i = 0; i < select_list.size(); ++i) {
             Status status;
-            output_columns->emplace_back(wrap_output_columns[i].GetParsedExpr(status));
+            output_columns->emplace_back(select_list[i].GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
         }
     }
 
-    auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, nullptr, nullptr, output_columns, nullptr, nullptr);
+    Vector<OrderByExpr *> *order_by_exprs = nullptr;
+    DeferFn defer_fn6([&]() {
+        if (order_by_exprs != nullptr) {
+            SizeT order_by_expr_len = order_by_exprs->size();
+            for (SizeT i = 0; i < order_by_expr_len; ++i) {
+                if ((*order_by_exprs)[i] != nullptr) {
+                    delete (*order_by_exprs)[i];
+                    (*order_by_exprs)[i] = nullptr;
+                }
+            }
+            delete order_by_exprs;
+            order_by_exprs = nullptr;
+        }
+    });
+    if (!order_by_list.empty()) {
+        order_by_exprs = new Vector<OrderByExpr *>();
+        order_by_exprs->reserve(order_by_list.size());
+        for (SizeT i = 0; i < order_by_list.size(); ++i) {
+            Status status;
+            order_by_exprs->emplace_back(order_by_list.at(i).GetOrderByExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
+    auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, nullptr, nullptr, output_columns, nullptr, order_by_exprs);
     search_expr = nullptr;
     filter = nullptr;
     output_columns = nullptr;
+    order_by_exprs = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }
