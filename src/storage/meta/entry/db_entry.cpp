@@ -329,6 +329,12 @@ void DBEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
+Vector<String> DBEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+    String error_message = "Unimplemented";
+    UnrecoverableError(error_message);
+    return Vector<String>();
+}
+
 void DBEntry::MemIndexCommit() {
     auto table_meta_map_guard = table_meta_map_.GetMetaMap();
     for (auto &[_, table_meta] : *table_meta_map_guard) {

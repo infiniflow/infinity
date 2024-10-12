@@ -27,7 +27,7 @@ import data_type;
 
 namespace infinity {
 
-class TableEntry;
+struct TableEntry;
 
 export class LogicalCommand : public LogicalNode {
 public:

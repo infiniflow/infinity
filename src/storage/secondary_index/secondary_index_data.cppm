@@ -31,7 +31,7 @@ import buffer_handle;
 import logger;
 
 namespace infinity {
-class ChunkIndexEntry;
+struct ChunkIndexEntry;
 
 template <typename T>
 concept KeepOrderedSelf = IsAnyOf<T, TinyIntT, SmallIntT, IntegerT, BigIntT, FloatT, DoubleT>;

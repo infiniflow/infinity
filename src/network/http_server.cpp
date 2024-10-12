@@ -3809,6 +3809,119 @@ public:
     }
 };
 
+class ShowMemoryHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->ShowMemory();
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                SizeT row_count = data_block->row_count();
+                for (SizeT row = 0; row < row_count; row++) {
+                    // config name
+                    Value name_value = data_block->GetValue(0, row);
+                    const String &config_name = name_value.ToString();
+                    // config value
+                    Value value = data_block->GetValue(1, row);
+                    const String &config_value = value.ToString();
+                    json_response[config_name] = config_value;
+                }
+            }
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowMemoryObjectsHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+        QueryResult result = infinity->ShowMemoryObjects();
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_table;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_table[column_name] = column_value;
+                    }
+                    json_response["memory_objects"].push_back(json_table);
+                }
+            }
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowMemoryAllocationsHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->ShowMemoryAllocations();
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_table;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_table[column_name] = column_value;
+                    }
+                    json_response["memory_allocations"].push_back(json_table);
+                }
+            }
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class AdminShowCurrentNodeHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -4151,6 +4264,9 @@ void HTTPServer::Start(const String &ip_address, u16 port) {
     router->route("GET", "/instance/objects", MakeShared<ShowObjectsHandler>());
     router->route("GET", "/instance/objects/{object_name}", MakeShared<ShowObjectHandler>());
     router->route("GET", "/instance/files", MakeShared<ShowFilesHandler>());
+    router->route("GET", "/instance/memory", MakeShared<ShowMemoryHandler>());
+    router->route("GET", "/instance/memory/objects", MakeShared<ShowMemoryObjectsHandler>());
+    router->route("GET", "/instance/memory/allocations", MakeShared<ShowMemoryAllocationsHandler>());
 
     // variable
     router->route("GET", "/variables/global", MakeShared<ShowGlobalVariablesHandler>());

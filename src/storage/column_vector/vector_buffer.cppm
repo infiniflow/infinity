@@ -30,7 +30,7 @@ import internal_types;
 namespace infinity {
 
 class BufferManager;
-class BlockColumnEntry;
+struct BlockColumnEntry;
 
 export enum class VectorBufferType {
     kInvalid,

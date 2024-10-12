@@ -75,7 +75,7 @@ public:
         return {meta, status};
     }
 
-    MapGuard GetMetaMap() { return {meta_map_, std::shared_lock(rw_locker_)}; }
+    MapGuard GetMetaMap() const { return {meta_map_, std::shared_lock(rw_locker_)}; }
 
     void PickCleanup(CleanupScanner *scanner);
 
@@ -97,7 +97,7 @@ public:
 private:
 
     mutable std::shared_mutex rw_locker_{};
-    Map meta_map_;
+    mutable Map meta_map_;
 };
 
 template <MetaConcept Meta>

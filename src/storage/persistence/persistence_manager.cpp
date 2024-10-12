@@ -258,6 +258,24 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
     return result;
 }
 
+Tuple<SizeT, Status> PersistenceManager::GetFileSize(const String &file_path) {
+    PersistReadResult result;
+
+    String local_path = RemovePrefix(file_path);
+    if (local_path.empty()) {
+        String error_message = fmt::format("Failed to find local path of {}", local_path);
+        UnrecoverableError(error_message);
+    }
+
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = local_path_obj_.find(local_path);
+    if (it == local_path_obj_.end()) {
+        return {0, Status::NotFound(fmt::format("Can't find {}", local_path))};
+    }
+
+    return {it->second.part_size_, Status::OK()};
+}
+
 ObjAddr PersistenceManager::GetObjCacheWithoutCnt(const String &local_path) {
     String lock_path = RemovePrefix(local_path);
     if (lock_path.empty()) {

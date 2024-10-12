@@ -51,7 +51,7 @@ export struct SegmentIndexesGuard {
     std::shared_lock<std::shared_mutex> lock_;
 };
 
-export struct TableIndexEntry : public BaseEntry {
+export struct TableIndexEntry final : public BaseEntry {
     friend struct TableEntry;
 
 public:
@@ -170,6 +170,8 @@ private:
 
 public:
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
+
+    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
 
     void PickCleanup(CleanupScanner *scanner) override;
 

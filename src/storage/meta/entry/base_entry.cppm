@@ -97,6 +97,7 @@ export struct BaseEntry {
 
     virtual void PickCleanup(CleanupScanner *scanner) {};
 
+    virtual Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const = 0;
 public:
     // Reserved
     inline void Commit(TxnTimeStamp commit_ts) {

@@ -33,14 +33,14 @@ import cleanup_scanner;
 
 namespace infinity {
 
-class DBEntry;
+struct DBEntry;
 class TxnManager;
 class Txn;
 
 export struct TableMeta : public BaseMeta {
     using EntryT = TableEntry;
 
-    friend class DBEntry;
+    friend struct DBEntry;
     friend struct Catalog;
 
 public:
