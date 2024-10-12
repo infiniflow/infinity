@@ -44,11 +44,15 @@ public:
 
     Status Load();
 
+    void SetFineGrained(bool fine_grained) { fine_grained_ = fine_grained; }
+
     String Tokenize(const String &line, Vector<String> &res);
 
     String FineGrainedTokenize(const String &tokens);
 
 protected:
+    int AnalyzeImpl(const Term &input, void *data, HookType func) override;
+
 private:
     static constexpr float DENOMINATOR = 1000000;
 
@@ -92,5 +96,7 @@ public:
     OpenCC *opencc_{nullptr};
 
     Vector<char> lowercase_string_buffer_;
+
+    bool fine_grained_{false};
 };
 } // namespace infinity

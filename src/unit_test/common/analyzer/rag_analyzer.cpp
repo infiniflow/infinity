@@ -11,11 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#define PCRE2_CODE_UNIT_WIDTH 8
 #include "gtest/gtest.h"
 #include <filesystem>
-#include <pcre2.h>
-#include <re2/re2.h>
 #include <vector>
 
 import base_test;
@@ -33,103 +30,6 @@ using namespace infinity;
 namespace fs = std::filesystem;
 
 class RAGAnalyzerTest : public BaseTest {};
-
-void RegexTokenize(const String &input, Vector<String> &tokens) {
-
-    std::string pattern =
-        R"((?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|(?=[^\(\"\`{\[:;&\#\*@\)}\]\-,])\S+?(?=\s|$|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|,(?=$|\s|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)))|\S)";
-
-    int errorcode = 0;
-    PCRE2_SIZE erroffset = 0;
-
-    pcre2_code_8 *re =
-        pcre2_compile((PCRE2_SPTR)(pattern.c_str()), PCRE2_ZERO_TERMINATED, PCRE2_MULTILINE | PCRE2_UTF, &errorcode, &erroffset, nullptr);
-
-    if (re == nullptr) {
-        std::cerr << "PCRE2 compilation failed at offset " << erroffset << ": error code " << errorcode << std::endl;
-        return ; // Return empty vector on failure
-    }
-
-    // Create the subject string
-    PCRE2_SPTR subject = (PCRE2_SPTR)input.c_str();
-    PCRE2_SIZE subject_length = input.length();
-
-    // Create match data
-    pcre2_match_data_8 *match_data = pcre2_match_data_create_8(1024, nullptr);
-
-    PCRE2_SIZE start_offset = 0; // Start searching at the beginning of the string
-
-    while (start_offset < subject_length) {
-        int res = pcre2_match(re, subject, subject_length, start_offset, 0, match_data, nullptr);
-
-        if (res < 0) {
-            if (res == PCRE2_ERROR_NOMATCH) {
-                break; // No more matches
-            } else {
-                std::cerr << "Matching error code: " << res << std::endl;
-                break; // Other error
-            }
-        }
-
-        // Extract matched substring
-        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
-        for (int i = 0; i < res; ++i) {
-            PCRE2_SIZE start = ovector[2 * i];
-            PCRE2_SIZE end = ovector[2 * i + 1];
-            tokens.emplace_back(input.substr(start, end - start));
-        }
-
-        // Update the start offset for the next search
-        start_offset = ovector[1]; // Move to the end of the last match
-    }
-
-    // Free memory
-    pcre2_match_data_free(match_data);
-    pcre2_code_free(re);
-}
-
-TEST_F(RAGAnalyzerTest, test0) {
-    String line =
-        R"#(The encoder structure we selected is VitDet [17] (base version with about 80M parameters) due to its local attention can greatly reduce the computational cost of high-resolution images. We follow the Vary-tiny setting [46] to design the last two layers of the encoder, which will transfer a 1024×1024×3 input image to 256×1024 image tokens. Then, these image tokens are projected into language model (OPT-125M [53]) dimension via a 1024×768 linear layer. Unlike the Vary encoder which only focuses on a single document task under a relatively unitary input shape, we incorporated natural scenes and cropped slices during our pre-training. In the pre-processing stage, images of each shape are directly resized to 1024×1024 squares, as square shapes can be used to adapt to images of various aspect ratios with a compromise.)#";
-
-    Vector<String> result;
-    RegexTokenize(line, result);
-    for(auto&t:result)
-        std::cout<<t<<" ";
-    std::cout<<std::endl;
-
-#if 0
-    fs::path executablePath = "/proc/self/exe";
-    std::error_code ec;
-    // Resolve the symlink to get the actual path
-    executablePath = fs::canonical(executablePath, ec);
-    if (ec) {
-        std::cerr << "Error resolving the path: " << executablePath << " " << ec.message() << std::endl;
-        return;
-    }
-
-    fs::path ROOT_PATH = executablePath.parent_path().parent_path().parent_path().parent_path() / "resource";
-
-    if (!fs::exists(ROOT_PATH)) {
-        std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
-        return;
-    }
-    fs::path LEMMA_PATH = ROOT_PATH / "wordnet";
-    std::cout << "Lemma resource directory: " << LEMMA_PATH << std::endl;
-    Lemmatizer lemma(LEMMA_PATH.string());
-    lemma.Load();
-    String str = lemma.Lemmatize("dogs");
-    std::cout << str << std::endl;
-    str = lemma.Lemmatize("churches");
-    std::cout << str << std::endl;
-    str = lemma.Lemmatize("aardwolves");
-    std::cout << str << std::endl;
-    str = lemma.Lemmatize("abaci");
-    std::cout << str << std::endl;
-    str = lemma.Lemmatize("hardrock");
-    std::cout << str << std::endl;
-#endif
-}
 
 TEST_F(RAGAnalyzerTest, test1) {
     // Get the path to the executable using the /proc/self/exe symlink

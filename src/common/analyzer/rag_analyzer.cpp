@@ -14,11 +14,14 @@
 
 module;
 
+#define PCRE2_CODE_UNIT_WIDTH 8
+
 #include <cmath>
 #include <filesystem>
 #include <fstream>
 
 #include <openccxx.h>
+#include <pcre2.h>
 #include <re2/re2.h>
 
 #include "string_utils.h"
@@ -183,23 +186,65 @@ bool IsChinese(const String &str) {
     return false;
 }
 
-void RegexTokenize(const String &input, Vector<String> &result) {
-    static String pattern("('s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
-                          "?[^\\s\\p{L}\\p{N}]+|\\s+\\(?!\\S\\)|\\s+)");
+void RegexTokenize(const String &input, Vector<String> &tokens) {
 
-    re2::StringPiece input_str(input);
-    re2::StringPiece match;
+    std::string pattern =
+        R"((?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|(?=[^\(\"\`{\[:;&\#\*@\)}\]\-,])\S+?(?=\s|$|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|,(?=$|\s|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)))|\S)";
 
-    while (RE2::FindAndConsume(&input_str, pattern, &match)) {
-        result.emplace_back(match.as_string());
+    int errorcode = 0;
+    PCRE2_SIZE erroffset = 0;
+
+    pcre2_code_8 *re =
+        pcre2_compile((PCRE2_SPTR)(pattern.c_str()), PCRE2_ZERO_TERMINATED, PCRE2_MULTILINE | PCRE2_UTF, &errorcode, &erroffset, nullptr);
+
+    if (re == nullptr) {
+        std::cerr << "PCRE2 compilation failed at offset " << erroffset << ": error code " << errorcode << std::endl;
+        return; // Return empty vector on failure
     }
+
+    // Create the subject string
+    PCRE2_SPTR subject = (PCRE2_SPTR)input.c_str();
+    PCRE2_SIZE subject_length = input.length();
+
+    // Create match data
+    pcre2_match_data_8 *match_data = pcre2_match_data_create_8(1024, nullptr);
+
+    PCRE2_SIZE start_offset = 0; // Start searching at the beginning of the string
+
+    while (start_offset < subject_length) {
+        int res = pcre2_match(re, subject, subject_length, start_offset, 0, match_data, nullptr);
+
+        if (res < 0) {
+            if (res == PCRE2_ERROR_NOMATCH) {
+                break; // No more matches
+            } else {
+                std::cerr << "Matching error code: " << res << std::endl;
+                break; // Other error
+            }
+        }
+
+        // Extract matched substring
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+        for (int i = 0; i < res; ++i) {
+            PCRE2_SIZE start = ovector[2 * i];
+            PCRE2_SIZE end = ovector[2 * i + 1];
+            tokens.emplace_back(input.substr(start, end - start));
+        }
+
+        // Update the start offset for the next search
+        start_offset = ovector[1]; // Move to the end of the last match
+    }
+
+    // Free memory
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
 }
 
 RAGAnalyzer::RAGAnalyzer(const String &path) : dict_path_(path), lowercase_string_buffer_(term_string_buffer_limit_) {}
 
 RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other)
     : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_), stemmer_(other.stemmer_), opencc_(other.opencc_),
-      lowercase_string_buffer_(term_string_buffer_limit_) {}
+      lowercase_string_buffer_(term_string_buffer_limit_), fine_grained_(other.fine_grained_) {}
 
 RAGAnalyzer::~RAGAnalyzer() {
     if (own_dict_) {
@@ -691,6 +736,21 @@ String RAGAnalyzer::FineGrainedTokenize(const String &tokens) {
     Vector<String> normalize_res = EnglishNormalize(res);
     String ret = Join(normalize_res, 0);
     return ret;
+}
+
+int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
+    unsigned level = 0;
+    Vector<String> tokens;
+    String output = Tokenize(input.text_.c_str(), tokens);
+    if (fine_grained_) {
+        output = FineGrainedTokenize(output);
+        tokens.clear();
+        Split(output, "( )", tokens);
+    }
+    for (auto &t : tokens) {
+        func(data, t.c_str(), t.size(), 0, 0, Term::AND, level, false);
+    }
+    return 0;
 }
 
 } // namespace infinity
