@@ -1889,6 +1889,44 @@ for question in questions:
 
 ---
 
+## highlight
+
+```python
+table_object.highlight(columns)
+```
+
+This method allows you to highlight the words of the output of the query, when the word text are matched.
+
+### Parameters
+
+#### columns: `list[str]`, *Required*
+
+A list of strings specifying the columns to include words match in match_text clause. Each string in the list can represent:
+
+- A user-defined column name: The name of the column to include in the output, e.g., `"body"`.
+
+:::tip NOTE
+The columns must also be the `output` clause output and also be the match_text clause column.
+:::
+
+### Returns
+
+An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+
+:::tip NOTE
+This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
+:::
+
+### Examples
+
+#### Highlight the matched column to display
+
+```python
+table_obj.output(["doctitle", "docdate", "body"]).highlight(["body"]).match_text("body^5", "harmful chemical", 3).to_pl()
+
+# The matched words will be embraced by <em> and </em>
+---
+
 ## fusion
 
 ```python

@@ -74,6 +74,22 @@ class LocalInfinityConnection(InfinityConnection, ABC):
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
+    def show_info(self, info_name):
+        self.check_connect()
+        res = self._client.show_info(info_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
+    def search(self, db_name, table_name):
+        self.check_connect()
+        res = self._client.search(db_name, table_name, [])
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
     @name_validity_check("db_name", "DB")
     def drop_database(self, db_name, conflict_type: ConflictType = ConflictType.Error):
         self.check_connect()

@@ -257,7 +257,7 @@ export struct WrapSearchExpr {
 
 export struct WrapParsedExpr {
     WrapParsedExpr() = default;
-    WrapParsedExpr(ParsedExprType expr_type) : type(expr_type){};
+    WrapParsedExpr(ParsedExprType expr_type) : type(expr_type) {};
     ParsedExprType type;
     WrapConstantExpr constant_expr;
     WrapColumnExpr column_expr;
@@ -274,7 +274,7 @@ export struct WrapParsedExpr {
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
-export struct WrapOrderByExpr{
+export struct WrapOrderByExpr {
     WrapOrderByExpr(WrapParsedExpr expr, bool asc) : expr(expr), asc(asc) {}
     WrapParsedExpr expr;
     bool asc{true};
@@ -315,6 +315,8 @@ export WrapQueryResult WrapShowVariables(Infinity &instance, SetScope scope);
 export WrapQueryResult WrapShowConfig(Infinity &instance, const String &config_name);
 
 export WrapQueryResult WrapShowConfigs(Infinity &instance);
+
+export WrapQueryResult WrapShowInfo(Infinity &instance, const String &info_name);
 
 // For embedded sqllogictest
 export WrapQueryResult WrapQuery(Infinity &instance, const String &query_text);
@@ -397,15 +399,22 @@ export WrapQueryResult WrapExplain(Infinity &instance,
                                    const String &db_name,
                                    const String &table_name,
                                    ExplainType explain_type,
-                                   Vector<WrapParsedExpr> wrap_output_columns,
+                                   Vector<WrapParsedExpr> select_list,
+                                   Vector<WrapParsedExpr> highlight_list,
+                                   Vector<WrapOrderByExpr> order_by_list,
+                                   Vector<WrapParsedExpr> group_by_list,
                                    WrapSearchExpr *wrap_search_expr,
-                                   WrapParsedExpr *wrap_filter);
+                                   WrapParsedExpr *filter_expr,
+                                   WrapParsedExpr *limit_expr,
+                                   WrapParsedExpr *offset_expr);
 
 export WrapQueryResult WrapSearch(Infinity &instance,
                                   const String &db_name,
                                   const String &table_name,
                                   Vector<WrapParsedExpr> select_list,
+                                  Vector<WrapParsedExpr> highlight_list,
                                   Vector<WrapOrderByExpr> order_by_list,
+                                  Vector<WrapParsedExpr> group_by_list,
                                   WrapSearchExpr *wrap_search_expr = nullptr,
                                   WrapParsedExpr *where_expr = nullptr,
                                   WrapParsedExpr *limit_expr = nullptr,

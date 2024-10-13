@@ -4332,11 +4332,12 @@ void swap(ExportRequest &a, ExportRequest &b);
 std::ostream& operator<<(std::ostream& out, const ExportRequest& obj);
 
 typedef struct _ExplainRequest__isset {
-  _ExplainRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), explain_type(false) {}
+  _ExplainRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), highlight_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), explain_type(false) {}
   bool session_id :1;
   bool db_name :1;
   bool table_name :1;
   bool select_list :1;
+  bool highlight_list :1;
   bool search_expr :1;
   bool where_expr :1;
   bool group_by_list :1;
@@ -4360,6 +4361,7 @@ class ExplainRequest : public virtual ::apache::thrift::TBase {
 
 
 
+
   }
 
   virtual ~ExplainRequest() noexcept;
@@ -4367,6 +4369,7 @@ class ExplainRequest : public virtual ::apache::thrift::TBase {
   std::string db_name;
   std::string table_name;
   std::vector<ParsedExpr>  select_list;
+  std::vector<ParsedExpr>  highlight_list;
   SearchExpr search_expr;
   ParsedExpr where_expr;
   std::vector<ParsedExpr>  group_by_list;
@@ -4389,6 +4392,8 @@ class ExplainRequest : public virtual ::apache::thrift::TBase {
   void __set_table_name(const std::string& val);
 
   void __set_select_list(const std::vector<ParsedExpr> & val);
+
+  void __set_highlight_list(const std::vector<ParsedExpr> & val);
 
   void __set_search_expr(const SearchExpr& val);
 
@@ -4415,6 +4420,10 @@ class ExplainRequest : public virtual ::apache::thrift::TBase {
     if (!(table_name == rhs.table_name))
       return false;
     if (!(select_list == rhs.select_list))
+      return false;
+    if (__isset.highlight_list != rhs.__isset.highlight_list)
+      return false;
+    else if (__isset.highlight_list && !(highlight_list == rhs.highlight_list))
       return false;
     if (__isset.search_expr != rhs.__isset.search_expr)
       return false;
@@ -4529,11 +4538,12 @@ void swap(ExplainResponse &a, ExplainResponse &b);
 std::ostream& operator<<(std::ostream& out, const ExplainResponse& obj);
 
 typedef struct _SelectRequest__isset {
-  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true) {}
+  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), highlight_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true) {}
   bool session_id :1;
   bool db_name :1;
   bool table_name :1;
   bool select_list :1;
+  bool highlight_list :1;
   bool search_expr :1;
   bool where_expr :1;
   bool group_by_list :1;
@@ -4555,6 +4565,7 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
 
 
 
+
   }
 
   virtual ~SelectRequest() noexcept;
@@ -4562,6 +4573,7 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   std::string db_name;
   std::string table_name;
   std::vector<ParsedExpr>  select_list;
+  std::vector<ParsedExpr>  highlight_list;
   SearchExpr search_expr;
   ParsedExpr where_expr;
   std::vector<ParsedExpr>  group_by_list;
@@ -4579,6 +4591,8 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   void __set_table_name(const std::string& val);
 
   void __set_select_list(const std::vector<ParsedExpr> & val);
+
+  void __set_highlight_list(const std::vector<ParsedExpr> & val);
 
   void __set_search_expr(const SearchExpr& val);
 
@@ -4603,6 +4617,10 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
     if (!(table_name == rhs.table_name))
       return false;
     if (!(select_list == rhs.select_list))
+      return false;
+    if (__isset.highlight_list != rhs.__isset.highlight_list)
+      return false;
+    else if (__isset.highlight_list && !(highlight_list == rhs.highlight_list))
       return false;
     if (__isset.search_expr != rhs.__isset.search_expr)
       return false;
