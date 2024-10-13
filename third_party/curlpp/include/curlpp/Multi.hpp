@@ -62,6 +62,10 @@ namespace curlpp
 								fd_set * exc_fd_set,
 								int * max_fd);
 
+		void timeout(long * curl_timeo){
+			curl_multi_timeout(mMultiHandle, curl_timeo);
+		}
+
 		typedef std::list<std::pair<const curlpp::Easy *, Multi::Info> >
 			Msgs;
 		
