@@ -388,7 +388,7 @@ if (SKBUILD)
     set(libname "nanobind-static-abi3")
     nanobind_build_library(${libname})
     nanobind_extension_abi3(embedded_infinity_ext)
-    add_dependencies(embedded_infinity_ext oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
+    add_dependencies(embedded_infinity_ext oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static)
 
     target_link_libraries(embedded_infinity_ext PRIVATE
             ${libname}
