@@ -38,6 +38,7 @@ public:
     Initialize(Config* config_ptr);
 
     static void Initialize(const LoggerConfig &config);
+    static void Flush();
 
     static void
     Shutdown();

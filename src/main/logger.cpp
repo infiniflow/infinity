@@ -89,6 +89,10 @@ void Logger::Initialize(const LoggerConfig &config) {
     SetLogLevel(config.log_level_);
 }
 
+void Logger::Flush() {
+    infinity_logger->flush();
+}
+
 void Logger::Shutdown() {
     if (stdout_sinker.get() != nullptr or rotating_file_sinker.get() != nullptr) {
         spdlog::shutdown();
