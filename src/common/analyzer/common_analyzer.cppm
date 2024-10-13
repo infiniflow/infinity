@@ -36,6 +36,8 @@ public:
 
     void SetExtractEngStem(bool extract_eng_stem = true) { extract_eng_stem_ = extract_eng_stem; }
 
+    void SetStemOnly(bool stem_only = true) { stem_only_ = stem_only; }
+
     void SetExtractSynonym(bool extract_synonym = true) { extract_synonym_ = extract_synonym; }
 
     void SetRemoveStopwords(bool remove_stopwords = true) { remove_stopwords_ = remove_stopwords; }
@@ -63,6 +65,7 @@ protected:
         token_ = nullptr;
         len_ = 0;
         offset_ = 0;
+        end_offset_ = 0;
         level_ = 0;
         is_index_ = false;
         is_raw_ = false;
@@ -76,6 +79,7 @@ protected:
     const char *token_{nullptr};
     SizeT len_{0};
     u32 offset_{0};
+    u32 end_offset_{0};
     u32 local_offset_{0};
     int level_{0};
     bool is_index_{false};
@@ -86,6 +90,7 @@ protected:
     bool extract_synonym_{false};
     bool cjk_{false};
     bool remove_stopwords_{false};
+    bool stem_only_{false};
 };
 
 } // namespace infinity

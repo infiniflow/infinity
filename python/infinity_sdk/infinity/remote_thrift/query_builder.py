@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SparseVector, InfinityException, SortType
+from infinity.common import VEC, SparseVector, InfinityException
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -41,15 +41,19 @@ class Query(ABC):
     def __init__(
         self,
         columns: Optional[List[ParsedExpr]],
+        highlight: Optional[List[ParsedExpr]],
         search: Optional[SearchExpr],
         filter: Optional[ParsedExpr],
+        groupby: Optional[List[ParsedExpr]],
         limit: Optional[ParsedExpr],
         offset: Optional[ParsedExpr],
         sort:  Optional[List[OrderByExpr]],
     ):
         self.columns = columns
+        self.highlight = highlight
         self.search = search
         self.filter = filter
+        self.groupby = groupby
         self.limit = limit
         self.offset = offset
         self.sort = sort
@@ -59,14 +63,16 @@ class ExplainQuery(Query):
     def __init__(
         self,
         columns: Optional[List[ParsedExpr]],
+        highlight: Optional[List[ParsedExpr]],
         search: Optional[SearchExpr],
         filter: Optional[ParsedExpr],
+        groupby: Optional[List[ParsedExpr]],
         limit: Optional[ParsedExpr],
         offset: Optional[ParsedExpr],
-        #sort:  Optional[List[OrderByExpr]],
+        sort:  Optional[List[OrderByExpr]],
         explain_type: Optional[ExplainType],
     ):
-        super().__init__(columns, search, filter, limit, offset, None)
+        super().__init__(columns, highlight, search, filter, groupby, limit, offset, sort)
         self.explain_type = explain_type
 
 
@@ -74,16 +80,20 @@ class InfinityThriftQueryBuilder(ABC):
     def __init__(self, table):
         self._table = table
         self._columns = None
+        self._highlight = None
         self._search = None
         self._filter = None
+        self._groupby = None
         self._limit = None
         self._offset = None
         self._sort = None
 
     def reset(self):
         self._columns = None
+        self._highlight = None
         self._search = None
         self._filter = None
+        self._groupby = None
         self._limit = None
         self._offset = None
         self._sort = None
@@ -345,7 +355,17 @@ class InfinityThriftQueryBuilder(ABC):
 
         self._columns = select_list
         return self
-    
+
+    def highlight(self, columns: Optional[list]) -> InfinityThriftQueryBuilder:
+        highlight_list: List[ParsedExpr] = []
+        for column in columns:
+            if isinstance(column, str):
+                column = column.lower()
+            highlight_list.append(parse_expr(maybe_parse(column)))
+
+        self._highlight = highlight_list
+        return self
+
     def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityThriftQueryBuilder:
         sort_list: List[OrderByExpr] = []
         for order_by_expr in order_by_expr_list:
@@ -393,8 +413,10 @@ class InfinityThriftQueryBuilder(ABC):
     def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any]]:
         query = Query(
             columns=self._columns,
+            highlight=self._highlight,
             search=self._search,
             filter=self._filter,
+            groupby=self._groupby,
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,
@@ -419,10 +441,13 @@ class InfinityThriftQueryBuilder(ABC):
     def explain(self, explain_type=ExplainType.Physical) -> Any:
         query = ExplainQuery(
             columns=self._columns,
+            highlight=self._highlight,
             search=self._search,
             filter=self._filter,
+            groupby=self._groupby,
             limit=self._limit,
             offset=self._offset,
+            sort = self._sort,
             explain_type=explain_type,
         )
         return self._table._explain_query(query)

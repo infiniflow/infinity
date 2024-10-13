@@ -1736,6 +1736,7 @@ Searches for data in a specified table. The search can range from a simple vecto
   - `content-Type: application/json`
 - Body:
   - `"output"`: `string[]`
+  - `"highlight"`: `string[]`
   - `"filter"`: `string`
   - `"fusion"`: `object`
 
@@ -1751,7 +1752,12 @@ curl --request GET \
         "output":
         [
             "name",
-            "score"
+            "score",
+            "body"
+        ],
+        "highlight":
+        [
+            "body"
         ],
         "filter": "score >= 4.0",
         "search":
@@ -1820,6 +1826,9 @@ curl --request GET \
     - `avg`
   - An arithmetic function: Apply an arithmetic operation on specified columns (e.g., `c1+5`).  
   > The list must contain at least one element. Empty lists are not allowed.
+
+- `"highlight"`: (*Body parameter*), `string`, *Optional*
+    A list of strings specifying the columns to include words match in match_text clause. The matched words will be embraced by <em> and </em>
 
 - `"filter"`: (*Body parameter*), `string`, *Optional*  
   A string that defines the condition for selecting rows. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be updated. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.  

@@ -13,13 +13,11 @@
 # limitations under the License.
 import functools
 import inspect
-from abc import ABC
 from typing import Optional, Union, List, Any
 
-import numpy as np
 from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflictType
-from infinity_embedded.embedded_infinity_ext import WrapIndexInfo, ImportOptions, CopyFileType, WrapParsedExpr, \
-    ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions
+from infinity_embedded.embedded_infinity_ext import ImportOptions, CopyFileType, WrapParsedExpr, \
+    ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions, WrapOrderByExpr
 from infinity_embedded.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN, SortType
 from infinity_embedded.common import INSERT_DATA, VEC, SparseVector, InfinityException
 from infinity_embedded.errors import ErrorCode
@@ -72,7 +70,7 @@ class LocalTable():
         elif conflict_type == ConflictType.Replace:
             create_index_conflict = LocalConflictType.kReplace
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
         index_info_to_use = index_info.to_local_type()
 
@@ -95,7 +93,7 @@ class LocalTable():
         elif conflict_type == ConflictType.Ignore:
             drop_index_conflict = LocalConflictType.kIgnore
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name, conflict_type=drop_index_conflict)
@@ -192,17 +190,20 @@ class LocalTable():
                     elif file_type == 'bvecs':
                         options.copy_file_type = CopyFileType.kBVECS
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file delimiter: {delimiter}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized export file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
                         options.header = v
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                "Boolean value is expected in header field")
                 else:
                     raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
 
@@ -232,32 +233,38 @@ class LocalTable():
                     elif file_type == 'fvecs':
                         options.copy_file_type = CopyFileType.kFVECS
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file delimiter: {delimiter}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized export file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
                         options.header = v
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                "Boolean value is expected in header field")
                 elif key == 'offset':
                     if isinstance(v, int):
                         options.offset = v
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'offset' field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                "Integer value is expected in 'offset' field")
                 elif key == 'limit':
                     if isinstance(v, int):
                         options.limit = v
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'limit' field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                "Integer value is expected in 'limit' field")
                 elif key == 'row_limit':
                     if isinstance(v, int):
                         options.row_limit = v
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'row_limit' field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                "Integer value is expected in 'row_limit' field")
                 else:
                     raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
         if not columns:
@@ -343,6 +350,10 @@ class LocalTable():
         self.query_builder.output(columns)
         return self
 
+    def highlight(self, columns: Optional[List[str]]):
+        self.query_builder.highlight(columns)
+        return self
+
     def to_result(self):
         return self.query_builder.to_result()
 
@@ -357,16 +368,17 @@ class LocalTable():
     def offset(self, offset: Optional[int]):
         self.query_builder.offset(offset)
         return self
-    
+
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
         for order_by_expr in order_by_expr_list:
             if len(order_by_expr) != 2:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"order_by_expr_list must be a list of [column_name, sort_type]")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER,
+                                        "order_by_expr_list must be a list of [column_name, sort_type]")
             if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, f"sort_type must be SortType.Asc or SortType.Desc")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER, "sort_type must be SortType.Asc or SortType.Desc")
             if order_by_expr[1] == SortType.Asc:
                 order_by_expr[1] = True
-            else :
+            else:
                 order_by_expr[1] = False
         self.query_builder.sort(order_by_expr_list)
         return self
@@ -382,7 +394,7 @@ class LocalTable():
 
     def explain(self, explain_type: ExplainType = ExplainType.Physical):
         return self.query_builder.explain(explain_type)
-    
+
     def optimize(self, index_name: str, opt_params: dict[str, str]):
         opt_options = WrapOptimizeOptions()
         opt_options.index_name = index_name
@@ -396,7 +408,6 @@ class LocalTable():
             get_ordinary_info(column_info, column_defs, column_name, index)
         return self._conn.add_columns(db_name=self._db_name, table_name=self._table_name, column_defs=column_defs)
 
-
     def drop_columns(self, columns: list[str] | str):
         if isinstance(columns, str):
             columns = [columns]
@@ -404,15 +415,28 @@ class LocalTable():
 
     def _execute_query(self, query: Query):
         # execute the query
-        res = self._conn.select(db_name=self._db_name,
+        highlight = []
+        if query.highlight is not None:
+            highlight = query.highlight
+
+        order_by_list = []
+        if query.sort is not None:
+            order_by_list = query.sort
+
+        group_by_list = []
+        if query.group_by is not None:
+            group_by_list = query.group_by
+
+        res = self._conn.search(db_name=self._db_name,
                                 table_name=self._table_name,
                                 select_list=query.columns,
+                                highlight_list=highlight,
+                                order_by_list=order_by_list,
+                                group_by_list=group_by_list,
                                 search_expr=query.search,
                                 where_expr=query.filter,
-                                group_by_list=None,
                                 limit_expr=query.limit,
-                                offset_expr=query.offset,
-                                order_by_list=query.sort)
+                                offset_expr=query.offset)
 
         # process the results
         if res.error_code == ErrorCode.OK:
@@ -421,13 +445,27 @@ class LocalTable():
             raise InfinityException(res.error_code, res.error_msg)
 
     def _explain_query(self, query: ExplainQuery) -> Any:
+        highlight = []
+        if query.highlight is not None:
+            highlight = query.highlight
+
+        order_by_list = []
+        if query.sort is not None:
+            order_by_list = query.sort
+
+        group_by_list = []
+        if query.group_by is not None:
+            group_by_list = query.group_by
+
         res = self._conn.explain(db_name=self._db_name,
                                  table_name=self._table_name,
                                  explain_type=query.explain_type.to_local_ttype(),
                                  select_list=query.columns,
+                                 highlight_list=highlight,
+                                 order_by_list=order_by_list,
+                                 group_by_list=group_by_list,
                                  search_expr=query.search,
                                  where_expr=query.filter,
-                                 group_by_list=None,
                                  limit_expr=query.limit,
                                  offset_expr=query.offset)
         if res.error_code == ErrorCode.OK:

@@ -22,15 +22,19 @@ class Query(ABC):
     def __init__(
         self,
         columns: Optional[List[WrapParsedExpr]],
+        highlight: Optional[List[WrapParsedExpr]],
         search: Optional[WrapSearchExpr],
         filter: Optional[WrapParsedExpr],
+        group_by: Optional[List[WrapParsedExpr]],
         limit: Optional[WrapParsedExpr],
         offset: Optional[WrapParsedExpr],
-        sort: Optional[WrapOrderByExpr]
+        sort: Optional[List[WrapOrderByExpr]]
     ):
         self.columns = columns
+        self.highlight = highlight
         self.search = search
         self.filter = filter
+        self.group_by = group_by
         self.limit = limit
         self.offset = offset
         self.sort = sort
@@ -40,13 +44,16 @@ class ExplainQuery(Query):
     def __init__(
         self,
         columns: Optional[List[WrapParsedExpr]],
+        highlight: Optional[List[WrapParsedExpr]],
         search: Optional[WrapSearchExpr],
         filter: Optional[WrapParsedExpr],
+        group_by: Optional[List[WrapParsedExpr]],
         limit: Optional[WrapParsedExpr],
         offset: Optional[WrapParsedExpr],
+        sort: Optional[List[WrapOrderByExpr]],
         explain_type: Optional[BaseExplainType],
     ):
-        super().__init__(columns, search, filter, limit, offset, None)
+        super().__init__(columns, highlight, search, filter, group_by, limit, offset, sort)
         self.explain_type = explain_type
 
 
@@ -54,19 +61,23 @@ class InfinityLocalQueryBuilder(ABC):
     def __init__(self, table):
         self._table = table
         self._columns = None
+        self._highlight = None
         self._search = None
         self._filter = None
+        self._group_by = None
         self._limit = None
         self._offset = None
-        self._sort = []
+        self._sort = None
 
     def reset(self):
         self._columns = None
+        self._highlight = None
         self._search = None
         self._filter = None
+        self._group_by = None
         self._limit = None
         self._offset = None
-        self._sort = []
+        self._sort = None
 
     def match_dense(
         self,
@@ -234,7 +245,7 @@ class InfinityLocalQueryBuilder(ABC):
                 sparse_expr.f64_array_value = values
             case SparseVector([int(), *_], None):
                 raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE,
-                                        f"No values! Sparse data does not support bool value type now")
+                                        "No values! Sparse data does not support bool value type now")
             case dict():
                 if len(sparse_data) == 0:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
@@ -438,6 +449,18 @@ class InfinityLocalQueryBuilder(ABC):
         self._columns = select_list
         return self
 
+    def highlight(self, columns: Optional[list]) -> InfinityLocalQueryBuilder:
+        highlight_list: List[WrapParsedExpr] = []
+        for column in columns:
+            if isinstance(column, str):
+                column = column.lower()
+
+            parsed_expr = parse_expr(maybe_parse(column))
+            highlight_list.append(parsed_expr)
+
+        self._highlight = highlight_list
+        return self
+
     def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityLocalQueryBuilder:
         sort_list: List[WrapOrderByExpr] = []
         for order_by_expr in order_by_expr_list:
@@ -509,8 +532,10 @@ class InfinityLocalQueryBuilder(ABC):
     def to_result(self):
         query = Query(
             columns=self._columns,
+            highlight=self._highlight,
             search=self._search,
             filter=self._filter,
+            group_by=self._group_by,
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,
@@ -535,10 +560,13 @@ class InfinityLocalQueryBuilder(ABC):
     def explain(self, explain_type=ExplainType.kPhysical) -> Any:
         query = ExplainQuery(
             columns=self._columns,
+            highlight=self._highlight,
             search=self._search,
             filter=self._filter,
+            group_by=self._group_by,
             limit=self._limit,
             offset=self._offset,
             explain_type=explain_type,
+            sort=self._sort
         )
         return self._table._explain_query(query)

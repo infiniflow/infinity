@@ -573,7 +573,10 @@ void TermQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool 
     os << '\n';
 }
 
-void TermQueryNode::GetQueryTerms(std::vector<std::string> &terms) const { terms.push_back(term_); }
+void TermQueryNode::GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const {
+    columns.push_back(column_);
+    terms.push_back(term_);
+}
 
 void PhraseQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
     os << prefix;
@@ -590,7 +593,8 @@ void PhraseQueryNode::PrintTree(std::ostream &os, const std::string &prefix, boo
     os << '\n';
 }
 
-void PhraseQueryNode::GetQueryTerms(std::vector<std::string> &terms) const {
+void PhraseQueryNode::GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const {
+    columns.push_back(column_);
     for (auto term : terms_) {
         terms.push_back(term);
     }
@@ -610,9 +614,9 @@ void MultiQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool
     children_.back()->PrintTree(os, next_prefix, true);
 }
 
-void MultiQueryNode::GetQueryTerms(std::vector<std::string> &terms) const {
+void MultiQueryNode::GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const {
     for (u32 i = 0; i < children_.size(); ++i) {
-        children_[i]->GetQueryTerms(terms);
+        children_[i]->GetQueryColumnsTerms(columns, terms);
     }
 }
 
