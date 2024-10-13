@@ -261,9 +261,13 @@ curl --request GET \
          "output":
          [
              "num",
-             "year",
+             "body",
              "score()",
              "row_id()"
+         ],
+         "highlight":
+         [
+             "body"
          ],
          "search":
          [
