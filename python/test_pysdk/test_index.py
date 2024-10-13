@@ -645,12 +645,12 @@ class TestInfinity:
         print(res)
 
         # Check if highlight work
-        # res = table_obj.output(["doctitle", "docdate", "body", "_row_id", "_score"]).highlight(["body"]).match_text(
-        #     "body^5", "harmful chemical", 3).to_pl()
-        # assert not res.is_empty()
-        # for body in res["body"].to_list():
-        #     assert body.find("<em>") != -1
-        # print(res)
+        res = table_obj.output(["doctitle", "docdate", "body", "_row_id", "_score"]).highlight(["body"]).match_text(
+            "body^5", "harmful chemical", 3).to_pl()
+        assert not res.is_empty()
+        for body in res["body"].to_list():
+            assert body.find("<em>") != -1
+        print(res)
 
         res = db_obj.drop_table(
             "test_insert_data_fulltext_index_search" + suffix, ConflictType.Error)

@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
             auto select_rowid_expr = new FunctionExpr();
             select_rowid_expr->func_name_ = "row_id";
             output_columns->emplace_back(select_rowid_expr);
-            auto result = infinity->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr);
+            auto result = infinity->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr);
             {
                 auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
                 auto &column = *cv[0];

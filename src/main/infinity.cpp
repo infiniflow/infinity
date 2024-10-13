@@ -896,7 +896,8 @@ QueryResult Infinity::Explain(const String &db_name,
                               ParsedExpr *offset,
                               Vector<ParsedExpr *> *output_columns,
                               Vector<ParsedExpr *> *highlight_columns,
-                              Vector<OrderByExpr *> *order_by_list) {
+                              Vector<OrderByExpr *> *order_by_list,
+                              Vector<ParsedExpr *> *group_by_list) {
 
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<ExplainStatement> explain_statment = MakeUnique<ExplainStatement>();
@@ -937,7 +938,8 @@ QueryResult Infinity::Search(const String &db_name,
                              ParsedExpr *offset,
                              Vector<ParsedExpr *> *output_columns,
                              Vector<ParsedExpr *> *highlight_columns,
-                             Vector<OrderByExpr *> *order_by_list) {
+                             Vector<OrderByExpr *> *order_by_list,
+                             Vector<ParsedExpr *> *group_by_list) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<SelectStatement> select_statement = MakeUnique<SelectStatement>();
 

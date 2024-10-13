@@ -204,7 +204,8 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                                                         offset.release(),
                                                         output_columns,
                                                         highlight_columns,
-                                                        order_by_list);
+                                                        order_by_list,
+                                                        nullptr);
 
         output_columns = nullptr;
         highlight_columns = nullptr;
@@ -420,7 +421,8 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                                                          offset.release(),
                                                          output_columns,
                                                          highlight_columns,
-                                                         order_by_list);
+                                                         order_by_list,
+                                                         nullptr);
 
         output_columns = nullptr;
         highlight_columns = nullptr;

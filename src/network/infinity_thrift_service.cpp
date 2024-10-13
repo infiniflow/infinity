@@ -668,8 +668,16 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     //
     // auto start3 = std::chrono::steady_clock::now();
 
-    const QueryResult result =
-        infinity->Search(request.db_name, request.table_name, search_expr, filter, limit, offset, output_columns, highlight_columns, order_by_list);
+    const QueryResult result = infinity->Search(request.db_name,
+                                                request.table_name,
+                                                search_expr,
+                                                filter,
+                                                limit,
+                                                offset,
+                                                output_columns,
+                                                highlight_columns,
+                                                order_by_list,
+                                                nullptr);
     output_columns = nullptr;
     highlight_columns = nullptr;
     filter = nullptr;
@@ -939,7 +947,8 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
                                                  offset,
                                                  output_columns,
                                                  highlight_columns,
-                                                 order_by_list);
+                                                 order_by_list,
+                                                 nullptr);
     output_columns = nullptr;
     highlight_columns = nullptr;
     search_expr = nullptr;

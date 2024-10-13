@@ -1387,6 +1387,30 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     }
 
+    Vector<ParsedExpr *> *group_by_exprs = nullptr;
+    DeferFn defer_fn8([&]() {
+        if (group_by_exprs != nullptr) {
+            SizeT group_by_column_len = group_by_exprs->size();
+            for (SizeT i = 0; i < group_by_column_len; ++i) {
+                if ((*group_by_exprs)[i] != nullptr) {
+                    delete (*group_by_exprs)[i];
+                    (*group_by_exprs)[i] = nullptr;
+                }
+            }
+        }
+    });
+    if (!group_by_list.empty()) {
+        group_by_exprs = new Vector<ParsedExpr *>();
+        group_by_exprs->reserve(group_by_list.size());
+        for (SizeT i = 0; i < group_by_list.size(); ++i) {
+            Status status;
+            group_by_exprs->emplace_back(group_by_list.at(i).GetParsedExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
     Vector<OrderByExpr *> *order_by_exprs = nullptr;
     DeferFn defer_fn6([&]() {
         if (order_by_exprs != nullptr) {
@@ -1413,13 +1437,16 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     }
 
-    auto query_result = instance.Search(db_name, table_name, search_expr, filter, limit, offset, output_columns, highlight, order_by_exprs);
+    auto query_result =
+        instance.Search(db_name, table_name, search_expr, filter, limit, offset, output_columns, highlight, order_by_exprs, group_by_exprs);
     search_expr = nullptr;
     filter = nullptr;
     limit = nullptr;
     offset = nullptr;
     output_columns = nullptr;
+    highlight = nullptr;
     order_by_exprs = nullptr;
+    group_by_exprs = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }
@@ -1497,6 +1524,84 @@ WrapQueryResult WrapExplain(Infinity &instance,
         }
     }
 
+    Vector<ParsedExpr *> *highlight = nullptr;
+    DeferFn defer_fn11([&]() {
+        if (highlight != nullptr) {
+            SizeT highlight_column_len = highlight->size();
+            for (SizeT i = 0; i < highlight_column_len; ++i) {
+                if ((*highlight)[i] != nullptr) {
+                    delete (*highlight)[i];
+                    (*highlight)[i] = nullptr;
+                }
+            }
+        }
+    });
+    if (!highlight_list.empty()) {
+        highlight = new Vector<ParsedExpr *>();
+        highlight->reserve(highlight_list.size());
+        for (SizeT i = 0; i < highlight_list.size(); ++i) {
+            Status status;
+            highlight->emplace_back(highlight_list.at(i).GetParsedExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
+    ParsedExpr *limit = nullptr;
+    DeferFn defer_fn9([&]() {
+        if (limit != nullptr) {
+            delete limit;
+            limit = nullptr;
+        }
+    });
+    if (limit_expr != nullptr) {
+        Status status;
+        limit = limit_expr->GetParsedExpr(status);
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+
+    ParsedExpr *offset = nullptr;
+    DeferFn defer_fn10([&]() {
+        if (offset != nullptr) {
+            delete offset;
+            offset = nullptr;
+        }
+    });
+    if (offset_expr != nullptr) {
+        Status status;
+        offset = offset_expr->GetParsedExpr(status);
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+
+    Vector<ParsedExpr *> *group_by_exprs = nullptr;
+    DeferFn defer_fn8([&]() {
+        if (group_by_exprs != nullptr) {
+            SizeT group_by_column_len = group_by_exprs->size();
+            for (SizeT i = 0; i < group_by_column_len; ++i) {
+                if ((*group_by_exprs)[i] != nullptr) {
+                    delete (*group_by_exprs)[i];
+                    (*group_by_exprs)[i] = nullptr;
+                }
+            }
+        }
+    });
+    if (!group_by_list.empty()) {
+        group_by_exprs = new Vector<ParsedExpr *>();
+        group_by_exprs->reserve(group_by_list.size());
+        for (SizeT i = 0; i < group_by_list.size(); ++i) {
+            Status status;
+            group_by_exprs->emplace_back(group_by_list.at(i).GetParsedExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
     Vector<OrderByExpr *> *order_by_exprs = nullptr;
     DeferFn defer_fn6([&]() {
         if (order_by_exprs != nullptr) {
@@ -1523,11 +1628,25 @@ WrapQueryResult WrapExplain(Infinity &instance,
         }
     }
 
-    auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, nullptr, nullptr, output_columns, nullptr, order_by_exprs);
+    auto query_result = instance.Explain(db_name,
+                                         table_name,
+                                         explain_type,
+                                         search_expr,
+                                         filter,
+                                         limit,
+                                         offset,
+                                         output_columns,
+                                         highlight,
+                                         order_by_exprs,
+                                         group_by_exprs);
     search_expr = nullptr;
     filter = nullptr;
+    limit = nullptr;
+    offset = nullptr;
     output_columns = nullptr;
+    highlight = nullptr;
     order_by_exprs = nullptr;
+    group_by_exprs = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }
