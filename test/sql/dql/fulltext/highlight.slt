@@ -1,0 +1,39 @@
+# name: test/sql/dql/hightlight.slt
+# description: Test fulltext+hightlight search
+# group: [dql]
+
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_enwiki;
+
+statement ok
+CREATE TABLE sqllogic_test_enwiki(doctitle varchar DEFAULT '', docdate varchar DEFAULT '', body varchar DEFAULT '');
+
+# copy data from csv file
+query I
+COPY sqllogic_test_enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t', FORMAT CSV );
+----
+
+statement ok
+CREATE INDEX ft_index ON sqllogic_test_enwiki(body) USING FULLTEXT;
+
+statement ok
+CREATE INDEX ft_index2 ON sqllogic_test_enwiki(doctitle) USING FULLTEXT;
+
+query IR rowsort
+SELECT ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle,body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
+----
+0 25.094610
+19 3.029415
+68 3.029415
+
+query IRTT rowsort
+SELECT ROW_ID(), SCORE(), doctitle, body HIGHLIGHT body, doctitle FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle,body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
+----
+0 25.094610 <em>Anarchism</em>... {{Redirect|Anarchist|the fictional character|Anarchist (comics)}} {{Redirect|Anarchists}} {{<em>Anarchism</em> sidebar}} {{Libertarianism sidebar}}  '''<em>Anarchism</em>... and <em>harmful</em><ref name="definition"> {{Cite journal|last=Malatesta|first=Errico|title=Towards <em>Anarchism</em>...com/eb/article-9117285|title=<em>Anarchism</em>...
+19 3.029415 <em>Anarchism</em>... as on page 10) * [[Alexandre Skirda|Skirda, Alexandre]]. Facing the Enemy: A History of Anarchist Organization from Proudhon to May 1968. AK Press 2002. p. 183. * Fernandez, Frank. Cuban <em>Anarchism</em>... "[[libertarian socialism]]" is sometimes used as a synonym for [[socialist <em>anarchism</em>... |title=Contemporary <em>Anarchism</em>...</ref> to distinguish it from "individualist libertarianism" (individualist <em>anarchism</em>... referring to free-market <em>anarchism</em> as "[[libertarian <em>anarchism</em>... (Using "libertarian <em>anarchism</em>...
+68 3.029415 <em>Anarchism</em>... History of A Movement'' by Frank Fernandez]</ref> From 1944 to 1947, the Bulgarian Anarchist Communist Federation reemerged as part of a factory and workplace committee movement, but was repressed by the new Communist regime.<ref name="robertgraham.wordpress.com">[http://robertgraham.wordpress.com/anarchism-a-documentary-history-of-libertarian-ideas-volume-two-the-emergence-of-the-new-<em>anarchism</em>-1939-1977/ <em>Anarchism</em> Volume Two: The Emergence of the New <em>Anarchism</em> (1939-1977) « Robert Graham’s <em>Anarchism</em>-- Bot generated title -->]</ref> In 1945 in [[<em>Anarchism</em> in France|France]] the [[Fédération Anarchiste]] was established and the also [[Synthesist <em>anarchism</em>|synthesist]] [[Federazione Anarchica Italiana]] was founded in [[<em>Anarchism</em> in Italy|Italy]]....
+
+
+# Clean up
+statement ok
+DROP TABLE sqllogic_test_enwiki;

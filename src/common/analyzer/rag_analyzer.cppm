@@ -54,6 +54,7 @@ public:
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;
 
+protected:
 private:
     static constexpr float DENOMINATOR = 1000000;
 

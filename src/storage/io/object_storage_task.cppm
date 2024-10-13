@@ -53,35 +53,42 @@ export struct BaseObjectStorageTask {
 };
 
 export struct DownloadTask final : public BaseObjectStorageTask {
-    DownloadTask() : BaseObjectStorageTask(ObjectStorageTaskType::kDownload) {}
+    DownloadTask(const String &_file_dir, const String& _object_name) : BaseObjectStorageTask(ObjectStorageTaskType::kDownload) , file_dir(_file_dir), object_name(_object_name){}
 
     ~DownloadTask() = default;
 
     String ToString() const final { return "Download Task"; }
+    String file_dir;
+    String object_name;
 };
 
 export struct UploadTask final : public BaseObjectStorageTask {
-    UploadTask() : BaseObjectStorageTask(ObjectStorageTaskType::kUpload) {}
+    UploadTask(const String &_file_dir, const String& _object_name) : BaseObjectStorageTask(ObjectStorageTaskType::kUpload), file_dir(_file_dir), object_name(_object_name){}
 
     ~UploadTask() = default;
 
     String ToString() const final { return "Download Task"; }
+    String file_dir;
+    String object_name;
 };
 
 export struct CopyTask final : public BaseObjectStorageTask {
-    CopyTask() : BaseObjectStorageTask(ObjectStorageTaskType::kCopy) {}
+    CopyTask(const String &_src_object_name, const String &_dst_object_name) : BaseObjectStorageTask(ObjectStorageTaskType::kCopy), src_object_name(_src_object_name), dst_object_name(_dst_object_name) {}
 
     ~CopyTask() = default;
 
     String ToString() const final { return "Copy Task"; }
+    String src_object_name;
+    String dst_object_name;
 };
 
 export struct RemoveTask final : public BaseObjectStorageTask {
-    RemoveTask() : BaseObjectStorageTask(ObjectStorageTaskType::kRemove) {}
+    RemoveTask(const String &_object_name) : BaseObjectStorageTask(ObjectStorageTaskType::kRemove), object_name(_object_name) {}
 
     ~RemoveTask() = default;
 
     String ToString() const final { return "Remove Task"; }
+    String object_name;
 };
 
 export struct StopObjectStorageProcessTask final : public BaseObjectStorageTask {

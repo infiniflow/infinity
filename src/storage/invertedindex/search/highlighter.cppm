@@ -22,6 +22,12 @@ import aho_corasick;
 import analyzer;
 
 namespace infinity {
+
+export struct HighlightInfo {
+    Vector<String> query_terms_;
+    String analyzer_;
+};
+
 export class Highlighter : public Singleton<Highlighter> {
 public:
     Highlighter();

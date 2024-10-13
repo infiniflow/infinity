@@ -24,7 +24,7 @@ from infinity_embedded.errors import ErrorCode
 from infinity_embedded.common import InfinityException, SparseVector
 from infinity_embedded.local_infinity.types import build_result, logic_type_to_dtype
 from infinity_embedded.utils import binary_exp_to_paser_exp
-from infinity_embedded.embedded_infinity_ext import WrapInExpr, WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapConstantExpr, ParsedExprType, LiteralType
+from infinity_embedded.embedded_infinity_ext import WrapInExpr, WrapParsedExpr, WrapOrderByExpr, WrapFunctionExpr, WrapColumnExpr, WrapConstantExpr, ParsedExprType, LiteralType
 from infinity_embedded.embedded_infinity_ext import WrapEmbeddingType, WrapColumnDef, WrapDataType, LogicalType, EmbeddingDataType, WrapSparseType, ConstraintType
 from datetime import date, time, datetime, timedelta
 

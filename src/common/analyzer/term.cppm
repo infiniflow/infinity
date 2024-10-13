@@ -60,6 +60,7 @@ public:
         back().text_.assign(text, len);
         back().word_offset_ = offset;
         back().end_offset_ = end_offset;
+        back().end_offset_ = end_offset;
         back().SetStats(and_or_bit, level);
     }
 

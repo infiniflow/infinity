@@ -200,14 +200,14 @@ export {
 
     // default persistence parameter
     constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence"; // Empty means disabled
-    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "100MB"; // 100MB
-    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 100 * 1024lu * 1024lu;  // 100MB
+    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "128MB"; // 128MB
+    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 128 * 1024lu * 1024lu;  // 128MB
 
     constexpr std::string_view DEFAULT_STORAGE_TYPE = "local";
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_BUCKET = "infinity";
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_DIR = "/var/infinity/localdiskcache";
-    constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT_STR = "100GB"; // 100GB
-    constexpr SizeT DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT = 100 * 1024lu * 1024lu * 1024lu; // 100GB
+    constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT_STR = "128GB"; // 128GB
+    constexpr SizeT DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT = 128 * 1024lu * 1024lu * 1024lu; // 128GB
 
 
     // config name
