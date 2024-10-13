@@ -82,12 +82,6 @@ protected:
         }
     }
 
-    static void AppendTermListForJieba(void *data, cppjieba::Word &cut_word) {
-        void **parameters = (void **)data;
-        TermList *output = (TermList *)parameters[0];
-        output->Add(cut_word);
-    }
-
     Tokenizer tokenizer_;
 
     SharedPtr<Analyzer> inner_analyzer_;

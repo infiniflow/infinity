@@ -147,7 +147,6 @@ void Highlighter::GetHighlightWithStemmer(const Vector<String> &query, const Str
         auto it = std::lower_bound(sentence_boundaries.begin(), sentence_boundaries.end(), term.word_offset_, [](auto element, auto value) {
             return element < value;
         });
-
         if (last_sentence_iter == sentence_boundaries.end()) {
             last_sentence_pos = 0;
             output.append(raw_text.substr(last_sentence_pos, term.word_offset_ - last_sentence_pos));

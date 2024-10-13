@@ -17,6 +17,7 @@
 #include <deque>
 #include <iostream>
 #include <vector>
+#include <vector>
 
 import base_test;
 import stl;
