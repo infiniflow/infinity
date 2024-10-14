@@ -80,6 +80,8 @@ public:
 
     inline bool IsDelimiter() { return is_delimiter_; }
 
+    inline SizeT GetTokenStartCursor() const { return token_start_cursor_; }
+
     inline SizeT GetInputCursor() const { return input_cursor_; }
 
     bool Tokenize(const String &input_string, TermList &special_terms, TermList &prim_terms);
@@ -97,6 +99,8 @@ private:
     CharTypeTable table_;
 
     String *input_{nullptr};
+
+    SizeT token_start_cursor_{0};
 
     SizeT input_cursor_{0};
 

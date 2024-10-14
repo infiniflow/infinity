@@ -56,7 +56,6 @@ def setup_class(request, local_infinity, http):
     yield
     request.cls.infinity_obj.disconnect()
 
-
 @pytest.mark.usefixtures("setup_class")
 @pytest.mark.usefixtures("suffix")
 class TestInfinity:

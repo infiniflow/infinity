@@ -224,7 +224,7 @@ OPTION(PCRE2_BUILD_PCRE2_16 "Build 16 bit PCRE2 library" OFF)
 
 OPTION(PCRE2_BUILD_PCRE2_32 "Build 32 bit PCRE2 library" OFF)
 
-OPTION(PCRE2_STATIC_PIC "Build the static library with the option position independent code enabled." OFF)
+OPTION(PCRE2_STATIC_PIC "Build the static library with the option position independent code enabled." ON)
 
 OPTION(PCRE2_DEBUG "Include debugging code" OFF)
 

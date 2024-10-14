@@ -217,7 +217,7 @@ int main() {
                         output_columns->emplace_back(col2);
 
                         [[maybe_unused]] auto ignored =
-                            infinity->Search("default_db", "benchmark_test", nullptr, nullptr, nullptr, nullptr, output_columns, nullptr);
+                            infinity->Search("default_db", "benchmark_test", nullptr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr);
                     });
                 results.push_back(fmt::format("-> Select QPS: {}", total_times / tims_costing_second));
             }

@@ -14,11 +14,15 @@
 
 module;
 
-#include <re2/re2.h>
+#define PCRE2_CODE_UNIT_WIDTH 8
 
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+
+#include <openccxx.h>
+#include <pcre2.h>
+#include <re2/re2.h>
 
 #include "string_utils.h"
 
@@ -30,6 +34,8 @@ import stemmer;
 import analyzer;
 import darts_trie;
 import lemmatizer;
+import stemmer;
+import term;
 
 namespace fs = std::filesystem;
 
@@ -40,19 +46,24 @@ static const String POS_DEF_PATH = "rag/pos-id.def";
 static const String TRIE_PATH = "rag/huqie.trie";
 static const String WORDNET_PATH = "wordnet";
 
+static const String OPENCC_PATH = "opencc";
+
 static const String REGEX_SPLIT_CHAR = R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#";
 
+static const String NLTK_TOKENIZE_PATTERN =
+    R"((?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|(?=[^\(\"\`{\[:;&\#\*@\)}\]\-,])\S+?(?=\s|$|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|,(?=$|\s|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)))|\S)";
+
 static inline i32 Encode(i32 freq, i32 idx) {
-    u32 encodedValue = 0;
+    u32 encoded_value = 0;
     if (freq < 0) {
-        encodedValue |= (u32)(-freq);
-        encodedValue |= (1U << 23);
+        encoded_value |= (u32)(-freq);
+        encoded_value |= (1U << 23);
     } else {
-        encodedValue = (u32)(freq & 0x7FFFFF);
+        encoded_value = (u32)(freq & 0x7FFFFF);
     }
 
-    encodedValue |= (u32)idx << 24;
-    return (i32)encodedValue;
+    encoded_value |= (u32)idx << 24;
+    return (i32)encoded_value;
 }
 
 static inline i32 DecodeFreq(i32 value) {
@@ -97,8 +108,6 @@ bool RegexMatch(const String &str, const String &pattern) { return RE2::PartialM
 
 String Join(const Vector<String> &tokens, int start, int end, const String &delim = " ") {
     std::ostringstream oss;
-    if (end > (int)tokens.size())
-        std::cout << "token.size() " << tokens.size() << " start " << start << " end " << end << std::endl;
     for (int i = start; i < end; ++i) {
         if (i > start)
             oss << delim;
@@ -108,6 +117,16 @@ String Join(const Vector<String> &tokens, int start, int end, const String &deli
 }
 
 String Join(const Vector<String> &tokens, int start, const String &delim = " ") { return Join(tokens, start, tokens.size(), delim); }
+
+String Join(const TermList &tokens, int start, int end, const String &delim = " ") {
+    std::ostringstream oss;
+    for (int i = start; i < end; ++i) {
+        if (i > start)
+            oss << delim;
+        oss << tokens[i].text_;
+    }
+    return oss.str();
+}
 
 std::wstring UTF8ToWide(const String &utf8) {
     std::wstring result;
@@ -178,15 +197,76 @@ bool IsChinese(const String &str) {
     return false;
 }
 
-RAGAnalyzer::RAGAnalyzer(const String &path) : dict_path_(path) {}
+class RegexTokenizer {
+public:
+    RegexTokenizer() {
+        int errorcode = 0;
+        PCRE2_SIZE erroffset = 0;
 
-RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other) : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_) {}
+        re_ = pcre2_compile((PCRE2_SPTR)(NLTK_TOKENIZE_PATTERN.c_str()),
+                            PCRE2_ZERO_TERMINATED,
+                            PCRE2_MULTILINE | PCRE2_UTF,
+                            &errorcode,
+                            &erroffset,
+                            nullptr);
+    }
+
+    ~RegexTokenizer() { pcre2_code_free(re_); }
+
+    void RegexTokenize(const String &input, TermList &tokens) {
+        PCRE2_SPTR subject = (PCRE2_SPTR)input.c_str();
+        PCRE2_SIZE subject_length = input.length();
+
+        pcre2_match_data_8 *match_data = pcre2_match_data_create_8(1024, nullptr);
+
+        PCRE2_SIZE start_offset = 0;
+
+        while (start_offset < subject_length) {
+            int res = pcre2_match(re_, subject, subject_length, start_offset, 0, match_data, nullptr);
+
+            if (res < 0) {
+                if (res == PCRE2_ERROR_NOMATCH) {
+                    break; // No more matches
+                } else {
+                    std::cerr << "Matching error code: " << res << std::endl;
+                    break; // Other error
+                }
+            }
+
+            // Extract matched substring
+            PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+            for (int i = 0; i < res; ++i) {
+                PCRE2_SIZE start = ovector[2 * i];
+                PCRE2_SIZE end = ovector[2 * i + 1];
+                tokens.Add(input.c_str() + start, end - start, start, end);
+            }
+
+            // Update the start offset for the next search
+            start_offset = ovector[1]; // Move to the end of the last match
+        }
+
+        // Free memory
+        pcre2_match_data_free(match_data);
+    }
+
+private:
+    pcre2_code_8 *re_{nullptr};
+};
+
+RAGAnalyzer::RAGAnalyzer(const String &path)
+    : dict_path_(path), lowercase_string_buffer_(term_string_buffer_limit_), regex_tokenizer_(MakeUnique<RegexTokenizer>()) {}
+
+RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other)
+    : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_), stemmer_(other.stemmer_), opencc_(other.opencc_),
+      lowercase_string_buffer_(term_string_buffer_limit_), fine_grained_(other.fine_grained_), regex_tokenizer_(MakeUnique<RegexTokenizer>()) {}
 
 RAGAnalyzer::~RAGAnalyzer() {
     if (own_dict_) {
         delete trie_;
         delete pos_table_;
         delete lemma_;
+        delete stemmer_;
+        delete opencc_;
     }
 }
 
@@ -249,6 +329,20 @@ Status RAGAnalyzer::Load() {
         return Status::InvalidAnalyzerFile(lemma_path);
     }
     lemma_ = new Lemmatizer(lemma_path.string());
+
+    stemmer_ = new Stemmer();
+    InitStemmer(STEM_LANG_ENGLISH);
+
+    fs::path opencc_path(root / OPENCC_PATH);
+
+    if (!fs::exists(opencc_path)) {
+        return Status::InvalidAnalyzerFile(opencc_path);
+    }
+    try {
+        opencc_ = new ::OpenCC(opencc_path.string());
+    } catch (const std::exception &e) {
+        return Status::InvalidAnalyzerFile("Failed to load OpenCC");
+    }
 
     return Status::OK();
 }
@@ -324,7 +418,6 @@ void RAGAnalyzer::SortTokens(const Vector<Vector<Pair<String, int>>> &token_list
         res.emplace_back(tks, score);
     }
 
-    // Sort the results in descending order based on the score
     std::sort(res.begin(), res.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
 }
 
@@ -478,8 +571,50 @@ String RAGAnalyzer::Merge(const String &tks_str) {
     return Join(res, 0, res.size());
 }
 
-String RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
-    String strline = StrQ2B(line);
+void RAGAnalyzer::EnglishNormalize(const Vector<String> &tokens, Vector<String> &res) {
+    for (auto &t : tokens) {
+        if (RegexMatch(t, "[a-zA-Z_-]+$")) {
+            String lemma_term = lemma_->Lemmatize(t);
+            char *lowercase_term = lowercase_string_buffer_.data();
+            ToLower(lemma_term.c_str(), lemma_term.size(), lowercase_term, term_string_buffer_limit_);
+            String stem_term;
+            stemmer_->Stem(lowercase_term, stem_term);
+            res.push_back(stem_term);
+        } else {
+            res.push_back(t);
+        }
+    }
+}
+
+String RAGAnalyzer::Tokenize(const String &line) {
+    String str1 = StrQ2B(line);
+    String strline;
+    opencc_->convert(str1, strline);
+    Vector<String> res;
+    std::size_t zh_num = 0;
+    int len = UTF8Length(strline);
+    for (int i = 0; i < len; ++i) {
+        String t = UTF8Substr(strline, i, 1);
+        if (IsChinese(t)) {
+            zh_num++;
+        }
+    }
+    if (zh_num == 0) {
+        TermList term_list;
+        // tokenizer_.Tokenize(line, term_list);
+        regex_tokenizer_->RegexTokenize(line, term_list);
+        for (unsigned i = 0; i < term_list.size(); ++i) {
+            String t = lemma_->Lemmatize(term_list[i].text_);
+            char *lowercase_term = lowercase_string_buffer_.data();
+            ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
+            String stem_term;
+            stemmer_->Stem(lowercase_term, stem_term);
+            res.push_back(stem_term);
+        }
+        String ret = Join(res, 0);
+        return ret;
+    }
+
     Vector<String> arr;
     Split(strline, REGEX_SPLIT_CHAR, arr, true);
     for (const auto &L : arr) {
@@ -488,19 +623,7 @@ String RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
             continue;
         }
         auto [tks, s] = MaxForward(L);
-        std::cout << std::endl;
         auto [tks1, s1] = MaxBackward(L);
-
-        std::cout << "[FW] ";
-        for (auto &token : tks) {
-            std::cout << token << " ";
-        }
-        std::cout << s << std::endl;
-        std::cout << "[BW] ";
-        for (auto &token : tks1) {
-            std::cout << token << " ";
-        }
-        std::cout << s1 << std::endl;
 
         Vector<int> diff(std::max(tks.size(), tks1.size()), 0);
         for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
@@ -542,13 +665,14 @@ String RAGAnalyzer::Tokenize(const String &line, Vector<String> &res) {
         }
     }
 
-    String r = Join(res, 0);
+    Vector<String> normalize_res;
+    EnglishNormalize(res, normalize_res);
+    String r = Join(normalize_res, 0);
     String ret = Merge(r);
-    std::cout << "[TKS]" << ret << std::endl;
     return ret;
 }
 
-String RAGAnalyzer::FineGrainedTokenize(const String &tokens) {
+void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &result) {
     Vector<String> tks;
     Split(tokens, "( )", tks);
     Vector<String> res;
@@ -567,12 +691,11 @@ String RAGAnalyzer::FineGrainedTokenize(const String &tokens) {
             std::istringstream iss(token);
             String sub_token;
             while (std::getline(iss, sub_token, '/')) {
-                res.push_back(sub_token);
+                result.push_back(sub_token);
             }
         }
-        String ret = Join(res, 0);
-        std::cout << ret << std::endl;
-        return ret;
+        // String ret = Join(res, 0);
+        return;
     }
 
     for (auto &token : tks) {
@@ -611,9 +734,24 @@ String RAGAnalyzer::FineGrainedTokenize(const String &tokens) {
         }
         res.push_back(s_token);
     }
-    String ret = Join(res, 0);
-    std::cout << ret << std::endl;
-    return ret;
+    EnglishNormalize(res, result);
+    // String ret = Join(normalize_res, 0);
+    // return ret;
+}
+
+int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
+    unsigned level = 0;
+    Vector<String> tokens;
+    String output = Tokenize(input.text_.c_str());
+    if (fine_grained_) {
+        FineGrainedTokenize(output, tokens);
+    } else
+        Split(output, "( )", tokens);
+    unsigned offset = 0;
+    for (auto &t : tokens) {
+        func(data, t.c_str(), t.size(), offset++, 0, Term::AND, level, false);
+    }
+    return 0;
 }
 
 } // namespace infinity

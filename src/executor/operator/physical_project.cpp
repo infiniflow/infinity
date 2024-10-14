@@ -27,6 +27,8 @@ import data_block;
 import column_vector;
 
 import infinity_exception;
+import analyzer_pool;
+import value;
 
 module physical_project;
 
@@ -100,9 +102,39 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
             }
 
             for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
-                //        Vector<SharedPtr<ColumnVector>> blocks_column;
-                //        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
                 evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
+
+                auto it = highlight_columns_.find(expr_idx);
+                if (it != highlight_columns_.end()) {
+                    SizeT num_rows = output_data_block->column_vectors[expr_idx]->Size();
+                    SharedPtr<ColumnVector> highlight_column = ColumnVector::Make(output_data_block->column_vectors[expr_idx]->data_type());
+                    highlight_column->Initialize(ColumnVectorType::kFlat, num_rows);
+
+                    SharedPtr<HighlightInfo> highlight_info = it->second;
+                    Vector<String> &query_terms = highlight_info->query_terms_;
+                    String &analyzer_name = highlight_info->analyzer_;
+                    if (analyzer_name.find("standard") != std::string::npos) {
+                        auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
+                        if (!status.ok()) {
+                            RecoverableError(status);
+                        }
+                        analyzer->SetCharOffset(true);
+                        for (SizeT i = 0; i < num_rows; ++i) {
+                            String raw_content = output_data_block->column_vectors[expr_idx]->GetValue(i).GetVarchar();
+                            String output;
+                            Highlighter::instance().GetHighlightWithStemmer(query_terms, raw_content, output, analyzer.get());
+                            highlight_column->AppendValue(Value::MakeVarchar(output));
+                        }
+                    } else {
+                        for (SizeT i = 0; i < num_rows; ++i) {
+                            String raw_content = output_data_block->column_vectors[expr_idx]->GetValue(i).GetVarchar();
+                            String output;
+                            Highlighter::instance().GetHighlightWithoutStemmer(query_terms, raw_content, output);
+                            highlight_column->AppendValue(Value::MakeVarchar(output));
+                        }
+                    }
+                    output_data_block->column_vectors[expr_idx] = std::move(highlight_column);
+                }
             }
             output_data_block->Finalize();
         }

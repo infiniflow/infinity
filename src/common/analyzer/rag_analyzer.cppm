@@ -14,6 +14,8 @@
 
 module;
 
+#include <re2/re2.h>
+
 export module rag_analyzer;
 
 import stl;
@@ -21,13 +23,17 @@ import term;
 import status;
 import darts_trie;
 import lemmatizer;
+import stemmer;
+import analyzer;
 
+class OpenCC;
 namespace infinity {
 
 // C++ reimplementation of
 // https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py
 
-export class RAGAnalyzer {
+class RegexTokenizer;
+export class RAGAnalyzer : public Analyzer {
 public:
     RAGAnalyzer(const String &path);
 
@@ -35,12 +41,20 @@ public:
 
     ~RAGAnalyzer();
 
+    void InitStemmer(Language language) { stemmer_->Init(language); }
+
     Status Load();
 
-    String Tokenize(const String &line, Vector<String> &res);
+    void SetFineGrained(bool fine_grained) { fine_grained_ = fine_grained; }
 
-    String FineGrainedTokenize(const String &tokens);
+    String Tokenize(const String &line);
 
+    void FineGrainedTokenize(const String &tokens, Vector<String> &result);
+
+protected:
+    int AnalyzeImpl(const Term &input, void *data, HookType func) override;
+
+protected:
 private:
     static constexpr float DENOMINATOR = 1000000;
 
@@ -64,7 +78,11 @@ private:
 
     String Merge(const String &tokens);
 
+    void EnglishNormalize(const Vector<String> &tokens, Vector<String> &res);
+
 public:
+    static const SizeT term_string_buffer_limit_ = 4096 * 3;
+
     String dict_path_;
 
     bool own_dict_{};
@@ -74,5 +92,15 @@ public:
     POSTable *pos_table_{nullptr};
 
     Lemmatizer *lemma_{nullptr};
+
+    Stemmer *stemmer_{nullptr};
+
+    OpenCC *opencc_{nullptr};
+
+    Vector<char> lowercase_string_buffer_;
+
+    bool fine_grained_{false};
+
+    UniquePtr<RegexTokenizer> regex_tokenizer_;
 };
 } // namespace infinity

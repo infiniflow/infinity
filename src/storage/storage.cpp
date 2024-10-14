@@ -128,6 +128,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                         UnrecoverableError("Object storage processor was initialized before.");
                     }
                     object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
+                    object_storage_processor_->Start();
                     break;
                 }
                 default: {

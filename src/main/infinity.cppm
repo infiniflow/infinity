@@ -150,12 +150,12 @@ public:
     QueryResult ShowDeltaCheckpoint();
     QueryResult ShowFullCheckpoint();
     QueryResult ShowObjects();
-    QueryResult ShowObject(const String& object_name);
+    QueryResult ShowObject(const String &object_name);
     QueryResult ShowFilesInObject();
     QueryResult ShowMemory();
     QueryResult ShowMemoryObjects();
     QueryResult ShowMemoryAllocations();
-    QueryResult ShowFunction(const String& function_name);
+    QueryResult ShowFunction(const String &function_name);
 
     QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
 
@@ -175,7 +175,10 @@ public:
                         ParsedExpr *filter,
                         ParsedExpr *limit,
                         ParsedExpr *offset,
-                        Vector<ParsedExpr *> *output_columns);
+                        Vector<ParsedExpr *> *output_columns,
+                        Vector<ParsedExpr *> *highlight_columns,
+                        Vector<OrderByExpr *> *order_by_list,
+                        Vector<ParsedExpr *> *group_by_list);
 
     QueryResult Search(const String &db_name,
                        const String &table_name,
@@ -184,7 +187,9 @@ public:
                        ParsedExpr *limit,
                        ParsedExpr *offset,
                        Vector<ParsedExpr *> *output_columns,
-                       Vector<OrderByExpr *> *order_by_list);
+                       Vector<ParsedExpr *> *highlight_columns,
+                       Vector<OrderByExpr *> *order_by_list,
+                       Vector<ParsedExpr *> *group_by_list);
 
     QueryResult Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_options = OptimizeOptions{});
 
@@ -195,7 +200,7 @@ public:
     QueryResult Cleanup();
 
     QueryResult ForceCheckpoint();
-    QueryResult CompactTable(const String &db_name, const String& table_name);
+    QueryResult CompactTable(const String &db_name, const String &table_name);
 
     // Admin interface
     QueryResult AdminShowCatalogs();
@@ -211,8 +216,8 @@ public:
     QueryResult AdminSetAdmin();
     QueryResult AdminSetStandalone();
     QueryResult AdminSetLeader(String node_name);
-    QueryResult AdminSetFollower(String node_name, const String& leader_address);
-    QueryResult AdminSetLearner(String node_name, const String& leader_address);
+    QueryResult AdminSetFollower(String node_name, const String &leader_address);
+    QueryResult AdminSetLearner(String node_name, const String &leader_address);
 
 private:
     UniquePtr<QueryContext> GetQueryContext() const;
