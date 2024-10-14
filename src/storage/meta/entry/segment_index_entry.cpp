@@ -393,17 +393,17 @@ void SegmentIndexEntry::AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn
     txn->AddWalCmd(MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id_, std::move(chunk_infos), std::move(deprecate_chunk_ids)));
 }
 
-void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id) {
-    const IndexBase *index_base = table_index_entry_->index_base();
-    if (index_base->index_type_ != IndexType::kFullText)
-        return;
-    // Init the mem index from previously spilled one.
-    assert(memory_indexer_.get() == nullptr);
-    const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-    String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
-    memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
-    memory_indexer_->Load();
-}
+// void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id) {
+//     const IndexBase *index_base = table_index_entry_->index_base();
+//     if (index_base->index_type_ != IndexType::kFullText)
+//         return;
+//     // Init the mem index from previously spilled one.
+//     assert(memory_indexer_.get() == nullptr);
+//     const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+//     String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
+//     memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
+//     memory_indexer_->Load();
+// }
 
 u32 SegmentIndexEntry::MemIndexRowCount() {
     const IndexBase *index_base = table_index_entry_->index_base();
@@ -1033,11 +1033,6 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
                                                                           TxnTimeStamp commit_ts,
                                                                           TxnTimeStamp deprecate_ts,
                                                                           BufferManager *buffer_mgr) {
-    if (chunk_id < next_chunk_id_) {
-        String error_message = fmt::format("Wal Chunk ID: {} < next chunk ID: {}. ignore", chunk_id, next_chunk_id_);
-        LOG_WARN(error_message);
-        return nullptr; // this happen when wal write latter than delta log which is possible in dump index.
-    }
     LOG_INFO(fmt::format("AddChunkIndexEntryReplayWal chunk_id: {} deprecate_ts: {}, base_rowid: {}, row_count: {} to to segment: {}",
                           chunk_id,
 
@@ -1047,6 +1042,12 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
                           segment_id_));
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
+    auto iter = std::find_if(chunk_index_entries_.begin(), chunk_index_entries_.end(), [chunk_id](const SharedPtr<ChunkIndexEntry> &entry) {
+        return entry->chunk_id_ == chunk_id;
+    });
+    if (iter != chunk_index_entries_.end()) {
+        UnrecoverableError(fmt::format("Chunk ID: {} already exists in segment: {}", chunk_id, segment_id_));
+    }
     chunk_index_entries_.push_back(chunk_index_entry);
     next_chunk_id_ = chunk_id + 1;
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {

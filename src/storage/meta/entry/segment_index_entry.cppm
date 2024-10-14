@@ -126,8 +126,8 @@ public:
 
     void AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn, Vector<ChunkID> chunk_ids = {});
 
-    // Init the mem index from previously spilled one.
-    void MemIndexLoad(const String &base_name, RowID base_row_id);
+    // // Init the mem index from previously spilled one.
+    // void MemIndexLoad(const String &base_name, RowID base_row_id);
 
     // Populate index entirely for the segment
     void PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config);
