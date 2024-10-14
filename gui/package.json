@@ -53,6 +53,9 @@
   "devDependencies": {
     "@svgr/webpack": "^8.1.0",
     "code-inspector-plugin": "^0.16.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.15",
+    "eslint-config-prettier": "^9.1.0",
     "prettier-plugin-organize-imports": "^4.0.0"
   }
 }
