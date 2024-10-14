@@ -173,12 +173,19 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
 
         if (column_type) {
             std::set<ConstraintType> constraints;
-            if (field_element.contains("constraints"))
+            if (field_element.contains("constraints")) {
                 for (auto &constraint_json : field_element["constraints"]) {
                     String constraint = constraint_json;
                     ToLower(constraint);
                     constraints.insert(StringToConstraintType(constraint));
                 }
+            }
+
+            String table_comment;
+            if (field_element.contains("comment")) {
+                table_comment = field_element["comment"];
+            }
+
             SharedPtr<ParsedExpr> default_expr{nullptr};
             if (field_element.contains("default")) {
                 switch (column_type->type()) {
@@ -193,7 +200,7 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
                     }
                 }
             }
-            ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, default_expr);
+            ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, table_comment, default_expr);
             column_definitions.emplace_back(col_def);
         } else {
             return infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));

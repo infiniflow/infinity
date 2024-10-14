@@ -15,7 +15,6 @@ if parent_dir not in sys.path:
 from infinity_http import infinity_http
 
 
-
 @pytest.fixture(scope="class")
 def local_infinity(request):
     return request.config.getoption("--local-infinity")
@@ -58,6 +57,9 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_show_table"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    # @pytest.mark.usefixtures("skip_if_http")
+    # @pytest.mark.usefixtures("skip_if_local_infinity")
     def _test_show_columns(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_columns"+suffix, ConflictType.Ignore)
@@ -69,10 +71,55 @@ class TestInfinity:
             res = db_obj.show_columns("test_show_columns"+suffix)
             print(res)
             # check the polars dataframe
-            assert res.columns == ["name", "type", "default"]
+            assert res.columns == ["name", "type", "default", "comment"]
 
         res = db_obj.drop_table("test_show_columns"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    # @pytest.mark.usefixtures("skip_if_http")
+    # @pytest.mark.usefixtures("skip_if_local_infinity")
+    def test_show_columns_with_comment(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_show_columns" + suffix, ConflictType.Ignore)
+        db_obj.create_table(
+            "test_show_columns" + suffix,
+            {
+                "num": {"type": "integer", "default": 0},
+                "body": {
+                    "type": "varchar",
+                    "default": "default text",
+                    "comment": "comment2",
+                },
+                "vec": {"type": "vector,5,float", "comment": "comment3"},
+            },
+            ConflictType.Error,
+        )
+        with pl.Config(fmt_str_lengths=1000):
+            res: pl.DataFrame = db_obj.show_columns("test_show_columns" + suffix)
+            print(res)
+            # check the polars dataframe
+            expected_data = [
+                {"name": "num", "type": "Integer", "default": "0", "comment": ""},
+                {
+                    "name": "body",
+                    "type": "Varchar",
+                    "default": "default text",
+                    "comment": "comment2",
+                },
+                {
+                    "name": "vec",
+                    "type": "Embedding(float,5)",
+                    "default": "Null",
+                    "comment": "comment3",
+                },
+            ]
+            expected_df = pl.DataFrame(expected_data)
+            print(expected_df)
+            assert res.equals(expected_df)
+
+        res = db_obj.drop_table("test_show_columns"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def _test_show_big_databases(self, suffix):
         for i in range(8193):
             self.infinity_obj.drop_database(f"test_show_big_databases_{i}"+suffix, ConflictType.Ignore)

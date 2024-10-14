@@ -37,7 +37,7 @@ The `uri` here can be either a local directory in `str` format or a `NetworkAddr
 
 :::tip IMPORTANT
 - When setting `uri` as `"/absolute/path/to/save/to"`, ensure you:
-  - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.4.0.dev3_OR_HIGHER>`
+  - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.4.0.dev4_OR_HIGHER>`
   - Import the `infinity_embedded` module: `import infinity_embedded`.
 - When setting `uri` as `NetworkAddress`, ensure you:
   - Install the Infinity SDK: `pip install infinity==<VERSION>`
@@ -54,7 +54,7 @@ When connecting to Infinity in client-server mode, ensure that the client versio
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
 | v0.3.0             | v0.3.0             |
-| v0.4.0.dev3        | v0.4.0.dev3        |
+| v0.4.0.dev4        | v0.4.0.dev4        |
 
 If the versions do not match, please update your client or server to ensure compatibility.
 
@@ -83,7 +83,7 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 #### Connect to the local directory of Infinity
 
-From v0.4.0.dev3 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev3_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
+From v0.4.0.dev4 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev4_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
 ```python
 import infinity_embedded

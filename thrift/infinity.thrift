@@ -273,6 +273,7 @@ struct ColumnDef {
 3:  DataType data_type,
 4:  list<Constraint> constraints = [],
 5:  ConstantExpr constant_expr,
+6:  string comment,
 }
 
 
