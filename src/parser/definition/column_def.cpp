@@ -57,6 +57,21 @@ ColumnDef::ColumnDef(int64_t id,
                      std::shared_ptr<DataType> column_type,
                      std::string column_name,
                      std::set<ConstraintType> constraints,
+                     std::string comment,
+                     std::shared_ptr<ParsedExpr> default_expr)
+    : TableElement(TableElementType::kColumn), id_(id), column_type_(std::move(column_type)), name_(std::move(column_name)),
+      constraints_(std::move(constraints)), comment_(std::move(comment)), default_expr_(std::move(default_expr)) {
+    // TODO: type check for default_expr
+    if (!default_expr_) {
+        auto const_expr = new ConstantExpr(LiteralType::kNull);
+        default_expr_ = std::shared_ptr<ParsedExpr>(const_expr);
+    }
+}
+
+ColumnDef::ColumnDef(int64_t id,
+                     std::shared_ptr<DataType> column_type,
+                     std::string column_name,
+                     std::set<ConstraintType> constraints,
                      std::shared_ptr<ParsedExpr> default_expr)
     : TableElement(TableElementType::kColumn), id_(id), column_type_(std::move(column_type)), name_(std::move(column_name)),
       constraints_(std::move(constraints)), default_expr_(std::move(default_expr)) {
@@ -76,10 +91,22 @@ ColumnDef::ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &
     }
 }
 
+ColumnDef::ColumnDef(LogicalType logical_type,
+                     const std::shared_ptr<TypeInfo> &type_info_ptr,
+                     std::string comment,
+                     std::shared_ptr<ParsedExpr> default_expr)
+    : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, type_info_ptr)), comment_(std::move(comment)),
+      default_expr_(std::move(default_expr)) {
+    if (!default_expr_) {
+        auto const_expr = new ConstantExpr(LiteralType::kNull);
+        default_expr_ = std::shared_ptr<ParsedExpr>(const_expr);
+    }
+}
+
 bool ColumnDef::operator==(const ColumnDef &other) const {
     bool res = type_ == other.type_ && id_ == other.id_ && name_ == other.name_ && column_type_ != nullptr && other.column_type_ != nullptr &&
                *column_type_ == *other.column_type_ && constraints_.size() == other.constraints_.size() &&
-               build_bloom_filter_ == other.build_bloom_filter_;
+               build_bloom_filter_ == other.build_bloom_filter_ && comment_ == other.comment_;
     if (!res) {
         return false;
     }
@@ -97,6 +124,7 @@ int32_t ColumnDef::GetSizeInBytes() const {
     size += column_type_->GetSizeInBytes();
     size += sizeof(int32_t) + name_.size();
     size += sizeof(int32_t) + constraints_.size() * sizeof(ConstraintType);
+    size += sizeof(int32_t) + comment_.size();
     size += (dynamic_cast<ConstantExpr *>(default_expr_.get()))->GetSizeInBytes();
     size += sizeof(uint8_t); // build_bloom_filter_
     return size;
@@ -110,6 +138,7 @@ void ColumnDef::WriteAdv(char *&ptr) const {
     for (const auto &cons : constraints_) {
         WriteBufAdv(ptr, cons);
     }
+    WriteBufAdv(ptr, comment_);
     (dynamic_cast<ConstantExpr *>(default_expr_.get()))->WriteAdv(ptr);
     uint8_t bf = build_bloom_filter_ ? 1 : 0;
     WriteBufAdv(ptr, bf);
@@ -124,8 +153,9 @@ std::shared_ptr<ColumnDef> ColumnDef::ReadAdv(const char *&ptr, int32_t maxbytes
     for (int32_t i = 0; i < constraint_size; i++) {
         constraints.insert(ReadBufAdv<ConstraintType>(ptr));
     }
+    std::string comment = ReadBufAdv<std::string>(ptr);
     std::shared_ptr<ParsedExpr> default_expr = ConstantExpr::ReadAdv(ptr, maxbytes);
-    auto column_def = std::make_shared<ColumnDef>(id, column_type, name, constraints, default_expr);
+    auto column_def = std::make_shared<ColumnDef>(id, column_type, name, constraints, comment, default_expr);
     uint8_t bf = ReadBufAdv<uint8_t>(ptr);
     column_def->build_bloom_filter_ = bf == 1;
     return column_def;
@@ -136,6 +166,9 @@ std::string ColumnDef::ToString() const {
     ss << name_ << " " << column_type_->ToString();
     for (auto &constraint : constraints_) {
         ss << " " << ConstrainTypeToString(constraint);
+    }
+    if(!comment_.empty()) {
+        ss << " comment " << comment_;
     }
     if (default_expr_ != nullptr) {
         ss << " default " << default_expr_->ToString();

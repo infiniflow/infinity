@@ -459,8 +459,9 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(const char *&ptr, const char
             ConstraintType ct = ReadBufAdv<ConstraintType>(ptr);
             constraints.insert(ct);
         }
+        String column_comment = ReadBufAdv<String>(ptr);
         SharedPtr<ParsedExpr> default_expr = ConstantExpr::ReadAdv(ptr, max_bytes);
-        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints, std::move(default_expr));
+        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints, column_comment, std::move(default_expr));
         columns.push_back(cd);
     }
     add_table_op->column_defs_ = std::move(columns);
@@ -562,6 +563,7 @@ SizeT AddTableEntryOp::GetSizeInBytes() const {
         total_size += sizeof(i32) + cd.name_.length();
         total_size += sizeof(i32);
         total_size += cd.constraints_.size() * sizeof(ConstraintType);
+        total_size += sizeof(i32) + cd.comment_.length();
         auto const_expr = dynamic_cast<ConstantExpr *>(cd.default_expr_.get());
         total_size += const_expr->GetSizeInBytes();
     }
@@ -646,6 +648,7 @@ void AddTableEntryOp::WriteAdv(char *&buf) const {
         for (const auto &cons : cd.constraints_) {
             WriteBufAdv(buf, cons);
         }
+        WriteBufAdv(buf, cd.comment_);
         (dynamic_cast<ConstantExpr *>(cd.default_expr_.get()))->WriteAdv(buf);
     }
     WriteBufAdv(buf, this->row_count_);
@@ -790,7 +793,8 @@ const String AddSegmentIndexEntryOp::ToString() const {
 }
 
 const String AddChunkIndexEntryOp::ToString() const {
-    return fmt::format("AddChunkIndexEntryOp base_name: {} base_rowid: {} row_count: {} commit_ts: {} deprecate_ts: {}",
+    return fmt::format("AddChunkIndexEntryOp {} base_name: {} base_rowid: {} row_count: {} commit_ts: {} deprecate_ts: {}",
+                       CatalogDeltaOperation::ToString(),
                        base_name_,
                        base_rowid_.ToUint64(),
                        row_count_,

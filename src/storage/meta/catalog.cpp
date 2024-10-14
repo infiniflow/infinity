@@ -584,7 +584,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
     auto *pm = InfinityContext::instance().persistence_manager();
     for (auto &op : delta_ops) {
         auto type = op->GetType();
-        LOG_INFO(fmt::format("Load delta op {}", op->ToString()));
+        // LOG_INFO(fmt::format("Load delta op {}", op->ToString()));
         auto commit_ts = op->commit_ts_;
         auto txn_id = op->txn_id_;
         auto begin_ts = op->begin_ts_;
@@ -799,7 +799,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
                 if (merge_flag == MergeFlag::kDelete) {
                     block_entry->DropColumnReplay(column_id);
-                } else if (merge_flag == MergeFlag::kNew) {
+                } else if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kUpdate) {
                     block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry,
                                                                                              column_id,
                                                                                              buffer_mgr,
@@ -807,8 +807,6 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                                                                                              last_chunk_offset,
                                                                                              commit_ts),
                                                  column_id);
-                } else if (merge_flag == MergeFlag::kUpdate) {
-                    // do nothing
                 } else {
                     UnrecoverableError(fmt::format("Unsupported merge flag {} for column entry {}", (i8)merge_flag, column_id));
                 }
@@ -1132,6 +1130,17 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry)); }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
+
+void Catalog::InitCompactionAlg(TxnTimeStamp system_start_ts) {
+    TransactionID txn_id = 0; // fake txn id
+    Vector<DBEntry *> db_entries = this->Databases(txn_id, system_start_ts);
+    for (auto *db_entry : db_entries) {
+        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, system_start_ts);
+        for (auto *table_entry : table_entries) {
+            table_entry->InitCompactionAlg(system_start_ts);
+        }
+    }
+}
 
 void Catalog::MemIndexCommit() {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();

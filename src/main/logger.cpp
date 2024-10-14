@@ -90,7 +90,9 @@ void Logger::Initialize(const LoggerConfig &config) {
 }
 
 void Logger::Flush() {
-    infinity_logger->flush();
+    if (IS_LOGGER_INITIALIZED()) {
+        infinity_logger->flush();
+    }
 }
 
 void Logger::Shutdown() {

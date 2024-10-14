@@ -173,12 +173,19 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
 
         if (column_type) {
             std::set<ConstraintType> constraints;
-            if (field_element.contains("constraints"))
+            if (field_element.contains("constraints")) {
                 for (auto &constraint_json : field_element["constraints"]) {
                     String constraint = constraint_json;
                     ToLower(constraint);
                     constraints.insert(StringToConstraintType(constraint));
                 }
+            }
+
+            String table_comment;
+            if (field_element.contains("comment")) {
+                table_comment = field_element["comment"];
+            }
+
             SharedPtr<ParsedExpr> default_expr{nullptr};
             if (field_element.contains("default")) {
                 switch (column_type->type()) {
@@ -193,7 +200,7 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
                     }
                 }
             }
-            ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, default_expr);
+            ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, table_comment, default_expr);
             column_definitions.emplace_back(col_def);
         } else {
             return infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
@@ -3922,6 +3929,55 @@ public:
     }
 };
 
+class ForceGlobalCheckpointHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->ForceCheckpoint();
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class CompactTableHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String data_body = request->readBodyToString();
+        nlohmann::json json_body = nlohmann::json::parse(data_body);
+        String db_name = json_body["db_name"];
+        String table_name = json_body["table_name"];
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        QueryResult result = infinity->CompactTable(db_name, table_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class AdminShowCurrentNodeHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -4267,6 +4323,8 @@ void HTTPServer::Start(const String &ip_address, u16 port) {
     router->route("GET", "/instance/memory", MakeShared<ShowMemoryHandler>());
     router->route("GET", "/instance/memory/objects", MakeShared<ShowMemoryObjectsHandler>());
     router->route("GET", "/instance/memory/allocations", MakeShared<ShowMemoryAllocationsHandler>());
+    router->route("POST", "/instance/flush", MakeShared<ForceGlobalCheckpointHandler>());
+    router->route("POST", "/instance/table/compact", MakeShared<CompactTableHandler>());
 
     // variable
     router->route("GET", "/variables/global", MakeShared<ShowGlobalVariablesHandler>());

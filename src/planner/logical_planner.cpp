@@ -426,6 +426,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     columns.reserve(column_count);
     for (SizeT idx = 0; idx < column_count; ++idx) {
         const String &column_name = create_table_info->column_defs_[idx]->name();
+        const String &column_comment = create_table_info->column_defs_[idx]->comment();
         switch (IdentifierValidation(column_name)) {
             case IdentifierValidationStatus::kOk:
                 break;
@@ -502,6 +503,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
                                                                 create_table_info->column_defs_[idx]->type(),
                                                                 column_name,
                                                                 create_table_info->column_defs_[idx]->constraints_,
+                                                                column_comment,
                                                                 std::move(create_table_info->column_defs_[idx]->default_expr_));
         columns.emplace_back(column_def);
     }

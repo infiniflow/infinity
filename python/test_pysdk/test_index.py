@@ -656,6 +656,63 @@ class TestInfinity:
             "test_insert_data_fulltext_index_search" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.parametrize("file_format", ["csv"])
+    def test_empty_fulltext_index(self, file_format, suffix):
+        # prepare data for insert
+        column_names = ["doctitle", "docdate", "body"]
+        df = pandas.read_csv(os.getcwd() + TEST_DATA_DIR + file_format + "/enwiki_99." + file_format,
+                             delimiter="\t",
+                             header=None,
+                             names=column_names)
+        data = {key: list(value.values())
+                for key, value in df.to_dict().items()}
+
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table(
+            "test_empty_fulltext_index" + suffix, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table("test_empty_fulltext_index" + suffix, {
+            "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "body2": {"type": "varchar", "default":""}
+        }, ConflictType.Error)
+
+        # Create 99*300/8192 = 3.6 BlockEntry to test MemIndexRecover and OptimizeIndex
+        for it in range(300):
+            value = []
+            for i in range(len(data["doctitle"])):
+                value.append({"doctitle": data["doctitle"][i],
+                              "docdate": data["docdate"][i], "body": data["body"][i]})
+            table_obj.insert(value)
+        for it in range(10):
+            value = []
+            for i in range(len(data["doctitle"])):
+                value.append({"doctitle": data["doctitle"][i],
+                              "docdate": data["docdate"][i], "body": ""})
+            table_obj.insert(value)
+        time.sleep(5)
+
+        res = table_obj.create_index("body_index",
+                                     index.IndexInfo("body",
+                                                     index.IndexType.FullText))
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.create_index("body2_index",
+                                     index.IndexInfo("body2",
+                                                     index.IndexType.FullText))
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
+            "body^5", "harmful chemical", 3).to_pl()
+        assert not res.is_empty()
+        print(res)
+
+        res = table_obj.output(["doctitle", "docdate", "body2", "_row_id", "_score"]).match_text(
+            "body2^5", "harmful chemical", 3).to_pl()
+        assert res.is_empty()
+        print(res)
+
+        res = db_obj.drop_table(
+            "test_empty_fulltext_index" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_9.csv", "data_dir": common_values.TEST_TMP_DIR, }],
                              indirect=True)
     def test_fulltext_match_with_invalid_analyzer(self, check_data, suffix):

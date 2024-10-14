@@ -105,6 +105,7 @@ export struct WrapColumnDef {
     String column_name;
     Set<ConstraintType> constraints;
     WrapConstantExpr constant_expr;
+    String comment;
 };
 
 export struct WrapCreateTableOptions {

@@ -392,7 +392,7 @@ struct SQL_LTYPE {
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TEXT MULTIVECTOR TENSOR SPARSE TENSORARRAY IGNORE
-%token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT
+%token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT COMMENT
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
@@ -748,7 +748,7 @@ IDENTIFIER column_type with_index_param_list default_expr {
     }
 
     std::shared_ptr<infinity::ParsedExpr> default_expr($4);
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, std::move(default_expr));
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, "", std::move(default_expr));
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;
@@ -758,7 +758,7 @@ IDENTIFIER column_type with_index_param_list default_expr {
         yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
     }
     */
-};
+}
 | IDENTIFIER column_type column_constraints default_expr {
     std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
@@ -783,7 +783,97 @@ IDENTIFIER column_type with_index_param_list default_expr {
     }
 
     std::shared_ptr<infinity::ParsedExpr> default_expr($4);
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, default_expr);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, "", default_expr);
+
+    ParserHelper::ToLower($1);
+    $$->name_ = $1;
+    $$->constraints_ = *$3;
+    delete $3;
+    free($1);
+    /*
+    if (!$$->trySetNullableExplicit()) {
+        yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
+    }
+    */
+}
+| IDENTIFIER column_type with_index_param_list default_expr COMMENT STRING {
+    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
+    std::vector<std::unique_ptr<infinity::InitParameter>> index_param_list = infinity::InitParameter::MakeInitParameterList($3);
+    switch($2.logical_type_) {
+        case infinity::LogicalType::kDecimal: {
+            type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
+            if(type_info_ptr == nullptr) {
+                yyerror(&yyloc, scanner, result, "Fail to create decimal info.");
+                free($1);
+                YYERROR;
+            }
+            break;
+        }
+//        case infinity::LogicalType::kBitmap: {
+//            type_info_ptr = infinity::BitmapInfo::Make($2.width);
+//            break;
+//        }
+        case infinity::LogicalType::kEmbedding:
+        case infinity::LogicalType::kMultiVector:
+        case infinity::LogicalType::kTensor:
+        case infinity::LogicalType::kTensorArray: {
+            type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
+            break;
+        }
+        case infinity::LogicalType::kSparse: {
+            auto store_type = infinity::SparseInfo::ParseStoreType(index_param_list);
+            type_info_ptr = infinity::SparseInfo::Make($2.embedding_type_, $2.width, store_type);
+            if (type_info_ptr == nullptr) {
+                yyerror(&yyloc, scanner, result, "Fail to create sparse info.");
+                free($1);
+                YYERROR;
+            }
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+
+    std::shared_ptr<infinity::ParsedExpr> default_expr($4);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, $6, std::move(default_expr));
+    free($6);
+
+    ParserHelper::ToLower($1);
+    $$->name_ = $1;
+    free($1);
+    /*
+    if (!$$->trySetNullableExplicit()) {
+        yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
+    }
+    */
+}
+| IDENTIFIER column_type column_constraints default_expr COMMENT STRING {
+    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
+    switch($2.logical_type_) {
+        case infinity::LogicalType::kDecimal: {
+            type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
+            break;
+        }
+//        case infinity::LogicalType::kBitmap: {
+//            type_info_ptr = infinity::BitmapInfo::Make($2.width);
+//            break;
+//        }
+        case infinity::LogicalType::kEmbedding:
+        case infinity::LogicalType::kMultiVector:
+        case infinity::LogicalType::kTensor:
+        case infinity::LogicalType::kTensorArray: {
+            type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+
+    std::shared_ptr<infinity::ParsedExpr> default_expr($4);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, $6, default_expr);
+    free($6);
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;

@@ -46,6 +46,7 @@ import plus;
 import pow;
 import substring;
 import substract;
+import char_length;
 import default_values;
 import special_function;
 import internal_types;
@@ -103,6 +104,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterLessEqualsFunction(catalog_ptr_);
     RegisterGreaterFunction(catalog_ptr_);
     RegisterGreaterEqualsFunction(catalog_ptr_);
+    RegisterCharLengthFunction(catalog_ptr_);
 
     // like function
     RegisterLikeFunction(catalog_ptr_);

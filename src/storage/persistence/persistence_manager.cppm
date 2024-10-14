@@ -42,6 +42,7 @@ export struct ObjAddr {
     void WriteBufAdv(char *&buf) const;
 
     static ObjAddr ReadBufAdv(const char *&buf);
+    static constexpr String KeyEmpty = "KEY_EMPTY";
 };
 
 export struct PersistWriteResult {
