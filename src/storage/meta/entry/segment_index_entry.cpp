@@ -1049,7 +1049,9 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
         UnrecoverableError(fmt::format("Chunk ID: {} already exists in segment: {}", chunk_id, segment_id_));
     }
     chunk_index_entries_.push_back(chunk_index_entry);
-    next_chunk_id_ = chunk_id + 1;
+    if (chunk_id == next_chunk_id_) {
+        next_chunk_id_++;
+    }
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
         try {
             u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
