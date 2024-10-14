@@ -25,9 +25,10 @@ class TestInsert:
 
         cur_insert_n = 0
         shutdown = False
+        error = False
 
         def insert_func(table_obj):
-            nonlocal cur_insert_n, shutdown
+            nonlocal cur_insert_n, shutdown, error
             batch_size = 10
 
             while cur_insert_n < insert_n:
@@ -49,17 +50,19 @@ class TestInsert:
                         cur_insert_n = insert_n
                 except Exception as e:
                     print(f"insert error at {cur_insert_n}")
-                    assert shutdown
+                    if not shutdown:
+                        error = True
+                        raise e
                     break
                 cur_insert_n += len(insert_data)
 
         shutdown_time = 0
 
         def shutdown_func():
-            nonlocal cur_insert_n, shutdown_time, shutdown
+            nonlocal cur_insert_n, shutdown_time, shutdown, error
             shutdown = False
             last_shutdown_insert_n = cur_insert_n
-            while True:
+            while not error:
                 if cur_insert_n >= insert_n or (
                     stop_n != 0
                     and cur_insert_n - last_shutdown_insert_n >= insert_n // stop_n

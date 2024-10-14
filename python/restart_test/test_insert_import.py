@@ -35,9 +35,10 @@ class TestInsertImport:
         cur_n = 0
         insert_finish = False
         shutdown = False
+        error = False
 
         def insert_import_func(table_obj):
-            nonlocal cur_n, insert_finish, shutdown
+            nonlocal cur_n, insert_finish, shutdown, error
 
             while cur_n < total_n:
                 r = random.randint(0, 100)
@@ -69,16 +70,18 @@ class TestInsertImport:
                         cur_n += import_size
                 except Exception as e:
                     print(f"insert/import {if_import} error at {cur_n}")
-                    assert shutdown
+                    if not shutdown:
+                        error = True
+                        raise e
                     break
 
         shutdown_time = 0
 
         def shutdown_func():
-            nonlocal cur_n, shutdown_time, shutdown
+            nonlocal cur_n, shutdown_time, shutdown, error
             shutdown = False
             last_shutdown_n = cur_n
-            while True:
+            while not error:
                 if cur_n >= total_n or (
                     stop_n != 0 and cur_n - last_shutdown_n >= interval_n
                 ):
