@@ -183,8 +183,8 @@ TEST_P(MemoryIndexerTest, test3) {
 TEST_P(MemoryIndexerTest, test4) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
     MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
-    indexer1.Insert(empty_column_, 0, 10, true);
-    indexer1.Insert(column_, 0, 10, true);
+    indexer1.Insert(empty_column_, 0, 5, true);
+    indexer1.Insert(column_, 0, 5, true);
     indexer1.Dump(true);
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
     fake_segment_index_entry_1->UpdateFulltextColumnLenInfo(indexer1.GetColumnLengthSum(), indexer1.GetDocCount());
@@ -195,8 +195,8 @@ TEST_P(MemoryIndexerTest, test4) {
     reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment), nullptr);
     Pair<u64, float> res = reader.GetTotalDfAndAvgColumnLength();
 
-    ASSERT_EQ(res.first, 20U);
-    ASSERT_EQ(res.second, 22.65f);
+    ASSERT_EQ(res.first, 10U);
+    ASSERT_EQ(res.second, 45.3f);
 }
 
 TEST_P(MemoryIndexerTest, SpillLoadTest) {
