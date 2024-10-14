@@ -3130,6 +3130,236 @@ The response includes a JSON object like the following:
 
 ---
 
+## Show memory
+
+**GET** `/instance/memory`
+
+Shows the memory usage information of the instance.
+
+### Request
+
+- Method: GET
+- URL: `/instance/memory`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/memory \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "memory_allocation":"Not activate",
+    "memory_objects":"Not activate"
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show memory object
+
+**GET** `/instance/memory/objects`
+
+Shows the memory object usage information of the instance.
+
+### Request
+
+- Method: GET
+- URL: `/instance/memory/objects`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/memory/objects \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show memory allocation
+
+**GET** `/instance/memory/allocation`
+
+Shows the memory allocation information of the instance.
+
+### Request
+
+- Method: GET
+- URL: `/instance/memory/allocation`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/memory/allocation \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Global Checkpoint
+
+**POST** `/instance/flush`
+
+Performs a full checkpoint on the instance.
+
+### Request
+
+- Method: POST
+- URL: `/instance/flush`
+- Headers:
+  - `accept: application/json`
+  - `content-type: application/json`
+
+#### Request example
+
+```shell
+curl --request POST \
+    --url http://localhost:23822/instance/flush\
+    --header 'accept: application/json' \
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Compact Table
+
+**POST** `/instance/table/compact`
+
+Performs a compaction operation on a specified table.
+
+### Request
+
+- Method: POST
+- URL: `/instance/table/compact`
+- Headers:
+  - `accept: application/json`
+  - `content-type: application/json`
+
+#### Request example
+
+```shell
+curl --request POST \
+    --url http://localhost:23820/instance/table/compact \
+    --header 'accept: application/json' \
+    --header 'content-type: application/json' \
+    --data ' 
+    {
+        "db_name" : "default_db",
+        "table_name" : "my_table",
+    } '
+```
+
+#### Request parameters
+
+- `db_name`: Required (*Body parameter*)
+- `table_name`: Required (*Body parameter*)
+`db_name` and `table_name` specifies the table to perform compaction.
+
+### Response
+
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":3022,
+    "error_message":"Table id_timep doesn't exist@src/planner/query_binder.cpp:423"
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
 ## Admin set node role
 
 **POST** `/admin/node/current`
