@@ -1558,11 +1558,31 @@ This method creates a filtering condition for your query. To display the results
 
 #### cond: `str`, *Required*
 
-A non-empty string representing the filter condition. It comprises one or multiple expressions combined by 'and' or 'or' logical operators, where each expression uses comparison operators to set criteria for keeping or removing rows.
+A non-empty string representing the filter condition. It comprises one or multiple expressions combined by 'and', 'or' or 'not' logical operators, where each expression uses comparison operators to set criteria for keeping or removing rows.
 
-:::tip NOTE
-Currently, only 'and' and 'or' logical expressions are supported.
-:::
+#### filter expressions in cond
+
+* `<`, `<=`, `>`, `>=`, `=`, `==`, `!=` expression
+* `in` and `not in` expression
+* `filter_fulltext` expression
+  - Similar to `match_text()`.
+    Usage: 'filter_fulltext(fields, matching_text)' or 'filter_fulltext(fields, matching_text, extra_options)'
+  - 'extra_options' is in the format of 'K1=V1;K2=V2;...;KN=VN',
+    where each 'K' represents a parameter name and 'V' represents its value
+  - Available parameters in 'extra_options':
+    - **'minimum_should_match'**: specifies how many clauses in the 'matching_text' should be satisfied at least.
+      It can be in the following format:
+      - Positive integer `N`: at least `N` clauses should be satisfied.
+      - Negative integer `-N`: at least (total clause count - `N`) clauses should be satisfied.
+      - Positive Percentage `N%`: at least `⌊total clause count * N%⌋` clauses should be satisfied.
+      - Negative Percentage `-N%`: at least `total clause count - ⌊total clause count * N%⌋` clauses should be satisfied.
+      - Combination `K<V`: `K` is positive integer, `V` is in one of four styles described above.
+        This means that when `total clause count > K`, the requirement `V` applies, otherwise all the clauses should be satisfied
+      - Multiple combinations `K1<V1 K2<V2 ... KN<VN`: several `K<V` strings seperated by spaces, with `K` in the ascending order.
+        If `K1 >= total clause count`, all the clauses should be satisfied.
+        Otherwise, we find the biggest `V` which is less than the total clause count and apply the correspondent `V`.
+    - **'default_field'**
+      - If `"fields"` is an empty string, this parameter specifies the default field to search on.
 
 ### Returns
 
@@ -1580,6 +1600,14 @@ table_object.output(["c1", "c2"]).filter("(-7 < c1 or 9 >= c1) and (c2 = 3)").to
 
 ```python
 table_object.output(["*"]).filter("c2 = 3").to_pl()
+```
+
+```python
+table_object.output(["*"]).filter("c1 not in (1, 2, 3) and (c2 + 1) in (1, 2, 3)").to_df()
+```
+
+```python
+table_object.output(["*"]).filter("filter_fulltext('doc', 'first second', 'minimum_should_match=99%') and not num = 2").to_pl()
 ```
 
 ---
