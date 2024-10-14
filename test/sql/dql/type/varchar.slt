@@ -41,4 +41,20 @@ abcddddd abcddddd 1
 abcddddc abcddddd 2
 
 statement ok
+INSERT INTO test_varchar_filter VALUES ('abc', 'abcd', 5);
+
+query VI
+SELECT * FROM test_varchar_filter where char_length(c1) = 8;
+----
+abcddddd abcddddd 1
+abcddddc abcddddd 2
+abcdddde abcddddd 3
+abcdddde abcdddde 4
+
+query VII
+SELECT * FROM test_varchar_filter where char_length(c1) = 3;
+----
+abc abcd 5
+
+statement ok
 DROP TABLE test_varchar_filter;
