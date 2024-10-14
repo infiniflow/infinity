@@ -251,7 +251,7 @@ private:
     TxnTimeStamp min_ts_{0}; // Indicate the commit_ts which create this SegmentIndexEntry
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this SegmentIndexEntry
     TxnTimeStamp checkpoint_ts_{0};
-    ChunkID next_chunk_id_{0};
+    Atomic<ChunkID> next_chunk_id_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
 

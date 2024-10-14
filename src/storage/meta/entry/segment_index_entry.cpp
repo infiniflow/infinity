@@ -101,7 +101,7 @@ SegmentIndexEntry::SegmentIndexEntry(const SegmentIndexEntry &other)
     min_ts_ = other.min_ts_;
     max_ts_ = other.max_ts_;
     checkpoint_ts_ = other.checkpoint_ts_;
-    next_chunk_id_ = other.next_chunk_id_;
+    next_chunk_id_ = other.next_chunk_id_.load();
 
     memory_hnsw_index_ = other.memory_hnsw_index_;
     memory_ivf_index_ = other.memory_ivf_index_;
@@ -178,7 +178,7 @@ void SegmentIndexEntry::UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> ne
     assert(new_entry->index_dir_ == index_dir_);
     min_ts_ = new_entry->min_ts_;
     max_ts_ = new_entry->max_ts_;
-    next_chunk_id_ = new_entry->next_chunk_id_;
+    next_chunk_id_ = new_entry->next_chunk_id_.load();
 }
 
 // String SegmentIndexEntry::IndexFileName(SegmentID segment_id) { return fmt::format("seg{}.idx", segment_id); }
@@ -1042,16 +1042,19 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
                           segment_id_));
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    auto iter = std::find_if(chunk_index_entries_.begin(), chunk_index_entries_.end(), [chunk_id](const SharedPtr<ChunkIndexEntry> &entry) {
-        return entry->chunk_id_ == chunk_id;
+    assert(std::is_sorted(chunk_index_entries_.begin(), chunk_index_entries_.end(), [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) {
+        return lhs->chunk_id_ < rhs->chunk_id_;
+    }));
+    auto iter = std::lower_bound(chunk_index_entries_.begin(), chunk_index_entries_.end(), chunk_id, [&](const SharedPtr<ChunkIndexEntry> &entry, ChunkID id) {
+        return entry->chunk_id_ < id;
     });
-    if (iter != chunk_index_entries_.end()) {
+    if (iter != chunk_index_entries_.end() && (*iter)->chunk_id_ == chunk_id) {
         UnrecoverableError(fmt::format("Chunk ID: {} already exists in segment: {}", chunk_id, segment_id_));
     }
-    chunk_index_entries_.push_back(chunk_index_entry);
-    if (chunk_id == next_chunk_id_) {
-        next_chunk_id_++;
-    }
+    chunk_index_entries_.insert(iter, chunk_index_entry);
+    ChunkID old_next_chunk_id = next_chunk_id_;
+    next_chunk_id_ = std::max(next_chunk_id_.load(), chunk_index_entries_.back()->chunk_id_ + 1);
+    LOG_INFO(fmt::format("AddChunkIndexEntryReplayWal, old_next_chunk_id: {}, next_chunk_id_, chunk_id: {}", old_next_chunk_id, next_chunk_id_, chunk_id));
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
         try {
             u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
@@ -1087,16 +1090,16 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
                           segment_id_));
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    bool added = false;
-    for (auto &chunk : chunk_index_entries_) {
-        if (chunk->chunk_id_ == chunk_id) {
-            chunk = chunk_index_entry;
-            added = true;
-            break;
-        }
-    }
-    if (!added) {
-        chunk_index_entries_.push_back(chunk_index_entry);
+    assert(std::is_sorted(chunk_index_entries_.begin(), chunk_index_entries_.end(), [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) {
+        return lhs->chunk_id_ < rhs->chunk_id_;
+    }));
+    auto iter = std::lower_bound(chunk_index_entries_.begin(), chunk_index_entries_.end(), chunk_id, [&](const SharedPtr<ChunkIndexEntry> &entry, ChunkID id) {
+        return entry->chunk_id_ < id;
+    });
+    if (iter != chunk_index_entries_.end() && (*iter)->chunk_id_ == chunk_id) {
+        *iter = chunk_index_entry;
+    } else {
+        chunk_index_entries_.insert(iter, chunk_index_entry);
     }
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
         try {
@@ -1136,7 +1139,7 @@ nlohmann::json SegmentIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
         index_entry_json["commit_ts"] = this->commit_ts_.load();
         index_entry_json["min_ts"] = this->min_ts_;
         index_entry_json["max_ts"] = this->max_ts_;
-        index_entry_json["next_chunk_id"] = this->next_chunk_id_;
+        index_entry_json["next_chunk_id"] = this->next_chunk_id_.load();
         index_entry_json["checkpoint_ts"] = this->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
 
         for (auto &chunk_index_entry : chunk_index_entries_) {
