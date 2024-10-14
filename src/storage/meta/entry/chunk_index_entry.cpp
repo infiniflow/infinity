@@ -62,9 +62,6 @@ Vector<std::string_view> ChunkIndexEntry::DecodeIndex(std::string_view encode) {
 }
 
 String ChunkIndexEntry::EncodeIndex(const ChunkID chunk_id, const String &base_name, const SegmentIndexEntry *segment_index_entry) {
-    if (!base_name.empty()) {
-        return fmt::format("{}#{}", segment_index_entry->encode(), base_name);
-    }
     return fmt::format("{}#{}", segment_index_entry->encode(), chunk_id);
 }
 

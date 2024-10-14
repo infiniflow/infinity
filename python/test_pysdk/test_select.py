@@ -730,6 +730,10 @@ class TestInfinity:
         def test_func():
             expect_result = pd.DataFrame({'num': (1,), "doc": "first text"}).astype({'num': dtype('int32')})
             pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
+                "filter_text('doc', 'first text', 'minimum_should_match=100%')").to_df())
+            pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
+                "filter_text('', 'first second', 'default_field=doc;minimum_should_match=99%') and not num = 2").to_df())
+            pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
                 "filter_text('doc', 'first OR second') and (num < 2 or num > 2)").to_df())
             pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
                 "(filter_text('doc', 'first') or filter_fulltext('doc', 'second')) and (num < 2 or num > 2)").to_df())

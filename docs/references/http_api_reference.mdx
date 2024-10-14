@@ -1586,10 +1586,6 @@ curl --request DELETE \
 - `"filter"`: (*Body parameter*), `string`, *Optional*  
   A string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `"filter"` is not specified or set to `Null`, the method will delete all rows in the table.
 
-:::tip NOTE
-The `filter` parameter currently supports 'and' and 'or' logical expressions only.
-:::
-
 ### Response
 
 <Tabs
@@ -1831,8 +1827,30 @@ curl --request GET \
     A list of strings specifying the columns to include words match in match_text clause. The matched words will be embraced by <em> and </em>
 
 - `"filter"`: (*Body parameter*), `string`, *Optional*  
-  A string that defines the condition for selecting rows. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be updated. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.  
-  > The `filter` parameter currently supports 'and' and 'or' logical expressions only.  
+  A string that defines the condition for selecting rows. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be output.
+  Supported filter expressions:
+  - Logical combination expressions: 'and', 'or', 'not'
+  - Comparison expressions: `<`, `<=`, `>`, `>=`, `=`, `==`, `!=`
+  - `in` and `not in` expression
+  - `filter_fulltext` expression:
+    - Similar to `match_text()`. Usage: 'filter_fulltext(fields, matching_text)' or 'filter_fulltext(fields, matching_text, extra_options)'
+    - 'extra_options' is in the format of 'K1=V1;K2=V2;...;KN=VN',
+      where each 'K' represents a parameter name and 'V' represents its value
+    - Available parameters in 'extra_options':
+      - **'minimum_should_match'**: specifies how many clauses in the 'matching_text' should be satisfied at least.
+        It can be in the following format:
+        - Positive integer `N`: at least `N` clauses should be satisfied.
+        - Negative integer `-N`: at least (total clause count - `N`) clauses should be satisfied.
+        - Positive Percentage `N%`: at least `⌊total clause count * N%⌋` clauses should be satisfied.
+        - Negative Percentage `-N%`: at least `total clause count - ⌊total clause count * N%⌋` clauses should be satisfied.
+        - Combination `K<V`: `K` is positive integer, `V` is in one of four styles described above.
+          This means that when `total clause count > K`, the requirement `V` applies, otherwise all the clauses should be satisfied
+        - Multiple combinations `K1<V1 K2<V2 ... KN<VN`: several `K<V` strings seperated by spaces, with `K` in the ascending order.
+          If `K1 >= total clause count`, all the clauses should be satisfied.
+          Otherwise, we find the biggest `V` which is less than the total clause count and apply the correspondent `V`.
+      - **'default_field'**
+        - If `"fields"` is an empty string, this parameter specifies the default field to search on.
+
 
 - `"search"`: (*Body parameter*), `object[]`, *Required*  
   A list of JSON objects, each representing a matching or fusion method. Note that if you have specified multiple matching methods, you must specify a fusion method.  

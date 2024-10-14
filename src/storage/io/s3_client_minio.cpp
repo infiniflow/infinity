@@ -29,11 +29,12 @@ Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &ob
     args.filename = file_path;
 
     // Call download object.
+    LOG_INFO(fmt::format("Downloading object {} from {} to {}", object_name, bucket_name, file_path));
     minio::s3::DownloadObjectResponse resp = client_->DownloadObject(args);
 
     // Handle response.
     if (resp) {
-        LOG_TRACE(fmt::format("{} downloaded to {} successfully", file_path, object_name));
+        LOG_INFO(fmt::format("{} downloaded to {} successfully", file_path, object_name));
     } else {
         UnrecoverableError("unable to download object; " + resp.Error().String());
     }
@@ -48,11 +49,12 @@ Status S3ClientMinio::UploadObject(const String &bucket_name, const String &obje
     args.filename = file_path;
 
     // Call upload object.
+    LOG_INFO(fmt::format("Uploading object {} to {} from {}", object_name, bucket_name, file_path));
     minio::s3::UploadObjectResponse resp = client_->UploadObject(args);
 
     // Handle response.
     if (resp) {
-        LOG_TRACE(fmt::format("{} uploaded to {} successfully", file_path, object_name));
+        LOG_INFO(fmt::format("{} uploaded to {} successfully", file_path, object_name));
     } else {
         UnrecoverableError("unable to upload object; " + resp.Error().String());
     }
@@ -66,11 +68,12 @@ Status S3ClientMinio::RemoveObject(const String &bucket_name, const String &obje
     args.object = object_name;
 
     // Call remove object.
+    LOG_INFO(fmt::format("Removing object {} from {}", object_name, bucket_name));
     minio::s3::RemoveObjectResponse resp = client_->RemoveObject(args);
 
     // Handle response.
     if (resp) {
-        LOG_TRACE(fmt::format("{} is removed from {} successfully", object_name, bucket_name));
+        LOG_INFO(fmt::format("{} is removed from {} successfully", object_name, bucket_name));
     } else {
         UnrecoverableError("unable to remove object; " + resp.Error().String());
     }

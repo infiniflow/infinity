@@ -3,7 +3,7 @@ import { Leaf } from './constants';
 import { TreeParentId } from './interface';
 
 export const updateTreeData = (
-  list: any[],
+  list: INode[],
   id: string | number,
   children: Array<INode>
 ) => {

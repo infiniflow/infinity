@@ -49,11 +49,11 @@ function AsyncTree() {
           element,
           isBranch,
           isExpanded,
-          isSelected,
-          isHalfSelected,
+          // isSelected,
+          // isHalfSelected,
+          // handleSelect,
           getNodeProps,
           level,
-          handleSelect,
           handleExpand
         }) => {
           const branchNode = (isExpanded: boolean, element: INode) => {
@@ -100,7 +100,13 @@ function AsyncTree() {
   );
 }
 
-const ArrowIcon = ({ isOpen, className }: any) => {
+const ArrowIcon = ({
+  isOpen,
+  className
+}: {
+  isOpen: boolean;
+  className?: string;
+}) => {
   const baseClass = 'arrow';
   const classes = cx(
     baseClass,
