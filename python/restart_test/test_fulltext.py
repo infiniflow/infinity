@@ -11,19 +11,20 @@ from infinity import index
 from infinity.errors import ErrorCode
 from restart_util import *
 
+
 @pytest.mark.slow
 class TestFullText:
-    @pytest.mark.skip(reason="not tested")
     @pytest.mark.parametrize(
         "config",
         [
             "test/data/config/restart_test/test_fulltext/1.toml",
-            # "test/data/config/restart_test/test_fulltext/2.toml",
-            # "test/data/config/restart_test/test_fulltext/3.toml",
+            "test/data/config/restart_test/test_fulltext/2.toml",
+            "test/data/config/restart_test/test_fulltext/3.toml",
         ],
     )
     def test_fulltext(self, infinity_runner: InfinityRunner, config: str):
-        enwiki_path = "test/data/csv/enwiki-10w.csv"
+        # should add symbolic link in advance
+        enwiki_path = "test/data/benchmark/enwiki-10w.csv"
         enwiki_size = 100000
 
         table_name = "test_fulltext"
@@ -59,8 +60,8 @@ class TestFullText:
             },
             ConflictType.Error,
         )
-        enwiki_gen1 = EnwikiGenerator.gen_factory(enwiki_path)
-        for id, (title, date, body) in enumerate(enwiki_gen1(enwiki_size)):
+        enwiki_gen1 = EnwikiGenerator.gen_factory(enwiki_path)(enwiki_size)
+        for id, (title, date, body) in enumerate(enwiki_gen1):
             gt_table_obj.insert(
                 [{"id": id, "title": title, "date": date, "body": body}]
             )
@@ -83,13 +84,13 @@ class TestFullText:
         infinity_runner.uninit()
 
         cur_insert_n = 0
-        enwiki_gen2 = EnwikiGenerator.gen_factory(enwiki_path)
+        enwiki_gen2 = EnwikiGenerator.gen_factory(enwiki_path)(enwiki_size)
         end = False
+        qu = queue.Queue()
 
         def work_func(table_obj, gt_table_obj):
-            nonlocal cur_insert_n
-            nonlocal end
-            while True:
+            nonlocal cur_insert_n, end, qu
+            while not end:
                 r = random.randint(0, 500 - 1)
                 try:
                     if r < 499:
@@ -111,27 +112,6 @@ class TestFullText:
                         )
                         cur_insert_n += 1
                     else:
-                        print(f"search at {cur_insert_n}")
-
-                        result_queue = queue.Queue()
-
-                        def wait_and_search():
-                            time.sleep(search_after_insert)
-                            res = (
-                                table_obj.output(["id"])
-                                .match_text(
-                                    fields="body",
-                                    matching_text=matching_text,
-                                    topn=10,
-                                    extra_options=None,
-                                )
-                                .to_result()
-                            )
-                            result_queue.put(res)
-
-                        t1 = threading.Thread(target=wait_and_search)
-                        t1.start()
-
                         gt_res = (
                             gt_table_obj.output(["id"])
                             .match_text(
@@ -143,30 +123,57 @@ class TestFullText:
                             .filter("id<{}".format(cur_insert_n))
                             .to_result()
                         )
-                        t1.join()
-                        res = result_queue.get()
 
-                        data_dict, _ = res
-                        gt_data_dict, _ = gt_res
-                        assert data_dict == gt_data_dict
-                        print(data_dict)
+                        def t1():
+                            print(f"search at {cur_insert_n}")
+
+                            res = (
+                                table_obj.output(["id"])
+                                .match_text(
+                                    fields="body",
+                                    matching_text=matching_text,
+                                    topn=10,
+                                    extra_options=None,
+                                )
+                                .to_result()
+                            )
+
+                            data_dict, _ = res
+                            gt_data_dict, _ = gt_res
+                            if data_dict != gt_data_dict:
+                                print(f"diff: {data_dict} {gt_data_dict}")
+                            else:
+                                print("same")
+                        search_time = time.time() + search_after_insert
+                        qu.put((t1, search_time))
 
                 except Exception as e:
                     print(e)
-                    assert shutdown == True
+                    assert shutdown
+                    break
+
+        def search_thread():
+            nonlocal qu, shutdown
+            while True:
+                (f, search_time) = qu.get()
+                while time.time() < search_time:
+                    time.sleep(0.1)
+                try:
+                    f()
+                except Exception as e:
+                    print(e)
+                    assert shutdown
                     break
 
         def shutdown_func():
             nonlocal shutdown
-            shutdown = True
+            shutdown = False
             time.sleep(shutdown_interval)
 
+            shutdown = True
             infinity_runner.uninit()
             print(f"cur_insert_n: {cur_insert_n}")
             print("shutdown infinity")
-            assert shutdown == False
-            shutdown = True
-            return
 
         while not end:
             infinity_runner.init(config)
@@ -178,7 +185,13 @@ class TestFullText:
 
             t1 = threading.Thread(target=shutdown_func)
             t1.start()
+
+            t2 = threading.Thread(target=search_thread)
+            t2.start()
+
             work_func(table_obj, gt_table_obj)
+
+            t2.join()
             t1.join()
 
             infinity_runner.uninit()

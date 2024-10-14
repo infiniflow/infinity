@@ -26,25 +26,27 @@ class TestInsertImport:
         data_gen = data_gen_factory(total_n)
 
         stop_n = 10
+        interval_n = total_n // stop_n
         uri = common_values.TEST_LOCAL_HOST
 
+        insert_batch_size = 10
+        import_rate = insert_batch_size / (import_size + insert_batch_size)
+
         cur_n = 0
-        gen_finished = False
         insert_finish = False
+        shutdown = False
+        error = False
 
         def insert_import_func(table_obj):
-            nonlocal cur_n, gen_finished, insert_finish
-            insert_batch_size = 10
+            nonlocal cur_n, insert_finish, shutdown, error
 
-            import_rate = insert_batch_size / (import_size + insert_batch_size)
-
-            while cur_n < total_n and not gen_finished:
+            while cur_n < total_n:
                 r = random.randint(0, 100)
                 if_import = r < import_rate * 100
                 if insert_finish:
                     print("insert finished")
-                if not if_import and not insert_finish:
-                    try:
+                try:
+                    if not if_import and not insert_finish:
                         insert_data = []
                         # get `batch_size` data in data_gen one time
                         for i in range(insert_batch_size):
@@ -57,37 +59,41 @@ class TestInsertImport:
                             except StopIteration:
                                 insert_finish = True
                                 break
-                        table_obj.insert(insert_data)
-                    except Exception as e:
-                        break
-                    cur_n += insert_batch_size
-                else:
-                    try:
+                        if len(insert_data) > 0:
+                            table_obj.insert(insert_data)
+                        else:
+                            cur_n = total_n
+                        cur_n += insert_batch_size
+                    else:
                         abs_import_file = os.path.abspath(import_file)
                         table_obj.import_data(abs_import_file, import_options)
-                    except Exception as e:
-                        break
-                    cur_n += import_size
-                if cur_n >= total_n:
-                    gen_finished = True
+                        cur_n += import_size
+                except Exception as e:
+                    print(f"insert/import {if_import} error at {cur_n}")
+                    if not shutdown:
+                        error = True
+                        raise e
+                    break
 
         shutdown_time = 0
 
         def shutdown_func():
-            nonlocal cur_n, shutdown_time
+            nonlocal cur_n, shutdown_time, shutdown, error
+            shutdown = False
             last_shutdown_n = cur_n
-            while True:
-                if gen_finished or (
-                    stop_n != 0 and cur_n - last_shutdown_n >= total_n // stop_n
+            while not error:
+                if cur_n >= total_n or (
+                    stop_n != 0 and cur_n - last_shutdown_n >= interval_n
                 ):
+                    shutdown = True
                     infinity_runner.uninit()
                     print("shutdown infinity")
                     shutdown_time += 1
                     return
-                print(f"cur_n: {cur_n}")
+                print(f"cur_n inner: {cur_n}")
                 time.sleep(0.1)
 
-        while not gen_finished:
+        while cur_n < total_n:
             infinity_runner.init(config)
             infinity_obj = InfinityRunner.connect(uri)
 

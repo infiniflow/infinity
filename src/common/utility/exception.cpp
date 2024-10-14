@@ -65,6 +65,7 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
         LOG_ERROR(std::move(error_msg));
     }
 
+    Logger::Flush();
     PrintStacktrace(message);
     throw UnrecoverableException(fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line));
 }

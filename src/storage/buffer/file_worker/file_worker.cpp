@@ -110,8 +110,16 @@ void FileWorker::ReadFromFile(bool from_spill) {
         handler = PersistResultHandler(persistence_manager_);
     }
     String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+    Optional<DeferFn<std::function<void()>>> defer_fn;
     if (use_object_cache) {
         PersistReadResult result = persistence_manager_->GetObjCache(read_path);
+        defer_fn.emplace(([&]() {
+            if (use_object_cache && obj_addr_.Valid()) {
+                String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+                PersistWriteResult res = persistence_manager_->PutObjCache(read_path);
+                handler.HandleWriteResult(res);
+            }
+        }));
         obj_addr_ = handler.HandleReadResult(result);
         if (!obj_addr_.Valid()) {
             String error_message = fmt::format("Failed to find object for local path {}", read_path);
@@ -131,12 +139,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
         file_size = file_handle->FileSize();
     }
     file_handle_ = std::move(file_handle);
-    DeferFn defer_fn([&]() {
-        if (use_object_cache && obj_addr_.Valid()) {
-            String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
-            PersistWriteResult res = persistence_manager_->PutObjCache(read_path);
-            handler.HandleWriteResult(res);
-        }
+    DeferFn defer_fn2([&]() {
         file_handle_ = nullptr;
     });
     ReadFromFileImpl(file_size);

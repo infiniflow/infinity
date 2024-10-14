@@ -333,9 +333,6 @@ void TableEntry::AddSegmentReplayWalCompact(SharedPtr<SegmentEntry> segment_entr
 void TableEntry::AddSegmentReplayWal(SharedPtr<SegmentEntry> new_segment) {
     SegmentID segment_id = new_segment->segment_id();
     segment_map_[segment_id] = new_segment;
-    if (compaction_alg_.get() != nullptr) {
-        compaction_alg_->AddSegment(new_segment.get());
-    }
     next_segment_id_++;
 }
 
@@ -346,9 +343,6 @@ void TableEntry::AddSegmentReplay(SharedPtr<SegmentEntry> new_segment) {
     if (!insert_ok) {
         String error_message = fmt::format("Segment {} already exists.", segment_id);
         UnrecoverableError(error_message);
-    }
-    if (compaction_alg_.get() != nullptr) {
-        compaction_alg_->AddSegment(new_segment.get());
     }
     if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);
@@ -540,17 +534,17 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
     }
 
     {
-        // {
-        //     String ss = "Compact commit: " + *this->GetTableName();
-        //     for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
-        //         auto *new_segment = segment_store.segment_entry_;
-        //         ss += ", new segment: " + std::to_string(new_segment->segment_id()) + ", old segment: ";
-        //         for (const auto *old_segment : old_segments) {
-        //             ss += std::to_string(old_segment->segment_id_) + " ";
-        //         }
-        //     }
-        //     LOG_INFO(ss);
-        // }
+        {
+            String ss = "Compact commit: " + *this->GetTableName();
+            for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
+                auto *new_segment = segment_store.segment_entry_;
+                ss += ", new segment: " + std::to_string(new_segment->segment_id()) + ", old segment: ";
+                for (const auto *old_segment : old_segments) {
+                    ss += std::to_string(old_segment->segment_id_) + " ";
+                }
+            }
+            LOG_INFO(ss);
+        }
         std::unique_lock lock(this->rw_locker_);
         for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
 
@@ -974,9 +968,11 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_, index_fulltext->flag_);
                     column_index_merger.Merge(base_names, base_rowids, dst_base_name);
 
+                    Vector<ChunkID> old_ids;
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
                         old_chunks.push_back(chunk_index_entry.get());
+                        old_ids.push_back(chunk_index_entry->chunk_id_);
                     }
                     ChunkID chunk_id = segment_index_entry->GetNextChunkID();
                     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
@@ -992,6 +988,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
                     table_index_entry->UpdateFulltextSegmentTs(ts);
                     LOG_INFO(fmt::format("done merging {} {}", index_name, dst_base_name));
+
+                    segment_index_entry->AddWalIndexDump(merged_chunk_index_entry.get(), txn, std::move(old_ids));
                 }
                 break;
             }
@@ -1319,8 +1317,15 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Transa
 }
 
 void TableEntry::AddSegmentToCompactionAlg(SegmentEntry *segment_entry) {
+    LOG_INFO(fmt::format("Add segment {} to table {} compaction algorithm. deprecate_ts: {}",
+                         segment_entry->segment_id(),
+                         *table_name_,
+                         segment_entry->deprecate_ts()));
     if (compaction_alg_.get() == nullptr) {
         return;
+    }
+    if (segment_entry->CheckDeprecate(UNCOMMIT_TS)) {
+        UnrecoverableError(fmt::format("Add deprecated segment {} to compaction algorithm", segment_entry->segment_id()));
     }
     compaction_alg_->AddSegment(segment_entry);
 }
@@ -1330,6 +1335,19 @@ void TableEntry::AddDeleteToCompactionAlg(SegmentID segment_id) {
         return;
     }
     compaction_alg_->DeleteInSegment(segment_id);
+}
+
+void TableEntry::InitCompactionAlg(TxnTimeStamp system_start_ts) {
+    for (auto &[segment_id, segment_entry] : segment_map_) {
+        if (segment_entry->CheckDeprecate(system_start_ts)) {
+            continue;
+        }
+        LOG_INFO(fmt::format("Add segment {} to table {} compaction algorithm. deprecate_ts: {}",
+                             segment_entry->segment_id(),
+                             *table_name_,
+                             segment_entry->deprecate_ts()));
+        compaction_alg_->AddSegment(segment_entry.get());
+    }
 }
 
 Vector<SegmentEntry *> TableEntry::CheckCompaction(TransactionID txn_id) {
@@ -1359,7 +1377,14 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
             // If segment is visible by txn, txn.begin_ts < segment.deprecate_ts
             // If segment can be cleaned up, segment.deprecate_ts > visible_ts, and visible_ts must > txn.begin_ts
             // So the used segment will not be cleaned up.
-            if (segment->CheckDeprecate(visible_ts)) {
+            bool deprecate = segment->CheckDeprecate(visible_ts);
+            LOG_INFO(fmt::format("Check deprecate of segment {} in table {}. check_ts: {}, drepcate_ts: {}. result: {}",
+                                 segment->segment_id(),
+                                 *table_name_,
+                                 visible_ts,
+                                 segment->deprecate_ts(),
+                                 deprecate));
+            if (deprecate) {
                 cleanup_segment_ids.push_back(iter->first);
                 scanner->AddEntry(std::move(iter->second));
                 iter = segment_map_.erase(iter);

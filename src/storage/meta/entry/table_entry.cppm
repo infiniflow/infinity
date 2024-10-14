@@ -316,6 +316,8 @@ public:
 
     void AddDeleteToCompactionAlg(SegmentID segment_id);
 
+    void InitCompactionAlg(TxnTimeStamp system_start_ts);
+
     Vector<SegmentEntry *> CheckCompaction(TransactionID txn_id);
 
     bool CompactPrepare() const;
