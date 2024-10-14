@@ -44,7 +44,7 @@ public:
     Shutdown();
 };
 
-inline bool IS_LOGGER_INITIALIZED() { return infinity_logger.get() != nullptr; }
+export inline bool IS_LOGGER_INITIALIZED() { return infinity_logger.get() != nullptr; }
 
 export inline bool SHOULD_LOG_TRACE() { return IS_LOGGER_INITIALIZED() && infinity_logger->should_log(spdlog::level::level_enum::trace); }
 
