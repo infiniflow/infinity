@@ -1,6 +1,11 @@
-import { ITableColumns, ITableIndex } from '@/lib/databse-interface';
+import {
+  ITableColumns,
+  ITableIndex,
+  ITableSegment
+} from '@/lib/databse-interface';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { INode, ITreeViewOnLoadDataProps } from 'react-accessible-treeview';
 import {
   listDatabase,
   listTable,
@@ -8,8 +13,7 @@ import {
   showTableIndexes,
   showTableSegments
 } from '../actions';
-import { initialData } from './constants';
-import { DatabaseRouteParams, TreeNode, TreeParentId } from './interface';
+import { DatabaseRouteParams, TreeParentId } from './interface';
 import { buildLeafData, getParentIdById, updateTreeData } from './utils';
 
 export const useHandleClickTreeName = () => {
@@ -25,7 +29,7 @@ export const useHandleClickTreeName = () => {
       level: number;
       name: string;
       parent: TreeParentId;
-      data: TreeNode[];
+      data: INode[];
     }) =>
       () => {
         if (level === 3) {
@@ -42,9 +46,9 @@ export const useHandleClickTreeName = () => {
 };
 
 export const useBuildTreeData = () => {
-  const loadedAlertElement = useRef(null);
-  const [data, setData] = useState<TreeNode[]>(initialData);
-  const [nodesAlreadyLoaded, setNodesAlreadyLoaded] = useState<any[]>([]);
+  const loadedAlertElement = useRef<HTMLDivElement>(null);
+  const [data, setData] = useState<INode[]>([]);
+  const [nodesAlreadyLoaded, setNodesAlreadyLoaded] = useState<INode[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchDatabases = useCallback(async () => {
@@ -52,9 +56,16 @@ export const useBuildTreeData = () => {
       setLoading(true);
       const ret = await listDatabase();
       if (ret.databases.length > 0) {
-        setData((value) =>
+        setData(
           updateTreeData(
-            value,
+            [
+              {
+                name: '',
+                id: 0,
+                children: [],
+                parent: null
+              }
+            ],
             0,
             ret.databases.map((x: string) => ({
               name: x,
@@ -67,7 +78,8 @@ export const useBuildTreeData = () => {
         );
       }
       setLoading(false);
-    } catch (error) {
+    } catch (err: unknown) {
+      console.log('🚀 ~ fetchDatabases ~ err:', err);
       setLoading(false);
     }
   }, []);
@@ -76,7 +88,7 @@ export const useBuildTreeData = () => {
     const ret = await listTable(databaseName);
     if (ret?.tables?.length > 0) {
       setData((value) => {
-        const tablePropertyList: TreeNode[] = [];
+        const tablePropertyList: INode[] = [];
         const tableList = ret.tables.map((x: string) => {
           const leafs = buildLeafData(x);
           tablePropertyList.push(...leafs);
@@ -95,6 +107,16 @@ export const useBuildTreeData = () => {
           ...tablePropertyList
         ];
       });
+    } else {
+      setData((value) =>
+        value.map((x) => {
+          const metadata = x.metadata ?? {};
+          if (x.id === databaseName) {
+            metadata['isEmpty'] = true;
+          }
+          return { ...x, metadata };
+        })
+      );
     }
   }, []);
 
@@ -102,7 +124,7 @@ export const useBuildTreeData = () => {
     fetchDatabases();
   }, [fetchDatabases]);
 
-  const onLoadData = async ({ element }: { element: TreeNode }) => {
+  const onLoadData = async ({ element }: { element: INode }) => {
     if (element.children.length > 0) {
       return;
     }
@@ -134,7 +156,7 @@ export const useBuildTreeData = () => {
     // });
   };
 
-  const wrappedOnLoadData = async (props: any) => {
+  const wrappedOnLoadData = async (props: ITreeViewOnLoadDataProps) => {
     const nodeHasNoChildData = props.element.children.length === 0;
     const nodeHasAlreadyBeenLoaded = nodesAlreadyLoaded.find(
       (e) => e.id === props.element.id
@@ -143,13 +165,17 @@ export const useBuildTreeData = () => {
     await onLoadData(props);
 
     if (nodeHasNoChildData && !nodeHasAlreadyBeenLoaded) {
-      const el: any = loadedAlertElement.current;
+      const el = loadedAlertElement.current;
       setNodesAlreadyLoaded([...nodesAlreadyLoaded, props.element]);
-      el && (el.innerHTML = `${props.element.name} loaded`);
+      if (el) {
+        el.innerHTML = `${props.element.name} loaded`;
+      }
 
       // Clearing aria-live region so loaded node alerts no longer appear in DOM
       setTimeout(() => {
-        el && (el.innerHTML = '');
+        if (el) {
+          el.innerHTML = '';
+        }
       }, 5000);
     }
   };
@@ -205,7 +231,7 @@ export const useFetchTableSegments = ({
   databaseId,
   tableId
 }: DatabaseRouteParams['params']) => {
-  const [tableSegments, setTableSegments] = useState<any[]>([]);
+  const [tableSegments, setTableSegments] = useState<ITableSegment[]>([]);
 
   const fetchTableSegments = useCallback(async () => {
     const data = await showTableSegments({

@@ -101,7 +101,7 @@ SegmentIndexEntry::SegmentIndexEntry(const SegmentIndexEntry &other)
     min_ts_ = other.min_ts_;
     max_ts_ = other.max_ts_;
     checkpoint_ts_ = other.checkpoint_ts_;
-    next_chunk_id_ = other.next_chunk_id_;
+    next_chunk_id_ = other.next_chunk_id_.load();
 
     memory_hnsw_index_ = other.memory_hnsw_index_;
     memory_ivf_index_ = other.memory_ivf_index_;
@@ -178,7 +178,7 @@ void SegmentIndexEntry::UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> ne
     assert(new_entry->index_dir_ == index_dir_);
     min_ts_ = new_entry->min_ts_;
     max_ts_ = new_entry->max_ts_;
-    next_chunk_id_ = new_entry->next_chunk_id_;
+    next_chunk_id_ = new_entry->next_chunk_id_.load();
 }
 
 // String SegmentIndexEntry::IndexFileName(SegmentID segment_id) { return fmt::format("seg{}.idx", segment_id); }
@@ -393,17 +393,17 @@ void SegmentIndexEntry::AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn
     txn->AddWalCmd(MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id_, std::move(chunk_infos), std::move(deprecate_chunk_ids)));
 }
 
-void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id) {
-    const IndexBase *index_base = table_index_entry_->index_base();
-    if (index_base->index_type_ != IndexType::kFullText)
-        return;
-    // Init the mem index from previously spilled one.
-    assert(memory_indexer_.get() == nullptr);
-    const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-    String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
-    memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
-    memory_indexer_->Load();
-}
+// void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id) {
+//     const IndexBase *index_base = table_index_entry_->index_base();
+//     if (index_base->index_type_ != IndexType::kFullText)
+//         return;
+//     // Init the mem index from previously spilled one.
+//     assert(memory_indexer_.get() == nullptr);
+//     const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+//     String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
+//     memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
+//     memory_indexer_->Load();
+// }
 
 u32 SegmentIndexEntry::MemIndexRowCount() {
     const IndexBase *index_base = table_index_entry_->index_base();
@@ -614,6 +614,40 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
     //     }
     // }
     return Status::OK();
+}
+
+void SegmentIndexEntry::GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries,
+                                             SharedPtr<MemoryIndexer> &memory_indexer,
+                                             Txn *txn) {
+    std::shared_lock lock(rw_locker_);
+    chunk_index_entries.clear();
+    SizeT num = chunk_index_entries_.size();
+    for (SizeT i = 0; i < num; i++) {
+        auto &chunk_index_entry = chunk_index_entries_[i];
+        bool add = chunk_index_entry->CheckVisible(txn);
+        LOG_INFO(fmt::format("GetChunkIndexEntries, CheckVisible ret: {}, chunk_id: {}, deprecate ts: {}",
+                             add,
+                             chunk_index_entry->chunk_id_,
+                             chunk_index_entry->deprecate_ts_.load()));
+        if (add) {
+            chunk_index_entries.push_back(chunk_index_entry);
+        }
+    }
+    std::sort(std::begin(chunk_index_entries),
+              std::end(chunk_index_entries),
+              [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) noexcept {
+                  return (lhs->base_rowid_ < rhs->base_rowid_ || (lhs->base_rowid_ == rhs->base_rowid_ && lhs->row_count_ < rhs->row_count_));
+              });
+    memory_indexer = memory_indexer_;
+}
+
+void SegmentIndexEntry::RemoveChunkIndexEntry(ChunkIndexEntry *chunk_index_entry) {
+    RowID base_rowid = chunk_index_entry->base_rowid_;
+    std::unique_lock lock(rw_locker_);
+    chunk_index_entries_.erase(std::remove_if(chunk_index_entries_.begin(),
+                                              chunk_index_entries_.end(),
+                                              [base_rowid](const SharedPtr<ChunkIndexEntry> &entry) { return entry->base_rowid_ == base_rowid; }),
+                               chunk_index_entries_.end());
 }
 
 void SegmentIndexEntry::CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -890,7 +924,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                         using IndexT = std::decay_t<decltype(*index)>;
                         using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
 
-                        OneColumnIterator<SparseRefT, true /*check_ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                        CappedOneColumnIterator<SparseRefT, true /*check_ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts, row_count);
                         index->AddDocs(std::move(iter));
                     }
                 },
@@ -999,12 +1033,41 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
                                                                           TxnTimeStamp commit_ts,
                                                                           TxnTimeStamp deprecate_ts,
                                                                           BufferManager *buffer_mgr) {
-    if (chunk_id != next_chunk_id_) {
-        UnrecoverableError(fmt::format("Chunk id: {} is not equal to next chunk id: {}", chunk_id, next_chunk_id_));
+    LOG_INFO(fmt::format("AddChunkIndexEntryReplayWal chunk_id: {} deprecate_ts: {}, base_rowid: {}, row_count: {} to to segment: {}",
+                          chunk_id,
+
+                          deprecate_ts,
+                          base_rowid.ToUint64(),
+                          row_count,
+                          segment_id_));
+    SharedPtr<ChunkIndexEntry> chunk_index_entry =
+        ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
+    assert(std::is_sorted(chunk_index_entries_.begin(), chunk_index_entries_.end(), [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) {
+        return lhs->chunk_id_ < rhs->chunk_id_;
+    }));
+    auto iter = std::lower_bound(chunk_index_entries_.begin(), chunk_index_entries_.end(), chunk_id, [&](const SharedPtr<ChunkIndexEntry> &entry, ChunkID id) {
+        return entry->chunk_id_ < id;
+    });
+    if (iter != chunk_index_entries_.end() && (*iter)->chunk_id_ == chunk_id) {
+        UnrecoverableError(fmt::format("Chunk ID: {} already exists in segment: {}", chunk_id, segment_id_));
     }
-    auto ret = this->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    ++next_chunk_id_;
-    return ret;
+    chunk_index_entries_.insert(iter, chunk_index_entry);
+    ChunkID old_next_chunk_id = next_chunk_id_;
+    next_chunk_id_ = std::max(next_chunk_id_.load(), chunk_index_entries_.back()->chunk_id_ + 1);
+    LOG_INFO(fmt::format("AddChunkIndexEntryReplayWal, old_next_chunk_id: {}, next_chunk_id_, chunk_id: {}", old_next_chunk_id, next_chunk_id_, chunk_id));
+    if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
+        try {
+            u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
+            UpdateFulltextColumnLenInfo(column_length_sum, row_count);
+        } catch (const UnrecoverableException &e) {
+            String msg(e.what());
+            if (!msg.find("No such file or directory")) {
+                throw e;
+            }
+            LOG_WARN("Fulltext index file not found, skip update column length info");
+        }
+    };
+    return chunk_index_entry;
 }
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID chunk_id,
@@ -1015,18 +1078,28 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
                                                                        TxnTimeStamp commit_ts,
                                                                        TxnTimeStamp deprecate_ts,
                                                                        BufferManager *buffer_mgr) {
+    if (chunk_id >= next_chunk_id_) {
+        UnrecoverableError(fmt::format("Chunk ID: {} is greater than next chunk ID: {}", chunk_id, next_chunk_id_));
+    }
+    LOG_INFO(fmt::format("AddChunkIndexEntryReplay chunk_id: {} deprecate_ts: {}, base_rowid: {}, row_count: {} to to segment: {}",
+                          chunk_id,
+
+                          deprecate_ts,
+                          base_rowid.ToUint64(),
+                          row_count,
+                          segment_id_));
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    bool add = false;
-    for (auto &chunk : chunk_index_entries_) {
-        if (chunk->chunk_id_ == chunk_id) {
-            chunk = chunk_index_entry;
-            add = true;
-            break;
-        }
-    }
-    if (!add) {
-        chunk_index_entries_.push_back(chunk_index_entry);
+    assert(std::is_sorted(chunk_index_entries_.begin(), chunk_index_entries_.end(), [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) {
+        return lhs->chunk_id_ < rhs->chunk_id_;
+    }));
+    auto iter = std::lower_bound(chunk_index_entries_.begin(), chunk_index_entries_.end(), chunk_id, [&](const SharedPtr<ChunkIndexEntry> &entry, ChunkID id) {
+        return entry->chunk_id_ < id;
+    });
+    if (iter != chunk_index_entries_.end() && (*iter)->chunk_id_ == chunk_id) {
+        *iter = chunk_index_entry;
+    } else {
+        chunk_index_entries_.insert(iter, chunk_index_entry);
     }
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
         try {
@@ -1066,7 +1139,7 @@ nlohmann::json SegmentIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
         index_entry_json["commit_ts"] = this->commit_ts_.load();
         index_entry_json["min_ts"] = this->min_ts_;
         index_entry_json["max_ts"] = this->max_ts_;
-        index_entry_json["next_chunk_id"] = this->next_chunk_id_;
+        index_entry_json["next_chunk_id"] = this->next_chunk_id_.load();
         index_entry_json["checkpoint_ts"] = this->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
 
         for (auto &chunk_index_entry : chunk_index_entries_) {

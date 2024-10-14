@@ -150,7 +150,7 @@ public:
     // Relative to the `data_dir` config item
     const SharedPtr<String> &block_dir() const { return block_dir_; }
 
-    BlockColumnEntry *GetColumnBlockEntry(SizeT column_idx) const { return columns_[column_idx].get(); }
+    BlockColumnEntry *GetColumnBlockEntry(SizeT column_idx) const;
 
     FastRoughFilter *GetFastRoughFilter() { return fast_rough_filter_.get(); }
 

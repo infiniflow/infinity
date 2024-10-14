@@ -126,8 +126,8 @@ public:
 
     void AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn, Vector<ChunkID> chunk_ids = {});
 
-    // Init the mem index from previously spilled one.
-    void MemIndexLoad(const String &base_name, RowID base_row_id);
+    // // Init the mem index from previously spilled one.
+    // void MemIndexLoad(const String &base_name, RowID base_row_id);
 
     // Populate index entirely for the segment
     void PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config);
@@ -138,32 +138,9 @@ public:
 
     Status CreateIndexDo(atomic_u64 &create_index_idx);
 
-    void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, SharedPtr<MemoryIndexer> &memory_indexer, Txn *txn = nullptr) {
-        std::shared_lock lock(rw_locker_);
-        chunk_index_entries.clear();
-        SizeT num = chunk_index_entries_.size();
-        for (SizeT i = 0; i < num; i++) {
-            auto &chunk_index_entry = chunk_index_entries_[i];
-            if (chunk_index_entry->CheckVisible(txn)) {
-                chunk_index_entries.push_back(chunk_index_entry);
-            }
-        }
-        std::sort(std::begin(chunk_index_entries),
-                  std::end(chunk_index_entries),
-                  [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) noexcept {
-                      return (lhs->base_rowid_ < rhs->base_rowid_ || (lhs->base_rowid_ == rhs->base_rowid_ && lhs->row_count_ < rhs->row_count_));
-                  });
-        memory_indexer = memory_indexer_;
-    }
+    void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, SharedPtr<MemoryIndexer> &memory_indexer, Txn *txn = nullptr);
 
-    void RemoveChunkIndexEntry(ChunkIndexEntry *chunk_index_entry) {
-        RowID base_rowid = chunk_index_entry->base_rowid_;
-        std::unique_lock lock(rw_locker_);
-        chunk_index_entries_.erase(std::remove_if(chunk_index_entries_.begin(),
-                                                  chunk_index_entries_.end(),
-                                                  [base_rowid](const SharedPtr<ChunkIndexEntry> &entry) { return entry->base_rowid_ == base_rowid; }),
-                                   chunk_index_entries_.end());
-    }
+    void RemoveChunkIndexEntry(ChunkIndexEntry *chunk_index_entry);
 
     void ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
                                   SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
@@ -274,7 +251,7 @@ private:
     TxnTimeStamp min_ts_{0}; // Indicate the commit_ts which create this SegmentIndexEntry
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this SegmentIndexEntry
     TxnTimeStamp checkpoint_ts_{0};
-    ChunkID next_chunk_id_{0};
+    Atomic<ChunkID> next_chunk_id_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
 

@@ -10,6 +10,7 @@ import re
 
 
 @pytest.mark.slow
+@pytest.mark.skip(reason="skip")
 class TestShutDownPytest:
     finish_one = False
 

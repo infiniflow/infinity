@@ -1,10 +1,11 @@
+import { INode } from 'react-accessible-treeview';
 import { Leaf } from './constants';
-import { TreeNode, TreeParentId } from './interface';
+import { TreeParentId } from './interface';
 
 export const updateTreeData = (
-  list: any[],
+  list: INode[],
   id: string | number,
-  children: Array<TreeNode>
+  children: Array<INode>
 ) => {
   const data = list.map((node) => {
     if (node.id === id) {
@@ -40,6 +41,6 @@ export const buildLeafData = (parent: string) => {
   ];
 };
 
-export const getParentIdById = (data: TreeNode[], id: TreeParentId) => {
+export const getParentIdById = (data: INode[], id: TreeParentId) => {
   return data.find((x) => x.id === id)?.parent;
 };

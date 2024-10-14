@@ -790,7 +790,8 @@ const String AddSegmentIndexEntryOp::ToString() const {
 }
 
 const String AddChunkIndexEntryOp::ToString() const {
-    return fmt::format("AddChunkIndexEntryOp base_name: {} base_rowid: {} row_count: {} commit_ts: {} deprecate_ts: {}",
+    return fmt::format("AddChunkIndexEntryOp {} base_name: {} base_rowid: {} row_count: {} commit_ts: {} deprecate_ts: {}",
+                       CatalogDeltaOperation::ToString(),
                        base_name_,
                        base_rowid_.ToUint64(),
                        row_count_,
