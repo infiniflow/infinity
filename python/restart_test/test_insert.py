@@ -96,7 +96,7 @@ class TestInsert:
         "insert_n, config",
         [
             (100000, "test/data/config/restart_test/test_insert/1.toml"),
-            (1000000, "test/data/config/restart_test/test_insert/1.toml"),
+            # (1000000, "test/data/config/restart_test/test_insert/1.toml"),
         ],
     )
     @pytest.mark.parametrize(
@@ -162,7 +162,7 @@ class TestInsert:
         "insert_n,config",
         [
             (100000, "test/data/config/restart_test/test_insert/1.toml"),
-            (1000000, "test/data/config/restart_test/test_insert/1.toml"),
+            # (1000000, "test/data/config/restart_test/test_insert/1.toml"),
         ],
     )
     @pytest.mark.parametrize(

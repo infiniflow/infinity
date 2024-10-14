@@ -54,4 +54,5 @@ if __name__ == "__main__":
         )
     process.wait()
     if process.returncode != 0:
-        raise Exception(f"An error occurred: {process.stderr}")
+        print(f"An error occurred: {process.stderr}")
+        sys.exit(-1)

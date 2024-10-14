@@ -1,6 +1,7 @@
 
 import argparse
 import os
+import sys
 import time
 
 
@@ -36,5 +37,4 @@ if __name__ == "__main__":
             os.system(f"python3 tools/run_restart_test.py --infinity_path={infinity_path} --slow=true")
         except Exception as e:
             print(e)
-            test_fail = True
-            raise e
+            sys.exit(1)

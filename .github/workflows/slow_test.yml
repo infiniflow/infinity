@@ -91,18 +91,21 @@ jobs:
           sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity release version
-        if: ${{ !cancelled() && !failure() && !contains(github.event.pull_request.labels.*.name, 'invalid')}}
+        if: ${{ !cancelled() && !failure()}}
+        # && !contains(github.event.pull_request.labels.*.name, 'invalid')
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_continuous_conf.toml > release.log 2> release_error.log" &
 
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version continously
-        if: ${{ !cancelled() && !failure() && !contains(github.event.pull_request.labels.*.name, 'invalid')}}
+        if: ${{ !cancelled() && !failure()}}
+        # && !contains(github.event.pull_request.labels.*.name, 'invalid')
         id: run_py_tests
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel_continuous.py" && sleep 1s
 
       - name: Stop infinity release
-        if: ${{ !cancelled() && !contains(github.event.pull_request.labels.*.name, 'invalid')}}
+        if: ${{ !cancelled() && !failure()}}
+        # && !contains(github.event.pull_request.labels.*.name, 'invalid')
         id: stop_py_tests
         run: |
           pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
