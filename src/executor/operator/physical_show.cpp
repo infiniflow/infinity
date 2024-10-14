@@ -175,12 +175,12 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("name");
             output_names_->emplace_back("type");
             output_names_->emplace_back("default");
-            //            output_names_->emplace_back("constraint");
+            output_names_->emplace_back("comment");
 
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
-            //            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
             break;
         }
         case ShowStmtType::kIndexes: {
@@ -1842,7 +1842,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         varchar_type,
         varchar_type,
         varchar_type,
-        //        varchar_type,
+        varchar_type,
     };
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
