@@ -1,7 +1,7 @@
 'use client';
 
 import cx from 'classnames';
-import TreeView from 'react-accessible-treeview';
+import TreeView, { INode } from 'react-accessible-treeview';
 import { AiOutlineLoading } from 'react-icons/ai';
 import { IoMdArrowDropright } from 'react-icons/io';
 import { Leaf, LeafIconMap } from './constants';
@@ -56,8 +56,10 @@ function AsyncTree() {
           handleSelect,
           handleExpand
         }) => {
-          const branchNode = (isExpanded: any, element: any) => {
-            return isExpanded && element.children.length === 0 ? (
+          const branchNode = (isExpanded: boolean, element: INode) => {
+            return isExpanded &&
+              !element.metadata?.isEmpty &&
+              element.children.length === 0 ? (
               <>
                 <span
                   role="alert"

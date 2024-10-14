@@ -1,6 +1,7 @@
 import { ITableColumns, ITableIndex } from '@/lib/databse-interface';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { INode } from 'react-accessible-treeview';
 import {
   listDatabase,
   listTable,
@@ -9,7 +10,7 @@ import {
   showTableSegments
 } from '../actions';
 import { initialData } from './constants';
-import { DatabaseRouteParams, TreeNode, TreeParentId } from './interface';
+import { DatabaseRouteParams, TreeParentId } from './interface';
 import { buildLeafData, getParentIdById, updateTreeData } from './utils';
 
 export const useHandleClickTreeName = () => {
@@ -25,7 +26,7 @@ export const useHandleClickTreeName = () => {
       level: number;
       name: string;
       parent: TreeParentId;
-      data: TreeNode[];
+      data: INode[];
     }) =>
       () => {
         if (level === 3) {
@@ -43,7 +44,7 @@ export const useHandleClickTreeName = () => {
 
 export const useBuildTreeData = () => {
   const loadedAlertElement = useRef(null);
-  const [data, setData] = useState<TreeNode[]>(initialData);
+  const [data, setData] = useState<INode[]>(initialData);
   const [nodesAlreadyLoaded, setNodesAlreadyLoaded] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -76,7 +77,7 @@ export const useBuildTreeData = () => {
     const ret = await listTable(databaseName);
     if (ret?.tables?.length > 0) {
       setData((value) => {
-        const tablePropertyList: TreeNode[] = [];
+        const tablePropertyList: INode[] = [];
         const tableList = ret.tables.map((x: string) => {
           const leafs = buildLeafData(x);
           tablePropertyList.push(...leafs);
@@ -95,6 +96,16 @@ export const useBuildTreeData = () => {
           ...tablePropertyList
         ];
       });
+    } else {
+      setData((value) =>
+        value.map((x) => {
+          let metadata = x.metadata ?? {};
+          if (x.id === databaseName) {
+            metadata['isEmpty'] = true;
+          }
+          return { ...x, metadata };
+        })
+      );
     }
   }, []);
 
@@ -102,7 +113,7 @@ export const useBuildTreeData = () => {
     fetchDatabases();
   }, [fetchDatabases]);
 
-  const onLoadData = async ({ element }: { element: TreeNode }) => {
+  const onLoadData = async ({ element }: { element: INode }) => {
     if (element.children.length > 0) {
       return;
     }
