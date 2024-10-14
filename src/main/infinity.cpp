@@ -49,6 +49,7 @@ import optimize_statement;
 import alter_statement;
 import statement_common;
 import admin_statement;
+import compact_statement;
 
 import create_schema_info;
 import drop_schema_info;
@@ -737,7 +738,7 @@ QueryResult Infinity::ShowObjects() {
     return result;
 }
 
-QueryResult Infinity::ShowObject(const String& filename) {
+QueryResult Infinity::ShowObject(const String &filename) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kPersistenceObject;
@@ -778,7 +779,7 @@ QueryResult Infinity::ShowMemoryAllocations() {
     return result;
 }
 
-QueryResult Infinity::ShowFunction(const String& function_name) {
+QueryResult Infinity::ShowFunction(const String &function_name) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kFunction;
@@ -1036,6 +1037,39 @@ QueryResult Infinity::Cleanup() {
     command_statement->command_info_ = MakeUnique<CleanupCmd>();
 
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    return result;
+}
+
+QueryResult Infinity::ForceCheckpoint() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto flush_statement = MakeUnique<FlushStatement>();
+    flush_statement->type_ = infinity::FlushType::kData;
+
+    QueryResult result = query_context_ptr->QueryStatement(flush_statement.get());
+
+    return result;
+}
+
+QueryResult Infinity::CompactTable(const String &db_name, const String &table_name) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto compact_statement = MakeUnique<ManualCompactStatement>(db_name, table_name);
+
+    QueryResult result = query_context_ptr->QueryStatement(compact_statement.get());
+
     return result;
 }
 
