@@ -69,20 +69,17 @@ jobs:
         run: |
           RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
           echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-          touch tmp.txt && echo "${RUNNER_WORKSPACE_PREFIX}" > tmp.txt
-          sudo mkdir -p test/data/benchmark && sudo ln -sf ${RUNNER_WORKSPACE_PREFIX}/benchmark/enwiki/enwiki-10w.csv test/data/benchmark/enwiki-10w.csv
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
+        id: run_restart_test
         run : sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
 
       - name: Collect restart test output
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # remove symbolic link
-        # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
-          sudo rm -f test/data/benchmark/enwiki-10w.csv
-          find . -name "restart_test.log.*" -exec cat {} \;
+          failure="${{ steps.run_restart_test.outcome == 'failure'}}"
+          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -208,20 +205,17 @@ jobs:
         run: |
           RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
           echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-          touch tmp.txt && echo "${RUNNER_WORKSPACE_PREFIX}" > tmp.txt
-          sudo mkdir -p test/data/benchmark && sudo ln -sf ${RUNNER_WORKSPACE_PREFIX}/benchmark/enwiki/enwiki-10w.csv test/data/benchmark/enwiki-10w.csv
     
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
+        id: run_restart_test
         run : sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && python3 tools/run_restart_test.py --infinity_path=cmake-build-release/src/infinity"
 
       - name: Collect restart test output
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # remove symbolic link
-        # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
-          sudo rm -f test/data/benchmark/enwiki-10w.csv
-          find . -name "restart_test.log.*" -exec cat {} \;
+          failure="${{ steps.run_restart_test.outcome == 'failure'}}"
+          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}

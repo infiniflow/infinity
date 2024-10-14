@@ -81,9 +81,14 @@ void CompactionProcessor::DoCompact() {
     for (const auto &[statement, txn] : statements) {
         BGQueryContextWrapper wrapper(txn);
         BGQueryState state;
-        bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
-        if (res) {
-            wrappers.emplace_back(std::move(wrapper), std::move(state));
+        try {
+            bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
+            if (res) {
+                wrappers.emplace_back(std::move(wrapper), std::move(state));
+            }
+        } catch (const std::exception &e) {
+            LOG_CRITICAL(fmt::format("DoCompact failed: {}", e.what()));
+            throw;
         }
     }
     for (auto &[wrapper, query_state] : wrappers) {

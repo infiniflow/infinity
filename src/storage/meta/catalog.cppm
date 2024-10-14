@@ -301,6 +301,8 @@ public:
 
     void PickCleanup(CleanupScanner *scanner);
 
+    void InitCompactionAlg(TxnTimeStamp system_start_ts);
+
 private:
     UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
 };

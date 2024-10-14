@@ -58,6 +58,7 @@ Vector<SegmentEntry *> SegmentLayer::PickCompacting(TransactionID txn_id, SizeT 
     {
         Vector<Pair<SegmentEntry *, SizeT>> segments;
         for (auto &[segment_id, segment_entry] : segments_) {
+            // LOG_INFO(fmt::format("Get rowcount of segment: {}", segment_id));
             segments.emplace_back(segment_entry, segment_entry->actual_row_count());
         }
         Vector<int> idx(segment_n);
@@ -124,6 +125,7 @@ Vector<SegmentEntry *> DBTCompactionAlg::CheckCompaction(TransactionID txn_id) {
     for (int layer = cur_layer_n - 1; layer >= 0; --layer) {
         auto &segment_layer = segment_layers_[layer];
         if (segment_layer.LayerSize() >= config_.m_) {
+            // LOG_INFO(fmt::format("Get rowcount of table {}", *table_entry_->GetTableName()));
             Vector<SegmentEntry *> compact_segments = segment_layer.PickCompacting(txn_id, config_.m_, max_segment_capacity_);
             if (compact_segments.empty()) {
                 continue;
