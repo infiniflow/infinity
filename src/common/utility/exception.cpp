@@ -48,7 +48,9 @@ void PrintStacktrace(const String &err_msg) {
 
 void RecoverableError(Status status, const char *file_name, u32 line) {
     status.AppendMessage(fmt::format("@{}:{}", infinity::TrimPath(file_name), line));
-    LOG_ERROR(status.message());
+    if (IS_LOGGER_INITIALIZED()) {
+        LOG_ERROR(status.message());
+    }
     throw RecoverableException(status);
 }
 
@@ -64,7 +66,9 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
         String error_msg = cleanup_tracer->GetCleanupInfo();
         LOG_ERROR(std::move(error_msg));
     }
-
+    if (IS_LOGGER_INITIALIZED()) {
+        LOG_CRITICAL(message);
+    }
     Logger::Flush();
     PrintStacktrace(message);
     throw UnrecoverableException(fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line));
@@ -73,12 +77,17 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
 #else
 
 void RecoverableError(Status status) {
-    LOG_ERROR(status.message());
+    if (IS_LOGGER_INITIALIZED()) {
+        LOG_ERROR(status.message());
+    }
     throw RecoverableException(status);
 }
 
 void UnrecoverableError(const String &message) {
-    LOG_CRITICAL(message);
+    if (IS_LOGGER_INITIALIZED()) {
+        LOG_CRITICAL(message);
+    }
+    Logger::Flush();
     throw UnrecoverableException(message);
 }
 

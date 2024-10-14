@@ -38,14 +38,12 @@ LocalFileHandle::~LocalFileHandle() {
 
     if(fd_ == -1) {
         String error_message = fmt::format("File was closed before or not open");
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     i32 ret = close(fd_);
     if(ret == -1) {
         String error_message = fmt::format("Close file: {}, error: {}", path_, strerror(errno));
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -62,14 +60,12 @@ Status LocalFileHandle::Close() {
 
     if(fd_ == -1) {
         String error_message = fmt::format("File was closed before");
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     i32 ret = close(fd_);
     if(ret == -1) {
         String error_message = fmt::format("Close file: {}, error: {}", path_, strerror(errno));
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -82,7 +78,6 @@ Status LocalFileHandle::Close() {
 Status LocalFileHandle::Append(const void *buffer, u64 nbytes) {
     if(access_mode_ != FileAccessMode::kWrite) {
         String error_message = fmt::format("File: {} isn't open.", path_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     i64 written = 0;
@@ -90,7 +85,6 @@ Status LocalFileHandle::Append(const void *buffer, u64 nbytes) {
         i64 write_count = write(fd_, (char*)buffer + written, nbytes - written);
         if (write_count == -1) {
             String error_message = fmt::format("Can't write file: {}: {}. fd: {}", path_, strerror(errno), fd_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         written += write_count;
@@ -112,7 +106,6 @@ Tuple<SizeT, Status> LocalFileHandle::Read(void *buffer, u64 nbytes) {
         }
         if (read_count == -1) {
             String error_message = fmt::format("Can't read file: {}: {}", path_, strerror(errno));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         read_n += read_count;
@@ -130,7 +123,6 @@ Tuple<SizeT, Status> LocalFileHandle::Read(String &buffer, u64 nbytes) {
         }
         if (read_count == -1) {
             String error_message = fmt::format("Can't read file: {}: {}", path_, strerror(errno));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         read_n += read_count;
@@ -141,7 +133,6 @@ Tuple<SizeT, Status> LocalFileHandle::Read(String &buffer, u64 nbytes) {
 Status LocalFileHandle::Seek(u64 nbytes) {
     if ((off_t)-1 == lseek(fd_, nbytes, SEEK_SET)) {
         String error_message = fmt::format("Can't seek file: {}: {}", path_, strerror(errno));
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return Status::OK();

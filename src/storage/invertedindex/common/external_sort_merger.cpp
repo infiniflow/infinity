@@ -153,6 +153,8 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
         u32 s = size_run_[i] > PRE_BUF_SIZE_ ? PRE_BUF_SIZE_ : size_run_[i];
         size_t ret = io_stream.Read(micro_buf_[i], s);
         size_micro_run_[i] = ret;
+        if (s == 0)
+            continue;
 
         /// it is not needed for compression, validation will be made within IOStream in that case
         // if a record can fit in microrun buffer

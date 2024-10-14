@@ -47,7 +47,6 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
             }
             default: {
                 String error_message = fmt::format("Invalid node type: {}", infinity_peer_server::to_string(request.node_type));
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -115,7 +114,6 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
             }
             default: {
                 String error_message = "Invalid node type";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
