@@ -1,0 +1,13 @@
+statement ok
+DROP TABLE IF EXISTS test_show_comment;
+
+statement ok
+CREATE TABLE test_show_comment (c1 INT DEFAULT 0 COMMENT 'c1 comment');
+
+query I
+SHOW TABLE test_show_comment COLUMNS;
+----
+c1 Integer 0 c1 comment
+
+statement ok
+DROP TABLE test_show_comment;

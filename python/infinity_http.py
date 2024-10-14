@@ -273,12 +273,13 @@ class infinity_http:
         h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.raise_exception(r)
-        res = {"name":[], "type":[], "default":[]}
+        res = {"name":[], "type":[], "default":[], "comment":[]}
         print(r.json())
         for col in r.json()["columns"]:
             res["name"].append(col["name"])
             res["type"].append(col["type"])
             res["default"].append(col["default"])
+            res["comment"].append(col["comment"])
         res = pl.from_pandas(pd.DataFrame(res))
         return res
 

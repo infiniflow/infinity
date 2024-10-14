@@ -1712,7 +1712,8 @@ Tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const in
         return {nullptr, status};
     }
 
-    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def.name, constraints, const_expr);
+    String comment = column_def.comment;
+    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def.name, constraints, std::move(comment), const_expr);
     return {col_def, Status::OK()};
 }
 

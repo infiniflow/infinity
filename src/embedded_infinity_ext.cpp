@@ -90,7 +90,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("column_type", &WrapColumnDef::column_type)
         .def_rw("column_name", &WrapColumnDef::column_name)
         .def_rw("constraints", &WrapColumnDef::constraints)
-        .def_rw("constant_expr", &WrapColumnDef::constant_expr);
+        .def_rw("constant_expr", &WrapColumnDef::constant_expr)
+        .def_rw("comment", &WrapColumnDef::comment);
 
     nb::class_<WrapEmbeddingType>(m, "WrapEmbeddingType")
         .def(nb::init<>())

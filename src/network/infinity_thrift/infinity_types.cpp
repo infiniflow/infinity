@@ -5397,6 +5397,10 @@ void ColumnDef::__set_constraints(const std::vector<Constraint::type> & val) {
 void ColumnDef::__set_constant_expr(const ConstantExpr& val) {
   this->constant_expr = val;
 }
+
+void ColumnDef::__set_comment(const std::string& val) {
+  this->comment = val;
+}
 std::ostream& operator<<(std::ostream& out, const ColumnDef& obj)
 {
   obj.printTo(out);
@@ -5479,6 +5483,14 @@ uint32_t ColumnDef::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->comment);
+          this->__isset.comment = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -5524,6 +5536,10 @@ uint32_t ColumnDef::write(::apache::thrift::protocol::TProtocol* oprot) const {
   xfer += this->constant_expr.write(oprot);
   xfer += oprot->writeFieldEnd();
 
+  xfer += oprot->writeFieldBegin("comment", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeString(this->comment);
+  xfer += oprot->writeFieldEnd();
+
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -5536,6 +5552,7 @@ void swap(ColumnDef &a, ColumnDef &b) {
   swap(a.data_type, b.data_type);
   swap(a.constraints, b.constraints);
   swap(a.constant_expr, b.constant_expr);
+  swap(a.comment, b.comment);
   swap(a.__isset, b.__isset);
 }
 
@@ -5545,6 +5562,7 @@ ColumnDef::ColumnDef(const ColumnDef& other257) {
   data_type = other257.data_type;
   constraints = other257.constraints;
   constant_expr = other257.constant_expr;
+  comment = other257.comment;
   __isset = other257.__isset;
 }
 ColumnDef& ColumnDef::operator=(const ColumnDef& other258) {
@@ -5553,6 +5571,7 @@ ColumnDef& ColumnDef::operator=(const ColumnDef& other258) {
   data_type = other258.data_type;
   constraints = other258.constraints;
   constant_expr = other258.constant_expr;
+  comment = other258.comment;
   __isset = other258.__isset;
   return *this;
 }
@@ -5564,6 +5583,7 @@ void ColumnDef::printTo(std::ostream& out) const {
   out << ", " << "data_type=" << to_string(data_type);
   out << ", " << "constraints=" << to_string(constraints);
   out << ", " << "constant_expr=" << to_string(constant_expr);
+  out << ", " << "comment=" << to_string(comment);
   out << ")";
 }
 
