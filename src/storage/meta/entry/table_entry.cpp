@@ -1148,6 +1148,10 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
                     column_def_json["constraints"].emplace_back(column_constraint);
                 }
 
+                if (!(column_def->comment().empty())) {
+                    column_def_json["column_comment"] = column_def->comment();
+                }
+
                 if (column_def->has_default_value()) {
                     auto default_expr = dynamic_pointer_cast<ConstantExpr>(column_def->default_expr_);
                     column_def_json["default"] = default_expr->Serialize();
@@ -1217,12 +1221,17 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
                 }
             }
 
+            String comment;
+            if (column_def_json.contains("column_comment")) {
+                comment = column_def_json["column_comment"];
+            }
+
             SharedPtr<ParsedExpr> default_expr = nullptr;
             if (column_def_json.contains("default")) {
                 default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
             }
 
-            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, default_expr);
+            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
             columns.emplace_back(column_def);
         }
         row_count = table_entry_json["row_count"];
@@ -1393,15 +1402,15 @@ Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
     Vector<TableIndexEntry *> table_index_entries = TableIndexes(txn_id, begin_ts);
     Vector<String> res;
     res.reserve(table_index_entries.size());
-    for(const auto& table_index_entry: table_index_entries) {
+    for (const auto &table_index_entry : table_index_entries) {
         Vector<String> index_files = table_index_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), index_files.begin(), index_files.end());
     }
 
     std::shared_lock lock(rw_locker_);
     res.reserve(res.size() + segment_map_.size());
-    for(const auto& segment_pair: segment_map_) {
-        const SegmentEntry* segment_entry = segment_pair.second.get();
+    for (const auto &segment_pair : segment_map_) {
+        const SegmentEntry *segment_entry = segment_pair.second.get();
         Vector<String> segment_files = segment_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), segment_files.begin(), segment_files.end());
     }

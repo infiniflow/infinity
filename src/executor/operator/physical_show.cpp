@@ -1830,6 +1830,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(1, varchar_type, "type", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(2, varchar_type, "default", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "comment", std::set<ConstraintType>()),
         //        MakeShared<ColumnDef>(3, varchar_type, "constraint", std::set<ConstraintType>())
     };
 
@@ -1857,7 +1858,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
         SizeT output_column_idx = 0;
         {
-            // Append column name to the first column
+            // Append column name to the 1st column
             Value value = Value::MakeVarchar(column->name());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
@@ -1865,7 +1866,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
         ++output_column_idx;
         {
-            // Append column type to the second column, if the column type is embedded type, append the embedded type
+            // Append column type to the 2nd column, if the column type is embedded type, append the embedded type
             String column_type = column->type()->ToString();
             Value value = Value::MakeVarchar(column_type);
             ValueExpression value_expr(value);
@@ -1874,25 +1875,20 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
         ++output_column_idx;
         {
-            // Append column default value to the fourth column
+            // Append column default value to the 3rd column
             String column_default = column->default_expr_->ToString();
             Value value = Value::MakeVarchar(column_default);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
 
-        //        ++output_column_idx;
-        //        {
-        //            // Append column constraint to the third column
-        //            String column_constraint;
-        //            for (auto &constraint : column->constraints_) {
-        //                column_constraint += " " + ConstrainTypeToString(constraint);
-        //            }
-        //
-        //            Value value = Value::MakeVarchar(column_constraint);
-        //            ValueExpression value_expr(value);
-        //            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
-        //        }
+        ++output_column_idx;
+        {
+            // Append column comment to the 4th column
+            Value value = Value::MakeVarchar(column->comment());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+        }
 
         if (++row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
