@@ -1656,7 +1656,6 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
             Span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
                 String error_message = "Embedding data size mismatch.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
@@ -1731,7 +1730,6 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
             String error_message = "Invalid data type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

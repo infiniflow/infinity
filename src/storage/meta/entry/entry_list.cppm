@@ -140,7 +140,6 @@ public:
         for (const auto &base_entry : entry_list_) {
             if (base_entry->entry_type_ != entry_type) {
                 String error_message = fmt::format("Unexpected entry type {}", ToString(entry_type));
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             if (base_entry->commit_ts_ <= max_commit_ts) {
