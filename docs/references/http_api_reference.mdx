@@ -1830,7 +1830,7 @@ curl --request GET \
   A string that defines the condition for selecting rows. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be output.
   Supported filter expressions:
   - Logical combination: 'and', 'or', 'not'
-  - Comparison: `<`, `<=`, `>`, `>=`, `=`, `==`, `!=` expression
+  - Comparison expressions: `<`, `<=`, `>`, `>=`, `=`, `==`, `!=`
   - `in` and `not in` expression
   - `filter_fulltext` expression:
     - Similar to `match_text()`. Usage: 'filter_fulltext(fields, matching_text)' or 'filter_fulltext(fields, matching_text, extra_options)'
