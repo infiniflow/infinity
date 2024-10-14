@@ -3229,14 +3229,12 @@ The response includes a JSON object like the following:
 
 Makes database to perform a full checkpoint.
 
-**POST** `/admin/node/current`
-
-Sets role for a node.
+**POST** `/instance/flush`
 
 ### Request
 
 - Method: POST
-- URL: `/admin/node/current`
+- URL: `/instance/flush`
 - Headers:
   - `accept: application/json`
   - `content-type: application/json`
@@ -3268,16 +3266,14 @@ The response includes a JSON object like the following:
 
 ## Compact Table
 
+**POST** `/instance/table/compact`
+
 Makes database to perform compaction on a table.
-
-**POST** `/admin/node/current`
-
-Sets role for a node.
 
 ### Request
 
 - Method: POST
-- URL: `/admin/node/current`
+- URL: `/instance/table/compact`
 - Headers:
   - `accept: application/json`
   - `content-type: application/json`
