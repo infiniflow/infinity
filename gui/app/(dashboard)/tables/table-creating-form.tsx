@@ -26,12 +26,12 @@ import { CreateOption } from '@/lib/constant/common';
 import { createDatabase } from '../actions';
 
 export const FormSchema = z.object({
-  name: z
+  database_name: z
     .string({
       required_error: 'Please input name'
     })
     .trim(),
-  fields: z.array(),
+  // fields: z.array(),
   create_option: z.nativeEnum(CreateOption)
 });
 
