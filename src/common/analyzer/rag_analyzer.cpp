@@ -83,7 +83,7 @@ void Split(const String &input, const String &split_pattern, std::vector<String>
     re2::StringPiece last_end = leftover;
     re2::StringPiece extracted_delim_token;
 
-    while (re2::RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
+    while (RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
         std::string_view token(last_end.data(), extracted_delim_token.data() - last_end.data());
         if (!token.empty()) {
             result.push_back(String(token.data(), token.size()));
