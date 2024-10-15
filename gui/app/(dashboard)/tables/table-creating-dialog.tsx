@@ -18,7 +18,7 @@ export function TableCreatingDialog({
   visible,
   switchVisible,
   hideDialog
-}: React.PropsWithChildren<IDialogProps<any>>) {
+}: React.PropsWithChildren<IDialogProps<unknown>>) {
   return (
     <Dialog open={visible} onOpenChange={switchVisible}>
       <DialogTrigger asChild>{children}</DialogTrigger>

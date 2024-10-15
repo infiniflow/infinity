@@ -3,8 +3,7 @@
 import { useEffect } from 'react';
 
 export default function Error({
-  error,
-  reset
+  error
 }: {
   error: Error & { digest?: string };
   reset: () => void;
@@ -15,12 +14,12 @@ export default function Error({
   }, [error]);
 
   return (
-    <main className="p-4 md:p-6">
+    <main className="p-4 md:p-6 h-[calc(100vh-32px)] flex items-center justify-center">
       <div className="mb-8 space-y-4">
-        <h1 className="font-semibold text-lg md:text-2xl">
-          Please complete setup
+        <h1 className="font-semibold text-lg md:text-2xl text-center">
+          Connection failed
         </h1>
-        <p>
+        {/* <p>
           Inside the Vercel Postgres dashboard, create a table based on the
           schema defined in this repository.
         </p>
@@ -39,7 +38,7 @@ export default function Error({
           <code>
             {`INSERT INTO users (id, email, name, username) VALUES (1, 'me@site.com', 'Me', 'username');`}
           </code>
-        </pre>
+        </pre> */}
       </div>
     </main>
   );
