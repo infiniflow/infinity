@@ -25,7 +25,7 @@ Client Client::Connect(const std::string &ip_address, uint16_t port) {
     transport->open();
     CommonResponse response;
     ConnectRequest request;
-    request.__set_client_version(21); // 0.4.0.dev4
+    request.__set_client_version(22); // 0.4.0.dev5
     client->Connect(response, request);
     return {socket, transport, protocol, std::move(client), response.session_id};
 }
