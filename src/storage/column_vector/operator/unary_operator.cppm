@@ -14,6 +14,7 @@
 
 module;
 
+#include <concepts>
 #include <type_traits>
 
 export module unary_operator;
@@ -29,8 +30,81 @@ namespace infinity {
 
 struct ColumnVectorCastData;
 
+template <typename InputType, typename Operator>
+class VarcharResultUnaryOperator {
+private:
+    static void inline VarcharResultExecuteFlatWithNull(const SharedPtr<ColumnVector> &input,
+                                                    SharedPtr<ColumnVector> &result,
+                                                    SizeT count,
+                                                    void *state_ptr) {
+        const auto &input_null = input->nulls_ptr_;
+        auto &result_null = result->nulls_ptr_;
+        *result_null = *input_null;
+        ColumnValueReader<InputType> input_ptr(input);
+        ColumnValueReader<VarcharT> result_ptr(result);
+        result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
+            if (row_index >= count) {
+                return false;
+            }
+            Operator::template Execute(input_ptr[row_index], result_ptr[row_index], result_null.get(), row_index, state_ptr);
+            return row_index + 1 < count;
+        });
+    }
+
+public:
+    static void inline Execute(const SharedPtr<ColumnVector> &input,
+                                SharedPtr<ColumnVector> &result,
+                                SizeT count,
+                                void *state_ptr,
+                                bool nullable){
+        const SharedPtr<Bitmask> &input_null = input->nulls_ptr_;
+        SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
+
+        switch (input->vector_type()) {
+            case ColumnVectorType::kFlat: {
+                if (nullable) {
+                    VarcharResultExecuteFlatWithNull(input, result, count, state_ptr);
+
+                } else {
+                    auto input_ptr = ColumnValueReader<InputType>(input);
+                    auto result_ptr = ColumnValueReader<VarcharT>(result);
+                    for (SizeT i = 0; i < count; ++i) {
+                        Operator::template Execute(input_ptr[i], result_ptr[i], result_null.get(), 0, state_ptr);
+                    }
+                }
+                // Result tail_index need to update.
+                result->Finalize(count);
+                return;
+            }
+            case ColumnVectorType::kConstant: {
+                if (count != 1) {
+                    String error_message = "Attempting to execute more than one row of the constant column vector.";
+                    UnrecoverableError(error_message);
+                }
+                if (nullable && !(input_null->IsAllTrue())) {
+                    result_null->SetFalse(0);
+                } else {
+                    result_null->SetAllTrue();
+                    auto input_ptr = ColumnValueReader<InputType>(input);
+                    auto result_ptr = ColumnValueReader<VarcharT>(result);
+                    Operator::template Execute(input_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr);
+                }
+                result->Finalize(1);
+                return;
+            }
+            default:
+                String error_message = "Invalid input ColumnVectorType. Support only kFlat and kConstant.";
+                UnrecoverableError(error_message);
+        }        
+    }
+};
 export class UnaryOperator {
 public:
+    template <std::same_as<VarcharT> InputType, std::same_as<VarcharT> ResultType, typename Operator>
+    static void inline Execute(const SharedPtr<ColumnVector> &input, SharedPtr<ColumnVector> &result, SizeT count, void *state_ptr, bool nullable) {
+        return VarcharResultUnaryOperator<InputType, Operator>::Execute(input, result, count, state_ptr, nullable);
+    }
+
     template <typename InputType, typename ResultType, typename Operator>
     static void inline Execute(const SharedPtr<ColumnVector> &input, SharedPtr<ColumnVector> &result, SizeT count, void *state_ptr, bool nullable) {
         const auto *input_ptr = (const InputType *)(input->data());
