@@ -141,11 +141,12 @@ export namespace std {
     using std::isnan;
     using std::log2;
     using std::make_heap;
+    using std::push_heap;
+    using std::pop_heap;
     using std::max_element;
     using std::min_element;
     using std::nearbyint;
     using std::partial_sort;
-    using std::pop_heap;
     using std::pow;
     using std::reduce;
     using std::remove_if;

@@ -31,6 +31,7 @@ export enum class DocIteratorType : u8 {
     kAndIterator,
     kAndNotIterator,
     kOrIterator,
+    kMinimumShouldMatchIterator,
     kBMMIterator,
     kBMWIterator,
     kFilterIterator,
