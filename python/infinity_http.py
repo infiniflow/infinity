@@ -88,14 +88,14 @@ class infinity_http:
                     print(500, resp_json["error_code"], resp_json["error_message"])
                     raise InfinityException(resp_json["error_code"], resp_json["error_message"])
                 elif resp.status_code == 404:
-                    #create_database("") return status_code 404 with no json
+                    # create_database("") return status_code 404 with no json
                     print(404)
                     raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME)
                 else:
                     print(resp.status_code)
                     raise InfinityException()
             else:
-                #print(200)
+                # print(200)
                 pass
 
         logging.debug("----------------------------------------------")
@@ -123,17 +123,17 @@ class infinity_http:
         else:
             try:
                 d = self.set_up_data(
-                   ["create_option"], {"create_option": opt}
+                    ["create_option"], {"create_option": opt}
                 )
                 r = self.request(url, "post", h, d)
                 self.raise_exception(r)
             except:
                 raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE)
-            #d = self.set_up_data(
+            # d = self.set_up_data(
             #    ["create_option"], {"create_option": str(opt)}
-            #)
-            #different exception type
-            #<ExceptionInfo InfinityException(3074, 'Invalid create option: 1.1') tblen=3>
+            # )
+            # different exception type
+            # <ExceptionInfo InfinityException(3074, 'Invalid create option: 1.1') tblen=3>
 
     def drop_database(self, db_name, opt=ConflictType.Error):
         url = f"databases/{db_name}"
@@ -151,7 +151,6 @@ class infinity_http:
             except:
                 raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE)
 
-
     def get_database(self, db_name, opt=ConflictType.Error):
         url = f"databases/{db_name}"
         h = self.set_up_header(["accept"])
@@ -167,9 +166,9 @@ class infinity_http:
         self.set_up_header(["accept"])
         r = self.request(url, "get")
         self.raise_exception(r)
-        return database_result(list = r.json()["databases"])
+        return database_result(list=r.json()["databases"])
 
-    def show_database(self,db_name):
+    def show_database(self, db_name):
         url = f"databases/{db_name}"
         h = self.set_up_header(["accept"])
         r = self.request(url, "get", h, {})
@@ -178,10 +177,10 @@ class infinity_http:
 
     # table
     def create_table(
-        self,
-        table_name,
-        columns_definition = {},
-        conflict_type=ConflictType.Error,
+            self,
+            table_name,
+            columns_definition={},
+            conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
         if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
@@ -215,11 +214,10 @@ class infinity_http:
         self.table_name = table_name
         return database_result(database_name=self.database_name, table_name=self.table_name)
 
-
     def drop_table(
-        self,
-        table_name,
-        conflict_type=ConflictType.Error,
+            self,
+            table_name,
+            conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
         if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
@@ -233,7 +231,6 @@ class infinity_http:
         r = self.request(url, "delete", h, d)
         self.raise_exception(r)
         return self
-
 
     def list_tables(self):
         url = f"databases/{self.database_name}/tables"
@@ -268,12 +265,12 @@ class infinity_http:
     def get_table(self, table_name):
         return self.show_table(table_name)
 
-    def show_columns(self,table_name):
-        url = f"databases/{self.database_name}/tables/{table_name}/columns"
+    def show_columns(self):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
         h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.raise_exception(r)
-        res = {"name":[], "type":[], "default":[], "comment":[]}
+        res = {"name": [], "type": [], "default": [], "comment": []}
         print(r.json())
         for col in r.json()["columns"]:
             res["name"].append(col["name"])
@@ -283,8 +280,8 @@ class infinity_http:
         res = pl.from_pandas(pd.DataFrame(res))
         return res
 
-    def show_columns_type(self,table_name):
-        url = f"databases/{self.database_name}/tables/{table_name}/columns"
+    def show_columns_type(self):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
         h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.raise_exception(r)
@@ -297,14 +294,14 @@ class infinity_http:
     def show_tables(self):
         self.get_all_tables()
         return database_result(columns=["database", "table", "type", "column_count", "block_count", "block_capacity",
-                                   "segment_count", "segment_capacity"])
+                                        "segment_count", "segment_capacity"])
 
     # index
     def create_index(
-        self,
-        index_name,
-        index_info,
-        conflict_type=ConflictType.Error,
+            self,
+            index_name,
+            index_info,
+            conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
         if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
@@ -321,8 +318,8 @@ class infinity_http:
                 if not isinstance(value, str):
                     raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"parameter value: {value} isn't string")
                 create_index_info[key] = value
-        #print(fields)
-        #print(create_index_info)
+        # print(fields)
+        # print(create_index_info)
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
         h = self.set_up_header(
@@ -336,9 +333,9 @@ class infinity_http:
         return self
 
     def drop_index(
-        self,
-        index_name,
-        conflict_type=ConflictType.Error,
+            self,
+            index_name,
+            conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
         if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
@@ -354,7 +351,7 @@ class infinity_http:
         self.raise_exception(r)
         return self
 
-    def show_index(self,index_name):
+    def show_index(self, index_name):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
         h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
@@ -375,7 +372,7 @@ class infinity_http:
         self.index_list = index_list
         return self
 
-    def optimize(self, index_name = "", optimize_options = {}):
+    def optimize(self, index_name="", optimize_options={}):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
         h = self.set_up_header(
             ["accept", "content-type"],
@@ -385,7 +382,7 @@ class infinity_http:
         self.raise_exception(r)
         return self
 
-    def insert(self,values=[]):
+    def insert(self, values=[]):
         if isinstance(values, list):
             pass
         else:
@@ -394,14 +391,15 @@ class infinity_http:
         for value in values:
             if isinstance(value, dict):
                 for key in value:
-                    if isinstance(value[key], np.ndarray):#trans np array to list since http api can not parse np array
+                    if isinstance(value[key],
+                                  np.ndarray):  # trans np array to list since http api can not parse np array
                         value[key] = value[key].tolist()
                     if isinstance(value[key], list):
                         for idx in range(len(value[key])):
                             if isinstance(value[key][idx], np.ndarray):
                                 value[key][idx] = value[key][idx].tolist()
                     if isinstance(value[key], SparseVector):
-                        value[key] = value[key].to_dict() 
+                        value[key] = value[key].to_dict()
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])
@@ -409,8 +407,8 @@ class infinity_http:
         self.raise_exception(r)
         return self
 
-    def import_data(self,data_path = "/home/infiniflow/Documents/development/infinity/test/data/csv/pysdk_test.csv",
-                    import_options = {}):
+    def import_data(self, data_path="/home/infiniflow/Documents/development/infinity/test/data/csv/pysdk_test.csv",
+                    import_options={}):
         data = {}
         data["file_path"] = data_path
         data["file_type"] = "csv"
@@ -431,7 +429,7 @@ class infinity_http:
         self.raise_exception(r)
         return self
 
-    def export_data(self,data_path = "", export_options = {}, columns = []):
+    def export_data(self, data_path="", export_options={}, columns=[]):
         data = {}
         data["file_path"] = data_path
         data["file_type"] = "csv"
@@ -468,23 +466,23 @@ class infinity_http:
         if len(self._search_exprs):
             tmp.update({"search": self._search_exprs})
         if len(self._output):
-            tmp.update({"output":self._output})
+            tmp.update({"output": self._output})
         if len(self._highlight):
-            tmp.update({"highlight":self._highlight})
+            tmp.update({"highlight": self._highlight})
         if len(self._sort):
-            tmp.update({"sort":self._sort})
-        #print(tmp)
+            tmp.update({"sort": self._sort})
+        # print(tmp)
         d = self.set_up_data([], tmp)
         r = self.request(url, "get", h, d)
         self.raise_exception(r)
-        #print(r.json())
+        # print(r.json())
         if "output" in r.json():
             self.output_res = r.json()["output"]
         else:
             self.output_res = []
         return self
 
-    def explain(self, ExplainType = ExplainType.Physical):
+    def explain(self, ExplainType=ExplainType.Physical):
         url = f"databases/{self.database_name}/tables/{self.table_name}/meta"
         h = self.set_up_header(["accept", "content-type"])
         tmp = {}
@@ -504,7 +502,7 @@ class infinity_http:
             tmp.update({"output": self._output})
         if len(self._highlight):
             tmp.update({"highlight": self._highlight})
-        tmp.update({"explain_type":ExplainType_transfrom(ExplainType)})
+        tmp.update({"explain_type": ExplainType_transfrom(ExplainType)})
         # print(tmp)
         d = self.set_up_data([], tmp)
         r = self.request(url, "get", h, d)
@@ -521,7 +519,7 @@ class infinity_http:
                     message = message + res[k] + "\n"
         return message
 
-    def add_columns(self, columns_definition = {}):
+    def add_columns(self, columns_definition={}):
         url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
         h = self.set_up_header(["accept", "content-type"])
         fields = []
@@ -544,8 +542,8 @@ class infinity_http:
         return self.get_database_result(r)
 
     def output(
-        self,
-        output=[],
+            self,
+            output=[],
     ):
         self.output_res = []
         self._output = output
@@ -554,10 +552,10 @@ class infinity_http:
         self._search_exprs = []
         self._sort = []
         return self
-    
+
     def highlight(
-        self,
-        highlight=[],
+            self,
+            highlight=[],
     ):
         self._highlight = highlight
         return self
@@ -566,7 +564,8 @@ class infinity_http:
         for order_by_expr in order_by_expr_list:
             tmp = {}
             if len(order_by_expr) != 2:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, "order_by_expr_list must be a list of [column_name, sort_type]")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER,
+                                        "order_by_expr_list must be a list of [column_name, sort_type]")
             if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
                 raise InfinityException(ErrorCode.INVALID_PARAMETER, "sort_type must be SortType.Asc or SortType.Desc")
             if order_by_expr[1] == SortType.Asc:
@@ -650,11 +649,11 @@ class infinity_http:
             self.select()
 
         df_dict = {}
-        col_types = self.show_columns_type(self.table_name)
+        col_types = self.show_columns_type()
         for output_col in self._output:
             if output_col in col_types:
                 df_dict[output_col] = ()
-        #when output["*"] and output_res is empty
+        # when output["*"] and output_res is empty
         for output_col in self._output:
             if output_col == "*":
                 for col in col_types:
@@ -667,18 +666,18 @@ class infinity_http:
                     df_dict[k] = ()
                 tup = df_dict[k]
                 if res[k].isdigit() or is_float(res[k]):
-                    new_tup = tup + (eval(res[k]), ) 
+                    new_tup = tup + (eval(res[k]),)
                 elif is_list(res[k]):
-                    new_tup = tup + (ast.literal_eval(res[k]), )
-                elif is_date(res[k]): 
-                    new_tup = tup + (res[k], )
-                elif is_time(res[k]): 
-                    new_tup = tup + (res[k], )
-                elif is_datetime(res[k]): 
-                    new_tup = tup + (res[k], )
-                elif is_sparse(res[k]):# sparse vector
+                    new_tup = tup + (ast.literal_eval(res[k]),)
+                elif is_date(res[k]):
+                    new_tup = tup + (res[k],)
+                elif is_time(res[k]):
+                    new_tup = tup + (res[k],)
+                elif is_datetime(res[k]):
+                    new_tup = tup + (res[k],)
+                elif is_sparse(res[k]):  # sparse vector
                     sparse_vec = str2sparse(res[k])
-                    new_tup = tup + (sparse_vec, ) 
+                    new_tup = tup + (sparse_vec,)
                 else:
                     if res[k].lower() == 'true':
                         res[k] = True
@@ -686,21 +685,21 @@ class infinity_http:
                         res[k] = False
                     new_tup = tup + (res[k],)
                 df_dict[k] = new_tup
-        #print(self.output_res)
-        #print(df_dict)
+        # print(self.output_res)
+        # print(df_dict)
 
         df_type = {}
         for k in df_dict:
-            if k in col_types:# might be object
+            if k in col_types:  # might be object
                 df_type[k] = type_to_dtype(col_types[k])
             if k in ["DISTANCE", "SCORE", "SIMILARITY"]:
                 df_type[k] = dtype('float32')
-            #"(c1 + c2)"
+            # "(c1 + c2)"
             k1 = k.replace("(", "")
             k1 = k1.replace(")", "")
-            cols = k1.split("+") + k1.split("-") #["c1 ", " c2", "c1 + c2"]
-            #print(cols)
-            #haven't considered data type priority
+            cols = k1.split("+") + k1.split("-")  # ["c1 ", " c2", "c1 + c2"]
+            # print(cols)
+            # haven't considered data type priority
             for col in cols:
                 if col.strip() in col_types:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
@@ -713,7 +712,7 @@ class infinity_http:
     def to_arrow(self):
         return pa.Table.from_pandas(self.to_df())
 
-    def delete(self,filter=""):
+    def delete(self, filter=""):
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])
         d = self.set_up_data([], {"filter": filter})
@@ -731,11 +730,12 @@ class infinity_http:
 
 
 class database_result(infinity_http):
-    def __init__(self, list = [], error_code = ErrorCode.OK, database_name = "" ,columns=[], table_name = "",
-                 index_list = [], output = ["*"], filter="", fusion=[], knn={}, match = {}, match_tensor = {}, match_sparse = {}, sort = [], output_res = []):
+    def __init__(self, list=[], error_code=ErrorCode.OK, database_name="", columns=[], table_name="",
+                 index_list=[], output=["*"], filter="", fusion=[], knn={}, match={}, match_tensor={}, match_sparse={},
+                 sort=[], output_res=[]):
         self.db_names = list
         self.error_code = error_code
-        self.database_name = database_name # get database
+        self.database_name = database_name  # get database
         self._db_name = database_name
         self.columns = columns
         self.table_name = table_name
@@ -751,8 +751,9 @@ class database_result(infinity_http):
         self.output_res = output_res
 
 
-
 identifier_limit = 65536
+
+
 def check_valid_name(name, name_type: str = "Table"):
     if not isinstance(name, str):
         raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
@@ -766,12 +767,11 @@ def check_valid_name(name, name_type: str = "Table"):
     if name is None:
         raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name.isspace():
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"{name_type} name cannot be composed of whitespace characters only")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name cannot be composed of whitespace characters only")
     if name == '':
         raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name == ' ':
         raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name.isdigit():
         raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
-
-
