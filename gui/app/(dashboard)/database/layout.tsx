@@ -9,7 +9,7 @@ export default async function DatabaseLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex divide-x h-full">
+    <div className="flex divide-x h-[calc(100vh-32px)]">
       <section className="w-1/4">
         <AsyncTree></AsyncTree>
       </section>

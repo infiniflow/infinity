@@ -47,10 +47,15 @@ public:
                            const Comparator& cmp = Comparator())
          : ik_(k), k_(round_up_to_power_of_two(k)),
           losers_(2 * k_), cmp_(cmp), first_insert_(true) {
-
+        /*
         for (Source i = ik_ - 1; i < k_; i++) {
             losers_[i + k_].sup = true;
             losers_[i + k_].source = invalid_;
+        }
+        */
+        for (Source i = 0; i < 2 * k_; i++) {
+            losers_[i].sup = true;
+            losers_[i].source = invalid_;
         }
     }
 

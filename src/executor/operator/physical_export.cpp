@@ -555,7 +555,6 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                         column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetConstColumnVector(buffer_manager));
                         if (column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
-                            LOG_CRITICAL(error_message);
                             UnrecoverableError(error_message);
                         }
                     }
@@ -574,7 +573,6 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
             auto status = file_writer->WriteRecordBatch(*block_batch);
             if (!status.ok()) {
                 String error_message = fmt::format("Failed to write record batch to parquet file: {}", status.message());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             row_count += block_row_count;
@@ -584,7 +582,6 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     auto status = file_writer->Close();
     if (!status.ok()) {
         String error_message = fmt::format("Failed to close parquet file: {}", status.message());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LOG_DEBUG(fmt::format("Export to PARQUET, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
@@ -784,7 +781,6 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
             String error_message = "Invalid data type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -988,7 +984,6 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
                 }
                 case EmbeddingDataType::kElemInvalid: {
                     String error_message = "Invalid embedding data type: EmbeddingDataType::kElemInvalid";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     break;
                 }
@@ -1031,7 +1026,6 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
             String error_message = "Invalid data type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -1045,7 +1039,6 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
     auto status = array_builder->Finish(&array);
     if (!status.ok()) {
         String error_message = fmt::format("Failed to build arrow array: {}", status.message());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return array;

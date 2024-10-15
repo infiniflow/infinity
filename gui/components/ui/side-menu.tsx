@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { ReactNode } from 'react';
 import { ContextMenu, ContextMenuTrigger } from './context-menu';
 
-function ChevronRightIcon(props: any) {
+function ChevronRightIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}

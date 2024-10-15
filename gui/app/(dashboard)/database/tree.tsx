@@ -59,7 +59,7 @@ function AsyncTree() {
           const branchNode = (isExpanded: boolean, element: INode) => {
             return isExpanded &&
               !element.metadata?.isEmpty &&
-              element.children.length === 0 ? (
+              element.children?.length === 0 ? (
               <>
                 <span
                   role="alert"
@@ -76,19 +76,20 @@ function AsyncTree() {
           };
           return (
             <div
-              {...getNodeProps({ onClick: handleExpand })}
+              {...getNodeProps({
+                onClick: isBranch
+                  ? handleExpand
+                  : handleClickTreeName({
+                      level,
+                      name: element.name,
+                      parent: element.parent,
+                      data
+                    })
+              })}
               style={{ marginLeft: 40 * (level - 1) }}
             >
               {isBranch && branchNode(isExpanded, element)}
-              <div
-                className="flex items-center ml-1"
-                onClick={handleClickTreeName({
-                  level,
-                  name: element.name,
-                  parent: element.parent,
-                  data
-                })}
-              >
+              <div className="flex items-center ml-1">
                 {renderIcon(level, element.name)}
                 <span className="name">{element.name}</span>
               </div>

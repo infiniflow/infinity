@@ -688,7 +688,7 @@ Optional<WrapQueryResult> UnwrapColumnDefs(Vector<WrapColumnDef> &column_defs, V
             }
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
-        auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints, default_expr);
+        auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints, wrap_column_def.comment, default_expr);
         column_defs_ptr.push_back(column_def);
     }
     return None;
@@ -1253,6 +1253,7 @@ void HandleColumnDef(WrapQueryResult &wrap_query_result, SizeT column_count, Sha
 
         WrapDataType &proto_data_type = proto_column_def.column_type;
         DataTypeToWrapDataType(proto_data_type, column_def->type());
+        proto_column_def.comment = column_def->comment();
 
         wrap_query_result.column_defs.emplace_back(proto_column_def);
     }

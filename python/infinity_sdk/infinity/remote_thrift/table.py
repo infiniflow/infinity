@@ -121,6 +121,13 @@ class RemoteTable():
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
+    def show_columns(self):
+        res = self._conn.show_columns(db_name=self._db_name, table_name=self._table_name)
+        if res.error_code == ErrorCode.OK:
+            return select_res_to_polars(res)
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
     def show_segments(self):
         res = self._conn.show_segments(db_name=self._db_name, table_name=self._table_name)
         if res.error_code == ErrorCode.OK:
@@ -210,17 +217,20 @@ class RemoteTable():
                     elif file_type == 'bvecs':
                         options.copy_file_type = ttypes.CopyFileType.BVECS
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file delimiter: {delimiter}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized export file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
                         options.has_header = v
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                "Boolean value is expected in header field")
                 else:
                     raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
 
@@ -254,32 +264,38 @@ class RemoteTable():
                     elif file_type == 'fvecs':
                         options.copy_file_type = ttypes.CopyFileType.FVECS
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file delimiter: {delimiter}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized export file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
                         options.has_header = v
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                "Boolean value is expected in header field")
                 elif key == 'offset':
                     if isinstance(v, int):
                         options.offset = v
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'offset' field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                "Integer value is expected in 'offset' field")
                 elif key == 'limit':
                     if isinstance(v, int):
                         options.limit = v
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'limit' field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                "Integer value is expected in 'limit' field")
                 elif key == 'row_limit':
                     if isinstance(v, int):
                         options.row_limit = v
                     else:
-                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'row_limit' field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                "Integer value is expected in 'row_limit' field")
                 else:
                     raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
 
@@ -377,16 +393,17 @@ class RemoteTable():
     def offset(self, offset: Optional[int]):
         self.query_builder.offset(offset)
         return self
-    
+
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
         for order_by_expr in order_by_expr_list:
             if len(order_by_expr) != 2:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, "order_by_expr_list must be a list of [column_name, sort_type]")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER,
+                                        "order_by_expr_list must be a list of [column_name, sort_type]")
             if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
                 raise InfinityException(ErrorCode.INVALID_PARAMETER, "sort_type must be SortType.Asc or SortType.Desc")
             if order_by_expr[1] == SortType.Asc:
                 order_by_expr[1] = True
-            else :
+            else:
                 order_by_expr[1] = False
         self.query_builder.sort(order_by_expr_list)
         return self
@@ -411,7 +428,7 @@ class RemoteTable():
         opt_options.index_name = index_name
         opt_options.opt_params = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
         return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
-    
+
     def add_columns(self, column_defs: dict):
         column_defs_list = []
         for index, (column_name, column_info) in enumerate(column_defs.items()):

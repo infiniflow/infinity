@@ -57,6 +57,7 @@ CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
 COLUMN          { return COLUMN; }
 COLUMNS         { return COLUMNS; }
+COMMENT         { return COMMENT; }
 COMPACT         { return COMPACT; }
 CONFIGS         { return CONFIGS; }
 CONFIG          { return CONFIG; }

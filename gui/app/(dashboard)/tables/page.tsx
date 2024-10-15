@@ -30,14 +30,9 @@ async function InfinityTable() {
   );
 }
 
-export default async function DatabasePage({
-  searchParams
-}: {
+export default async function DatabasePage({}: {
   searchParams: { q: string; offset: string };
 }) {
-  const search = searchParams.q ?? '';
-  const offset = searchParams.offset ?? 0;
-
   const items: MenuItem[] = [
     {
       key: 'sub1',
@@ -56,14 +51,14 @@ export default async function DatabasePage({
   ];
 
   const ret = await listDatabase();
-  if (ret.databases.length > 1) {
-    const latestDatabase = ret.databases.at(-1);
+  if (ret.databases?.length > 1) {
+    const latestDatabase = ret.databases?.at(-1);
     const tables = await listTable(latestDatabase);
     console.log('🚀 ~ ret:', tables);
     items.push({
       key: latestDatabase,
       label: latestDatabase,
-      children: tables.tables
+      children: tables?.tables ?? []
     });
   }
 

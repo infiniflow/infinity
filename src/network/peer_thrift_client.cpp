@@ -189,7 +189,6 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
             }
             default: {
                 String error_message = "Register to the leader";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -224,7 +223,6 @@ void PeerClient::Unregister(UnregisterPeerTask *peer_task) {
             }
             default: {
                 String error_message = "Unregister from the leader";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -271,7 +269,6 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
             }
             default: {
                 String error_message = "Heartbeat: error in data transfer to leader";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -311,7 +308,6 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                 }
                 default: {
                     String error_message = "Invalid role type";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -326,7 +322,6 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                 }
                 default: {
                     String error_message = "Invalid node status";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -357,7 +352,6 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
             }
             default: {
                 String error_message = "Synlog: error in data transfer to follower or learner";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }

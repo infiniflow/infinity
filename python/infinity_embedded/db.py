@@ -33,10 +33,6 @@ class Database(ABC):
         pass  # implement describe table logic here
 
     @abstractmethod
-    def show_columns(self, table_name):
-        pass  # implement describe table logic here
-
-    @abstractmethod
     def get_table(self, table_name):
         pass  # implement get table logic here
 

@@ -1,6 +1,6 @@
-#line 1 "search_lexer_plain.cpp"
+#line 2 "search_lexer_plain.cpp"
 
-#line 3 "search_lexer_plain.cpp"
+#line 4 "search_lexer_plain.cpp"
 
 #define  YY_INT_ALIGNED short int
 
@@ -534,9 +534,9 @@ using token = infinity::SearchParser::token;
 /* update location on matching */
 #define YY_USER_ACTION loc->step(); loc->columns(yyleng);
 
-#line 537 "search_lexer_plain.cpp"
+#line 538 "search_lexer_plain.cpp"
 #define YY_NO_INPUT 1
-#line 539 "search_lexer_plain.cpp"
+#line 540 "search_lexer_plain.cpp"
 
 #define INITIAL 0
 
@@ -735,7 +735,7 @@ YY_DECL
             yylval = lval;
 
 
-#line 738 "search_lexer_plain.cpp"
+#line 739 "search_lexer_plain.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -830,7 +830,7 @@ YY_RULE_SETUP
 #line 57 "search_lexer_plain.l"
 ECHO;
 	YY_BREAK
-#line 833 "search_lexer_plain.cpp"
+#line 834 "search_lexer_plain.cpp"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 

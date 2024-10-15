@@ -500,35 +500,35 @@ class TestInfinity:
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table_columns"+suffix, ConflictType.Ignore)
 
-        db_obj.create_table("test_show_table_columns"+suffix, {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+        table_object = db_obj.create_table("test_show_table_columns"+suffix, {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
                             ConflictType.Error)
 
-        res = db_obj.show_columns(column_name+suffix)
+        res = table_object.show_columns()
         db_obj.drop_table("test_show_table_columns"+suffix, ConflictType.Error)
         print(res)
 
-    @pytest.mark.parametrize("column_name", [pytest.param("Invalid name"),
-                                             pytest.param("not_exist_name"),
-                                             pytest.param(1),
-                                             pytest.param(1.1),
-                                             pytest.param(True),
-                                             pytest.param([]),
-                                             pytest.param(()),
-                                             pytest.param({}),
-                                             ])
-    def test_show_table_columns_with_invalid_name(self, column_name, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_show_table_columns"+suffix, ConflictType.Ignore)
-
-        db_obj.create_table("test_show_table_columns"+suffix, {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}})
-
-        with pytest.raises(InfinityException) as e:
-            db_obj.show_columns(column_name)
-
-        assert e.type == InfinityException
-        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST or e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
-
-        db_obj.drop_table("test_show_table_columns"+suffix, ConflictType.Error)
+    # @pytest.mark.parametrize("column_name", [pytest.param("Invalid name"),
+    #                                          pytest.param("not_exist_name"),
+    #                                          pytest.param(1),
+    #                                          pytest.param(1.1),
+    #                                          pytest.param(True),
+    #                                          pytest.param([]),
+    #                                          pytest.param(()),
+    #                                          pytest.param({}),
+    #                                          ])
+    # def test_show_table_columns_with_invalid_name(self, column_name, suffix):
+    #     db_obj = self.infinity_obj.get_database("default_db")
+    #     db_obj.drop_table("test_show_table_columns"+suffix, ConflictType.Ignore)
+    #
+    #     table_object = db_obj.create_table("test_show_table_columns"+suffix, {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}})
+    #
+    #     with pytest.raises(InfinityException) as e:
+    #         table_object.show_columns()
+    #
+    #     assert e.type == InfinityException
+    #     assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST or e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
+    #
+    #     db_obj.drop_table("test_show_table_columns"+suffix, ConflictType.Error)
 
     @pytest.mark.slow
     def test_create_drop_show_1M_databases(self, suffix):
