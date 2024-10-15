@@ -37,10 +37,10 @@ try:
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("db1")
 
-    db_instance.create_table("table1", {
-        "num": {"type": "integer", "constraints": ["PRIMARY KEY"]},
-        "body": {"type": "varchar"},
-        "vec": {"type": "vector, 4, float"},
+    table1_object = db_instance.create_table("table1", {
+        "num": {"type": "integer", "constraints": ["PRIMARY KEY"], "comment": "number column"},
+        "body": {"type": "varchar", "comment": "body column"},
+        "vec": {"type": "vector, 4, float", "comment": "vec column"},
     }, infinity.common.ConflictType.Ignore)
 
     db_instance.create_table("table2", {
@@ -57,6 +57,9 @@ try:
 
     res = db_instance.list_tables()
     print(res.table_names)
+
+    res = table1_object.show_columns()
+    print(res)
     # # Insert 3 rows of data into the 'my_table'
     # table_instance.insert(
     #     [

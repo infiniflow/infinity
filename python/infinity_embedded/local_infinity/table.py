@@ -102,6 +102,13 @@ class LocalTable():
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
+    def show_columns(self):
+        res = self._conn.show_columns(db_name=self._db_name, table_name=self._table_name)
+        if res.error_code == ErrorCode.OK:
+            return select_res_to_polars(res)
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
     @name_validity_check("index_name", "Index")
     def show_index(self, index_name: str):
         res = self._conn.show_index(db_name=self._db_name, table_name=self._table_name, index_name=index_name)

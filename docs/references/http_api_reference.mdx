@@ -318,7 +318,8 @@ curl --request POST \
          "fields": [
              {
                   "name": "name",
-                  "type": "varchar"
+                  "type": "varchar",
+                  "comment": "name column"
              },
              {
                   "name": "score",
@@ -464,6 +465,8 @@ curl --request POST \
         - `"bfloat16"`
   - `"default"`: `Any`, *Optional*  
     The default value for unspecified cells in that column.
+  - `"comment"`: `string`, *Optional*
+    User provided text to describe the column.
 
 ### Response
 
