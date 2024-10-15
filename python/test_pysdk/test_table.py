@@ -372,9 +372,9 @@ class TestInfinity:
         assert tb
 
         # get table
-        res = db_obj.get_table(table_name)
+        table_obj = db_obj.get_table(table_name)
 
-        res = db_obj.show_columns(table_name)
+        res = table_obj.show_columns()
         print("\n")
         print(res)
         assert res["name"][0] == "c1"
@@ -393,9 +393,9 @@ class TestInfinity:
         assert tb
 
         # get table
-        res = db_obj.get_table(table_name)
+        table_obj = db_obj.get_table(table_name)
 
-        res = db_obj.show_columns(table_name)
+        res = table_obj.show_columns()
         print("\n")
         print(res)
         db_obj.drop_table(table_name, ConflictType.Ignore)
@@ -411,9 +411,9 @@ class TestInfinity:
         assert tb
 
         # get table
-        res = db_obj.get_table(table_name)
+        table_obj = db_obj.get_table(table_name)
 
-        res = db_obj.show_columns(table_name)
+        res = table_obj.show_columns()
         print("\n")
         print(res)
         db_obj.drop_table(table_name, ConflictType.Ignore)
@@ -429,9 +429,9 @@ class TestInfinity:
         assert tb
 
         # get table
-        res = db_obj.get_table(table_name)
+        table_obj = db_obj.get_table(table_name)
 
-        res = db_obj.show_columns(table_name)
+        res = table_obj.show_columns()
         print("\n")
         print(res)
         db_obj.drop_table(table_name, ConflictType.Ignore)

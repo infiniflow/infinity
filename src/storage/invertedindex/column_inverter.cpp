@@ -260,9 +260,9 @@ void ColumnInverter::SortForOfflineDump() {
 
 void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter>& buf_writer) {
     // spill sort results for external merge sort
-    if (positions_.empty()) {
-        return;
-    }
+    // if (positions_.empty()) {
+    //    return;
+    //}
     SizeT spill_file_tell = ftell(spill_file);
     // size of this Run in bytes
     u32 data_size = 0;

@@ -318,7 +318,8 @@ curl --request POST \
          "fields": [
              {
                   "name": "name",
-                  "type": "varchar"
+                  "type": "varchar",
+                  "comment": "name column"
              },
              {
                   "name": "score",
@@ -464,6 +465,8 @@ curl --request POST \
         - `"bfloat16"`
   - `"default"`: `Any`, *Optional*  
     The default value for unspecified cells in that column.
+  - `"comment"`: `string`, *Optional*
+    User provided text to describe the column.
 
 ### Response
 
@@ -1586,10 +1589,6 @@ curl --request DELETE \
 - `"filter"`: (*Body parameter*), `string`, *Optional*  
   A string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `"filter"` is not specified or set to `Null`, the method will delete all rows in the table.
 
-:::tip NOTE
-The `filter` parameter currently supports 'and' and 'or' logical expressions only.
-:::
-
 ### Response
 
 <Tabs
@@ -1831,8 +1830,30 @@ curl --request GET \
     A list of strings specifying the columns to include words match in match_text clause. The matched words will be embraced by <em> and </em>
 
 - `"filter"`: (*Body parameter*), `string`, *Optional*  
-  A string that defines the condition for selecting rows. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be updated. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.  
-  > The `filter` parameter currently supports 'and' and 'or' logical expressions only.  
+  A string that defines the condition for selecting rows. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be output.
+  Supported filter expressions:
+  - Logical combination expressions: 'and', 'or', 'not'
+  - Comparison expressions: `<`, `<=`, `>`, `>=`, `=`, `==`, `!=`
+  - `in` and `not in` expression
+  - `filter_fulltext` expression:
+    - Similar to `match_text()`. Usage: 'filter_fulltext(fields, matching_text)' or 'filter_fulltext(fields, matching_text, extra_options)'
+    - 'extra_options' is in the format of 'K1=V1;K2=V2;...;KN=VN',
+      where each 'K' represents a parameter name and 'V' represents its value
+    - Available parameters in 'extra_options':
+      - **'minimum_should_match'**: specifies how many clauses in the 'matching_text' should be satisfied at least.
+        It can be in the following format:
+        - Positive integer `N`: at least `N` clauses should be satisfied.
+        - Negative integer `-N`: at least (total clause count - `N`) clauses should be satisfied.
+        - Positive Percentage `N%`: at least `⌊total clause count * N%⌋` clauses should be satisfied.
+        - Negative Percentage `-N%`: at least `total clause count - ⌊total clause count * N%⌋` clauses should be satisfied.
+        - Combination `K<V`: `K` is positive integer, `V` is in one of four styles described above.
+          This means that when `total clause count > K`, the requirement `V` applies, otherwise all the clauses should be satisfied
+        - Multiple combinations `K1<V1 K2<V2 ... KN<VN`: several `K<V` strings seperated by spaces, with `K` in the ascending order.
+          If `K1 >= total clause count`, all the clauses should be satisfied.
+          Otherwise, we find the biggest `V` which is less than the total clause count and apply the correspondent `V`.
+      - **'default_field'**
+        - If `"fields"` is an empty string, this parameter specifies the default field to search on.
+
 
 - `"search"`: (*Body parameter*), `object[]`, *Required*  
   A list of JSON objects, each representing a matching or fusion method. Note that if you have specified multiple matching methods, you must specify a fusion method.  
@@ -3109,6 +3130,236 @@ The response includes a JSON object like the following:
 
 - `"error_code"`: `integer`  
   `0`: The operation succeeds.
+
+---
+
+## Show memory
+
+**GET** `/instance/memory`
+
+Shows the memory usage information of the instance.
+
+### Request
+
+- Method: GET
+- URL: `/instance/memory`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/memory \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+    "memory_allocation":"Not activate",
+    "memory_objects":"Not activate"
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show memory object
+
+**GET** `/instance/memory/objects`
+
+Shows the memory object usage information of the instance.
+
+### Request
+
+- Method: GET
+- URL: `/instance/memory/objects`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/memory/objects \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Show memory allocation
+
+**GET** `/instance/memory/allocation`
+
+Shows the memory allocation information of the instance.
+
+### Request
+
+- Method: GET
+- URL: `/instance/memory/allocation`
+- Headers: `accept: application/json`
+
+#### Request example
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/instance/memory/allocation \
+    --header 'accept: application/json'
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Global Checkpoint
+
+**POST** `/instance/flush`
+
+Performs a full checkpoint on the instance.
+
+### Request
+
+- Method: POST
+- URL: `/instance/flush`
+- Headers:
+  - `accept: application/json`
+  - `content-type: application/json`
+
+#### Request example
+
+```shell
+curl --request POST \
+    --url http://localhost:23822/instance/flush\
+    --header 'accept: application/json' \
+```
+
+### Response
+
+#### Status code 200
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":0,
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+---
+
+## Compact Table
+
+**POST** `/instance/table/compact`
+
+Performs a compaction operation on a specified table.
+
+### Request
+
+- Method: POST
+- URL: `/instance/table/compact`
+- Headers:
+  - `accept: application/json`
+  - `content-type: application/json`
+
+#### Request example
+
+```shell
+curl --request POST \
+    --url http://localhost:23820/instance/table/compact \
+    --header 'accept: application/json' \
+    --header 'content-type: application/json' \
+    --data ' 
+    {
+        "db_name" : "default_db",
+        "table_name" : "my_table",
+    } '
+```
+
+#### Request parameters
+
+- `db_name`: Required (*Body parameter*)
+- `table_name`: Required (*Body parameter*)
+`db_name` and `table_name` specifies the table to perform compaction.
+
+### Response
+
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`  
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":3022,
+    "error_message":"Table id_timep doesn't exist@src/planner/query_binder.cpp:423"
+}
+```
+
+- `"error_code"`: `integer`  
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`  
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
 
 ---
 

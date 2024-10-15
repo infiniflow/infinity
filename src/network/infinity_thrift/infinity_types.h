@@ -2152,12 +2152,13 @@ void swap(InExpr &a, InExpr &b);
 std::ostream& operator<<(std::ostream& out, const InExpr& obj);
 
 typedef struct _ColumnDef__isset {
-  _ColumnDef__isset() : id(false), name(false), data_type(false), constraints(true), constant_expr(false) {}
+  _ColumnDef__isset() : id(false), name(false), data_type(false), constraints(true), constant_expr(false), comment(false) {}
   bool id :1;
   bool name :1;
   bool data_type :1;
   bool constraints :1;
   bool constant_expr :1;
+  bool comment :1;
 } _ColumnDef__isset;
 
 class ColumnDef : public virtual ::apache::thrift::TBase {
@@ -2167,7 +2168,8 @@ class ColumnDef : public virtual ::apache::thrift::TBase {
   ColumnDef& operator=(const ColumnDef&);
   ColumnDef() noexcept
             : id(0),
-              name() {
+              name(),
+              comment() {
 
   }
 
@@ -2177,6 +2179,7 @@ class ColumnDef : public virtual ::apache::thrift::TBase {
   DataType data_type;
   std::vector<Constraint::type>  constraints;
   ConstantExpr constant_expr;
+  std::string comment;
 
   _ColumnDef__isset __isset;
 
@@ -2190,6 +2193,8 @@ class ColumnDef : public virtual ::apache::thrift::TBase {
 
   void __set_constant_expr(const ConstantExpr& val);
 
+  void __set_comment(const std::string& val);
+
   bool operator == (const ColumnDef & rhs) const
   {
     if (!(id == rhs.id))
@@ -2201,6 +2206,8 @@ class ColumnDef : public virtual ::apache::thrift::TBase {
     if (!(constraints == rhs.constraints))
       return false;
     if (!(constant_expr == rhs.constant_expr))
+      return false;
+    if (!(comment == rhs.comment))
       return false;
     return true;
   }

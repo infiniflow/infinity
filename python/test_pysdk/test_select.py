@@ -730,6 +730,10 @@ class TestInfinity:
         def test_func():
             expect_result = pd.DataFrame({'num': (1,), "doc": "first text"}).astype({'num': dtype('int32')})
             pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
+                "filter_text('doc', 'first text', 'minimum_should_match=100%')").to_df())
+            pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
+                "filter_text('', 'first second', 'default_field=doc;minimum_should_match=99%') and not num = 2").to_df())
+            pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
                 "filter_text('doc', 'first OR second') and (num < 2 or num > 2)").to_df())
             pd.testing.assert_frame_equal(expect_result, table_obj.output(["*"]).filter(
                 "(filter_text('doc', 'first') or filter_fulltext('doc', 'second')) and (num < 2 or num > 2)").to_df())
@@ -799,4 +803,32 @@ class TestInfinity:
         print(res)
 
         res = db_obj.drop_table("test_sort"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_varchar_length(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_varchar_length"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_varchar_length"+suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_varchar_length"+suffix)
+        table_obj.insert(
+            [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
+             {"c1": 'abc', "c2": 'abc'}, {"c1": 'bbc', "c2": 'bbc'}, {"c1": 'cbc', "c2": 'cbc'}, {"c1": 'dbc', "c2": 'dbc'}])
+
+
+
+        res = table_obj.output(["*"]).filter("char_length(c1) = 1").to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a', 'b', 'c', 'd'),
+                                                         'c2': ('a', 'b', 'c', 'd')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+        res = table_obj.output(["*"]).filter("char_length(c1) = 3").to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('abc', 'bbc', 'cbc', 'dbc'),
+                                                         'c2': ('abc', 'bbc', 'cbc', 'dbc')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+        res = db_obj.drop_table("test_select_varchar_length"+suffix)
         assert res.error_code == ErrorCode.OK

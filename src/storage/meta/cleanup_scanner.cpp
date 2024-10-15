@@ -84,7 +84,6 @@ void CleanupScanner::CleanupDir(const String &abs_dir) {
             LOG_WARN(fmt::format("Cleanup: Dir {} not found. Skip", abs_dir));
         } else {
             String error_message = fmt::format("Cleanup {} encounter unexpected error: {}", abs_dir, e.what());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

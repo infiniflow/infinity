@@ -773,7 +773,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     // if column count is larger than columns defined from schema, extra columns are abandoned
     if (column_count > table_entry->ColumnCount()) {
         UniquePtr<String> err_msg = MakeUnique<String>(
-            fmt::format("CSV file column count isn't match with table schema, row id: {}, column_count = {}, table_entry->ColumnCount = {}.",
+            fmt::format("CSV file column count isn't match with table schema, row id: {}, column_count: {}, table_entry->ColumnCount: {}.",
                         parser_context->row_count_,
                         column_count,
                         table_entry->ColumnCount()));
@@ -800,7 +800,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
                 auto &column_vector = parser_context->column_vectors_[column_idx];
                 column_vector.AppendByConstantExpr(const_expr);
             } else {
-                Status status = Status::ImportFileFormatError(fmt::format("Column {} is empty.", column_def->name_));
+                Status status = Status::ImportFileFormatError(fmt::format("No value in column {} in CSV of row number: {}", column_def->name_, parser_context->row_count_));
                 RecoverableError(status);
             }
         }
@@ -812,7 +812,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
             auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
             column_vector.AppendByConstantExpr(const_expr);
         } else {
-            Status status = Status::ImportFileFormatError(fmt::format("Column {} is empty.", column_def->name_));
+            Status status = Status::ImportFileFormatError(fmt::format("No value in column {} in CSV of row number: {}", column_def->name_, parser_context->row_count_));
             RecoverableError(status);
         }
     }
@@ -1977,7 +1977,6 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
         case LogicalType::kEmptyArray:
         case LogicalType::kInvalid: {
             String error_message = "Not implement: Invalid data type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

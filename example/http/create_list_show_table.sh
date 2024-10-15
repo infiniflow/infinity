@@ -23,7 +23,8 @@ curl --request POST \
          "fields": [
              {
                   "name": "name",
-                  "type": "varchar"
+                  "type": "varchar",
+                  "comment": "name column"
              },
              {
                   "name": "score",

@@ -37,7 +37,7 @@ The `uri` here can be either a local directory in `str` format or a `NetworkAddr
 
 :::tip IMPORTANT
 - When setting `uri` as `"/absolute/path/to/save/to"`, ensure you:
-  - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.4.0.dev3_OR_HIGHER>`
+  - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.4.0.dev4_OR_HIGHER>`
   - Import the `infinity_embedded` module: `import infinity_embedded`.
 - When setting `uri` as `NetworkAddress`, ensure you:
   - Install the Infinity SDK: `pip install infinity==<VERSION>`
@@ -54,7 +54,7 @@ When connecting to Infinity in client-server mode, ensure that the client versio
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
 | v0.3.0             | v0.3.0             |
-| v0.4.0.dev3        | v0.4.0.dev3        |
+| v0.4.0.dev4        | v0.4.0.dev4        |
 
 If the versions do not match, please update your client or server to ensure compatibility.
 
@@ -83,7 +83,7 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 #### Connect to the local directory of Infinity
 
-From v0.4.0.dev3 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev3_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
+From v0.4.0.dev4 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev4_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
 ```python
 import infinity_embedded
@@ -1067,6 +1067,31 @@ table_object.drop_index("my_index")
 
 ---
 
+## show_columns
+
+```python
+table_object.show_columns()
+```
+
+Show the column definition of the current table.
+
+### Returns
+
+An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+
+:::tip NOTE
+This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
+:::
+
+### Examples
+
+```python
+res = table_object.show_columns()
+print(res)
+```
+
+---
+
 ## list_indexes
 
 ```python
@@ -1558,11 +1583,31 @@ This method creates a filtering condition for your query. To display the results
 
 #### cond: `str`, *Required*
 
-A non-empty string representing the filter condition. It comprises one or multiple expressions combined by 'and' or 'or' logical operators, where each expression uses comparison operators to set criteria for keeping or removing rows.
+A non-empty string representing the filter condition. It comprises one or multiple expressions combined by 'and', 'or' or 'not' logical operators, where each expression uses comparison operators to set criteria for keeping or removing rows.
 
-:::tip NOTE
-Currently, only 'and' and 'or' logical expressions are supported.
-:::
+#### filter expressions in cond
+
+* `<`, `<=`, `>`, `>=`, `=`, `==`, `!=` expression
+* `in` and `not in` expression
+* `filter_fulltext` expression
+  - Similar to `match_text()`.
+    Usage: 'filter_fulltext(fields, matching_text)' or 'filter_fulltext(fields, matching_text, extra_options)'
+  - 'extra_options' is in the format of 'K1=V1;K2=V2;...;KN=VN',
+    where each 'K' represents a parameter name and 'V' represents its value
+  - Available parameters in 'extra_options':
+    - **'minimum_should_match'**: specifies how many clauses in the 'matching_text' should be satisfied at least.
+      It can be in the following format:
+      - Positive integer `N`: at least `N` clauses should be satisfied.
+      - Negative integer `-N`: at least (total clause count - `N`) clauses should be satisfied.
+      - Positive Percentage `N%`: at least `⌊total clause count * N%⌋` clauses should be satisfied.
+      - Negative Percentage `-N%`: at least `total clause count - ⌊total clause count * N%⌋` clauses should be satisfied.
+      - Combination `K<V`: `K` is positive integer, `V` is in one of four styles described above.
+        This means that when `total clause count > K`, the requirement `V` applies, otherwise all the clauses should be satisfied
+      - Multiple combinations `K1<V1 K2<V2 ... KN<VN`: several `K<V` strings seperated by spaces, with `K` in the ascending order.
+        If `K1 >= total clause count`, all the clauses should be satisfied.
+        Otherwise, we find the biggest `V` which is less than the total clause count and apply the correspondent `V`.
+    - **'default_field'**
+      - If `"fields"` is an empty string, this parameter specifies the default field to search on.
 
 ### Returns
 
@@ -1580,6 +1625,14 @@ table_object.output(["c1", "c2"]).filter("(-7 < c1 or 9 >= c1) and (c2 = 3)").to
 
 ```python
 table_object.output(["*"]).filter("c2 = 3").to_pl()
+```
+
+```python
+table_object.output(["*"]).filter("c1 not in (1, 2, 3) and (c2 + 1) in (1, 2, 3)").to_df()
+```
+
+```python
+table_object.output(["*"]).filter("filter_fulltext('doc', 'first second', 'minimum_should_match=99%') and not num = 2").to_pl()
 ```
 
 ---
