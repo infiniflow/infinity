@@ -59,6 +59,8 @@ time_zone                = "utc-8"
 # Number of worker threads. Defaults to the number of the CPU cores
 # Range : [1, 16384]
 cpu_limit                = 8
+# Server mode (standalone or cluster)
+server_mode              = "standalone"
 
 # Network configuration
 [network]
@@ -122,6 +124,21 @@ compact_interval         = "120s"
 # The system performs a flush operation for that in-memory index
 # Range : [8192, 8388608]
 mem_index_capacity       = 1048576
+# Storage type. Default to local  
+storage_type             = "minio"
+
+# Object storage configuration
+[storage.object_storage]
+# Url of the object storage server
+url                      = "192.168.200.165:9000"
+# The bucket where store the data
+bucket_name              = "infinity"
+# Access key of object storage server
+access_key               = "minioadmin"
+# Secret key of object storage server
+secret_key               = "minioadmin"
+# Using http or https protocol
+enable_https             = false
 
 # Buffer manager configuration
 [buffer]
