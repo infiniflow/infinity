@@ -1067,6 +1067,31 @@ table_object.drop_index("my_index")
 
 ---
 
+## show_columns
+
+```python
+table_object.show_columns()
+```
+
+Show the column definition of the current table.
+
+### Returns
+
+An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+
+:::tip NOTE
+This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
+:::
+
+### Examples
+
+```python
+res = table_object.show_columns()
+print(res)
+```
+
+---
+
 ## list_indexes
 
 ```python
