@@ -21,35 +21,25 @@ import column_vector;
 namespace infinity {
 
 struct Md5Function {
-    template <typename TA, typename TB>
-    static inline void Run(TA &left, TB &result) {
+    template <typename TA, typename TB, typename TC, typename TD>
+    static inline void Run(TA &left, TB &result, TC left_ptr, TD result_ptr) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
 };
 
 template <>
-inline void Md5Function::Run(VarcharT &left, VarcharT &result) {
+inline void Md5Function::Run(VarcharT &left, VarcharT &result, ColumnVector *left_ptr, ColumnVector *result_ptr) {
     unsigned char digest[MD5_DIGEST_LENGTH];
     const char *input = nullptr;
     SizeT input_len = 0;
-    //GetReaderValue(left, input, input_len);
+    Span<const char> left_v = left_ptr->GetVarcharInner(left);
+    input = left_v.data();
+    input_len = left_v.size();
     MD5(reinterpret_cast<const unsigned char *>(input), input_len, digest);
-
+    Span<const char> digest_span = Span<const char>(reinterpret_cast<const char *>(digest), MD5_DIGEST_LENGTH);
+    result_ptr->AppendVarcharInner(digest_span, result);
 }
-
-
-struct ColumnValueReaderMd5Function {
-    template <typename TA, typename TB>
-    static inline void Run(TA &left, TB &result) {
-        unsigned char digest[MD5_DIGEST_LENGTH];
-        const char *input = nullptr;
-        SizeT input_len = 0;
-        GetReaderValue(left, input, input_len);
-        MD5(reinterpret_cast<const unsigned char *>(input), input_len, digest);
-        SetReaderValue(result, reinterpret_cast<const char*>(digest), MD5_DIGEST_LENGTH);
-    }
-};
 
 
 void RegisterMd5Function(const UniquePtr<Catalog> &catalog_ptr){
@@ -60,7 +50,7 @@ void RegisterMd5Function(const UniquePtr<Catalog> &catalog_ptr){
     ScalarFunction md5_function(func_name,
                                      {DataType(LogicalType::kVarchar)},
                                      {DataType(LogicalType::kVarchar)},
-                                     &ScalarFunction::UnaryFunction<VarcharT, VarcharT, ColumnValueReaderMd5Function>);
+                                     &ScalarFunction::UnaryOpDirectVarlenToVarlenWrapper<VarcharT, VarcharT, Md5Function>);
     function_set_ptr->AddFunction(md5_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

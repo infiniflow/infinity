@@ -204,7 +204,7 @@ export struct ColumnVectorCast {
     static bool
     GenericTryCastColumnVector(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &result, SizeT count, CastParameters &parameters) {
         ColumnVectorCastData input(parameters.strict, source.get(), result.get(), *source->data_type(), *result->data_type());
-        UnaryOperator::Execute<SourceType, TargetType, Operator>(source, result, count, &input, true);
+        UnaryOperator::Execute<SourceType, TargetType, Operator>(source, result, count, nullptr, &input, true);
         return input.all_converted_;
     }
 
