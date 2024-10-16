@@ -94,10 +94,22 @@ curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/segments \
      --header 'accept: application/json'
 
-# show table tbl1 blocks
-echo -e '\n-- show tbl1 blocks'
+# show table tbl1 segment 0 blocks
+echo -e '\n-- show tbl1 segment 0 blocks'
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/segments/0/blocks \
+     --header 'accept: application/json'
+
+# show table tbl1 segment 0 block 0
+echo -e '\n-- show tbl1 segment 0 block 0'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/segments/0/blocks/0 \
+     --header 'accept: application/json'
+
+# show table tbl1 segment 0 block 0 column 0
+echo -e '\n-- show tbl1 segment 0 block 0 column 0'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/segments/0/blocks/0/0 \
      --header 'accept: application/json'
 
 # show table tb1 columns
