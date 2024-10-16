@@ -19,7 +19,7 @@ class InfinityConnection(ABC):
         self.uri = uri
 
     @abstractmethod
-    def create_database(self, db_name, options=None):
+    def create_database(self, db_name, options=None, comment: str = None):
         pass
 
     @abstractmethod

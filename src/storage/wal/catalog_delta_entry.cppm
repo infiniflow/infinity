@@ -142,6 +142,7 @@ public:
 
 public:
     SharedPtr<String> db_entry_dir_{};
+    SharedPtr<String> comment_{};
 };
 
 /// class AddTableEntryOp

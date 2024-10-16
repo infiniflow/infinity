@@ -50,16 +50,22 @@ public:
                      bool is_delete,
                      const SharedPtr<String> &db_entry_dir,
                      const SharedPtr<String> &db_name,
+                     const SharedPtr<String> &comment,
                      TransactionID txn_id,
                      TxnTimeStamp begin_ts);
 
-    static SharedPtr<DBEntry>
-    NewDBEntry(DBMeta *db_meta, bool is_delete, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    static SharedPtr<DBEntry> NewDBEntry(DBMeta *db_meta,
+                                         bool is_delete,
+                                         const SharedPtr<String> &db_name,
+                                         const SharedPtr<String> &comment,
+                                         TransactionID txn_id,
+                                         TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry> ReplayDBEntry(DBMeta *db_meta,
                                             bool is_delete,
                                             const SharedPtr<String> &db_entry_dir,
                                             const SharedPtr<String> &db_name,
+                                            const SharedPtr<String> &comment,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
                                             TxnTimeStamp commit_ts) noexcept;
@@ -74,6 +80,8 @@ public:
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
 
     [[nodiscard]] const SharedPtr<String> &db_entry_dir() const { return db_entry_dir_; }
+
+    [[nodiscard]] const SharedPtr<String> &db_comment_ptr() const { return db_comment_; }
 
     SharedPtr<String> AbsoluteDir() const;
 
@@ -120,7 +128,7 @@ public:
 
     Status GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_array);
 
-    Tuple<Vector<String>, Vector<TableMeta*>, std::shared_lock<std::shared_mutex>> GetAllTableMetas() const;
+    Tuple<Vector<String>, Vector<TableMeta *>, std::shared_lock<std::shared_mutex>> GetAllTableMetas() const;
 
 private:
     static SharedPtr<String> DetermineDBDir(const String &db_name);
@@ -133,6 +141,7 @@ public:
 private:
     const SharedPtr<String> db_entry_dir_{};
     const SharedPtr<String> db_name_{};
+    const SharedPtr<String> db_comment_{};
 
     MetaMap<TableMeta> table_meta_map_{};
 

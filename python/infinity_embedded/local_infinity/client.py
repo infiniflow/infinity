@@ -69,10 +69,15 @@ class LocalInfinityClient:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, index_names=res.names)
         return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
 
-    def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError):
+    def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError, comment: str = None):
         create_database_options = CreateDatabaseOptions()
         create_database_options.conflict_type = conflict_type
-        return self.convert_res(self.client.CreateDatabase(db_name, create_database_options))
+        db_comment: str = None
+        if comment is None:
+            db_comment = ""
+        else:
+            db_comment = comment
+        return self.convert_res(self.client.CreateDatabase(db_name, create_database_options, db_comment))
 
     def drop_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError):
         drop_database_options = DropDatabaseOptions()

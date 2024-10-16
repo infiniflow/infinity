@@ -15,8 +15,8 @@
 module;
 
 #include <cassert>
-#include <vector>
 #include <sstream>
+#include <vector>
 
 module wal_entry;
 
@@ -246,7 +246,7 @@ i32 WalChunkIndexInfo::GetSizeInBytes() const {
     bool use_object_cache = pm != nullptr;
     SizeT size = 0;
     if (use_object_cache) {
-        pm_size_= addr_serializer_.GetSizeInBytes();
+        pm_size_ = addr_serializer_.GetSizeInBytes();
         size += pm_size_;
     }
     return size + sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);
@@ -308,7 +308,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
         case WalCommandType::CREATE_DATABASE: {
             String db_name = ReadBufAdv<String>(ptr);
             String db_dir_tail = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdCreateDatabase>(std::move(db_name), std::move(db_dir_tail));
+            String db_comment = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdCreateDatabase>(std::move(db_name), std::move(db_dir_tail), std::move(db_comment));
             break;
         }
         case WalCommandType::DROP_DATABASE: {
@@ -642,7 +643,8 @@ bool WalCmdDropColumns::operator==(const WalCmd &other) const {
 }
 
 i32 WalCmdCreateDatabase::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size();
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size() + sizeof(i32) +
+           this->db_comment_.size();
 }
 
 i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
@@ -757,6 +759,7 @@ void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_dir_tail_);
+    WriteBufAdv(buf, this->db_comment_);
 }
 
 void WalCmdDropDatabase::WriteAdv(char *&buf) const {
@@ -929,6 +932,7 @@ String WalCmdCreateDatabase::ToString() const {
     std::stringstream ss;
     ss << "db name: " << db_name_ << std::endl;
     ss << "db dir: " << db_dir_tail_ << std::endl;
+    ss << "db comment: " << db_comment_ << std::endl;
     return ss.str();
 }
 
@@ -1097,7 +1101,7 @@ String WalCmdDropColumns::ToString() const {
 }
 
 String WalCmdCreateDatabase::CompactInfo() const {
-    return fmt::format("{}: database: {}, dir: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, db_dir_tail_);
+    return fmt::format("{}: database: {}, dir: {}, comment: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, db_dir_tail_, db_comment_);
 }
 
 String WalCmdDropDatabase::CompactInfo() const { return fmt::format("{}: database: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_); }

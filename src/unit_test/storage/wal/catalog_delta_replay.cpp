@@ -128,8 +128,8 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
 
-            txn->CreateDatabase(*db_name1, ConflictType::kError);
-            txn->CreateDatabase(*db_name2, ConflictType::kError);
+            txn->CreateDatabase(db_name1, ConflictType::kError, MakeShared<String>());
+            txn->CreateDatabase(db_name2, ConflictType::kError, MakeShared<String>());
             txn->DropDatabase(*db_name2, ConflictType::kError);
 
             auto [db_entry, status] = txn->GetDatabase(*db_name1);
@@ -140,7 +140,7 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
-            txn->CreateDatabase(*db_name3, ConflictType::kError);
+            txn->CreateDatabase(db_name3, ConflictType::kError, MakeShared<String>());
             txn_mgr->RollBackTxn(txn);
         }
         WaitFlushDeltaOp(storage);
@@ -911,7 +911,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
             // create database
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
 
-            txn->CreateDatabase(*db_name, ConflictType::kError);
+            txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
 
             auto [db_entry, status] = txn->GetDatabase(*db_name);
             EXPECT_TRUE(status.ok());

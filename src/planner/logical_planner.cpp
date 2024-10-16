@@ -617,9 +617,10 @@ Status LogicalPlanner::BuildCreateDatabase(const CreateStatement *statement, Sha
     }
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_schema_info->schema_name_);
+    SharedPtr<String> comment_ptr = MakeShared<String>(create_schema_info->comment_);
 
     SharedPtr<LogicalNode> logical_create_schema_operator =
-        LogicalCreateSchema::Make(bind_context_ptr->GetNewLogicalNodeId(), schema_name_ptr, create_schema_info->conflict_type_);
+        LogicalCreateSchema::Make(bind_context_ptr->GetNewLogicalNodeId(), schema_name_ptr, create_schema_info->conflict_type_, comment_ptr);
 
     this->logical_plan_ = logical_create_schema_operator;
     this->names_ptr_->emplace_back("OK");

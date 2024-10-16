@@ -32,7 +32,7 @@ void PhysicalCreateSchema::Init() {}
 
 bool PhysicalCreateSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto txn = query_context->GetTxn();
-    Status status = txn->CreateDatabase(*schema_name_, conflict_type_);
+    Status status = txn->CreateDatabase(schema_name_, conflict_type_, comment_);
     if (!status.ok()) {
         operator_state->status_ = status;
     }

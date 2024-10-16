@@ -71,7 +71,7 @@ TEST_P(CatalogTest, simple_test1) {
 
     // create db in empty catalog should be success
     {
-        auto [base_entry, status] = catalog->CreateDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
+        auto [base_entry, status] = catalog->CreateDatabase(MakeShared<String>("db1"), MakeShared<String>(), txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
         // store this entry
         databases["db1"] = base_entry;
@@ -127,7 +127,7 @@ TEST_P(CatalogTest, simple_test2) {
 
     // create db in empty catalog should be success
     {
-        Status status = txn1->CreateDatabase("db1", ConflictType::kError);
+        Status status = txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
     }
 
@@ -177,7 +177,7 @@ TEST_P(CatalogTest, concurrent_test) {
         auto write_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
                 String db_name = "db" + std::to_string(db_id);
-                Status status = txn->CreateDatabase(db_name, ConflictType::kError);
+                Status status = txn->CreateDatabase(MakeShared<String>(db_name), ConflictType::kError, MakeShared<String>());
                 EXPECT_TRUE(status.ok());
             }
         };
@@ -260,10 +260,9 @@ TEST_P(CatalogTest, get_db_info_test) {
     // start txn2
     auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
 
-
     // create db in empty catalog should be success
     {
-        auto [base_entry, status] = catalog->CreateDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
+        auto [base_entry, status] = catalog->CreateDatabase(MakeShared<String>("db1"), MakeShared<String>(), txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -271,7 +270,7 @@ TEST_P(CatalogTest, get_db_info_test) {
         auto [db_info1, status1] = catalog->GetDatabaseInfo("db1", txn1->TxnID(), txn1->BeginTS());
         // should be visible to same txn
         EXPECT_TRUE(status1.ok());
-        std::cout<<*(db_info1->db_name_)<<std::endl;
+        std::cout << *(db_info1->db_name_) << std::endl;
         EXPECT_STREQ("db1", db_info1->db_name_->c_str());
 
         // should not be visible to other txn
@@ -306,7 +305,7 @@ TEST_P(CatalogTest, get_table_info_test) {
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-    //create table, get table info, drop table
+    // create table, get table info, drop table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -314,12 +313,12 @@ TEST_P(CatalogTest, get_table_info_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
 
         auto [table_info, status1] = catalog->GetTableInfo("default_db", "tbl1", txn1);
@@ -342,7 +341,7 @@ TEST_P(CatalogTest, get_table_index_info_test) {
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
 
-    //create table
+    // create table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -350,12 +349,12 @@ TEST_P(CatalogTest, get_table_index_info_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -383,20 +382,21 @@ TEST_P(CatalogTest, get_table_index_info_test) {
         EXPECT_EQ(index_status.ok(), true);
     }
 
-    //get index info
+    // get index info
     {
         auto [index_info, status] = catalog->GetTableIndexInfo("default_db", "tbl1", "hnsw_index", txn1->TxnID(), txn1->BeginTS());
         EXPECT_TRUE(status.ok());
         EXPECT_STREQ("hnsw_index", index_info->index_name_->c_str());
     }
 
-    //drop index
+    // drop index
     {
-        auto [index_entry, status] = catalog->DropIndex("default_db", "tbl1", "hnsw_index", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
+        auto [index_entry, status] =
+            catalog->DropIndex("default_db", "tbl1", "hnsw_index", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
-    //drop table
+    // drop table
     {
         auto [table_entry, status] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
@@ -414,7 +414,7 @@ TEST_P(CatalogTest, remove_index_test) {
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
 
-    //create table
+    // create table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -422,12 +422,12 @@ TEST_P(CatalogTest, remove_index_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -455,7 +455,7 @@ TEST_P(CatalogTest, remove_index_test) {
         EXPECT_EQ(index_status.ok(), true);
     }
 
-    //remove index
+    // remove index
     {
         auto [index_entry, index_status] = catalog->GetIndexByName("default_db", "tbl1", "hnsw_index", txn1->TxnID(), txn1->BeginTS());
         EXPECT_TRUE(index_status.ok());
@@ -463,7 +463,7 @@ TEST_P(CatalogTest, remove_index_test) {
         EXPECT_TRUE(status.ok());
     }
 
-    //drop table
+    // drop table
     {
         auto [table_entry, status] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
@@ -482,7 +482,7 @@ TEST_P(CatalogTest, roll_back_append_test) {
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-    //create table
+    // create table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -490,12 +490,12 @@ TEST_P(CatalogTest, roll_back_append_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -503,14 +503,12 @@ TEST_P(CatalogTest, roll_back_append_test) {
         auto [table_entry, status] = catalog->GetTableByName("default_db", "tbl1", txn1->TxnID(), txn1->BeginTS());
         EXPECT_TRUE(status.ok());
 
-
         auto txn_store = txn1->GetTxnTableStore(table_entry);
         txn_store->SetAppendState(MakeUnique<AppendState>(txn_store->GetBlocks()));
         Catalog::Append(table_entry, txn1->TxnID(), (void *)txn_store, txn1->CommitTS(), buffer_mgr);
         EXPECT_THROW(Catalog::RollbackAppend(table_entry, txn1->TxnID(), txn1->CommitTS(), (void *)txn_store), UnrecoverableException);
     }
 }
-
 
 TEST_P(CatalogTest, roll_back_delete_test) {
     using namespace infinity;
@@ -522,7 +520,7 @@ TEST_P(CatalogTest, roll_back_delete_test) {
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-    //create table
+    // create table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -530,12 +528,12 @@ TEST_P(CatalogTest, roll_back_delete_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -545,7 +543,7 @@ TEST_P(CatalogTest, roll_back_delete_test) {
 
         auto txn_store = txn1->GetTxnTableStore(table_entry);
         Catalog::Delete(table_entry, txn1->TxnID(), (void *)txn_store, txn1->CommitTS(), txn_store->GetDeleteStateRef());
-        EXPECT_THROW(Catalog::RollbackDelete(table_entry, txn1->TxnID(), txn_store->GetDeleteStateRef(), buffer_mgr),UnrecoverableException);
+        EXPECT_THROW(Catalog::RollbackDelete(table_entry, txn1->TxnID(), txn_store->GetDeleteStateRef(), buffer_mgr), UnrecoverableException);
     }
 }
 
@@ -559,7 +557,7 @@ TEST_P(CatalogTest, roll_back_write_test) {
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-    //create table
+    // create table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -567,19 +565,18 @@ TEST_P(CatalogTest, roll_back_write_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
     {
         auto [table_entry, status] = catalog->GetTableByName("default_db", "tbl1", txn1->TxnID(), txn1->BeginTS());
         EXPECT_TRUE(status.ok());
-
 
         auto txn_store = txn1->GetTxnTableStore(table_entry);
         txn_store->SetAppendState(MakeUnique<AppendState>(txn_store->GetBlocks()));

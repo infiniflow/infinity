@@ -51,6 +51,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("database_name", &WrapQueryResult::database_name)
         .def_rw("store_dir", &WrapQueryResult::store_dir)
         .def_rw("table_count", &WrapQueryResult::table_count);
+        .def_rw("comment", &WrapQueryResult::comment);
 
     nb::class_<WrapColumnField>(m, "WrapColumnField")
         .def(nb::init<>())
