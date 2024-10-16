@@ -451,35 +451,35 @@ UniquePtr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(con
     }
 }
 
+void IndexFilterEvaluatorFulltext::OptimizeQueryTree() {
+    if (after_optimize_.test(std::memory_order_acquire)) {
+        UnrecoverableError(std::format("{}: Already optimized!", __func__));
+    }
+    auto new_query_tree = QueryNode::GetOptimizedQueryTree(std::move(query_tree_));
+    query_tree_ = std::move(new_query_tree);
+    if (!minimum_should_match_option_.empty()) {
+        const auto leaf_count = query_tree_->LeafCount();
+        minimum_should_match_ = GetMinimumShouldMatchParameter(minimum_should_match_option_, leaf_count);
+    }
+    after_optimize_.test_and_set(std::memory_order_release);
+}
+
 Bitmask IndexFilterEvaluatorFulltext::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count, Txn *txn) const {
+    if (!after_optimize_.test(std::memory_order_acquire)) {
+        UnrecoverableError(std::format("{}: Not optimized!", __func__));
+    }
     Bitmask result(segment_row_count);
     result.SetAllFalse();
     const RowID begin_rowid(segment_id, 0);
     const RowID end_rowid(segment_id, segment_row_count);
-    if (const auto ft_iter = query_tree_->CreateSearch(table_entry_, index_reader_, early_term_algo_); ft_iter && ft_iter->Next(begin_rowid)) {
-        u32 minimum_should_match_val = 0;
-        if (!minimum_should_match_option_.empty()) {
-            const auto leaf_count = ft_iter->LeafCount();
-            minimum_should_match_val = GetMinimumShouldMatchParameter(minimum_should_match_option_, leaf_count);
+    if (const auto ft_iter = query_tree_->CreateSearch(table_entry_, index_reader_, early_term_algo_, minimum_should_match_);
+        ft_iter && ft_iter->Next(begin_rowid)) {
+        while (ft_iter->DocID() < end_rowid) {
+            result.SetTrue(ft_iter->DocID().segment_offset_);
+            ft_iter->Next();
         }
-        if (minimum_should_match_val <= 1) {
-            // no need for minimum_should_match
-            while (ft_iter->DocID() < end_rowid) {
-                result.SetTrue(ft_iter->DocID().segment_offset_);
-                ft_iter->Next();
-            }
-        } else {
-            // now minimum_should_match_val >= 2
-            // use minimum_should_match
-            while (ft_iter->DocID() < end_rowid) {
-                if (ft_iter->MatchCount() >= minimum_should_match_val) {
-                    result.SetTrue(ft_iter->DocID().segment_offset_);
-                }
-                ft_iter->Next();
-            }
-        }
+        result.RunOptimize();
     }
-    result.RunOptimize();
     return result;
 }
 
@@ -503,9 +503,13 @@ Bitmask IndexFilterEvaluatorAND::Evaluate(const SegmentID segment_id, const Segm
             const auto &roaring_end = result.End();
             Bitmask new_result(segment_row_count);
             new_result.SetAllFalse();
+            if (!fulltext_evaluator_->after_optimize_.test(std::memory_order_acquire)) {
+                UnrecoverableError(std::format("{}: Not optimized!", __func__));
+            }
             const auto ft_iter = fulltext_evaluator_->query_tree_->CreateSearch(fulltext_evaluator_->table_entry_,
                                                                                 fulltext_evaluator_->index_reader_,
-                                                                                fulltext_evaluator_->early_term_algo_);
+                                                                                fulltext_evaluator_->early_term_algo_,
+                                                                                fulltext_evaluator_->minimum_should_match_);
             if (ft_iter) {
                 const RowID end_rowid(segment_id, segment_row_count);
                 while (roaring_begin != roaring_end && ft_iter->Next(RowID(segment_id, *roaring_begin))) {

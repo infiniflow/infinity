@@ -103,7 +103,6 @@ public:
     void UpdateScoreThreshold(float threshold) override { query_iterator_->UpdateScoreThreshold(threshold); }
 
     // for minimum_should_match parameter
-    u32 LeafCount() const override { return query_iterator_->LeafCount(); }
     u32 MatchCount() const override { return query_iterator_->MatchCount(); }
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
@@ -144,19 +143,24 @@ struct FilterQueryNode final : public QueryNode {
         query_tree_ = std::move(new_query_tree);
     }
 
+    uint32_t LeafCount() const override { return query_tree_->LeafCount(); }
+
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
 
-    std::unique_ptr<DocIterator>
-    CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override {
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry,
+                                              const IndexReader &index_reader,
+                                              const EarlyTermAlgo early_term_algo,
+                                              const u32 minimum_should_match) const override {
         assert(common_query_filter_ != nullptr);
         if (!common_query_filter_->AlwaysTrue() && common_query_filter_->filter_result_count_ == 0)
             return nullptr;
-        auto search_iter = query_tree_->CreateSearch(table_entry, index_reader, early_term_algo);
+        auto search_iter = query_tree_->CreateSearch(table_entry, index_reader, early_term_algo, minimum_should_match);
         if (!search_iter) {
             return nullptr;
         }
-        if (common_query_filter_->AlwaysTrue())
+        if (common_query_filter_->AlwaysTrue()) {
             return search_iter;
+        }
         return MakeUnique<FilterIterator>(common_query_filter_, std::move(search_iter));
     }
 
@@ -186,19 +190,17 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
     }
 }
 
-template <bool use_minimum_should_match>
-void ExecuteFTSearchT(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt, const u32 minimum_should_match) {
+void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt) {
+    // et_iter is nullptr if fulltext index is present but there's no data
+    if (et_iter == nullptr) {
+        LOG_DEBUG(fmt::format("et_iter is nullptr"));
+        return;
+    }
     while (true) {
         ++blockmax_loop_cnt;
         bool ok = et_iter->Next();
         if (!ok) [[unlikely]] {
             break;
-        }
-        if constexpr (use_minimum_should_match) {
-            assert(minimum_should_match >= 2);
-            if (et_iter->MatchCount() < minimum_should_match) {
-                continue;
-            }
         }
         RowID id = et_iter->DocID();
         float et_score = et_iter->BM25Score();
@@ -216,30 +218,6 @@ void ExecuteFTSearchT(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &
         if (blockmax_loop_cnt % 10 == 0) {
             LOG_DEBUG(fmt::format("ExecuteFTSearch has evaluated {} candidates", blockmax_loop_cnt));
         }
-    }
-}
-
-void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter,
-                     FullTextScoreResultHeap &result_heap,
-                     u32 &blockmax_loop_cnt,
-                     const MinimumShouldMatchOption &minimum_should_match_option) {
-    // et_iter is nullptr if fulltext index is present but there's no data
-    if (et_iter == nullptr) {
-        LOG_DEBUG(fmt::format("et_iter is nullptr"));
-        return;
-    }
-    u32 minimum_should_match_val = 0;
-    if (!minimum_should_match_option.empty()) {
-        const auto leaf_count = et_iter->LeafCount();
-        minimum_should_match_val = GetMinimumShouldMatchParameter(minimum_should_match_option, leaf_count);
-    }
-    if (minimum_should_match_val <= 1) {
-        // no need for minimum_should_match
-        return ExecuteFTSearchT<false>(et_iter, result_heap, blockmax_loop_cnt, 0);
-    } else {
-        // now minimum_should_match_val >= 2
-        // use minimum_should_match
-        return ExecuteFTSearchT<true>(et_iter, result_heap, blockmax_loop_cnt, minimum_should_match_val);
     }
 }
 
@@ -310,13 +288,13 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree_));
 
     if (use_block_max_iter) {
-        et_iter = query_builder.CreateSearch(full_text_query_context, early_term_algo_);
+        et_iter = query_builder.CreateSearch(full_text_query_context, early_term_algo_, minimum_should_match_option_);
         // et_iter is nullptr if fulltext index is present but there's no data
         if (et_iter != nullptr)
             et_iter->UpdateScoreThreshold(begin_threshold_);
     }
     if (use_ordinary_iter) {
-        doc_iterator = query_builder.CreateSearch(full_text_query_context, EarlyTermAlgo::kNaive);
+        doc_iterator = query_builder.CreateSearch(full_text_query_context, EarlyTermAlgo::kNaive, minimum_should_match_option_);
     }
 
     // 3 full text search
@@ -331,7 +309,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 #ifdef INFINITY_DEBUG
         auto blockmax_begin_ts = std::chrono::high_resolution_clock::now();
 #endif
-        ExecuteFTSearch(et_iter, result_heap, blockmax_loop_cnt, minimum_should_match_option_);
+        ExecuteFTSearch(et_iter, result_heap, blockmax_loop_cnt);
         result_heap.Sort();
         blockmax_result_count = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG
@@ -346,7 +324,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 #ifdef INFINITY_DEBUG
         auto ordinary_begin_ts = std::chrono::high_resolution_clock::now();
 #endif
-        ExecuteFTSearch(doc_iterator, result_heap, ordinary_loop_cnt, minimum_should_match_option_);
+        ExecuteFTSearch(doc_iterator, result_heap, ordinary_loop_cnt);
         result_heap.Sort();
         ordinary_result_count = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG

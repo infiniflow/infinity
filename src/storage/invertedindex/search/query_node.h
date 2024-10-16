@@ -72,6 +72,8 @@ struct QueryNode {
     void MultiplyWeight(float factor) { weight_ *= factor; }
     void ResetWeight() { weight_ = 1.0f; }
 
+    virtual uint32_t LeafCount() const = 0;
+
     // will do two jobs:
     // 1. push down the weight to the leaf term node
     // 2. optimize the query tree
@@ -81,8 +83,10 @@ struct QueryNode {
     // recursively multiply and push down the weight to the leaf term nodes
     virtual void PushDownWeight(float factor = 1.0f) = 0;
     // create the iterator from the query tree, need to be called after optimization
-    virtual std::unique_ptr<DocIterator>
-    CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const = 0;
+    virtual std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry,
+                                                      const IndexReader &index_reader,
+                                                      EarlyTermAlgo early_term_algo,
+                                                      uint32_t minimum_should_match) const = 0;
     // print the query tree, for debugging
     virtual void PrintTree(std::ostream &os, const std::string &prefix = "", bool is_final = true) const = 0;
 
@@ -96,8 +100,12 @@ struct TermQueryNode : public QueryNode {
 
     TermQueryNode() : QueryNode(QueryNodeType::TERM) {}
 
+    uint32_t LeafCount() const override { return 1; }
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry,
+                                              const IndexReader &index_reader,
+                                              EarlyTermAlgo early_term_algo,
+                                              uint32_t minimum_should_match) const override;
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
     void GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const override;
 };
@@ -109,8 +117,12 @@ struct PhraseQueryNode final : public QueryNode {
 
     PhraseQueryNode() : QueryNode(QueryNodeType::PHRASE) {}
 
+    uint32_t LeafCount() const override { return 1; }
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry,
+                                              const IndexReader &index_reader,
+                                              EarlyTermAlgo early_term_algo,
+                                              uint32_t minimum_should_match) const override;
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
     void GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const override;
 
@@ -123,6 +135,7 @@ struct MultiQueryNode : public QueryNode {
     MultiQueryNode(QueryNodeType type) : QueryNode(type) {}
 
     void Add(std::unique_ptr<QueryNode> &&node) { children_.emplace_back(std::move(node)); }
+    uint32_t LeafCount() const override;
     void PushDownWeight(float factor) final {
         // no need to update weight for MultiQueryNode, because it will be reset to 1.0
         factor *= GetWeight();
@@ -142,23 +155,40 @@ struct MultiQueryNode : public QueryNode {
 // otherwise, query statement is invalid
 struct NotQueryNode final : public MultiQueryNode {
     NotQueryNode() : MultiQueryNode(QueryNodeType::NOT) {}
+    uint32_t LeafCount() const override { return 0; }
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry,
+                                              const IndexReader &index_reader,
+                                              EarlyTermAlgo early_term_algo,
+                                              uint32_t minimum_should_match) const override;
 };
+
 struct AndQueryNode final : public MultiQueryNode {
     AndQueryNode() : MultiQueryNode(QueryNodeType::AND) {}
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry,
+                                              const IndexReader &index_reader,
+                                              EarlyTermAlgo early_term_algo,
+                                              uint32_t minimum_should_match) const override;
 };
+
 struct AndNotQueryNode final : public MultiQueryNode {
     AndNotQueryNode() : MultiQueryNode(QueryNodeType::AND_NOT) {}
+    uint32_t LeafCount() const override { return children_[0]->LeafCount(); }
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry,
+                                              const IndexReader &index_reader,
+                                              EarlyTermAlgo early_term_algo,
+                                              uint32_t minimum_should_match) const override;
 };
+
 struct OrQueryNode final : public MultiQueryNode {
     OrQueryNode() : MultiQueryNode(QueryNodeType::OR) {}
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry,
+                                              const IndexReader &index_reader,
+                                              EarlyTermAlgo early_term_algo,
+                                              uint32_t minimum_should_match) const override;
 };
 
 // unimplemented
