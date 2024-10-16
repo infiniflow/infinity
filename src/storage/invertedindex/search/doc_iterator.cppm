@@ -74,7 +74,6 @@ public:
     virtual void UpdateScoreThreshold(float threshold) = 0;
 
     // for minimum_should_match parameter
-    virtual u32 LeafCount() const = 0;
     virtual u32 MatchCount() const = 0;
 
     // print the query tree, for debugging

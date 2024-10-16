@@ -38,8 +38,6 @@ public:
 
     float BM25Score() override;
 
-    u32 LeafCount() const override;
-
     u32 MatchCount() const override;
 
 private:
@@ -54,6 +52,28 @@ private:
     Vector<u32> head_heap_{};
     Vector<u32> tail_heap_{};
     u32 tail_size_ = 0;
+
+    // bm25 score cache
+    RowID bm25_score_cache_docid_ = {};
+    float bm25_score_cache_ = {};
+};
+
+export template <std::derived_from<MultiDocIterator> T>
+class MinimumShouldMatchWrapper final : public T {
+    u32 minimum_should_match_ = 0;
+
+public:
+    MinimumShouldMatchWrapper(Vector<UniquePtr<DocIterator>> &&iterators, const u32 minimum_should_match)
+        : T(std::move(iterators)), minimum_should_match_(minimum_should_match) {}
+    ~MinimumShouldMatchWrapper() override = default;
+    bool Next(RowID doc_id) override {
+        for (; T::Next(doc_id); doc_id = this->doc_id_ + 1) {
+            if (this->MatchCount() >= minimum_should_match_) {
+                return true;
+            }
+        }
+        return false;
+    }
 };
 
 } // namespace infinity

@@ -124,12 +124,6 @@ void AndIterator::UpdateScoreThreshold(float threshold) {
     }
 }
 
-u32 AndIterator::LeafCount() const {
-    return std::accumulate(children_.begin(), children_.end(), static_cast<u32>(0), [](const u32 cnt, const auto &it) {
-        return cnt + it->LeafCount();
-    });
-}
-
 u32 AndIterator::MatchCount() const {
     if (DocID() == INVALID_ROWID) {
         return 0;

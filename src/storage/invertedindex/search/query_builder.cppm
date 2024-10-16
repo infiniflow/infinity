@@ -23,6 +23,7 @@ import table_entry;
 import internal_types;
 import default_values;
 import base_table_ref;
+import parse_fulltext_options;
 
 namespace infinity {
 
@@ -31,6 +32,7 @@ struct QueryNode;
 export struct FullTextQueryContext {
     UniquePtr<QueryNode> query_tree_;
     UniquePtr<QueryNode> optimized_query_tree_;
+    u32 minimum_should_match_ = 0;
 };
 
 export class QueryBuilder {
@@ -44,7 +46,8 @@ public:
 
     const Map<String, String> &GetColumn2Analyzer() { return index_reader_.GetColumn2Analyzer(); }
 
-    UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo);
+    UniquePtr<DocIterator>
+    CreateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo, const MinimumShouldMatchOption &minimum_should_match_option);
 
 private:
     BaseTableRef* base_table_ref_{nullptr};

@@ -90,6 +90,8 @@ export struct IndexFilterEvaluatorFulltext final : IndexFilterEvaluator {
     IndexReader index_reader_;
     UniquePtr<QueryNode> query_tree_;
     MinimumShouldMatchOption minimum_should_match_option_;
+    u32 minimum_should_match_ = 0;
+    std::atomic_flag after_optimize_ = {};
 
     IndexFilterEvaluatorFulltext(const FilterFulltextExpression *src_filter_fulltext_expression,
                                  const TableEntry *table_entry,
@@ -102,10 +104,7 @@ export struct IndexFilterEvaluatorFulltext final : IndexFilterEvaluator {
           minimum_should_match_option_(std::move(minimum_should_match_option)) {}
     Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count, Txn *txn) const override;
     bool HaveMinimumShouldMatchOption() const { return !minimum_should_match_option_.empty(); }
-    void OptimizeQueryTree() {
-        auto new_query_tree = QueryNode::GetOptimizedQueryTree(std::move(query_tree_));
-        query_tree_ = std::move(new_query_tree);
-    }
+    void OptimizeQueryTree();
 };
 
 export UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromAnd(Vector<UniquePtr<IndexFilterEvaluator>> candidates);

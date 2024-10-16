@@ -292,6 +292,7 @@ export namespace std {
     using std::conditional_t;
     using std::remove_pointer_t;
     using std::remove_reference_t;
+    using std::derived_from;
 
     using std::function;
     using std::monostate;
