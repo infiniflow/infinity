@@ -272,6 +272,9 @@ Status VirtualStore::Truncate(const String &file_name, SizeT new_length) {
         UnrecoverableError(error_message);
     }
     std::error_code error_code;
+    if (!std::filesystem::exists(file_name)) {
+        std::ofstream file(file_name, std::ios::out | std::ios::binary | std::ios::trunc);
+    }
     std::filesystem::resize_file(file_name, new_length, error_code);
     if (error_code.value() != 0) {
         String error_message = fmt::format("Failed to truncate {} to size {}", file_name, strerror(errno));

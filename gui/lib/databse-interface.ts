@@ -1,11 +1,11 @@
-export type IResponseBody<T extends any> = {
+export type IResponseBody<T = Record<string, unknown>> = {
   error_code: number;
 } & { [U: string | number]: T };
 
 export interface ITableColumns {
   name: string;
   type: string;
-  default: any;
+  default: unknown;
 }
 
 export interface ITableIndex {

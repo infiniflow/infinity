@@ -160,7 +160,6 @@ Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(
 
     auto [entries, status] = VirtualStore::ListDirectory(wal_dir);
     if(!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 

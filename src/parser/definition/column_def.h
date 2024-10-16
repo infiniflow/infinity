@@ -21,8 +21,8 @@
 #include "type/type_info.h"
 
 #include <memory>
-#include <string>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace infinity {
@@ -81,6 +81,19 @@ public:
               std::shared_ptr<DataType> column_type,
               std::string column_name,
               std::set<ConstraintType> constraints,
+              std::string comment,
+              std::shared_ptr<ParsedExpr> default_expr = nullptr);
+
+    ColumnDef(int64_t id,
+              std::shared_ptr<DataType> column_type,
+              std::string column_name,
+              std::set<ConstraintType> constraints,
+              std::shared_ptr<ParsedExpr> default_expr = nullptr);
+
+
+    ColumnDef(LogicalType logical_type,
+              const std::shared_ptr<TypeInfo> &type_info_ptr,
+              std::string comment,
               std::shared_ptr<ParsedExpr> default_expr = nullptr);
 
     ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr, std::shared_ptr<ParsedExpr> default_expr = nullptr);
@@ -99,6 +112,8 @@ public:
 
     inline const std::string &name() const { return name_; }
 
+    inline const std::string &comment() const { return comment_; }
+
     [[nodiscard]] inline int64_t id() const { return id_; }
 
     inline const std::shared_ptr<DataType> &type() const { return column_type_; }
@@ -108,15 +123,14 @@ public:
         return const_expr != nullptr && const_expr->literal_type_ != LiteralType::kNull;
     }
 
-    const std::shared_ptr<ConstantExpr> default_value() const {
-        return std::dynamic_pointer_cast<ConstantExpr>(default_expr_);
-    }
+    const std::shared_ptr<ConstantExpr> default_value() const { return std::dynamic_pointer_cast<ConstantExpr>(default_expr_); }
 
 public:
     int64_t id_{-1};
     const std::shared_ptr<DataType> column_type_{};
     std::string name_{};
     std::set<ConstraintType> constraints_{};
+    std::string comment_{};
     std::shared_ptr<ParsedExpr> default_expr_{nullptr};
     bool build_bloom_filter_{};
 };

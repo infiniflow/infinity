@@ -39,7 +39,7 @@ export const useHandleClickTreeName = () => {
           }
         }
       },
-    []
+    [router]
   );
 
   return { handleClickTreeName };
@@ -55,7 +55,7 @@ export const useBuildTreeData = () => {
     try {
       setLoading(true);
       const ret = await listDatabase();
-      if (ret.databases.length > 0) {
+      if (ret.databases?.length > 0) {
         setData(
           updateTreeData(
             [
@@ -125,7 +125,7 @@ export const useBuildTreeData = () => {
   }, [fetchDatabases]);
 
   const onLoadData = async ({ element }: { element: INode }) => {
-    if (element.children.length > 0) {
+    if (element?.children?.length > 0) {
       return;
     }
 
@@ -157,7 +157,7 @@ export const useBuildTreeData = () => {
   };
 
   const wrappedOnLoadData = async (props: ITreeViewOnLoadDataProps) => {
-    const nodeHasNoChildData = props.element.children.length === 0;
+    const nodeHasNoChildData = props.element.children?.length === 0;
     const nodeHasAlreadyBeenLoaded = nodesAlreadyLoaded.find(
       (e) => e.id === props.element.id
     );
@@ -196,7 +196,7 @@ export const useFetchTableColumns = ({
     });
 
     setTableColumns(data);
-  }, []);
+  }, [databaseId, tableId]);
 
   useEffect(() => {
     fetchTableColumns();
@@ -218,7 +218,7 @@ export const useFetchTableIndexes = ({
     });
 
     setTableIndexes(data);
-  }, []);
+  }, [databaseId, tableId]);
 
   useEffect(() => {
     fetchTableIndexes();
@@ -240,7 +240,7 @@ export const useFetchTableSegments = ({
     });
 
     setTableSegments(data);
-  }, []);
+  }, [databaseId, tableId]);
 
   useEffect(() => {
     fetchTableSegments();

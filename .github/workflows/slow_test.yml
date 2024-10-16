@@ -25,7 +25,7 @@ concurrency:
 jobs:
   slow_tests:
     name: run slow test
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'invalid') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: ["self-hosted", "slow-test" ]
     steps:
 

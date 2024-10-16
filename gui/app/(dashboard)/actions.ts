@@ -8,6 +8,8 @@ import {
   ITableSegment
 } from '@/lib/databse-interface';
 import { drop, get, post } from '@/lib/request';
+import { isResponseListExist } from '@/lib/utils';
+import { unstable_rethrow } from 'next/navigation';
 
 export const listDatabase = async () => {
   try {
@@ -15,7 +17,8 @@ export const listDatabase = async () => {
     console.log('🚀 ~ x:', x);
     return x;
   } catch (error) {
-    console.log('🚀 ~ error:', error);
+    unstable_rethrow(error);
+    return { databases: [] };
   }
 };
 
@@ -142,6 +145,8 @@ export const showConfigs = async () => {
     return x;
   } catch (error) {
     console.log('🚀 ~ error:', error);
+    unstable_rethrow(error);
+    return {};
   }
 };
 
@@ -150,16 +155,9 @@ export const showVariables = async () => {
     const x = await get(`${ApiUrl.variables}/global`);
     return x;
   } catch (error) {
+    unstable_rethrow(error);
     console.log('🚀 ~ error:', error);
-  }
-};
-
-export const showCurrentNode = async () => {
-  try {
-    const x = await get(`${ApiUrl.variables}/global`);
-    return x;
-  } catch (error) {
-    console.log('🚀 ~ error:', error);
+    return {};
   }
 };
 
@@ -174,11 +172,12 @@ export const showTableColumns = async ({
     const x = await get(
       `${ApiUrl.databases}/${database_name}/${ApiUrl.tables}/${table_name}/${ApiUrl.columns}`
     );
-    if (x.error_code === 0) {
+    if (isResponseListExist(x, 'columns')) {
       return x.columns;
     }
     return [];
-  } catch (error) {
+  } catch (error: unknown) {
+    console.log('🚀 ~ error:', error);
     return [];
   }
 };
@@ -194,11 +193,12 @@ export const showTableIndexes = async ({
     const x = await get(
       `${ApiUrl.databases}/${database_name}/${ApiUrl.tables}/${table_name}/${ApiUrl.indexes}`
     );
-    if (x.error_code === 0) {
+    if (isResponseListExist(x, 'indexes')) {
       return x.indexes;
     }
     return [];
-  } catch (error) {
+  } catch (error: unknown) {
+    console.log('🚀 ~ error:', error);
     return [];
   }
 };
@@ -214,11 +214,12 @@ export const showTableSegments = async ({
     const x = await get(
       `${ApiUrl.databases}/${database_name}/${ApiUrl.tables}/${table_name}/${ApiUrl.segments}`
     );
-    if (x.error_code === 0) {
+    if (isResponseListExist(x, 'segments')) {
       return x?.segments ?? [];
     }
     return [];
-  } catch (error) {
+  } catch (error: unknown) {
+    console.log('🚀 ~ error:', error);
     return [];
   }
 };

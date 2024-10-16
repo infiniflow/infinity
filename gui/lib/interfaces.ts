@@ -4,5 +4,5 @@ export interface IDialogProps<T> {
   switchVisible(): void;
   visible?: boolean;
   loading?: boolean;
-  onOk?(payload?: T): Promise<any> | void;
+  onOk?(payload?: T): Promise<unknown> | void;
 }
