@@ -210,6 +210,8 @@ public:
 
     inline const SharedPtr<String> &GetTableName() const { return table_name_; }
 
+    TxnTimeStamp max_commit_ts() const { return max_commit_ts_; }
+
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
 
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, Txn *txn) const;
@@ -307,6 +309,8 @@ private:
 
     // for full text search cache
     SharedPtr<TableIndexReaderCache> fulltext_column_index_cache_;
+
+    TxnTimeStamp max_commit_ts_ = 0;
 
 public:
     // set nullptr to close auto compaction
