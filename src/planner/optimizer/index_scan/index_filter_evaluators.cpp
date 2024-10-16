@@ -503,9 +503,13 @@ Bitmask IndexFilterEvaluatorAND::Evaluate(const SegmentID segment_id, const Segm
             const auto &roaring_end = result.End();
             Bitmask new_result(segment_row_count);
             new_result.SetAllFalse();
+            if (!fulltext_evaluator_->after_optimize_.test(std::memory_order_acquire)) {
+                UnrecoverableError(std::format("{}: Not optimized!", __func__));
+            }
             const auto ft_iter = fulltext_evaluator_->query_tree_->CreateSearch(fulltext_evaluator_->table_entry_,
                                                                                 fulltext_evaluator_->index_reader_,
-                                                                                fulltext_evaluator_->early_term_algo_);
+                                                                                fulltext_evaluator_->early_term_algo_,
+                                                                                fulltext_evaluator_->minimum_should_match_);
             if (ft_iter) {
                 const RowID end_rowid(segment_id, segment_row_count);
                 while (roaring_begin != roaring_end && ft_iter->Next(RowID(segment_id, *roaring_begin))) {

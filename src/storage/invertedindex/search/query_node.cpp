@@ -563,7 +563,7 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const TableEntry *table_e
         if (minimum_should_match <= 1u) {
             return MakeUnique<OrIterator>(std::move(sub_doc_iters));
         } else {
-            return MakeUnique<MinimumShouldMatchWrapper<OrIterator>>(std::move(sub_doc_iters));
+            return MakeUnique<MinimumShouldMatchWrapper<OrIterator>>(std::move(sub_doc_iters), minimum_should_match);
         }
     }
 }

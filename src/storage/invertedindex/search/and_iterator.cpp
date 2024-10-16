@@ -42,15 +42,7 @@ AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIte
                 ++fixed_match_count_;
                 break;
             }
-            case DocIteratorType::kAndIterator:
-            case DocIteratorType::kAndNotIterator:
-            case DocIteratorType::kFilterIterator: {
-                UnrecoverableError("Wrong optimization result");
-                break;
-            }
-            case DocIteratorType::kOrIterator:
-            case DocIteratorType::kBMMIterator:
-            case DocIteratorType::kBMWIterator: {
+            default: {
                 dyn_match_ids_.push_back(i);
                 break;
             }

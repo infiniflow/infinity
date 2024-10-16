@@ -147,17 +147,20 @@ struct FilterQueryNode final : public QueryNode {
 
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
 
-    std::unique_ptr<DocIterator>
-    CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override {
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry,
+                                              const IndexReader &index_reader,
+                                              const EarlyTermAlgo early_term_algo,
+                                              const u32 minimum_should_match) const override {
         assert(common_query_filter_ != nullptr);
         if (!common_query_filter_->AlwaysTrue() && common_query_filter_->filter_result_count_ == 0)
             return nullptr;
-        auto search_iter = query_tree_->CreateSearch(table_entry, index_reader, early_term_algo);
+        auto search_iter = query_tree_->CreateSearch(table_entry, index_reader, early_term_algo, minimum_should_match);
         if (!search_iter) {
             return nullptr;
         }
-        if (common_query_filter_->AlwaysTrue())
+        if (common_query_filter_->AlwaysTrue()) {
             return search_iter;
+        }
         return MakeUnique<FilterIterator>(common_query_filter_, std::move(search_iter));
     }
 
