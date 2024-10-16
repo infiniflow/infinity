@@ -85,6 +85,7 @@ import physical_fusion;
 import physical_create_index_prepare;
 import physical_create_index_do;
 import physical_create_index_finish;
+import physical_read_cache;
 
 import logical_node;
 import logical_node_type;
@@ -128,6 +129,7 @@ import logical_match;
 import logical_match_tensor_scan;
 import logical_match_sparse_scan;
 import logical_fusion;
+import logical_read_cache;
 
 import value;
 import value_expression;
@@ -331,6 +333,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kCompactFinish: {
             result = BuildCompactFinish(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kReadCache: {
+            result = BuildReadCache(logical_operator);
             break;
         }
         default: {
@@ -955,7 +961,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
                                      logical_match->common_query_filter_,
                                      std::move(logical_match->minimum_should_match_option_),
                                      logical_match->TableIndex(),
-                                     logical_operator->load_metas());
+                                     logical_operator->load_metas(),
+                                     true /*cache_result*/);
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -1149,6 +1156,15 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactFinish(const SharedPtr<
                                              logical_compact_finish->GetOutputNames(),
                                              logical_compact_finish->GetOutputTypes(),
                                              logical_operator->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildReadCache(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto *logical_read_cache = static_cast<LogicalReadCache *>(logical_operator.get());
+    return MakeUnique<PhysicalReadCache>(logical_read_cache->node_id(),
+                                         logical_read_cache->base_table_ref_,
+                                         logical_read_cache->cache_content_,
+                                         logical_read_cache->column_map_,
+                                         logical_read_cache->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const {

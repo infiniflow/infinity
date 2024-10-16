@@ -153,6 +153,8 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "CreateIndexDo";
         case PhysicalOperatorType::kCreateIndexFinish:
             return "CreateIndexFinish";
+        case PhysicalOperatorType::kReadCache:
+            return "ReadCache";
     }
 
     Status status = Status::NotSupport("Unknown physical operator type");

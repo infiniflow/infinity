@@ -81,6 +81,7 @@ export enum class LogicalNodeType : u8 {
     kCompactIndex,
     kCompactFinish,
 
+    kReadCache,
     kMock,
 };
 }

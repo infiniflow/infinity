@@ -37,8 +37,10 @@ public:
                                      UniquePtr<PhysicalOperator> left,
                                      UniquePtr<PhysicalOperator> right,
                                      const u64 id,
-                                     SharedPtr<Vector<LoadMeta>> load_metas)
-        : operator_id_(id), operator_type_(type), left_(std::move(left)), right_(std::move(right)), load_metas_(std::move(load_metas)) {}
+                                     SharedPtr<Vector<LoadMeta>> load_metas,
+                                     bool cache_result = false)
+        : operator_id_(id), operator_type_(type), left_(std::move(left)), right_(std::move(right)), load_metas_(std::move(load_metas)),
+          cache_result_(cache_result) {}
 
     virtual ~PhysicalOperator() = default;
 
@@ -71,6 +73,8 @@ public:
 
     const SharedPtr<Vector<LoadMeta>> &load_metas() const { return load_metas_; }
 
+    bool cache_result() const { return cache_result_; }
+
 protected:
     u64 operator_id_;
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
@@ -80,6 +84,7 @@ protected:
     SharedPtr<DataTable> output_{};
 
     SharedPtr<Vector<LoadMeta>> load_metas_{};
+    bool cache_result_;
 
 public:
     // Operator
