@@ -398,6 +398,10 @@ export struct FusionOperatorState : public OperatorState {
     Map<u64, Vector<UniquePtr<DataBlock>>> input_data_blocks_{};
 };
 
+export struct ReadCacheState : public OperatorState {
+    inline explicit ReadCacheState() : OperatorState(PhysicalOperatorType::kReadCache) {}
+};
+
 // Compact
 export struct CompactOperatorState : public OperatorState {
     inline explicit CompactOperatorState(Vector<Vector<SegmentEntry *>> segment_groups, SharedPtr<CompactStateData> compact_state_data)

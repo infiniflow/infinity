@@ -61,6 +61,8 @@ public:
 
     SharedPtr<String> table_name() const { return table_entry_ptr_->GetTableName(); }
 
+    TxnTimeStamp max_commit_ts() const { return table_entry_ptr_->max_commit_ts(); }
+
     TableEntry *table_entry_ptr_{};
     Vector<SizeT> column_ids_{};
     SharedPtr<BlockIndex> block_index_{};

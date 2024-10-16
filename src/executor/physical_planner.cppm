@@ -131,6 +131,9 @@ private:
 
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const;
 
+    // Read cache
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildReadCache(const SharedPtr<LogicalNode> &logical_operator) const;
+
     // Explain
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const;
 };

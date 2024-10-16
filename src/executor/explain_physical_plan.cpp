@@ -75,6 +75,7 @@ import physical_merge_match_sparse;
 import physical_merge_aggregate;
 import status;
 import physical_operator_type;
+import physical_read_cache;
 
 import explain_logical_plan;
 import logical_show;
@@ -93,6 +94,7 @@ import common_query_filter;
 import table_entry;
 import logger;
 import show_statement;
+import base_table_ref;
 
 namespace infinity {
 
@@ -303,6 +305,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kMergeAggregate: {
             Explain((PhysicalMergeAggregate *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kReadCache: {
+            Explain(static_cast<const PhysicalReadCache *>(op), result, intent_size);
             break;
         }
         default: {
@@ -2644,6 +2650,38 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeAggregate *merge_aggregate_
         output_columns += merge_aggregate_node->GetOutputNames()->at(idx) + ", ";
     }
     output_columns += merge_aggregate_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalReadCache *read_cache_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> Read cache ";
+    } else {
+        explain_header_str = "Read cache ";
+    }
+    explain_header_str += "(" + std::to_string(read_cache_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(explain_header_str));
+
+    const BaseTableRef *base_table_ref = read_cache_node->base_table_ref();
+    // Table alias and name
+    String table_name = String(intent_size, ' ') + " - table name: (";
+    table_name += *base_table_ref->schema_name() + ".";
+    table_name += *base_table_ref->table_name() + ")";
+    result->emplace_back(MakeShared<String>(table_name));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = read_cache_node->GetOutputNames()->size();
+    if (column_count == 0) {
+        String error_message = "No column in read cache node.";
+        UnrecoverableError(error_message);
+    }
+    for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += read_cache_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += read_cache_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 }

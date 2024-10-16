@@ -39,6 +39,9 @@ import parse_fulltext_options;
 
 namespace infinity {
 
+class ResultCacheManager;
+class DataBlock;
+
 export class PhysicalMatch final : public PhysicalOperator {
 public:
     explicit PhysicalMatch(u64 id,
@@ -52,7 +55,8 @@ public:
                            const SharedPtr<CommonQueryFilter> &common_query_filter,
                            MinimumShouldMatchOption &&minimum_should_match_option,
                            u64 match_table_index,
-                           SharedPtr<Vector<LoadMeta>> load_metas);
+                           SharedPtr<Vector<LoadMeta>> load_metas,
+                           bool cache_result);
 
     ~PhysicalMatch() override;
 
@@ -80,9 +84,18 @@ public:
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline MatchExpression *match_expr() const { return match_expr_.get(); }
+    [[nodiscard]] inline const SharedPtr<MatchExpression> &match_expr() const { return match_expr_; }
+
+    SharedPtr<BaseExpression> filter_expression() const { return common_query_filter_->original_filter_; }
 
     [[nodiscard]] inline const CommonQueryFilter *common_query_filter() const { return common_query_filter_.get(); }
+
+    const SharedPtr<BaseTableRef> &base_table_ref() const { return base_table_ref_; }
+
+    SizeT top_n() const { return top_n_; }
+
+private:
+    void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks);
 
 private:
     u64 table_index_ = 0;

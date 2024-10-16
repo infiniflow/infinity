@@ -68,6 +68,8 @@ import segment_entry;
 import knn_filter;
 import highlighter;
 import parse_fulltext_options;
+import result_cache_manager;
+import cached_match;
 
 namespace infinity {
 
@@ -426,6 +428,10 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     }
 
     operator_state->SetComplete();
+    ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
+    if (cache_result_ && cache_mgr != nullptr) {
+        AddCache(query_context, cache_mgr, output_data_blocks);
+    }
     auto finish_output_time = std::chrono::high_resolution_clock::now();
     TimeDurationType output_duration = finish_output_time - begin_output_time;
     LOG_DEBUG(fmt::format("PhysicalMatch Part 5: Output data time: {} ms", output_duration.count()));
@@ -444,11 +450,12 @@ PhysicalMatch::PhysicalMatch(u64 id,
                              const SharedPtr<CommonQueryFilter> &common_query_filter,
                              MinimumShouldMatchOption &&minimum_should_match_option,
                              u64 match_table_index,
-                             SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, std::move(load_metas)), table_index_(match_table_index),
+                             SharedPtr<Vector<LoadMeta>> load_metas,
+                             bool cache_result)
+    : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, std::move(load_metas), cache_result), table_index_(match_table_index),
       base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), index_reader_(index_reader), query_tree_(std::move(query_tree)),
       begin_threshold_(begin_threshold), early_term_algo_(early_term_algo), top_n_(top_n), common_query_filter_(common_query_filter),
-      minimum_should_match_option_(std::move(minimum_should_match_option)){}
+      minimum_should_match_option_(std::move(minimum_should_match_option)) {}
 
 PhysicalMatch::~PhysicalMatch() = default;
 
@@ -507,6 +514,23 @@ String PhysicalMatch::ToString(i64 &space) const {
     }
     String res = fmt::format("{} Table: {}, {}", arrow_str, *(base_table_ref_->table_entry_ptr_->GetTableName()), match_expr_->ToString());
     return res;
+}
+
+void PhysicalMatch::AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
+    Txn *txn = query_context->GetTxn();
+    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+    TxnTimeStamp query_ts = std::min(txn->BeginTS(), table_entry->max_commit_ts());
+    Vector<UniquePtr<DataBlock>> data_blocks(output_data_blocks.size());
+    for (SizeT i = 0; i < output_data_blocks.size(); ++i) {
+        data_blocks[i] = output_data_blocks[i]->Clone();
+    }
+    auto cached_node = MakeUnique<CachedMatch>(query_ts, this);
+    bool success = cache_mgr->AddCache(std::move(cached_node), std::move(data_blocks));
+    if (!success) {
+        LOG_WARN(fmt::format("Add cache failed for query: {}", txn->BeginTS()));
+    } else {
+        LOG_INFO(fmt::format("Add cache success for query: {}", txn->BeginTS()));
+    }
 }
 
 } // namespace infinity

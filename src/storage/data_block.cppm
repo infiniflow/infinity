@@ -38,6 +38,10 @@ public:
 public:
     DataBlock() = default;
 
+    bool AppendColumns(const DataBlock &other, const Vector<SizeT> &column_idxes);
+
+    UniquePtr<DataBlock> Clone() const;
+
     void Init(const DataBlock *input, const SharedPtr<Selection> &input_select);
 
     void Init(const SharedPtr<DataBlock> &input, const SharedPtr<Selection> &input_select);
