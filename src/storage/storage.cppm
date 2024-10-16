@@ -34,10 +34,13 @@ export module storage;
 namespace infinity {
 
 class CleanupInfoTracer;
+class ResultCacheManager;
 
 export class Storage {
 public:
     explicit Storage(Config *config_ptr);
+
+    ~Storage();
 
     [[nodiscard]] inline Catalog *catalog() noexcept { return new_catalog_.get(); }
 
@@ -61,6 +64,8 @@ public:
 
     [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
 
+    [[nodiscard]] inline ResultCacheManager *result_cache_manager() const noexcept { return result_cache_manager_.get(); }
+
     StorageMode GetStorageMode() const;
     void SetStorageMode(StorageMode mode);
 
@@ -83,6 +88,7 @@ private:
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
     UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
+    UniquePtr<ResultCacheManager> result_cache_manager_{};
 
     mutable std::mutex mutex_;
     StorageMode current_storage_mode_{StorageMode::kUnInitialized};

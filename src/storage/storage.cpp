@@ -51,10 +51,13 @@ import cleanup_scanner;
 import persistence_manager;
 import extra_ddl_info;
 import virtual_store;
+import result_cache_manager;
 
 namespace infinity {
 
 Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {}
+
+Storage::~Storage() = default;
 
 StorageMode Storage::GetStorageMode() const {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -144,6 +147,12 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
                 persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
             }
+
+            if (result_cache_manager_ != nullptr) {
+                UnrecoverableError("Result cache manager was initialized before.");
+            }
+            // TODO: add result_cache_manager
+            // result_cache_manager_ = MakeUnique<ResultCacheManager>();
 
             // Construct buffer manager
             if (buffer_mgr_ != nullptr) {
