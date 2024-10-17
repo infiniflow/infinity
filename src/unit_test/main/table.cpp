@@ -48,7 +48,7 @@ TEST_F(InfinityTableTest, test1) {
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
     {
         CreateDatabaseOptions create_db_opts;
-        infinity->CreateDatabase("db1", create_db_opts);
+        infinity->CreateDatabase("db1", create_db_opts, "");
 
         QueryResult result = infinity->GetDatabase("db1");
         EXPECT_TRUE(result.IsOk());

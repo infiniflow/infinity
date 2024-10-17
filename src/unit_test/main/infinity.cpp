@@ -45,8 +45,8 @@ TEST_F(InfinityTest, test1) {
 
     {
         QueryResult result = infinity->ListDatabases();
-        //    EXPECT_EQ(result.result_table_->row_count(), 1); // Bug
-        EXPECT_EQ(result.result_table_->ColumnCount(), 1u);
+        EXPECT_EQ(result.result_table_->row_count(), 1);
+        EXPECT_EQ(result.result_table_->ColumnCount(), 3u);
         EXPECT_EQ(result.result_table_->GetColumnNameById(0), "database");
         EXPECT_EQ(result.result_table_->DataBlockCount(), 1u);
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
@@ -58,7 +58,7 @@ TEST_F(InfinityTest, test1) {
 
     {
         CreateDatabaseOptions create_db_opts;
-        infinity->CreateDatabase("db1", create_db_opts);
+        infinity->CreateDatabase("db1", create_db_opts, "");
         QueryResult result = infinity->ListDatabases();
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 2);

@@ -137,9 +137,13 @@ void PhysicalShow::Init() {
             break;
         }
         case ShowStmtType::kDatabases: {
-            output_names_->reserve(1);
-            output_types_->reserve(1);
+            output_names_->reserve(3);
+            output_types_->reserve(3);
             output_names_->emplace_back("database");
+            output_names_->emplace_back("dir");
+            output_names_->emplace_back("comment");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             break;
         }
@@ -814,6 +818,22 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
         }
     }
 
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("comment");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(*(database_info->db_comment_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
     output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
@@ -1467,7 +1487,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type};
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type};
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
@@ -1482,6 +1502,24 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
             // Append schema name to the 0 column
             const String *db_name = database_detail.db_name_.get();
             Value value = Value::MakeVarchar(*db_name);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++ column_id;
+        {
+            // Append entry dir to the 1 column
+            const String *db_entry_dir = database_detail.db_entry_dir_.get();
+            Value value = Value::MakeVarchar(*db_entry_dir);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++ column_id;
+        {
+            // Append comment to the 2 column
+            const String *db_comment = database_detail.db_comment_.get();
+            Value value = Value::MakeVarchar(*db_comment);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }

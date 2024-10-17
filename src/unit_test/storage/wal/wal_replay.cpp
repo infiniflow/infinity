@@ -102,22 +102,22 @@ TEST_P(WalReplayTest, wal_replay_database) {
 
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
-            txn->CreateDatabase("db1", ConflictType::kIgnore);
+            txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kIgnore, MakeShared<String>());
             txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
-            txn->CreateDatabase("db2", ConflictType::kIgnore);
+            txn->CreateDatabase(MakeShared<String>("db2"), ConflictType::kIgnore, MakeShared<String>());
             txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
-            txn->CreateDatabase("db3", ConflictType::kIgnore);
+            txn->CreateDatabase(MakeShared<String>("db3"), ConflictType::kIgnore, MakeShared<String>());
             txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
-            txn->CreateDatabase("db4", ConflictType::kIgnore);
+            txn->CreateDatabase(MakeShared<String>("db4"), ConflictType::kIgnore, MakeShared<String>());
             txn_mgr->CommitTxn(txn);
         }
         {
@@ -129,7 +129,7 @@ TEST_P(WalReplayTest, wal_replay_database) {
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
-            txn->CreateDatabase("db5", ConflictType::kIgnore);
+            txn->CreateDatabase(MakeShared<String>("db5"), ConflictType::kIgnore, MakeShared<String>());
             txn_mgr->CommitTxn(txn);
         }
         {
@@ -164,7 +164,7 @@ TEST_P(WalReplayTest, wal_replay_database) {
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
-            Status status = txn->CreateDatabase("db1", ConflictType::kError);
+            Status status = txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
             EXPECT_EQ(status.ok(), true);
             txn_mgr->CommitTxn(txn);
         }

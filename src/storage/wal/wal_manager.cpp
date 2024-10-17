@@ -221,10 +221,9 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
         }
     }
 
-
     log_strings.reserve(log_entries.size());
 
-    for(const auto& log_entry: log_entries) {
+    for (const auto &log_entry : log_entries) {
 
         i32 exp_size = log_entry->GetSizeInBytes();
 
@@ -235,7 +234,10 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
         log_entry->WriteAdv(ptr);
         i32 act_size = ptr - buf_ptr->data();
         if (exp_size != act_size) {
-            String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}", exp_size, act_size, log_entry->ToString());
+            String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
+                                               exp_size,
+                                               act_size,
+                                               log_entry->ToString());
             UnrecoverableError(error_message);
         }
 
@@ -939,8 +941,9 @@ void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, Tra
     auto db_dir = MakeShared<String>(cmd.db_dir_tail_);
     catalog->CreateDatabaseReplay(
         MakeShared<String>(cmd.db_name_),
-        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return DBEntry::ReplayDBEntry(db_meta, false, db_dir, db_name, txn_id, begin_ts, commit_ts);
+        MakeShared<String>(cmd.db_comment_),
+        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, const SharedPtr<String> &comment, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return DBEntry::ReplayDBEntry(db_meta, false, db_dir, db_name, comment, txn_id, begin_ts, commit_ts);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -976,7 +979,7 @@ void WalManager::WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, Transac
     storage_->catalog()->DropDatabaseReplay(
         cmd.db_name_,
         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return DBEntry::ReplayDBEntry(db_meta, true, data_path_ptr, db_name, txn_id, begin_ts, commit_ts);
+            return DBEntry::ReplayDBEntry(db_meta, true, data_path_ptr, db_name, MakeShared<String>(), txn_id, begin_ts, commit_ts);
         },
         txn_id,
         0 /*begin_ts*/);

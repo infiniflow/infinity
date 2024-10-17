@@ -539,8 +539,8 @@ UpdateExpr *WrapUpdateExpr::GetUpdateExpr(Status &status) {
     return update_expr;
 }
 
-WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options) {
-    auto query_result = instance.CreateDatabase(db_name, options);
+WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options, const String& comment) {
+    auto query_result = instance.CreateDatabase(db_name, options, comment);
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
     return result;
 }
@@ -577,7 +577,7 @@ WrapQueryResult WrapShowDatabase(Infinity &instance, const String &db_name) {
     if (query_result.IsOk()) {
         SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 3) {
+        if (row_count != 4) {
             String error_message = "ShowDatabase: query result is invalid.";
             UnrecoverableError(error_message);
         }
@@ -592,6 +592,10 @@ WrapQueryResult WrapShowDatabase(Infinity &instance, const String &db_name) {
         {
             Value value = data_block->GetValue(1, 2);
             result.table_count = std::stol(value.GetVarchar());
+        }
+        {
+            Value value = data_block->GetValue(1, 3);
+            result.comment = value.GetVarchar();
         }
     }
     return result;

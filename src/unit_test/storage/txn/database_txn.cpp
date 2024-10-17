@@ -48,7 +48,7 @@ TEST_P(DBTxnTest, test1) {
     Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
 
     // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
 
     // Txn1: Get db1, OK
     auto [db_entry1, status1] = new_txn->GetDatabase("db1");
@@ -96,7 +96,7 @@ TEST_P(DBTxnTest, test20) {
     Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
 
     // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Commit, OK
@@ -115,7 +115,7 @@ TEST_P(DBTxnTest, test20) {
     EXPECT_TRUE(status.ok());
 
     // Txn2: Create db1, OK
-    status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn2: Get db1, OK
@@ -135,7 +135,7 @@ TEST_P(DBTxnTest, test20) {
     EXPECT_NE(db_entry3, nullptr);
 
     // Txn3: Create db1, NOT OK
-    status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(!status.ok());
 
     // Txn3: Commit, OK
@@ -151,11 +151,11 @@ TEST_P(DBTxnTest, test2) {
 
     // Txn1: Create db1, OK
 
-    Status status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Create db1, duplicated，NOT OK
-    status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(!status.ok());
 
     // Txn1: Drop db1, OK
@@ -178,7 +178,7 @@ TEST_P(DBTxnTest, test2) {
     EXPECT_FALSE(status2.ok());
 
     // Txn2: Create db1, OK
-    status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn2: Get db1, OK
@@ -197,7 +197,7 @@ TEST_P(DBTxnTest, test2) {
     EXPECT_NE(db_entry4, nullptr);
 
     // Txn3: Create db1, NOT OK
-    status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(!status.ok());
 
     // Txn3: Commit, OK
@@ -219,11 +219,11 @@ TEST_P(DBTxnTest, test3) {
     Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
 
     // Txn1: Create db1, OK
-    Status status = new_txn1->CreateDatabase("db1", ConflictType::kError);
+    Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn2: Create db1, NOT OK, WW-conflict
-    status = new_txn2->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(!status.ok());
 
     // Txn1: Commit, OK
@@ -247,14 +247,14 @@ TEST_P(DBTxnTest, test4) {
     Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
 
     // Txn1: Create db1, OK
-    Status status = new_txn1->CreateDatabase("db1", ConflictType::kError);
+    Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Commit, OK
     txn_mgr->CommitTxn(new_txn1);
 
     // Txn2: Create db1, NOT OK
-    status = new_txn2->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(!status.ok());
 
     // Txn2: Commit, OK
@@ -269,7 +269,7 @@ TEST_P(DBTxnTest, test5) {
     Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
 
     // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Rollback, OK
@@ -303,18 +303,18 @@ TEST_P(DBTxnTest, test6) {
 
     // Txn1: Create db1, OK
 
-    Status status = new_txn1->CreateDatabase("db1", ConflictType::kError);
+    Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn2: Create db1, NOT OK, WW-conflict
-    status = new_txn2->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(!status.ok());
 
     // Txn1: Commit, OK
     txn_mgr->RollBackTxn(new_txn1);
 
     // Txn2: Since txn1 is rollback, txn2 db1, OK, no conflict
-    status = new_txn2->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn2: Commit, OK
@@ -348,11 +348,11 @@ TEST_P(DBTxnTest, test7) {
 
     // Txn1: Create db1, OK
 
-    Status status = new_txn1->CreateDatabase("db1", ConflictType::kError);
+    Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn2: Create db1, NOT OK, WW-conflict
-    status = new_txn2->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(!status.ok());
 
     // Txn1: Drop db1, OK
@@ -360,7 +360,7 @@ TEST_P(DBTxnTest, test7) {
     EXPECT_TRUE(status.ok());
 
     // Txn2: Create db1, OK
-    status = new_txn2->CreateDatabase("db1", ConflictType::kError);
+    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Commit, OK
