@@ -45,7 +45,8 @@ CachedMatch::CachedMatch(TxnTimeStamp query_ts, PhysicalMatch *physical_match)
 
 u64 CachedMatch::Hash() const {
     u64 h = CachedMatchBase::Hash();
-    // TODO
+    h ^= match_expr_->Hash();
+    h ^= std::hash<u32>()(topn_);
     return h;
 }
 
@@ -54,11 +55,15 @@ bool CachedMatch::Eq(const CachedNodeBase &other_base) const {
         return false;
     }
     const auto &other = static_cast<const CachedMatch &>(other_base);
-    bool cached = CachedMatchBase::Equal(other);
-    if (!cached) {
+    if (!CachedMatchBase::Equal(other)) {
         return false;
     }
-    // TODO
+    if (!match_expr_->Eq(*other.match_expr_)) {
+        return false;
+    }
+    if (topn_ != other.topn_) {
+        return false;
+    }
     return true;
 }
 

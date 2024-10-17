@@ -5278,7 +5278,7 @@ yyreduce:
         yyerror(&yyloc, scanner, result, "Offset expression isn't valid without Limit expression");
         YYERROR;
     }
-    if((yyvsp[-3].select_stmt)->search_expr_ != nullptr and ((yyvsp[-2].order_by_expr_list_t) != nullptr or (yyvsp[-1].expr_t) != nullptr or (yyvsp[0].expr_t) != nullptr)) {
+    if((yyvsp[-3].select_stmt)->search_expr_ != nullptr and ((yyvsp[-2].order_by_expr_list_t) != nullptr /*or $3 != nullptr or $4 != nullptr*/)) {
         delete (yyvsp[-3].select_stmt);
         if ((yyvsp[-2].order_by_expr_list_t)) {
             for (auto ptr : *((yyvsp[-2].order_by_expr_list_t))) {
@@ -5288,7 +5288,7 @@ yyreduce:
         }
         delete (yyvsp[-1].expr_t);
         delete (yyvsp[0].expr_t);
-        yyerror(&yyloc, scanner, result, "Result modifier(ORDER BY, LIMIT, OFFSET) is conflict with SEARCH expression.");
+        yyerror(&yyloc, scanner, result, "Result modifier(ORDER BY) is conflict with SEARCH expression.");
         YYERROR;
     }
     (yyvsp[-3].select_stmt)->order_by_list = (yyvsp[-2].order_by_expr_list_t);

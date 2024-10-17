@@ -88,8 +88,8 @@ SizeT CacheResultMap::DropIF(std::function<bool(const CachedNodeBase &)> pred) {
     for (auto mp_iter = lru_map_.begin(); mp_iter != lru_map_.end();) {
         const auto &[cached_node, iter] = *mp_iter;
         if (pred(*cached_node)) {
-            mp_iter = lru_map_.erase(mp_iter);
             lru_list_.erase(iter);
+            mp_iter = lru_map_.erase(mp_iter);
             ++removed;
         } else {
             ++mp_iter;
