@@ -30,6 +30,7 @@ export struct DatabaseInfo {
 
 export struct TableInfo {
     SharedPtr<String> table_name_{};
+    SharedPtr<String> table_comment_{};
     SharedPtr<String> table_full_dir_{};
     i64 column_count_{};
     i64 segment_count_{};
@@ -49,6 +50,7 @@ export struct TableIndexInfo {
 export struct TableDetail {
     SharedPtr<String> db_name_{};
     SharedPtr<String> table_name_{};
+    SharedPtr<String> table_comment_{};
     TableEntryType table_entry_type_;
     i64 column_count_{};
     i64 row_count_{};

@@ -73,7 +73,8 @@ public:
 private:
     Tuple<TableEntry *, Status> CreateEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                             TableEntryType table_entry_type,
-                                            const SharedPtr<String> &table_collection_name,
+                                            const SharedPtr<String> &table_name,
+                                            const SharedPtr<String> &table_comment,
                                             const Vector<SharedPtr<ColumnDef>> &columns,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,

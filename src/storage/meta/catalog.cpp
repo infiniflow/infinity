@@ -241,8 +241,14 @@ Tuple<TableEntry *, Status> Catalog::CreateTable(const String &db_name,
         return {nullptr, status};
     }
 
-    return db_entry
-        ->CreateTable(TableEntryType::kTableEntry, table_def->table_name(), table_def->columns(), txn_id, begin_ts, txn_mgr, conflict_type);
+    return db_entry->CreateTable(TableEntryType::kTableEntry,
+                                 table_def->table_name(),
+                                 table_def->table_comment(),
+                                 table_def->columns(),
+                                 txn_id,
+                                 begin_ts,
+                                 txn_mgr,
+                                 conflict_type);
 }
 
 Tuple<SharedPtr<TableEntry>, Status> Catalog::DropTableByName(const String &db_name,
@@ -552,7 +558,7 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
 UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info) {
     const auto &catalog_path = delta_ckp_info.path_;
 
-    if(!VirtualStore::Exists(catalog_path)){
+    if (!VirtualStore::Exists(catalog_path)) {
         VirtualStore::DownloadObject(catalog_path, catalog_path);
     }
 
@@ -640,17 +646,23 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 SegmentID unsealed_id = add_table_entry_op->unsealed_id_;
                 SegmentID next_segment_id = add_table_entry_op->next_segment_id_;
                 ColumnID next_column_id = add_table_entry_op->next_column_id_;
+                const SharedPtr<String>& table_comment = add_table_entry_op->table_comment_;
 
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
                     // Actually the table entry replayed doesn't have full information cause index entry are lacked, but that is ok for now.
                     db_entry->DropTableReplay(
                         *table_name,
-                        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                        [&](TableMeta *table_meta,
+                            const SharedPtr<String> &table_name,
+                            const SharedPtr<String> &table_comment,
+                            TransactionID txn_id,
+                            TxnTimeStamp begin_ts) {
                             return TableEntry::ReplayTableEntry(true,
                                                                 table_meta,
                                                                 table_entry_dir,
                                                                 table_name,
+                                                                table_comment,
                                                                 column_defs,
                                                                 entry_type,
                                                                 txn_id,
@@ -664,11 +676,16 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                         txn_id,
                         begin_ts);
                 }
-                auto init_table_entry = [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                auto init_table_entry = [&](TableMeta *table_meta,
+                                            const SharedPtr<String> &table_name,
+                                            const SharedPtr<String> &table_comment,
+                                            TransactionID txn_id,
+                                            TxnTimeStamp begin_ts) {
                     return TableEntry::ReplayTableEntry(false,
                                                         table_meta,
                                                         table_entry_dir,
                                                         table_name,
+                                                        table_comment,
                                                         column_defs,
                                                         entry_type,
                                                         txn_id,
@@ -680,9 +697,9 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                                                         next_column_id);
                 };
                 if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
-                    db_entry->CreateTableReplay(table_name, init_table_entry, txn_id, begin_ts);
+                    db_entry->CreateTableReplay(table_name, table_comment, init_table_entry, txn_id, begin_ts);
                 } else if (merge_flag == MergeFlag::kUpdate) {
-                    db_entry->UpdateTableReplay(table_name, init_table_entry, txn_id, begin_ts);
+                    db_entry->UpdateTableReplay(table_name, table_comment, init_table_entry, txn_id, begin_ts);
                 }
                 break;
             }
@@ -949,7 +966,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
 UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
     const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / full_ckp_info.path_;
 
-    if(!VirtualStore::Exists(catalog_path)){
+    if (!VirtualStore::Exists(catalog_path)) {
         VirtualStore::DownloadObject(catalog_path, catalog_path);
     }
 
@@ -1020,8 +1037,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     // Rename temp file to regular catalog file
     VirtualStore::Rename(catalog_tmp_path, full_path);
-    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader or
-       InfinityContext::instance().GetServerRole() == NodeRole::kStandalone){
+    if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader or InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
         VirtualStore::UploadObject(full_path, full_path);
     }
 
@@ -1109,8 +1125,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 
     out_file_handle->Append((reinterpret_cast<const char *>(buf.data())), act_size);
     out_file_handle->Sync();
-    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader or
-       InfinityContext::instance().GetServerRole() == NodeRole::kStandalone){
+    if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader or InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
         VirtualStore::UploadObject(full_path, full_path);
     }
     // {

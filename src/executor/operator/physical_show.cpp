@@ -145,8 +145,8 @@ void PhysicalShow::Init() {
         }
         case ShowStmtType::kTables: {
 
-            output_names_->reserve(8);
-            output_types_->reserve(8);
+            output_names_->reserve(9);
+            output_types_->reserve(9);
 
             output_names_->emplace_back("database");
             output_names_->emplace_back("table");
@@ -156,6 +156,7 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("block_capacity");
             output_names_->emplace_back("segment_count");
             output_names_->emplace_back("segment_capacity");
+            output_names_->emplace_back("comment");
 
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -165,6 +166,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
             break;
         }
         case ShowStmtType::kColumns: {
@@ -874,6 +876,22 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
+            Value value = Value::MakeVarchar("table_comment");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(*table_info->table_comment_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
             Value value = Value::MakeVarchar("storage_directory");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1525,7 +1543,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>>
-        column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
+        column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type, varchar_type};
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
@@ -1643,6 +1661,14 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             // Append segment capacity the 7 column
             SizeT default_row_size = table_detail.segment_capacity_;
             Value value = Value::MakeBigInt(default_row_size);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            // Append segment capacity the 8 column
+            Value value = Value::MakeVarchar(*table_detail.table_comment_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -3350,7 +3376,8 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3369,7 +3396,8 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3388,7 +3416,8 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3407,7 +3436,8 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
                 MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3426,7 +3456,8 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3603,7 +3634,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3621,7 +3653,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3642,7 +3675,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3664,7 +3698,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3683,7 +3718,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3703,7 +3739,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3723,7 +3760,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3743,7 +3781,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3765,7 +3804,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3785,7 +3825,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3805,7 +3846,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3825,7 +3867,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3845,7 +3888,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3865,7 +3909,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3885,7 +3930,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3906,7 +3952,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3926,7 +3973,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3946,7 +3994,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3966,7 +4015,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -3986,7 +4036,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 MakeShared<ColumnDef>(0, double_type, "value", std::set<ConstraintType>()),
             };
 
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
             output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
             Vector<SharedPtr<DataType>> output_column_types{
@@ -4024,7 +4075,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                     MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
                 };
 
-                SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+                SharedPtr<TableDef> table_def =
+                    TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
                 output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
                 Vector<SharedPtr<DataType>> output_column_types{
