@@ -192,6 +192,27 @@ struct UnaryOpDirectVarlenToVarlenWrapper {
     }
 };
 
+template <typename Operator>
+struct TernaryTryOpVarlenToVarlenWrapper {
+    template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType>
+    inline static void
+    Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *nulls_ptr, SizeT idx, void *first_ptr, void *state_ptr) {
+        auto *function_data_ptr_first = (ScalarFunctionData *)(first_ptr);
+        auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
+        if (Operator::template Run<FirstType, SecondType, ThirdType, ResultType>(first,
+                                                                                 second,
+                                                                                 third,
+                                                                                 result,
+                                                                                 function_data_ptr_first->column_vector_ptr_,
+                                                                                 function_data_ptr->column_vector_ptr_)) {
+            return;
+        }
+
+        nulls_ptr->SetFalse(idx);
+        result = NullValue<ResultType>();
+    }
+};
+
 
 using ScalarFunctionType = std::function<void(const DataBlock &, SharedPtr<ColumnVector> &)>;
 
@@ -409,6 +430,7 @@ public:
                                                                                                                   output,
                                                                                                                   input.row_count(),
                                                                                                                   nullptr,
+                                                                                                                  nullptr,
                                                                                                                   true);
     }
 
@@ -428,6 +450,7 @@ public:
                                                                                                                input.column_vectors[2],
                                                                                                                output,
                                                                                                                input.row_count(),
+                                                                                                               nullptr,
                                                                                                                nullptr,
                                                                                                                true);
     }
@@ -449,6 +472,7 @@ public:
                                                                                                                           input.column_vectors[2],
                                                                                                                           output,
                                                                                                                           input.row_count(),
+                                                                                                                          nullptr,
                                                                                                                           &function_data,
                                                                                                                           true);
     }
@@ -470,6 +494,30 @@ public:
                                                                                                                        input.column_vectors[2],
                                                                                                                        output,
                                                                                                                        input.row_count(),
+                                                                                                                       nullptr,
+                                                                                                                       &function_data,
+                                                                                                                       true);
+    }
+
+    // Ternary function result is varlen with some failures such as overflow.
+    template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operation>
+    static inline void TernaryFunctionVarlenToVarlenWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
+        if (input.column_count() != 3) {
+            String error_message = "Ternary function: input column count isn't three.";
+            UnrecoverableError(error_message);
+        }
+        if (!input.Finalized()) {
+            String error_message = "Input data block is finalized";
+            UnrecoverableError(error_message);
+        }
+        ScalarFunctionData function_data_first(input.column_vectors[0].get());
+        ScalarFunctionData function_data(output.get());
+        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpVarlenToVarlenWrapper<Operation>>(input.column_vectors[0],
+                                                                                                                       input.column_vectors[1],
+                                                                                                                       input.column_vectors[2],
+                                                                                                                       output,
+                                                                                                                       input.row_count(),
+                                                                                                                       &function_data_first,
                                                                                                                        &function_data,
                                                                                                                        true);
     }
