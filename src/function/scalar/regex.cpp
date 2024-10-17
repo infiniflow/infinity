@@ -38,7 +38,7 @@ struct RegexFunction {
 
 
 void RegisterRegexFunction(const UniquePtr<Catalog> &catalog_ptr){
-    String func_name = "Regex";
+    String func_name = "regex";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
