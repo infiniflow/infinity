@@ -32,6 +32,7 @@ public:
                                const SharedPtr<ColumnVector> &third,
                                SharedPtr<ColumnVector> &result,
                                SizeT count,
+                               void *state_ptr_first,
                                void *state_ptr,
                                bool nullable) {
 
@@ -70,6 +71,7 @@ public:
                                                                                            result_ptr,
                                                                                            result_null,
                                                                                            count,
+                                                                                           state_ptr_first,
                                                                                            state_ptr);
             } else {
                 ExecuteFFF<FirstType, SecondType, ThirdType, ResultType, Operator>(first_ptr,
@@ -78,6 +80,7 @@ public:
                                                                                    result_ptr,
                                                                                    result_null,
                                                                                    count,
+                                                                                   state_ptr_first,
                                                                                    state_ptr);
             }
             result->Finalize(count);
@@ -110,6 +113,7 @@ public:
                                                                                            result_ptr,
                                                                                            result_null,
                                                                                            count,
+                                                                                           state_ptr_first,
                                                                                            state_ptr);
             } else {
                 ExecuteFCC<FirstType, SecondType, ThirdType, ResultType, Operator>(first_ptr,
@@ -118,6 +122,7 @@ public:
                                                                                    result_ptr,
                                                                                    result_null,
                                                                                    count,
+                                                                                   state_ptr_first,
                                                                                    state_ptr);
             }
             result->Finalize(count);
@@ -159,6 +164,7 @@ public:
                                                                                              result_ptr[0],
                                                                                              result_null.get(),
                                                                                              0,
+                                                                                             state_ptr_first,
                                                                                              state_ptr);
                 } else {
                     result->nulls_ptr_->SetFalse(0);
@@ -171,6 +177,7 @@ public:
                                                                                          result_ptr[0],
                                                                                          result_null.get(),
                                                                                          0,
+                                                                                         state_ptr_first,
                                                                                          state_ptr);
             }
             result->Finalize(1);
@@ -187,6 +194,7 @@ private:
                                   ResultType *__restrict result_ptr,
                                   SharedPtr<Bitmask> &result_null,
                                   SizeT count,
+                                  void *state_ptr_first,
                                   void *state_ptr) {
         for (SizeT i = 0; i < count; i++) {
             Operator::template Execute<FirstType, SecondType, ThirdType, ResultType>(first_ptr[i],
@@ -195,6 +203,7 @@ private:
                                                                                      result_ptr[i],
                                                                                      result_null.get(),
                                                                                      i,
+                                                                                     state_ptr_first,
                                                                                      state_ptr);
         }
     }
@@ -209,6 +218,7 @@ private:
                                           ResultType *__restrict result_ptr,
                                           SharedPtr<Bitmask> &result_null,
                                           SizeT count,
+                                          void *state_ptr_first,
                                           void *state_ptr) {
         *result_null = *first_null;
         result_null->MergeAnd(*second_null);
@@ -223,6 +233,7 @@ private:
                                                                                      result_ptr[i],
                                                                                      result_null.get(),
                                                                                      i,
+                                                                                     state_ptr_first,
                                                                                      state_ptr);
             return i + 1 < count;
         });
@@ -236,6 +247,7 @@ private:
                                   ResultType *__restrict result_ptr,
                                   SharedPtr<Bitmask> &result_null,
                                   SizeT count,
+                                  void *state_ptr_first,
                                   void *state_ptr) {
         for (SizeT i = 0; i < count; i++) {
             Operator::template Execute<FirstType, SecondType, ThirdType, ResultType>(first_ptr[i],
@@ -244,6 +256,7 @@ private:
                                                                                      result_ptr[i],
                                                                                      result_null.get(),
                                                                                      i,
+                                                                                     state_ptr_first,
                                                                                      state_ptr);
         }
     }
@@ -258,6 +271,7 @@ private:
                                           ResultType *__restrict result_ptr,
                                           SharedPtr<Bitmask> &result_null,
                                           SizeT count,
+                                          void *state_ptr_first,
                                           void *state_ptr) {
         *result_null = *first_null;
         if (!(second_null->IsAllTrue() && third_null->IsAllTrue())) {
@@ -273,6 +287,7 @@ private:
                                                                                      result_ptr[i],
                                                                                      result_null.get(),
                                                                                      i,
+                                                                                     state_ptr_first,
                                                                                      state_ptr);
             return i + 1 < count;
         });

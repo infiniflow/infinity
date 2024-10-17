@@ -42,11 +42,11 @@ void RegisterRegexFunction(const UniquePtr<Catalog> &catalog_ptr){
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    ScalarFunction Regex_function(func_name,
+    ScalarFunction regex_function(func_name,
                                      {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
                                      DataType(LogicalType::kBoolean),
                                      &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, RegexFunction>);
-    function_set_ptr->AddFunction(Regex_function);
+    function_set_ptr->AddFunction(regex_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
