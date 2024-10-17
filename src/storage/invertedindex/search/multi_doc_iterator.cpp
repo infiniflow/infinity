@@ -28,7 +28,10 @@ void MultiDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is
     os << prefix;
     os << (is_final ? "└──" : "├──");
     os << Name();
-    os << " (doc_freq: " << GetDF() << ")";
+    {
+        auto [level, cost] = GetEstimateIterateCost();
+        os << " (estimate_iterate_cost: " << level << ", " << cost << ")";
+    }
     os << " (bm25_score_upper_bound: " << BM25ScoreUpperBound() << ")";
     os << " (threshold: " << Threshold() << ")";
     os << " (children count: " << children_.size() << ")";
