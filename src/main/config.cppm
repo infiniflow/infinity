@@ -112,6 +112,9 @@ public:
 
     i64 MemIndexMemoryQuota();
 
+    String ResultCacheMode();
+    i64 CacheResultNum();
+
     // WAL
     String WALDir();
 
