@@ -20,7 +20,7 @@ from typing import List
 
 class LocalQueryResult:
     def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, index_names=None,
-                 column_defs=None, column_fields=None, database_name=None, store_dir=None, table_count=None):
+                 column_defs=None, column_fields=None, database_name=None, store_dir=None, table_count=None, comment=None):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_names = db_names
@@ -32,6 +32,7 @@ class LocalQueryResult:
         self.database_name = database_name
         self.store_dir = store_dir
         self.table_count = table_count
+        self.comment = comment
 
 
 class LocalInfinityClient:
@@ -64,7 +65,7 @@ class LocalInfinityClient:
                                     column_fields=res.column_fields)
         if has_db_name:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, database_name=res.database_name,
-                                    store_dir=res.store_dir, table_count=res.table_count)
+                                    store_dir=res.store_dir, table_count=res.table_count, comment=res.comment)
         if has_index_names:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, index_names=res.names)
         return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
