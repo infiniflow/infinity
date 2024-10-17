@@ -242,7 +242,7 @@ Status DBEntry::GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_arra
         TableDetail table_detail;
         table_detail.db_name_ = this->db_name_;
         table_detail.table_name_ = table_entry->GetTableName();
-        table_detail.table_name_ = table_entry->GetTableComment();
+        table_detail.table_comment_ = table_entry->GetTableComment();
         table_detail.table_entry_type_ = table_entry->EntryType();
         table_detail.column_count_ = table_entry->ColumnCount();
         table_detail.row_count_ = table_entry->row_count();
