@@ -359,7 +359,8 @@ MergeFlag CatalogDeltaOperation::NextDeleteFlag(MergeFlag new_merge_flag) const 
 };
 
 AddDBEntryOp::AddDBEntryOp(DBEntry *db_entry, TxnTimeStamp commit_ts)
-    : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, db_entry, commit_ts), db_entry_dir_(db_entry->db_entry_dir()) {}
+    : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, db_entry, commit_ts), db_entry_dir_(db_entry->db_entry_dir()),
+      comment_(db_entry->db_comment_ptr()) {}
 
 AddTableEntryOp::AddTableEntryOp(TableEntry *table_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, table_entry, commit_ts), table_entry_dir_(table_entry->TableEntryDir()),
@@ -433,6 +434,7 @@ UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(const char *&ptr) {
     add_db_op->ReadAdvBase(ptr);
 
     add_db_op->db_entry_dir_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+    add_db_op->comment_ = MakeShared<String>(ReadBufAdv<String>(ptr));
     return add_db_op;
 }
 
@@ -546,7 +548,7 @@ UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(const char *&ptr) 
 
 SizeT AddDBEntryOp::GetSizeInBytes() const {
     auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-    total_size += sizeof(i32) + db_entry_dir_->size();
+    total_size += sizeof(i32) + db_entry_dir_->size() + sizeof(i32) + comment_->size();
     return total_size;
 }
 
@@ -630,6 +632,7 @@ void AddDBEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->type_);
     WriteAdvBase(buf);
     WriteBufAdv(buf, *this->db_entry_dir_);
+    WriteBufAdv(buf, *this->comment_);
 }
 
 void AddTableEntryOp::WriteAdv(char *&buf) const {
@@ -719,9 +722,10 @@ void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
 }
 
 const String AddDBEntryOp::ToString() const {
-    return fmt::format("AddDBEntryOp {} db_entry_dir: {}",
+    return fmt::format("AddDBEntryOp {} db_entry_dir: {} comment: {}",
                        CatalogDeltaOperation::ToString(),
-                       db_entry_dir_.get() != nullptr ? *db_entry_dir_ : "nullptr");
+                       db_entry_dir_.get() != nullptr ? *db_entry_dir_ : "nullptr",
+                       comment_->empty() ? "" : *comment_);
 }
 
 const String AddTableEntryOp::ToString() const {
@@ -804,7 +808,8 @@ const String AddChunkIndexEntryOp::ToString() const {
 
 bool AddDBEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddDBEntryOp *>(&rhs);
-    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_entry_dir_, *rhs_op->db_entry_dir_);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_entry_dir_, *rhs_op->db_entry_dir_) &&
+           IsEqual(*comment_, *rhs_op->comment_);
 }
 
 bool AddTableEntryOp::operator==(const CatalogDeltaOperation &rhs) const {

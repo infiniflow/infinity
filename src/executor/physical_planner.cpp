@@ -427,6 +427,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateDatabase(const SharedPtr
     SharedPtr<LogicalCreateSchema> logical_create_schema = static_pointer_cast<LogicalCreateSchema>(logical_operator);
     return MakeUnique<PhysicalCreateSchema>(logical_create_schema->schema_name(),
                                             logical_create_schema->conflict_type(),
+                                            logical_create_schema->comment(),
                                             logical_create_schema->GetOutputNames(),
                                             logical_create_schema->GetOutputTypes(),
                                             logical_create_schema->node_id(),

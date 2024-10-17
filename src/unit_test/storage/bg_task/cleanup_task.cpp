@@ -77,7 +77,7 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
     auto db_name = MakeShared<String>("db1");
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
-        txn->CreateDatabase(*db_name, ConflictType::kError);
+        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->CommitTxn(txn);
     }
     WaitFlushDeltaOp(storage);
@@ -106,7 +106,7 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     auto db_name = MakeShared<String>("db1");
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
-        txn->CreateDatabase(*db_name, ConflictType::kError);
+        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -117,12 +117,12 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
-        txn->CreateDatabase(*db_name, ConflictType::kError);
+        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->RollBackTxn(txn);
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
-        txn->CreateDatabase(*db_name, ConflictType::kError);
+        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->CommitTxn(txn);
     }
     {

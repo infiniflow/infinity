@@ -363,6 +363,8 @@ struct ListDatabaseResponse {
 1: i64 error_code,
 2: string error_msg,
 3: list<string> db_names = [],
+4: list<string> db_dirs = [],
+5: list<string> db_comments = [],
 }
 
 struct ListTableRequest {
@@ -399,6 +401,7 @@ struct ShowDatabaseResponse {
 3: string database_name,
 4: string store_dir,
 5: i64 table_count,
+6: string comment
 }
 
 struct ShowTableRequest {
@@ -498,9 +501,10 @@ struct GetDatabaseRequest {
 }
 
 struct CreateDatabaseRequest {
-1:  string db_name,
-2:  i64 session_id,
-3:  CreateOption create_option,
+1: string db_name,
+2: i64 session_id,
+3: CreateOption create_option,
+4: string db_comment,
 }
 
 struct DropDatabaseRequest {

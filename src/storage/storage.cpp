@@ -116,13 +116,12 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     if (VirtualStore::IsInit()) {
                         UnrecoverableError("remote storage system was initialized before.");
                     }
-                    Status status = VirtualStore::InitRemoteStore(
-                    StorageType::kMinio, 
-                    config_ptr_->ObjectStorageUrl(), 
-                    config_ptr_->ObjectStorageHttps(),
-                    config_ptr_->ObjectStorageAccessKey(), 
-                    config_ptr_->ObjectStorageSecretKey(),
-                    config_ptr_->ObjectStorageBucket());
+                    Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
+                                                                  config_ptr_->ObjectStorageUrl(),
+                                                                  config_ptr_->ObjectStorageHttps(),
+                                                                  config_ptr_->ObjectStorageAccessKey(),
+                                                                  config_ptr_->ObjectStorageSecretKey(),
+                                                                  config_ptr_->ObjectStorageBucket());
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -432,7 +431,7 @@ void Storage::CreateDefaultDB() {
     Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"));
     new_txn->SetReaderAllowed(true);
     // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase("default_db", ConflictType::kError);
+    Status status = new_txn->CreateDatabase(MakeShared<String>("default_db"), ConflictType::kError, MakeShared<String>("Initial startup created"));
     if (!status.ok()) {
         UnrecoverableError("Can't initial 'default_db'");
     }

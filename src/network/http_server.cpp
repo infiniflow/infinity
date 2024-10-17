@@ -282,8 +282,13 @@ public:
             }
         }
 
+        String db_comment;
+        if (body_info_json.contains("comment")) {
+            db_comment = body_info_json["comment"];
+        }
+
         // create database
-        auto result = infinity->CreateDatabase(database_name, options);
+        auto result = infinity->CreateDatabase(database_name, options, db_comment);
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;

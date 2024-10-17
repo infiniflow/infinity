@@ -61,7 +61,7 @@ public:
 
     void LocalDisconnect();
 
-    QueryResult CreateDatabase(const String &db_name, const CreateDatabaseOptions &options);
+    QueryResult CreateDatabase(const String &db_name, const CreateDatabaseOptions &options, const String& db_comment);
 
     QueryResult DropDatabase(const String &db_name, const DropDatabaseOptions &options);
 

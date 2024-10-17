@@ -168,7 +168,7 @@ void InfinityThriftService::CreateDatabase(infinity_thrift_rpc::CommonResponse &
 
     auto [infinity, status] = GetInfinityBySessionID(request.session_id);
     if (status.ok()) {
-        auto result = infinity->CreateDatabase(request.db_name, create_database_opts);
+        auto result = infinity->CreateDatabase(request.db_name, create_database_opts, request.db_comment);
         ProcessQueryResult(response, result);
     } else {
         ProcessStatus(response, status);
@@ -1148,7 +1148,7 @@ void InfinityThriftService::ShowDatabase(infinity_thrift_rpc::ShowDatabaseRespon
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 3) {
+        if (row_count != 4) {
             String error_message = "ShowDatabase: query result is invalid.";
             UnrecoverableError(error_message);
         }
@@ -1166,6 +1166,11 @@ void InfinityThriftService::ShowDatabase(infinity_thrift_rpc::ShowDatabaseRespon
         {
             Value value = data_block->GetValue(1, 2);
             response.table_count = std::stol(value.GetVarchar());
+        }
+
+        {
+            Value value = data_block->GetValue(1, 3);
+            response.comment = value.GetVarchar();
         }
 
         response.__set_error_code((i64)(result.ErrorCode()));

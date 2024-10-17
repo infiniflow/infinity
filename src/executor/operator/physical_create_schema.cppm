@@ -36,12 +36,14 @@ export class PhysicalCreateSchema final : public PhysicalOperator {
 public:
     explicit PhysicalCreateSchema(SharedPtr<String> schema_name,
                                   ConflictType conflict_type,
+                                  SharedPtr<String> comment,
                                   SharedPtr<Vector<String>> output_names,
                                   SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                   u64 id,
                                   SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kCreateDatabase, nullptr, nullptr, id, load_metas), schema_name_(std::move(schema_name)),
-          conflict_type_(conflict_type), output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
+          conflict_type_(conflict_type), comment_(std::move(comment)), output_names_(std::move(output_names)),
+          output_types_(std::move(output_types)) {}
 
     ~PhysicalCreateSchema() override = default;
 
@@ -66,6 +68,7 @@ public:
 private:
     SharedPtr<String> schema_name_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
+    SharedPtr<String> comment_{};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

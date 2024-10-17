@@ -106,7 +106,7 @@ TEST_P(TableEntryTest, test2) {
     Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
 
     // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Create tbl1, OK

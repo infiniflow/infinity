@@ -177,7 +177,8 @@ export struct WalCmd {
 };
 
 export struct WalCmdCreateDatabase final : public WalCmd {
-    explicit WalCmdCreateDatabase(String db_name, String db_dir_tail) : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)) {
+    explicit WalCmdCreateDatabase(String db_name, String db_dir_tail, String db_comment)
+        : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)), db_comment_(std::move(db_comment)) {
         assert(!std::filesystem::path(db_dir_tail_).is_absolute());
     }
 
@@ -193,6 +194,7 @@ export struct WalCmdCreateDatabase final : public WalCmd {
 
     String db_name_{};
     String db_dir_tail_{};
+    String db_comment_{};
 };
 
 export struct WalCmdDropDatabase final : public WalCmd {

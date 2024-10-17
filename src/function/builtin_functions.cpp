@@ -118,7 +118,10 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterSubstringFunction(catalog_ptr_);
     RegisterCharLengthFunction(catalog_ptr_);
     RegisterMd5Function(catalog_ptr_);
+<<<<<<< HEAD
     RegisterRegexFunction(catalog_ptr_);
+=======
+>>>>>>> upstream/main
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}
