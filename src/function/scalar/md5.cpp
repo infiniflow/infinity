@@ -50,7 +50,7 @@ void RegisterMd5Function(const UniquePtr<Catalog> &catalog_ptr){
     ScalarFunction md5_function(func_name,
                                      {DataType(LogicalType::kVarchar)},
                                      {DataType(LogicalType::kVarchar)},
-                                     &ScalarFunction::UnaryOpDirectVarlenToVarlenWrapper<VarcharT, VarcharT, Md5Function>);
+                                     &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, Md5Function>);
     function_set_ptr->AddFunction(md5_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
