@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
         std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
         CreateDatabaseOptions create_db_options;
         create_db_options.conflict_type_ = ConflictType::kIgnore;
-        auto r1 = infinity->CreateDatabase(db_name, std::move(create_db_options));
+        auto r1 = infinity->CreateDatabase(db_name, std::move(create_db_options), "");
 
 //        auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
         CreateTableOptions create_tb_options;

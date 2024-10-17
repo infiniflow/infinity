@@ -135,12 +135,16 @@ Catalog::~Catalog() {
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
 // use Txn::CreateDatabase instead
-Tuple<DBEntry *, Status>
-Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-    auto init_db_meta = [&]() { return DBMeta::NewDBMeta(MakeShared<String>(db_name)); };
-    LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
-    auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta));
-    return db_meta->CreateNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
+Tuple<DBEntry *, Status> Catalog::CreateDatabase(const SharedPtr<String> &db_name,
+                                                 const SharedPtr<String> &comment,
+                                                 TransactionID txn_id,
+                                                 TxnTimeStamp begin_ts,
+                                                 TxnManager *txn_mgr,
+                                                 ConflictType conflict_type) {
+    auto init_db_meta = [&]() { return DBMeta::NewDBMeta(db_name); };
+    LOG_TRACE(fmt::format("Adding new database entry: {}", *db_name));
+    auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(*db_name, std::move(init_db_meta));
+    return db_meta->CreateNewEntry(std::move(r_lock), comment, txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 // do not only use this method to drop database
@@ -173,14 +177,17 @@ Tuple<SharedPtr<DatabaseInfo>, Status> Catalog::GetDatabaseInfo(const String &db
     return db_meta->GetDatabaseInfo(std::move(r_lock), txn_id, begin_ts);
 }
 
-void Catalog::CreateDatabaseReplay(const SharedPtr<String> &db_name,
-                                   std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                                   TransactionID txn_id,
-                                   TxnTimeStamp begin_ts) {
+void Catalog::CreateDatabaseReplay(
+    const SharedPtr<String> &db_name,
+    const SharedPtr<String> &comment,
+    std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+    TransactionID txn_id,
+    TxnTimeStamp begin_ts) {
+
     auto init_db_meta = [&]() { return DBMeta::NewDBMeta(db_name); };
     LOG_TRACE(fmt::format("Adding new database entry: {}", *db_name));
     auto *db_meta = db_meta_map_.GetMetaNoLock(*db_name, std::move(init_db_meta));
-    db_meta->CreateEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(db_meta, db_meta->db_name(), txn_id, begin_ts); },
+    db_meta->CreateEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(db_meta, db_name, comment, txn_id, begin_ts); },
                                txn_id,
                                begin_ts);
 }
@@ -615,7 +622,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                     this->DropDatabaseReplay(
                         *db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, true, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
+                            return DBEntry::ReplayDBEntry(db_meta, true, db_entry_dir, db_name, MakeShared<String>(), txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);
@@ -623,8 +630,13 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
                     this->CreateDatabaseReplay(
                         db_name,
-                        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, false, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
+                        add_db_entry_op->comment_,
+                        [&](DBMeta *db_meta,
+                            const SharedPtr<String> &db_name,
+                            const SharedPtr<String> &comment,
+                            TransactionID txn_id,
+                            TxnTimeStamp begin_ts) {
+                            return DBEntry::ReplayDBEntry(db_meta, false, db_entry_dir, db_name, comment, txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);
@@ -1026,7 +1038,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
     // FIXME: Temp implementation, will be replaced by async task.
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_tmp_path, FileAccessMode::kWrite);
     if (!status.ok()) {
-        UnrecoverableError(status.message());
+        UnrecoverableError(fmt::format("{}: {}", catalog_tmp_path, status.message()));
     }
 
     status = catalog_file_handle->Append(catalog_str.data(), catalog_str.size());

@@ -10,9 +10,10 @@ from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflic
 
 
 class LocalDatabase(Database, ABC):
-    def __init__(self, conn, name: str):
+    def __init__(self, conn, name: str, comment: str = None):
         self._conn = conn
         self._db_name = name
+        self._db_comment = comment
 
     def create_table(self, table_name: str, columns_definition,
                      conflict_type: ConflictType = ConflictType.Error):

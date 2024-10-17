@@ -92,7 +92,8 @@ public:
 
 public:
     // Database related functions
-    Tuple<DBEntry *, Status> CreateDatabase(const String &db_name,
+    Tuple<DBEntry *, Status> CreateDatabase(const SharedPtr<String> &db_name,
+                                            const SharedPtr<String> &comment,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
                                             TxnManager *txn_mgr,
@@ -112,7 +113,8 @@ public:
 
     // replay
     void CreateDatabaseReplay(const SharedPtr<String> &db_name,
-                              std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                              const SharedPtr<String> &comment,
+                              std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
                               TransactionID txn_id,
                               TxnTimeStamp begin_ts);
 

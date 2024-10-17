@@ -25,6 +25,7 @@ export struct DatabaseInfo {
     SharedPtr<String> db_name_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> absolute_db_path_{};
+    SharedPtr<String> db_comment_{};
     i64 table_count_{};
 };
 

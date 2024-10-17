@@ -128,6 +128,7 @@ export struct WrapQueryResult {
     String database_name;
     String store_dir;
     BigIntT table_count;
+    String comment;
 
     WrapQueryResult() = default;
     WrapQueryResult(ErrorCode error_code, const char *error_msg) : error_code(error_code) {
@@ -289,7 +290,7 @@ export struct WrapUpdateExpr {
     UpdateExpr *GetUpdateExpr(Status &status);
 };
 
-export WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options);
+export WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options, const String &comment);
 
 export WrapQueryResult WrapDropDatabase(Infinity &instance, const String &db_name, const DropDatabaseOptions &options);
 

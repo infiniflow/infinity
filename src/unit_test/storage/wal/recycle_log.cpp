@@ -81,7 +81,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
                 }
                 { // put create after drop to prevent the merge delta result is empty
                     auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
-                    auto status = txn->CreateDatabase("db1", ConflictType::kIgnore);
+                    auto status = txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kIgnore, MakeShared<String>());
                     ASSERT_TRUE(status.ok());
                     txn_mgr->CommitTxn(txn);
                 }
@@ -176,7 +176,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
                 }
                 { // put create after drop to prevent the merge delta result is empty
                     auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
-                    auto status = txn->CreateDatabase("db1", ConflictType::kIgnore);
+                    auto status = txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kIgnore, MakeShared<String>());
                     ASSERT_TRUE(status.ok());
                     txn_mgr->CommitTxn(txn);
                 }

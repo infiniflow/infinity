@@ -2711,10 +2711,12 @@ void swap(ListDatabaseRequest &a, ListDatabaseRequest &b);
 std::ostream& operator<<(std::ostream& out, const ListDatabaseRequest& obj);
 
 typedef struct _ListDatabaseResponse__isset {
-  _ListDatabaseResponse__isset() : error_code(false), error_msg(false), db_names(true) {}
+  _ListDatabaseResponse__isset() : error_code(false), error_msg(false), db_names(true), db_dirs(true), db_comments(true) {}
   bool error_code :1;
   bool error_msg :1;
   bool db_names :1;
+  bool db_dirs :1;
+  bool db_comments :1;
 } _ListDatabaseResponse__isset;
 
 class ListDatabaseResponse : public virtual ::apache::thrift::TBase {
@@ -2726,12 +2728,16 @@ class ListDatabaseResponse : public virtual ::apache::thrift::TBase {
                        : error_code(0),
                          error_msg() {
 
+
+
   }
 
   virtual ~ListDatabaseResponse() noexcept;
   int64_t error_code;
   std::string error_msg;
   std::vector<std::string>  db_names;
+  std::vector<std::string>  db_dirs;
+  std::vector<std::string>  db_comments;
 
   _ListDatabaseResponse__isset __isset;
 
@@ -2741,6 +2747,10 @@ class ListDatabaseResponse : public virtual ::apache::thrift::TBase {
 
   void __set_db_names(const std::vector<std::string> & val);
 
+  void __set_db_dirs(const std::vector<std::string> & val);
+
+  void __set_db_comments(const std::vector<std::string> & val);
+
   bool operator == (const ListDatabaseResponse & rhs) const
   {
     if (!(error_code == rhs.error_code))
@@ -2748,6 +2758,10 @@ class ListDatabaseResponse : public virtual ::apache::thrift::TBase {
     if (!(error_msg == rhs.error_msg))
       return false;
     if (!(db_names == rhs.db_names))
+      return false;
+    if (!(db_dirs == rhs.db_dirs))
+      return false;
+    if (!(db_comments == rhs.db_comments))
       return false;
     return true;
   }
@@ -3039,12 +3053,13 @@ void swap(ShowDatabaseRequest &a, ShowDatabaseRequest &b);
 std::ostream& operator<<(std::ostream& out, const ShowDatabaseRequest& obj);
 
 typedef struct _ShowDatabaseResponse__isset {
-  _ShowDatabaseResponse__isset() : error_code(false), error_msg(false), database_name(false), store_dir(false), table_count(false) {}
+  _ShowDatabaseResponse__isset() : error_code(false), error_msg(false), database_name(false), store_dir(false), table_count(false), comment(false) {}
   bool error_code :1;
   bool error_msg :1;
   bool database_name :1;
   bool store_dir :1;
   bool table_count :1;
+  bool comment :1;
 } _ShowDatabaseResponse__isset;
 
 class ShowDatabaseResponse : public virtual ::apache::thrift::TBase {
@@ -3057,7 +3072,8 @@ class ShowDatabaseResponse : public virtual ::apache::thrift::TBase {
                          error_msg(),
                          database_name(),
                          store_dir(),
-                         table_count(0) {
+                         table_count(0),
+                         comment() {
   }
 
   virtual ~ShowDatabaseResponse() noexcept;
@@ -3066,6 +3082,7 @@ class ShowDatabaseResponse : public virtual ::apache::thrift::TBase {
   std::string database_name;
   std::string store_dir;
   int64_t table_count;
+  std::string comment;
 
   _ShowDatabaseResponse__isset __isset;
 
@@ -3079,6 +3096,8 @@ class ShowDatabaseResponse : public virtual ::apache::thrift::TBase {
 
   void __set_table_count(const int64_t val);
 
+  void __set_comment(const std::string& val);
+
   bool operator == (const ShowDatabaseResponse & rhs) const
   {
     if (!(error_code == rhs.error_code))
@@ -3090,6 +3109,8 @@ class ShowDatabaseResponse : public virtual ::apache::thrift::TBase {
     if (!(store_dir == rhs.store_dir))
       return false;
     if (!(table_count == rhs.table_count))
+      return false;
+    if (!(comment == rhs.comment))
       return false;
     return true;
   }
@@ -3877,10 +3898,11 @@ void swap(GetDatabaseRequest &a, GetDatabaseRequest &b);
 std::ostream& operator<<(std::ostream& out, const GetDatabaseRequest& obj);
 
 typedef struct _CreateDatabaseRequest__isset {
-  _CreateDatabaseRequest__isset() : db_name(false), session_id(false), create_option(false) {}
+  _CreateDatabaseRequest__isset() : db_name(false), session_id(false), create_option(false), db_comment(false) {}
   bool db_name :1;
   bool session_id :1;
   bool create_option :1;
+  bool db_comment :1;
 } _CreateDatabaseRequest__isset;
 
 class CreateDatabaseRequest : public virtual ::apache::thrift::TBase {
@@ -3890,13 +3912,15 @@ class CreateDatabaseRequest : public virtual ::apache::thrift::TBase {
   CreateDatabaseRequest& operator=(const CreateDatabaseRequest&);
   CreateDatabaseRequest() noexcept
                         : db_name(),
-                          session_id(0) {
+                          session_id(0),
+                          db_comment() {
   }
 
   virtual ~CreateDatabaseRequest() noexcept;
   std::string db_name;
   int64_t session_id;
   CreateOption create_option;
+  std::string db_comment;
 
   _CreateDatabaseRequest__isset __isset;
 
@@ -3906,6 +3930,8 @@ class CreateDatabaseRequest : public virtual ::apache::thrift::TBase {
 
   void __set_create_option(const CreateOption& val);
 
+  void __set_db_comment(const std::string& val);
+
   bool operator == (const CreateDatabaseRequest & rhs) const
   {
     if (!(db_name == rhs.db_name))
@@ -3913,6 +3939,8 @@ class CreateDatabaseRequest : public virtual ::apache::thrift::TBase {
     if (!(session_id == rhs.session_id))
       return false;
     if (!(create_option == rhs.create_option))
+      return false;
+    if (!(db_comment == rhs.db_comment))
       return false;
     return true;
   }

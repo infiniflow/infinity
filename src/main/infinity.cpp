@@ -132,7 +132,7 @@ void Infinity::RemoteDisconnect() {
     session_.reset();
 }
 
-QueryResult Infinity::CreateDatabase(const String &schema_name, const CreateDatabaseOptions &create_db_options) {
+QueryResult Infinity::CreateDatabase(const String &schema_name, const CreateDatabaseOptions &create_db_options, const String &comment) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
     SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
@@ -141,6 +141,7 @@ QueryResult Infinity::CreateDatabase(const String &schema_name, const CreateData
     ToLower(create_schema_info->schema_name_);
     create_statement->create_info_ = create_schema_info;
     create_statement->create_info_->conflict_type_ = create_db_options.conflict_type_;
+    create_statement->create_info_->comment_ = comment;
     QueryResult query_result = query_context_ptr->QueryStatement(create_statement.get());
     return query_result;
 }

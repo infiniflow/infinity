@@ -36,9 +36,9 @@ TEST_P(DBMetaTest, to_string_test) {
 
     // create db in empty catalog should be success
     {
-        auto [base_entry, status] = catalog->CreateDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
+        auto [base_entry, status] = catalog->CreateDatabase(MakeShared<String>("db1"), MakeShared<String>(), txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
-        std::cout<<base_entry->db_meta_->ToString()->c_str()<<std::endl;
+        std::cout << base_entry->db_meta_->ToString()->c_str() << std::endl;
         ASSERT_STREQ(base_entry->db_meta_->ToString()->c_str(), "DBMeta, db name: db1, entry count: 1");
     }
 
@@ -46,7 +46,7 @@ TEST_P(DBMetaTest, to_string_test) {
     {
         auto [base_entry, status] = catalog->DropDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
-        std::cout<<base_entry->db_meta_->ToString()->c_str()<<std::endl;
+        std::cout << base_entry->db_meta_->ToString()->c_str() << std::endl;
         ASSERT_STREQ(base_entry->db_meta_->ToString()->c_str(), "DBMeta, db name: db1, entry count: 0");
     }
 
@@ -62,9 +62,9 @@ TEST_P(DBMetaTest, empty_db_entry_test) {
 
     // create db in empty catalog should be success
     {
-        auto [base_entry, status] = catalog->CreateDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
+        auto [base_entry, status] = catalog->CreateDatabase(MakeShared<String>("db1"), MakeShared<String>(), txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
-        std::cout<<base_entry->db_meta_->ToString()->c_str()<<std::endl;
+        std::cout << base_entry->db_meta_->ToString()->c_str() << std::endl;
         EXPECT_FALSE(base_entry->db_meta_->Empty());
     }
 
@@ -72,7 +72,7 @@ TEST_P(DBMetaTest, empty_db_entry_test) {
     {
         auto [base_entry, status] = catalog->DropDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
-        std::cout<<base_entry->db_meta_->ToString()->c_str()<<std::endl;
+        std::cout << base_entry->db_meta_->ToString()->c_str() << std::endl;
         EXPECT_TRUE(base_entry->db_meta_->Empty());
     }
 
@@ -88,9 +88,9 @@ TEST_P(DBMetaTest, get_all_db_entry_test) {
 
     // create db in empty catalog should be success
     {
-        auto [base_entry, status] = catalog->CreateDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
+        auto [base_entry, status] = catalog->CreateDatabase(MakeShared<String>("db1"), MakeShared<String>(), txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
-        std::cout<<base_entry->db_meta_->ToString()->c_str()<<std::endl;
+        std::cout << base_entry->db_meta_->ToString()->c_str() << std::endl;
         EXPECT_EQ(base_entry->db_meta_->GetAllEntries().size(), 1);
     }
 
@@ -98,7 +98,7 @@ TEST_P(DBMetaTest, get_all_db_entry_test) {
     {
         auto [base_entry, status] = catalog->DropDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
-        std::cout<<base_entry->db_meta_->ToString()->c_str()<<std::endl;
+        std::cout << base_entry->db_meta_->ToString()->c_str() << std::endl;
         EXPECT_EQ(base_entry->db_meta_->GetAllEntries().size(), 0);
     }
 

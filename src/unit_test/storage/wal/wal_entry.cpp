@@ -98,7 +98,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
         SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("default2", "AAA_default2"));
+        entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("default2", "default2_comment", "AAA_default2"));
         entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("default_db", "BBB_default", MockTableDesc2()));
         WalSegmentInfo segment_info = MakeSegmentInfo(row_count, commit_ts, 2);
         entry->cmds_.push_back(MakeShared<WalCmdImport>("default_db", "tbl1", std::move(segment_info)));
@@ -200,7 +200,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     RemoveDbDirs();
     infinity::InfinityContext::instance().Init(nullptr);
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
-    entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("db1", "AAA_db1"));
+    entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("db1", "default2_comment", "AAA_db1"));
     entry->cmds_.push_back(MakeShared<WalCmdDropDatabase>("db1"));
     entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("db1", "BBB_tb1", MockTableDesc2()));
     entry->cmds_.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));

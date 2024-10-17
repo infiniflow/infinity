@@ -107,7 +107,7 @@ SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
     CreateDatabaseOptions create_db_options;
     create_db_options.conflict_type_ = ConflictType::kIgnore;
-    infinity->CreateDatabase(db_name, std::move(create_db_options));
+    infinity->CreateDatabase(db_name, std::move(create_db_options), "");
 
     DropTableOptions drop_tb_options;
     drop_tb_options.conflict_type_ = ConflictType::kIgnore;
