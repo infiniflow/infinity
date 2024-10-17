@@ -24,6 +24,13 @@ import logger;
 
 namespace infinity {
 
+TermDocIterator::TermDocIterator(UniquePtr<PostingIterator> &&iter, const u64 column_id, const float weight)
+    : column_id_(column_id), iter_(std::move(iter)), weight_(weight) {
+    doc_freq_ = iter_->GetDocFreq();
+    term_freq_ = 0;
+    estimate_iterate_cost_ = {0, doc_freq_};
+}
+
 TermDocIterator::~TermDocIterator() {
     if (SHOULD_LOG_TRACE()) {
         OStringStream oss;
@@ -135,7 +142,7 @@ void TermDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_
     os << " (weight: " << weight_ << ")";
     os << " (column: " << *column_name_ptr_ << ")";
     os << " (term: " << *term_ptr_ << ")";
-    os << " (doc_freq: " << GetDF() << ")";
+    os << " (doc_freq: " << GetDocFreq() << ")";
     os << " (bm25_score_upper_bound: " << BM25ScoreUpperBound() << ")";
     os << " (threshold: " << Threshold() << ")";
     os << " (bm25_score_cache_docid_: " << bm25_score_cache_docid_.ToUint64() << ")";

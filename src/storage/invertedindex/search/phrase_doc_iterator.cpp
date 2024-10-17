@@ -15,6 +15,21 @@ import logger;
 
 namespace infinity {
 
+PhraseDocIterator::PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, const float weight, const u32 slop)
+    : pos_iters_(std::move(iters)), weight_(weight), slop_(slop) {
+    doc_freq_ = 0;
+    phrase_freq_ = 0;
+    if (pos_iters_.size()) {
+        estimate_doc_freq_ = pos_iters_[0]->GetDocFreq();
+    } else {
+        estimate_doc_freq_ = 0;
+    }
+    for (SizeT i = 0; i < pos_iters_.size(); ++i) {
+        estimate_doc_freq_ = std::min(estimate_doc_freq_, pos_iters_[i]->GetDocFreq());
+    }
+    estimate_iterate_cost_ = {1, estimate_doc_freq_};
+}
+
 void PhraseDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader) {
     // BM25 parameters
     constexpr float k1 = 1.2F;
@@ -44,13 +59,13 @@ void PhraseDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&col
     }
 }
 
-bool PhraseDocIterator::Next(RowID doc_id) {
+bool PhraseDocIterator::Next(const RowID doc_id) {
     assert(doc_id != INVALID_ROWID);
     if (doc_id_ != INVALID_ROWID && doc_id_ >= doc_id)
         return true;
     assert(pos_iters_.size() > 0);
     RowID target_doc_id = doc_id;
-    do {
+    while (true) {
         for (const auto &it : pos_iters_) {
             target_doc_id = it->SeekDoc(target_doc_id);
             if (target_doc_id == INVALID_ROWID) {
@@ -64,9 +79,9 @@ bool PhraseDocIterator::Next(RowID doc_id) {
                 doc_id_ = target_doc_id;
                 return true;
             }
-            target_doc_id++;
+            ++target_doc_id;
         }
-    } while (1);
+    }
 }
 
 float PhraseDocIterator::BM25Score() {
@@ -93,7 +108,7 @@ void PhraseDocIterator::PrintTree(std::ostream &os, const String &prefix, bool i
         os << " " << term;
     }
     os << ")";
-    os << " (doc_freq: " << GetDF() << ")";
+    os << " (doc_freq: " << GetDocFreq() << ")";
     os << '\n';
 }
 
