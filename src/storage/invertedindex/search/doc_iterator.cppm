@@ -37,6 +37,19 @@ export enum class DocIteratorType : u8 {
     kFilterIterator,
 };
 
+export struct DocIteratorEstimateIterateCost {
+    u32 priority_ = 0;
+    u32 estimate_cost_ = 0;
+    friend auto operator<=>(const DocIteratorEstimateIterateCost &, const DocIteratorEstimateIterateCost &) = default;
+    auto &operator+=(DocIteratorEstimateIterateCost rhs) {
+        if (priority_ < rhs.priority_) {
+            std::swap(*this, rhs);
+        }
+        estimate_cost_ += (rhs.estimate_cost_ >> 3 * (priority_ - rhs.priority_));
+        return *this;
+    }
+};
+
 export class DocIterator {
 public:
     DocIterator() {}
@@ -45,7 +58,7 @@ public:
 
     RowID DocID() const { return doc_id_; }
 
-    inline u32 GetDF() const { return doc_freq_; }
+    inline DocIteratorEstimateIterateCost GetEstimateIterateCost() const { return estimate_iterate_cost_; }
 
     // Update doc_id_ to one larger than previous one.
     // If has_blockmax is true, it ensures its BM25 score be larger than current threshold.
@@ -81,8 +94,8 @@ public:
 
 protected:
     RowID doc_id_{INVALID_ROWID};
-    u32 doc_freq_ = 0;
     float threshold_ = 0.0f;
     float bm25_score_upper_bound_ = std::numeric_limits<float>::max();
+    DocIteratorEstimateIterateCost estimate_iterate_cost_ = {};
 };
 } // namespace infinity

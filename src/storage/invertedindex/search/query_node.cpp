@@ -20,7 +20,6 @@ import or_iterator;
 import term_doc_iterator;
 import phrase_doc_iterator;
 import blockmax_wand_iterator;
-import blockmax_maxscore_iterator;
 import minimum_should_match_iterator;
 
 namespace infinity {

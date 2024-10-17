@@ -13,19 +13,9 @@ import column_length_io;
 namespace infinity {
 export class PhraseDocIterator final : public DocIterator {
 public:
-    PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight, u32 slop = 0)
-        : pos_iters_(std::move(iters)), weight_(weight), slop_(slop) {
-        doc_freq_ = 0;
-        phrase_freq_ = 0;
-        if (pos_iters_.size()) {
-            estimate_doc_freq_ = pos_iters_[0]->GetDocFreq();
-        } else {
-            estimate_doc_freq_ = 0;
-        }
-        for (SizeT i = 0; i < pos_iters_.size(); ++i) {
-            estimate_doc_freq_ = std::min(estimate_doc_freq_, pos_iters_[i]->GetDocFreq());
-        }
-    }
+    PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight, u32 slop = 0);
+
+    inline u32 GetDocFreq() const { return doc_freq_; }
 
     u32 GetEstimateDF() const { return estimate_doc_freq_; }
 
@@ -65,6 +55,9 @@ private:
     }
     bool GetExactPhraseMatchData();
     bool GetSloppyPhraseMatchData();
+
+    u32 doc_freq_ = 0;
+
     Vector<UniquePtr<PostingIterator>> pos_iters_;
     float weight_;
     u32 slop_{};
