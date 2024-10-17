@@ -48,8 +48,8 @@ curl --request POST \
         ]
     } '
 
-# insert 4 rows into 'tbl1'
-echo -e '\n\n-- insert 4 rows into tbl1'
+# insert rows into 'tbl1'
+echo -e '\n\n-- insert rows into tbl1'
 curl --request POST \
      --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
      --header 'accept: application/json' \
