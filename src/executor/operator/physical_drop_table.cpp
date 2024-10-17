@@ -21,7 +21,7 @@ import txn;
 import query_context;
 import table_def;
 import data_table;
-
+import result_cache_manager;
 import physical_operator_type;
 import operator_state;
 import status;
@@ -37,6 +37,9 @@ bool PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *oper
     auto txn = query_context->GetTxn();
 
     Status status = txn->DropTableCollectionByName(*schema_name_, *table_name_, conflict_type_);
+    if (ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager(); cache_mgr != nullptr) {
+        cache_mgr->DropTable(*schema_name_, *table_name_);
+    }
 
     if(!status.ok()) {
         operator_state->status_ = status;

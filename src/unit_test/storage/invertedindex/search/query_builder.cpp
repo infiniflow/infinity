@@ -31,6 +31,7 @@ import infinity_context;
 import global_resource_usage;
 import third_party;
 import logger;
+import parse_fulltext_options;
 
 namespace infinity {
 
@@ -61,7 +62,6 @@ public:
 
     void UpdateScoreThreshold(float threshold) override {}
 
-    u32 LeafCount() const override { return 1; }
     u32 MatchCount() const override { return DocID() != INVALID_ROWID; }
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final = true) const override {
@@ -94,7 +94,7 @@ struct MockQueryNode : public TermQueryNode {
     }
 
     void PushDownWeight(float factor) final { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, const IndexReader &, EarlyTermAlgo early_term_algo) const override {
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, const IndexReader &, EarlyTermAlgo, u32) const override {
         return MakeUnique<MockVectorDocIterator>(std::move(doc_ids_), term_, column_);
     }
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final {
@@ -204,7 +204,7 @@ TEST_F(QueryBuilderTest, test_and) {
     context.query_tree_ = std::move(and_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive);
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive, MinimumShouldMatchOption{});
 
     oss.str("");
     oss << "DocIterator tree after optimization:" << std::endl;
@@ -274,7 +274,7 @@ TEST_F(QueryBuilderTest, test_or) {
     context.query_tree_ = std::move(or_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive);
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive, MinimumShouldMatchOption{});
 
     oss.str("");
     oss << "DocIterator tree after optimization:" << std::endl;
@@ -350,7 +350,7 @@ TEST_F(QueryBuilderTest, test_and_not) {
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive);
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive, MinimumShouldMatchOption{});
 
     oss.str("");
     oss << "DocIterator tree after optimization:" << std::endl;
@@ -432,7 +432,7 @@ TEST_F(QueryBuilderTest, test_and_not2) {
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive);
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive, MinimumShouldMatchOption{});
 
     oss.str("");
     oss << "DocIterator tree after optimization:" << std::endl;

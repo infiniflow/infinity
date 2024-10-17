@@ -33,6 +33,7 @@ import segment_entry;
 import term_doc_iterator;
 import logger;
 import third_party;
+import parse_fulltext_options;
 
 namespace infinity {
 
@@ -40,13 +41,19 @@ void QueryBuilder::Init(IndexReader index_reader) { index_reader_ = index_reader
 
 QueryBuilder::~QueryBuilder() {}
 
-UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo) {
+UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context,
+                                                  EarlyTermAlgo early_term_algo,
+                                                  const MinimumShouldMatchOption &minimum_should_match_option) {
     // Optimize the query tree.
     if (!context.optimized_query_tree_) {
         context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
+        if (!minimum_should_match_option.empty()) {
+            const auto leaf_count = context.optimized_query_tree_->LeafCount();
+            context.minimum_should_match_ = GetMinimumShouldMatchParameter(minimum_should_match_option, leaf_count);
+        }
     }
     // Create the iterator from the query tree.
-    UniquePtr<DocIterator> result = context.optimized_query_tree_->CreateSearch(table_entry_, index_reader_, early_term_algo);
+    auto result = context.optimized_query_tree_->CreateSearch(table_entry_, index_reader_, early_term_algo, context.minimum_should_match_);
 #ifdef INFINITY_DEBUG
     {
         OStringStream oss;

@@ -93,7 +93,7 @@ public:
 
     Lemmatizer *lemma_{nullptr};
 
-    Stemmer *stemmer_{nullptr};
+    UniquePtr<Stemmer> stemmer_;
 
     OpenCC *opencc_{nullptr};
 
@@ -102,5 +102,21 @@ public:
     bool fine_grained_{false};
 
     UniquePtr<RegexTokenizer> regex_tokenizer_;
+
+    RE2 pattern1_{"[a-zA-Z_-]+$"};
+
+    RE2 pattern2_{"[a-z\\.-]+$"};
+
+    RE2 pattern3_{"[0-9\\.-]+$"};
+
+    RE2 pattern4_{"[0-9,\\.-]+$"};
+
+    RE2 pattern5_{"[a-z\\.-]+"};
+
+    RE2 regex_split_pattern_{R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#"};
+
+    RE2 blank_pattern_{"( )"};
+
+    RE2 replace_space_pattern_{R"#(([ ]+))#"};
 };
 } // namespace infinity

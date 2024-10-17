@@ -11,7 +11,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "infinity_embedded_sdk"
-version = "0.4.0.dev5"
+version = "0.4.0"
 requires-python = ">=3.10"
 dependencies = [
     "sqlglot~=11.7.0",

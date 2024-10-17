@@ -42,15 +42,7 @@ AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIte
                 ++fixed_match_count_;
                 break;
             }
-            case DocIteratorType::kAndIterator:
-            case DocIteratorType::kAndNotIterator:
-            case DocIteratorType::kFilterIterator: {
-                UnrecoverableError("Wrong optimization result");
-                break;
-            }
-            case DocIteratorType::kOrIterator:
-            case DocIteratorType::kBMMIterator:
-            case DocIteratorType::kBMWIterator: {
+            default: {
                 dyn_match_ids_.push_back(i);
                 break;
             }
@@ -122,12 +114,6 @@ void AndIterator::UpdateScoreThreshold(float threshold) {
         float new_threshold = std::max(0.0f, base_threshold + it->BM25ScoreUpperBound());
         it->UpdateScoreThreshold(new_threshold);
     }
-}
-
-u32 AndIterator::LeafCount() const {
-    return std::accumulate(children_.begin(), children_.end(), static_cast<u32>(0), [](const u32 cnt, const auto &it) {
-        return cnt + it->LeafCount();
-    });
 }
 
 u32 AndIterator::MatchCount() const {

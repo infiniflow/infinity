@@ -557,6 +557,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
                 old_segment->SetDeprecated(commit_ts);
             }
         }
+        max_commit_ts_ = std::max(max_commit_ts_, commit_ts);
     }
 
     // Update fulltext ts so that TableIndexReaderCache::GetIndexReader will update the cache
@@ -664,6 +665,7 @@ Status TableEntry::CommitWrite(TransactionID txn_id,
         auto *segment_entry = segment_store.segment_entry_;
         segment_entry->CommitSegment(txn_id, commit_ts, segment_store, delete_state);
     }
+    max_commit_ts_ = std::max(max_commit_ts_, commit_ts);
     return Status::OK();
 }
 

@@ -30,6 +30,7 @@ import logical_node;
 import explain_statement;
 import logical_node_type;
 import base_statement;
+import result_cache_getter;
 
 module optimizer;
 
@@ -42,6 +43,7 @@ Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query
     AddRule(MakeUnique<ColumnPruner>());
     AddRule(MakeUnique<LazyLoad>());
     AddRule(MakeUnique<ColumnRemapper>());
+    AddRule(MakeUnique<ResultCacheGetter>()); // put after column pruner, column remapper
 }
 
 void Optimizer::AddRule(UniquePtr<OptimizerRule> rule) { rules_.emplace_back(std::move(rule)); }

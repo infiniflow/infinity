@@ -107,12 +107,6 @@ void OrIterator::UpdateScoreThreshold(float threshold) {
     }
 }
 
-u32 OrIterator::LeafCount() const {
-    return std::accumulate(children_.begin(), children_.end(), static_cast<u32>(0), [](const u32 cnt, const auto &it) {
-        return cnt + it->LeafCount();
-    });
-}
-
 u32 OrIterator::MatchCount() const {
     u32 count = 0;
     if (const auto current_doc_id = DocID(); current_doc_id != INVALID_ROWID) {

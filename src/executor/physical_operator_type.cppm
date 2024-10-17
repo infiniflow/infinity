@@ -105,6 +105,8 @@ export enum class PhysicalOperatorType : i8 {
     kCompactIndexDo,
     kCompactFinish,
 
+    kReadCache,
+
     kSink,
     kSource,
 };
