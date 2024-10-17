@@ -39,7 +39,7 @@ private:
 };
 
 TEST(ResultCacheManagerTest, test1) {
-    ResultCacheManager cache_manager;
+    ResultCacheManager cache_manager(100);
 
     String key1 = "key1";
     auto output_names1 = MakeShared<Vector<String>>(Vector<String>{"col1", "col2"});
@@ -97,9 +97,41 @@ TEST(ResultCacheManagerTest, test1) {
     auto res3 = cache_manager.GetCache(*cached_node3);
     EXPECT_FALSE(res3.has_value());
     bool success3 = cache_manager.AddCache(std::move(cached_node3), std::move(blocks3));
-    EXPECT_TRUE(success3);
+    EXPECT_FALSE(success3);
     auto res4 = cache_manager.GetCache(*cached_node4);
     EXPECT_TRUE(res4.has_value());
     EXPECT_EQ(res4->column_map_.size(), 1);
     EXPECT_EQ(res4->column_map_[0], 2);
+}
+
+TEST(ResultCacheManagerTest, test2) {
+    ResultCacheManager cache_manager(2);
+    String key1 = "key1";
+    auto output_names1 = MakeShared<Vector<String>>(Vector<String>{"col1"});
+    auto cached_node1 = MakeUnique<MockCachedNode>(key1, output_names1);
+
+    String key2 = "key2";
+    auto output_names2 = MakeShared<Vector<String>>(Vector<String>{"col2"});
+    auto cached_node2 = MakeUnique<MockCachedNode>(key2, output_names2);
+
+    String key3 = "key3";
+    auto output_names3 = MakeShared<Vector<String>>(Vector<String>{"col1", "col2", "col3"});
+    auto cached_node3 = MakeUnique<MockCachedNode>(key3, output_names3);
+
+    auto cached_node11 = MakeUnique<MockCachedNode>(key1, output_names1);
+    bool success = cache_manager.AddCache(std::move(cached_node1), {});
+    EXPECT_TRUE(success);
+
+    auto cached_node21 = MakeUnique<MockCachedNode>(key2, output_names2);
+    bool success2 = cache_manager.AddCache(std::move(cached_node2), {});
+    EXPECT_TRUE(success2);
+
+    auto res1 = cache_manager.GetCache(*cached_node11);
+    EXPECT_TRUE(res1.has_value());
+
+    bool success3 = cache_manager.AddCache(std::move(cached_node3), {});
+    EXPECT_TRUE(success3);
+
+    auto res2 = cache_manager.GetCache(*cached_node21);
+    EXPECT_FALSE(res2.has_value());
 }

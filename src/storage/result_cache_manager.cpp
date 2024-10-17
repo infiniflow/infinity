@@ -23,6 +23,7 @@ import infinity_exception;
 import logical_match;
 import physical_match;
 import logical_node_type;
+import logger;
 
 namespace infinity {
 
@@ -44,49 +45,95 @@ bool CacheContent::AppendColumns(const CacheContent &other, const Vector<SizeT> 
     return true;
 }
 
+bool CacheResultMap::AddCache(
+    UniquePtr<CachedNodeBase> cached_node,
+    Vector<UniquePtr<DataBlock>> data_blocks,
+    const std::function<void(UniquePtr<CachedNodeBase>, CacheContent &, Vector<UniquePtr<DataBlock>>)> &update_content_func) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto mp_iter = lru_map_.find(cached_node.get());
+    if (mp_iter != lru_map_.end()) {
+        CacheContent &old_content = *mp_iter->second->cache_content_;
+        update_content_func(std::move(cached_node), old_content, std::move(data_blocks));
+        return false;
+    }
+    if (lru_list_.size() >= cache_num_capacity_) {
+        LRUEntry &envict_entry = lru_list_.back();
+        SizeT remove_n = lru_map_.erase(envict_entry.cached_node_.get());
+        if (remove_n != 1) {
+            UnrecoverableError("Failed to remove cache entry from lru_map_");
+        }
+        lru_list_.pop_back();
+    }
+    auto *cached_node_ptr = cached_node.get();
+    auto cache_content = MakeShared<CacheContent>(std::move(data_blocks), cached_node->output_names());
+    lru_list_.emplace_front(std::move(cached_node), cache_content);
+    lru_map_.emplace_hint(mp_iter, cached_node_ptr, lru_list_.begin());
+    return true;
+}
+
+SharedPtr<CacheContent> CacheResultMap::GetCache(const CachedNodeBase &cached_node) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto mp_iter = lru_map_.find(&cached_node);
+    if (mp_iter == lru_map_.end()) {
+        return nullptr;
+    }
+    auto iter = mp_iter->second;
+    lru_list_.splice(lru_list_.begin(), lru_list_, iter);
+    return iter->cache_content_;
+}
+
+SizeT CacheResultMap::DropIF(std::function<bool(const CachedNodeBase &)> pred) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    SizeT removed = 0;
+    for (auto mp_iter = lru_map_.begin(); mp_iter != lru_map_.end();) {
+        const auto &[cached_node, iter] = *mp_iter;
+        if (pred(*cached_node)) {
+            mp_iter = lru_map_.erase(mp_iter);
+            lru_list_.erase(iter);
+            ++removed;
+        } else {
+            ++mp_iter;
+        }
+    }
+    return removed;
+}
+
 bool ResultCacheManager::AddCache(UniquePtr<CachedNodeBase> cached_node, Vector<UniquePtr<DataBlock>> data_blocks) {
     if (cached_node == nullptr) {
         return false;
     }
-    auto cache_content = MakeShared<CacheContent>(std::move(data_blocks), cached_node->output_names());
+    auto update_content_func = [](UniquePtr<CachedNodeBase> cached_node, CacheContent &old_content, Vector<UniquePtr<DataBlock>> data_blocks) {
+        auto new_content = MakeShared<CacheContent>(std::move(data_blocks), cached_node->output_names());
+        SharedPtr<Vector<String>> new_output_names = new_content->column_names_;
+        SharedPtr<Vector<String>> old_output_names = old_content.column_names_;
 
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto iter = cache_map_.find(static_cast<const CachedNodeBase *>(cached_node.get()));
-    if (iter == cache_map_.end()) {
-        cache_map_.emplace(std::move(cached_node), std::move(cache_content));
-        return true;
-    }
-
-    SharedPtr<Vector<String>> new_output_names = cached_node->output_names();
-    SharedPtr<Vector<String>> old_output_names = iter->second->column_names_;
-
-    Vector<SizeT> add_columns;
-    for (SizeT i = 0; i < new_output_names->size(); ++i) {
-        const String &output_name = (*new_output_names)[i];
-        auto iter = std::find(old_output_names->begin(), old_output_names->end(), output_name);
-        if (iter == old_output_names->end()) {
-            add_columns.push_back(i);
+        Vector<SizeT> add_columns;
+        for (SizeT i = 0; i < new_output_names->size(); ++i) {
+            const String &output_name = (*new_output_names)[i];
+            auto iter = std::find(old_output_names->begin(), old_output_names->end(), output_name);
+            if (iter == old_output_names->end()) {
+                add_columns.push_back(i);
+            }
         }
-    }
-    if (add_columns.empty()) {
-        return true;
-    }
-    bool success = iter->second->AppendColumns(*cache_content, add_columns);
-    if (!success) {
-        iter->second = std::move(cache_content);
-        return false;
-    }
-    return true;
+        if (add_columns.empty()) {
+            return;
+        }
+        bool success = old_content.AppendColumns(*new_content, add_columns);
+        if (!success) {
+            LOG_WARN("Failed to append columns to cache content");
+            old_content = std::move(*new_content);
+        }
+    };
+    return cache_map_.AddCache(std::move(cached_node), std::move(data_blocks), update_content_func);
 }
 
 Optional<CacheOutput> ResultCacheManager::GetCache(const CachedNodeBase &cached_node) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto iter = cache_map_.find(&cached_node);
-    if (iter == cache_map_.end()) {
+    SharedPtr<CacheContent> cache_content = cache_map_.GetCache(cached_node);
+    if (!cache_content) {
         return None;
     }
-    SharedPtr<CacheContent> cache_content = iter->second;
     SharedPtr<Vector<String>> output_names = cached_node.output_names();
+
     Vector<SizeT> column_map;
     for (const String &output_name : *output_names) {
         auto column_iter = std::find(cache_content->column_names_->begin(), cache_content->column_names_->end(), output_name);
@@ -99,28 +146,18 @@ Optional<CacheOutput> ResultCacheManager::GetCache(const CachedNodeBase &cached_
 }
 
 SizeT ResultCacheManager::DropTable(const String &schema_name, const String &table_name) {
-    std::lock_guard<std::mutex> lock(mtx_);
-
-    SizeT removed = 0;
-    for (auto iter = cache_map_.begin(); iter != cache_map_.end();) {
-        const CachedNodeBase &cached_node_base = *iter->first;
+    auto pred = [&](const CachedNodeBase &cached_node_base) {
         switch (cached_node_base.type()) {
             case LogicalNodeType::kMatch: {
                 const auto &cached_match_base = static_cast<const CachedMatchBase &>(cached_node_base);
-                if (cached_match_base.schema_name() == schema_name && cached_match_base.table_name() == table_name) {
-                    iter = cache_map_.erase(iter);
-                    ++removed;
-                } else {
-                    ++iter;
-                }
-                break;
+                return cached_match_base.schema_name() == schema_name && cached_match_base.table_name() == table_name;
             }
             default: {
-                break;
+                return false;
             }
         }
-    }
-    return removed;
+    };
+    return cache_map_.DropIF(pred);
 }
 
 } // namespace infinity
