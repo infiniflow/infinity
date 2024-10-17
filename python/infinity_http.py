@@ -294,7 +294,7 @@ class infinity_http:
     def show_tables(self):
         self.get_all_tables()
         return database_result(columns=["database", "table", "type", "column_count", "block_count", "block_capacity",
-                                        "segment_count", "segment_capacity"])
+                                        "segment_count", "segment_capacity, comment"])
 
     # index
     def create_index(
