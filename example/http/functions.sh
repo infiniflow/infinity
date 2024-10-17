@@ -87,6 +87,30 @@ curl --request POST \
              "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
              "year": 2018,
              "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
+         },
+         {
+             "num": 5,
+             "body": "test@gmail.com",
+             "vec": [4.0, 4.2, 4.3, 4.5],
+             "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
+             "year": 2018,
+             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
+         },
+         {
+             "num": 6,
+             "body": "test@hotmailcom",
+             "vec": [4.0, 4.2, 4.3, 4.5],
+             "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
+             "year": 2018,
+             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
+         },
+         {
+             "num": 7,
+             "body": "this is a sentence including a mail address, test@hotmail.com",
+             "vec": [4.0, 4.2, 4.3, 4.5],
+             "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
+             "year": 2018,
+             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
          }
      ] '
 
@@ -132,6 +156,66 @@ curl --request GET \
              "*"
          ],
         "filter": "char_length(body) > 4"
+     } '
+
+# show rows of 'tbl1' where body inluding 'com'
+echo -e '\n\n-- show rows of 'tbl1' where body inluding '\'com\'''
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "regex(body, '\'com\'')"
+     } '
+
+# show rows of 'tbl1' where body including a mail address (using regex)
+echo -e '\n\n-- show rows of 'tbl1' where body including a mail address (using regex)'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "regex(body, '\''('.'*'')'@'('.'*'')''\\''.'com\'')"
+     } '
+
+# show rows of 'tbl1' where body including a mail address (using regex)
+echo -e '\n\n-- show rows of 'tbl1' where body including a mail address (using regex)'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "regex(body, '\''('[0-9A-Za-z_]+'('[-+.][0-9A-Za-z_]+')''*'')'@'('[0-9A-Za-z_]+'('[-.][0-9A-Za-z_]+')''*'')''\\'.'('[0-9A-Za-z_]+'('[-.][0-9A-Za-z_]+')''*'')'\'')"
+     } '
+
+# show rows of 'tbl1' where first 4 chars of body is 'test'
+echo -e '\n\n-- show rows of 'tbl1' where first 4 chars of body is 'test''
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "substring(body, 0, 4) = '\'test\''"
      } '
 
 # drop tbl1

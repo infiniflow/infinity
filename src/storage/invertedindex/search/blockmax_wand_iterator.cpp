@@ -46,12 +46,15 @@ BlockMaxWandIterator::~BlockMaxWandIterator() {
 BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iterators)
     : MultiDocIterator(std::move(iterators)), pivot_(sorted_iterators_.size()) {
     bm25_score_upper_bound_ = 0.0f;
+    estimate_iterate_cost_ = {};
     SizeT num_iterators = children_.size();
     for (SizeT i = 0; i < num_iterators; i++){
         TermDocIterator *tdi = dynamic_cast<TermDocIterator *>(children_[i].get());
-        if (tdi == nullptr)
-            continue;
+        if (tdi == nullptr) {
+            UnrecoverableError("BMW only supports TermDocIterator");
+        }
         bm25_score_upper_bound_ += tdi->BM25ScoreUpperBound();
+        estimate_iterate_cost_ += tdi->GetEstimateIterateCost();
         sorted_iterators_.push_back(tdi);
     }
     next_sum_score_bm_low_cnt_dist_.resize(100, 0);

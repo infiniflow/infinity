@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <vector>
 
 module or_iterator;
 import internal_types;
@@ -52,19 +53,21 @@ void DocIteratorHeap::AdjustDown(SizeT idx) {
 }
 
 OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
-    doc_freq_ = 0;
     bm25_score_upper_bound_ = 0.0f;
+    estimate_iterate_cost_ = {};
+    for (const auto &child : children_) {
+        bm25_score_upper_bound_ += child->BM25ScoreUpperBound();
+        estimate_iterate_cost_ += child->GetEstimateIterateCost();
+    }
 }
 
-bool OrIterator::Next(RowID doc_id) {
+bool OrIterator::Next(const RowID doc_id) {
     assert(doc_id != INVALID_ROWID);
     if (doc_id_ == INVALID_ROWID) {
         for (u32 i = 0; i < children_.size(); ++i) {
-            doc_freq_ += children_[i]->GetDF();
             children_[i]->Next();
             DocIteratorEntry entry = {children_[i]->DocID(), i};
             heap_.AddEntry(entry);
-            bm25_score_upper_bound_ += children_[i]->BM25ScoreUpperBound();
         }
         heap_.BuildHeap();
         doc_id_ = heap_.TopEntry().doc_id_;
@@ -86,33 +89,33 @@ float OrIterator::BM25Score() {
         return bm25_score_cache_;
     }
     float sum_score = 0;
-    for (u32 i = 0; i < children_.size(); ++i) {
-        if (children_[i]->DocID() == doc_id_)
-            sum_score += children_[i]->BM25Score();
+    for (const auto &child : children_) {
+        if (child->DocID() == doc_id_) {
+            sum_score += child->BM25Score();
+        }
     }
     bm25_score_cache_docid_ = doc_id_;
     bm25_score_cache_ = sum_score;
     return sum_score;
 }
 
-void OrIterator::UpdateScoreThreshold(float threshold) {
+void OrIterator::UpdateScoreThreshold(const float threshold) {
     if (threshold <= threshold_)
         return;
     threshold_ = threshold;
     const float base_threshold = threshold - BM25ScoreUpperBound();
-    for (SizeT i = 0; i < children_.size(); i++) {
-        const auto &it = children_[i];
-        float new_threshold = std::max(0.0f, base_threshold + it->BM25ScoreUpperBound());
-        it->UpdateScoreThreshold(new_threshold);
+    for (const auto &child : children_) {
+        const float new_threshold = std::max(0.0f, base_threshold + child->BM25ScoreUpperBound());
+        child->UpdateScoreThreshold(new_threshold);
     }
 }
 
 u32 OrIterator::MatchCount() const {
     u32 count = 0;
     if (const auto current_doc_id = DocID(); current_doc_id != INVALID_ROWID) {
-        for (u32 i = 0; i < children_.size(); ++i) {
-            if (children_[i]->DocID() == current_doc_id) {
-                count += children_[i]->MatchCount();
+        for (const auto &child : children_) {
+            if (child->DocID() == current_doc_id) {
+                count += child->MatchCount();
             }
         }
     }
