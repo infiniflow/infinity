@@ -44,7 +44,7 @@ struct ScalarFunctionData {
 template <typename Operator>
 struct UnaryOpDirectWrapper {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *, SizeT, void *) {
+    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *, SizeT, void *, void *) {
         return Operator::template Run<SourceValueType, TargetValueType>(input, result);
     }
 };
@@ -68,7 +68,7 @@ struct TernaryOpDirectWrapper {
 template <typename Operator>
 struct UnaryTryOpWrapper {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *) {
+    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *, void *) {
         if (Operator::template Run<SourceValueType, TargetValueType>(input, result)) {
             return;
         }
@@ -107,7 +107,7 @@ struct TernaryTryOpWrapper {
 template <typename Operator>
 struct UnaryOpDirectToVarlenWrapper {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *, SizeT, void *state_ptr) {
+    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *, SizeT, void *, void *state_ptr) {
         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
         return Operator::template Run<SourceValueType, TargetValueType>(input, result, function_data_ptr->column_vector_ptr_);
     }
@@ -138,7 +138,7 @@ struct TernaryOpDirectToVarlenWrapper {
 template <typename Operator>
 struct UnaryTryOpToVarlenWrapper {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *, void *state_ptr) {
         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
         if (Operator::template Run<SourceValueType, TargetValueType>(input, result, function_data_ptr->column_vector_ptr_)) {
             return;
@@ -182,6 +182,17 @@ struct TernaryTryOpToVarlenWrapper {
     }
 };
 
+template <typename Operator>
+struct UnaryOpDirectVarlenToVarlenWrapper {
+    template <typename SourceValueType, typename TargetValueType>
+    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *, SizeT, void *state_ptr_input, void *state_ptr) {
+        auto *function_data_ptr_input = (ScalarFunctionData *)(state_ptr_input);
+        auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
+        return Operator::template Run<SourceValueType, TargetValueType>(input, result, function_data_ptr_input->column_vector_ptr_, function_data_ptr->column_vector_ptr_);
+    }
+};
+
+
 using ScalarFunctionType = std::function<void(const DataBlock &, SharedPtr<ColumnVector> &)>;
 
 export class ScalarFunction final : public Function {
@@ -219,6 +230,7 @@ public:
                                                                                        output,
                                                                                        input.row_count(),
                                                                                        nullptr,
+                                                                                       nullptr,
                                                                                        true);
     }
 
@@ -236,6 +248,7 @@ public:
         UnaryOperator::Execute<InputType, OutputType, UnaryTryOpWrapper<Operation>>(input.column_vectors[0],
                                                                                     output,
                                                                                     input.row_count(),
+                                                                                    nullptr,
                                                                                     nullptr,
                                                                                     true);
     }
@@ -255,7 +268,29 @@ public:
         UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectToVarlenWrapper<Operation>>(input.column_vectors[0],
                                                                                                output,
                                                                                                input.row_count(),
+                                                                                               nullptr,
                                                                                                &function_data,
+                                                                                               true);
+    }
+
+    // Unary function result is varlen without any failure.
+    template <typename InputType, typename OutputType, typename Operation>
+    static inline void UnaryFunctionVarlenToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
+        if (input.column_count() != 1) {
+            String error_message = "Unary function: input column count isn't one.";
+            UnrecoverableError(error_message);
+        }
+        if (!input.Finalized()) {
+            String error_message = "Input data block is finalized";
+            UnrecoverableError(error_message);
+        }
+        ScalarFunctionData function_data_input(input.column_vectors[0].get());
+        ScalarFunctionData function_data_output(output.get());
+        UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectVarlenToVarlenWrapper<Operation>>(input.column_vectors[0],
+                                                                                               output,
+                                                                                               input.row_count(),
+                                                                                               &function_data_input,
+                                                                                               &function_data_output,
                                                                                                true);
     }
 
@@ -274,6 +309,7 @@ public:
         UnaryOperator::Execute<InputType, OutputType, UnaryTryOpToVarlenWrapper<Operation>>(input.column_vectors[0],
                                                                                             output,
                                                                                             input.row_count(),
+                                                                                            nullptr,
                                                                                             &function_data,
                                                                                             true);
     }
