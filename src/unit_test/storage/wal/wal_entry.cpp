@@ -70,7 +70,7 @@ SharedPtr<TableDef> MockTableDesc2() {
         }
     }
 
-    return MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+    return MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
 }
 
 WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT column_count) {

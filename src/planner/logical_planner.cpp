@@ -522,8 +522,11 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
         }
     }
 
-    SharedPtr<TableDef> table_def_ptr =
-        TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>(create_table_info->table_name_), std::move(columns));
+    SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default_db"),
+                                                       MakeShared<String>(create_table_info->table_name_),
+                                                       MakeShared<String>(create_table_info->comment_),
+                                                       std::move(columns));
+
     for (HashSet<String> visited_param_names; auto *property_ptr : create_table_info->properties_) {
         auto &[param_name, param_value] = *property_ptr;
         if (auto [_, success] = visited_param_names.insert(param_name); !success) {

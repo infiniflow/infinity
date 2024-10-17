@@ -97,7 +97,7 @@ TEST_P(SealingTaskTest, append_unsealed_segment_sealed) {
         }
         {
             // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);

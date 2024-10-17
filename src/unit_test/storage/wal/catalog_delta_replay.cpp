@@ -184,9 +184,9 @@ TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
     auto table_name1 = std::make_shared<std::string>("tb1");
     auto table_name2 = std::make_shared<std::string>("tb2");
     auto table_name3 = std::make_shared<std::string>("tb3");
-    auto table_def1 = TableDef::Make(db_name, table_name1, {column_def1, column_def2});
-    auto table_def2 = TableDef::Make(db_name, table_name2, {column_def1, column_def2});
-    auto table_def3 = TableDef::Make(db_name, table_name3, {column_def1, column_def2});
+    auto table_def1 = TableDef::Make(db_name, table_name1, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def2 = TableDef::Make(db_name, table_name2, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def3 = TableDef::Make(db_name, table_name3, MakeShared<String>(), {column_def1, column_def2});
 
     std::shared_ptr<std::string> table_entry_dir1;
     {
@@ -253,7 +253,7 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
     {
         InfinityContext::instance().Init(config_path);
@@ -354,7 +354,7 @@ TEST_P(CatalogDeltaReplayTest, replay_append) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
     {
         InfinityContext::instance().Init(config_path);
         Storage *storage = InfinityContext::instance().storage();
@@ -433,7 +433,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
     std::shared_ptr<std::string> table_entry_dir1;
     {
@@ -502,9 +502,9 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_name_committed = std::make_shared<std::string>("tb_committed");
     auto table_name_uncommitted = std::make_shared<std::string>("tb_uncommitted");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
-    auto table_def_committed = TableDef::Make(db_name, table_name_committed, {column_def1, column_def2});
-    auto table_def_uncommitted = TableDef::Make(db_name, table_name_uncommitted, {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def_committed = TableDef::Make(db_name, table_name_committed, MakeShared<String>(), {column_def1, column_def2});
+    auto table_def_uncommitted = TableDef::Make(db_name, table_name_uncommitted, MakeShared<String>(), {column_def1, column_def2});
 
     {
         InfinityContext::instance().Init(config_path);
@@ -702,7 +702,7 @@ TEST_P(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     }
     {
         // create table
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
         Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
@@ -749,7 +749,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
     {
         InfinityContext::instance().Init(config_path);
@@ -900,7 +900,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
     {
         InfinityContext::instance().Init(config_path);
@@ -1063,7 +1063,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
 
     std::set<ConstraintType> constraints;
     auto column_def1 = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "col1", constraints);
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
 
     {
         InfinityContext::instance().Init(config_path);

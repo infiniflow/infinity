@@ -175,7 +175,7 @@ void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table
         auto col3_def = MakeShared<ColumnDef>(2, col3_type, std::move(col3_name), std::set<ConstraintType>());
         column_defs.push_back(col3_def);
     }
-    auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name), std::move(column_defs));
+    auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name), MakeShared<String>(), std::move(column_defs));
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
     {

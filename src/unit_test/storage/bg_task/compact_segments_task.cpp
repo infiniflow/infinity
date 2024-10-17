@@ -133,7 +133,7 @@ TEST_P(CompactTaskTest, compact_to_single_segment) {
             }
         }
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
@@ -194,7 +194,7 @@ TEST_P(CompactTaskTest, compact_to_two_segment) {
             }
         }
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
@@ -259,7 +259,7 @@ TEST_P(CompactTaskTest, compact_with_delete) {
             }
         }
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
@@ -345,7 +345,7 @@ TEST_P(SilentLogTestCompactTaskTest, delete_in_compact_process) {
             }
         }
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
@@ -459,7 +459,7 @@ TEST_P(CompactTaskTest, uncommit_delete_in_compact_process) {
             }
         }
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
@@ -606,7 +606,7 @@ TEST_P(CompactTaskTest, compact_not_exist_table) {
         std::set<ConstraintType> constraints;
         auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
         columns.emplace_back(column_def_ptr);
-        tbl1_def = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+        tbl1_def = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
     }
     {
         // create table
