@@ -48,12 +48,9 @@ import substring;
 import substract;
 import char_length;
 import md5;
-<<<<<<< HEAD
 import lower;
 import upper;
-=======
 import regex;
->>>>>>> upstream/main
 import default_values;
 import special_function;
 import internal_types;
