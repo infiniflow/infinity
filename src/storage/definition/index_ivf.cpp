@@ -276,11 +276,12 @@ void CheckIndexIVFStorageOption(IndexIVFStorageOption &storage_option, const Dat
             } else if (storage_option.type_ == IndexIVFStorageOption::Type::kProductQuantization) {
                 // check product_quantization_subspace_num_, product_quantization_subspace_bits_
                 if (const auto product_quantization_subspace_num = storage_option.product_quantization_subspace_num_;
-                    product_quantization_subspace_num > embedding_dimension) {
-                    RecoverableError(
-                        Status::InvalidIndexDefinition(std::format("product_quantization_subspace_num ({}) is larger than embedding_dimension({}).",
-                                                                   product_quantization_subspace_num,
-                                                                   embedding_dimension)));
+                    product_quantization_subspace_num >= embedding_dimension || product_quantization_subspace_num <= 0 ||
+                    embedding_dimension % product_quantization_subspace_num != 0) {
+                    RecoverableError(Status::InvalidIndexDefinition(
+                        std::format("product_quantization_subspace_num ({}) is not divisor of embedding_dimension({})!",
+                                    product_quantization_subspace_num,
+                                    embedding_dimension)));
                 }
                 if (const auto product_quantization_subspace_bits = storage_option.product_quantization_subspace_bits_;
                     product_quantization_subspace_bits < 4 || product_quantization_subspace_bits > 16) {
