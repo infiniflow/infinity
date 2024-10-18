@@ -258,7 +258,7 @@ void WalManager::Flush() {
 
     Deque<WalEntry *> log_batch{};
     TxnManager *txn_mgr = storage_->txn_manager();
-    ClusterManager *cluster_manager = InfinityContext::instance().cluster_manager();
+    ClusterManager *cluster_manager = nullptr;
     while (running_.load()) {
         wait_flush_.DequeueBulk(log_batch);
         if (log_batch.empty()) {
@@ -301,6 +301,9 @@ void WalManager::Flush() {
             ofs_.write(buf->data(), ptr - buf->data());
 
             if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
+                if(cluster_manager == nullptr) {
+                    cluster_manager = InfinityContext::instance().cluster_manager();
+                }
                 cluster_manager->PrepareLogs(buf);
             }
 
