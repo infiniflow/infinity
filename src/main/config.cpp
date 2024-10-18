@@ -1740,11 +1740,10 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     }
                 }
                 
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCacheMode) == nullptr) {
-                    // Result Cache Mode
-                    String result_cache_mode_str(DEFAULT_RESULT_CACHE_MODE);
-                    UniquePtr<StringOption> result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode_str);
-                    Status status = global_options_.AddOption(std::move(result_cache_mode_option));
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kCacheResultNum) == nullptr) {
+                    i64 cache_result_num = DEFAULT_CACHE_RESULT_NUM;
+                    UniquePtr<IntegerOption> cache_result_num_option = MakeUnique<IntegerOption>(CACHE_RESULT_NUM_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
+                    Status status = global_options_.AddOption(std::move(cache_result_num_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
