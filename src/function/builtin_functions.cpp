@@ -49,6 +49,7 @@ import substract;
 import char_length;
 import md5;
 import regex;
+import position;
 import default_values;
 import special_function;
 import internal_types;
@@ -119,6 +120,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterCharLengthFunction(catalog_ptr_);
     RegisterMd5Function(catalog_ptr_);
     RegisterRegexFunction(catalog_ptr_);
+    RegisterPositionFunction(catalog_ptr_);
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}
