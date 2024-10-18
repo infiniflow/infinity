@@ -57,13 +57,14 @@ UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &db_entry_d
 Tuple<TableEntry *, Status> TableMeta::CreateEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                    TableEntryType table_entry_type,
                                                    const SharedPtr<String> &table_name,
+                                                   const SharedPtr<String> &table_comment,
                                                    const Vector<SharedPtr<ColumnDef>> &columns,
                                                    TransactionID txn_id,
                                                    TxnTimeStamp begin_ts,
                                                    TxnManager *txn_mgr,
                                                    ConflictType conflict_type) {
     auto init_table_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
-        return TableEntry::NewTableEntry(false, this->db_entry_dir_, table_name, columns, table_entry_type, this, txn_id, begin_ts);
+        return TableEntry::NewTableEntry(false, this->db_entry_dir_, table_name, table_comment, columns, table_entry_type, this, txn_id, begin_ts);
     };
     return table_entry_list_.AddEntry(std::move(r_lock), std::move(init_table_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
@@ -79,6 +80,7 @@ Tuple<SharedPtr<TableEntry>, Status> TableMeta::DropEntry(std::shared_lock<std::
         return TableEntry::NewTableEntry(true,
                                          this->db_entry_dir_,
                                          this->table_name_,
+                                         MakeShared<String>(),
                                          dummy_columns,
                                          TableEntryType::kTableEntry,
                                          this,
@@ -101,6 +103,7 @@ Tuple<SharedPtr<TableInfo>, Status> TableMeta::GetTableInfo(std::shared_lock<std
     table_info->table_full_dir_ = MakeShared<String>(Path(InfinityContext::instance().config()->DataDir()) / *table_entry->TableEntryDir());
     table_info->column_count_ = table_entry->ColumnCount();
     table_info->row_count_ = table_entry->row_count();
+    table_info->table_comment_ = table_entry->GetTableComment();
 
     SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(txn);
     table_info->segment_count_ = segment_index->SegmentCount();
@@ -224,7 +227,7 @@ void TableMeta::PushBackEntry(const SharedPtr<TableEntry> &new_table_entry) { ta
 
 void TableMeta::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) { table_entry_list_.Cleanup(info_tracer, dropped); }
 
-bool TableMeta::PickCleanup(CleanupScanner *scanner) { 
+bool TableMeta::PickCleanup(CleanupScanner *scanner) {
     LOG_DEBUG(fmt::format("Pick cleanup for table: {}, entry_list size: {}", *table_name_, table_entry_list_.size()));
     return table_entry_list_.PickCleanup(scanner);
 }

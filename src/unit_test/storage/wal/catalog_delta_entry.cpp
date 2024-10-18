@@ -93,6 +93,7 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             op->column_defs_ = column_defs;
             op->row_count_ = 0;
             op->unsealed_id_ = 0;
+            op->table_comment_ = MakeShared<String>("test_comment");
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
@@ -224,6 +225,8 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
 
         op1_same_name->table_entry_dir_ = op2->table_entry_dir_ = op1->table_entry_dir_ = table_entry_dir;
         op1_same_name->column_defs_ = op2->column_defs_ = op1->column_defs_ = column_defs;
+        op1->table_comment_ = MakeShared<String>("test_comment");
+        op2->table_comment_ = MakeShared<String>("test_comment");
 
         auto op1_copy = MakeUnique<AddTableEntryOp>(*op1);
         op1_copy->merge_flag_ = MergeFlag::kUpdate;

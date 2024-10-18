@@ -88,7 +88,8 @@ public:
     String GetPathNameTail() const;
 
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
-                                            const SharedPtr<String> &table_collection_name,
+                                            const SharedPtr<String> &table_name,
+                                            const SharedPtr<String> &table_comment,
                                             const Vector<SharedPtr<ColumnDef>> &columns,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
@@ -107,20 +108,25 @@ public:
     Status AddTable(SharedPtr<TableEntry> table_entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, bool add_if_found = false);
 
     // replay
-    void CreateTableReplay(const SharedPtr<String> &table_name,
-                           std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                           TransactionID txn_id,
-                           TxnTimeStamp begin_ts);
+    void CreateTableReplay(
+        const SharedPtr<String> &table_name,
+        const SharedPtr<String> &table_comment,
+        std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+        TransactionID txn_id,
+        TxnTimeStamp begin_ts);
 
-    void UpdateTableReplay(const SharedPtr<String> &table_name,
-                           std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                           TransactionID txn_id,
-                           TxnTimeStamp begin_ts);
+    void UpdateTableReplay(
+        const SharedPtr<String> &table_name,
+        const SharedPtr<String> &table_comment,
+        std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+        TransactionID txn_id,
+        TxnTimeStamp begin_ts);
 
-    void DropTableReplay(const String &table_name,
-                         std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                         TransactionID txn_id,
-                         TxnTimeStamp begin_ts);
+    void
+    DropTableReplay(const String &table_name,
+                    std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                    TransactionID txn_id,
+                    TxnTimeStamp begin_ts);
 
     TableEntry *GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 

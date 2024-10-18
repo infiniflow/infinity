@@ -169,6 +169,7 @@ public:
     SegmentID unsealed_id_{};
     SegmentID next_segment_id_{0};
     ColumnID next_column_id_{};
+    SharedPtr<String> table_comment_{};
 };
 
 /// class AddSegmentEntryOp
