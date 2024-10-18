@@ -90,7 +90,7 @@ TEST_P(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0, data_type, "c1", std::set<ConstraintType>());
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("t1"), {col_def});
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("t1"), MakeShared<String>(), {col_def});
     SharedPtr<DataTable> input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
@@ -189,7 +189,7 @@ TEST_P(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     ExpressionEvaluator expr_evaluator;
 
     SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "c1", std::set<ConstraintType>());
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("t1"), {col_def});
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("t1"), MakeShared<String>(), {col_def});
     SharedPtr<DataTable> input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {

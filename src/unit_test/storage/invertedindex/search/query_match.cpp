@@ -175,7 +175,7 @@ void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table
         auto col3_def = MakeShared<ColumnDef>(2, col3_type, std::move(col3_name), std::set<ConstraintType>());
         column_defs.push_back(col3_def);
     }
-    auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name), std::move(column_defs));
+    auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name), MakeShared<String>(), std::move(column_defs));
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
     {
@@ -357,14 +357,14 @@ void QueryMatchTest::QueryMatch(const String &db_name,
         if (query_type == DocIteratorType::kPhraseIterator) {
             EXPECT_EQ(doc_iterator->GetType(), DocIteratorType::kPhraseIterator);
             auto phrase_iterator = dynamic_cast<PhraseDocIterator *>(doc_iterator.get());
-            auto res_df = phrase_iterator->GetDF();
+            auto res_df = phrase_iterator->GetDocFreq();
             auto res_phrase_freq = phrase_iterator->GetPhraseFreq();
             EXPECT_EQ(res_df, expected_doc_freq);
             EXPECT_FLOAT_EQ(res_phrase_freq, expected_matched_freq);
         } else {
             EXPECT_EQ(doc_iterator->GetType(), DocIteratorType::kTermDocIterator);
             auto term_iterator = dynamic_cast<TermDocIterator *>(doc_iterator.get());
-            auto res_df = term_iterator->GetDF();
+            auto res_df = term_iterator->GetDocFreq();
             auto res_term_freq = term_iterator->GetTermFreq();
             EXPECT_EQ(res_df, expected_doc_freq);
             EXPECT_FLOAT_EQ(res_term_freq, expected_matched_freq);

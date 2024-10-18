@@ -207,3 +207,5 @@ class TestMemIdx:
             assert len(idx2_files_in_dir) == 1
 
         part2()
+
+        infinity_runner.clear()

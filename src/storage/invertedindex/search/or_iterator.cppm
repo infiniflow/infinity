@@ -72,4 +72,5 @@ private:
     RowID bm25_score_cache_docid_ = INVALID_ROWID;
     float bm25_score_cache_ = 0.0f;
 };
+
 } // namespace infinity

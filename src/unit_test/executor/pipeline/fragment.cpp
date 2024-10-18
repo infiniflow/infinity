@@ -74,7 +74,7 @@ TEST_F(FragmentTest, test_build_fragment) {
 
     /// Show
     auto result7 = SQLRunner::Run("show tables", true);
-    EXPECT_EQ(result7->definition_ptr_->column_count(), 8u);
+    EXPECT_EQ(result7->definition_ptr_->column_count(), 9u);
     auto result8 = SQLRunner::Run("show table t2", true);
     EXPECT_EQ(result8->definition_ptr_->column_count(), 2u);
 

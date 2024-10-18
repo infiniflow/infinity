@@ -74,8 +74,8 @@ UniquePtr<TableDef> MockTableDesc() {
         }
     }
 
-    UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
-    return MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+    UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
+    return MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
 }
 
 TEST_P(TableTxnTest, test1) {
@@ -447,7 +447,6 @@ TEST_P(TableTxnTest, test9) {
 TEST_P(TableTxnTest, test10) {
     using namespace infinity;
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-
 
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));

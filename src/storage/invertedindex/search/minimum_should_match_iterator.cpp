@@ -49,11 +49,27 @@ MinimumShouldMatchIterator::MinimumShouldMatchIterator(Vector<UniquePtr<DocItera
     }
     tail_heap_.resize(minimum_should_match_ - 1u);
     bm25_score_cache_docid_ = INVALID_ROWID;
+    bm25_score_upper_bound_ = 0.0f;
+    estimate_iterate_cost_ = {};
+    for (const auto &child : children_) {
+        bm25_score_upper_bound_ += child->BM25ScoreUpperBound();
+        estimate_iterate_cost_ += child->GetEstimateIterateCost();
+    }
 }
 
 MinimumShouldMatchIterator::~MinimumShouldMatchIterator() {}
 
-void MinimumShouldMatchIterator::UpdateScoreThreshold(float threshold) { UnrecoverableError("Unreachable code"); }
+void MinimumShouldMatchIterator::UpdateScoreThreshold(const float threshold) {
+    if (threshold <= threshold_) {
+        return;
+    }
+    threshold_ = threshold;
+    const float base_threshold = threshold - BM25ScoreUpperBound();
+    for (const auto &it : children_) {
+        const float new_threshold = std::max(0.0f, base_threshold + it->BM25ScoreUpperBound());
+        it->UpdateScoreThreshold(new_threshold);
+    }
+}
 
 bool MinimumShouldMatchIterator::Next(RowID doc_id) {
     if (doc_id_ == INVALID_ROWID) {
@@ -160,13 +176,13 @@ u32 MinimumShouldMatchIterator::PopFromHeadHeap() {
 }
 
 Pair<bool, u32> MinimumShouldMatchIterator::PushToTailHeap(const u32 idx) {
-    auto comp = [&](const u32 lhs, const u32 rhs) { return children_[lhs]->GetDF() > children_[rhs]->GetDF(); };
+    auto comp = [&](const u32 lhs, const u32 rhs) { return children_[lhs]->GetEstimateIterateCost() > children_[rhs]->GetEstimateIterateCost(); };
     if (tail_size_ < tail_heap_.size()) {
         tail_heap_[tail_size_++] = idx;
         std::push_heap(tail_heap_.begin(), tail_heap_.begin() + tail_size_, comp);
         return {false, std::numeric_limits<u32>::max()};
     }
-    if (children_[idx]->GetDF() <= children_[tail_heap_.front()]->GetDF()) {
+    if (children_[idx]->GetEstimateIterateCost() <= children_[tail_heap_.front()]->GetEstimateIterateCost()) {
         return {true, idx};
     }
     const auto result = tail_heap_.front();
@@ -179,7 +195,7 @@ Pair<bool, u32> MinimumShouldMatchIterator::PushToTailHeap(const u32 idx) {
 u32 MinimumShouldMatchIterator::PopFromTailHeap() {
     assert(tail_size_ > 0);
     std::pop_heap(tail_heap_.begin(), tail_heap_.begin() + tail_size_, [&](const u32 lhs, const u32 rhs) {
-        return children_[lhs]->GetDF() > children_[rhs]->GetDF();
+        return children_[lhs]->GetEstimateIterateCost() > children_[rhs]->GetEstimateIterateCost();
     });
     return tail_heap_[--tail_size_];
 }
