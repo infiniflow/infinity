@@ -853,3 +853,44 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_select_regex"+suffix)
         assert res.error_code == ErrorCode.OK
+
+    def test_select_upper_lower(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_upper_lower"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_upper_lower"+suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_upper_lower"+suffix)
+        table_obj.insert(
+            [{"c1": 'a', "c2": 'A'}, {"c1": 'b', "c2": 'B'}, {"c1": 'c', "c2": 'C'}, {"c1": 'd', "c2": 'D'},
+             {"c1": 'abc', "c2": 'ABC'}, {"c1": 'bbc', "c2": 'bbc'}, {"c1": 'cbc', "c2": 'cbc'}, {"c1": 'dbc', "c2": 'dbc'},])
+
+        res = table_obj.output(["*"]).filter("upper(c1) = c2").to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a', 'b', 'c', 'd', 'abc'),
+                                                         'c2': ('A', 'B', 'C', 'D', 'ABC')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+
+        res = db_obj.drop_table("test_select_upper_lower"+suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_substring(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_substring"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_substring"+suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_substring"+suffix)
+        table_obj.insert(
+            [{"c1": 'a', "c2": 'A'}, {"c1": 'b', "c2": 'B'}, {"c1": 'c', "c2": 'C'}, {"c1": 'd', "c2": 'D'},
+             {"c1": 'abc', "c2": 'ABC'}, {"c1": 'bbcc', "c2": 'bbc'}, {"c1": 'cbcc', "c2": 'cbc'}, {"c1": 'dbcc', "c2": 'dbc'},])
+
+        res = table_obj.output(["*"]).filter("substring(c1, 0, 3) = c2").to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('bbcc', 'cbcc', 'dbcc'),
+                                                         'c2': ('bbc', 'cbc', 'dbc')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+        res = db_obj.drop_table("test_select_substring"+suffix)
+        assert res.error_code == ErrorCode.OK
