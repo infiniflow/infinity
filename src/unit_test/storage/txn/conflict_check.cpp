@@ -124,7 +124,7 @@ TEST_F(ConflictCheckTest, conflict_check_delete) {
     auto table_name = std::make_shared<std::string>("table1");
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
 
     SizeT row_cnt = 10;
 

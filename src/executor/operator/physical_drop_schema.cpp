@@ -36,7 +36,7 @@ void PhysicalDropSchema::Init() {}
 bool PhysicalDropSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto txn = query_context->GetTxn();
     Status status = txn->DropDatabase(*schema_name_, conflict_type_);
-    if(!status.ok()) {
+    if (!status.ok()) {
         operator_state->status_ = status;
     }
 
@@ -44,7 +44,8 @@ bool PhysicalDropSchema::Execute(QueryContext *query_context, OperatorState *ope
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
 
-    auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), column_defs);
+    auto result_table_def_ptr =
+        TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
     output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     operator_state->SetComplete();
     return true;

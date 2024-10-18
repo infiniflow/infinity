@@ -648,6 +648,55 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER COMMENT STRING {
     create_table_info->select_ = $6;
     $$->create_info_ = create_table_info;
 }
+| CREATE TABLE if_not_exists table_name '(' table_element_array ')' optional_table_properties_list COMMENT STRING {
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateTableInfo> create_table_info = std::make_shared<infinity::CreateTableInfo>();
+    if($4->schema_name_ptr_ != nullptr) {
+        create_table_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    create_table_info->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    delete $4;
+
+    for (infinity::TableElement*& element : *$6) {
+        if(element->type_ == infinity::TableElementType::kColumn) {
+            create_table_info->column_defs_.emplace_back((infinity::ColumnDef*)element);
+        } else {
+            create_table_info->constraints_.emplace_back((infinity::TableConstraint*)element);
+        }
+    }
+    delete $6;
+
+    if ($8 != nullptr) {
+        create_table_info->properties_ = std::move(*$8);
+        delete $8;
+    }
+
+    create_table_info->comment_ = $10;
+    free($10);
+
+    $$->create_info_ = create_table_info;
+    $$->create_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
+}
+/* CREATE TABLE table_name AS SELECT .... ; */
+| CREATE TABLE if_not_exists table_name AS select_statement COMMENT STRING {
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateTableInfo> create_table_info = std::make_shared<infinity::CreateTableInfo>();
+    if($4->schema_name_ptr_ != nullptr) {
+        create_table_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    create_table_info->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    delete $4;
+
+    create_table_info->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
+    create_table_info->select_ = $6;
+    create_table_info->comment_ = $8;
+    free($8);
+    $$->create_info_ = create_table_info;
+}
 /* CREATE VIEW table_name AS SELECT .... ; */
 | CREATE VIEW if_not_exists table_name optional_identifier_array AS select_statement {
     $$ = new infinity::CreateStatement();

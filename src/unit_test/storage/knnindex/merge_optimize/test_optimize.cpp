@@ -83,7 +83,7 @@ TEST_P(OptimizeKnnTest, test1) {
                                     std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
     auto index_name = std::make_shared<std::string>("idx1");
 
@@ -206,7 +206,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
     auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
     auto index_name = std::make_shared<std::string>("idx1");
 
     {

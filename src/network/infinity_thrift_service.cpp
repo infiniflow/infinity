@@ -1190,38 +1190,50 @@ void InfinityThriftService::ShowTable(infinity_thrift_rpc::ShowTableResponse &re
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 6) {
+        if (row_count != 7) {
             String error_message = "ShowTable: query result is invalid.";
             UnrecoverableError(error_message);
         }
 
         {
+            // db name
             Value value = data_block->GetValue(1, 0);
             response.database_name = value.GetVarchar();
         }
 
         {
+            // table name
             Value value = data_block->GetValue(1, 1);
             response.table_name = value.GetVarchar();
         }
 
         {
+            // table comment
             Value value = data_block->GetValue(1, 2);
             response.store_dir = value.GetVarchar();
         }
 
         {
+            // storage directory
             Value value = data_block->GetValue(1, 3);
+            response.store_dir = value.GetVarchar();
+        }
+
+        {
+            // column count
+            Value value = data_block->GetValue(1, 4);
             response.column_count = std::stol(value.GetVarchar());
         }
 
         {
-            Value value = data_block->GetValue(1, 4);
+            // segment count
+            Value value = data_block->GetValue(1, 5);
             response.segment_count = std::stol(value.GetVarchar());
         }
 
         {
-            Value value = data_block->GetValue(1, 5);
+            // row count
+            Value value = data_block->GetValue(1, 6);
             response.row_count = std::stol(value.GetVarchar());
         }
 
