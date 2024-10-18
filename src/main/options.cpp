@@ -72,6 +72,9 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(TEMP_DIR_OPTION_NAME)] = GlobalOptionIndex::kTempDir;
     name2index_[String(MEMINDEX_MEMORY_QUOTA_OPTION_NAME)] = GlobalOptionIndex::kMemIndexMemoryQuota;
 
+    name2index_[String(RESULT_CACHE_MODE_OPTION_NAME)] = GlobalOptionIndex::kResultCacheMode;
+    name2index_[String(CACHE_RESULT_NUM_OPTION_NAME)] = GlobalOptionIndex::kCacheResultNum;
+
     name2index_[String(WAL_DIR_OPTION_NAME)] = GlobalOptionIndex::kWALDir;
     name2index_[String(WAL_COMPACT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kWALCompactThreshold;
     name2index_[String(FULL_CHECKPOINT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kFullCheckpointInterval;

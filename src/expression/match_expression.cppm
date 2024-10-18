@@ -32,6 +32,10 @@ public:
 
     String ToString() const override;
 
+    u64 Hash() const;
+
+    bool Eq(const MatchExpression &other) const;
+
 public:
     String fields_;
     String matching_text_;

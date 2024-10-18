@@ -151,7 +151,10 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Result cache manager was initialized before.");
             }
             // TODO: add result_cache_manager
-            // result_cache_manager_ = MakeUnique<ResultCacheManager>();
+            if (config_ptr_->ResultCacheMode() == "on") {
+                SizeT cache_result_num = config_ptr_->CacheResultNum();
+                result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
+            }
 
             // Construct buffer manager
             if (buffer_mgr_ != nullptr) {

@@ -1119,7 +1119,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             tasks_[0]->sink_state_ = MakeUnique<QueueSinkState>(plan_fragment_ptr_->FragmentID(), 0);
             break;
         }
-
+        case PhysicalOperatorType::kReadCache:
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kShow: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {

@@ -421,6 +421,23 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Result Cache Mode
+        String result_cache_mode(DEFAULT_RESULT_CACHE_MODE);
+        auto result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode);
+        status = global_options_.AddOption(std::move(result_cache_mode_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        i64 cache_result_num = DEFAULT_CACHE_RESULT_NUM;
+        auto cache_result_num_option = MakeUnique<IntegerOption>(CACHE_RESULT_NUM_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
+        status = global_options_.AddOption(std::move(cache_result_num_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Temp Dir
         String temp_dir = "/var/infinity/tmp";
         if(default_config != nullptr) {
@@ -1646,6 +1663,28 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             global_options_.AddOption(std::move(mem_index_memory_quota_option));
                             break;
                         }
+                        case GlobalOptionIndex::kResultCacheMode: {
+                            String result_cache_mode_str(DEFAULT_RESULT_CACHE_MODE);
+                            if (elem.second.is_string()) {
+                                result_cache_mode_str = elem.second.value_or(result_cache_mode_str);
+                            } else {
+                                return Status::InvalidConfig("'result_cache_mode' field isn't string.");
+                            }
+                            auto result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode_str);
+                            global_options_.AddOption(std::move(result_cache_mode_option));
+                            break;
+                        }
+                        case GlobalOptionIndex::kCacheResultNum: {
+                            i64 cache_result_num = DEFAULT_CACHE_RESULT_NUM;
+                            if (elem.second.is_integer()) {
+                                cache_result_num = elem.second.value_or(cache_result_num);
+                            } else {
+                                return Status::InvalidConfig("'cache_result_num' field isn't integer.");
+                            }
+                            auto cache_result_num_option = MakeUnique<IntegerOption>(CACHE_RESULT_NUM_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
+                            global_options_.AddOption(std::move(cache_result_num_option));
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'buffer' field", var_name));
                         }
@@ -1687,6 +1726,25 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     UniquePtr<IntegerOption> mem_index_memory_quota_option =
                         MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME, mem_index_memory_quota, std::numeric_limits<i64>::max(), 0);
                     Status status = global_options_.AddOption(std::move(mem_index_memory_quota_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCacheMode) == nullptr) {
+                    // Result Cache Mode
+                    String result_cache_mode_str(DEFAULT_RESULT_CACHE_MODE);
+                    UniquePtr<StringOption> result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode_str);
+                    Status status = global_options_.AddOption(std::move(result_cache_mode_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCacheMode) == nullptr) {
+                    // Result Cache Mode
+                    String result_cache_mode_str(DEFAULT_RESULT_CACHE_MODE);
+                    UniquePtr<StringOption> result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode_str);
+                    Status status = global_options_.AddOption(std::move(result_cache_mode_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2265,6 +2323,16 @@ String Config::TempDir() {
 i64 Config::MemIndexMemoryQuota() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexMemoryQuota);
+}
+
+String Config::ResultCacheMode() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kResultCacheMode);
+}
+
+i64 Config::CacheResultNum() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kCacheResultNum);
 }
 
 // WAL

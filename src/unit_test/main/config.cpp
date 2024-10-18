@@ -69,6 +69,9 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(config.LRUNum(), 7);
     EXPECT_EQ(config.TempDir(), "/var/infinity/tmp");
     EXPECT_EQ(config.MemIndexMemoryQuota(), 4 * 1024l * 1024l * 1024l);
+
+    EXPECT_EQ(config.ResultCacheMode(), "off");
+    EXPECT_EQ(config.CacheResultNum(), 10000);
 }
 
 TEST_F(ConfigTest, test2) {
@@ -112,6 +115,9 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.LRUNum(), 8);
     EXPECT_EQ(config.TempDir(), "/var/infinity/tmp");
     EXPECT_EQ(config.MemIndexMemoryQuota(), 2 * 1024l * 1024l * 1024l);
+
+    EXPECT_EQ(config.ResultCacheMode(), "on");
+    EXPECT_EQ(config.CacheResultNum(), 100);
 }
 
 TEST_F(ConfigTest, TestWrongParamNames) {
