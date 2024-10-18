@@ -23,37 +23,37 @@ table_obj.insert(
         {"c1": 'test@gmail.com', "c2": 'email'}, {"c1": 'test@hotmail.com', "c2": 'email'}])
 
 #function char_length
-res = table_obj.output(["*"]).filter("char_length(c1) = 1").to_df()
+res = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 1").to_df()
 print(res)
 
-res = table_obj.output(["*"]).filter("char_length(c1) = 3").to_df()
+res = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 3").to_df()
 print(res)
 
-res = table_obj.output(["*"]).filter("char_length(c1) = 4").to_df()
+res = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 4").to_df()
 print(res)
 
-res = table_obj.output(["*"]).filter("char_length(c1) = char_length(c2)").to_df()
+res = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = char_length(c2)").to_df()
 print(res)
 
 #functin regex
-res = table_obj.output(["*"]).filter("regex(c1, 'bc')").to_df()
+res = table_obj.output(["*", "regex(c1, 'bc')"]).filter("regex(c1, 'bc')").to_df()
 print(res)
 
 res = table_obj.output(["*"]).filter("regex(c1, '(\w+([-+.]\w+)*)@(\w+([-.]\w+)*)\.(\w+([-.]\w+)*)')").to_df()
 print(res)
 
 #function ltrim, rtrim, trim
-res = table_obj.output(["*"]).filter("ltrim('   abc') = c1").to_df()
+res = table_obj.output(["*", "ltrim('   abc')"]).filter("ltrim('   abc') = c1").to_df()
 print(res)
 
-res = table_obj.output(["*"]).filter("rtrim('abc   ') = c1").to_df()
+res = table_obj.output(["*", "rtrim('abc   ')"]).filter("rtrim('abc   ') = c1").to_df()
 print(res)
 
-res = table_obj.output(["*"]).filter("trim('   abc   ') = c1").to_df()
+res = table_obj.output(["*", "trim('   abc   ')"]).filter("trim('   abc   ') = c1").to_df()
 print(res)
 
-res = table_obj.output(["*"]).filter("trim('   abc   ') = rtrim(ltrim('   abc   '))").to_df()
-print(res)
+#res = table_obj.output(["*", "trim('   abc   ')"]).filter("trim('   abc   ') = rtrim(ltrim('   abc   '))").to_df()
+#print(res)
 
 res = db_obj.drop_table("function_example")
 
