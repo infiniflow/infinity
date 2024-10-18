@@ -35,11 +35,25 @@ print(res)
 res = table_obj.output(["*"]).filter("char_length(c1) = char_length(c2)").to_df()
 print(res)
 
-#functin regex
+#function regex
 res = table_obj.output(["*"]).filter("regex(c1, 'bc')").to_df()
 print(res)
 
 res = table_obj.output(["*"]).filter("regex(c1, '(\w+([-+.]\w+)*)@(\w+([-.]\w+)*)\.(\w+([-.]\w+)*)')").to_df()
+print(res)
+
+#function substring
+res = table_obj.output(["*"]).filter("substring(c1, 0, 2) = 'ab'").to_df()
+print(res)
+
+res = table_obj.output(["*"]).filter("substring(c1, 0, 4) = 'test'").to_df()
+print(res)
+
+#function upper and lower
+res = table_obj.output(["*"]).filter("upper(c1) = 'TEST@GMAIL.COM'").to_df()
+print(res)
+
+res = table_obj.output(["*"]).filter("lower('ABC') = c1").to_df()
 print(res)
 
 res = db_obj.drop_table("function_example")

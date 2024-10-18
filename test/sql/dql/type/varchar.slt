@@ -62,7 +62,7 @@ SELECT * FROM test_varchar_filter where md5(c1) = md5(c2);
 abcddddd abcddddd 1
 abcdddde abcdddde 4
 
-query VIIII
+query IX
 SELECT * FROM test_varchar_filter where md5(c1) = md5('abcdddde');
 ----
 abcdddde abcddddd 3
@@ -95,7 +95,7 @@ abcddddc abcddddd 2
 abcdddde abcddddd 3
 abcdddde abcdddde 4
 
-query XIIII
+query XIV
 SELECT * FROM test_varchar_filter where substring(c1, 0, 0) = '';
 ----
 abcddddd abcddddd 1
@@ -104,6 +104,16 @@ abcdddde abcddddd 3
 abcdddde abcdddde 4
 abc abcd 5
 regex@regex.com gmail@gmail.com 6
+
+query XV
+SELECT * FROM test_varchar_filter where upper(c1) = 'ABCDDDDD';
+----
+abcddddd abcddddd 1
+
+query XVI
+SELECT * FROM test_varchar_filter where lower('ABCDDDDD') = c1;
+----
+abcddddd abcddddd 1
 
 statement ok
 DROP TABLE test_varchar_filter;
