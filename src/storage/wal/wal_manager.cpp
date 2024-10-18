@@ -55,6 +55,8 @@ import default_values;
 import defer_op;
 import index_base;
 import base_table_ref;
+import cluster_manager;
+import peer_task;
 
 module wal_manager;
 
@@ -256,6 +258,7 @@ void WalManager::Flush() {
 
     Deque<WalEntry *> log_batch{};
     TxnManager *txn_mgr = storage_->txn_manager();
+    ClusterManager *cluster_manager = InfinityContext::instance().cluster_manager();
     while (running_.load()) {
         wait_flush_.DequeueBulk(log_batch);
         if (log_batch.empty()) {
@@ -284,10 +287,10 @@ void WalManager::Flush() {
             }
 
             i32 exp_size = entry->GetSizeInBytes();
-            Vector<char> buf(exp_size);
-            char *ptr = buf.data();
+            SharedPtr<String> buf = MakeShared<String>(exp_size, 0);
+            char *ptr = buf->data();
             entry->WriteAdv(ptr);
-            i32 act_size = ptr - buf.data();
+            i32 act_size = ptr - buf->data();
             if (exp_size != act_size) {
                 String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
                                                    exp_size,
@@ -295,7 +298,12 @@ void WalManager::Flush() {
                                                    entry->ToString());
                 UnrecoverableError(error_message);
             }
-            ofs_.write(buf.data(), ptr - buf.data());
+            ofs_.write(buf->data(), ptr - buf->data());
+
+            if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
+                cluster_manager->PrepareLogs(buf);
+            }
+
             LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id_, entry->commit_ts_));
 
             UpdateCommitState(entry->commit_ts_, wal_size_ + act_size);
@@ -318,6 +326,10 @@ void WalManager::Flush() {
                 ofs_.flush(); // FIXME: not flush, flush per second
                 break;
             }
+        }
+
+        if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
+            cluster_manager->SyncLogs();
         }
 
         for (const auto &entry : log_batch) {

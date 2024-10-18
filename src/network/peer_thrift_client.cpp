@@ -82,7 +82,7 @@ Status PeerClient::Reconnect() {
 
 Status PeerClient::Disconnect() {
     Status status = Status::OK();
-    if(server_connected_ == false) {
+    if (server_connected_ == false) {
         return status;
     }
 
@@ -136,7 +136,7 @@ void PeerClient::Process() {
                 }
                 case PeerTaskType::kLogSync: {
                     LOG_TRACE(peer_task->ToString());
-                    SyncLogTask* sync_log_task = static_cast<SyncLogTask*>(peer_task.get());
+                    SyncLogTask *sync_log_task = static_cast<SyncLogTask *>(peer_task.get());
                     SyncLogs(sync_log_task);
                     break;
                 }
@@ -193,7 +193,6 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
             }
         }
     }
-
 
     if (response.error_code != 0) {
         // Error
@@ -336,7 +335,7 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
     request.node_name = peer_task->node_name_;
     SizeT log_count = peer_task->log_strings_.size();
     request.log_entries.reserve(log_count);
-    for(SizeT i = 0; i < log_count; ++ i) {
+    for (SizeT i = 0; i < log_count; ++i) {
         request.log_entries.emplace_back(*peer_task->log_strings_[i]);
     }
 
@@ -361,6 +360,7 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
         // Error
         peer_task->error_code_ = response.error_code;
         peer_task->error_message_ = response.error_message;
+        LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
     }
 }
 
