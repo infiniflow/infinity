@@ -169,6 +169,23 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             }
             break;
         }
+        case PhysicalOperatorType::kReadCache: {
+            auto *read_cache_state = static_cast<ReadCacheState *>(task_op_state);
+            if (read_cache_state->data_block_array_.empty()) {
+                if (materialize_sink_state->Error()) {
+                    materialize_sink_state->empty_result_ = true;
+                } else {
+                    String error_message = "Empty read cache output";
+                    UnrecoverableError(error_message);
+                }
+            } else {
+                for (auto &data_block : read_cache_state->data_block_array_) {
+                    materialize_sink_state->data_block_array_.emplace_back(std::move(data_block));
+                }
+                read_cache_state->data_block_array_.clear();
+            }
+            break;
+        }
         default: {
             Status status = Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_op_state->operator_type_)));
             RecoverableError(status);

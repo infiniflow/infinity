@@ -58,4 +58,34 @@ String FunctionExpression::ToString() const {
     return ss.str();
 }
 
+u64 FunctionExpression::Hash() const {
+    return 0;
+    // u64 h = 0;
+
+    // for (const auto &arg : arguments_) {
+    //     h ^= arg->Hash();
+    // }
+    // return h;
+}
+
+bool FunctionExpression::Eq(const BaseExpression &other_base) const {
+    return false; // cannot compare function
+    // if (other_base.type() != ExpressionType::kFunction) {
+    //     return false;
+    // }
+    // const auto &other = static_cast<const FunctionExpression &>(other_base);
+    // if (func_ != other.func_) {
+    //     return false;
+    // }
+    // if (arguments_.size() != other.arguments_.size()) {
+    //     return false;
+    // }
+    // for (SizeT i = 0; i < arguments_.size(); ++i) {
+    //     if (!arguments_[i]->Eq(*other.arguments_[i])) {
+    //         return false;
+    //     }
+    // }
+    // return true;
+}
+
 } // namespace infinity

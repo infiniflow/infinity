@@ -42,6 +42,12 @@ export struct MatchTensorScanIndexOptions {
     u32 emvb_n_doc_out_second_stage_ = topn_ * EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR;
     f32 emvb_threshold_final_ = EMVB_THRESHOLD_FINAL;
     explicit MatchTensorScanIndexOptions(u32 topn) : topn_(topn) {}
+
+    bool operator==(const MatchTensorScanIndexOptions &other) const {
+        return topn_ == other.topn_ && emvb_centroid_nprobe_ == other.emvb_centroid_nprobe_ &&
+               emvb_threshold_first_ == other.emvb_threshold_first_ && emvb_n_doc_to_score_ == other.emvb_n_doc_to_score_ &&
+               emvb_n_doc_out_second_stage_ == other.emvb_n_doc_out_second_stage_ && emvb_threshold_final_ == other.emvb_threshold_final_;
+    }
 };
 
 export class LogicalMatchTensorScan final : public LogicalMatchScanBase {
@@ -57,7 +63,7 @@ public:
     // extra options
     // will be parsed in InitExtraOptions()
     u32 topn_ = 0;
-    UniquePtr<MatchTensorScanIndexOptions> index_options_;
+    SharedPtr<MatchTensorScanIndexOptions> index_options_;
 };
 
 } // namespace infinity

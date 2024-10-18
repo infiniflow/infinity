@@ -1,3 +1,5 @@
+statement ok
+SET CONFIG result_cache_mode "off";
 
 statement ok
 DROP TABLE IF EXISTS sqllogic_fusion_rerank_maxsim;
@@ -148,3 +150,6 @@ test33 3.620001
 # Cleanup
 statement ok
 DROP TABLE sqllogic_fusion_rerank_maxsim;
+
+statement ok
+SET CONFIG result_cache_mode "on";

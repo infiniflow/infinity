@@ -1,0 +1,76 @@
+statement ok
+DROP TABLE IF EXISTS cached_limit_fulltext;
+
+statement ok
+CREATE TABLE cached_limit_fulltext(doctitle varchar DEFAULT '', docdate varchar DEFAULT '', body varchar DEFAULT '');
+
+statement ok
+COPY cached_limit_fulltext FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t', FORMAT CSV );
+
+statement ok
+CREATE INDEX ft_index ON cached_limit_fulltext(body) USING FULLTEXT;
+
+query I
+EXPLAIN SELECT ROW_ID() FROM cached_limit_fulltext SEARCH MATCH TEXT ('body^5', 'American', 'topn=10') LIMIT 3;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [ROW_ID (#1)]
+ -> LIMIT (3)
+    - limit: 3
+    - output columns: [__score, __rowid]
+   -> MATCH (2)
+      - table name: cached_limit_fulltext(default_db.cached_limit_fulltext)
+      - table index: #1
+      - match expression: MATCH TEXT ('body^5', 'American', 'topn=10')
+      - index filter: None
+      - leftover filter: None
+      - output columns: [__score, __rowid]
+
+query I
+SELECT ROW_ID() FROM cached_limit_fulltext SEARCH MATCH TEXT ('body^5', 'American', 'topn=10') LIMIT 3;
+----
+94
+95
+78
+
+query I
+EXPLAIN SELECT ROW_ID() FROM cached_limit_fulltext SEARCH MATCH TEXT ('body^5', 'American', 'topn=10') LIMIT 3 OFFSET 3;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [ROW_ID (#1)]
+ -> LIMIT (3)
+    - limit: 3
+    - offset: 3
+    - output columns: [__score, __rowid]
+   -> Read cache (2)
+      - table name: (default_db.cached_limit_fulltext)
+      - output columns: [__score, __rowid]
+
+query I
+SELECT ROW_ID() FROM cached_limit_fulltext SEARCH MATCH TEXT ('body^5', 'American', 'topn=10') LIMIT 3 OFFSET 3;
+----
+72
+66
+54
+
+query I
+EXPLAIN SELECT ROW_ID() FROM cached_limit_fulltext SEARCH MATCH TEXT ('body^5', 'American', 'topn=30') LIMIT 3;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [ROW_ID (#1)]
+ -> LIMIT (3)
+    - limit: 3
+    - output columns: [__score, __rowid]
+   -> MATCH (2)
+      - table name: cached_limit_fulltext(default_db.cached_limit_fulltext)
+      - table index: #1
+      - match expression: MATCH TEXT ('body^5', 'American', 'topn=30')
+      - index filter: None
+      - leftover filter: None
+      - output columns: [__score, __rowid]
+
+statement ok
+DROP TABLE cached_limit_fulltext;

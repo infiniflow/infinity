@@ -22,6 +22,25 @@ import column_vector;
 
 namespace infinity {
 
+PhysicalReadCache::PhysicalReadCache(u64 id,
+                                     LogicalNodeType origin_type,
+                                     SharedPtr<BaseTableRef> base_table_ref,
+                                     SharedPtr<CacheContent> cache_content,
+                                     Vector<SizeT> column_map,
+                                     SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kReadCache, nullptr, nullptr, id, load_metas), base_table_ref_(base_table_ref),
+      cache_content_(cache_content), column_map_(column_map) {
+    switch (origin_type) {
+        case LogicalNodeType::kMatch: {
+            origin_type_ = PhysicalOperatorType::kMatch;
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented");
+        }
+    }
+}
+
 bool PhysicalReadCache::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *read_cache_state = static_cast<ReadCacheState *>(operator_state);
     Vector<UniquePtr<DataBlock>> &data_block_array = read_cache_state->data_block_array_;

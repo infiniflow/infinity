@@ -55,6 +55,7 @@ import mlas_matrix_multiply;
 import physical_match_tensor_scan;
 import physical_knn_scan;
 import physical_merge_knn;
+import physical_read_cache;
 
 namespace infinity {
 
@@ -230,7 +231,11 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                 child_op = right();
             else
                 child_op = other_children_[i - 2].get();
-            switch (child_op->operator_type()) {
+            auto child_type = child_op->operator_type();
+            if (child_type == PhysicalOperatorType::kReadCache) {
+                child_type = static_cast<PhysicalReadCache *>(child_op)->origin_type();
+            }
+            switch (child_type) {
                 case PhysicalOperatorType::kKnnScan: {
                     PhysicalKnnScan *phy_knn_scan = static_cast<PhysicalKnnScan *>(child_op);
                     min_heaps[i] = phy_knn_scan->IsKnnMinHeap();

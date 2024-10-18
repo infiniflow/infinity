@@ -35,6 +35,13 @@ import block_column_entry;
 import logger;
 import column_vector;
 import query_context;
+import txn;
+import cached_node_base;
+import cached_match_scan;
+import physical_knn_scan;
+import physical_match_sparse_scan;
+import physical_match_tensor_scan;
+import result_cache_manager;
 
 namespace infinity {
 
@@ -136,6 +143,45 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
         }
     }
     output_block_ptr->Finalize();
+
+    ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
+    if (cache_result_ && cache_mgr != nullptr) {
+        AddCache(query_context, cache_mgr, operator_state->data_block_array_);
+    }
+}
+
+void PhysicalScanBase::AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
+    Txn *txn = query_context->GetTxn();
+    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+    TxnTimeStamp query_ts = std::min(txn->BeginTS(), table_entry->max_commit_ts());
+    Vector<UniquePtr<DataBlock>> data_blocks(output_data_blocks.size());
+    for (SizeT i = 0; i < output_data_blocks.size(); ++i) {
+        data_blocks[i] = output_data_blocks[i]->Clone();
+    }
+    UniquePtr<CachedNodeBase> cached_node;
+    switch (operator_type_) {
+        case PhysicalOperatorType::kKnnScan: {
+            cached_node = MakeUnique<CachedKnnScan>(query_ts, static_cast<const PhysicalKnnScan *>(this));
+            break;
+        }
+        case PhysicalOperatorType::kMatchSparseScan: {
+            cached_node = MakeUnique<CachedMatchSparseScan>(query_ts, static_cast<const PhysicalMatchSparseScan *>(this));
+            break;
+        }
+        case PhysicalOperatorType::kMatchTensorScan: {
+            cached_node = MakeUnique<CachedMatchTensorScan>(query_ts, static_cast<const PhysicalMatchTensorScan *>(this));
+            break;
+        }
+        default: {
+            UnrecoverableError("Unsupported operator type for cache");
+        }
+    }
+    bool success = cache_mgr->AddCache(std::move(cached_node), std::move(data_blocks));
+    if (!success) {
+        LOG_WARN(fmt::format("Add cache failed for query: {}", txn->BeginTS()));
+    } else {
+        LOG_INFO(fmt::format("Add cache success for query: {}", txn->BeginTS()));
+    }
 }
 
 } // namespace infinity

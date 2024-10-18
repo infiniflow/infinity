@@ -14,33 +14,15 @@
 
 module;
 
-export module match_expression;
+export module matched_index_scan;
 
 import stl;
-import data_type;
-import base_expression;
-import logical_type;
-import internal_types;
+import cached_match_base;
 
 namespace infinity {
 
-export class MatchExpression : public BaseExpression {
-public:
-    MatchExpression(const String &fields, const String &matching_text, const String &options_text);
+class CachedIndexScan : public CachedMatchBase {
 
-    inline DataType Type() const override { return DataType(LogicalType::kFloat); }
-
-    String ToString() const override;
-
-    u64 Hash() const override;
-
-    bool Eq(const BaseExpression &other) const override;
-
-public:
-    String fields_;
-    String matching_text_;
-    String options_text_;
-    SharedPtr<BaseExpression> optional_filter_;
 };
 
-} // namespace infinity
+}

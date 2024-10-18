@@ -975,11 +975,12 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
                                             std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
                                             logical_match_tensor->common_query_filter_,
                                             logical_match_tensor->topn_,
-                                            *logical_match_tensor->index_options_,
+                                            logical_match_tensor->index_options_,
                                             logical_operator->load_metas());
     match_tensor_scan_op->CheckColumn();
     match_tensor_scan_op->PlanWithIndex(query_context_ptr_);
     if (match_tensor_scan_op->TaskletCount() == 1) {
+        match_tensor_scan_op->SetCacheResult(true);
         return match_tensor_scan_op;
     } else {
         return MakeUnique<PhysicalMergeMatchTensor>(query_context_ptr_->GetNextNodeID(),
@@ -1002,6 +1003,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPt
                                             logical_match_sparse->common_query_filter_,
                                             logical_operator->load_metas());
     if (match_sparse_scan_op->GetTaskletCount(query_context_ptr_) == 1) {
+        match_sparse_scan_op->SetCacheResult(true);
         return match_sparse_scan_op;
     }
     auto merge_match_sparse_op =
@@ -1051,6 +1053,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
 
     knn_scan_op->PlanWithIndex(query_context_ptr_);
     if (knn_scan_op->TaskletCount() == 1) {
+        knn_scan_op->SetCacheResult(true);
         return knn_scan_op;
     } else {
         return MakeUnique<PhysicalMergeKnn>(query_context_ptr_->GetNextNodeID(),
@@ -1162,6 +1165,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactFinish(const SharedPtr<
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildReadCache(const SharedPtr<LogicalNode> &logical_operator) const {
     const auto *logical_read_cache = static_cast<LogicalReadCache *>(logical_operator.get());
     return MakeUnique<PhysicalReadCache>(logical_read_cache->node_id(),
+                                         logical_read_cache->origin_type_,
                                          logical_read_cache->base_table_ref_,
                                          logical_read_cache->cache_content_,
                                          logical_read_cache->column_map_,

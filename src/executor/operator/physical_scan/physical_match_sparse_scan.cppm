@@ -63,6 +63,10 @@ public:
         return table_index_;
     }
 
+    SharedPtr<MatchSparseExpression> match_sparse_expr() const {
+        return match_sparse_expr_;
+    }
+
 private:
     template <typename DataType>
     void ExecuteInner(QueryContext *query_context,

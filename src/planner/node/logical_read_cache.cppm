@@ -30,7 +30,11 @@ struct CacheContent;
 
 export class LogicalReadCache : public LogicalNode {
 public:
-    LogicalReadCache(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<CacheContent> cache_content, Vector<SizeT> column_map);
+    LogicalReadCache(u64 node_id,
+                     LogicalNodeType origin_type,
+                     SharedPtr<BaseTableRef> base_table_ref,
+                     SharedPtr<CacheContent> cache_content,
+                     Vector<SizeT> column_map);
 
 public:
     virtual Vector<ColumnBinding> GetColumnBindings() const;
@@ -44,6 +48,7 @@ public:
     virtual String name() { return "LogicalReadCache"; }
 
 public:
+    LogicalNodeType origin_type_;
     SharedPtr<BaseTableRef> base_table_ref_;
     SharedPtr<CacheContent> cache_content_;
     Vector<SizeT> column_map_; // result column id -> cache column id

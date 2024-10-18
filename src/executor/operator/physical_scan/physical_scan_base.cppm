@@ -29,6 +29,9 @@ import query_context;
 
 namespace infinity {
 
+class ResultCacheManager;
+class DataBlock;
+
 export class PhysicalScanBase : public PhysicalOperator {
 public:
     PhysicalScanBase(const u64 id,
@@ -52,6 +55,9 @@ protected:
                    i64 result_n,
                    QueryContext *query_context,
                    OperatorState *operator_state);
+
+private:
+    void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks);
 
 public:
     SharedPtr<BaseTableRef> base_table_ref_{};
