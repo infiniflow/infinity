@@ -40,6 +40,10 @@ public:
 
     const Value &GetValue() const { return value_; }
 
+    u64 Hash() const override;
+
+    bool Eq(const BaseExpression &other) const override;
+
 private:
     Value value_;
 };

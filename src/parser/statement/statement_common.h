@@ -91,6 +91,10 @@ struct InitParameter {
         delete init_params;
         return results;
     }
+
+    bool operator==(const InitParameter &other) const {
+        return param_name_ == other.param_name_ && param_value_ == other.param_value_;
+    }
 };
 
 struct IfExistsInfo {

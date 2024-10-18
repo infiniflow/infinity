@@ -47,6 +47,9 @@ u64 CachedMatch::Hash() const {
     u64 h = CachedMatchBase::Hash();
     h ^= match_expr_->Hash();
     h ^= std::hash<u32>()(topn_);
+    if (filter_expression_) {
+        h ^= filter_expression_->Hash();
+    }
     return h;
 }
 
@@ -64,8 +67,11 @@ bool CachedMatch::Eq(const CachedNodeBase &other_base) const {
     if (topn_ != other.topn_) {
         return false;
     }
+    if (filter_expression_ && other.filter_expression_) {
+        return filter_expression_->Eq(*other.filter_expression_);
+    }
     if (filter_expression_ || other.filter_expression_) {
-        return false; // TODO check if filter expr is the same.
+        return false;
     }
     return true;
 }

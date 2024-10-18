@@ -86,4 +86,36 @@ String KnnExpression::ToString() const {
     return expr_str;
 }
 
+u64 KnnExpression::Hash() const {
+    u64 h = 0;
+    h = std::hash<i64>()(dimension_);
+    h ^= std::hash<EmbeddingDataType>()(embedding_data_type_);
+    h ^= std::hash<KnnDistanceType>()(distance_type_);
+    h ^= std::hash<i32>()(topn_);
+    if (optional_filter_) {
+        h ^= optional_filter_->Hash();
+    }
+    return h;
+}
+
+bool KnnExpression::Eq(const BaseExpression &other_base) const {
+    if (other_base.type() != ExpressionType::kKnn) {
+        return false;
+    }
+    const auto &other = static_cast<const KnnExpression &>(other_base);
+    bool eq = dimension_ == other.dimension_ && embedding_data_type_ == other.embedding_data_type_ && distance_type_ == other.distance_type_ &&
+              query_embedding_.Eq(other.query_embedding_, embedding_data_type_, dimension_) && topn_ == other.topn_ &&
+              opt_params_ == other.opt_params_;
+    if (!eq) {
+        return false;
+    }
+    if (optional_filter_ && other.optional_filter_) {
+        return optional_filter_->Eq(*other.optional_filter_);
+    }
+    if (bool(optional_filter_) ^ bool(other.optional_filter_)) {
+        return false;
+    }
+    return true;
+}
+
 } // namespace infinity

@@ -44,6 +44,10 @@ public:
 
     static String MethodToString(MatchTensorSearchMethod method);
 
+    u64 Hash() const override;
+
+    bool Eq(const BaseExpression &other) const override;
+
     const MatchTensorSearchMethod search_method_;
     const ColumnExpression *column_expr_ = nullptr;
     const EmbeddingDataType embedding_data_type_;

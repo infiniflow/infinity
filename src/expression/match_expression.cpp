@@ -48,18 +48,13 @@ u64 MatchExpression::Hash() const {
     return h;
 }
 
-bool MatchExpression::Eq(const MatchExpression &other) const {
+bool MatchExpression::Eq(const BaseExpression &other_base) const {
+    if (other_base.type() != ExpressionType::kMatch) {
+        return false;
+    }
+    const auto &other = static_cast<const MatchExpression &>(other_base);
     bool eq = fields_ == other.fields_ && matching_text_ == other.matching_text_ && options_text_ == other.options_text_;
-    if (!eq) {
-        return false;
-    }
-    if (bool(optional_filter_) ^ bool(other.optional_filter_)) {
-        return false;
-    }
-    if (optional_filter_ && other.optional_filter_) {
-        return false; // TODO: compare optional filter
-    }
-    return true;
+    return eq;
 }
 
 } // namespace infinity

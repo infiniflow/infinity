@@ -93,6 +93,51 @@ DataType MatchSparseExpression::Type() const {
     return DataType(LogicalType::kInvalid);
 }
 
+u64 MatchSparseExpression::Hash() const {
+    u64 h = 0;
+    for (const auto &arg : arguments_) {
+        h ^= arg->Hash();
+    }
+    h ^= column_expr_->Hash();
+    h ^= query_sparse_expr_->Hash();
+    h ^= std::hash<SparseMetricType>()(metric_type_);
+    h ^= std::hash<SizeT>()(query_n_);
+    h ^= std::hash<SizeT>()(topn_);
+    if (optional_filter_) {
+        h ^= optional_filter_->Hash();
+    }
+    return h;
+}
+
+bool MatchSparseExpression::Eq(const BaseExpression &other_base) const {
+    if (other_base.type() != ExpressionType::kMatchSparse) {
+        return false;
+    }
+    const auto &other = static_cast<const MatchSparseExpression &>(other_base);
+    if (arguments_.size() != other.arguments_.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < arguments_.size(); ++i) {
+        if (!arguments_[i]->Eq(*other.arguments_[i])) {
+            return false;
+        }
+    }
+    bool eq = column_expr_->Eq(*other.column_expr_) && query_sparse_expr_->Eq(*other.query_sparse_expr_) && metric_type_ == other.metric_type_ &&
+              query_n_ == other.query_n_ && topn_ == other.topn_;
+    if (!eq) {
+        return false;
+    }
+    if (opt_params_.size() != other.opt_params_.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < opt_params_.size(); ++i) {
+        if (*(opt_params_[i]) != *(other.opt_params_[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void MatchSparseExpression::MakeQuery(SharedPtr<BaseExpression> query_sparse_expr) {
     const auto &column_type = column_expr_->Type();
     BoundCastFunc cast = CastFunction::GetBoundFunc(query_sparse_expr->Type(), column_type);

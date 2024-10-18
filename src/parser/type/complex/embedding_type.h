@@ -291,6 +291,10 @@ public:
         ParserError("ToString() isn't implemented");
         return std::string();
     }
+
+    bool Eq(const EmbeddingType &other, EmbeddingDataType type, size_t dimension) const {
+        return std::memcmp(ptr, other.ptr,  EmbeddingSize(type, dimension)) == 0;
+    }
 };
 
 } // namespace infinity
