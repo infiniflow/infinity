@@ -48,6 +48,8 @@ import substring;
 import substract;
 import char_length;
 import md5;
+import lower;
+import upper;
 import regex;
 import ltrim;
 import rtrim;
@@ -121,6 +123,8 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterSubstringFunction(catalog_ptr_);
     RegisterCharLengthFunction(catalog_ptr_);
     RegisterMd5Function(catalog_ptr_);
+    RegisterLowerFunction(catalog_ptr_);
+    RegisterUpperFunction(catalog_ptr_);
     RegisterRegexFunction(catalog_ptr_);
     RegisterLtrimFunction(catalog_ptr_);
     RegisterRtrimFunction(catalog_ptr_);

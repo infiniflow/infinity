@@ -48,8 +48,8 @@ curl --request POST \
         ]
     } '
 
-# insert 4 rows into 'tbl1'
-echo -e '\n\n-- insert 4 rows into tbl1'
+# insert rows into 'tbl1'
+echo -e '\n\n-- insert rows into tbl1'
 curl --request POST \
      --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
      --header 'accept: application/json' \
@@ -226,8 +226,8 @@ curl --request GET \
         "filter": "substring(body, 0, 4) = '\'test\''"
      } '
 
-# show rows of 'tbl1' where ltrim(body) = 'this is an example for trim '
-echo -e '\n\n-- show rows of 'tbl1' where ltrim(body) = '\'this is an example for trim \'''
+# show rows of 'tbl1' where upper chars of body is 'TEST@GMAIL.COM'
+echo -e '\n\n-- show rows of 'tbl1' where upper chars of body is 'TEST@GMAIL.COM''
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
      --header 'accept: application/json' \
@@ -238,11 +238,11 @@ curl --request GET \
          [
              "body"
          ],
-        "filter": "ltrim(body) = '\''this is an example for trim '\''"
+        "filter": "upper(body) = '\'TEST@GMAIL.COM\''"
      } '
 
-# show rows of 'tbl1' where rtrim(body) = ' this is an example for trim'
-echo -e '\n\n-- show rows of 'tbl1' where rtrim(body) = '\' this is an example for trim\'''
+# show rows of 'tbl1' where chars of body is lower of 'TEST@GMAIL.COM'
+echo -e '\n\n-- show rows of 'tbl1' where chars of body is lower of 'TEST@GMAIL.COM''
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
      --header 'accept: application/json' \
@@ -253,22 +253,7 @@ curl --request GET \
          [
              "body"
          ],
-        "filter": "rtrim(body) = '\'' this is an example for trim'\''"
-     } '
-
-# show rows of 'tbl1' where trim(body) = 'this is an example for trim'
-echo -e '\n\n-- show rows of 'tbl1' where trim(body) = '\'this is an example for trim\'''
-curl --request GET \
-     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
-     --header 'accept: application/json' \
-     --header 'content-type: application/json' \
-     --data '
-     {
-         "output":
-         [
-             "body"
-         ],
-        "filter": "trim(body) = '\''this is an example for trim'\''"
+        "filter": "body = lower('\'TEST@GMAIL.COM\'')"
      } '
 
 # drop tbl1
