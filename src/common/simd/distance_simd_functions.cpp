@@ -14,8 +14,8 @@
 
 module;
 
-#include <cmath>
 #include "simd_common_intrin_include.h"
+#include <cmath>
 
 /*
 #if defined(__x86_64__) && (defined(__clang_major__) && (__clang_major__ > 10))
@@ -74,6 +74,19 @@ f32 CosineDistance_common(const f32 *x, const f32 *y, SizeT d) {
         sqr_y += y[i] * y[i];
     }
     return dot ? dot / sqrt(sqr_x * sqr_y) : 0.0f;
+}
+
+f32 HammingDistance_common(const u8 *x, const u8 *y, SizeT d) {
+    SizeT real_d = d / 8;
+    f32 result = 0;
+    for (SizeT i = 0; i < real_d; ++i) {
+        u8 xor_result = x[i] ^ y[i];
+        while (xor_result) {
+            result += (xor_result | 1);
+            xor_result >>= 1;
+        }
+    }
+    return result;
 }
 
 #if defined(__AVX2__)

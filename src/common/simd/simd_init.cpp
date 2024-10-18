@@ -66,6 +66,10 @@ F32DistanceFuncType GetCosineDistanceFuncPtr() {
     return &CosineDistance_common;
 }
 
+ U8HammingDistanceFuncType GetHammingDistanceFuncPtr() {
+    return &HammingDistance_common;
+}
+
 F32DistanceFuncType Get_HNSW_F32L2_16_ptr() {
 #if defined(__AVX512F__)
     if (IsAVX512Supported()) {
