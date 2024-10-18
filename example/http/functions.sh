@@ -256,6 +256,51 @@ curl --request GET \
         "filter": "body = lower('\'TEST@GMAIL.COM\'')"
      } '
 
+# show rows of 'tbl1' where ltrim(body) is "this is an example for trim "
+echo -e '\n\n-- show rows of 'tbl1' where ltrim(body) is "this is an example for trim "'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "ltrim(body) = '\''this is an example for trim '\''"
+     } '
+
+# show rows of 'tbl1' where rtrim(body) is " this is an example for trim"
+echo -e '\n\n-- show rows of 'tbl1' where rtrim(body) is " this is an example for trim"'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "rtrim(body) = '\'' this is an example for trim'\''"
+     } '
+
+# show rows of 'tbl1' where trim(body) is "this is an example for trim "
+echo -e '\n\n-- show rows of 'tbl1' where trim(body) is "this is an example for trim"'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "trim(body) = '\''this is an example for trim'\''"
+     } '
+
 # drop tbl1
 echo -e '\n\n-- drop tbl1'
 curl --request DELETE \

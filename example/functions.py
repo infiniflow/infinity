@@ -43,14 +43,14 @@ res = table_obj.output(["*"]).filter("regex(c1, '(\w+([-+.]\w+)*)@(\w+([-.]\w+)*
 print(res)
 
 #function substring
-res = table_obj.output(["*"]).filter("substring(c1, 0, 2) = 'ab'").to_df()
+res = table_obj.output(["*", "substring(c1, 0, 2)"]).filter("substring(c1, 0, 2) = 'ab'").to_df()
 print(res)
 
-res = table_obj.output(["*"]).filter("substring(c1, 0, 4) = 'test'").to_df()
+res = table_obj.output(["*", "substring(c1, 0, 4)"]).filter("substring(c1, 0, 4) = 'test'").to_df()
 print(res)
 
 #function upper and lower
-res = table_obj.output(["*"]).filter("upper(c1) = 'TEST@GMAIL.COM'").to_df()
+res = table_obj.output(["*", "upper(c1)"]).filter("upper(c1) = 'TEST@GMAIL.COM'").to_df()
 print(res)
 
 res = table_obj.output(["*"]).filter("lower('ABC') = c1").to_df()
@@ -64,6 +64,9 @@ res = table_obj.output(["*", "rtrim('abc   ')"]).filter("rtrim('abc   ') = c1").
 print(res)
 
 res = table_obj.output(["*", "trim('   abc   ')"]).filter("trim('   abc   ') = c1").to_df()
+print(res)
+
+res = table_obj.output(["*"]).filter("trim('   abc   ') = rtrim(ltrim('   abc   '))").to_df()
 print(res)
 
 #res = table_obj.output(["*", "trim('   abc   ')"]).filter("trim('   abc   ') = rtrim(ltrim('   abc   '))").to_df()

@@ -44,12 +44,12 @@ statement ok
 INSERT INTO test_varchar_filter VALUES ('abc', 'abcd', 5);
 
 query VI
-SELECT * FROM test_varchar_filter where char_length(c1) = 8;
+SELECT *, char_length(c1) FROM test_varchar_filter where char_length(c1) = 8;
 ----
-abcddddd abcddddd 1
-abcddddc abcddddd 2
-abcdddde abcddddd 3
-abcdddde abcdddde 4
+abcddddd abcddddd 1 8
+abcddddc abcddddd 2 8
+abcdddde abcddddd 3 8
+abcdddde abcdddde 4 8
 
 query VII
 SELECT * FROM test_varchar_filter where char_length(c1) = 3;
@@ -72,10 +72,10 @@ statement ok
 INSERT INTO test_varchar_filter VALUES ('regex@regex.com', 'gmail@gmail.com', 6);
 
 query X
-SELECT * FROM test_varchar_filter where regex(c1, 'abc\w+e');
+SELECT *, regex(c1, 'abc\w+e') FROM test_varchar_filter where regex(c1, 'abc\w+e');
 ----
-abcdddde abcddddd 3
-abcdddde abcdddde 4
+abcdddde abcddddd 3 true
+abcdddde abcdddde 4 true
 
 query XI
 SELECT * FROM test_varchar_filter where regex(c1, 'ddddc');
@@ -88,12 +88,12 @@ SELECT * FROM test_varchar_filter where regex(c1, '(\w+([-+.]\w+)*)@(\w+([-.]\w+
 regex@regex.com gmail@gmail.com 6
 
 query XIII
-SELECT * FROM test_varchar_filter where substring(c1, 0, 4) = 'abcd';
+SELECT *, substring(c1, 0, 4) FROM test_varchar_filter where substring(c1, 0, 4) = 'abcd';
 ----
-abcddddd abcddddd 1
-abcddddc abcddddd 2
-abcdddde abcddddd 3
-abcdddde abcdddde 4
+abcddddd abcddddd 1 abcd
+abcddddc abcddddd 2 abcd
+abcdddde abcddddd 3 abcd
+abcdddde abcdddde 4 abcd
 
 query XIV
 SELECT * FROM test_varchar_filter where substring(c1, 0, 0) = '';
@@ -106,14 +106,39 @@ abc abcd 5
 regex@regex.com gmail@gmail.com 6
 
 query XV
-SELECT * FROM test_varchar_filter where upper(c1) = 'ABCDDDDD';
+SELECT *, upper(c1) FROM test_varchar_filter where upper(c1) = 'ABCDDDDD';
 ----
-abcddddd abcddddd 1
+abcddddd abcddddd 1 ABCDDDDD
 
 query XVI
-SELECT * FROM test_varchar_filter where lower('ABCDDDDD') = c1;
+SELECT *, lower('ABCDDDDD') FROM test_varchar_filter where lower('ABCDDDDD') = c1;
+----
+abcddddd abcddddd 1 abcddddd
+
+query XVII
+SELECT *, ltrim(' abcddddd') FROM test_varchar_filter where ltrim(' abcddddd') = c1;
+----
+abcddddd abcddddd 1 abcddddd
+
+query XVIII
+SELECT *, rtrim('abcddddd ') FROM test_varchar_filter where rtrim('abcddddd ') = c1;
+----
+abcddddd abcddddd 1 abcddddd
+
+query XIX
+SELECT *, trim(' abcddddd ') FROM test_varchar_filter where trim(' abcddddd ') = c1;
+----
+abcddddd abcddddd 1 abcddddd
+
+query XX
+SELECT * FROM test_varchar_filter where trim(' abcd dddd ') = rtrim(ltrim(' abcd dddd '));
 ----
 abcddddd abcddddd 1
+abcddddc abcddddd 2
+abcdddde abcddddd 3
+abcdddde abcdddde 4
+abc abcd 5
+regex@regex.com gmail@gmail.com 6
 
 statement ok
 DROP TABLE test_varchar_filter;
