@@ -47,6 +47,7 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
                     break;
                 }
                 auto logical_read_cache = MakeShared<LogicalReadCache>(logical_match->node_id(),
+                                                                       LogicalNodeType::kMatch,
                                                                        logical_match->base_table_ref_,
                                                                        std::move(cache_output->cache_content_),
                                                                        std::move(cache_output->column_map_));

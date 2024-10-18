@@ -27,22 +27,31 @@ import logger;
 
 namespace infinity {
 
-bool CacheContent::AppendColumns(const CacheContent &other, const Vector<SizeT> &column_idxes) {
+UniquePtr<CacheContent> CacheContent::AppendColumns(const CacheContent &other, const Vector<SizeT> &column_idxes) const {
     if (data_blocks_.size() != other.data_blocks_.size()) {
-        return false;
+        return nullptr;
     }
-    for (SizeT i = 0; i < data_blocks_.size(); ++i) {
-        DataBlock &old_block = *data_blocks_[i];
+    UniquePtr<CacheContent> result = Clone();
+    for (SizeT i = 0; i < result->data_blocks_.size(); ++i) {
+        DataBlock &old_block = *result->data_blocks_[i];
         const DataBlock &new_block = *other.data_blocks_[i];
         bool success = old_block.AppendColumns(new_block, column_idxes);
         if (!success) {
-            return false;
+            return nullptr;
         }
     }
     for (SizeT idx : column_idxes) {
-        column_names_->push_back((*(other.column_names_))[idx]);
+        result->column_names_->push_back((*(other.column_names_))[idx]);
     }
-    return true;
+    return result;
+}
+
+UniquePtr<CacheContent> CacheContent::Clone() const {
+    Vector<UniquePtr<DataBlock>> data_blocks;
+    for (const auto &block : data_blocks_) {
+        data_blocks.push_back(block->Clone());
+    }
+    return MakeUnique<CacheContent>(std::move(data_blocks), column_names_);
 }
 
 bool CacheResultMap::AddCache(
@@ -118,10 +127,13 @@ bool ResultCacheManager::AddCache(UniquePtr<CachedNodeBase> cached_node, Vector<
         if (add_columns.empty()) {
             return;
         }
-        bool success = old_content.AppendColumns(*new_content, add_columns);
-        if (!success) {
+        UniquePtr<CacheContent> updated_content = old_content.AppendColumns(*new_content, add_columns);
+        if (!updated_content) {
             LOG_WARN("Failed to append columns to cache content");
             old_content = std::move(*new_content);
+        } else {
+            LOG_INFO("Success update cache content");
+            old_content = std::move(*updated_content);
         }
     };
     return cache_map_.AddCache(std::move(cached_node), std::move(data_blocks), update_content_func);

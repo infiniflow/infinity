@@ -64,6 +64,9 @@ bool CachedMatch::Eq(const CachedNodeBase &other_base) const {
     if (topn_ != other.topn_) {
         return false;
     }
+    if (filter_expression_ || other.filter_expression_) {
+        return false; // TODO check if filter expr is the same.
+    }
     return true;
 }
 

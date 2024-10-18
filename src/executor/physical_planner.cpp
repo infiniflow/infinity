@@ -1162,6 +1162,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactFinish(const SharedPtr<
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildReadCache(const SharedPtr<LogicalNode> &logical_operator) const {
     const auto *logical_read_cache = static_cast<LogicalReadCache *>(logical_operator.get());
     return MakeUnique<PhysicalReadCache>(logical_read_cache->node_id(),
+                                         logical_read_cache->origin_type_,
                                          logical_read_cache->base_table_ref_,
                                          logical_read_cache->cache_content_,
                                          logical_read_cache->column_map_,

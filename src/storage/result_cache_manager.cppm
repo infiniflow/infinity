@@ -33,7 +33,9 @@ public:
     CacheContent(Vector<UniquePtr<DataBlock>> data_blocks, SharedPtr<Vector<String>> column_names)
         : data_blocks_(std::move(data_blocks)), column_names_(std::move(column_names)) {}
 
-    bool AppendColumns(const CacheContent &other, const Vector<SizeT> &column_idxes);
+    UniquePtr<CacheContent> AppendColumns(const CacheContent &other, const Vector<SizeT> &column_idxes) const;
+
+    UniquePtr<CacheContent> Clone() const;
 
     Vector<UniquePtr<DataBlock>> data_blocks_;
     SharedPtr<Vector<String>> column_names_;

@@ -1119,7 +1119,6 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             tasks_[0]->sink_state_ = MakeUnique<QueueSinkState>(plan_fragment_ptr_->FragmentID(), 0);
             break;
         }
-        case PhysicalOperatorType::kReadCache:
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kShow: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
@@ -1138,6 +1137,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             sink_state_ptr->column_names_ = last_operator->GetOutputNames();
             break;
         }
+        case PhysicalOperatorType::kReadCache:
         case PhysicalOperatorType::kMatch: {
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
                 tasks_[task_id]->sink_state_ = MakeUnique<QueueSinkState>(plan_fragment_ptr_->FragmentID(), task_id);
@@ -1326,6 +1326,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count, FragmentCon
             }
             break;
         }
+        case PhysicalOperatorType::kReadCache:
         case PhysicalOperatorType::kMatch:
         case PhysicalOperatorType::kMergeKnn:
         case PhysicalOperatorType::kMergeMatchTensor:
