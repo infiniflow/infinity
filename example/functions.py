@@ -20,7 +20,8 @@ table_obj.insert(
     [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
         {"c1": 'abc', "c2": 'abc'}, {"c1": 'bbc', "c2": 'bbc'}, {"c1": 'cbc', "c2": 'cbc'}, {"c1": 'dbc', "c2": 'dbc'},
         {"c1": 'abcd', "c2": 'abc'}, 
-        {"c1": 'test@gmail.com', "c2": 'email'}, {"c1": 'test@hotmail.com', "c2": 'email'}])
+        {"c1": 'test@gmail.com', "c2": 'email'}, {"c1": 'test@hotmail.com', "c2": 'email'},
+        {"c1": ' abc', "c2": 'abc'}, {"c1": 'abc ', "c2": 'abc'}, {"c1": ' abc ', "c2": 'abc'}])
 
 #function char_length
 res = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 1").to_df()
@@ -57,20 +58,17 @@ res = table_obj.output(["*"]).filter("lower('ABC') = c1").to_df()
 print(res)
 
 #function ltrim, rtrim, trim
-res = table_obj.output(["*", "ltrim('   abc')"]).filter("ltrim('   abc') = c1").to_df()
+res = table_obj.output(["*", "ltrim(c1)"]).filter("ltrim(c1) = 'abc'").to_df()
 print(res)
 
-res = table_obj.output(["*", "rtrim('abc   ')"]).filter("rtrim('abc   ') = c1").to_df()
+res = table_obj.output(["*", "rtrim(c1)"]).filter("rtrim(c1) = 'abc'").to_df()
 print(res)
 
-res = table_obj.output(["*", "trim('   abc   ')"]).filter("trim('   abc   ') = c1").to_df()
+res = table_obj.output(["*", "trim(c1)"]).filter("trim(c1) = 'abc'").to_df()
 print(res)
 
 res = table_obj.output(["*"]).filter("trim('   abc   ') = rtrim(ltrim('   abc   '))").to_df()
 print(res)
-
-#res = table_obj.output(["*", "trim('   abc   ')"]).filter("trim('   abc   ') = rtrim(ltrim('   abc   '))").to_df()
-#print(res)
 
 res = db_obj.drop_table("function_example")
 

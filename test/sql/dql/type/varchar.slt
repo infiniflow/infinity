@@ -111,34 +111,29 @@ SELECT *, upper(c1) FROM test_varchar_filter where upper(c1) = 'ABCDDDDD';
 abcddddd abcddddd 1 ABCDDDDD
 
 query XVI
-SELECT *, lower('ABCDDDDD') FROM test_varchar_filter where lower('ABCDDDDD') = c1;
+SELECT *, lower(c1) FROM test_varchar_filter where lower('ABCDDDDD') = c1;
 ----
 abcddddd abcddddd 1 abcddddd
+
+statement ok
+INSERT INTO test_varchar_filter VALUES (' a b c', 'abc', 7), ('a b c ', 'abc', 8), (' a b c ', 'abc', 9);
 
 query XVII
-SELECT *, ltrim(' abcddddd') FROM test_varchar_filter where ltrim(' abcddddd') = c1;
+SELECT *, ltrim(c1) FROM test_varchar_filter where ltrim(c1) = 'a b c';
 ----
-abcddddd abcddddd 1 abcddddd
+ a b c abc 7 a b c
 
 query XVIII
-SELECT *, rtrim('abcddddd ') FROM test_varchar_filter where rtrim('abcddddd ') = c1;
+SELECT *, rtrim(c1) FROM test_varchar_filter where rtrim(c1) = 'a b c';
 ----
-abcddddd abcddddd 1 abcddddd
+a b c  abc 8 a b c
 
 query XIX
-SELECT *, trim(' abcddddd ') FROM test_varchar_filter where trim(' abcddddd ') = c1;
+SELECT *, trim(c1) FROM test_varchar_filter where trim(c1) = 'a b c';
 ----
-abcddddd abcddddd 1 abcddddd
-
-query XX
-SELECT * FROM test_varchar_filter where trim(' abcd dddd ') = rtrim(ltrim(' abcd dddd '));
-----
-abcddddd abcddddd 1
-abcddddc abcddddd 2
-abcdddde abcddddd 3
-abcdddde abcdddde 4
-abc abcd 5
-regex@regex.com gmail@gmail.com 6
+ a b c abc 7 a b c
+a b c  abc 8 a b c
+ a b c  abc 9 a b c
 
 statement ok
 DROP TABLE test_varchar_filter;
