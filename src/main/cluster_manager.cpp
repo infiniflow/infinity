@@ -318,21 +318,46 @@ Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const
     return {client, client_status};
 }
 
-Status ClusterManager::SendLogs(const String &node_name, const SharedPtr<PeerClient> &peer_client, const Vector<SharedPtr<String>> &logs, bool synchronize) {
+Status
+ClusterManager::SendLogs(const String &node_name, const SharedPtr<PeerClient> &peer_client, const Vector<SharedPtr<String>> &logs, bool synchronize) {
     SharedPtr<SyncLogTask> sync_log_task = MakeShared<SyncLogTask>(node_name, logs);
     peer_client->Send(sync_log_task);
 
-    if(synchronize) {
+    Status status = Status::OK();
+    if (synchronize) {
         sync_log_task->Wait();
+    } else {
+        return status;
     }
 
-    Status status = Status::OK();
     if (sync_log_task->error_code_ != 0) {
         LOG_ERROR(fmt::format("Fail to send log follower: {}, error message: {}", node_name, sync_log_task->error_message_));
         status.code_ = static_cast<ErrorCode>(sync_log_task->error_code_);
         status.msg_ = MakeUnique<String>(sync_log_task->error_message_);
     }
     return status;
+}
+
+Status ClusterManager::GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
+                                      Vector<SharedPtr<PeerClient>> &follower_clients,
+                                      Vector<SharedPtr<NodeInfo>> &learners,
+                                      Vector<SharedPtr<PeerClient>> &learner_clients) {
+    if (this_node_->node_role_ != NodeRole::kLeader) {
+        return Status::InvalidNodeRole("Expect leader node");
+    }
+    std::unique_lock<std::mutex> lock(mutex_);
+    for (const auto &node_info_pair : other_node_map_) {
+        if (node_info_pair.second->node_role_ == NodeRole::kFollower) {
+            followers.emplace_back(node_info_pair.second);
+            follower_clients.emplace_back(reader_client_map_[node_info_pair.first]);
+        }
+        if (node_info_pair.second->node_role_ == NodeRole::kLearner) {
+            learners.emplace_back(node_info_pair.second);
+            learner_clients.emplace_back(reader_client_map_[node_info_pair.first]);
+        }
+    }
+
+    return Status::OK();
 }
 
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
@@ -378,7 +403,7 @@ Status ClusterManager::RemoveNode(const String &node_name) {
     }
 
     auto client_iter = reader_client_map_.find(node_name);
-    if(client_iter == reader_client_map_.end()) {
+    if (client_iter == reader_client_map_.end()) {
         return Status::NotExistNode(fmt::format("Attempt to disconnect from non-exist node: {}", node_name));
     } else {
         client_iter->second->UnInit();
@@ -481,18 +506,61 @@ Status ClusterManager::SyncLogsOnRegistration(const SharedPtr<NodeInfo> &non_lea
     return SendLogs(non_leader_node->node_name_, peer_client, wal_strings, true);
 }
 
-Status ClusterManager::SyncLogsToFollower() {
-    // Used by leader to sync logs when get HB from follower
-    return Status::OK();
-}
+void ClusterManager::PrepareLogs(const SharedPtr<String> &log_string) { logs_to_sync_.emplace_back(log_string); }
 
-Status ClusterManager::AsyncLogsToLearner() {
-    // Used by leader to async logs when get HB from learner
+Status ClusterManager::SyncLogs() {
+    LOG_TRACE("Sync logs to follower and async logs to learner");
+    Set<String> sent_nodes;
+    while (true) {
+        // Get follower and learner node
+        Vector<SharedPtr<NodeInfo>> followers;
+        Vector<SharedPtr<PeerClient>> follower_clients;
+        Vector<SharedPtr<NodeInfo>> learners;
+        Vector<SharedPtr<PeerClient>> learner_clients;
+
+        Status status = GetReadersInfo(followers, follower_clients, learners, learner_clients);
+        if (!status.ok()) {
+            return status;
+        }
+
+        SizeT follower_count = followers.size();
+        SizeT learner_count = learners.size();
+
+        if (follower_count != follower_clients.size() && learner_count != learner_clients.size()) {
+            return Status::UnexpectedError("Node info and node client count isn't match");
+        }
+
+        // Replicate logs to follower
+        for(SizeT idx = 0; idx < follower_count; ++ idx) {
+            const String& follower_name = followers[idx]->node_name_;
+            if(!sent_nodes.contains(follower_name)) {
+                status = SendLogs(follower_name, follower_clients[idx], logs_to_sync_, true);
+                if(status.ok()) {
+                    sent_nodes.insert(follower_name);
+                }
+            }
+        }
+
+        // Replicate logs to learner
+        for(SizeT idx = 0; idx < learner_count; ++ idx) {
+            const String& learner_name = learners[idx]->node_name_;
+            if(!sent_nodes.contains(learner_name)) {
+                status = SendLogs(learner_name, learner_clients[idx], logs_to_sync_, false);
+                if(status.ok()) {
+                    sent_nodes.insert(learner_name);
+                }
+            }
+        }
+
+        if(sent_nodes.size() == follower_count + learner_count) {
+            break;
+        }
+    }
     return Status::OK();
 }
 
 Status ClusterManager::SetFollowerNumber(SizeT new_follower_number) {
-    if(new_follower_number > 5) {
+    if (new_follower_number > 5) {
         return Status::NotSupport("Attempt to set follower count larger than 5.");
     }
 
@@ -501,9 +569,7 @@ Status ClusterManager::SetFollowerNumber(SizeT new_follower_number) {
     return Status::OK();
 }
 
-SizeT ClusterManager::GetFollowerNumber() const {
-    return follower_count_;
-}
+SizeT ClusterManager::GetFollowerNumber() const { return follower_count_; }
 
 Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &info_of_nodes) {
     // Only follower and learner will use this function.
@@ -542,8 +608,8 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
     return Status::OK();
 }
 
-Status ClusterManager::ApplySyncedLogNolock(const Vector<String>& synced_logs) {
-    for(auto& log_str: synced_logs) {
+Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
+    for (auto &log_str : synced_logs) {
         const i32 entry_size = log_str.size();
         const char *ptr = log_str.data();
         SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
