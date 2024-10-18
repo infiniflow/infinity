@@ -114,6 +114,7 @@ public:
 
     String ResultCacheMode();
     i64 CacheResultNum();
+    void SetCacheResult(const String &mode);
 
     // WAL
     String WALDir();

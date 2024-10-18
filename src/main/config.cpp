@@ -2335,6 +2335,17 @@ i64 Config::CacheResultNum() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kCacheResultNum);
 }
 
+void Config::SetCacheResult(const String &mode) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCacheMode);
+    if (base_option->data_type_ != BaseOptionDataType::kString) {
+        String error_message = "Attempt to set string value to result cache mode data type option";
+        UnrecoverableError(error_message);
+    }
+    StringOption *result_cache_mode_option = static_cast<StringOption *>(base_option);
+    result_cache_mode_option->value_ = mode;
+}
+
 // WAL
 String Config::WALDir() {
     std::lock_guard<std::mutex> guard(mutex_);

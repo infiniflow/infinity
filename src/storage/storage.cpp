@@ -59,6 +59,13 @@ Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {}
 
 Storage::~Storage() = default;
 
+ResultCacheManager *Storage::result_cache_manager() const noexcept {
+    if (config_ptr_->ResultCacheMode() != "on") {
+        return nullptr;
+    }
+    return result_cache_manager_.get();
+}
+
 StorageMode Storage::GetStorageMode() const {
     std::unique_lock<std::mutex> lock(mutex_);
     return current_storage_mode_;
