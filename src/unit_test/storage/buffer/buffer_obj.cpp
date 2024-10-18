@@ -59,13 +59,9 @@ import default_values;
 using namespace infinity;
 
 class BufferObjTest : public BaseTest {
-    void SetUp() override {
-        BaseTest::SetUp();
-    }
+    void SetUp() override { BaseTest::SetUp(); }
 
-    void TearDown() override {
-        BaseTest::TearDown();
-    }
+    void TearDown() override { BaseTest::TearDown(); }
 
 public:
     void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
@@ -91,7 +87,7 @@ TEST_F(BufferObjTest, test1) {
 
     RemoveDbDirs();
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
-//    RemoveDbDirs();
+    //    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
     SizeT memory_limit = 1024;
@@ -100,7 +96,8 @@ TEST_F(BufferObjTest, test1) {
     auto base_dir = MakeShared<String>(GetFullDataDir());
     auto persistence_dir = MakeShared<String>(data_dir + "/persistence");
 
-    UniquePtr<PersistenceManager> persistence_manager = MakeUnique<PersistenceManager>(*persistence_dir, *base_dir, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+    UniquePtr<PersistenceManager> persistence_manager =
+        MakeUnique<PersistenceManager>(*persistence_dir, *base_dir, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager.get());
 
     SizeT test_size1 = 1024;
@@ -138,7 +135,9 @@ TEST_F(BufferObjTest, test1) {
         buf1->CheckState();
     }
 
-    { auto handle2 = buf2->Load(); }
+    {
+        auto handle2 = buf2->Load();
+    }
     // kUnloaded, kEphemeral -> kFreed, kEphemeral
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
     buf1->CheckState();
@@ -150,7 +149,9 @@ TEST_F(BufferObjTest, test1) {
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         buf1->CheckState();
     }
-    { auto handle2 = buf2->Load(); }
+    {
+        auto handle2 = buf2->Load();
+    }
 
     /// kTemp
     {
@@ -172,7 +173,9 @@ TEST_F(BufferObjTest, test1) {
         buf1->CheckState();
     }
 
-    { auto handle2 = buf2->Load(); }
+    {
+        auto handle2 = buf2->Load();
+    }
     // kUnloaded, kTemp -> kFreed, kTemp
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
     buf1->CheckState();
@@ -200,7 +203,9 @@ TEST_F(BufferObjTest, test1) {
         buf1->CheckState();
     }
 
-    { auto handle2 = buf2->Load(); }
+    {
+        auto handle2 = buf2->Load();
+    }
     // kUnloaded, kPersistent -> kFreed, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
     buf1->CheckState();
@@ -254,7 +259,9 @@ TEST_F(BufferObjTest, test1) {
         auto handle1 = buf1->Load();
         __attribute__((unused)) auto data1 = handle1.GetDataMut();
     }
-    { auto handle2 = buf2->Load(); }
+    {
+        auto handle2 = buf2->Load();
+    }
     {
         auto handle1 = buf1->Load();
         SaveBufferObj(buf1);
@@ -267,8 +274,12 @@ TEST_F(BufferObjTest, test1) {
         auto handle1 = buf1->Load();
         __attribute__((unused)) auto data1 = handle1.GetDataMut();
     }
-    { auto handle2 = buf2->Load(); }
-    { auto handle1 = buf1->Load(); }
+    {
+        auto handle2 = buf2->Load();
+    }
+    {
+        auto handle1 = buf1->Load();
+    }
     SaveBufferObj(buf1);
     // kUnloaded, kPersistent -> kUnloaded, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
@@ -494,7 +505,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     infinity::GlobalResourceUsage::Init();
 #endif
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj_2.toml");
-//    RemoveDbDirs();
+    //    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
     constexpr u64 kInsertN = 2;
@@ -524,7 +535,8 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embedding_info), "col1", constraints);
             column_defs.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_hnsw"), column_defs);
+        auto tbl1_def =
+            MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_hnsw"), MakeShared<String>("test_comment"), column_defs);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -677,6 +689,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
 
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
+    auto table_comment = MakeShared<String>("table1_commment");
     auto index_name = MakeShared<String>("idx1");
     auto column_name = MakeShared<String>("col1");
 
@@ -687,7 +700,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
     }
     {
-        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, table_comment, column_defs);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -771,6 +784,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
 
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
+    auto table_comment = MakeShared<String>("table_comment");
     auto index_name = MakeShared<String>("idx1");
     auto column_name = MakeShared<String>("col1");
 
@@ -781,7 +795,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
     }
     {
-        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, table_comment, column_defs);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());

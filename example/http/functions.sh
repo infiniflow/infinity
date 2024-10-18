@@ -203,6 +203,21 @@ curl --request GET \
         "filter": "regex(body, '\''('[0-9A-Za-z_]+'('[-+.][0-9A-Za-z_]+')''*'')'@'('[0-9A-Za-z_]+'('[-.][0-9A-Za-z_]+')''*'')''\\'.'('[0-9A-Za-z_]+'('[-.][0-9A-Za-z_]+')''*'')'\'')"
      } '
 
+# show rows of 'tbl1' where first 4 chars of body is 'test'
+echo -e '\n\n-- show rows of 'tbl1' where first 4 chars of body is 'test''
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "substring(body, 0, 4) = '\'test\''"
+     } '
+
 # drop tbl1
 echo -e '\n\n-- drop tbl1'
 curl --request DELETE \

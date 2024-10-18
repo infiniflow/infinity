@@ -952,14 +952,21 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
     auto *db_entry = storage_->catalog()->GetDatabaseReplay(cmd.db_name_, txn_id, 0 /*begin_ts*/);
     auto table_dir = MakeShared<String>(*db_entry->db_entry_dir() + "/" + cmd.table_dir_tail_);
     SharedPtr<String> table_name = cmd.table_def_->table_name();
+    SharedPtr<String> table_comment = cmd.table_def_->table_comment();
     db_entry->CreateTableReplay(
         table_name,
-        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+        table_comment,
+        [&](TableMeta *table_meta,
+            const SharedPtr<String> &table_name,
+            const SharedPtr<String> &table_comment,
+            TransactionID txn_id,
+            TxnTimeStamp begin_ts) {
             ColumnID next_column_id = cmd.table_def_->columns().size();
             return TableEntry::ReplayTableEntry(false,
                                                 table_meta,
                                                 table_dir,
                                                 table_name,
+                                                table_comment,
                                                 cmd.table_def_->columns(),
                                                 TableEntryType::kTableEntry,
                                                 txn_id,
@@ -989,11 +996,16 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID
     auto *db_entry = storage_->catalog()->GetDatabaseReplay(cmd.db_name_, txn_id, 0 /*begin_ts*/);
     db_entry->DropTableReplay(
         cmd.table_name_,
-        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+        [&](TableMeta *table_meta,
+            const SharedPtr<String> &table_name,
+            const SharedPtr<String> &table_comment,
+            TransactionID txn_id,
+            TxnTimeStamp begin_ts) {
             return TableEntry::ReplayTableEntry(true,
                                                 table_meta,
                                                 nullptr,
                                                 table_name,
+                                                table_comment,
                                                 Vector<SharedPtr<ColumnDef>>{},
                                                 TableEntryType::kTableEntry,
                                                 txn_id,
@@ -1239,7 +1251,12 @@ void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn
     new_table_entry->commit_ts_ = commit_ts;
     db_entry->CreateTableReplay(
         table_entry->GetTableName(),
-        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) { return new_table_entry; },
+        table_entry->GetTableComment(),
+        [&](TableMeta *table_meta,
+            const SharedPtr<String> &table_name,
+            const SharedPtr<String> &table_comment,
+            TransactionID txn_id,
+            TxnTimeStamp begin_ts) { return new_table_entry; },
         txn_id,
         commit_ts);
 }
@@ -1263,7 +1280,12 @@ void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID t
     new_table_entry->commit_ts_ = commit_ts;
     db_entry->CreateTableReplay(
         table_entry->GetTableName(),
-        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) { return new_table_entry; },
+        table_entry->GetTableComment(),
+        [&](TableMeta *table_meta,
+            const SharedPtr<String> &table_name,
+            const SharedPtr<String> &table_comment,
+            TransactionID txn_id,
+            TxnTimeStamp begin_ts) { return new_table_entry; },
         txn_id,
         commit_ts);
 }

@@ -98,6 +98,7 @@ String TableEntry::EncodeIndex(const String &table_name, TableMeta *table_meta) 
 TableEntry::TableEntry(bool is_delete,
                        const SharedPtr<String> &table_entry_dir,
                        SharedPtr<String> table_name,
+                       SharedPtr<String> table_comment,
                        const Vector<SharedPtr<ColumnDef>> &columns,
                        TableEntryType table_entry_type,
                        TableMeta *table_meta,
@@ -107,8 +108,8 @@ TableEntry::TableEntry(bool is_delete,
                        SegmentID next_segment_id,
                        ColumnID next_column_id)
     : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
-      table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns), next_column_id_(next_column_id),
-      table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id),
+      table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), table_comment_(std::move(table_comment)), columns_(columns),
+      next_column_id_(next_column_id), table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id),
       fulltext_column_index_cache_(MakeShared<TableIndexReaderCache>(this)) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
@@ -122,7 +123,8 @@ TableEntry::TableEntry(bool is_delete,
 
 TableEntry::TableEntry(const TableEntry &other)
     : BaseEntry(other), table_meta_(other.table_meta_), table_entry_dir_(other.table_entry_dir_), table_name_(other.table_name_),
-      columns_(other.columns_), next_column_id_(other.next_column_id_), table_entry_type_(other.table_entry_type_) {
+      table_comment_(other.table_comment_), columns_(other.columns_), next_column_id_(other.next_column_id_),
+      table_entry_type_(other.table_entry_type_) {
     row_count_ = other.row_count_.load();
     unsealed_id_ = other.unsealed_id_;
     next_segment_id_ = other.next_segment_id_.load();
@@ -147,6 +149,7 @@ UniquePtr<TableEntry> TableEntry::Clone(TableMeta *meta) const {
 SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 const SharedPtr<String> &db_entry_dir,
                                                 SharedPtr<String> table_name,
+                                                SharedPtr<String> table_comment,
                                                 const Vector<SharedPtr<ColumnDef>> &columns,
                                                 TableEntryType table_entry_type,
                                                 TableMeta *table_meta,
@@ -162,6 +165,7 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
     return MakeShared<TableEntry>(is_delete,
                                   std::move(table_entry_dir),
                                   std::move(table_name),
+                                  std::move(table_comment),
                                   columns,
                                   table_entry_type,
                                   table_meta,
@@ -176,6 +180,7 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
                                                    TableMeta *table_meta,
                                                    SharedPtr<String> table_entry_dir,
                                                    SharedPtr<String> table_name,
+                                                   SharedPtr<String> table_comment,
                                                    const Vector<SharedPtr<ColumnDef>> &column_defs,
                                                    TableEntryType table_entry_type,
                                                    TransactionID txn_id,
@@ -188,6 +193,7 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
     auto table_entry = MakeShared<TableEntry>(is_delete,
                                               std::move(table_entry_dir),
                                               std::move(table_name),
+                                              std::move(table_comment),
                                               column_defs,
                                               table_entry_type,
                                               table_meta,
@@ -1131,6 +1137,11 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["table_name"] = *this->GetTableName();
+        String table_comment = *this->GetTableComment();
+        if (!table_comment.empty()) {
+            json_res["table_comment"] = table_comment;
+        }
+
         json_res["table_entry_type"] = this->table_entry_type_;
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
@@ -1199,6 +1210,10 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
 UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr) {
     SharedPtr<String> table_name = MakeShared<String>(table_entry_json["table_name"]);
+    SharedPtr<String> table_comment = MakeShared<String>();
+    if (table_entry_json.contains("table_comment")) {
+        table_comment = MakeShared<String>(table_entry_json["table_comment"]);
+    }
     TableEntryType table_entry_type = table_entry_json["table_entry_type"];
 
     bool deleted = table_entry_json["deleted"];
@@ -1251,6 +1266,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted,
                                                                table_entry_dir,
                                                                table_name,
+                                                               table_comment,
                                                                columns,
                                                                table_entry_type,
                                                                table_meta,

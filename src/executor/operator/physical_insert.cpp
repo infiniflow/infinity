@@ -47,7 +47,8 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     SizeT column_count = value_list_[0].size();
     SizeT table_collection_column_count = table_entry_->ColumnCount();
     if (column_count != table_collection_column_count) {
-        String error_message = fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count);
+        String error_message =
+            fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count);
         UnrecoverableError(error_message);
     }
 
@@ -86,7 +87,8 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     if (operator_state == nullptr) {
         // Generate the result table
         Vector<SharedPtr<ColumnDef>> column_defs;
-        SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), column_defs);
+        SharedPtr<TableDef> result_table_def_ptr =
+            TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
         output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
         output_->SetResultMsg(std::move(result_msg));
     } else {

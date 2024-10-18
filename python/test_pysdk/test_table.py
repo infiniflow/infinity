@@ -514,7 +514,7 @@ class TestInfinity:
             print(res)
             # check the polars dataframe
             assert res.columns == ["database", "table", "type", "column_count", "block_count", "block_capacity",
-                                   "segment_count", "segment_capacity"]
+                                   "segment_count", "segment_capacity", "comment"]
 
     def _test_create_varchar_table(self, suffix):
         """
