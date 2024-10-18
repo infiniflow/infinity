@@ -42,6 +42,19 @@ print(res)
 res = table_obj.output(["*"]).filter("regex(c1, '(\w+([-+.]\w+)*)@(\w+([-.]\w+)*)\.(\w+([-.]\w+)*)')").to_df()
 print(res)
 
+#function ltrim, rtrim, trim
+res = table_obj.output(["*"]).filter("ltrim('   abc') = c1").to_df()
+print(res)
+
+res = table_obj.output(["*"]).filter("rtrim('abc   ') = c1").to_df()
+print(res)
+
+res = table_obj.output(["*"]).filter("trim('   abc   ') = c1").to_df()
+print(res)
+
+res = table_obj.output(["*"]).filter("trim('   abc   ') = rtrim(ltrim('   abc   '))").to_df()
+print(res)
+
 res = db_obj.drop_table("function_example")
 
 infinity_obj.disconnect()
