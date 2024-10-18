@@ -73,6 +73,7 @@ auto GetKnnExprForCalculation(const KnnExpression &src_knn_expr, const Embedding
     const auto src_query_embedding_type = src_knn_expr.embedding_data_type_;
     EmbeddingDataType new_query_embedding_type = EmbeddingDataType::kElemInvalid;
     switch (column_embedding_type) {
+        case EmbeddingDataType::kElemBit:
         case EmbeddingDataType::kElemUInt8:
         case EmbeddingDataType::kElemInt8: {
             // expect query embedding to be the same type
@@ -86,7 +87,6 @@ auto GetKnnExprForCalculation(const KnnExpression &src_knn_expr, const Embedding
             // no need for alignment
             break;
         }
-        case EmbeddingDataType::kElemBit:
         case EmbeddingDataType::kElemInt16:
         case EmbeddingDataType::kElemInt32:
         case EmbeddingDataType::kElemInt64: {
@@ -228,7 +228,9 @@ void PhysicalKnnScan::ExecuteInternalByColumnLogicalType(QueryContext *query_con
         case EmbeddingDataType::kElemBFloat16: {
             return ExecuteInternalByColumnDataType<t, BFloat16T>(query_context, knn_scan_operator_state);
         }
-        case EmbeddingDataType::kElemBit:
+        case EmbeddingDataType::kElemBit: {
+            return ExecuteInternalByColumnDataType<t, u8>(query_context, knn_scan_operator_state);
+        }
         case EmbeddingDataType::kElemInt16:
         case EmbeddingDataType::kElemInt32:
         case EmbeddingDataType::kElemInt64:
@@ -322,7 +324,16 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataType(QueryContext *query_contex
             UnrecoverableError(fmt::format("BUG: Query embedding data type: {} should be cast to Float before knn search!",
                                            EmbeddingT::EmbeddingDataType2String(query_elem_type)));
         }
-        case EmbeddingDataType::kElemBit:
+        case EmbeddingDataType::kElemBit: {
+            switch (query_dist_type) {
+                case KnnDistanceType::kHamming: {
+                    return ExecuteDispatchHelper<t, ColumnDataT, u8, CompareMax, f32>::Execute(this, query_context, knn_scan_operator_state);
+                }
+                default: {
+                    return knn_distance_error();
+                }
+            }
+        }
         case EmbeddingDataType::kElemInt16:
         case EmbeddingDataType::kElemInt32:
         case EmbeddingDataType::kElemInt64:
