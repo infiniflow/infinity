@@ -599,6 +599,7 @@ Status ClusterManager::SyncLogs() {
         }
 
         if (sent_nodes.size() == follower_count + learner_count) {
+            logs_to_sync_.clear();
             break;
         }
     }
