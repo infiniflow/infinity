@@ -32,7 +32,7 @@ ClusterManager::~ClusterManager() {
     other_node_map_.clear();
     this_node_.reset();
     if (client_to_leader_.get() != nullptr) {
-        client_to_leader_->UnInit();
+        client_to_leader_->UnInit(true);
     }
     client_to_leader_.reset();
 }
@@ -79,7 +79,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     leader_node_->port_ = leader_port;
 
     Status client_status = Status::OK();
-    std::tie(client_to_leader_, client_status) = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
+    std::tie(client_to_leader_, client_status) = ClusterManager::ConnectToServerNoLock(node_name, leader_ip, leader_port);
     if (!client_status.ok()) {
         return client_status;
     }
@@ -110,7 +110,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     leader_node_->port_ = leader_port;
 
     Status client_status = Status::OK();
-    std::tie(client_to_leader_, client_status) = ClusterManager::ConnectToServerNoLock(leader_ip, leader_port);
+    std::tie(client_to_leader_, client_status) = ClusterManager::ConnectToServerNoLock(node_name, leader_ip, leader_port);
     if (!client_status.ok()) {
         return client_status;
     }
@@ -136,7 +136,7 @@ Status ClusterManager::UnInit() {
     other_node_map_.clear();
     this_node_.reset();
     if (client_to_leader_.get() != nullptr) {
-        client_to_leader_->UnInit();
+        client_to_leader_->UnInit(true);
     }
     client_to_leader_.reset();
 
@@ -309,8 +309,9 @@ Status ClusterManager::UnregisterFromLeaderNoLock() {
     return status;
 }
 
-Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const String &server_ip, i64 server_port) {
-    SharedPtr<PeerClient> client = MakeShared<PeerClient>(server_ip, server_port);
+Tuple<SharedPtr<PeerClient>, Status>
+ClusterManager::ConnectToServerNoLock(const String &sending_node_name, const String &server_ip, i64 server_port) {
+    SharedPtr<PeerClient> client = MakeShared<PeerClient>(sending_node_name, server_ip, server_port);
     Status client_status = client->Init();
     if (!client_status.ok()) {
         return {nullptr, client_status};
@@ -347,11 +348,11 @@ Status ClusterManager::GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
     }
     std::unique_lock<std::mutex> lock(mutex_);
     for (const auto &node_info_pair : other_node_map_) {
-        if (node_info_pair.second->node_role_ == NodeRole::kFollower) {
+        if (node_info_pair.second->node_role_ == NodeRole::kFollower && node_info_pair.second->node_status_ == NodeStatus::kAlive) {
             followers.emplace_back(node_info_pair.second);
             follower_clients.emplace_back(reader_client_map_[node_info_pair.first]);
         }
-        if (node_info_pair.second->node_role_ == NodeRole::kLearner) {
+        if (node_info_pair.second->node_role_ == NodeRole::kLearner && node_info_pair.second->node_status_ == NodeStatus::kAlive) {
             learners.emplace_back(node_info_pair.second);
             learner_clients.emplace_back(reader_client_map_[node_info_pair.first]);
         }
@@ -379,7 +380,8 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     }
 
     // Connect to follower/learner server.
-    auto [client_to_follower, client_status] = ClusterManager::ConnectToServerNoLock(node_info->ip_address_, node_info->port_);
+    auto [client_to_follower, client_status] =
+        ClusterManager::ConnectToServerNoLock(this_node_->node_name_, node_info->ip_address_, node_info->port_);
     if (!client_status.ok()) {
         return client_status;
     }
@@ -391,7 +393,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     return Status::OK();
 }
 
-Status ClusterManager::RemoveNode(const String &node_name) {
+Status ClusterManager::UpdateNodeByLeader(const String &node_name, UpdateNodeOp update_node_op) {
     // Only used in leader mode.
     std::unique_lock<std::mutex> lock(mutex_);
 
@@ -399,15 +401,35 @@ Status ClusterManager::RemoveNode(const String &node_name) {
     if (iter == other_node_map_.end()) {
         return Status::NotExistNode(fmt::format("Attempt to remove non-exist node: {}", node_name));
     } else {
-        other_node_map_.erase(node_name);
+        switch (update_node_op) {
+            case UpdateNodeOp::kRemove: {
+                other_node_map_.erase(node_name);
+                break;
+            }
+            case UpdateNodeOp::kLostConnection: {
+                // Can't connect to the node
+                iter->second->node_status_ = NodeStatus::kLostConnection;
+                break;
+            }
+        }
     }
 
     auto client_iter = reader_client_map_.find(node_name);
     if (client_iter == reader_client_map_.end()) {
         return Status::NotExistNode(fmt::format("Attempt to disconnect from non-exist node: {}", node_name));
     } else {
-        client_iter->second->UnInit();
-        reader_client_map_.erase(node_name);
+        switch (update_node_op) {
+            case UpdateNodeOp::kRemove: {
+                client_iter->second->UnInit(true);
+                reader_client_map_.erase(node_name);
+                break;
+            }
+            case UpdateNodeOp::kLostConnection: {
+                client_iter->second->UnInit(false);
+                reader_client_map_.erase(node_name);
+                break;
+            }
+        }
     }
 
     return Status::OK();
@@ -531,28 +553,28 @@ Status ClusterManager::SyncLogs() {
         }
 
         // Replicate logs to follower
-        for(SizeT idx = 0; idx < follower_count; ++ idx) {
-            const String& follower_name = followers[idx]->node_name_;
-            if(!sent_nodes.contains(follower_name)) {
+        for (SizeT idx = 0; idx < follower_count; ++idx) {
+            const String &follower_name = followers[idx]->node_name_;
+            if (!sent_nodes.contains(follower_name)) {
                 status = SendLogs(follower_name, follower_clients[idx], logs_to_sync_, true);
-                if(status.ok()) {
+                if (status.ok()) {
                     sent_nodes.insert(follower_name);
                 }
             }
         }
 
         // Replicate logs to learner
-        for(SizeT idx = 0; idx < learner_count; ++ idx) {
-            const String& learner_name = learners[idx]->node_name_;
-            if(!sent_nodes.contains(learner_name)) {
+        for (SizeT idx = 0; idx < learner_count; ++idx) {
+            const String &learner_name = learners[idx]->node_name_;
+            if (!sent_nodes.contains(learner_name)) {
                 status = SendLogs(learner_name, learner_clients[idx], logs_to_sync_, false);
-                if(status.ok()) {
+                if (status.ok()) {
                     sent_nodes.insert(learner_name);
                 }
             }
         }
 
-        if(sent_nodes.size() == follower_count + learner_count) {
+        if (sent_nodes.size() == follower_count + learner_count) {
             break;
         }
     }
@@ -609,11 +631,13 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
 }
 
 Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
+    //    WalManager *wal_manager = txn_manager_->wal_manager();
     for (auto &log_str : synced_logs) {
         const i32 entry_size = log_str.size();
         const char *ptr = log_str.data();
         SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
         LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
+        //        wal_manager->ReplayWalEntry(*entry);
     }
     return Status::OK();
 }

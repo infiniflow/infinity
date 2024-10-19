@@ -80,7 +80,7 @@ void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterRespons
     LOG_TRACE("Get Unregister request");
     NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
     if (leader_node->node_role_ == NodeRole::kLeader) {
-        Status status = InfinityContext::instance().cluster_manager()->RemoveNode(request.node_name);
+        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(request.node_name, UpdateNodeOp::kRemove);
         if (!status.ok()) {
             response.error_code = static_cast<i64>(status.code_);
             response.error_message = status.message();

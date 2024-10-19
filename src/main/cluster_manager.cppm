@@ -26,6 +26,8 @@ import txn_manager;
 
 namespace infinity {
 
+export enum class UpdateNodeOp { kRemove, kLostConnection };
+
 export class ClusterManager {
 public:
     explicit ClusterManager(TxnManager *txn_manager) : txn_manager_(txn_manager) {}
@@ -46,7 +48,7 @@ private:
     void CheckHeartBeatInner();
     Status RegisterToLeaderNoLock();
     Status UnregisterFromLeaderNoLock();
-    Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &server_ip, i64 server_port);
+    Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &sending_node_name, const String &server_ip, i64 server_port);
     Status SendLogs(const String &node_name, const SharedPtr<PeerClient> &peer_client, const Vector<SharedPtr<String>> &logs, bool synchronize);
 
     Status GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
@@ -59,7 +61,7 @@ public:
     Status AddNodeInfo(const SharedPtr<NodeInfo> &new_node);
 
     // Used by leader to remove unregister node
-    Status RemoveNode(const String &node_name);
+    Status UpdateNodeByLeader(const String &node_name, UpdateNodeOp update_node_op);
 
     // Used by leader when get HB request
     Status

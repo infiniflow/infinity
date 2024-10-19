@@ -24,12 +24,14 @@ import status;
 import thrift;
 import infinity_exception;
 import peer_task;
+import infinity_context;
+import cluster_manager;
 
 namespace infinity {
 
 PeerClient::~PeerClient() {
     if (running_) {
-        UnInit();
+        UnInit(false);
     }
     server_connected_ = false;
 }
@@ -45,16 +47,21 @@ Status PeerClient::Init() {
 }
 
 /// TODO: comment
-Status PeerClient::UnInit() {
-    LOG_INFO(fmt::format("Peer client: {} is stopping.", this_node_name_));
+Status PeerClient::UnInit(bool sync) {
+    LOG_INFO(fmt::format("Peer client: {} is stopping.", sending_node_name_));
+
     if (processor_thread_.get() != nullptr) {
-        SharedPtr<TerminatePeerTask> terminate_task = MakeShared<TerminatePeerTask>();
+        SharedPtr<TerminatePeerTask> terminate_task = MakeShared<TerminatePeerTask>(!sync);
         peer_task_queue_.Enqueue(terminate_task);
         terminate_task->Wait();
-        processor_thread_->join();
+        if (sync) {
+            processor_thread_->join();
+        } else {
+            processor_thread_->detach();
+        }
     }
 
-    LOG_INFO(fmt::format("Peer client: {} is stopped.", this_node_name_));
+    LOG_INFO(fmt::format("Peer client: {} is stopped.", sending_node_name_));
     return Disconnect();
 }
 
@@ -65,7 +72,7 @@ Status PeerClient::Reconnect() {
     }
 
     try {
-        socket_ = MakeShared<TSocket>(node_info_.ip_address_, node_info_.port_);
+        socket_ = MakeShared<TSocket>(ip_address_, port_);
 
         TSocket *socket = static_cast<TSocket *>(socket_.get());
         socket->setConnTimeout(2000); // 2s to timeout
@@ -75,7 +82,7 @@ Status PeerClient::Reconnect() {
         transport_->open();
         server_connected_ = true;
     } catch (const std::exception &e) {
-        status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
+        status = Status::CantConnectServer(ip_address_, port_, e.what());
     }
     return status;
 }
@@ -94,7 +101,7 @@ Status PeerClient::Disconnect() {
         transport_->close();
         server_connected_ = false;
     } catch (const std::exception &e) {
-        status = Status::CantConnectServer(node_info_.ip_address_, node_info_.port_, e.what());
+        status = Status::CantConnectServer(ip_address_, port_, e.what());
     }
     return status;
 }
@@ -284,7 +291,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
         for (SizeT idx = 0; idx < node_count; ++idx) {
             SharedPtr<NodeInfo> node_info = MakeShared<NodeInfo>();
             auto &other_node = response.other_nodes[idx];
-            if (this_node_name_ == other_node.node_name) {
+            if (sending_node_name_ == other_node.node_name) {
                 continue;
             }
             node_info->node_name_ = other_node.node_name;
@@ -341,26 +348,20 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
 
     try {
         client_->SyncLog(response, request);
-    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
-        server_connected_ = false;
-        switch (thrift_exception.getType()) {
-            case TTransportExceptionType::END_OF_FILE: {
-                peer_task->error_message_ = thrift_exception.what();
-                peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
-                return;
-            }
-            default: {
-                String error_message = "Synlog: error in data transfer to follower or learner";
-                UnrecoverableError(error_message);
-            }
+        if (response.error_code != 0) {
+            // Error
+            peer_task->error_code_ = response.error_code;
+            peer_task->error_message_ = response.error_message;
+            LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
         }
-    }
-
-    if (response.error_code != 0) {
-        // Error
-        peer_task->error_code_ = response.error_code;
-        peer_task->error_message_ = response.error_message;
+    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+        peer_task->error_message_ = thrift_exception.what();
+        peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
         LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
+        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
+        if (!status.ok()) {
+            LOG_ERROR(status.message());
+        }
     }
 }
 

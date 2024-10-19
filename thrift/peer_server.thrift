@@ -12,6 +12,7 @@ kInvalid,
 enum NodeStatus {
 kInvalid,
 kAlive,
+kLostConnection,
 kTimeout
 }
 

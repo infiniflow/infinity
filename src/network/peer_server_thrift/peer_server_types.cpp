@@ -49,14 +49,16 @@ std::string to_string(const NodeType::type& val) {
 int _kNodeStatusValues[] = {
   NodeStatus::kInvalid,
   NodeStatus::kAlive,
+  NodeStatus::kLostConnection,
   NodeStatus::kTimeout
 };
 const char* _kNodeStatusNames[] = {
   "kInvalid",
   "kAlive",
+  "kLostConnection",
   "kTimeout"
 };
-const std::map<int, const char*> _NodeStatus_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(3, _kNodeStatusValues, _kNodeStatusNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _NodeStatus_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(4, _kNodeStatusValues, _kNodeStatusNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const NodeStatus::type& val) {
   std::map<int, const char*>::const_iterator it = _NodeStatus_VALUES_TO_NAMES.find(val);

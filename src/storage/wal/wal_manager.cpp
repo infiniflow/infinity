@@ -176,7 +176,7 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
 
     Vector<SharedPtr<WalEntry>> log_entries;
 
-    TxnTimeStamp max_commit_ts = 0; // the max commit ts that has be checkpointed
+    TxnTimeStamp max_commit_ts = 0; // the max commit ts that has been checkpointed
     String catalog_dir = "";
 
     {
@@ -196,9 +196,12 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
                 catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
-                break;
+                log_entries.push_back(wal_entry);
+                if(checkpoint_cmd->is_full_checkpoint_) {
+                    // Full checkpoint, OK
+                    break;
+                }
             }
-            log_entries.push_back(wal_entry);
         }
         LOG_INFO(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
 
@@ -216,6 +219,11 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
             LOG_TRACE(wal_entry->ToString());
 
             if (wal_entry->commit_ts_ >= max_commit_ts and wal_entry->commit_ts_ > start_timestamp) {
+                WalCmdCheckpoint *checkpoint_cmd = nullptr;
+                if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
+                    // Ignore other CKPs
+                    continue;
+                }
                 log_entries.push_back(wal_entry);
             } else {
                 break;
@@ -916,6 +924,11 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             //                                              entry.commit_ts_);
             //     break;
             case WalCommandType::CHECKPOINT: {
+                if(storage_->GetStorageMode() == StorageMode::kReadable) {
+                    LOG_DEBUG("Load the checkpoint");
+                } else {
+                    UnrecoverableError("Checkpoint");
+                }
                 break;
             }
             case WalCommandType::COMPACT: {

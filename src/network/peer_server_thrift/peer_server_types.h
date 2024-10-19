@@ -40,7 +40,8 @@ struct NodeStatus {
   enum type {
     kInvalid = 0,
     kAlive = 1,
-    kTimeout = 2
+    kLostConnection = 2,
+    kTimeout = 3
   };
 };
 

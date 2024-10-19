@@ -45,7 +45,9 @@ String ToString(NodeStatus status) {
         case NodeStatus::kTimeout:
             return "timeout";
         case NodeStatus::kInvalid:
-            return "kInvalid";
+            return "invalid";
+        case NodeStatus::kLostConnection:
+            return "lost connection";
     }
 }
 
