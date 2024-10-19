@@ -4,14 +4,14 @@ version = "0.4.0"
 requires-python = ">=3.10"
 dependencies = [
     "sqlglot~=11.7.0",
-    "pydantic~=2.7.0",
+    "pydantic~=2.9.0",
     "thrift~=0.20.0",
-    "setuptools>=71.0.0",
-    "pytest~=8.2.0",
+    "setuptools~=75.2.0",
+    "pytest~=8.3.0",
     "pandas~=2.2.0",
-    "numpy~=1.26.0",
-    "pyarrow~=16.0.0",
-    "polars~=0.20.0",
+    "numpy~=2.1.0",
+    "pyarrow~=17.0.0",
+    "polars~=1.9.0",
     "openpyxl~=3.1.0",
     "requests~=2.32.0"
 ]
