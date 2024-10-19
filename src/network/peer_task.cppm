@@ -157,6 +157,7 @@ public:
     String error_message_{};
     i64 leader_term_{};
     Vector<SharedPtr<NodeInfo>> other_nodes_{};
+    NodeStatus sender_status_{NodeStatus::kInvalid};
 };
 
 export class SyncLogTask final : public PeerTask {

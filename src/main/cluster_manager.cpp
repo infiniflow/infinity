@@ -131,7 +131,7 @@ Status ClusterManager::UnInit() {
     }
 
     std::unique_lock<std::mutex> lock(mutex_);
-    Status status = UnregisterFromLeaderNoLock();
+    Status status = UnregisterToLeaderNoLock();
 
     other_node_map_.clear();
     this_node_.reset();
@@ -216,6 +216,9 @@ void ClusterManager::HeartBeatToLeader() {
 
         // Update the non-leader node info from leader
         UpdateNodeInfoNoLock(hb_task->other_nodes_);
+
+        // Check if leader can't send message to this reader node
+        this_node_->node_status_ = hb_task->sender_status_;
     }
     return;
 }
@@ -291,7 +294,7 @@ Status ClusterManager::RegisterToLeaderNoLock() {
     return status;
 }
 
-Status ClusterManager::UnregisterFromLeaderNoLock() {
+Status ClusterManager::UnregisterToLeaderNoLock() {
     Status status = Status::OK();
     if (this_node_->node_role_ == NodeRole::kFollower or this_node_->node_role_ == NodeRole::kLearner) {
         if (leader_node_->node_status_ == NodeStatus::kAlive) {
@@ -437,7 +440,8 @@ Status ClusterManager::UpdateNodeByLeader(const String &node_name, UpdateNodeOp 
 
 Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_leader_node,
                                                  Vector<infinity_peer_server::NodeInfo> &other_nodes,
-                                                 i64 &leader_term) {
+                                                 i64 &leader_term,
+                                                 infinity_peer_server::NodeStatus::type &sender_status) {
     // Used by leader
     std::unique_lock<std::mutex> lock(mutex_);
     if (this_node_->node_role_ != NodeRole::kLeader) {
@@ -458,12 +462,32 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
                                                    other_node->port_);
                 return Status::NodeInfoUpdated(ToString(other_node->node_role_));
             }
-            // Found the node, just update the timestamp
-            other_node->txn_timestamp_ = non_leader_node->txn_timestamp_;
-            auto now = std::chrono::system_clock::now();
-            auto time_since_epoch = now.time_since_epoch();
-            other_node->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
-            ++other_node->heartbeat_count_;
+            // Found the node
+            switch (other_node->node_status_) {
+                case NodeStatus::kAlive:
+                case NodeStatus::kTimeout: {
+                    // just update the timestamp
+                    other_node->txn_timestamp_ = non_leader_node->txn_timestamp_;
+                    auto now = std::chrono::system_clock::now();
+                    auto time_since_epoch = now.time_since_epoch();
+                    other_node->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+                    ++other_node->heartbeat_count_;
+                    sender_status = infinity_peer_server::NodeStatus::type::kAlive;
+                    break;
+                }
+                case NodeStatus::kLostConnection: {
+                    LOG_ERROR(fmt::format("Node {} from {}:{} cant' connected, but still can receive heartbeat.",
+                                          other_node->node_name_,
+                                          other_node->ip_address_,
+                                          other_node->port_));
+                    sender_status = infinity_peer_server::NodeStatus::type::kLostConnection;
+                    break;
+                }
+                case NodeStatus::kInvalid: {
+                    UnrecoverableError("Invalid node status");
+                }
+            }
+
             non_leader_node_found = true;
         } else {
             infinity_peer_server::NodeInfo thrift_node_info;

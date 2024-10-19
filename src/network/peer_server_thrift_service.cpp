@@ -128,14 +128,15 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
 
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeInfoByHeartBeat(non_leader_node_info,
                                                                                                  response.other_nodes,
-                                                                                                 response.leader_term);
+                                                                                                 response.leader_term,
+                                                                                                 response.sender_status);
         if (!status.ok()) {
             response.error_code = static_cast<i64>(status.code());
             response.error_message = status.message();
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = fmt::format("Attempt to heatbeat from a non-leader node: {}", ToString(leader_node->node_role_));
+        response.error_message = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(leader_node->node_role_));
     }
     return;
 }

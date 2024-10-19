@@ -47,7 +47,7 @@ public:
 private:
     void CheckHeartBeatInner();
     Status RegisterToLeaderNoLock();
-    Status UnregisterFromLeaderNoLock();
+    Status UnregisterToLeaderNoLock();
     Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &sending_node_name, const String &server_ip, i64 server_port);
     Status SendLogs(const String &node_name, const SharedPtr<PeerClient> &peer_client, const Vector<SharedPtr<String>> &logs, bool synchronize);
 
@@ -64,8 +64,10 @@ public:
     Status UpdateNodeByLeader(const String &node_name, UpdateNodeOp update_node_op);
 
     // Used by leader when get HB request
-    Status
-    UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_leader_node, Vector<infinity_peer_server::NodeInfo> &other_nodes, i64 &leader_term);
+    Status UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_leader_node,
+                                     Vector<infinity_peer_server::NodeInfo> &other_nodes,
+                                     i64 &leader_term,
+                                     infinity_peer_server::NodeStatus::type &sender_status);
 
     // Used by leader to notify leader to synchronize logs to the follower and learner, during registration
     Status SyncLogsOnRegistration(const SharedPtr<NodeInfo> &non_leader_node, const SharedPtr<PeerClient> &peer_client);

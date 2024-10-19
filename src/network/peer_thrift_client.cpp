@@ -285,6 +285,25 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
         peer_task->error_code_ = response.error_code;
         peer_task->error_message_ = response.error_message;
     } else {
+        switch (response.sender_status) {
+            case infinity_peer_server::NodeStatus::type::kAlive: {
+                peer_task->sender_status_ = NodeStatus::kAlive;
+                break;
+            }
+            case infinity_peer_server::NodeStatus::type::kTimeout: {
+                peer_task->sender_status_ = NodeStatus::kTimeout;
+                break;
+            }
+            case infinity_peer_server::NodeStatus::type::kLostConnection: {
+                peer_task->sender_status_ = NodeStatus::kLostConnection;
+                break;
+            }
+            default: {
+                String error_message = "Invalid sender status";
+                UnrecoverableError(error_message);
+            }
+        }
+
         peer_task->leader_term_ = response.leader_term;
         SizeT node_count = response.other_nodes.size();
         peer_task->other_nodes_.reserve(node_count);
