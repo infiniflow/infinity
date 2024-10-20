@@ -1223,7 +1223,6 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
             auto segment_index_entry_ptr = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
                                                                                          table_entry,
                                                                                          cmd.segment_id_,
-                                                                                         buffer_mgr,
                                                                                          commit_ts /*min_ts*/,
                                                                                          commit_ts /*max_ts*/,
                                                                                          0 /*next_chunk_id*/,

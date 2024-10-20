@@ -297,7 +297,7 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts) {
     return json_res;
 }
 
-UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta, BufferManager *buffer_mgr) {
+UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta) {
     nlohmann::json json_res;
 
     bool deleted = db_entry_json["deleted"];
@@ -324,7 +324,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
 
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {
-            UniquePtr<TableMeta> table_meta = TableMeta::Deserialize(table_meta_json, db_entry.get(), buffer_mgr);
+            UniquePtr<TableMeta> table_meta = TableMeta::Deserialize(table_meta_json, db_entry.get());
             db_entry->table_meta_map_.AddNewMetaNoLock(*table_meta->table_name_, std::move(table_meta));
         }
     }

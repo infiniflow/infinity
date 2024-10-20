@@ -839,7 +839,6 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
                 segment_index_entry = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
                                                                                     this,
                                                                                     segment_id,
-                                                                                    buffer_manager,
                                                                                     ts /*min_ts*/,
                                                                                     ts /*max_ts*/,
                                                                                     0 /*next_chunk_id*/,
@@ -1208,7 +1207,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     return json_res;
 }
 
-UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr) {
+UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta) {
     SharedPtr<String> table_name = MakeShared<String>(table_entry_json["table_name"]);
     SharedPtr<String> table_comment = MakeShared<String>();
     if (table_entry_json.contains("table_comment")) {
@@ -1279,7 +1278,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 
     if (table_entry_json.contains("segments")) {
         for (const auto &segment_json : table_entry_json["segments"]) {
-            SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
+            SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get());
             table_entry->segment_map_.emplace(segment_entry->segment_id(), segment_entry);
         }
         // here the unsealed_segment_ may be nullptr
@@ -1300,7 +1299,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     if (table_entry_json.contains("table_indexes")) {
         for (const auto &index_def_meta_json : table_entry_json["table_indexes"]) {
 
-            UniquePtr<TableIndexMeta> table_index_meta = TableIndexMeta::Deserialize(index_def_meta_json, table_entry.get(), buffer_mgr);
+            UniquePtr<TableIndexMeta> table_index_meta = TableIndexMeta::Deserialize(index_def_meta_json, table_entry.get());
             String index_name = index_def_meta_json["index_name"];
             table_entry->AddIndexMetaNoLock(index_name, std::move(table_index_meta));
         }

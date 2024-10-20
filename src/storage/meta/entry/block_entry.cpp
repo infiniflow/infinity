@@ -140,13 +140,14 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     block_entry->commit_ts_ = commit_ts;
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
 
+    BufferManager *buffer_manager = infinity::InfinityContext::instance().storage()->buffer_manager();
     auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                              block_entry->block_dir(),
                                                              BlockVersion::FileName(),
                                                              row_capacity,
-                                                             buffer_mgr->persistence_manager());
-    block_entry->version_buffer_object_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+                                                             buffer_manager->persistence_manager());
+    block_entry->version_buffer_object_ = buffer_manager->GetBufferObject(std::move(version_file_worker));
 
     block_entry->checkpoint_ts_ = check_point_ts;
     block_entry->checkpoint_row_count_ = checkpoint_row_count;
@@ -165,9 +166,7 @@ void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String blo
     }
 }
 
-BlockColumnEntry *BlockEntry::GetColumnBlockEntry(SizeT column_idx) const {
-    return columns_[column_idx].get();
-}
+BlockColumnEntry *BlockEntry::GetColumnBlockEntry(SizeT column_idx) const { return columns_[column_idx].get(); }
 
 SizeT BlockEntry::row_count(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
@@ -512,7 +511,7 @@ Vector<String> BlockEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
     std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
     Vector<String> res;
     res.reserve(columns_.size());
-    for(const auto& block_column_entry: columns_) {
+    for (const auto &block_column_entry : columns_) {
         Vector<String> files = block_column_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), files.begin(), files.end());
     }
@@ -547,7 +546,7 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp max_commit_ts) {
     return json_res;
 }
 
-UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
+UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_json, SegmentEntry *segment_entry) {
     u64 block_id = block_entry_json["block_id"];
 
     auto block_dir = block_entry_json["block_dir"];
@@ -560,6 +559,7 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
 
     auto txn_id = block_entry_json["txn_id"];
 
+    BufferManager *buffer_manager = infinity::InfinityContext::instance().storage()->buffer_manager();
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewReplayBlockEntry(segment_entry,
                                                                         block_id,
                                                                         row_count,
@@ -569,13 +569,13 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
                                                                         commit_ts,
                                                                         checkpoint_ts,
                                                                         row_count,
-                                                                        buffer_mgr,
+                                                                        buffer_manager,
                                                                         txn_id);
 
     block_entry->begin_ts_ = block_entry_json["begin_ts"];
 
     for (const auto &block_column_json : block_entry_json["columns"]) {
-        block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));
+        block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get()));
     }
 
     // Load FastRoughFilter from json file
@@ -604,7 +604,9 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
 }
 
 void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id) {
-    auto iter = std::lower_bound(columns_.begin(), columns_.end(), column_id, [&](const auto &column, ColumnID column_id) { return column->column_id() < column_id; });
+    auto iter = std::lower_bound(columns_.begin(), columns_.end(), column_id, [&](const auto &column, ColumnID column_id) {
+        return column->column_id() < column_id;
+    });
     if (iter != columns_.end() && (*iter)->column_id() == column_id) {
         *iter = std::move(column_entry);
     } else {

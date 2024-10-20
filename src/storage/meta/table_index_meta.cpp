@@ -41,8 +41,7 @@ struct SegmentEntry;
 TableIndexMeta::TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name)
     : index_name_(std::move(index_name)), table_entry_(table_entry) {}
 
-TableIndexMeta::TableIndexMeta(const TableIndexMeta &meta)
-    : index_name_(meta.index_name_), table_entry_(meta.table_entry_) {}
+TableIndexMeta::TableIndexMeta(const TableIndexMeta &meta) : index_name_(meta.index_name_), table_entry_(meta.table_entry_) {}
 
 UniquePtr<TableIndexMeta> TableIndexMeta::Clone(TableEntry *table_entry) const {
     auto ret = UniquePtr<TableIndexMeta>(new TableIndexMeta(*this));
@@ -183,14 +182,13 @@ nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
     Vector<BaseEntry *> entry_candidates = index_entry_list_.GetCandidateEntry(max_commit_ts, EntryType::kTableIndex);
 
     for (const auto &entry : entry_candidates) {
-        TableIndexEntry* table_index_entry = static_cast<TableIndexEntry*>(entry);
+        TableIndexEntry *table_index_entry = static_cast<TableIndexEntry *>(entry);
         json_res["index_entries"].emplace_back(table_index_entry->Serialize(max_commit_ts));
     }
     return json_res;
 }
 
-UniquePtr<TableIndexMeta>
-TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
+UniquePtr<TableIndexMeta> TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEntry *table_entry) {
     LOG_TRACE(fmt::format("load index"));
 
     SharedPtr<String> index_name = MakeShared<String>(table_index_meta_json["index_name"]);
@@ -199,14 +197,14 @@ TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEn
         auto &entries = table_index_meta_json["index_entries"];
         // traverse reversely because a dummy head has been inserted
         for (auto iter = entries.rbegin(); iter != entries.rend(); iter++) {
-            auto entry = TableIndexEntry::Deserialize(*iter, res.get(), buffer_mgr, table_entry);
+            auto entry = TableIndexEntry::Deserialize(*iter, res.get(), table_entry);
             res->PushFrontEntry(entry);
         }
     }
     return res;
 }
 
-void TableIndexMeta::PushFrontEntry(const SharedPtr<TableIndexEntry>& new_table_index_entry) {
+void TableIndexMeta::PushFrontEntry(const SharedPtr<TableIndexEntry> &new_table_index_entry) {
     index_entry_list_.PushFrontEntry(new_table_index_entry);
 }
 

@@ -428,7 +428,7 @@ void Storage::SetStorageMode(StorageMode target_storage_mode) {
 }
 
 void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
-    new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
+    new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos);
 }
 
 void Storage::CreateDefaultDB() {

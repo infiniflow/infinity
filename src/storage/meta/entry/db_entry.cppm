@@ -75,7 +75,7 @@ public:
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta, BufferManager *buffer_mgr);
+    static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta);
 
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
 

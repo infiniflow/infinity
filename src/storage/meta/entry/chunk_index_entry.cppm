@@ -66,8 +66,12 @@ public:
                                                                   BufferManager *buffer_mgr,
                                                                   SizeT index_size);
 
-    static SharedPtr<ChunkIndexEntry>
-    NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry, ChunkID chunk_id, const String &base_name, RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
+    static SharedPtr<ChunkIndexEntry> NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry,
+                                                           ChunkID chunk_id,
+                                                           const String &base_name,
+                                                           RowID base_rowid,
+                                                           u32 row_count,
+                                                           BufferManager *buffer_mgr);
 
     static SharedPtr<ChunkIndexEntry> NewSecondaryIndexChunkIndexEntry(ChunkID chunk_id,
                                                                        SegmentIndexEntry *segment_index_entry,
@@ -126,8 +130,7 @@ public:
 
     nlohmann::json Serialize();
 
-    static SharedPtr<ChunkIndexEntry>
-    Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
+    static SharedPtr<ChunkIndexEntry> Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry);
 
     virtual void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 

@@ -540,20 +540,19 @@ UniquePtr<Catalog> Catalog::NewCatalog() {
     return catalog;
 }
 
-UniquePtr<Catalog>
-Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, BufferManager *buffer_mgr) {
+UniquePtr<Catalog> Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
 
     // 1. load json
     // 2. load entries
     LOG_INFO(fmt::format("Load base FULL catalog json from: {}", full_ckp_info.path_));
-    auto catalog = Catalog::LoadFromFile(full_ckp_info, buffer_mgr);
+    auto catalog = Catalog::LoadFromFile(full_ckp_info);
 
     // Load catalogs delta checkpoints and merge.
     for (const auto &delta_ckp_info : delta_ckp_infos) {
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", delta_ckp_info.path_));
         UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_info);
 
-        catalog->LoadFromEntryDelta(std::move(catalog_delta_entry), buffer_mgr);
+        catalog->LoadFromEntryDelta(std::move(catalog_delta_entry));
     }
 
     LOG_TRACE(fmt::format("Catalog Delta Op is done"));
@@ -592,8 +591,9 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
     return catalog_delta_entry;
 }
 
-void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, BufferManager *buffer_mgr) {
+void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry) {
     Vector<UniquePtr<CatalogDeltaOperation>> &delta_ops = delta_entry->operations();
+    BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
     auto *pm = InfinityContext::instance().persistence_manager();
     for (auto &op : delta_ops) {
         auto type = op->GetType();
@@ -658,7 +658,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 SegmentID unsealed_id = add_table_entry_op->unsealed_id_;
                 SegmentID next_segment_id = add_table_entry_op->next_segment_id_;
                 ColumnID next_column_id = add_table_entry_op->next_column_id_;
-                const SharedPtr<String>& table_comment = add_table_entry_op->table_comment_;
+                const SharedPtr<String> &table_comment = add_table_entry_op->table_comment_;
 
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
@@ -906,7 +906,6 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                     auto segment_index_entry = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
                                                                                              table_entry,
                                                                                              segment_id,
-                                                                                             buffer_mgr,
                                                                                              min_ts,
                                                                                              max_ts,
                                                                                              next_chunk_id,
@@ -975,7 +974,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
     }
 }
 
-UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
+UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_info) {
     const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / full_ckp_info.path_;
 
     if (!VirtualStore::Exists(catalog_path)) {
@@ -999,17 +998,17 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
-    return Deserialize(catalog_json, buffer_mgr);
+    return Deserialize(catalog_json);
 }
 
-UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr) {
+UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json) {
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
     auto catalog = MakeUnique<Catalog>();
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
     catalog->full_ckp_commit_ts_ = catalog_json["full_ckp_commit_ts"];
     if (catalog_json.contains("databases")) {
         for (const auto &db_json : catalog_json["databases"]) {
-            UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
+            UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json);
             catalog->db_meta_map_.AddNewMetaNoLock(*db_meta->db_name(), std::move(db_meta));
         }
     }

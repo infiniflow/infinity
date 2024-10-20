@@ -393,15 +393,15 @@ nlohmann::json ChunkIndexEntry::Serialize() {
     return index_entry_json;
 }
 
-SharedPtr<ChunkIndexEntry>
-ChunkIndexEntry::Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) {
+SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry) {
     ChunkID chunk_id = index_entry_json["chunk_id"];
     String base_name = index_entry_json["base_name"];
     RowID base_rowid = RowID::FromUint64(index_entry_json["base_rowid"]);
     u32 row_count = index_entry_json["row_count"];
     TxnTimeStamp commit_ts = index_entry_json["commit_ts"];
     TxnTimeStamp deprecate_ts = index_entry_json["deprecate_ts"];
-    auto ret = NewReplayChunkIndexEntry(chunk_id, segment_index_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
+    BufferManager *buffer_manager = infinity::InfinityContext::instance().storage()->buffer_manager();
+    auto ret = NewReplayChunkIndexEntry(chunk_id, segment_index_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_manager);
     return ret;
 }
 

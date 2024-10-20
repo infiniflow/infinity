@@ -846,9 +846,7 @@ AdminExecutor::LoadCatalogFiles(QueryContext *query_context, const AdminStatemen
         delta_catalog_fileinfo_array.emplace_back(delta_catalog_file_info);
     }
 
-    BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
-
-    UniquePtr<Catalog> catalog_ptr = Catalog::LoadFromFiles(full_catalog_file_info, delta_catalog_fileinfo_array, buffer_mgr);
+    UniquePtr<Catalog> catalog_ptr = Catalog::LoadFromFiles(full_catalog_file_info, delta_catalog_fileinfo_array);
     return {std::move(catalog_ptr), Status::OK()};
 }
 

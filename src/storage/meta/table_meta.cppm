@@ -20,7 +20,6 @@ import stl;
 
 import third_party;
 import table_entry_type;
-import buffer_manager;
 import status;
 import extra_ddl_info;
 import column_def;
@@ -56,7 +55,7 @@ public:
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static UniquePtr<TableMeta> Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr);
+    static UniquePtr<TableMeta> Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry);
 
     [[nodiscard]] const SharedPtr<String> &table_name_ptr() const { return table_name_; }
     [[nodiscard]] const String &table_name() const { return *table_name_; }

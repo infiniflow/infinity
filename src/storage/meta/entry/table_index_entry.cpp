@@ -238,10 +238,8 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     return json;
 }
 
-SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &index_def_entry_json,
-                                                        TableIndexMeta *table_index_meta,
-                                                        BufferManager *buffer_mgr,
-                                                        TableEntry *table_entry) {
+SharedPtr<TableIndexEntry>
+TableIndexEntry::Deserialize(const nlohmann::json &index_def_entry_json, TableIndexMeta *table_index_meta, TableEntry *table_entry) {
     TransactionID txn_id = index_def_entry_json["txn_id"];
     TxnTimeStamp begin_ts = index_def_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = index_def_entry_json["commit_ts"];
@@ -266,7 +264,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     if (index_def_entry_json.contains("segment_indexes")) {
         for (const auto &segment_index_entry_json : index_def_entry_json["segment_indexes"]) {
             SharedPtr<SegmentIndexEntry> segment_index_entry =
-                SegmentIndexEntry::Deserialize(segment_index_entry_json, table_index_entry.get(), buffer_mgr, table_entry);
+                SegmentIndexEntry::Deserialize(segment_index_entry_json, table_index_entry.get(), table_entry);
             table_index_entry->index_by_segment_.emplace(segment_index_entry->segment_id(), std::move(segment_index_entry));
         }
     }
@@ -402,8 +400,8 @@ Vector<String> TableIndexEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp b
     std::shared_lock lock(rw_locker_);
     Vector<String> res;
     res.reserve(index_by_segment_.size());
-    for(const auto& index_pair: index_by_segment_) {
-        const SegmentIndexEntry* segment_index_entry = index_pair.second.get();
+    for (const auto &index_pair : index_by_segment_) {
+        const SegmentIndexEntry *segment_index_entry = index_pair.second.get();
         Vector<String> segment_files = segment_index_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), segment_files.begin(), segment_files.end());
     }

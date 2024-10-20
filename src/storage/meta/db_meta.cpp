@@ -39,7 +39,7 @@ UniquePtr<DBMeta> DBMeta::NewDBMeta(const SharedPtr<String> &db_name) {
 
 // TODO: Use Txn* txn as parma instead of TransactionID txn_id and TxnManager *txn_mgr
 Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                                const SharedPtr<String>& comment,
+                                                const SharedPtr<String> &comment,
                                                 TransactionID txn_id,
                                                 TxnTimeStamp begin_ts,
                                                 TxnManager *txn_mgr,
@@ -119,21 +119,20 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts) {
     Vector<BaseEntry *> entry_candidates = db_entry_list_.GetCandidateEntry(max_commit_ts, EntryType::kDatabase);
 
     for (const auto &entry : entry_candidates) {
-        DBEntry* db_entry = static_cast<DBEntry*>(entry);
+        DBEntry *db_entry = static_cast<DBEntry *>(entry);
         json_res["db_entries"].emplace_back(db_entry->Serialize(max_commit_ts));
     }
 
     return json_res;
-
 }
 
-UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr) {
+UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json) {
     SharedPtr<String> db_name = MakeShared<String>(db_meta_json["db_name"]);
     UniquePtr<DBMeta> res = MakeUnique<DBMeta>(db_name);
 
     if (db_meta_json.contains("db_entries")) {
         for (const auto &db_entry_json : db_meta_json["db_entries"]) {
-            auto db_entry = DBEntry::Deserialize(db_entry_json, res.get(), buffer_mgr);
+            auto db_entry = DBEntry::Deserialize(db_entry_json, res.get());
             res->PushBackEntry(std::move(db_entry));
         }
     }
@@ -142,17 +141,11 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, Buffer
     return res;
 }
 
-void DBMeta::Sort() {
-    db_entry_list_.SortEntryListByTS();
-}
+void DBMeta::Sort() { db_entry_list_.SortEntryListByTS(); }
 
-void DBMeta::PushBackEntry(const SharedPtr<DBEntry>& new_db_entry) {
-    db_entry_list_.PushBackEntry(new_db_entry);
-}
+void DBMeta::PushBackEntry(const SharedPtr<DBEntry> &new_db_entry) { db_entry_list_.PushBackEntry(new_db_entry); }
 
-void DBMeta::PushFrontEntry(const SharedPtr<DBEntry>& new_db_entry) {
-    db_entry_list_.PushFrontEntry(new_db_entry);
-}
+void DBMeta::PushFrontEntry(const SharedPtr<DBEntry> &new_db_entry) { db_entry_list_.PushFrontEntry(new_db_entry); }
 
 void DBMeta::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) { db_entry_list_.Cleanup(info_tracer, dropped); }
 

@@ -30,7 +30,6 @@ import meta_info;
 namespace infinity {
 
 class TxnManager;
-class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
 
@@ -105,7 +104,7 @@ private:
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static UniquePtr<TableIndexMeta> Deserialize(const nlohmann::json &index_def_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr);
+    static UniquePtr<TableIndexMeta> Deserialize(const nlohmann::json &index_def_meta_json, TableEntry *table_entry);
 
     void PushFrontEntry(const SharedPtr<TableIndexEntry>& new_table_index_entry);
 

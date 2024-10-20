@@ -111,7 +111,7 @@ public:
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
+    static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry);
 
 public:
     void AddBlockReplay(SharedPtr<BlockEntry> block_entry);

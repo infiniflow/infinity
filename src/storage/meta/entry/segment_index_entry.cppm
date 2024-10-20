@@ -41,7 +41,6 @@ class TxnTableStore;
 struct TableIndexEntry;
 struct BlockEntry;
 struct TableEntry;
-class BufferManager;
 struct SegmentEntry;
 struct TableEntry;
 class HnswIndexInMem;
@@ -50,6 +49,7 @@ class SecondaryIndexInMem;
 class EMVBIndexInMem;
 class BMPIndexInMem;
 class BaseMemIndex;
+class BufferManager;
 
 export struct PopulateEntireConfig {
     bool prepare_;
@@ -67,7 +67,6 @@ public:
     static SharedPtr<SegmentIndexEntry> NewReplaySegmentIndexEntry(TableIndexEntry *table_index_entry,
                                                                    TableEntry *table_entry,
                                                                    SegmentID segment_id,
-                                                                   BufferManager *buffer_manager,
                                                                    TxnTimeStamp min_ts,
                                                                    TxnTimeStamp max_ts,
                                                                    u32 next_chunk_id,
@@ -84,7 +83,7 @@ public:
     void SaveIndexFile();
 
     static UniquePtr<SegmentIndexEntry>
-    Deserialize(const nlohmann::json &index_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
+    Deserialize(const nlohmann::json &index_entry_json, TableIndexEntry *table_index_entry, TableEntry *table_entry);
 
     void CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp commit_ts);
 
@@ -241,7 +240,6 @@ public:
     UniquePtr<SegmentIndexEntry> Clone(TableIndexEntry *table_index_entry) const;
 
 private:
-    BufferManager *buffer_manager_{};
     TableIndexEntry *table_index_entry_;
     SharedPtr<String> index_dir_{};
     const SegmentID segment_id_{};

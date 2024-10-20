@@ -96,8 +96,7 @@ SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, Segment
 };
 
 SegmentIndexEntry::SegmentIndexEntry(const SegmentIndexEntry &other)
-    : BaseEntry(other), buffer_manager_(other.buffer_manager_), table_index_entry_(other.table_index_entry_), index_dir_(other.index_dir_),
-      segment_id_(other.segment_id_) {
+    : BaseEntry(other), table_index_entry_(other.table_index_entry_), index_dir_(other.index_dir_), segment_id_(other.segment_id_) {
     min_ts_ = other.min_ts_;
     max_ts_ = other.max_ts_;
     checkpoint_ts_ = other.checkpoint_ts_;
@@ -132,13 +131,11 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::CreateFakeEntry(const String &in
 }
 
 SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Txn *txn) {
-    auto *buffer_mgr = txn->buffer_mgr();
     auto segment_index_entry = SharedPtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id));
     auto begin_ts = txn->BeginTS();
     segment_index_entry->min_ts_ = begin_ts;
     segment_index_entry->max_ts_ = begin_ts;
     segment_index_entry->begin_ts_ = begin_ts;
-    segment_index_entry->buffer_manager_ = buffer_mgr;
 
     return segment_index_entry;
 }
@@ -146,7 +143,6 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewIndexEntry(TableIndexEntry *t
 SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(TableIndexEntry *table_index_entry,
                                                                            TableEntry *table_entry,
                                                                            SegmentID segment_id,
-                                                                           BufferManager *buffer_manager,
                                                                            TxnTimeStamp min_ts,
                                                                            TxnTimeStamp max_ts,
                                                                            u32 next_chunk_id,
@@ -168,7 +164,6 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     segment_index_entry->next_chunk_id_ = next_chunk_id;
 
     segment_index_entry->commit_ts_.store(commit_ts);
-    segment_index_entry->buffer_manager_ = buffer_manager;
     return segment_index_entry;
 }
 
@@ -304,13 +299,14 @@ void SegmentIndexEntry::MemIndexWaitInflightTasks() {
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *dump_size) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();
+    BufferManager *buffer_manager = infinity::InfinityContext::instance().storage()->buffer_manager();
     std::lock_guard lck_m(mem_index_locker_);
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
             if (memory_hnsw_index_.get() == nullptr) {
                 break;
             }
-            chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_manager_, dump_size);
+            chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_manager, dump_size);
             chunk_index_entry->SaveIndexFile();
             std::unique_lock lck2(rw_locker_);
             chunk_index_entries_.push_back(chunk_index_entry);
@@ -334,7 +330,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             if (memory_secondary_index_.get() == nullptr) {
                 break;
             }
-            chunk_index_entry = memory_secondary_index_->Dump(this, buffer_manager_);
+            chunk_index_entry = memory_secondary_index_->Dump(this, buffer_manager);
             chunk_index_entry->SaveIndexFile();
             std::unique_lock lck(rw_locker_);
             chunk_index_entries_.push_back(chunk_index_entry);
@@ -345,7 +341,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             if (memory_ivf_index_.get() == nullptr) {
                 break;
             }
-            chunk_index_entry = memory_ivf_index_->Dump(this, buffer_manager_);
+            chunk_index_entry = memory_ivf_index_->Dump(this, buffer_manager);
             chunk_index_entry->SaveIndexFile();
             std::unique_lock lck(rw_locker_);
             chunk_index_entries_.push_back(chunk_index_entry);
@@ -357,7 +353,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
                 return nullptr;
             }
             std::unique_lock lck(rw_locker_);
-            chunk_index_entry = memory_emvb_index_->Dump(this, buffer_manager_);
+            chunk_index_entry = memory_emvb_index_->Dump(this, buffer_manager);
             chunk_index_entry->SaveIndexFile();
             chunk_index_entries_.push_back(chunk_index_entry);
             memory_emvb_index_.reset();
@@ -367,7 +363,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             if (memory_bmp_index_.get() == nullptr) {
                 return nullptr;
             }
-            chunk_index_entry = memory_bmp_index_->Dump(this, buffer_manager_);
+            chunk_index_entry = memory_bmp_index_->Dump(this, buffer_manager);
             chunk_index_entry->SaveIndexFile();
             std::unique_lock lck(rw_locker_);
             chunk_index_entries_.push_back(chunk_index_entry);
@@ -443,6 +439,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
     u32 seg_id = segment_entry->segment_id();
     RowID base_row_id(seg_id, 0);
     auto *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
+    BufferManager *buffer_manager = infinity::InfinityContext::instance().storage()->buffer_manager();
 
     switch (index_base->index_type_) {
         case IndexType::kFullText: {
@@ -483,7 +480,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             insert_config.optimize_ = true;
             memory_hnsw_index->InsertVecs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_, insert_config);
 
-            dumped_memindex_entry = memory_hnsw_index->Dump(this, buffer_manager_);
+            dumped_memindex_entry = memory_hnsw_index->Dump(this, buffer_manager);
             dumped_memindex_entry->SaveIndexFile();
             {
                 std::unique_lock lck(rw_locker_);
@@ -821,7 +818,7 @@ Vector<String> SegmentIndexEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp
     std::shared_lock lock(rw_locker_);
     Vector<String> res;
     res.reserve(chunk_index_entries_.size());
-    for(const auto& chunk_index_entry: chunk_index_entries_) {
+    for (const auto &chunk_index_entry : chunk_index_entries_) {
         Vector<String> chunk_files = chunk_index_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), chunk_files.begin(), chunk_files.end());
     }
@@ -1019,8 +1016,9 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String 
     std::shared_lock lock(rw_locker_);
     ChunkID chunk_id = this->GetNextChunkID();
     // row range of chunk_index_entries_ may overlop and misorder due to deprecated ones.
+    BufferManager *buffer_manager = infinity::InfinityContext::instance().storage()->buffer_manager();
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
-        ChunkIndexEntry::NewFtChunkIndexEntry(this, chunk_id, base_name, base_rowid, row_count, buffer_manager_);
+        ChunkIndexEntry::NewFtChunkIndexEntry(this, chunk_id, base_name, base_rowid, row_count, buffer_manager);
     chunk_index_entries_.push_back(chunk_index_entry);
     return chunk_index_entry;
 }
@@ -1034,27 +1032,30 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
                                                                           TxnTimeStamp deprecate_ts,
                                                                           BufferManager *buffer_mgr) {
     LOG_INFO(fmt::format("AddChunkIndexEntryReplayWal chunk_id: {} deprecate_ts: {}, base_rowid: {}, row_count: {} to to segment: {}",
-                          chunk_id,
+                         chunk_id,
 
-                          deprecate_ts,
-                          base_rowid.ToUint64(),
-                          row_count,
-                          segment_id_));
+                         deprecate_ts,
+                         base_rowid.ToUint64(),
+                         row_count,
+                         segment_id_));
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    assert(std::is_sorted(chunk_index_entries_.begin(), chunk_index_entries_.end(), [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) {
-        return lhs->chunk_id_ < rhs->chunk_id_;
-    }));
-    auto iter = std::lower_bound(chunk_index_entries_.begin(), chunk_index_entries_.end(), chunk_id, [&](const SharedPtr<ChunkIndexEntry> &entry, ChunkID id) {
-        return entry->chunk_id_ < id;
-    });
+    assert(
+        std::is_sorted(chunk_index_entries_.begin(),
+                       chunk_index_entries_.end(),
+                       [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) { return lhs->chunk_id_ < rhs->chunk_id_; }));
+    auto iter = std::lower_bound(chunk_index_entries_.begin(),
+                                 chunk_index_entries_.end(),
+                                 chunk_id,
+                                 [&](const SharedPtr<ChunkIndexEntry> &entry, ChunkID id) { return entry->chunk_id_ < id; });
     if (iter != chunk_index_entries_.end() && (*iter)->chunk_id_ == chunk_id) {
         UnrecoverableError(fmt::format("Chunk ID: {} already exists in segment: {}", chunk_id, segment_id_));
     }
     chunk_index_entries_.insert(iter, chunk_index_entry);
     ChunkID old_next_chunk_id = next_chunk_id_;
     next_chunk_id_ = std::max(next_chunk_id_.load(), chunk_index_entries_.back()->chunk_id_ + 1);
-    LOG_INFO(fmt::format("AddChunkIndexEntryReplayWal, old_next_chunk_id: {}, next_chunk_id_, chunk_id: {}", old_next_chunk_id, next_chunk_id_, chunk_id));
+    LOG_INFO(
+        fmt::format("AddChunkIndexEntryReplayWal, old_next_chunk_id: {}, next_chunk_id_, chunk_id: {}", old_next_chunk_id, next_chunk_id_, chunk_id));
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
         try {
             u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
@@ -1082,20 +1083,22 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
         UnrecoverableError(fmt::format("Chunk ID: {} is greater than next chunk ID: {}", chunk_id, next_chunk_id_));
     }
     LOG_INFO(fmt::format("AddChunkIndexEntryReplay chunk_id: {} deprecate_ts: {}, base_rowid: {}, row_count: {} to to segment: {}",
-                          chunk_id,
+                         chunk_id,
 
-                          deprecate_ts,
-                          base_rowid.ToUint64(),
-                          row_count,
-                          segment_id_));
+                         deprecate_ts,
+                         base_rowid.ToUint64(),
+                         row_count,
+                         segment_id_));
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-    assert(std::is_sorted(chunk_index_entries_.begin(), chunk_index_entries_.end(), [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) {
-        return lhs->chunk_id_ < rhs->chunk_id_;
-    }));
-    auto iter = std::lower_bound(chunk_index_entries_.begin(), chunk_index_entries_.end(), chunk_id, [&](const SharedPtr<ChunkIndexEntry> &entry, ChunkID id) {
-        return entry->chunk_id_ < id;
-    });
+    assert(
+        std::is_sorted(chunk_index_entries_.begin(),
+                       chunk_index_entries_.end(),
+                       [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) { return lhs->chunk_id_ < rhs->chunk_id_; }));
+    auto iter = std::lower_bound(chunk_index_entries_.begin(),
+                                 chunk_index_entries_.end(),
+                                 chunk_id,
+                                 [&](const SharedPtr<ChunkIndexEntry> &entry, ChunkID id) { return entry->chunk_id_ < id; });
     if (iter != chunk_index_entries_.end() && (*iter)->chunk_id_ == chunk_id) {
         *iter = chunk_index_entry;
     } else {
@@ -1154,10 +1157,8 @@ nlohmann::json SegmentIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     return index_entry_json;
 }
 
-UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json &index_entry_json,
-                                                            TableIndexEntry *table_index_entry,
-                                                            BufferManager *buffer_mgr,
-                                                            TableEntry *table_entry) {
+UniquePtr<SegmentIndexEntry>
+SegmentIndexEntry::Deserialize(const nlohmann::json &index_entry_json, TableIndexEntry *table_index_entry, TableEntry *table_entry) {
     SegmentID segment_id = index_entry_json["segment_id"];
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
 
@@ -1168,7 +1169,6 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     const IndexBase *index_base = table_index_entry->index_base();
     String column_name = index_base->column_name();
     auto segment_index_entry = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id));
-    segment_index_entry->buffer_manager_ = buffer_mgr;
     segment_index_entry->min_ts_ = index_entry_json["min_ts"];
     segment_index_entry->max_ts_ = index_entry_json["max_ts"];
     segment_index_entry->commit_ts_.store(index_entry_json["commit_ts"]);
@@ -1176,7 +1176,7 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     segment_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry
     if (index_entry_json.contains("chunk_index_entries")) {
         for (const auto &chunk_index_entry_json : index_entry_json["chunk_index_entries"]) {
-            auto chunk_index_entry = ChunkIndexEntry::Deserialize(chunk_index_entry_json, segment_index_entry.get(), buffer_mgr);
+            auto chunk_index_entry = ChunkIndexEntry::Deserialize(chunk_index_entry_json, segment_index_entry.get());
             segment_index_entry->chunk_index_entries_.push_back(std::move(chunk_index_entry));
         }
     }

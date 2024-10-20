@@ -811,7 +811,6 @@ TEST_P(TableEntryTest, serialize_test){
 
 TEST_P(TableEntryTest, deserialize_test){
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
     //create table
     {
@@ -864,7 +863,7 @@ TEST_P(TableEntryTest, deserialize_test){
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
         auto json_res = table_entry->Serialize(txn1->BeginTS());
 
-        auto table_entry1 = TableEntry::Deserialize(json_res, table_entry->GetTableMeta(), buffer_mgr);
+        auto table_entry1 = TableEntry::Deserialize(json_res, table_entry->GetTableMeta());
         auto json_res1 = table_entry->Serialize(txn1->BeginTS());
         EXPECT_TRUE(json_res == json_res1);
     }

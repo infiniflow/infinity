@@ -91,7 +91,7 @@ public:
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
+    static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry);
 
     void AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id);
 
