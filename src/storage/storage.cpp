@@ -194,7 +194,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                               buffer_mgr_.get(),
                                               wal_mgr_.get(),
-                                              new_catalog_->next_txn_id(),
                                               system_start_ts);
             txn_mgr_->Start();
 
@@ -450,7 +449,6 @@ Status Storage::SetReaderStorageContinue() {
 //                                      buffer_mgr_.get(),
 //                                      bg_processor_.get(),
 //                                      wal_mgr_.get(),
-//                                      new_catalog_->next_txn_id(),
 //                                      system_start_ts);
 //    txn_mgr_->Start();
 //

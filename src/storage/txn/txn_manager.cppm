@@ -40,7 +40,6 @@ public:
     explicit TxnManager(Catalog *catalog,
                         BufferManager *buffer_mgr,
                         WalManager *wal_mgr,
-                        TransactionID start_txn_id,
                         TxnTimeStamp start_ts);
 
     ~TxnManager() = default;

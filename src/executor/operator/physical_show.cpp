@@ -3788,7 +3788,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
 
             Catalog *catalog_ptr = query_context->storage()->catalog();
-            Value value = Value::MakeBigInt(catalog_ptr->next_txn_id());
+
+                       Value value = Value::MakeBigInt(catalog_ptr->next_txn_id());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;

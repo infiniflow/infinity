@@ -39,7 +39,6 @@ namespace infinity {
 TxnManager::TxnManager(Catalog *catalog,
                        BufferManager *buffer_mgr,
                        WalManager *wal_mgr,
-                       TransactionID start_txn_id,
                        TxnTimeStamp start_ts)
     : catalog_(catalog), buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false) {}
 
