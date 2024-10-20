@@ -59,11 +59,10 @@ namespace infinity {
 Txn::Txn(TxnManager *txn_manager,
          BufferManager *buffer_manager,
          Catalog *catalog,
-         BGTaskProcessor *bg_task_processor,
          TransactionID txn_id,
          TxnTimeStamp begin_ts,
          SharedPtr<String> txn_text)
-    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog), txn_store_(this, catalog),
+    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), catalog_(catalog), txn_store_(this, catalog),
       txn_id_(txn_id), txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
       txn_text_(std::move(txn_text)) {}
 
@@ -519,7 +518,7 @@ TxnTimeStamp Txn::Commit() {
     txn_store_.MaintainCompactionAlg();
 
     if (!txn_delta_ops_entry_->operations().empty()) {
-        txn_mgr_->AddDeltaEntry(std::move(txn_delta_ops_entry_));
+        InfinityContext::instance().storage()->bg_processor()->Submit(MakeShared<AddDeltaEntryTask>(std::move(txn_delta_ops_entry_)));
     }
 
     return commit_ts;

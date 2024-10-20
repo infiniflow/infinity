@@ -193,7 +193,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             }
             txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                               buffer_mgr_.get(),
-                                              bg_processor_.get(),
                                               wal_mgr_.get(),
                                               new_catalog_->next_txn_id(),
                                               system_start_ts);
@@ -421,6 +420,98 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
     std::unique_lock<std::mutex> lock(mutex_);
     current_storage_mode_ = target_mode;
+}
+
+Status Storage::SetReaderStorageContinue() {
+//    StorageMode current_mode = GetStorageMode();
+//    if (current_mode != StorageMode::kReadable) {
+//        UnrecoverableError(fmt::format("Expect current storage mode is READER, but it is {}", ToString(current_mode)));
+//    }
+//
+//    if (system_start_ts == 0) {
+//        // Init database, need to create default_db
+//        LOG_INFO(fmt::format("Init a new catalog"));
+//        new_catalog_ = Catalog::NewCatalog();
+//    }
+//
+//    BuiltinFunctions builtin_functions(new_catalog_);
+//    builtin_functions.Init();
+//    // Catalog finish init here.
+//    if (bg_processor_ != nullptr) {
+//        UnrecoverableError("Background processor was initialized before.");
+//    }
+//    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
+//
+//    // Construct txn manager
+//    if (txn_mgr_ != nullptr) {
+//        UnrecoverableError("Transaction manager was initialized before.");
+//    }
+//    txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
+//                                      buffer_mgr_.get(),
+//                                      bg_processor_.get(),
+//                                      wal_mgr_.get(),
+//                                      new_catalog_->next_txn_id(),
+//                                      system_start_ts);
+//    txn_mgr_->Start();
+//
+//    // start WalManager after TxnManager since it depends on TxnManager.
+//    wal_mgr_->Start();
+//
+//    if (system_start_ts == 0 && target_mode == StorageMode::kWritable) {
+//        CreateDefaultDB();
+//    }
+//
+//    if (memory_index_tracer_ != nullptr) {
+//        UnrecoverableError("Memory index tracer was initialized before.");
+//    }
+//    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
+//
+//    new_catalog_->StartMemoryIndexCommit();
+//    new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
+//
+//    bg_processor_->Start();
+//
+//    if (target_mode == StorageMode::kWritable) {
+//        if (compact_processor_ != nullptr) {
+//            UnrecoverableError("compact processor was initialized before.");
+//        }
+//
+//        compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
+//        compact_processor_->Start();
+//    }
+//
+//    if (periodic_trigger_thread_ != nullptr) {
+//        UnrecoverableError("periodic trigger was initialized before.");
+//    }
+//    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+//
+//    if (target_mode == StorageMode::kWritable) {
+//        periodic_trigger_thread_->full_checkpoint_trigger_ =
+//            MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
+//        periodic_trigger_thread_->delta_checkpoint_trigger_ =
+//            MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
+//        periodic_trigger_thread_->compact_segment_trigger_ =
+//            MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
+//        periodic_trigger_thread_->optimize_index_trigger_ =
+//            MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
+//    }
+//
+//    periodic_trigger_thread_->cleanup_trigger_ =
+//        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
+//    bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+//
+//    if (target_mode == StorageMode::kWritable) {
+//        auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
+//        auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
+//        bg_processor_->Submit(force_ckp_task);
+//        force_ckp_task->Wait();
+//        txn->SetReaderAllowed(true);
+//        txn_mgr_->CommitTxn(txn);
+//    }
+//
+//    periodic_trigger_thread_->Start();
+//
+    return Status::OK();
 }
 
 void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {

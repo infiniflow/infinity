@@ -38,11 +38,10 @@ namespace infinity {
 
 TxnManager::TxnManager(Catalog *catalog,
                        BufferManager *buffer_mgr,
-                       BGTaskProcessor *bg_task_processor,
                        WalManager *wal_mgr,
                        TransactionID start_txn_id,
                        TxnTimeStamp start_ts)
-    : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false) {}
+    : catalog_(catalog), buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false) {}
 
 Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     // Check if the is_running_ is true
@@ -69,7 +68,7 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     }
 
     // Create txn instance
-    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, begin_ts, std::move(txn_text)));
+    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, new_txn_id, begin_ts, std::move(txn_text)));
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
@@ -206,15 +205,6 @@ void TxnManager::SendToWAL(Txn *txn) {
         } while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr);
         wal_mgr_->PutEntries(wal_entries);
     }
-}
-
-void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
-    // Check if the is_running_ is true
-    if (is_running_.load() == false) {
-        String error_message = "TxnManager is not running, cannot add delta entry";
-        UnrecoverableError(error_message);
-    }
-    bg_task_processor_->Submit(MakeShared<AddDeltaEntryTask>(std::move(delta_entry)));
 }
 
 void TxnManager::Start() {

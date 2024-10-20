@@ -50,7 +50,6 @@ struct ScanParam {
 
 class TxnManager;
 struct Catalog;
-class BGTaskProcessor;
 struct TableEntry;
 struct DBEntry;
 struct BaseEntry;
@@ -70,7 +69,6 @@ public:
     explicit Txn(TxnManager *txn_manager,
                  BufferManager *buffer_manager,
                  Catalog *catalog,
-                 BGTaskProcessor *bg_task_processor,
                  TransactionID txn_id,
                  TxnTimeStamp begin_ts,
                  SharedPtr<String> txn_text);
@@ -244,7 +242,6 @@ private:
     // Reference to external class
     TxnManager *txn_mgr_{};
     BufferManager *buffer_mgr_{}; // This BufferManager ptr Only for replaying wal
-    BGTaskProcessor *bg_task_processor_{};
     Catalog *catalog_{};
 
     TxnStore txn_store_; // this has this ptr, so txn cannot be moved.

@@ -39,10 +39,32 @@ export enum class StorageMode {
     kWritable,
 };
 
+String ToString(StorageMode storage_mode) {
+    switch (storage_mode) {
+        case StorageMode::kUnInitialized: {
+            return "Uninitialized";
+        }
+        case StorageMode::kAdmin: {
+            return "Admin";
+        }
+        case StorageMode::kReadable: {
+            return "Readable";
+        }
+        case StorageMode::kWritable: {
+            return "Writable";
+        }
+    }
+}
+
 export class WalManager {
 public:
     WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
-    WalManager(Storage *storage, String wal_dir, String data_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
+    WalManager(Storage *storage,
+               String wal_dir,
+               String data_dir,
+               u64 wal_size_threshold,
+               u64 delta_checkpoint_interval_wal_bytes,
+               FlushOptionType flush_option);
 
     ~WalManager();
 

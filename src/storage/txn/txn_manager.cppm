@@ -39,7 +39,6 @@ export class TxnManager {
 public:
     explicit TxnManager(Catalog *catalog,
                         BufferManager *buffer_mgr,
-                        BGTaskProcessor *task_processor,
                         WalManager *wal_mgr,
                         TransactionID start_txn_id,
                         TxnTimeStamp start_ts);
@@ -62,8 +61,6 @@ public:
 
     Catalog *GetCatalog() const { return catalog_; }
 
-    BGTaskProcessor *bg_task_processor() const { return bg_task_processor_; }
-
     TxnTimeStamp GetCommitTimeStampR(Txn *txn);
 
     TxnTimeStamp GetCommitTimeStampW(Txn *txn);
@@ -71,8 +68,6 @@ public:
     bool CheckConflict(Txn *txn);
 
     void SendToWAL(Txn *txn);
-
-    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     void Start();
 
@@ -118,7 +113,7 @@ private:
     Catalog *catalog_{};
     mutable std::mutex locker_{};
     BufferManager *buffer_mgr_{};
-    BGTaskProcessor *bg_task_processor_{};
+
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 

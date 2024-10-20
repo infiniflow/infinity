@@ -28,6 +28,7 @@ import log_file;
 import memindex_tracer;
 import persistence_manager;
 import virtual_store;
+import status;
 
 export module storage;
 
@@ -68,6 +69,7 @@ public:
 
     StorageMode GetStorageMode() const;
     void SetStorageMode(StorageMode mode);
+    Status SetReaderStorageContinue();
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
 
