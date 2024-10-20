@@ -64,16 +64,16 @@ StorageMode Storage::GetStorageMode() const {
     return current_storage_mode_;
 }
 
-void Storage::SetStorageMode(StorageMode target_mode) {
-    StorageMode current_mode = GetStorageMode();
-    if (current_mode == target_mode) {
+void Storage::SetStorageMode(StorageMode target_storage_mode) {
+    StorageMode current_storage_mode = GetStorageMode();
+    if (current_storage_mode == target_storage_mode) {
         LOG_WARN(fmt::format("Set unchanged mode"));
         return;
     }
     cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
-    switch (current_mode) {
+    switch (current_storage_mode) {
         case StorageMode::kUnInitialized: {
-            if (target_mode != StorageMode::kAdmin) {
+            if (target_storage_mode != StorageMode::kAdmin) {
                 UnrecoverableError("Attempt to set storage mode from UnInit to UnInit");
             }
 
@@ -92,11 +92,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             break;
         }
         case StorageMode::kAdmin: {
-            if (target_mode == StorageMode::kAdmin) {
+            if (target_storage_mode == StorageMode::kAdmin) {
                 UnrecoverableError("Attempt to set storage mode from Admin to Admin");
             }
 
-            if (target_mode == StorageMode::kUnInitialized) {
+            if (target_storage_mode == StorageMode::kUnInitialized) {
                 wal_mgr_.reset();
                 LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
                 break;
@@ -144,7 +144,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     UnrecoverableError("persistence_manager was initialized before.");
                 }
                 i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
-                persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
+                persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir,
+                                                                      config_ptr_->DataDir(),
+                                                                      (SizeT)persistence_object_size_limit,
+                                                                      config_ptr_->StorageType(),
+                                                                      target_storage_mode);
             }
 
             if (result_cache_manager_ != nullptr) {
@@ -166,7 +170,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
             // Must init catalog before txn manager.
             // Replay wal file wrap init catalog
-            TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(target_mode);
+            TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(target_storage_mode);
             if (system_start_ts == 0) {
                 // Init database, need to create default_db
                 LOG_INFO(fmt::format("Init a new catalog"));
@@ -202,7 +206,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             // start WalManager after TxnManager since it depends on TxnManager.
             wal_mgr_->Start();
 
-            if (system_start_ts == 0 && target_mode == StorageMode::kWritable) {
+            if (system_start_ts == 0 && target_storage_mode == StorageMode::kWritable) {
                 CreateDefaultDB();
             }
 
@@ -216,7 +220,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
             bg_processor_->Start();
 
-            if (target_mode == StorageMode::kWritable) {
+            if (target_storage_mode == StorageMode::kWritable) {
                 if (compact_processor_ != nullptr) {
                     UnrecoverableError("compact processor was initialized before.");
                 }
@@ -230,7 +234,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             }
             periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
-            if (target_mode == StorageMode::kWritable) {
+            if (target_storage_mode == StorageMode::kWritable) {
                 periodic_trigger_thread_->full_checkpoint_trigger_ =
                     MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
                 periodic_trigger_thread_->delta_checkpoint_trigger_ =
@@ -245,7 +249,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
             bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
 
-            if (target_mode == StorageMode::kWritable) {
+            if (target_storage_mode == StorageMode::kWritable) {
                 auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
                 auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
                 bg_processor_->Submit(force_ckp_task);
@@ -258,11 +262,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             break;
         }
         case StorageMode::kReadable: {
-            if (target_mode == StorageMode::kReadable) {
+            if (target_storage_mode == StorageMode::kReadable) {
                 UnrecoverableError("Attempt to set storage mode from Readable to Readable");
             }
 
-            if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
+            if (target_storage_mode == StorageMode::kUnInitialized or target_storage_mode == StorageMode::kAdmin) {
                 periodic_trigger_thread_->Stop();
                 periodic_trigger_thread_.reset();
 
@@ -295,7 +299,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 wal_mgr_->Stop();
                 wal_mgr_.reset();
-                if (target_mode == StorageMode::kAdmin) {
+                if (target_storage_mode == StorageMode::kAdmin) {
                     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
                     wal_mgr_ = MakeUnique<WalManager>(this,
                                                       config_ptr_->WALDir(),
@@ -314,7 +318,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 persistence_manager_.reset();
             }
 
-            if (target_mode == StorageMode::kWritable) {
+            if (target_storage_mode == StorageMode::kWritable) {
                 if (compact_processor_ != nullptr) {
                     UnrecoverableError("compact processor was initialized before.");
                 }
@@ -341,15 +345,15 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             break;
         }
         case StorageMode::kWritable: {
-            if (target_mode == StorageMode::kWritable) {
+            if (target_storage_mode == StorageMode::kWritable) {
                 UnrecoverableError("Attempt to set storage mode from Writable to Writable");
             }
 
-            if (target_mode == StorageMode::kUnInitialized) {
+            if (target_storage_mode == StorageMode::kUnInitialized) {
                 UnrecoverableError("Attempt to set storage mode from Writeable to UnInit");
             }
 
-            if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
+            if (target_storage_mode == StorageMode::kUnInitialized or target_storage_mode == StorageMode::kAdmin) {
                 periodic_trigger_thread_->Stop();
                 periodic_trigger_thread_.reset();
 
@@ -381,7 +385,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 wal_mgr_->Stop();
                 wal_mgr_.reset();
-                if (target_mode == StorageMode::kAdmin) {
+                if (target_storage_mode == StorageMode::kAdmin) {
                     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
                     wal_mgr_ = MakeUnique<WalManager>(this,
                                                       config_ptr_->WALDir(),
@@ -400,7 +404,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 persistence_manager_.reset();
             }
 
-            if (target_mode == StorageMode::kReadable) {
+            if (target_storage_mode == StorageMode::kReadable) {
                 periodic_trigger_thread_->Stop();
                 periodic_trigger_thread_.reset();
 
@@ -420,7 +424,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
     }
 
     std::unique_lock<std::mutex> lock(mutex_);
-    current_storage_mode_ = target_mode;
+    current_storage_mode_ = target_storage_mode;
 }
 
 void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {

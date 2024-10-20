@@ -925,7 +925,7 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             //     break;
             case WalCommandType::CHECKPOINT: {
                 if(storage_->GetStorageMode() == StorageMode::kReadable) {
-                    LOG_DEBUG("Load the checkpoint");
+                    LOG_DEBUG(fmt::format("Load the checkpoint: {}", cmd->ToString()));
                 } else {
                     UnrecoverableError("Checkpoint");
                 }

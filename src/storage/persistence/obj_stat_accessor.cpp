@@ -142,9 +142,9 @@ LRUListEntry *ObjectStatMap::EnvictLast() {
     return &(*lru_iter);
 }
 
-// ObjectStatAccessor_LocalStorage
+// ObjectStatAccessorLocalStorage
 
-ObjectStatAccessor_LocalStorage::~ObjectStatAccessor_LocalStorage() {
+ObjectStatAccessorLocalStorage::~ObjectStatAccessorLocalStorage() {
     [[maybe_unused]] SizeT sum_ref_count = 0;
     for (const auto &[key, obj_stat] : obj_map_) {
         if (obj_stat.ref_count_ > 0) {
@@ -155,7 +155,7 @@ ObjectStatAccessor_LocalStorage::~ObjectStatAccessor_LocalStorage() {
     assert(sum_ref_count == 0);
 }
 
-ObjStat *ObjectStatAccessor_LocalStorage::Get(const String &key) {
+ObjStat *ObjectStatAccessorLocalStorage::Get(const String &key) {
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
         return nullptr;
@@ -165,7 +165,7 @@ ObjStat *ObjectStatAccessor_LocalStorage::Get(const String &key) {
     return obj_stat;
 }
 
-ObjStat *ObjectStatAccessor_LocalStorage::GetNoCount(const String &key) {
+ObjStat *ObjectStatAccessorLocalStorage::GetNoCount(const String &key) {
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
         return nullptr;
@@ -174,7 +174,7 @@ ObjStat *ObjectStatAccessor_LocalStorage::GetNoCount(const String &key) {
     return obj_stat;
 }
 
-ObjStat *ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<String> &) {
+ObjStat *ObjectStatAccessorLocalStorage::Release(const String &key, Vector<String> &) {
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
         return nullptr;
@@ -187,7 +187,7 @@ ObjStat *ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<Stri
     return obj_stat;
 }
 
-void ObjectStatAccessor_LocalStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &) {
+void ObjectStatAccessorLocalStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &) {
     auto map_iter = obj_map_.find(key);
     if (map_iter != obj_map_.end()) {
         UnrecoverableError(fmt::format("PutNew object {} is already in object map", key));
@@ -196,7 +196,7 @@ void ObjectStatAccessor_LocalStorage::PutNew(const String &key, ObjStat obj_stat
     obj_map_.emplace_hint(map_iter, key, std::move(obj_stat));
 }
 
-void ObjectStatAccessor_LocalStorage::PutNoCount(const String &key, ObjStat obj_stat) {
+void ObjectStatAccessorLocalStorage::PutNoCount(const String &key, ObjStat obj_stat) {
     obj_stat.cached_ = true;
     auto [iter, insert_ok] = obj_map_.insert_or_assign(key, std::move(obj_stat));
     if (!insert_ok) {
@@ -204,7 +204,7 @@ void ObjectStatAccessor_LocalStorage::PutNoCount(const String &key, ObjStat obj_
     }
 }
 
-Optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const String &key) {
+Optional<ObjStat> ObjectStatAccessorLocalStorage::Invalidate(const String &key) {
     auto iter = obj_map_.find(key);
     if (iter == obj_map_.end()) {
         return None;
@@ -214,13 +214,13 @@ Optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const String &key)
     return obj_stat;
 }
 
-void ObjectStatAccessor_LocalStorage::CheckValid(SizeT current_object_size) {
+void ObjectStatAccessorLocalStorage::CheckValid(SizeT current_object_size) {
     for (auto &[obj_key, obj_stat] : obj_map_) {
         obj_stat.CheckValid(obj_key, current_object_size);
     }
 }
 
-nlohmann::json ObjectStatAccessor_LocalStorage::Serialize() {
+nlohmann::json ObjectStatAccessorLocalStorage::Serialize() {
     nlohmann::json json_obj;
     json_obj["obj_stat_size"] = obj_map_.size();
     json_obj["obj_stat_array"] = nlohmann::json::array();
@@ -233,7 +233,7 @@ nlohmann::json ObjectStatAccessor_LocalStorage::Serialize() {
     return json_obj;
 }
 
-void ObjectStatAccessor_LocalStorage::Deserialize(const nlohmann::json &obj) {
+void ObjectStatAccessorLocalStorage::Deserialize(const nlohmann::json &obj) {
     SizeT len = 0;
     if (obj.contains("obj_stat_size")) {
         len = obj["obj_stat_size"];
@@ -249,15 +249,15 @@ void ObjectStatAccessor_LocalStorage::Deserialize(const nlohmann::json &obj) {
     }
 }
 
-HashMap<String, ObjStat> ObjectStatAccessor_LocalStorage::GetAllObjects() const { return obj_map_; }
+HashMap<String, ObjStat> ObjectStatAccessorLocalStorage::GetAllObjects() const { return obj_map_; }
 
-// ObjectStatAccessor_ObjectStorage
+// ObjectStatAccessorObjectStorage
 
-ObjectStatAccessor_ObjectStorage::ObjectStatAccessor_ObjectStorage(SizeT disk_capacity_limit) : disk_capacity_limit_(disk_capacity_limit) {}
+ObjectStatAccessorObjectStorage::ObjectStatAccessorObjectStorage(SizeT disk_capacity_limit) : disk_capacity_limit_(disk_capacity_limit) {}
 
-ObjectStatAccessor_ObjectStorage::~ObjectStatAccessor_ObjectStorage() = default;
+ObjectStatAccessorObjectStorage::~ObjectStatAccessorObjectStorage() = default;
 
-ObjStat *ObjectStatAccessor_ObjectStorage::Get(const String &key) {
+ObjStat *ObjectStatAccessorObjectStorage::Get(const String &key) {
     ObjStat *obj_stat = obj_map_.Get(key);
     if (obj_stat == nullptr) {
         return nullptr;
@@ -269,9 +269,9 @@ ObjStat *ObjectStatAccessor_ObjectStorage::Get(const String &key) {
     return obj_stat;
 }
 
-ObjStat *ObjectStatAccessor_ObjectStorage::GetNoCount(const String &key) { return obj_map_.GetNoCount(key); }
+ObjStat *ObjectStatAccessorObjectStorage::GetNoCount(const String &key) { return obj_map_.GetNoCount(key); }
 
-ObjStat *ObjectStatAccessor_ObjectStorage::Release(const String &key, Vector<String> &drop_keys) {
+ObjStat *ObjectStatAccessorObjectStorage::Release(const String &key, Vector<String> &drop_keys) {
     auto [release_ok, obj_stat] = obj_map_.Release(key);
     if (!release_ok) {
         return obj_stat;
@@ -283,7 +283,7 @@ ObjStat *ObjectStatAccessor_ObjectStorage::Release(const String &key, Vector<Str
     return obj_stat;
 }
 
-void ObjectStatAccessor_ObjectStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) {
+void ObjectStatAccessorObjectStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) {
     obj_map_.PutNew(key, std::move(obj_stat));
     disk_used_ += obj_stat.obj_size_;
     if (disk_used_ > disk_capacity_limit_) {
@@ -291,9 +291,9 @@ void ObjectStatAccessor_ObjectStorage::PutNew(const String &key, ObjStat obj_sta
     }
 }
 
-void ObjectStatAccessor_ObjectStorage::PutNoCount(const String &key, ObjStat obj_stat) { obj_map_.PutNew(key, std::move(obj_stat)); }
+void ObjectStatAccessorObjectStorage::PutNoCount(const String &key, ObjStat obj_stat) { obj_map_.PutNew(key, std::move(obj_stat)); }
 
-Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Invalidate(const String &key) {
+Optional<ObjStat> ObjectStatAccessorObjectStorage::Invalidate(const String &key) {
     Optional<ObjStat> obj_stat = obj_map_.Invalidate(key);
     if (!obj_stat.has_value()) {
         return None;
@@ -302,13 +302,13 @@ Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Invalidate(const String &key
     return obj_stat;
 }
 
-void ObjectStatAccessor_ObjectStorage::CheckValid(SizeT current_object_size) {
+void ObjectStatAccessorObjectStorage::CheckValid(SizeT current_object_size) {
     for (const auto &[obj_key, lru_iter] : obj_map_.obj_map()) {
         lru_iter->obj_stat_.CheckValid(obj_key, current_object_size);
     }
 }
 
-nlohmann::json ObjectStatAccessor_ObjectStorage::Serialize() {
+nlohmann::json ObjectStatAccessorObjectStorage::Serialize() {
     nlohmann::json json_obj;
     json_obj["obj_stat_size"] = obj_map_.obj_map().size();
     json_obj["obj_stat_array"] = nlohmann::json::array();
@@ -321,7 +321,7 @@ nlohmann::json ObjectStatAccessor_ObjectStorage::Serialize() {
     return json_obj;
 }
 
-void ObjectStatAccessor_ObjectStorage::Deserialize(const nlohmann::json &obj) {
+void ObjectStatAccessorObjectStorage::Deserialize(const nlohmann::json &obj) {
     SizeT len = 0;
     if (obj.contains("obj_stat_size")) {
         len = obj["obj_stat_size"];
@@ -337,7 +337,7 @@ void ObjectStatAccessor_ObjectStorage::Deserialize(const nlohmann::json &obj) {
     }
 }
 
-HashMap<String, ObjStat> ObjectStatAccessor_ObjectStorage::GetAllObjects() const {
+HashMap<String, ObjStat> ObjectStatAccessorObjectStorage::GetAllObjects() const {
     HashMap<String, ObjStat> res;
     for (const auto &[key, lru_iter] : obj_map_.obj_map()) {
         res.emplace(key, lru_iter->obj_stat_);
@@ -345,7 +345,7 @@ HashMap<String, ObjStat> ObjectStatAccessor_ObjectStorage::GetAllObjects() const
     return res;
 }
 
-bool ObjectStatAccessor_ObjectStorage::Envict(Vector<String> &drop_keys) {
+bool ObjectStatAccessorObjectStorage::Envict(Vector<String> &drop_keys) {
     while (disk_used_ > disk_capacity_limit_) {
         LRUListEntry *lru_entry = obj_map_.EnvictLast();
         if (lru_entry == nullptr) {

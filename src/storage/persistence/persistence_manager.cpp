@@ -13,10 +13,12 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
 #include <filesystem>
 
 module persistence_manager;
+
 import stl;
 import uuid;
 import serialize;
@@ -24,6 +26,7 @@ import third_party;
 import infinity_exception;
 import virtual_store;
 import logger;
+import wal_manager;
 
 namespace fs = std::filesystem;
 
@@ -60,13 +63,27 @@ ObjAddr ObjAddr::ReadBufAdv(const char *&buf) {
     return ret;
 }
 
-PersistenceManager::PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit, bool local_storage)
+PersistenceManager::PersistenceManager(const String &workspace,
+                                       const String &data_dir,
+                                       SizeT object_size_limit,
+                                       StorageType storage_type,
+                                       StorageMode storage_mode)
     : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
-    if (local_storage) {
-        objects_ = MakeUnique<ObjectStatAccessor_LocalStorage>();
-    } else {
-        UnrecoverableError("Remote storage is not supported yet.");
+
+    switch (storage_type) {
+        case StorageType::kLocal: {
+            objects_ = MakeUnique<ObjectStatAccessorLocalStorage>();
+            break;
+        }
+        case StorageType::kMinio: {
+//            objects_ = MakeUnique<ObjectStatAccessorObjectStorage>();
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(storage_type)));
+        }
     }
+
     current_object_key_ = ObjCreate();
     current_object_size_ = 0;
     current_object_parts_ = 0;
@@ -254,10 +271,10 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         result.cached_ = true;
     } else if (ObjStat *obj_stat = objects_->Get(it->second.obj_key_); obj_stat != nullptr) {
         LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
-        if(!obj_stat->cached_){
+        if (!obj_stat->cached_) {
             String read_path = GetObjPath(result.obj_addr_.obj_key_);
             VirtualStore::DownloadObject(read_path, read_path);
-            if(VirtualStore::Exists(read_path)){
+            if (VirtualStore::Exists(read_path)) {
                 LOG_TRACE(fmt::format("GetObjCache download object {}", read_path));
                 obj_stat->cached_ = true;
             }

@@ -100,9 +100,9 @@ public:
     virtual HashMap<String, ObjStat> GetAllObjects() const = 0;
 };
 
-export class ObjectStatAccessor_LocalStorage : public ObjectStatAccessorBase {
+export class ObjectStatAccessorLocalStorage : public ObjectStatAccessorBase {
 public:
-    ~ObjectStatAccessor_LocalStorage() override;
+    ~ObjectStatAccessorLocalStorage() override;
 
     ObjStat *Get(const String &key) override;
 
@@ -128,12 +128,12 @@ private:
     HashMap<String, ObjStat> obj_map_{};
 };
 
-// envict and recover is encapsulated
-export class ObjectStatAccessor_ObjectStorage : public ObjectStatAccessorBase {
+// evict and recover is encapsulated
+export class ObjectStatAccessorObjectStorage : public ObjectStatAccessorBase {
 public:
-    ObjectStatAccessor_ObjectStorage(SizeT disk_capacity_limit);
+    ObjectStatAccessorObjectStorage(SizeT disk_capacity_limit);
 
-    ~ObjectStatAccessor_ObjectStorage() override;
+    ~ObjectStatAccessorObjectStorage() override;
 
     ObjStat *Get(const String &key) override;
 
