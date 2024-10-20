@@ -76,6 +76,7 @@ PersistenceManager::PersistenceManager(const String &workspace,
             break;
         }
         case StorageType::kMinio: {
+            objects_ = MakeUnique<ObjectStatAccessorLocalStorage>();
 //            objects_ = MakeUnique<ObjectStatAccessorObjectStorage>();
             break;
         }
