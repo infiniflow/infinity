@@ -56,22 +56,21 @@ import peer_task;
 
 namespace infinity {
 
-Txn::Txn(TxnManager *txn_manager,
-         BufferManager *buffer_manager,
-         Catalog *catalog,
-         TransactionID txn_id,
-         TxnTimeStamp begin_ts,
-         SharedPtr<String> txn_text)
-    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), catalog_(catalog), txn_store_(this, catalog),
-      txn_id_(txn_id), txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
-      txn_text_(std::move(txn_text)) {}
+Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<String> txn_text)
+    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(this, InfinityContext::instance().storage()->catalog()), txn_id_(txn_id),
+      txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
+      txn_text_(std::move(txn_text)) {
+    catalog_ = txn_store_.GetCatalog();
+}
 
-Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts)
-    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_store_(this, catalog), txn_id_(txn_id), txn_context_(begin_ts),
-      wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
+Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts)
+    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this, InfinityContext::instance().storage()->catalog()), txn_id_(txn_id), txn_context_(begin_ts),
+      wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {
+    catalog_ = txn_store_.GetCatalog();
+}
 
-UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id, begin_ts);
+UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, txn_id, begin_ts);
     txn->txn_context_.commit_ts_ = begin_ts;
     txn->txn_context_.state_ = TxnState::kCommitted;
     return txn;
@@ -524,7 +523,7 @@ TxnTimeStamp Txn::Commit() {
     return commit_ts;
 }
 
-bool Txn::CheckConflict(Catalog *catalog) { return txn_store_.CheckConflict(catalog); }
+bool Txn::CheckConflict() { return txn_store_.CheckConflict(catalog_); }
 
 bool Txn::CheckConflict(Txn *other_txn) {
     LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, other_txn->txn_id_));

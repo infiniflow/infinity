@@ -66,17 +66,12 @@ struct SegmentIndexEntry;
 export class Txn : public EnableSharedFromThis<Txn> {
 public:
     // For new txn
-    explicit Txn(TxnManager *txn_manager,
-                 BufferManager *buffer_manager,
-                 Catalog *catalog,
-                 TransactionID txn_id,
-                 TxnTimeStamp begin_ts,
-                 SharedPtr<String> txn_text);
+    explicit Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<String> txn_text);
 
     // For replay txn
-    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
+    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
+    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // Txn steps:
     // 1. CreateTxn
@@ -93,7 +88,7 @@ public:
 
     TxnTimeStamp Commit();
 
-    bool CheckConflict(Catalog *catalog);
+    bool CheckConflict();
 
     bool CheckConflict(Txn *txn);
 

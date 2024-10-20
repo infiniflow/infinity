@@ -26,7 +26,6 @@ import default_values;
 namespace infinity {
 
 class BGTaskProcessor;
-struct Catalog;
 class WalManager;
 class CatalogDeltaEntry;
 
@@ -37,8 +36,7 @@ export struct TxnInfo {
 
 export class TxnManager {
 public:
-    explicit TxnManager(Catalog *catalog,
-                        BufferManager *buffer_mgr,
+    explicit TxnManager(BufferManager *buffer_mgr,
                         WalManager *wal_mgr,
                         TxnTimeStamp start_ts);
 
@@ -57,8 +55,6 @@ public:
     inline void UnLock() { locker_.unlock(); }
 
     BufferManager *GetBufferMgr() const { return buffer_mgr_; }
-
-    Catalog *GetCatalog() const { return catalog_; }
 
     TxnTimeStamp GetCommitTimeStampR(Txn *txn);
 
@@ -109,7 +105,6 @@ public:
     bool InCheckpointProcess(TxnTimeStamp commit_ts);
 
 private:
-    Catalog *catalog_{};
     mutable std::mutex locker_{};
     BufferManager *buffer_mgr_{};
 

@@ -191,8 +191,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             if (txn_mgr_ != nullptr) {
                 UnrecoverableError("Transaction manager was initialized before.");
             }
-            txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
-                                              buffer_mgr_.get(),
+            txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(),
                                               wal_mgr_.get(),
                                               system_start_ts);
             txn_mgr_->Start();
