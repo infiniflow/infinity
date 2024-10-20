@@ -32,6 +32,7 @@ import config;
 import infinity_exception;
 import persistence_manager;
 import default_values;
+import wal_manager;
 
 using namespace infinity;
 
@@ -114,7 +115,8 @@ TEST_F(BufferManagerTest, cleanup_test) {
 
         for (SizeT i = 0; i < file_num; ++i) {
             auto file_name = MakeShared<String>(fmt::format("file_{}", i));
-            auto file_worker = MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_size, buffer_mgr.persistence_manager());
+            auto file_worker =
+                MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_size, buffer_mgr.persistence_manager());
             auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
             buffer_objs.push_back(buffer_obj);
             {
@@ -195,7 +197,11 @@ TEST_F(BufferManagerTest, varfile_test) {
     SizeT buffer_size = 100;
     SizeT file_num = 10;
 
-    SharedPtr<PersistenceManager> persistence_manager_ = MakeShared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+    SharedPtr<PersistenceManager> persistence_manager_ = MakeShared<PersistenceManager>(*persistence_dir_,
+                                                                                        *data_dir_,
+                                                                                        DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT,
+                                                                                        StorageType::kLocal,
+                                                                                        StorageMode::kWritable);
     BufferManager buffer_mgr(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
     Vector<BufferObj *> buffer_objs;
     for (SizeT i = 0; i < file_num; ++i) {
@@ -351,7 +357,7 @@ protected:
                 test_obj->Check(file_info);
             }
         }
-//        LOG_INFO(fmt::format("Test {} thread {} finished", test_i, thread_i));
+        //        LOG_INFO(fmt::format("Test {} thread {} finished", test_i, thread_i));
     }
 };
 
@@ -401,7 +407,11 @@ public:
 
 TEST_F(BufferManagerParallelTest, parallel_test1) {
     for (int i = 0; i < 1; ++i) {
-        SharedPtr<PersistenceManager> persistence_manager_ = MakeShared<PersistenceManager>(*persistence_dir_, *data_dir_, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+        SharedPtr<PersistenceManager> persistence_manager_ = MakeShared<PersistenceManager>(*persistence_dir_,
+                                                                                            *data_dir_,
+                                                                                            DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT,
+                                                                                            StorageType::kLocal,
+                                                                                            StorageMode::kWritable);
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_, persistence_manager_.get());
         auto test1_obj = MakeUnique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_, temp_dir_);
 
@@ -409,7 +419,7 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
         for (SizeT i = 0; i < file_n; ++i) {
             file_infos.emplace_back(i);
         }
-//        LOG_INFO(fmt::format("Start parallel test1 {}", i));
+        //        LOG_INFO(fmt::format("Start parallel test1 {}", i));
         for (SizeT test_i = 0; test_i < test_n_; test_i++) {
             Atomic<SizeT> finished_n = 0;
             for (auto &file_info : file_infos) {
@@ -427,7 +437,7 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
         EXPECT_EQ(buffer_mgr->memory_usage(), 0);
         buffer_mgr->RemoveClean();
 
-//        LOG_INFO(fmt::format("Finished parallel test1 {}", i));
+        //        LOG_INFO(fmt::format("Finished parallel test1 {}", i));
         ResetDir();
     }
 }
@@ -490,7 +500,7 @@ TEST_F(BufferManagerParallelTest, parallel_test2) {
         for (SizeT i = 0; i < file_n; ++i) {
             file_infos.emplace_back(i);
         }
-//        LOG_INFO(fmt::format("Start parallel test2 {}", i));
+        //        LOG_INFO(fmt::format("Start parallel test2 {}", i));
         for (SizeT test_i = 0; test_i < test_n_; test_i++) {
             Atomic<SizeT> finished_n = 0;
             for (auto &file_info : file_infos) {
@@ -533,7 +543,7 @@ TEST_F(BufferManagerParallelTest, parallel_test2) {
         ASSERT_EQ(buffer_mgr->memory_usage(), 0);
         buffer_mgr->RemoveClean();
 
-//        LOG_INFO(fmt::format("Finished parallel test2 {}", i));
+        //        LOG_INFO(fmt::format("Finished parallel test2 {}", i));
         ResetDir();
     }
 }

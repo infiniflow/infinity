@@ -1,4 +1,5 @@
 #include "gtest/gtest.h"
+
 import base_test;
 import stl;
 import persistence_manager;
@@ -6,6 +7,7 @@ import virtual_store;
 import third_party;
 import persist_result_handler;
 import local_file_handle;
+import wal_manager;
 
 using namespace infinity;
 namespace fs = std::filesystem;
@@ -18,10 +20,10 @@ public:
         file_dir_ = String(GetFullTmpDir()) + "/persistence_src";
         system(("mkdir -p " + workspace_).c_str());
         system(("mkdir -p " + file_dir_).c_str());
-        pm_ = MakeUnique<PersistenceManager>(workspace_, file_dir_, ObjSizeLimit);
+        pm_ = MakeUnique<PersistenceManager>(workspace_, file_dir_, ObjSizeLimit, StorageType::kLocal, StorageMode::kWritable);
         handler_ = MakeUnique<PersistResultHandler>(pm_.get());
     }
-    void CheckObjData(const String& obj_addr, const String& data);
+    void CheckObjData(const String &obj_addr, const String &data);
 
 protected:
     String workspace_{};
@@ -31,7 +33,7 @@ protected:
     UniquePtr<PersistResultHandler> handler_;
 };
 
-void PersistenceManagerTest::CheckObjData(const String& local_file_path, const String& data) {
+void PersistenceManagerTest::CheckObjData(const String &local_file_path, const String &data) {
     PersistReadResult result = pm_->GetObjCache(local_file_path);
     const ObjAddr &obj_addr = handler_->HandleReadResult(result);
     String obj_path = pm_->GetObjPath(obj_addr.obj_key_);
@@ -130,7 +132,7 @@ TEST_F(PersistenceManagerTest, PersistFileMultiThread) {
             obj_addrs[file_path] = obj_addr;
         });
     }
-    for (auto& thread : threads) {
+    for (auto &thread : threads) {
         thread.join();
     }
     ASSERT_EQ(file_paths.size(), persist_strs.size());
@@ -176,7 +178,7 @@ TEST_F(PersistenceManagerTest, CleanupBasic) {
         CheckObjData(file_paths[i], persist_strs[i]);
     }
 
-    for (const auto& obj_path : obj_paths) {
+    for (const auto &obj_path : obj_paths) {
         ASSERT_TRUE(fs::exists(obj_path));
     }
 
@@ -184,11 +186,11 @@ TEST_F(PersistenceManagerTest, CleanupBasic) {
     std::mt19937 g(rd());
     std::shuffle(file_paths.begin(), file_paths.end(), g);
 
-    for (auto& file_path : file_paths) {
+    for (auto &file_path : file_paths) {
         PersistWriteResult result = pm_->Cleanup(file_path);
         handler_->HandleWriteResult(result);
     }
-    for (const auto& obj_path : obj_paths) {
+    for (const auto &obj_path : obj_paths) {
         ASSERT_FALSE(fs::exists(obj_path));
     }
 }
