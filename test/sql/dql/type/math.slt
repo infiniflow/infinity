@@ -7,16 +7,43 @@ CREATE TABLE test_math (c1 integer, c2 float);
 # insert
 
 statement ok
-INSERT INTO test_math VALUES (1, 4), (4, 9), (9, 16);
+INSERT INTO test_math VALUES (1, 4), (4, 9), (9, 16), (10, 2.4), (10, -2.4), (10, 2.5), (10, -2.5);
 
 query I
-SELECT *, sqrt(c1), sqrt(c2) FROM test_math;
+SELECT *, sqrt(c1), sqrt(c2) FROM test_math WHERE c1 < 10;
 ----
 1 4.000000 1.000000 2.000000
 4 9.000000 2.000000 3.000000
 9 16.000000 3.000000 4.000000
 
 query II
-SELECT *, sqrt(c1) FROM test_math WHERE sqrt(c1) = 2;
+SELECT c1, sqrt(c1) FROM test_math WHERE sqrt(c1) = 2;
 ----
-4 9.000000 2.000000
+4 2.000000
+
+query III
+SELECT c2, round(c2) FROM test_math WHERE c1 > 9;
+----
+2.400000 2.000000
+-2.400000 -2.000000
+2.500000 3.000000
+-2.500000 -3.000000
+
+query IV
+SELECT c2, ceiling(c2) FROM test_math WHERE c1 > 9;
+----
+2.400000 3.000000
+-2.400000 -2.000000
+2.500000 3.000000
+-2.500000 -2.000000
+
+query V
+SELECT c2, floor(c2) FROM test_math WHERE c1 > 9;
+----
+2.400000 2.000000
+-2.400000 -3.000000
+2.500000 2.000000
+-2.500000 -3.000000
+
+statement ok
+DROP TABLE test_math;
