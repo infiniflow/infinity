@@ -1234,10 +1234,11 @@ concept PODValueType = IsAnyOf<ValueType,
                                TimestampT,
                                IntervalT,
                                RowID,
-                               UuidT>;
+                               UuidT,
+                               VarcharT>;
 
 export template <typename ValueType>
-concept BinaryGenerateBoolean = PODValueType<ValueType> or IsAnyOf<ValueType, BooleanT, VarcharT>;
+concept BinaryGenerateBoolean = PODValueType<ValueType> or IsAnyOf<ValueType, BooleanT>;
 
 template <typename Unsupported>
 class ColumnVectorPtrAndIdx {

@@ -70,6 +70,10 @@ print(res)
 res = table_obj.output(["*"]).filter("trim('   abc   ') = rtrim(ltrim('   abc   '))").to_df()
 print(res)
 
+#function char_position
+res = table_obj.output(["*", "char_position(c1, 'bc')"]).filter("char_position(c1, c1) <> 0").to_df()
+print(res)
+
 res = db_obj.drop_table("function_example")
 
 infinity_obj.disconnect()
