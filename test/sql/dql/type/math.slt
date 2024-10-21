@@ -1,0 +1,22 @@
+statement ok
+DROP TABLE IF EXISTS test_math;
+
+statement ok
+CREATE TABLE test_math (c1 integer, c2 float);
+
+# insert
+
+statement ok
+INSERT INTO test_math VALUES (1, 4), (4, 9), (9, 16);
+
+query I
+SELECT *, sqrt(c1), sqrt(c2) FROM test_math;
+----
+1 4.000000 1.000000 2.000000
+4 9.000000 2.000000 3.000000
+9 16.000000 3.000000 4.000000
+
+query II
+SELECT *, sqrt(c1) FROM test_math WHERE sqrt(c1) = 2;
+----
+4 9.000000 2.000000

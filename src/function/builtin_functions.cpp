@@ -27,6 +27,7 @@ import sum;
 
 import add;
 import abs;
+import sqrt;
 import and_func;
 import divide;
 import equals;
@@ -100,8 +101,8 @@ void BuiltinFunctions::RegisterScalarFunction() {
 
     // Math functions
     RegisterAbsFunction(catalog_ptr_);
-
     RegisterPowFunction(catalog_ptr_);
+    RegisterSqrtFunction(catalog_ptr_);
 
     // register comparison operator
     RegisterEqualsFunction(catalog_ptr_);
