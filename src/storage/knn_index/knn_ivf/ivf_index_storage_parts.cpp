@@ -114,6 +114,11 @@ class IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> 
     // size: real_subspace_centroid_num_ * subspace_num_
     UniquePtr<f32[]> subspace_centroid_norms_neg_half_ = {};
 
+public:
+    auto subspace_dimension() const { return subspace_dimension_; }
+
+    auto real_subspace_centroid_num() const { return real_subspace_centroid_num_; }
+
     const f32 *subspace_centroids_data_at_subspace(const u32 subspace_id) const {
         return subspace_centroids_data_.get() + subspace_id * subspace_dimension_ * real_subspace_centroid_num_;
     }
@@ -128,7 +133,6 @@ class IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> 
     NON_CONST_VERSION_MEMBER_FUNC(subspace_centroids_data_at_subspace);
     NON_CONST_VERSION_MEMBER_FUNC(subspace_centroid_norms_neg_half_at_subspace);
 
-public:
     IVF_Parts_Storage_Info(const u32 embedding_dim,
                            const u32 centroids_num,
                            const EmbeddingDataType embedding_data_type,
@@ -617,11 +621,46 @@ public:
 
     void AppendOneEmbedding(const void *embedding_ptr,
                             const SegmentOffset segment_offset,
-                            const IVF_Centroids_Storage *,
-                            const IVF_Parts_Storage *) override {
-        const auto *src_embedding_data = static_cast<const ColumnEmbeddingElementT *>(embedding_ptr);
-        (void)(src_embedding_data);
-        // TODO
+                            const IVF_Centroids_Storage *ivf_centroids_storage,
+                            const IVF_Parts_Storage *ivf_parts_storage) override {
+        const auto *ivf_parts_storage_info =
+            dynamic_cast<const IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> *>(ivf_parts_storage);
+        assert(ivf_parts_storage_info);
+        const auto dimension = ivf_centroids_storage->embedding_dimension();
+        const auto subspace_dimension = ivf_parts_storage_info->subspace_dimension();
+        const auto real_subspace_centroid_num = ivf_parts_storage_info->real_subspace_centroid_num();
+        const auto residual = MakeUniqueForOverwrite<f32[]>(dimension);
+        {
+            const auto [src_embedding_f32, _] = GetF32Ptr(static_cast<const ColumnEmbeddingElementT *>(embedding_ptr), dimension);
+            const auto centroid_data = ivf_centroids_storage->data() + part_id() * dimension;
+            for (u32 i = 0; i < dimension; ++i) {
+                residual[i] = src_embedding_f32[i] - centroid_data[i];
+            }
+        }
+        const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
+        const auto xy_buffer = MakeUniqueForOverwrite<f32[]>(real_subspace_centroid_num);
+        const f32 *part_residual = residual.get();
+        for (u32 j = 0; j < subspace_num_; ++j) {
+            matrixA_multiply_transpose_matrixB_output_to_C(part_residual,
+                                                           ivf_parts_storage_info->subspace_centroids_data_at_subspace(j),
+                                                           1,
+                                                           real_subspace_centroid_num,
+                                                           subspace_dimension,
+                                                           xy_buffer.get());
+            part_residual += subspace_dimension;
+            // find max id (for every embedding, find centroid with min l2 distance, and equivalently max (x*y - 0.5*y^2))
+            const auto *c_norm_data = ivf_parts_storage_info->subspace_centroid_norms_neg_half_at_subspace(j);
+            f32 max_neg_distance = std::numeric_limits<f32>::lowest();
+            u32 max_id = 0;
+            for (u32 k = 0; k < real_subspace_centroid_num; ++k) {
+                if (const f32 neg_distance = xy_buffer[k] + c_norm_data[k]; neg_distance > max_neg_distance) {
+                    max_neg_distance = neg_distance;
+                    max_id = k;
+                }
+            }
+            encoded_codes[j] = max_id;
+        }
+        pq_code_storage_->AppendCodes(encoded_codes.get());
         embedding_segment_offsets_.push_back(segment_offset);
         ++embedding_num_;
     }
@@ -631,7 +670,7 @@ public:
                      const EmbeddingDataType query_element_type,
                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                      const std::function<void(f32, SegmentOffset)> &add_result_func,
-                     const IVF_Parts_Storage *) const override {
+                     const IVF_Parts_Storage *ivf_parts_storage) const override {
         auto ReturnT = [&]<EmbeddingDataType query_element_type> {
             if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
                           (query_element_type == src_embedding_data_type &&
