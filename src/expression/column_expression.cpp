@@ -58,4 +58,23 @@ String ColumnExpression::ToString() const {
     }
 }
 
+u64 ColumnExpression::Hash() const {
+    u64 h = 0;
+    h ^= std::hash<String>()(table_name_);
+    h ^= std::hash<String>()(column_name_);
+    return h;
+}
+
+bool ColumnExpression::Eq(const BaseExpression &other) const {
+    if (other.type() != ExpressionType::kColumn) {
+        return false;
+    }
+    const auto &other_column = static_cast<const ColumnExpression &>(other);
+    bool eq = table_name_ == other_column.table_name_ && column_name_ == other_column.column_name_;
+    if (!eq) {
+        return false;
+    }
+    return true;
+}
+
 } // namespace infinity

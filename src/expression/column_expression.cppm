@@ -72,6 +72,10 @@ public:
 
     inline Optional<SpecialType> special() const { return special_; }
 
+    u64 Hash() const override;
+
+    bool Eq(const BaseExpression &other) const override;
+
 private:
     String ToString() const final;
 

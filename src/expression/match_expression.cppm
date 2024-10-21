@@ -32,9 +32,9 @@ public:
 
     String ToString() const override;
 
-    u64 Hash() const;
+    u64 Hash() const override;
 
-    bool Eq(const MatchExpression &other) const;
+    bool Eq(const BaseExpression &other) const override;
 
 public:
     String fields_;
