@@ -25,6 +25,15 @@ using namespace infinity;
 
 class SIMDTest : public BaseTest {};
 
+#if defined(__aarch64__)
+inline float hsum256_ps_avx(__m256 v) {
+    const __m128 x128 = _mm_add_ps(_mm256_extractf128_ps(v, 1), _mm256_castps256_ps128(v));
+    const __m128 x64 = _mm_add_ps(x128, _mm_movehl_ps(x128, x128));
+    const __m128 x32 = _mm_add_ss(x64, _mm_shuffle_ps(x64, x64, 0x55));
+    return _mm_cvtss_f32(x32);
+}
+#endif
+
 TEST_F(SIMDTest, testsum256) {
     constexpr u32 test_sum256_loop = 20;
 
