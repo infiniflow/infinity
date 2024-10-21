@@ -30,9 +30,10 @@ https://github.com/gperftools/gperftools/releases/download/gperftools-2.15/gperf
 https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1w/openssl-1.1.1w.tar.gz
 https://github.com/openssl/openssl/releases/download/openssl-3.0.15/openssl-3.0.15.tar.gz
 https://dlcdn.apache.org/thrift/0.20.0/thrift-0.20.0.tar.gz
-https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tar.xz
-https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tar.xz
-https://www.python.org/ftp/python/3.12.4/Python-3.12.4.tar.xz"
+https://www.python.org/ftp/python/3.10.15/Python-3.10.15.tar.xz
+https://www.python.org/ftp/python/3.11.10/Python-3.11.10.tar.xz
+https://www.python.org/ftp/python/3.12.7/Python-3.12.7.tar.xz
+https://www.python.org/ftp/python/3.13.0/Python-3.13.0.tar.xz"
 
 SAVEIFS=$IFS   # Save current IFS (Internal Field Separator)
 IFS=$'\n'      # Change IFS to newline char
