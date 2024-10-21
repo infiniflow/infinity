@@ -24,7 +24,7 @@ log_level               = "debug"
 
 [storage]
 persistence_dir         = "/var/infinity/follower/persistence"
-data_dir                = "/var/infinity/follower/data"
+data_dir                = "/var/infinity/leader/data"
 # periodically activates garbage collection:
 # 0 means real-time,
 # s means seconds, for example "60s", 60 seconds

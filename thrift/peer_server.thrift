@@ -70,6 +70,7 @@ struct HeartBeatResponse {
 struct SyncLogRequest {
 1: string node_name,
 2: list<binary> log_entries,
+3: bool on_startup,
 }
 
 struct SyncLogResponse {

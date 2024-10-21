@@ -162,13 +162,14 @@ public:
 
 export class SyncLogTask final : public PeerTask {
 public:
-    SyncLogTask(const String &node_name, const Vector<SharedPtr<String>> &log_strings)
-        : PeerTask(PeerTaskType::kLogSync), node_name_(node_name), log_strings_(log_strings) {}
+    SyncLogTask(const String &node_name, const Vector<SharedPtr<String>> &log_strings, bool on_register)
+        : PeerTask(PeerTaskType::kLogSync), node_name_(node_name), log_strings_(log_strings), on_register_(on_register) {}
 
     String ToString() const final;
 
-    String node_name_;
+    String node_name_{};
     Vector<SharedPtr<String>> log_strings_;
+    bool on_register_{false};
 
     // response
     i64 error_code_{};

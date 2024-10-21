@@ -186,7 +186,7 @@ void ClusterManager::HeartBeatToLeader() {
                                                                              this_node_->node_role_,
                                                                              this_node_->ip_address_,
                                                                              this_node_->port_,
-                                                                             txn_manager_->CurrentTS());
+                                                                             storage_->txn_manager()->CurrentTS());
         client_to_leader_->Send(hb_task);
         hb_task->Wait();
 
@@ -263,12 +263,19 @@ void ClusterManager::CheckHeartBeatInner() {
 }
 
 Status ClusterManager::RegisterToLeaderNoLock() {
-    // Register to leader;
-    SharedPtr<RegisterPeerTask> register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
-                                                                                  this_node_->node_role_,
-                                                                                  this_node_->ip_address_,
-                                                                                  this_node_->port_,
-                                                                                  txn_manager_->CurrentTS());
+    // Register to leader, used by follower and learner
+    SharedPtr<RegisterPeerTask> register_peer_task = nullptr;
+    if (storage_->reader_init_phase() == ReaderInitPhase::kPhase2) {
+        register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
+                                                          this_node_->node_role_,
+                                                          this_node_->ip_address_,
+                                                          this_node_->port_,
+                                                          storage_->txn_manager()->CurrentTS());
+    } else {
+        register_peer_task =
+            MakeShared<RegisterPeerTask>(this_node_->node_name_, this_node_->node_role_, this_node_->ip_address_, this_node_->port_, 0);
+    }
+
     client_to_leader_->Send(register_peer_task);
     register_peer_task->Wait();
 
@@ -313,8 +320,8 @@ Status ClusterManager::UnregisterToLeaderNoLock() {
 }
 
 Tuple<SharedPtr<PeerClient>, Status>
-ClusterManager::ConnectToServerNoLock(const String &sending_node_name, const String &server_ip, i64 server_port) {
-    SharedPtr<PeerClient> client = MakeShared<PeerClient>(sending_node_name, server_ip, server_port);
+ClusterManager::ConnectToServerNoLock(const String &from_node_name, const String &server_ip, i64 server_port) {
+    SharedPtr<PeerClient> client = MakeShared<PeerClient>(from_node_name, server_ip, server_port);
     Status client_status = client->Init();
     if (!client_status.ok()) {
         return {nullptr, client_status};
@@ -322,9 +329,12 @@ ClusterManager::ConnectToServerNoLock(const String &sending_node_name, const Str
     return {client, client_status};
 }
 
-Status
-ClusterManager::SendLogs(const String &node_name, const SharedPtr<PeerClient> &peer_client, const Vector<SharedPtr<String>> &logs, bool synchronize) {
-    SharedPtr<SyncLogTask> sync_log_task = MakeShared<SyncLogTask>(node_name, logs);
+Status ClusterManager::SendLogs(const String &node_name,
+                                const SharedPtr<PeerClient> &peer_client,
+                                const Vector<SharedPtr<String>> &logs,
+                                bool synchronize,
+                                bool on_register) {
+    SharedPtr<SyncLogTask> sync_log_task = MakeShared<SyncLogTask>(node_name, logs, on_register);
     peer_client->Send(sync_log_task);
 
     Status status = Status::OK();
@@ -366,34 +376,38 @@ Status ClusterManager::GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
 
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     // Only used by Leader on follower/learner registration.
-    std::unique_lock<std::mutex> lock(mutex_);
-    if (this_node_->node_role_ != NodeRole::kLeader) {
-        String error_message = "Invalid node role.";
-        UnrecoverableError(error_message);
+
+    SharedPtr<PeerClient> peer_client{};
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (this_node_->node_role_ != NodeRole::kLeader) {
+            String error_message = "Invalid node role.";
+            UnrecoverableError(error_message);
+        }
+
+        // Add by register
+        auto iter = other_node_map_.find(node_info->node_name_);
+        if (iter == other_node_map_.end()) {
+            // Not find, so add the node
+            other_node_map_.emplace(node_info->node_name_, node_info);
+        } else {
+            // Duplicated node
+            return Status::DuplicateNode(node_info->node_name_);
+        }
+
+        // Connect to follower/learner server.
+        auto [client_to_follower, client_status] =
+            ClusterManager::ConnectToServerNoLock(this_node_->node_name_, node_info->ip_address_, node_info->port_);
+        if (!client_status.ok()) {
+            return client_status;
+        }
+
+        reader_client_map_.emplace(node_info->node_name_, client_to_follower);
+        peer_client = client_to_follower;
     }
 
-    // Add by register
-    auto iter = other_node_map_.find(node_info->node_name_);
-    if (iter == other_node_map_.end()) {
-        // Not find, so add the node
-        other_node_map_.emplace(node_info->node_name_, node_info);
-    } else {
-        // Duplicated node
-        return Status::DuplicateNode(node_info->node_name_);
-    }
-
-    // Connect to follower/learner server.
-    auto [client_to_follower, client_status] =
-        ClusterManager::ConnectToServerNoLock(this_node_->node_name_, node_info->ip_address_, node_info->port_);
-    if (!client_status.ok()) {
-        return client_status;
-    }
-
-    reader_client_map_.emplace(node_info->node_name_, client_to_follower);
-
-    SyncLogsOnRegistration(node_info, client_to_follower);
-
-    return Status::OK();
+    Status log_sending_status = SyncLogsOnRegistration(node_info, peer_client);
+    return log_sending_status;
 }
 
 Status ClusterManager::UpdateNodeByLeader(const String &node_name, UpdateNodeOp update_node_op) {
@@ -476,7 +490,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
                     break;
                 }
                 case NodeStatus::kLostConnection: {
-                    LOG_ERROR(fmt::format("Node {} from {}:{} cant' connected, but still can receive heartbeat.",
+                    LOG_ERROR(fmt::format("Node {} from {}:{} can't connected, but still can receive heartbeat.",
                                           other_node->node_name_,
                                           other_node->ip_address_,
                                           other_node->port_));
@@ -544,12 +558,12 @@ Status ClusterManager::SyncLogsOnRegistration(const SharedPtr<NodeInfo> &non_lea
 
     // Check leader WAL and get the diff log
     LOG_TRACE("Leader will get the log diff");
-    WalManager *wal_manager = txn_manager_->wal_manager();
+    WalManager *wal_manager = storage_->wal_manager();
     Vector<SharedPtr<String>> wal_strings = wal_manager->GetDiffWalEntryString(non_leader_node->txn_timestamp_);
 
     // Leader will send the WALs
     LOG_TRACE(fmt::format("Leader will send the diff logs count: {} to {} synchronously", wal_strings.size(), non_leader_node->node_name_));
-    return SendLogs(non_leader_node->node_name_, peer_client, wal_strings, true);
+    return SendLogs(non_leader_node->node_name_, peer_client, wal_strings, true, true);
 }
 
 void ClusterManager::PrepareLogs(const SharedPtr<String> &log_string) { logs_to_sync_.emplace_back(log_string); }
@@ -580,7 +594,7 @@ Status ClusterManager::SyncLogs() {
         for (SizeT idx = 0; idx < follower_count; ++idx) {
             const String &follower_name = followers[idx]->node_name_;
             if (!sent_nodes.contains(follower_name)) {
-                status = SendLogs(follower_name, follower_clients[idx], logs_to_sync_, true);
+                status = SendLogs(follower_name, follower_clients[idx], logs_to_sync_, true, false);
                 if (status.ok()) {
                     sent_nodes.insert(follower_name);
                 }
@@ -591,7 +605,7 @@ Status ClusterManager::SyncLogs() {
         for (SizeT idx = 0; idx < learner_count; ++idx) {
             const String &learner_name = learners[idx]->node_name_;
             if (!sent_nodes.contains(learner_name)) {
-                status = SendLogs(learner_name, learner_clients[idx], logs_to_sync_, false);
+                status = SendLogs(learner_name, learner_clients[idx], logs_to_sync_, false, false);
                 if (status.ok()) {
                     sent_nodes.insert(learner_name);
                 }
@@ -656,14 +670,42 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
 }
 
 Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
-    //    WalManager *wal_manager = txn_manager_->wal_manager();
+    WalManager *wal_manager = storage_->wal_manager();
     for (auto &log_str : synced_logs) {
         const i32 entry_size = log_str.size();
         const char *ptr = log_str.data();
         SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
         LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
-        //        wal_manager->ReplayWalEntry(*entry);
+        wal_manager->ReplayWalEntry(*entry, false);
     }
+    return Status::OK();
+}
+
+Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
+    WalManager *wal_manager = storage_->wal_manager();
+    bool is_checkpoint = true;
+    TxnTimeStamp last_commit_ts;
+    for (auto &log_str : synced_logs) {
+        const i32 entry_size = log_str.size();
+        const char *ptr = log_str.data();
+        SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
+        for (const auto &cmd : entry->cmds_) {
+            if (is_checkpoint) {
+                if (cmd->GetType() != WalCommandType::CHECKPOINT) {
+                    is_checkpoint = false;
+                }
+            } else {
+                if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+                    UnrecoverableError("Expect non-checkpoint log");
+                }
+            }
+        }
+        LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
+        wal_manager->ReplayWalEntry(*entry, true);
+        last_commit_ts = entry->commit_ts_;
+    }
+
+    storage_->SetReaderStorageContinue(last_commit_ts + 1);
     return Status::OK();
 }
 

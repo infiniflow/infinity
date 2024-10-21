@@ -559,9 +559,10 @@ void swap(HeartBeatResponse &a, HeartBeatResponse &b);
 std::ostream& operator<<(std::ostream& out, const HeartBeatResponse& obj);
 
 typedef struct _SyncLogRequest__isset {
-  _SyncLogRequest__isset() : node_name(false), log_entries(false) {}
+  _SyncLogRequest__isset() : node_name(false), log_entries(false), on_startup(false) {}
   bool node_name :1;
   bool log_entries :1;
+  bool on_startup :1;
 } _SyncLogRequest__isset;
 
 class SyncLogRequest : public virtual ::apache::thrift::TBase {
@@ -570,12 +571,14 @@ class SyncLogRequest : public virtual ::apache::thrift::TBase {
   SyncLogRequest(const SyncLogRequest&);
   SyncLogRequest& operator=(const SyncLogRequest&);
   SyncLogRequest() noexcept
-                 : node_name() {
+                 : node_name(),
+                   on_startup(0) {
   }
 
   virtual ~SyncLogRequest() noexcept;
   std::string node_name;
   std::vector<std::string>  log_entries;
+  bool on_startup;
 
   _SyncLogRequest__isset __isset;
 
@@ -583,11 +586,15 @@ class SyncLogRequest : public virtual ::apache::thrift::TBase {
 
   void __set_log_entries(const std::vector<std::string> & val);
 
+  void __set_on_startup(const bool val);
+
   bool operator == (const SyncLogRequest & rhs) const
   {
     if (!(node_name == rhs.node_name))
       return false;
     if (!(log_entries == rhs.log_entries))
+      return false;
+    if (!(on_startup == rhs.on_startup))
       return false;
     return true;
   }

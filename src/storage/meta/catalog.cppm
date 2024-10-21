@@ -112,11 +112,12 @@ public:
     void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
 
     // replay
-    void CreateDatabaseReplay(const SharedPtr<String> &db_name,
-                              const SharedPtr<String> &comment,
-                              std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                              TransactionID txn_id,
-                              TxnTimeStamp begin_ts);
+    void
+    CreateDatabaseReplay(const SharedPtr<String> &db_name,
+                         const SharedPtr<String> &comment,
+                         std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
 
     void DropDatabaseReplay(const String &db_name,
                             std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
@@ -240,14 +241,15 @@ public:
 
     Vector<CatalogDeltaOpBrief> GetDeltaLogBriefs() const;
 
+    static UniquePtr<Catalog> LoadFullCheckpoint(const String &file_name);
+    void AttachDeltaCheckpoint(const String &file_name);
+
 private:
     static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
 
-    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info);
+    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
 
     void LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, BufferManager *buffer_mgr);
-
-    static UniquePtr<Catalog> LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods
