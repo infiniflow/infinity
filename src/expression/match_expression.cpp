@@ -40,4 +40,21 @@ String MatchExpression::ToString() const {
     return expr_str;
 }
 
+u64 MatchExpression::Hash() const {
+    u64 h = 0;
+    h ^= std::hash<String>()(fields_);
+    h ^= std::hash<String>()(matching_text_);
+    h ^= std::hash<String>()(options_text_);
+    return h;
+}
+
+bool MatchExpression::Eq(const BaseExpression &other_base) const {
+    if (other_base.type() != ExpressionType::kMatch) {
+        return false;
+    }
+    const auto &other = static_cast<const MatchExpression &>(other_base);
+    bool eq = fields_ == other.fields_ && matching_text_ == other.matching_text_ && options_text_ == other.options_text_;
+    return eq;
+}
+
 } // namespace infinity

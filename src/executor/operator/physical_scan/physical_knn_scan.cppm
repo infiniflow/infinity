@@ -44,9 +44,15 @@ public:
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              u64 knn_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalFilterScanBase(id, PhysicalOperatorType::kKnnScan, nullptr, nullptr, base_table_ref, common_query_filter, load_metas),
-          knn_expression_(std::move(knn_expression)), output_names_(std::move(output_names)), output_types_(std::move(output_types)),
-          knn_table_index_(knn_table_index) {}
+        : PhysicalFilterScanBase(id,
+                                 PhysicalOperatorType::kKnnScan,
+                                 nullptr,
+                                 nullptr,
+                                 knn_table_index,
+                                 base_table_ref,
+                                 common_query_filter,
+                                 load_metas),
+          knn_expression_(std::move(knn_expression)), output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
 
     ~PhysicalKnnScan() override = default;
 
@@ -72,10 +78,6 @@ public:
 
     SizeT TaskletCount() override;
 
-    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
-        table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
-    }
-
     inline bool IsKnnMinHeap() const { return knn_expression_->IsKnnMinHeap(); }
 
 private:
@@ -91,7 +93,6 @@ public:
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
-    u64 knn_table_index_{};
 
     Vector<Pair<u32, u32>> block_parallel_options_;
     u32 block_column_entries_size_ = 0; // need this value because block_column_entries_ will be moved into KnnScanSharedData

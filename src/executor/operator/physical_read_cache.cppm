@@ -22,18 +22,19 @@ import data_type;
 import result_cache_manager;
 import physical_operator_type;
 import load_meta;
+import logical_node_type;
 
 namespace infinity {
 
 export class PhysicalReadCache : public PhysicalOperator {
 public:
     PhysicalReadCache(u64 id,
+                      LogicalNodeType origin_type,
                       SharedPtr<BaseTableRef> base_table_ref,
                       SharedPtr<CacheContent> cache_content,
                       Vector<SizeT> column_map,
-                      SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kReadCache, nullptr, nullptr, id, load_metas), base_table_ref_(base_table_ref),
-          cache_content_(cache_content), column_map_(column_map) {}
+                      SharedPtr<Vector<LoadMeta>> load_metas,
+                      bool is_min_heap);
 
     void Init() override {};
 
@@ -45,14 +46,25 @@ public:
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
 
+    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+        table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
+    }
+
+
     const BaseTableRef *base_table_ref() const { return base_table_ref_.get(); }
+
+    PhysicalOperatorType origin_type() const { return origin_type_; }
+
+    bool is_min_heap() const { return is_min_heap_; }
 
 private:
     SharedPtr<BaseTableRef> base_table_ref_;
 
     SharedPtr<CacheContent> cache_content_;
 
+    PhysicalOperatorType origin_type_;
     Vector<SizeT> column_map_; // result column id -> cache column id
+    bool is_min_heap_;
 };
 
 } // namespace infinity

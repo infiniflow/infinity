@@ -169,4 +169,19 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
 
 String CastExpression::ToString() const { return fmt::format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString()); }
 
+u64 CastExpression::Hash() const {
+    u64 h = 0;
+    h ^= std::hash<SizeT>() (reinterpret_cast<SizeT>(func_.function));
+    h ^= arguments_[0]->Hash();
+    return h;
+}
+
+bool CastExpression::Eq(const BaseExpression &other_base) const {
+    if (other_base.type() != ExpressionType::kCast) {
+        return false;
+    }
+    const auto &other = static_cast<const CastExpression &>(other_base);
+    return func_.function == other.func_.function && arguments_[0]->Eq(*other.arguments_[0]);
+}
+
 } // namespace infinity

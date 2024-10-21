@@ -70,8 +70,15 @@ PhysicalMatchSparseScan::PhysicalMatchSparseScan(u64 id,
                                                  SharedPtr<MatchSparseExpression> match_sparse_expression,
                                                  const SharedPtr<CommonQueryFilter> &common_query_filter,
                                                  SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalFilterScanBase(id, PhysicalOperatorType::kMatchSparseScan, nullptr, nullptr, base_table_ref, common_query_filter, load_metas),
-      table_index_(table_index), match_sparse_expr_(std::move(match_sparse_expression)) {}
+    : PhysicalFilterScanBase(id,
+                             PhysicalOperatorType::kMatchSparseScan,
+                             nullptr,
+                             nullptr,
+                             table_index,
+                             base_table_ref,
+                             common_query_filter,
+                             load_metas),
+      match_sparse_expr_(std::move(match_sparse_expression)) {}
 
 void PhysicalMatchSparseScan::Init() { search_column_id_ = match_sparse_expr_->column_expr_->binding().column_idx; }
 

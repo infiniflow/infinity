@@ -33,7 +33,7 @@ public:
         return h;
     }
 
-    virtual bool Eq(const CachedNodeBase &other) const = 0;
+    virtual bool Eq(const CachedNodeBase &other) const { return type_ == other.type_; }
 
     LogicalNodeType type() const { return type_; }
 

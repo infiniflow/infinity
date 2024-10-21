@@ -30,7 +30,7 @@ import logger;
 
 namespace infinity {
 
-ScalarFunction::ScalarFunction(String name, Vector<DataType> argument_types, DataType return_type, ScalarFunctionType function)
+ScalarFunction::ScalarFunction(String name, Vector<DataType> argument_types, DataType return_type, ScalarFunctionTypePtr function)
     : Function(std::move(name), FunctionType::kScalar), parameter_types_(std::move(argument_types)), return_type_(std::move(return_type)),
       function_(std::move(function)) {}
 
@@ -75,5 +75,9 @@ String ScalarFunction::ToString() const {
 
     return ss.str();
 }
+
+u64 ScalarFunction::Hash() const { return std::hash<SizeT>()(reinterpret_cast<SizeT>(function_)); }
+
+bool ScalarFunction::Eq(const ScalarFunction &other) const { return function_ == other.function_; }
 
 } // namespace infinity

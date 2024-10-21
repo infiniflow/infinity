@@ -38,6 +38,7 @@ import fast_rough_filter;
 import roaring_bitmap;
 import filter_value_type_classification;
 import physical_scan_base;
+import result_cache_manager;
 
 namespace infinity {
 
@@ -49,8 +50,9 @@ PhysicalIndexScan::PhysicalIndexScan(const u64 id,
                                      SharedPtr<Vector<LoadMeta>> load_metas,
                                      SharedPtr<Vector<String>> output_names,
                                      SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                                     const bool add_row_id)
-    : PhysicalScanBase(id, PhysicalOperatorType::kIndexScan, nullptr, nullptr, std::move(base_table_ref), std::move(load_metas)),
+                                     const bool add_row_id,
+                                     bool cache_result)
+    : PhysicalScanBase(id, PhysicalOperatorType::kIndexScan, nullptr, nullptr, 0, std::move(base_table_ref), std::move(load_metas), cache_result),
       index_filter_(std::move(index_filter)), index_filter_evaluator_(std::move(index_filter_evaluator)),
       fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)), output_names_(std::move(output_names)),
       output_types_(std::move(output_types)), add_row_id_(add_row_id) {
@@ -181,6 +183,11 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
         if (++next_idx >= segment_ids.size()) {
             // Finished
             index_scan_operator_state->SetComplete();
+        }
+
+        ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
+        if (cache_result_ && cache_mgr != nullptr) {
+            AddCache(query_context, cache_mgr, output_data_blocks);
         }
     };
     // check FastRoughFilter

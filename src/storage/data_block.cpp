@@ -54,8 +54,7 @@ bool DataBlock::AppendColumns(const DataBlock &other, const Vector<SizeT> &colum
 
 UniquePtr<DataBlock> DataBlock::Clone() const {
     if (!finalized) {
-        String error_message = "Not finalized data block";
-        UnrecoverableError(error_message);
+        return nullptr;
     }
     auto data_block = MakeUnique<DataBlock>();
     data_block->Init(column_vectors);

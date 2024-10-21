@@ -60,11 +60,15 @@ public:
         }
     }
 
+    u64 Hash() const override;
+
+    bool Eq(const BaseExpression &other) const override;
+
 public:
     const i64 dimension_{0};
     const EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     const KnnDistanceType distance_type_{KnnDistanceType::kInvalid};
-    const EmbeddingT query_embedding_;
+    EmbeddingT query_embedding_;
     const i64 topn_;
     Vector<InitParameter> opt_params_;
     const String using_index_;

@@ -1,0 +1,80 @@
+statement ok
+DROP TABLE IF EXISTS cached_fulltext;
+
+statement ok
+CREATE TABLE cached_fulltext(doctitle varchar DEFAULT '', docdate varchar DEFAULT '', body varchar DEFAULT '');
+
+statement ok
+COPY cached_fulltext FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t', FORMAT CSV );
+
+statement ok
+CREATE INDEX ft_index ON cached_fulltext(body) USING FULLTEXT;
+
+query I
+EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [doctitle (#0), docdate (#1), ROW_ID (#3), SCORE (#2)]
+ -> MATCH (2)
+    - table name: cached_fulltext(default_db.cached_fulltext)
+    - table index: #1
+    - match expression: MATCH TEXT ('body^5', 'harmful chemical', '')
+    - index filter: None
+    - leftover filter: None
+    - output columns: [doctitle, docdate, __score, __rowid]
+
+query I
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 22.299635
+
+query I
+EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [doctitle (#0), docdate (#1), ROW_ID (#3), SCORE (#2)]
+ -> Read cache (2)
+    - table name: (default_db.cached_fulltext)
+    - output columns: [doctitle, docdate, __score, __rowid]
+
+query I
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 22.299635
+
+query I
+EXPLAIN SELECT ROW_ID() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [ROW_ID (#1)]
+ -> Read cache (2)
+    - table name: (default_db.cached_fulltext)
+    - output columns: [__score, __rowid]
+
+query I
+SELECT ROW_ID() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+----
+0
+
+statement ok
+INSERT INTO cached_fulltext VALUES('Anarchism', '30-APR-2012 03:25:17.000', 'Anarchism is a political philosophy that advocates self-governed societies based on voluntary institutions. These are often described as stateless societies, although several authors have defined them more specifically as institutions based on non-hierarchical free associations. Anarchism holds the state to be undesirable, unnecessary and harmful.');
+
+query I
+EXPLAIN SELECT doctitle, docdate, ROW_ID(), SCORE() FROM cached_fulltext SEARCH MATCH TEXT ('body^5', 'harmful chemical');
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [doctitle (#0), docdate (#1), ROW_ID (#3), SCORE (#2)]
+ -> MATCH (2)
+    - table name: cached_fulltext(default_db.cached_fulltext)
+    - table index: #1
+    - match expression: MATCH TEXT ('body^5', 'harmful chemical', '')
+    - index filter: None
+    - leftover filter: None
+    - output columns: [doctitle, docdate, __score, __rowid]
+
+statement ok
+DROP TABLE cached_fulltext;

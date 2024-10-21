@@ -225,11 +225,11 @@ struct TernaryTryOpVarlenToVarlenWrapper {
 };
 
 
-using ScalarFunctionType = std::function<void(const DataBlock &, SharedPtr<ColumnVector> &)>;
+using ScalarFunctionTypePtr = void (*)(const DataBlock &, SharedPtr<ColumnVector> &);
 
 export class ScalarFunction final : public Function {
 public:
-    explicit ScalarFunction(String name, Vector<DataType> argument_types, DataType return_type, ScalarFunctionType function);
+    explicit ScalarFunction(String name, Vector<DataType> argument_types, DataType return_type, ScalarFunctionTypePtr function);
 
     void CastArgumentTypes(Vector<BaseExpression> &input_arguments);
 
@@ -237,11 +237,15 @@ public:
 
     [[nodiscard]] String ToString() const final;
 
+    u64 Hash() const;
+
+    bool Eq(const ScalarFunction &other) const;
+
 public:
     Vector<DataType> parameter_types_{};
     DataType return_type_;
 
-    ScalarFunctionType function_{};
+    ScalarFunctionTypePtr function_{};
 
 public:
     // Unary function

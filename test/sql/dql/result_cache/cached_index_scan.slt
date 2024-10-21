@@ -1,0 +1,85 @@
+statement ok
+DROP TABLE IF EXISTS cached_index_scan;
+
+statement ok
+CREATE TABLE cached_index_scan (c1 integer, mod_256_min_128 tinyint, mod_7 tinyint);
+
+statement ok
+COPY cached_index_scan FROM '/var/infinity/test_data/test_big_index_scan.csv' WITH (DELIMITER ',', FORMAT CSV);
+
+statement ok
+CREATE INDEX idx_c1 on cached_index_scan(c1);
+
+query I
+EXPLAIN SELECT * FROM cached_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
+----
+ PROJECT (5)
+  - table index: #4
+  - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
+ -> SORT (4)
+    - expressions: [c1 (#0) ASC]
+    - output columns: [c1, __rowid]
+   -> INDEX SCAN (7)
+      - table name: cached_index_scan(default_db.cached_index_scan)
+      - table index: #1
+      - filter: ((CAST(c1 (#1.0) AS BigInt) < 5) OR ((CAST(c1 (#1.0) AS BigInt) > 10000) AND (CAST(c1 (#1.0) AS BigInt) < 10005))) OR (CAST(c1 (#1.0) AS BigInt) = 19990)
+      - output_columns: [__rowid]
+
+query I
+SELECT * FROM cached_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
+----
+0 0 0
+1 1 1
+2 2 2
+3 3 3
+4 4 4
+10001 17 5
+10002 18 6
+10003 19 0
+10004 20 1
+19990 22 5
+
+query I
+EXPLAIN SELECT * FROM cached_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
+----
+ PROJECT (5)
+  - table index: #4
+  - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
+ -> SORT (4)
+    - expressions: [c1 (#0) ASC]
+    - output columns: [c1, __rowid]
+   -> Read cache (7)
+      - table name: (default_db.cached_index_scan)
+      - output columns: [__rowid]
+
+query I
+SELECT * FROM cached_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
+----
+0 0 0
+1 1 1
+2 2 2
+3 3 3
+4 4 4
+10001 17 5
+10002 18 6
+10003 19 0
+10004 20 1
+19990 22 5
+
+query I
+EXPLAIN SELECT * FROM cached_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10010) OR c1 = 19990 ORDER BY c1;
+----
+ PROJECT (5)
+  - table index: #4
+  - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
+ -> SORT (4)
+    - expressions: [c1 (#0) ASC]
+    - output columns: [c1, __rowid]
+   -> INDEX SCAN (7)
+      - table name: cached_index_scan(default_db.cached_index_scan)
+      - table index: #1
+      - filter: ((CAST(c1 (#1.0) AS BigInt) < 5) OR ((CAST(c1 (#1.0) AS BigInt) > 10000) AND (CAST(c1 (#1.0) AS BigInt) < 10010))) OR (CAST(c1 (#1.0) AS BigInt) = 19990)
+      - output_columns: [__rowid]
+
+statement ok
+DROP TABLE cached_index_scan;

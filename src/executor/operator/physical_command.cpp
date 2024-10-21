@@ -143,6 +143,23 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     Config* config = query_context->global_config();
                     GlobalOptionIndex config_index = config->GetOptionIndex(set_command->var_name());
                     switch(config_index) {
+                        case GlobalOptionIndex::kResultCacheMode: {
+                            if (set_command->value_type() != SetVarType::kString) {
+                                Status status = Status::DataTypeMismatch("String", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
+                            if (set_command->value_str() == "on") {
+                                config->SetCacheResult("on");
+                                return true;
+                            }
+                            if (set_command->value_str() == "off") {
+                                config->SetCacheResult("off");
+                                return true;
+                            }
+                            Status status = Status::SetInvalidVarValue("cache result", "on, off");
+                            RecoverableError(status);
+                            break;
+                        }
                         case GlobalOptionIndex::kLogLevel: {
                             if (set_command->value_type() != SetVarType::kString) {
                                 Status status = Status::DataTypeMismatch("String", set_command->value_type_str());

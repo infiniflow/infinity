@@ -14,29 +14,26 @@
 
 module;
 
-export module cached_match_base;
+export module cached_scan_base;
 
 import stl;
 import cached_node_base;
-import base_table_ref;
 import logical_node_type;
 
 namespace infinity {
 
-export class CachedMatchBase : public CachedNodeBase {
+class BaseTableRef;
+class PhysicalScanBase;
+
+export class CachedScanBase : public CachedNodeBase {
 public:
-    CachedMatchBase(LogicalNodeType type,
-                    SharedPtr<String> schema_name,
-                    SharedPtr<String> table_name,
-                    const Vector<ColumnID> column_ids,
-                    TxnTimeStamp query_ts,
-                    SharedPtr<Vector<String>> output_names)
-        : CachedNodeBase(type, output_names), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)), column_ids_(column_ids),
-          query_ts_(query_ts) {}
+    CachedScanBase(LogicalNodeType type, const BaseTableRef *base_table_ref, TxnTimeStamp query_ts, SharedPtr<Vector<String>> output_names);
+
+    CachedScanBase(LogicalNodeType type, const PhysicalScanBase *physical_scan_base, TxnTimeStamp query_ts);
 
     u64 Hash() const override;
 
-    bool Equal(const CachedMatchBase &other) const;
+    bool Eq(const CachedNodeBase &other) const override;
 
     const String &schema_name() const { return *schema_name_; }
     const String &table_name() const { return *table_name_; }

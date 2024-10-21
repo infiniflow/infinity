@@ -41,6 +41,10 @@ public:
 
     String ToString() const override;
 
+    u64 Hash() const override;
+
+    bool Eq(const BaseExpression &other) const override;
+
 private:
     DataType data_type_;
 
