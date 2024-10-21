@@ -101,9 +101,20 @@ inline EmbeddingDataType ToEmbeddingDataType<bfloat16_t>() {
 struct EmbeddingType {
 public:
     char *ptr{};
-    const bool new_allocated_{};
+        bool new_allocated_{};
 
     static size_t embedding_type_width[];
+
+    void Own(EmbeddingDataType type, size_t dimension) {
+        if (new_allocated_) {
+            return;
+        }
+        size_t mem_size = EmbeddingSize(type, dimension);
+        char *new_ptr = new char[mem_size];
+        std::memcpy(new_ptr, ptr, mem_size);
+        ptr = new_ptr;
+        new_allocated_ = true;
+    }
 
 public:
     static inline size_t EmbeddingDataWidth(EmbeddingDataType type_index) { return embedding_type_width[to_underlying_val(type_index)]; }
@@ -290,6 +301,10 @@ public:
     [[nodiscard]] inline std::string ToString() const {
         ParserError("ToString() isn't implemented");
         return std::string();
+    }
+
+    bool Eq(const EmbeddingType &other, EmbeddingDataType type, size_t dimension) const {
+        return std::memcmp(ptr, other.ptr, EmbeddingSize(type, dimension)) == 0;
     }
 };
 

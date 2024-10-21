@@ -920,7 +920,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const SharedPtr<Logi
                                          logical_operator->load_metas(),
                                          logical_operator->GetOutputNames(),
                                          logical_operator->GetOutputTypes(),
-                                         logical_index_scan->add_row_id_);
+                                         logical_index_scan->add_row_id_,
+                                         true);
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -975,11 +976,12 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
                                             std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
                                             logical_match_tensor->common_query_filter_,
                                             logical_match_tensor->topn_,
-                                            *logical_match_tensor->index_options_,
+                                            logical_match_tensor->index_options_,
                                             logical_operator->load_metas());
     match_tensor_scan_op->CheckColumn();
     match_tensor_scan_op->PlanWithIndex(query_context_ptr_);
     if (match_tensor_scan_op->TaskletCount() == 1) {
+        match_tensor_scan_op->SetCacheResult(true);
         return match_tensor_scan_op;
     } else {
         return MakeUnique<PhysicalMergeMatchTensor>(query_context_ptr_->GetNextNodeID(),
@@ -987,8 +989,11 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
                                                     logical_match_tensor->TableIndex(),
                                                     logical_match_tensor->base_table_ref_,
                                                     std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
+                                                    logical_match_tensor->common_query_filter_->original_filter_,
                                                     logical_match_tensor->topn_,
-                                                    MakeShared<Vector<LoadMeta>>());
+                                                    logical_match_tensor->index_options_,
+                                                    MakeShared<Vector<LoadMeta>>(),
+                                                    true);
     }
 }
 
@@ -1002,6 +1007,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPt
                                             logical_match_sparse->common_query_filter_,
                                             logical_operator->load_metas());
     if (match_sparse_scan_op->GetTaskletCount(query_context_ptr_) == 1) {
+        match_sparse_scan_op->SetCacheResult(true);
         return match_sparse_scan_op;
     }
     auto merge_match_sparse_op =
@@ -1010,7 +1016,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPt
                                              logical_match_sparse->TableIndex(),
                                              logical_match_sparse->base_table_ref_,
                                              std::static_pointer_cast<MatchSparseExpression>(logical_match_sparse->query_expression_),
-                                             MakeShared<Vector<LoadMeta>>());
+                                             logical_match_sparse->common_query_filter_->original_filter_,
+                                             MakeShared<Vector<LoadMeta>>(),
+                                             true);
     return merge_match_sparse_op;
 }
 
@@ -1051,6 +1059,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
 
     knn_scan_op->PlanWithIndex(query_context_ptr_);
     if (knn_scan_op->TaskletCount() == 1) {
+        knn_scan_op->SetCacheResult(true);
         return knn_scan_op;
     } else {
         return MakeUnique<PhysicalMergeKnn>(query_context_ptr_->GetNextNodeID(),
@@ -1059,8 +1068,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
                                             logical_knn_scan->GetOutputNames(),
                                             logical_knn_scan->GetOutputTypes(),
                                             logical_knn_scan->knn_expression(),
+                                            logical_knn_scan->common_query_filter_->original_filter_,
                                             logical_knn_scan->knn_table_index_,
-                                            MakeShared<Vector<LoadMeta>>());
+                                            MakeShared<Vector<LoadMeta>>(),
+                                            true);
     }
 }
 

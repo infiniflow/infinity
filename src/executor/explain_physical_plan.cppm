@@ -62,6 +62,7 @@ import physical_merge_top;
 import physical_merge_sort;
 import physical_merge_knn;
 import physical_merge_match_tensor;
+import physical_merge_match_sparse;
 import physical_match;
 import physical_match_tensor_scan;
 import physical_fusion;
@@ -175,6 +176,8 @@ public:
     static void Explain(const PhysicalMatchSparseScan *match_sparse_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const PhysicalMergeMatchTensor *merge_match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static void Explain(const PhysicalMergeMatchSparse *merge_match_sparse_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const PhysicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 

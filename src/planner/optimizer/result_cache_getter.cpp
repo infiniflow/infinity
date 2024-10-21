@@ -23,7 +23,16 @@ import result_cache_manager;
 import logical_node_type;
 import logical_read_cache;
 import logical_fusion;
+import logical_match_tensor_scan;
+import logical_match_sparse_scan;
+import logical_knn_scan;
+import logical_index_scan;
 import cached_match;
+import cached_match_scan;
+import cached_index_scan;
+import third_party;
+import logger;
+import base_table_ref;
 
 namespace infinity {
 
@@ -37,29 +46,67 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
         if (!op) {
             return;
         }
+        Optional<CacheOutput> cache_output;
+        SharedPtr<BaseTableRef> base_table_ref;
         switch (op->operator_type()) {
             case LogicalNodeType::kMatch: {
                 auto *logical_match = static_cast<LogicalMatch *>(op.get());
+                base_table_ref = logical_match->base_table_ref_;
                 TxnTimeStamp query_ts = std::min(begin_ts, logical_match->base_table_ref_->max_commit_ts());
                 CachedMatch cached_match(query_ts, logical_match);
-                Optional<CacheOutput> cache_output = cache_mgr->GetCache(cached_match);
-                if (!cache_output.has_value()) {
-                    break;
-                }
-                auto logical_read_cache = MakeShared<LogicalReadCache>(logical_match->node_id(),
-                                                                       LogicalNodeType::kMatch,
-                                                                       logical_match->base_table_ref_,
-                                                                       std::move(cache_output->cache_content_),
-                                                                       std::move(cache_output->column_map_));
-                logical_read_cache->set_left_node(op->left_node());
-                logical_read_cache->set_right_node(op->right_node());
-                op = logical_read_cache;
+                cache_output = cache_mgr->GetCache(cached_match);
+                break;
+            }
+            case LogicalNodeType::kMatchTensorScan: {
+                auto *logical_match_tensor_scan = static_cast<LogicalMatchTensorScan *>(op.get());
+                base_table_ref = logical_match_tensor_scan->base_table_ref_;
+                TxnTimeStamp query_ts = std::min(begin_ts, logical_match_tensor_scan->base_table_ref_->max_commit_ts());
+                CachedMatchTensorScan cached_match_tensor_scan(query_ts, logical_match_tensor_scan);
+                cache_output = cache_mgr->GetCache(cached_match_tensor_scan);
+                break;
+            }
+            case LogicalNodeType::kMatchSparseScan: {
+                auto *logical_match_sparse_scan = static_cast<LogicalMatchSparseScan *>(op.get());
+                base_table_ref = logical_match_sparse_scan->base_table_ref_;
+                TxnTimeStamp query_ts = std::min(begin_ts, logical_match_sparse_scan->base_table_ref_->max_commit_ts());
+                CachedMatchSparseScan cached_match_sparse_scan(query_ts, logical_match_sparse_scan);
+                cache_output = cache_mgr->GetCache(cached_match_sparse_scan);
+                break;
+            }
+            case LogicalNodeType::kKnnScan: {
+                auto *logical_knn_scan = static_cast<LogicalKnnScan *>(op.get());
+                base_table_ref = logical_knn_scan->base_table_ref_;
+                TxnTimeStamp query_ts = std::min(begin_ts, logical_knn_scan->base_table_ref_->max_commit_ts());
+                CachedKnnScan cached_knn_scan(query_ts, logical_knn_scan);
+                cache_output = cache_mgr->GetCache(cached_knn_scan);
+                break;
+            }
+            case LogicalNodeType::kIndexScan: {
+                auto *logical_index_scan = static_cast<LogicalIndexScan *>(op.get());
+                base_table_ref = logical_index_scan->base_table_ref_;
+                TxnTimeStamp query_ts = std::min(begin_ts, logical_index_scan->base_table_ref_->max_commit_ts());
+                CachedIndexScan cached_index_scan(query_ts, logical_index_scan);
+                cache_output = cache_mgr->GetCache(cached_index_scan);
                 break;
             }
             default: {
-                //
+                break;
             }
         }
+        if (!cache_output.has_value()) {
+            LOG_INFO(fmt::format("No cache found for match node {}", op->node_id()));
+        } else {
+            LOG_INFO(fmt::format("Cache found for match node {}", op->node_id()));
+            auto logical_read_cache = MakeShared<LogicalReadCache>(op->node_id(),
+                                                                   op->operator_type(),
+                                                                   base_table_ref,
+                                                                   std::move(cache_output->cache_content_),
+                                                                   std::move(cache_output->column_map_));
+            logical_read_cache->set_left_node(op->left_node());
+            logical_read_cache->set_right_node(op->right_node());
+            op = logical_read_cache;
+        }
+
         // visit children after handling current node
         visit_node(op->left_node());
         visit_node(op->right_node());

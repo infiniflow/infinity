@@ -26,27 +26,26 @@ import physical_match;
 namespace infinity {
 
 CachedMatch::CachedMatch(TxnTimeStamp query_ts, LogicalMatch *logical_match)
-    : CachedMatchBase(LogicalNodeType::kMatch,
-                      logical_match->base_table_ref_->schema_name(),
-                      logical_match->base_table_ref_->table_name(),
-                      logical_match->base_table_ref_->column_ids_,
+    : CachedScanBase(LogicalNodeType::kMatch,
+                      logical_match->base_table_ref_.get(),
                       query_ts,
                       logical_match->GetOutputNames()),
       match_expr_(logical_match->match_expr_), filter_expression_(logical_match->filter_expression_), topn_(logical_match->top_n_) {}
 
 CachedMatch::CachedMatch(TxnTimeStamp query_ts, PhysicalMatch *physical_match)
-    : CachedMatchBase(LogicalNodeType::kMatch,
-                      physical_match->base_table_ref()->schema_name(),
-                      physical_match->base_table_ref()->table_name(),
-                      physical_match->base_table_ref()->column_ids_,
+    : CachedScanBase(LogicalNodeType::kMatch,
+                      physical_match->base_table_ref().get(),
                       query_ts,
                       physical_match->GetOutputNames()),
       match_expr_(physical_match->match_expr()), filter_expression_(physical_match->filter_expression()), topn_(physical_match->top_n()) {}
 
 u64 CachedMatch::Hash() const {
-    u64 h = CachedMatchBase::Hash();
+    u64 h = CachedScanBase::Hash();
     h ^= match_expr_->Hash();
     h ^= std::hash<u32>()(topn_);
+    if (filter_expression_) {
+        h ^= filter_expression_->Hash();
+    }
     return h;
 }
 
@@ -55,7 +54,7 @@ bool CachedMatch::Eq(const CachedNodeBase &other_base) const {
         return false;
     }
     const auto &other = static_cast<const CachedMatch &>(other_base);
-    if (!CachedMatchBase::Equal(other)) {
+    if (!CachedScanBase::Eq(other)) {
         return false;
     }
     if (!match_expr_->Eq(*other.match_expr_)) {
@@ -64,8 +63,11 @@ bool CachedMatch::Eq(const CachedNodeBase &other_base) const {
     if (topn_ != other.topn_) {
         return false;
     }
+    if (filter_expression_ && other.filter_expression_) {
+        return filter_expression_->Eq(*other.filter_expression_);
+    }
     if (filter_expression_ || other.filter_expression_) {
-        return false; // TODO check if filter expr is the same.
+        return false;
     }
     return true;
 }

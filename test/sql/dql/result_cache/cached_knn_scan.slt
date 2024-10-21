@@ -1,0 +1,68 @@
+statement ok
+DROP TABLE IF EXISTS cached_knn_scan;
+
+statement ok
+CREATE TABLE cached_knn_scan(c1 INT, c2 EMBEDDING(FLOAT, 4));
+
+statement ok
+COPY cached_knn_scan FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',', FORMAT CSV);
+
+query I
+EXPLAIN SELECT c1 FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [c1 (#0)]
+ -> KNN SCAN (2)
+    - table name: cached_knn_scan(default_db.cached_knn_scan)
+    - table index: #4
+    - embedding info: c2
+      - element type: FLOAT32
+      - dimension: 4
+      - distance type: L2
+      - query embedding: [0.3,0.3,0.2,0.2]
+    - output columns: [c1, __score, __rowid]
+
+query I
+SELECT c1 FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+8
+6
+4
+
+query I
+EXPLAIN SELECT c1 FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [c1 (#0)]
+ -> Read cache (2)
+    - table name: (default_db.cached_knn_scan)
+    - output columns: [c1, __score, __rowid]
+
+query I
+SELECT c1 FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+8
+6
+4
+
+query I
+EXPLAIN SELECT c1 FROM cached_knn_scan SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.1], 'float', 'l2', 3);
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [c1 (#0)]
+ -> KNN SCAN (2)
+    - table name: cached_knn_scan(default_db.cached_knn_scan)
+    - table index: #4
+    - embedding info: c2
+      - element type: FLOAT32
+      - dimension: 4
+      - distance type: L2
+      - query embedding: [0.3,0.3,0.2,0.1]
+    - output columns: [c1, __score, __rowid]
+
+statement ok
+DROP TABLE cached_knn_scan;
+

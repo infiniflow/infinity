@@ -59,8 +59,8 @@ public:
 
     Vector<SharedPtr<Vector<SegmentID>>> PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> &block_groups, i64 parallel_count);
 
-    u64 table_index() const {
-        return table_index_;
+    SharedPtr<MatchSparseExpression> match_sparse_expr() const {
+        return match_sparse_expr_;
     }
 
 private:
@@ -84,7 +84,6 @@ private:
     ExecuteInnerT(DistFunc *dist_func, MergeHeap *merge_heap, QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state);
 
 private:
-    u64 table_index_ = 0;
     SharedPtr<MatchSparseExpression> match_sparse_expr_;
 
     // column to search

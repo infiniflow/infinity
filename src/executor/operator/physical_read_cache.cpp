@@ -35,6 +35,22 @@ PhysicalReadCache::PhysicalReadCache(u64 id,
             origin_type_ = PhysicalOperatorType::kMatch;
             break;
         }
+        case LogicalNodeType::kKnnScan: {
+            origin_type_ = PhysicalOperatorType::kKnnScan;
+            break;
+        }
+        case LogicalNodeType::kMatchSparseScan: {
+            origin_type_ = PhysicalOperatorType::kMatchSparseScan;
+            break;
+        }
+        case LogicalNodeType::kMatchTensorScan: {
+            origin_type_ = PhysicalOperatorType::kMatchTensorScan;
+            break;
+        }
+        case LogicalNodeType::kIndexScan: {
+            origin_type_ = PhysicalOperatorType::kIndexScan;
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented");
         }

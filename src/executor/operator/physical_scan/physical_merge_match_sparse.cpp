@@ -38,6 +38,7 @@ import logical_type;
 import knn_result_handler;
 import merge_knn;
 import match_sparse_scan_function_data;
+import result_cache_manager;
 
 namespace infinity {
 
@@ -46,9 +47,11 @@ PhysicalMergeMatchSparse::PhysicalMergeMatchSparse(u64 id,
                                                    u64 table_index,
                                                    SharedPtr<BaseTableRef> base_table_ref,
                                                    SharedPtr<MatchSparseExpression> match_sparse_expr,
-                                                   SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalScanBase(id, PhysicalOperatorType::kMergeMatchSparse, std::move(left), nullptr, base_table_ref, load_metas), table_index_(table_index),
-      match_sparse_expr_(std::move(match_sparse_expr)) {}
+                                                   SharedPtr<BaseExpression> filter_expression,
+                                                   SharedPtr<Vector<LoadMeta>> load_metas,
+                                                   bool cache_result)
+    : PhysicalScanBase(id, PhysicalOperatorType::kMergeMatchSparse, std::move(left), nullptr, table_index, base_table_ref, load_metas, cache_result),
+      match_sparse_expr_(std::move(match_sparse_expr)), filter_expression_(std::move(filter_expression)) {}
 
 void PhysicalMergeMatchSparse::Init() { left_->Init(); }
 

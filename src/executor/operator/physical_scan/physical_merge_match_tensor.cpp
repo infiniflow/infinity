@@ -30,6 +30,8 @@ import default_values;
 import data_block;
 import value;
 import column_vector;
+import cached_match_scan;
+import result_cache_manager;
 
 namespace infinity {
 
@@ -58,10 +60,14 @@ PhysicalMergeMatchTensor::PhysicalMergeMatchTensor(const u64 id,
                                                    const u64 table_index,
                                                    SharedPtr<BaseTableRef> base_table_ref,
                                                    SharedPtr<MatchTensorExpression> match_tensor_expr,
+                                                   SharedPtr<BaseExpression> filter_expression,
                                                    const u32 topn,
-                                                   SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kMergeMatchTensor, std::move(left), nullptr, id, load_metas), table_index_(table_index),
-      base_table_ref_(std::move(base_table_ref)), match_tensor_expr_(std::move(match_tensor_expr)), topn_(topn) {}
+                                                   const SharedPtr<MatchTensorScanIndexOptions> &index_options,
+                                                   SharedPtr<Vector<LoadMeta>> load_metas,
+                                                   bool cache_result)
+    : PhysicalOperator(PhysicalOperatorType::kMergeMatchTensor, std::move(left), nullptr, id, load_metas, cache_result), table_index_(table_index),
+      base_table_ref_(std::move(base_table_ref)), match_tensor_expr_(std::move(match_tensor_expr)), filter_expression_(std::move(filter_expression)),
+      topn_(topn), index_options_(index_options) {}
 
 void PhysicalMergeMatchTensor::Init() { left()->Init(); }
 
@@ -175,6 +181,30 @@ void PhysicalMergeMatchTensor::ExecuteInner(QueryContext *query_context, MergeMa
             output_data_block_array.push_back(std::move(data_block));
         }
         operator_state->SetComplete();
+
+        ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
+        if (cache_result_ && cache_mgr != nullptr) {
+            AddCache(query_context, cache_mgr, operator_state->data_block_array_);
+        }
+    }
+}
+
+void PhysicalMergeMatchTensor::AddCache(QueryContext *query_context,
+                                        ResultCacheManager *cache_mgr,
+                                        const Vector<UniquePtr<DataBlock>> &output_data_blocks) const {
+    Txn *txn = query_context->GetTxn();
+    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+    TxnTimeStamp query_ts = std::min(txn->BeginTS(), table_entry->max_commit_ts());
+    Vector<UniquePtr<DataBlock>> data_blocks(output_data_blocks.size());
+    for (SizeT i = 0; i < output_data_blocks.size(); ++i) {
+        data_blocks[i] = output_data_blocks[i]->Clone();
+    }
+    auto cached_node = MakeUnique<CachedMatchTensorScan>(query_ts, this);
+    bool success = cache_mgr->AddCache(std::move(cached_node), std::move(data_blocks));
+    if (!success) {
+        LOG_WARN(fmt::format("Add cache failed for query: {}", txn->BeginTS()));
+    } else {
+        LOG_INFO(fmt::format("Add cache success for query: {}", txn->BeginTS()));
     }
 }
 

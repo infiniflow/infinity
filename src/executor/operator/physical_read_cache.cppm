@@ -45,6 +45,11 @@ public:
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
 
+    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+        table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
+    }
+
+
     const BaseTableRef *base_table_ref() const { return base_table_ref_.get(); }
 
     PhysicalOperatorType origin_type() const { return origin_type_; }

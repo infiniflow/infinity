@@ -18,7 +18,7 @@ module;
 
 module result_cache_manager;
 
-import cached_match_base;
+import cached_scan_base;
 import infinity_exception;
 import logical_match;
 import physical_match;
@@ -161,8 +161,8 @@ SizeT ResultCacheManager::DropTable(const String &schema_name, const String &tab
     auto pred = [&](const CachedNodeBase &cached_node_base) {
         switch (cached_node_base.type()) {
             case LogicalNodeType::kMatch: {
-                const auto &cached_match_base = static_cast<const CachedMatchBase &>(cached_node_base);
-                return cached_match_base.schema_name() == schema_name && cached_match_base.table_name() == table_name;
+                const auto &cached_scan_base = static_cast<const CachedScanBase &>(cached_node_base);
+                return cached_scan_base.schema_name() == schema_name && cached_scan_base.table_name() == table_name;
             }
             default: {
                 return false;

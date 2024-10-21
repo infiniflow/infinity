@@ -24,9 +24,14 @@ import table_entry;
 import match_tensor_expression;
 import base_table_ref;
 import data_type;
+import base_expression;
+import logical_match_tensor_scan;
 
 namespace infinity {
+
 struct LoadMeta;
+class ResultCacheManager;
+class DataBlock;
 
 export class PhysicalMergeMatchTensor final : public PhysicalOperator {
 public:
@@ -35,8 +40,11 @@ public:
                              u64 table_index,
                              SharedPtr<BaseTableRef> base_table_ref,
                              SharedPtr<MatchTensorExpression> match_tensor_expr,
+                             SharedPtr<BaseExpression> filter_expression,
                              u32 topn,
-                             SharedPtr<Vector<LoadMeta>> load_metas);
+                             const SharedPtr<MatchTensorScanIndexOptions> &index_options,
+                             SharedPtr<Vector<LoadMeta>> load_metas,
+                             bool cache_result);
 
     void Init() override;
 
@@ -58,17 +66,27 @@ public:
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline MatchTensorExpression *match_tensor_expr() const { return match_tensor_expr_.get(); }
+    [[nodiscard]] inline const BaseTableRef *base_table_ref() const { return base_table_ref_.get(); }
+
+    [[nodiscard]] inline const SharedPtr<MatchTensorExpression> &match_tensor_expr() const { return match_tensor_expr_; }
+
+    [[nodiscard]] inline const SharedPtr<BaseExpression> &filter_expression() const { return filter_expression_; }
 
     [[nodiscard]] inline u32 GetTopN() const { return topn_; }
+
+    const SharedPtr<MatchTensorScanIndexOptions> &index_options() const { return index_options_; }
+
+    void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) const;
 
 private:
     u64 table_index_ = 0;
     SharedPtr<BaseTableRef> base_table_ref_;
     SharedPtr<MatchTensorExpression> match_tensor_expr_;
+    SharedPtr<BaseExpression> filter_expression_{};
     // extra options
     // inited by Init()
     u32 topn_ = 0;
+    SharedPtr<MatchTensorScanIndexOptions> index_options_;
 
     void ExecuteInner(QueryContext *query_context, MergeMatchTensorOperatorState *operator_state) const;
 };

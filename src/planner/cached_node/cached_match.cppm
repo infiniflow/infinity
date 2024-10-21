@@ -18,7 +18,7 @@ export module cached_match;
 
 import stl;
 import cached_node_base;
-import cached_match_base;
+import cached_scan_base;
 import logical_node_type;
 
 namespace infinity {
@@ -29,7 +29,7 @@ class BaseExpression;
 class LogicalMatch;
 class PhysicalMatch;
 
-export class CachedMatch : public CachedMatchBase {
+export class CachedMatch final : public CachedScanBase {
 public:
     CachedMatch(TxnTimeStamp query_ts, LogicalMatch *logical_match);
 
