@@ -52,7 +52,7 @@ struct UnaryOpDirectWrapper {
 template <typename Operator>
 struct BinaryOpDirectWrapper {
     template <typename LeftValueType, typename RightValueType, typename TargetValueType>
-    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *, SizeT, void *) {
+    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *, SizeT, void *, void *, void *) {
         return Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result);
     }
 };
@@ -81,7 +81,7 @@ struct UnaryTryOpWrapper {
 template <typename Operator>
 struct BinaryTryOpWrapper {
     template <typename LeftValueType, typename RightValueType, typename TargetValueType>
-    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *) {
+    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *, void *, void *) {
         if (Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result)) {
             return;
         }
@@ -116,7 +116,7 @@ struct UnaryOpDirectToVarlenWrapper {
 template <typename Operator>
 struct BinaryOpDirectToVarlenWrapper {
     template <typename LeftValueType, typename RightValueType, typename TargetValueType>
-    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *, SizeT, void *state_ptr) {
+    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *, SizeT, void *, void *, void *state_ptr) {
         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
         return Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result, function_data_ptr->column_vector_ptr_);
     }
@@ -152,7 +152,7 @@ struct UnaryTryOpToVarlenWrapper {
 template <typename Operator>
 struct BinaryTryOpToVarlenWrapper {
     template <typename LeftValueType, typename RightValueType, typename TargetValueType>
-    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *, void *, void *state_ptr) {
         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
         if (Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result, function_data_ptr->column_vector_ptr_)) {
             return;
@@ -189,6 +189,17 @@ struct UnaryOpDirectVarlenToVarlenWrapper {
         auto *function_data_ptr_input = (ScalarFunctionData *)(state_ptr_input);
         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
         return Operator::template Run<SourceValueType, TargetValueType>(input, result, function_data_ptr_input->column_vector_ptr_, function_data_ptr->column_vector_ptr_);
+    }
+};
+
+template <typename Operator>
+struct BinaryOpDirectVarlenToVarlenWrapper {
+    template <typename LeftValueType, typename RightValueType, typename TargetValueType>
+    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *, SizeT, void *state_ptr_left, void *state_ptr_right, void *state_ptr) {
+        auto *function_data_ptr_left = (ScalarFunctionData *)(state_ptr_left);
+        auto *function_data_ptr_right = (ScalarFunctionData *)(state_ptr_right);
+        auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
+        return Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result, function_data_ptr_left->column_vector_ptr_, function_data_ptr_right->column_vector_ptr_, function_data_ptr->column_vector_ptr_);
     }
 };
 
@@ -351,6 +362,8 @@ public:
                                                                                                    output,
                                                                                                    input.row_count(),
                                                                                                    nullptr,
+                                                                                                   nullptr,
+                                                                                                   nullptr,
                                                                                                    true);
     }
 
@@ -369,6 +382,8 @@ public:
                                                                                                 input.column_vectors[1],
                                                                                                 output,
                                                                                                 input.row_count(),
+                                                                                                nullptr,
+                                                                                                nullptr,
                                                                                                 nullptr,
                                                                                                 true);
     }
@@ -389,6 +404,8 @@ public:
                                                                                                            input.column_vectors[1],
                                                                                                            output,
                                                                                                            input.row_count(),
+                                                                                                           nullptr,
+                                                                                                           nullptr,
                                                                                                            &function_data,
                                                                                                            true);
     }
@@ -409,8 +426,34 @@ public:
                                                                                                         input.column_vectors[1],
                                                                                                         output,
                                                                                                         input.row_count(),
+                                                                                                        nullptr,
+                                                                                                        nullptr,
                                                                                                         &function_data,
                                                                                                         true);
+    }
+
+    // Binary function result is varlen without any failure.
+    template <typename LeftType, typename RightType, typename OutputType, typename Operation>
+    static inline void BinaryFunctionVarlenToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
+        if (input.column_count() != 2) {
+            String error_message = "Binary function: input column count isn't two.";
+            UnrecoverableError(error_message);
+        }
+        if (!input.Finalized()) {
+            String error_message = "Input data block is finalized";
+            UnrecoverableError(error_message);
+        }
+        ScalarFunctionData function_data_left(input.column_vectors[0].get());
+        ScalarFunctionData function_data_right(input.column_vectors[1].get());
+        ScalarFunctionData function_data(output.get());
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectVarlenToVarlenWrapper<Operation>>(input.column_vectors[0],
+                                                                                                           input.column_vectors[1],
+                                                                                                           output,
+                                                                                                           input.row_count(),
+                                                                                                           &function_data_left,
+                                                                                                           &function_data_right,
+                                                                                                           &function_data,
+                                                                                                           true);
     }
 
     // Ternary function without any failure.

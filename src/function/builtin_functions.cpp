@@ -58,6 +58,7 @@ import regex;
 import ltrim;
 import rtrim;
 import trim;
+import position;
 import default_values;
 import special_function;
 import internal_types;
@@ -136,6 +137,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterLtrimFunction(catalog_ptr_);
     RegisterRtrimFunction(catalog_ptr_);
     RegisterTrimFunction(catalog_ptr_);
+    RegisterPositionFunction(catalog_ptr_);
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}

@@ -301,6 +301,22 @@ curl --request GET \
         "filter": "trim(body) = '\''this is an example for trim'\''"
      } '
 
+# show rows of 'tbl1' where char_position(body, '123') = 1
+echo -e '\n\n-- show rows of 'tbl1' where char_position(body, '123') = 1'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "char_position(body, '123') = 1"
+     } '
+
+
 # drop tbl1
 echo -e '\n\n-- drop tbl1'
 curl --request DELETE \

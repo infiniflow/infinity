@@ -135,5 +135,13 @@ SELECT *, trim(c1) FROM test_varchar_filter where trim(c1) = 'a b c';
 a b c  abc 8 a b c
  a b c  abc 9 a b c
 
+query XX
+SELECT *, char_position(c1, 'abcd') FROM test_varchar_filter where char_position(c1, 'abcd')  = 1;
+----
+abcddddd abcddddd 1 1
+abcddddc abcddddd 2 1
+abcdddde abcddddd 3 1 
+abcdddde abcdddde 4 1
+
 statement ok
 DROP TABLE test_varchar_filter;
