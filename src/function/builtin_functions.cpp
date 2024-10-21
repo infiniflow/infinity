@@ -51,6 +51,9 @@ import md5;
 import lower;
 import upper;
 import regex;
+import ltrim;
+import rtrim;
+import trim;
 import position;
 import default_values;
 import special_function;
@@ -124,6 +127,9 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterLowerFunction(catalog_ptr_);
     RegisterUpperFunction(catalog_ptr_);
     RegisterRegexFunction(catalog_ptr_);
+    RegisterLtrimFunction(catalog_ptr_);
+    RegisterRtrimFunction(catalog_ptr_);
+    RegisterTrimFunction(catalog_ptr_);
     RegisterPositionFunction(catalog_ptr_);
 }
 

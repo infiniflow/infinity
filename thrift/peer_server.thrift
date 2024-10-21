@@ -12,6 +12,7 @@ kInvalid,
 enum NodeStatus {
 kInvalid,
 kAlive,
+kLostConnection,
 kTimeout
 }
 
@@ -63,6 +64,7 @@ struct HeartBeatResponse {
 2: string error_message,
 3: i64 leader_term,
 4: list<NodeInfo> other_nodes,
+5: NodeStatus sender_status
 }
 
 struct SyncLogRequest {

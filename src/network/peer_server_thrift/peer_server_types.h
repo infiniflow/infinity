@@ -40,7 +40,8 @@ struct NodeStatus {
   enum type {
     kInvalid = 0,
     kAlive = 1,
-    kTimeout = 2
+    kLostConnection = 2,
+    kTimeout = 3
   };
 };
 
@@ -484,11 +485,12 @@ void swap(HeartBeatRequest &a, HeartBeatRequest &b);
 std::ostream& operator<<(std::ostream& out, const HeartBeatRequest& obj);
 
 typedef struct _HeartBeatResponse__isset {
-  _HeartBeatResponse__isset() : error_code(false), error_message(false), leader_term(false), other_nodes(false) {}
+  _HeartBeatResponse__isset() : error_code(false), error_message(false), leader_term(false), other_nodes(false), sender_status(false) {}
   bool error_code :1;
   bool error_message :1;
   bool leader_term :1;
   bool other_nodes :1;
+  bool sender_status :1;
 } _HeartBeatResponse__isset;
 
 class HeartBeatResponse : public virtual ::apache::thrift::TBase {
@@ -499,7 +501,8 @@ class HeartBeatResponse : public virtual ::apache::thrift::TBase {
   HeartBeatResponse() noexcept
                     : error_code(0),
                       error_message(),
-                      leader_term(0) {
+                      leader_term(0),
+                      sender_status(static_cast<NodeStatus::type>(0)) {
   }
 
   virtual ~HeartBeatResponse() noexcept;
@@ -507,6 +510,11 @@ class HeartBeatResponse : public virtual ::apache::thrift::TBase {
   std::string error_message;
   int64_t leader_term;
   std::vector<NodeInfo>  other_nodes;
+  /**
+   * 
+   * @see NodeStatus
+   */
+  NodeStatus::type sender_status;
 
   _HeartBeatResponse__isset __isset;
 
@@ -518,6 +526,8 @@ class HeartBeatResponse : public virtual ::apache::thrift::TBase {
 
   void __set_other_nodes(const std::vector<NodeInfo> & val);
 
+  void __set_sender_status(const NodeStatus::type val);
+
   bool operator == (const HeartBeatResponse & rhs) const
   {
     if (!(error_code == rhs.error_code))
@@ -527,6 +537,8 @@ class HeartBeatResponse : public virtual ::apache::thrift::TBase {
     if (!(leader_term == rhs.leader_term))
       return false;
     if (!(other_nodes == rhs.other_nodes))
+      return false;
+    if (!(sender_status == rhs.sender_status))
       return false;
     return true;
   }

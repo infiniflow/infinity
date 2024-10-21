@@ -111,6 +111,14 @@ curl --request POST \
              "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
              "year": 2018,
              "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
+         },
+         {
+             "num": 8,
+             "body": " this is an example for trim ",
+             "vec": [4.0, 4.2, 4.3, 4.5],
+             "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
+             "year": 2018,
+             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
          }
      ] '
 
@@ -246,6 +254,51 @@ curl --request GET \
              "body"
          ],
         "filter": "body = lower('\'TEST@GMAIL.COM\'')"
+     } '
+
+# show rows of 'tbl1' where ltrim(body) is "this is an example for trim "
+echo -e '\n\n-- show rows of 'tbl1' where ltrim(body) is "this is an example for trim "'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "ltrim(body) = '\''this is an example for trim '\''"
+     } '
+
+# show rows of 'tbl1' where rtrim(body) is " this is an example for trim"
+echo -e '\n\n-- show rows of 'tbl1' where rtrim(body) is " this is an example for trim"'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "rtrim(body) = '\'' this is an example for trim'\''"
+     } '
+
+# show rows of 'tbl1' where trim(body) is "this is an example for trim "
+echo -e '\n\n-- show rows of 'tbl1' where trim(body) is "this is an example for trim"'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "trim(body) = '\''this is an example for trim'\''"
      } '
 
 # drop tbl1
