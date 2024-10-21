@@ -22,7 +22,7 @@ import status;
 import peer_thrift_client;
 import peer_server_thrift_types;
 import peer_task;
-import txn_manager;
+import storage;
 
 namespace infinity {
 
@@ -30,7 +30,7 @@ export enum class UpdateNodeOp { kRemove, kLostConnection };
 
 export class ClusterManager {
 public:
-    explicit ClusterManager(TxnManager *txn_manager) : txn_manager_(txn_manager) {}
+    explicit ClusterManager(Storage *storage) : storage_(storage) {}
     ~ClusterManager();
 
 public:
@@ -48,7 +48,7 @@ private:
     void CheckHeartBeatInner();
     Status RegisterToLeaderNoLock();
     Status UnregisterToLeaderNoLock();
-    Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &sending_node_name, const String &server_ip, i64 server_port);
+    Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &from_node_name, const String &server_ip, i64 server_port);
     Status SendLogs(const String &node_name,
                     const SharedPtr<PeerClient> &peer_client,
                     const Vector<SharedPtr<String>> &logs,
@@ -99,7 +99,7 @@ public:
     SharedPtr<NodeInfo> ThisNode() const;
 
 private:
-    TxnManager *txn_manager_{};
+    Storage *storage_{};
     mutable std::mutex mutex_;
 
     SharedPtr<NodeInfo> leader_node_; // Used by follower / learner
@@ -113,6 +113,7 @@ private:
     Vector<SharedPtr<String>> logs_to_sync_{};
 
     SharedPtr<PeerClient> client_to_leader_{}; // Used by follower and learner to connect leader server;
+
 
     SharedPtr<Thread> hb_periodic_thread_{};
     std::mutex hb_mutex_;

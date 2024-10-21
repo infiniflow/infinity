@@ -112,11 +112,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 current_storage_mode_ = target_mode;
             }
 
-            i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
-            i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-            i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-            i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-            i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
             switch (config_ptr_->StorageType()) {
                 case StorageType::kLocal: {
                     // Not init remote store
@@ -180,12 +175,15 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             if (system_start_ts == 0) {
                 if (current_storage_mode_ == StorageMode::kReadable) {
                     LOG_INFO("No checkpoint found in READER mode, waiting for log replication");
+                    reader_init_phase_ = ReaderInitPhase::kPhase1;
                     return;
                 }
                 // Init database, need to create default_db
                 LOG_INFO(fmt::format("Init a new catalog"));
                 new_catalog_ = Catalog::NewCatalog();
             }
+
+            i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
             if (compact_interval > 0 and current_storage_mode_ == StorageMode::kWritable) {
                 LOG_INFO(fmt::format("Init compaction alg"));
                 new_catalog_->InitCompactionAlg(system_start_ts);
@@ -244,6 +242,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             }
             periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
+            i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
+            i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+            i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
+            i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
+
             if (target_mode == StorageMode::kWritable) {
                 periodic_trigger_thread_->full_checkpoint_trigger_ =
                     MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
@@ -266,6 +269,8 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 force_ckp_task->Wait();
                 txn->SetReaderAllowed(true);
                 txn_mgr_->CommitTxn(txn);
+            } else {
+                reader_init_phase_ = ReaderInitPhase::kPhase2;
             }
 
             periodic_trigger_thread_->Start();
@@ -442,100 +447,67 @@ void Storage::SetStorageMode(StorageMode target_mode) {
     }
 }
 
-Status Storage::SetReaderStorageContinue() {
+Status Storage::SetReaderStorageContinue(TxnTimeStamp system_start_ts) {
     StorageMode current_mode = GetStorageMode();
     if (current_mode != StorageMode::kReadable) {
         UnrecoverableError(fmt::format("Expect current storage mode is READER, but it is {}", ToString(current_mode)));
     }
 
-    //    if (system_start_ts == 0) {
-    //        // Init database, need to create default_db
-    //        LOG_INFO(fmt::format("Init a new catalog"));
-    //        new_catalog_ = Catalog::NewCatalog();
-    //    }
-    //
-    //    BuiltinFunctions builtin_functions(new_catalog_);
-    //    builtin_functions.Init();
-    //    // Catalog finish init here.
-    //    if (bg_processor_ != nullptr) {
-    //        UnrecoverableError("Background processor was initialized before.");
-    //    }
-    //    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
-    //
-    //    // Construct txn manager
-    //    if (txn_mgr_ != nullptr) {
-    //        UnrecoverableError("Transaction manager was initialized before.");
-    //    }
-    //    txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
-    //                                      buffer_mgr_.get(),
-    //                                      bg_processor_.get(),
-    //                                      wal_mgr_.get(),
-    //                                      system_start_ts);
-    //    txn_mgr_->Start();
-    //
-    //    // start WalManager after TxnManager since it depends on TxnManager.
-    //    wal_mgr_->Start();
-    //
-    //    if (system_start_ts == 0 && target_mode == StorageMode::kWritable) {
-    //        CreateDefaultDB();
-    //    }
-    //
-    //    if (memory_index_tracer_ != nullptr) {
-    //        UnrecoverableError("Memory index tracer was initialized before.");
-    //    }
-    //    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
-    //
-    //    new_catalog_->StartMemoryIndexCommit();
-    //    new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
-    //
-    //    bg_processor_->Start();
-    //
-    //    if (target_mode == StorageMode::kWritable) {
-    //        if (compact_processor_ != nullptr) {
-    //            UnrecoverableError("compact processor was initialized before.");
-    //        }
-    //
-    //        compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
-    //        compact_processor_->Start();
-    //    }
-    //
-    //    if (periodic_trigger_thread_ != nullptr) {
-    //        UnrecoverableError("periodic trigger was initialized before.");
-    //    }
-    //    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
-    //
-    //    if (target_mode == StorageMode::kWritable) {
-    //        periodic_trigger_thread_->full_checkpoint_trigger_ =
-    //            MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
-    //        periodic_trigger_thread_->delta_checkpoint_trigger_ =
-    //            MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
-    //        periodic_trigger_thread_->compact_segment_trigger_ =
-    //            MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
-    //        periodic_trigger_thread_->optimize_index_trigger_ =
-    //            MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
-    //    }
-    //
-    //    periodic_trigger_thread_->cleanup_trigger_ =
-    //        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
-    //    bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
-    //
-    //    if (target_mode == StorageMode::kWritable) {
-    //        auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
-    //        auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
-    //        bg_processor_->Submit(force_ckp_task);
-    //        force_ckp_task->Wait();
-    //        txn->SetReaderAllowed(true);
-    //        txn_mgr_->CommitTxn(txn);
-    //    }
-    //
-    //    periodic_trigger_thread_->Start();
-    //
+    BuiltinFunctions builtin_functions(new_catalog_);
+    builtin_functions.Init();
+    // Catalog finish init here.
+    if (bg_processor_ != nullptr) {
+        UnrecoverableError("Background processor was initialized before.");
+    }
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
+
+    // Construct txn manager
+    if (txn_mgr_ != nullptr) {
+        UnrecoverableError("Transaction manager was initialized before.");
+    }
+    txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
+    txn_mgr_->Start();
+
+    // start WalManager after TxnManager since it depends on TxnManager.
+    wal_mgr_->Start();
+
+    if (memory_index_tracer_ != nullptr) {
+        UnrecoverableError("Memory index tracer was initialized before.");
+    }
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
+
+    new_catalog_->StartMemoryIndexCommit();
+    new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
+
+    bg_processor_->Start();
+
+    if (periodic_trigger_thread_ != nullptr) {
+        UnrecoverableError("periodic trigger was initialized before.");
+    }
+    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+
+    i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+    periodic_trigger_thread_->cleanup_trigger_ =
+        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
+    bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+
+    periodic_trigger_thread_->Start();
+    reader_init_phase_ = ReaderInitPhase::kPhase2;
+
     return Status::OK();
 }
 
 void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
     new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
+
+void Storage::LoadFullCheckpoint(const String &checkpoint_path) {
+    if (new_catalog_.get() != nullptr) {
+        UnrecoverableError("Catalog was already initialized before.");
+    }
+    new_catalog_ = Catalog::LoadFullCheckpoint(checkpoint_path);
+}
+void Storage::AttachDeltaCheckpoint(const String &checkpoint_path) { new_catalog_->AttachDeltaCheckpoint(checkpoint_path); }
 
 void Storage::CreateDefaultDB() {
     Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"));

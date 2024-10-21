@@ -100,7 +100,7 @@ public:
 
     Vector<SharedPtr<WalEntry>> CollectWalEntries() const;
 
-    void ReplayWalEntry(const WalEntry &entry);
+    void ReplayWalEntry(const WalEntry &entry, bool on_startup);
 
     TxnTimeStamp GetCheckpointedTS();
 

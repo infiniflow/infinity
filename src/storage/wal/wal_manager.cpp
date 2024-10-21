@@ -721,7 +721,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
         LOG_DEBUG(replay_entries[replay_count]->ToString());
-        ReplayWalEntry(*replay_entries[replay_count]);
+        ReplayWalEntry(*replay_entries[replay_count], false);
     }
 
     LOG_INFO(fmt::format("Latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
@@ -877,7 +877,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
     return wal_entries;
 }
 
-void WalManager::ReplayWalEntry(const WalEntry &entry) {
+void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup) {
     for (const auto &cmd : entry.cmds_) {
         LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
         switch (cmd->GetType()) {
@@ -931,10 +931,12 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             //                                              entry.commit_ts_);
             //     break;
             case WalCommandType::CHECKPOINT: {
-                if (storage_->GetStorageMode() == StorageMode::kReadable) {
-                    WalCmdCheckpointReplay(*static_cast<const WalCmdCheckpoint *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
-                } else {
-                    UnrecoverableError("Checkpoint");
+                if(on_startup) {
+                    if (storage_->GetStorageMode() == StorageMode::kReadable) {
+                        WalCmdCheckpointReplay(*static_cast<const WalCmdCheckpoint *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                    } else {
+                        UnrecoverableError("Checkpoint");
+                    }
                 }
                 break;
             }
@@ -1171,9 +1173,9 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
 void WalManager::WalCmdCheckpointReplay(const WalCmdCheckpoint &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
     //  Only used in follower / learner startup and received the replicate logs phase
     if (cmd.is_full_checkpoint_) {
-        ;
+        storage_->LoadFullCheckpoint(fmt::format("{}/{}", cmd.catalog_path_, cmd.catalog_name_));
     } else {
-        ;
+        storage_->AttachDeltaCheckpoint(cmd.catalog_path_);
     }
     return;
 }

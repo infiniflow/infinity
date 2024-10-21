@@ -37,6 +37,12 @@ namespace infinity {
 class CleanupInfoTracer;
 class ResultCacheManager;
 
+export enum class ReaderInitPhase {
+    kInvalid,
+    kPhase1,
+    kPhase2,
+};
+
 export class Storage {
 public:
     explicit Storage(Config *config_ptr);
@@ -69,11 +75,14 @@ public:
 
     StorageMode GetStorageMode() const;
     void SetStorageMode(StorageMode mode);
-    Status SetReaderStorageContinue();
+    Status SetReaderStorageContinue(TxnTimeStamp system_start_ts);
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
+    void LoadFullCheckpoint(const String &checkpoint_path);
+    void AttachDeltaCheckpoint(const String &checkpoint_path);
 
     Config *config() const { return config_ptr_; }
+    ReaderInitPhase reader_init_phase() const { return reader_init_phase_; }
 
     void CreateDefaultDB();
 
@@ -94,6 +103,7 @@ private:
 
     mutable std::mutex mutex_;
     StorageMode current_storage_mode_{StorageMode::kUnInitialized};
+    ReaderInitPhase reader_init_phase_{ReaderInitPhase::kInvalid};
 };
 
 } // namespace infinity
