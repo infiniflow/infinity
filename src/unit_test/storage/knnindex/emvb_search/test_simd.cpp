@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <cstdlib>
-#include <immintrin.h>
+#include "common/simd/simd_common_intrin_include.h"
 
 #include "gtest/gtest.h"
 import base_test;
