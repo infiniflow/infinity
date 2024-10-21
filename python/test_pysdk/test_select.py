@@ -966,7 +966,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_select_sqrt"+suffix)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_select_round(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_round"+suffix, ConflictType.Ignore)
