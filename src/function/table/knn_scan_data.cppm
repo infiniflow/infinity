@@ -104,6 +104,7 @@ public:
     using DistFunc = DistType (*)(const QueryDataType *, const QueryDataType *, SizeT);
 
     DistFunc dist_func_{};
+    KnnDistanceType dist_type_{};
 };
 
 template <>

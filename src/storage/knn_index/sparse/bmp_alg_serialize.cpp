@@ -15,7 +15,7 @@
 module;
 
 #include <vector>
-#include <xmmintrin.h>
+#include "common/simd/simd_common_intrin_include.h"
 
 module bmp_alg;
 

@@ -173,10 +173,22 @@ endif ()
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm64.*")
+    set(ARM64 TRUE)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64.*")
+    set(ARM64 TRUE)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
+    set(X86_64 TRUE)
+endif()          
+
 #add_definitions(-march=native)
 add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
 if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
-    add_definitions(-mevex512)
+    if(X86_64)
+        add_definitions(-mevex512)
+    else()
+        add_definitions(-march=native)
+    endif()
 endif ()
 
 execute_process(

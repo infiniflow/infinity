@@ -18,47 +18,52 @@ add_subdirectory(parser)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
+
 if(APPLE)
-    execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA"
-            RESULT_VARIABLE SUPPORT_FMA
-            OUTPUT_QUIET
-            ERROR_QUIET)
+    if(X86_64)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA"
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-    execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
-            RESULT_VARIABLE SUPPORT_SSE42
-            OUTPUT_QUIET
-            ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-    execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
-            RESULT_VARIABLE SUPPORT_AVX2
-            OUTPUT_QUIET
-            ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-    execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
-            RESULT_VARIABLE SUPPORT_AVX512
-            OUTPUT_QUIET
-            ERROR_QUIET)
+        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+    endif()
 else()
     #Linux
-    execute_process(COMMAND grep -q fma /proc/cpuinfo
-            RESULT_VARIABLE SUPPORT_FMA
-            OUTPUT_QUIET
-            ERROR_QUIET)
+    if(X86_64)
+        execute_process(COMMAND grep -q fma /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-    execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
-            RESULT_VARIABLE SUPPORT_SSE42
-            OUTPUT_QUIET
-            ERROR_QUIET)
+        execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-    execute_process(COMMAND grep -q avx2 /proc/cpuinfo
-            RESULT_VARIABLE SUPPORT_AVX2
-            OUTPUT_QUIET
-            ERROR_QUIET)
+        execute_process(COMMAND grep -q avx2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX2
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-    execute_process(COMMAND grep -q avx512 /proc/cpuinfo
-            RESULT_VARIABLE SUPPORT_AVX512
-            OUTPUT_QUIET
-            ERROR_QUIET)
+        execute_process(COMMAND grep -q avx512 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+    endif()
 endif()
 
 
@@ -283,22 +288,24 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
 
 
-if (NOT SUPPORT_FMA EQUAL 0)
-    message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
-endif ()
+if(X86_64)
+    if (NOT SUPPORT_FMA EQUAL 0)
+        message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
+    endif ()
 
-if (NOT SUPPORT_SSE42 EQUAL 0)
-    message(FATAL_ERROR "This project requires the processor support sse4_2 instructions.")
-endif ()
+    if (NOT SUPPORT_SSE42 EQUAL 0)
+        message(FATAL_ERROR "This project requires the processor support sse4_2 instructions.")
+    endif ()
 
-if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
-    message("Compiled by AVX2 or AVX512")
-    add_definitions(-march=native)
-    target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
-else ()
-    message("Compiled by SSE")
-    add_definitions(-msse4.2 -mfma)
-    target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+    if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
+        message("Compiled by AVX2 or AVX512")
+        add_definitions(-march=native)
+        target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
+    else ()
+        message("Compiled by SSE")
+        add_definitions(-msse4.2 -mfma)
+        target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+    endif ()
 endif ()
 
 add_executable(infinity
@@ -622,12 +629,17 @@ target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcr
 
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
-if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
-    message("Compiled by AVX2 or AVX512")
-    add_definitions(-mavx2 -mfma -mf16c -mpopcnt)
-    target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
-else ()
-    message("Compiled by SSE")
-    add_definitions(-msse4.2 -mfma)
-    target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+if(X86_64)
+    if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
+        message("Compiled by AVX2 or AVX512")
+        add_definitions(-mavx2 -mfma -mf16c -mpopcnt)
+        target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+    else ()
+        message("Compiled by SSE")
+        add_definitions(-msse4.2 -mfma)
+        target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+    endif ()
+else()
+    add_definitions(-march=native)
 endif ()
+

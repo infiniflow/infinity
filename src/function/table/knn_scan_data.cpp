@@ -38,6 +38,7 @@ namespace infinity {
 
 template <>
 KnnDistance1<f32, f32>::KnnDistance1(KnnDistanceType dist_type) {
+    dist_type_ = dist_type;
     switch (dist_type) {
         case KnnDistanceType::kL2: {
             dist_func_ = GetSIMD_FUNCTIONS().L2Distance_func_ptr_;
@@ -60,6 +61,7 @@ KnnDistance1<f32, f32>::KnnDistance1(KnnDistanceType dist_type) {
 
 template <>
 KnnDistance1<u8, i32>::KnnDistance1(KnnDistanceType dist_type) {
+    dist_type_ = dist_type;
     switch (dist_type) {
         case KnnDistanceType::kL2: {
             dist_func_ = GetSIMD_FUNCTIONS().HNSW_U8L2_ptr_;
@@ -81,6 +83,7 @@ f32 hnsw_u8ip_f32_wrapper(const u8 *v1, const u8 *v2, SizeT dim) { return static
 
 template <>
 KnnDistance1<u8, f32>::KnnDistance1(KnnDistanceType dist_type) {
+    dist_type_ = dist_type;
     switch (dist_type) {
         case KnnDistanceType::kL2: {
             dist_func_ = &hnsw_u8l2_f32_wrapper;
@@ -103,6 +106,7 @@ KnnDistance1<u8, f32>::KnnDistance1(KnnDistanceType dist_type) {
 
 template <>
 KnnDistance1<i8, i32>::KnnDistance1(KnnDistanceType dist_type) {
+    dist_type_ = dist_type;
     switch (dist_type) {
         case KnnDistanceType::kL2: {
             dist_func_ = GetSIMD_FUNCTIONS().HNSW_I8L2_ptr_;
@@ -124,6 +128,7 @@ f32 hnsw_i8ip_f32_wrapper(const i8 *v1, const i8 *v2, SizeT dim) { return static
 
 template <>
 KnnDistance1<i8, f32>::KnnDistance1(KnnDistanceType dist_type) {
+    dist_type_ = dist_type;
     switch (dist_type) {
         case KnnDistanceType::kL2: {
             dist_func_ = &hnsw_i8l2_f32_wrapper;

@@ -14,7 +14,7 @@
 
 module;
 
-#include <xmmintrin.h>
+#include "common/simd/simd_common_intrin_include.h"
 
 export module bmp_blockterms;
 

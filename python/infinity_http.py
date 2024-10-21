@@ -661,7 +661,7 @@ class infinity_http:
 
         for res in self.output_res:
             for k in res:
-                print(res[k])
+                #print(res[k])
                 if k not in df_dict:
                     df_dict[k] = ()
                 tup = df_dict[k]
@@ -686,7 +686,7 @@ class infinity_http:
                     new_tup = tup + (res[k],)
                 df_dict[k] = new_tup
         # print(self.output_res)
-        # print(df_dict)
+        print(df_dict)
 
         df_type = {}
         for k in df_dict:
@@ -694,19 +694,33 @@ class infinity_http:
                 df_type[k] = type_to_dtype(col_types[k])
             if k in ["DISTANCE", "SCORE", "SIMILARITY"]:
                 df_type[k] = dtype('float32')
-            # "(c1 + c2)"
-            k1 = k.replace("(", "")
-            k1 = k1.replace(")", "")
-            cols = k1.split("+") + k1.split("-")  # ["c1 ", " c2", "c1 + c2"]
-            # print(cols)
-            # haven't considered data type priority
+            # "(c1 + c2)", "sqrt(c1), round(c1)"
+            k1 = k.replace("(", " ")
+            k1 = k1.replace(")", " ")
+            k1 = k1.replace("+", " ")
+            k1 = k1.replace("-", " ")
+            cols = k1.split(" ")
+            #print(cols)
+
+            function_name = ""
             for col in cols:
+                #print(function_name)
                 if col.strip() in col_types:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
-                if col.strip().isdigit():
+                    df_type[k] = function_return_type(function_name, df_type[k])
+                elif col.strip().isdigit() and df_type[k] != dtype('float64'):
                     df_type[k] = dtype('int32')
-                if is_float(col.strip()):
+                    df_type[k] = function_return_type(function_name, df_type[k])
+                elif is_float(col.strip()):
                     df_type[k] = dtype('float64')
+                    df_type[k] = function_return_type(function_name, df_type[k])
+                else:
+                    function_name = col.strip().lower()
+                    if (function_name in functions):
+                        df_type[k] = function_return_type(function_name, None)
+                    if (function_name in bool_functions):
+                        df_type[k] = dtype('bool')
+                        break
         return pd.DataFrame(df_dict).astype(df_type)
 
     def to_arrow(self):
