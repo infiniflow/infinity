@@ -322,9 +322,12 @@ ClusterManager::ConnectToServerNoLock(const String &sending_node_name, const Str
     return {client, client_status};
 }
 
-Status
-ClusterManager::SendLogs(const String &node_name, const SharedPtr<PeerClient> &peer_client, const Vector<SharedPtr<String>> &logs, bool synchronize) {
-    SharedPtr<SyncLogTask> sync_log_task = MakeShared<SyncLogTask>(node_name, logs);
+Status ClusterManager::SendLogs(const String &node_name,
+                                const SharedPtr<PeerClient> &peer_client,
+                                const Vector<SharedPtr<String>> &logs,
+                                bool synchronize,
+                                bool on_register) {
+    SharedPtr<SyncLogTask> sync_log_task = MakeShared<SyncLogTask>(node_name, logs, on_register);
     peer_client->Send(sync_log_task);
 
     Status status = Status::OK();
@@ -549,7 +552,7 @@ Status ClusterManager::SyncLogsOnRegistration(const SharedPtr<NodeInfo> &non_lea
 
     // Leader will send the WALs
     LOG_TRACE(fmt::format("Leader will send the diff logs count: {} to {} synchronously", wal_strings.size(), non_leader_node->node_name_));
-    return SendLogs(non_leader_node->node_name_, peer_client, wal_strings, true);
+    return SendLogs(non_leader_node->node_name_, peer_client, wal_strings, true, true);
 }
 
 void ClusterManager::PrepareLogs(const SharedPtr<String> &log_string) { logs_to_sync_.emplace_back(log_string); }
@@ -580,7 +583,7 @@ Status ClusterManager::SyncLogs() {
         for (SizeT idx = 0; idx < follower_count; ++idx) {
             const String &follower_name = followers[idx]->node_name_;
             if (!sent_nodes.contains(follower_name)) {
-                status = SendLogs(follower_name, follower_clients[idx], logs_to_sync_, true);
+                status = SendLogs(follower_name, follower_clients[idx], logs_to_sync_, true, false);
                 if (status.ok()) {
                     sent_nodes.insert(follower_name);
                 }
@@ -591,7 +594,7 @@ Status ClusterManager::SyncLogs() {
         for (SizeT idx = 0; idx < learner_count; ++idx) {
             const String &learner_name = learners[idx]->node_name_;
             if (!sent_nodes.contains(learner_name)) {
-                status = SendLogs(learner_name, learner_clients[idx], logs_to_sync_, false);
+                status = SendLogs(learner_name, learner_clients[idx], logs_to_sync_, false, false);
                 if (status.ok()) {
                     sent_nodes.insert(learner_name);
                 }
@@ -666,6 +669,16 @@ Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
     }
     return Status::OK();
 }
+
+Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
+    for (auto &log_str : synced_logs) {
+        const i32 entry_size = log_str.size();
+        const char *ptr = log_str.data();
+        SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
+        LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
+        //        wal_manager->ReplayWalEntry(*entry);
+    }
+    return Status::OK(); }
 
 Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
     // ADMIN SHOW NODES;

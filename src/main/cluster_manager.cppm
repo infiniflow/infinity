@@ -49,7 +49,11 @@ private:
     Status RegisterToLeaderNoLock();
     Status UnregisterToLeaderNoLock();
     Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &sending_node_name, const String &server_ip, i64 server_port);
-    Status SendLogs(const String &node_name, const SharedPtr<PeerClient> &peer_client, const Vector<SharedPtr<String>> &logs, bool synchronize);
+    Status SendLogs(const String &node_name,
+                    const SharedPtr<PeerClient> &peer_client,
+                    const Vector<SharedPtr<String>> &logs,
+                    bool synchronize,
+                    bool on_register);
 
     Status GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
                           Vector<SharedPtr<PeerClient>> &follower_clients,
@@ -82,6 +86,7 @@ public:
     // Use by follower / learner to update all node info when get HB response from leader
     Status UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &info_of_nodes);
 
+    Status ContinueStartup(const Vector<String> &synced_logs);
     Status ApplySyncedLogNolock(const Vector<String> &synced_logs);
 
     // Used by all nodes ADMIN SHOW NODES

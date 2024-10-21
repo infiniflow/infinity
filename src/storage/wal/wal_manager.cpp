@@ -197,7 +197,7 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
                 std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
                 catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
                 log_entries.push_back(wal_entry);
-                if(checkpoint_cmd->is_full_checkpoint_) {
+                if (checkpoint_cmd->is_full_checkpoint_) {
                     // Full checkpoint, OK
                     break;
                 }
@@ -309,7 +309,7 @@ void WalManager::Flush() {
             ofs_.write(buf->data(), ptr - buf->data());
 
             if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
-                if(cluster_manager == nullptr) {
+                if (cluster_manager == nullptr) {
                     cluster_manager = InfinityContext::instance().cluster_manager();
                 }
                 cluster_manager->PrepareLogs(buf);
@@ -376,6 +376,13 @@ void WalManager::Flush() {
         LOG_TRACE("WAL flush is finished.");
     }
     LOG_TRACE("WalManager::Flush mainloop end");
+}
+
+void WalManager::FlushLogByReplication(const Vector<String> &synced_logs) {
+    for (const String &synced_log : synced_logs) {
+        ofs_.write(synced_log.c_str(), synced_log.size());
+    }
+    ofs_.flush();
 }
 
 bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task) {
@@ -924,8 +931,8 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             //                                              entry.commit_ts_);
             //     break;
             case WalCommandType::CHECKPOINT: {
-                if(storage_->GetStorageMode() == StorageMode::kReadable) {
-                    LOG_DEBUG("Load the checkpoint");
+                if (storage_->GetStorageMode() == StorageMode::kReadable) {
+                    WalCmdCheckpointReplay(*static_cast<const WalCmdCheckpoint *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 } else {
                     UnrecoverableError("Checkpoint");
                 }
@@ -1159,6 +1166,16 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     table_store->Delete(cmd.row_ids_);
     Catalog::Delete(table_store->GetTableEntry(), fake_txn->TxnID(), (void *)table_store, fake_txn->CommitTS(), table_store->GetDeleteStateRef());
     Catalog::CommitWrite(table_store->GetTableEntry(), fake_txn->TxnID(), commit_ts, table_store->txn_segments(), table_store->GetDeleteStatePtr());
+}
+
+void WalManager::WalCmdCheckpointReplay(const WalCmdCheckpoint &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    //  Only used in follower / learner startup and received the replicate logs phase
+    if (cmd.is_full_checkpoint_) {
+        ;
+    } else {
+        ;
+    }
+    return;
 }
 
 void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

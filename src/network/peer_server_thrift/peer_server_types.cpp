@@ -1225,6 +1225,10 @@ void SyncLogRequest::__set_node_name(const std::string& val) {
 void SyncLogRequest::__set_log_entries(const std::vector<std::string> & val) {
   this->log_entries = val;
 }
+
+void SyncLogRequest::__set_on_startup(const bool val) {
+  this->on_startup = val;
+}
 std::ostream& operator<<(std::ostream& out, const SyncLogRequest& obj)
 {
   obj.printTo(out);
@@ -1281,6 +1285,14 @@ uint32_t SyncLogRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->on_startup);
+          this->__isset.on_startup = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -1314,6 +1326,10 @@ uint32_t SyncLogRequest::write(::apache::thrift::protocol::TProtocol* oprot) con
   }
   xfer += oprot->writeFieldEnd();
 
+  xfer += oprot->writeFieldBegin("on_startup", ::apache::thrift::protocol::T_BOOL, 3);
+  xfer += oprot->writeBool(this->on_startup);
+  xfer += oprot->writeFieldEnd();
+
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -1323,17 +1339,20 @@ void swap(SyncLogRequest &a, SyncLogRequest &b) {
   using ::std::swap;
   swap(a.node_name, b.node_name);
   swap(a.log_entries, b.log_entries);
+  swap(a.on_startup, b.on_startup);
   swap(a.__isset, b.__isset);
 }
 
 SyncLogRequest::SyncLogRequest(const SyncLogRequest& other31) {
   node_name = other31.node_name;
   log_entries = other31.log_entries;
+  on_startup = other31.on_startup;
   __isset = other31.__isset;
 }
 SyncLogRequest& SyncLogRequest::operator=(const SyncLogRequest& other32) {
   node_name = other32.node_name;
   log_entries = other32.log_entries;
+  on_startup = other32.on_startup;
   __isset = other32.__isset;
   return *this;
 }
@@ -1342,6 +1361,7 @@ void SyncLogRequest::printTo(std::ostream& out) const {
   out << "SyncLogRequest(";
   out << "node_name=" << to_string(node_name);
   out << ", " << "log_entries=" << to_string(log_entries);
+  out << ", " << "on_startup=" << to_string(on_startup);
   out << ")";
 }
 

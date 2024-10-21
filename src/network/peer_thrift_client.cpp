@@ -361,6 +361,7 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
     request.node_name = peer_task->node_name_;
     SizeT log_count = peer_task->log_strings_.size();
     request.log_entries.reserve(log_count);
+    request.on_startup = peer_task->on_register_;
     for (SizeT i = 0; i < log_count; ++i) {
         request.log_entries.emplace_back(*peer_task->log_strings_[i]);
     }

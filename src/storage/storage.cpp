@@ -443,11 +443,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 }
 
 Status Storage::SetReaderStorageContinue() {
-    //    StorageMode current_mode = GetStorageMode();
-    //    if (current_mode != StorageMode::kReadable) {
-    //        UnrecoverableError(fmt::format("Expect current storage mode is READER, but it is {}", ToString(current_mode)));
-    //    }
-    //
+    StorageMode current_mode = GetStorageMode();
+    if (current_mode != StorageMode::kReadable) {
+        UnrecoverableError(fmt::format("Expect current storage mode is READER, but it is {}", ToString(current_mode)));
+    }
+
     //    if (system_start_ts == 0) {
     //        // Init database, need to create default_db
     //        LOG_INFO(fmt::format("Init a new catalog"));
