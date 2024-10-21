@@ -46,3 +46,15 @@ SELECT * FROM sqllogic_test_insert_embedding;
 
 statement ok
 DROP TABLE sqllogic_test_insert_embedding;
+
+statement ok
+CREATE TABLE sqllogic_test_insert_embedding (col1 INT, col2 EMBEDDING(BIT, 8));
+
+query I
+INSERT INTO sqllogic_test_insert_embedding VALUES(0, [0.0, 0.1, 0.2, 0.3, 0.3, 0.2, 0.1, 0.0]);
+----
+
+query II
+SELECT * FROM sqllogic_test_insert_embedding;
+----
+0 [01111110]

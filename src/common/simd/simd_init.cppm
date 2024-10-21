@@ -31,6 +31,7 @@ export using F32DistanceFuncType = f32(*)(const f32 *, const f32 *, SizeT);
 export using I8DistanceFuncType = i32(*)(const i8 *, const i8 *, SizeT);
 export using I8CosDistanceFuncType = f32(*)(const i8 *, const i8 *, SizeT);
 export using U8DistanceFuncType = i32(*)(const u8 *, const u8 *, SizeT);
+export using U8HammingDistanceFuncType = f32(*)(const u8 *, const u8 *, SizeT);
 export using U8CosDistanceFuncType = f32(*)(const u8 *, const u8 *, SizeT);
 export using MaxSimF32BitIPFuncType = f32(*)(const f32 *, const u8 *, SizeT);
 export using MaxSimI32BitIPFuncType = i32(*)(const i32 *, const u8 *, SizeT);
@@ -42,6 +43,10 @@ export using SearchTop1WithDisF32U32FuncType = void(*)(u32, u32, const f32 *, u3
 export F32DistanceFuncType GetL2DistanceFuncPtr();
 export F32DistanceFuncType GetIPDistanceFuncPtr();
 export F32DistanceFuncType GetCosineDistanceFuncPtr();
+
+// u32 distance functions
+export U8HammingDistanceFuncType GetHammingDistanceFuncPtr();
+
 // HNSW F32
 export F32DistanceFuncType Get_HNSW_F32L2_ptr();
 export F32DistanceFuncType Get_HNSW_F32L2_16_ptr();
