@@ -676,7 +676,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
         switch (targe_storage_mode) {
             case StorageMode::kWritable: {
                 // once wal is not empty, a checkpoint should always be found in leader or standalone mode.
-                String error_message = "No checkpoint found in wal";
+                String error_message = "WAL replay: No checkpoint found in wal";
                 UnrecoverableError(error_message);
                 break;
             }
@@ -780,7 +780,7 @@ Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::Ge
 
     if (system_start_ts == 0) {
         // once wal is not empty, a checkpoint should always be found.
-        String error_message = "No checkpoint found in wal";
+        String error_message = "No checkpoint is found WAL";
         UnrecoverableError(error_message);
     }
     LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));

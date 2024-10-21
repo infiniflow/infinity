@@ -77,6 +77,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from UnInit to UnInit");
             }
 
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                current_storage_mode_ = target_mode;
+            }
+
             // Construct wal manager
             if (wal_mgr_ != nullptr) {
                 UnrecoverableError("WAL manager was initialized before.");
@@ -100,6 +105,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 wal_mgr_.reset();
                 LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
                 break;
+            }
+
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                current_storage_mode_ = target_mode;
             }
 
             i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
@@ -262,6 +272,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from Readable to Readable");
             }
 
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                current_storage_mode_ = target_mode;
+            }
+
             if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
                 periodic_trigger_thread_->Stop();
                 periodic_trigger_thread_.reset();
@@ -349,6 +364,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from Writeable to UnInit");
             }
 
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                current_storage_mode_ = target_mode;
+            }
+
             if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
                 periodic_trigger_thread_->Stop();
                 periodic_trigger_thread_.reset();
@@ -404,8 +424,8 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 periodic_trigger_thread_->Stop();
                 periodic_trigger_thread_.reset();
 
-                compact_processor_->Stop(); // Different from Readable
-                compact_processor_.reset(); // Different from Readable
+                compact_processor_->Stop();
+                compact_processor_.reset();
 
                 i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
 
@@ -418,9 +438,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             break;
         }
     }
-
-    std::unique_lock<std::mutex> lock(mutex_);
-    current_storage_mode_ = target_mode;
 }
 
 Status Storage::SetReaderStorageContinue() {
