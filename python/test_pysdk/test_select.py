@@ -944,3 +944,55 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_select_position"+suffix)
         assert res.error_code == ErrorCode.OK
+
+    def test_select_sqrt(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_sqrt"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_sqrt"+suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "double"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_sqrt"+suffix)
+        table_obj.insert(
+            [{"c1": '1', "c2": '2'}, {"c1": '4', "c2": '5'}, {"c1": '9', "c2": '10'}, {"c1": '16', "c2": '17'}])
+
+        res = table_obj.output(["*", "sqrt(c1)", "sqrt(c2)"]).to_df()
+        print(res)
+
+        res = table_obj.output(["*"]).filter("sqrt(c1) = 2").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (4,),
+                                                         'c2': (5,)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('double')}))
+
+        res = db_obj.drop_table("test_select_sqrt"+suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_round(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_round"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_round"+suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "double"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_round"+suffix)
+        table_obj.insert(
+            [{"c1": '1', "c2": '2.4'}, {"c1": '4', "c2": '-2.4'}, {"c1": '9', "c2": '2.5'}, {"c1": '16', "c2": '-2.5'}])
+
+        res = table_obj.output(["c1", "round(c2)"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
+                                                         'round(c2)': (2, -2, 3, -3)})
+                                      .astype({'c1': dtype('int32'), 'round(c2)': dtype('double')}))
+
+        res = table_obj.output(["c1", "ceil(c2)"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
+                                                         'ceil(c2)': (3, -2, 3, -2)})
+                                      .astype({'c1': dtype('int32'), 'ceil(c2)': dtype('double')}))
+
+        res = table_obj.output(["c1", "floor(c2)"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
+                                                         'floor(c2)': (2, -3, 2, -3)})
+                                      .astype({'c1': dtype('int32'), 'floor(c2)': dtype('double')}))
+
+        res = db_obj.drop_table("test_select_round"+suffix)
+        assert res.error_code == ErrorCode.OK
