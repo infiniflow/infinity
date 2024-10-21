@@ -39,7 +39,6 @@ namespace infinity {
 class Txn;
 class TxnManager;
 class TableIndexMeta;
-class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
 class BaseTableRef;
@@ -94,7 +93,7 @@ public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static SharedPtr<TableIndexEntry>
-    Deserialize(const nlohmann::json &index_def_entry_json, TableIndexMeta *table_index_meta, BufferManager *buffer_mgr, TableEntry *table_entry);
+    Deserialize(const nlohmann::json &index_def_entry_json, TableIndexMeta *table_index_meta, TableEntry *table_entry);
 
 public:
     // Getter

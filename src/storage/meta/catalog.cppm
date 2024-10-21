@@ -112,11 +112,12 @@ public:
     void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
 
     // replay
-    void CreateDatabaseReplay(const SharedPtr<String> &db_name,
-                              const SharedPtr<String> &comment,
-                              std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                              TransactionID txn_id,
-                              TxnTimeStamp begin_ts);
+    void
+    CreateDatabaseReplay(const SharedPtr<String> &db_name,
+                         const SharedPtr<String> &comment,
+                         std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
 
     void DropDatabaseReplay(const String &db_name,
                             std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
@@ -233,21 +234,20 @@ public:
 
     static UniquePtr<Catalog> NewCatalog();
 
-    static UniquePtr<Catalog>
-    LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
 
     SizeT GetDeltaLogCount() const;
 
     Vector<CatalogDeltaOpBrief> GetDeltaLogBriefs() const;
 
 private:
-    static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json);
 
     static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info);
 
-    void LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, BufferManager *buffer_mgr);
+    void LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry);
 
-    static UniquePtr<Catalog> LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> LoadFromFile(const FullCatalogFileInfo &full_ckp_info);
 
 public:
     // Profile related methods

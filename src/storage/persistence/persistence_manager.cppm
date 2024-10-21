@@ -59,10 +59,13 @@ export struct PersistReadResult {
     Vector<String> drop_from_remote_keys_; // object that should be removed from remote storage. because of object's all parts are deleted
 };
 
+enum class StorageMode;
+enum class StorageType;
+
 export class PersistenceManager {
 public:
     // TODO: build cache from existing files under workspace
-    PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit, bool local_storage = true);
+    PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit, StorageType storage_type, StorageMode storage_mode);
 
     ~PersistenceManager();
 

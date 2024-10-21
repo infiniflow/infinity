@@ -205,14 +205,14 @@ nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts) {
  * @param buffer_mgr
  * @return UniquePtr<TableMeta>
  */
-UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr) {
+UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry) {
     SharedPtr<String> db_entry_dir = MakeShared<String>(table_meta_json["db_entry_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
     LOG_TRACE(fmt::format("load table {}", *table_name));
     UniquePtr<TableMeta> table_meta = MakeUnique<TableMeta>(db_entry_dir, table_name, db_entry);
     if (table_meta_json.contains("table_entries")) {
         for (const auto &table_entry_json : table_meta_json["table_entries"]) {
-            UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, table_meta.get(), buffer_mgr);
+            UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, table_meta.get());
             table_meta->PushBackEntry(std::move(table_entry));
         }
     }

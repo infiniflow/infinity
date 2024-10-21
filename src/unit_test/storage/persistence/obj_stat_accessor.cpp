@@ -11,7 +11,7 @@ class ObjectStatMapTest : public BaseTest {};
 
 TEST_F(ObjectStatMapTest, test1) {
     SizeT disk_capacity_limit = 10;
-    ObjectStatAccessor_ObjectStorage obj_map(disk_capacity_limit);
+    ObjectStatAccessorObjectStorage obj_map(disk_capacity_limit);
 
     ObjStat *obj_stat = obj_map.Get("key1");
     EXPECT_EQ(obj_stat, nullptr);

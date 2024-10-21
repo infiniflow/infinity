@@ -66,7 +66,7 @@ public:
 
     nlohmann::json Serialize();
 
-    static UniquePtr<BlockColumnEntry> Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
+    static UniquePtr<BlockColumnEntry> Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry);
 
     void CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts);
 

@@ -503,7 +503,7 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
         block_entry->CommitBlock(txn_id, commit_ts);
     }
     for (auto *block_column_entry : segment_store.block_column_entries_) {
-        block_column_entry->CommitColumn(txn_id, commit_ts);   
+        block_column_entry->CommitColumn(txn_id, commit_ts);
     }
 }
 
@@ -573,7 +573,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
     return json_res;
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
+SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableEntry *table_entry) {
     std::underlying_type_t<SegmentStatus> saved_status = segment_entry_json["status"];
     SegmentStatus segment_status = static_cast<SegmentStatus>(saved_status);
     SharedPtr<String> segment_dir = MakeShared<String>(segment_entry_json["segment_dir"]);
@@ -598,7 +598,7 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
 
     if (segment_entry_json.contains("block_entries")) {
         for (const auto &block_json : segment_entry_json["block_entries"]) {
-            UniquePtr<BlockEntry> block_entry = BlockEntry::Deserialize(block_json, segment_entry.get(), buffer_mgr);
+            UniquePtr<BlockEntry> block_entry = BlockEntry::Deserialize(block_json, segment_entry.get());
             auto block_entries_size = segment_entry->block_entries_.size();
             segment_entry->block_entries_.resize(std::max(static_cast<SizeT>(block_entries_size), static_cast<SizeT>(block_entry->block_id() + 1)));
             segment_entry->block_entries_[block_entry->block_id()] = std::move(block_entry);
@@ -648,7 +648,7 @@ Vector<String> SegmentEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begi
     std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
     Vector<String> res;
     res.reserve(block_entries_.size());
-    for(const auto& block_entry: block_entries_) {
+    for (const auto &block_entry : block_entries_) {
         Vector<String> files = block_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), files.begin(), files.end());
     }
@@ -687,7 +687,12 @@ String SegmentEntry::SegmentStatusToString(const SegmentStatus &type) {
 }
 
 String SegmentEntry::ToString() const {
-    return fmt::format("Segment path: {}, id: {}, row_count: {}, block_count: {}, status: {}", *segment_dir_, segment_id_, row_count_, block_entries_.size(), SegmentStatusToString(status_));
+    return fmt::format("Segment path: {}, id: {}, row_count: {}, block_count: {}, status: {}",
+                       *segment_dir_,
+                       segment_id_,
+                       row_count_,
+                       block_entries_.size(),
+                       SegmentStatusToString(status_));
 }
 
 void SegmentEntry::AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store) {

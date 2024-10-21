@@ -55,6 +55,7 @@ import wal_manager;
 import internal_types;
 import persistence_manager;
 import default_values;
+import virtual_store;
 
 using namespace infinity;
 
@@ -96,8 +97,11 @@ TEST_F(BufferObjTest, test1) {
     auto base_dir = MakeShared<String>(GetFullDataDir());
     auto persistence_dir = MakeShared<String>(data_dir + "/persistence");
 
-    UniquePtr<PersistenceManager> persistence_manager =
-        MakeUnique<PersistenceManager>(*persistence_dir, *base_dir, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
+    UniquePtr<PersistenceManager> persistence_manager = MakeUnique<PersistenceManager>(*persistence_dir,
+                                                                                       *base_dir,
+                                                                                       DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT,
+                                                                                       StorageType::kLocal,
+                                                                                       StorageMode::kWritable);
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager.get());
 
     SizeT test_size1 = 1024;
