@@ -30,7 +30,7 @@ SELECT c2, round(c2) FROM test_math WHERE c1 > 9;
 -2.500000 -3.000000
 
 query IV
-SELECT c2, ceiling(c2) FROM test_math WHERE c1 > 9;
+SELECT c2, ceil(c2) FROM test_math WHERE c1 > 9;
 ----
 2.400000 3.000000
 -2.400000 -2.000000

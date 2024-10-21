@@ -29,7 +29,7 @@ import add;
 import abs;
 import sqrt;
 import round;
-import ceiling;
+import ceil;
 import floor;
 import and_func;
 import divide;
@@ -108,7 +108,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterPowFunction(catalog_ptr_);
     RegisterSqrtFunction(catalog_ptr_);
     RegisterRoundFunction(catalog_ptr_);
-    RegisterCeilingFunction(catalog_ptr_);
+    RegisterCeilFunction(catalog_ptr_);
     RegisterFloorFunction(catalog_ptr_);
 
     // register comparison operator

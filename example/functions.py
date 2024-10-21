@@ -83,7 +83,7 @@ db_obj.create_table("function_example",
                         "c2": {"type": "double"}}, ConflictType.Error)
 table_obj = db_obj.get_table("function_example")
 table_obj.insert(
-    [{"c1": 1, "c2": 2}, {"c1": 3, "c2": 4}, {"c1": 5, "c2": 6}, {"c1": 7, "c2": 8},
+    [{"c1": 1, "c2": 2.4}, {"c1": 3, "c2": 4.5}, {"c1": 5, "c2": 6.6}, {"c1": 7, "c2": 8},
         {"c1": 9, "c2": 10}, {"c1": 11, "c2": 12}, {"c1": 13, "c2": 14}, {"c1": 15, "c2": 16},])
 
 #function sqrt
@@ -91,6 +91,18 @@ res = table_obj.output(["*", "sqrt(c1)", "sqrt(c2)"]).to_df()
 print(res)
 
 res = table_obj.output(["*", "sqrt(c1)", "sqrt(c2)"]).filter("sqrt(c1) = 3").to_df()
+print(res)
+
+#function round
+res = table_obj.output(["*", "round(c1)", "round(c2)"]).to_df()
+print(res)
+
+#function ceiling
+res = table_obj.output(["*", "ceil(c1)", "ceil(c2)"]).to_df()
+print(res)
+
+#function floor
+res = table_obj.output(["*", "floor(c1)", "floor(c2)"]).to_df()
 print(res)
 
 res = db_obj.drop_table("function_example")
