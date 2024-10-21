@@ -159,22 +159,28 @@ RUN yum install -y gdbm-devel sqlite-devel xz-devel libffi-devel libuuid-devel b
 
 # We need build a wheel for each supported Python minor version. Refers to https://github.com/wjakob/nanobind/pull/561.
 # Install Python 3.10
-RUN --mount=type=bind,source=Python-3.10.14.tar.xz,target=/root/Python-3.10.14.tar.xz  \
-    cd /root && tar xJf Python-3.10.14.tar.xz \
-    && cd Python-3.10.14 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
-    && ldconfig && cd /root && rm -rf Python-3.10.14
+RUN --mount=type=bind,source=Python-3.10.15.tar.xz,target=/root/Python-3.10.15.tar.xz  \
+    cd /root && tar xJf Python-3.10.15.tar.xz \
+    && cd Python-3.10.15 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
+    && ldconfig && cd /root && rm -rf Python-3.10.15
 
 # Install Python 3.11
-RUN --mount=type=bind,source=Python-3.11.9.tar.xz,target=/root/Python-3.11.9.tar.xz  \
-cd /root && tar xJf Python-3.11.9.tar.xz \
-&& cd Python-3.11.9 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
-&& ldconfig && cd /root && rm -rf Python-3.11.9
+RUN --mount=type=bind,source=Python-3.11.10.tar.xz,target=/root/Python-3.11.10.tar.xz  \
+cd /root && tar xJf Python-3.11.10.tar.xz \
+&& cd Python-3.11.10 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
+&& ldconfig && cd /root && rm -rf Python-3.11.10
 
 # Install Python 3.12
-RUN --mount=type=bind,source=Python-3.12.4.tar.xz,target=/root/Python-3.12.4.tar.xz  \
-cd /root && tar xJf Python-3.12.4.tar.xz \
-&& cd Python-3.12.4 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
-&& ldconfig && cd /root && rm -rf Python-3.12.4
+RUN --mount=type=bind,source=Python-3.12.7.tar.xz,target=/root/Python-3.12.7.tar.xz  \
+cd /root && tar xJf Python-3.12.7.tar.xz \
+&& cd Python-3.12.7 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
+&& ldconfig && cd /root && rm -rf Python-3.12.7
+
+# Install Python 3.13
+RUN --mount=type=bind,source=Python-3.13.0.tar.xz,target=/root/Python-3.13.0.tar.xz  \
+cd /root && tar xJf Python-3.13.0.tar.xz \
+&& cd Python-3.13.0 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
+&& ldconfig && cd /root && rm -rf Python-3.13.0
 
 RUN /usr/local/bin/pip3.10 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && /usr/local/bin/pip3.10 config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.pku.edu.cn" && /usr/local/bin/pip3.10 config set global.extra-index-url "https://mirrors.pku.edu.cn/pypi/web/simple"
 

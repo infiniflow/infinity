@@ -55,6 +55,8 @@ import default_values;
 import defer_op;
 import index_base;
 import base_table_ref;
+import cluster_manager;
+import peer_task;
 
 module wal_manager;
 
@@ -174,7 +176,7 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
 
     Vector<SharedPtr<WalEntry>> log_entries;
 
-    TxnTimeStamp max_commit_ts = 0; // the max commit ts that has be checkpointed
+    TxnTimeStamp max_commit_ts = 0; // the max commit ts that has been checkpointed
     String catalog_dir = "";
 
     {
@@ -194,9 +196,12 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
                 catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
-                break;
+                log_entries.push_back(wal_entry);
+                if(checkpoint_cmd->is_full_checkpoint_) {
+                    // Full checkpoint, OK
+                    break;
+                }
             }
-            log_entries.push_back(wal_entry);
         }
         LOG_INFO(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
 
@@ -214,6 +219,11 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
             LOG_TRACE(wal_entry->ToString());
 
             if (wal_entry->commit_ts_ >= max_commit_ts and wal_entry->commit_ts_ > start_timestamp) {
+                WalCmdCheckpoint *checkpoint_cmd = nullptr;
+                if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
+                    // Ignore other CKPs
+                    continue;
+                }
                 log_entries.push_back(wal_entry);
             } else {
                 break;
@@ -256,6 +266,7 @@ void WalManager::Flush() {
 
     Deque<WalEntry *> log_batch{};
     TxnManager *txn_mgr = storage_->txn_manager();
+    ClusterManager *cluster_manager = nullptr;
     while (running_.load()) {
         wait_flush_.DequeueBulk(log_batch);
         if (log_batch.empty()) {
@@ -284,10 +295,10 @@ void WalManager::Flush() {
             }
 
             i32 exp_size = entry->GetSizeInBytes();
-            Vector<char> buf(exp_size);
-            char *ptr = buf.data();
+            SharedPtr<String> buf = MakeShared<String>(exp_size, 0);
+            char *ptr = buf->data();
             entry->WriteAdv(ptr);
-            i32 act_size = ptr - buf.data();
+            i32 act_size = ptr - buf->data();
             if (exp_size != act_size) {
                 String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
                                                    exp_size,
@@ -295,7 +306,15 @@ void WalManager::Flush() {
                                                    entry->ToString());
                 UnrecoverableError(error_message);
             }
-            ofs_.write(buf.data(), ptr - buf.data());
+            ofs_.write(buf->data(), ptr - buf->data());
+
+            if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
+                if(cluster_manager == nullptr) {
+                    cluster_manager = InfinityContext::instance().cluster_manager();
+                }
+                cluster_manager->PrepareLogs(buf);
+            }
+
             LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id_, entry->commit_ts_));
 
             UpdateCommitState(entry->commit_ts_, wal_size_ + act_size);
@@ -318,6 +337,10 @@ void WalManager::Flush() {
                 ofs_.flush(); // FIXME: not flush, flush per second
                 break;
             }
+        }
+
+        if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
+            cluster_manager->SyncLogs();
         }
 
         for (const auto &entry : log_batch) {
@@ -901,6 +924,11 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             //                                              entry.commit_ts_);
             //     break;
             case WalCommandType::CHECKPOINT: {
+                if(storage_->GetStorageMode() == StorageMode::kReadable) {
+                    LOG_DEBUG("Load the checkpoint");
+                } else {
+                    UnrecoverableError("Checkpoint");
+                }
                 break;
             }
             case WalCommandType::COMPACT: {
