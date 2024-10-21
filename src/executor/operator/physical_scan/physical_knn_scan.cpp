@@ -425,8 +425,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 RecoverableError(std::move(error_status));
             }
             // check index type
-            if (auto index_type = table_index_entry->index_base()->index_type_;
-                index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
+            if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                 LOG_ERROR("Invalid index type");
                 Status error_status = Status::InvalidIndexType("invalid index");
                 RecoverableError(std::move(error_status));
@@ -820,7 +819,12 @@ struct BruteForceBlockScan<LogicalType::kEmbedding, ColumnDataType, QueryDataTyp
             }
             target_ptr = buffer_ptr_for_cast.get();
         }
-        merge_heap->Search(knn_query_ptr, target_ptr, embedding_dim, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
+        auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
+        if (embedding_info->Type() == EmbeddingDataType::kElemBit) {
+            merge_heap->Search(knn_query_ptr, target_ptr, embedding_dim / 8, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
+        } else {
+            merge_heap->Search(knn_query_ptr, target_ptr, embedding_dim, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
+        }
     }
 };
 
@@ -890,6 +894,5 @@ void MultiVectorSearchOneLine(MergeKnn<QueryDataType, C, DistanceDataType> *merg
     const RowID db_row_id(segment_id, segment_offset);
     merge_heap->Search(0, &result_dist, &db_row_id, 1);
 }
-
 
 } // namespace infinity

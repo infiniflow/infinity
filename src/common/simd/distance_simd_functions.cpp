@@ -77,12 +77,11 @@ f32 CosineDistance_common(const f32 *x, const f32 *y, SizeT d) {
 }
 
 f32 HammingDistance_common(const u8 *x, const u8 *y, SizeT d) {
-    SizeT real_d = d / 8;
     f32 result = 0;
-    for (SizeT i = 0; i < real_d; ++i) {
+    for (SizeT i = 0; i < d; ++i) {
         u8 xor_result = x[i] ^ y[i];
         while (xor_result) {
-            result += (xor_result | 1);
+            result += (xor_result & 1);
             xor_result >>= 1;
         }
     }
