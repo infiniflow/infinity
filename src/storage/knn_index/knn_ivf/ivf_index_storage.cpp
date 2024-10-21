@@ -37,33 +37,6 @@ import ivf_index_util_func;
 
 namespace infinity {
 
-inline auto ApplyEmbeddingDataTypeToFunc(const EmbeddingDataType embedding_data_type, auto func, auto default_f) {
-    switch (embedding_data_type) {
-        case EmbeddingDataType::kElemUInt8: {
-            return func.template operator()<EmbeddingDataType::kElemUInt8>();
-        }
-        case EmbeddingDataType::kElemInt8: {
-            return func.template operator()<EmbeddingDataType::kElemInt8>();
-        }
-        case EmbeddingDataType::kElemDouble: {
-            return func.template operator()<EmbeddingDataType::kElemDouble>();
-        }
-        case EmbeddingDataType::kElemFloat: {
-            return func.template operator()<EmbeddingDataType::kElemFloat>();
-        }
-        case EmbeddingDataType::kElemFloat16: {
-            return func.template operator()<EmbeddingDataType::kElemFloat16>();
-        }
-        case EmbeddingDataType::kElemBFloat16: {
-            return func.template operator()<EmbeddingDataType::kElemBFloat16>();
-        }
-        default: {
-            UnrecoverableError("Unsupported embedding data type");
-            return default_f();
-        }
-    }
-}
-
 // IVF_Centroids_Storage
 
 IVF_Centroids_Storage::IVF_Centroids_Storage(const u32 embedding_dimension, const u32 centroids_num, Vector<f32> &&centroids_data)
@@ -86,230 +59,23 @@ void IVF_Centroids_Storage::Load(LocalFileHandle &file_handle) {
     file_handle.Read(centroids_data_.data(), vec_size * sizeof(f32));
 }
 
-// IVF_Part_Storage
-
-void IVF_Part_Storage::Save(LocalFileHandle &file_handle) const {
-    file_handle.Append(&part_id_, sizeof(part_id_));
-    file_handle.Append(&embedding_dimension_, sizeof(embedding_dimension_));
-    file_handle.Append(&embedding_num_, sizeof(embedding_num_));
-    static_assert(std::is_same_v<SegmentOffset, typename decltype(embedding_segment_offsets_)::value_type>);
-    assert(embedding_num_ == embedding_segment_offsets_.size());
-    file_handle.Append(embedding_segment_offsets_.data(), embedding_num_ * sizeof(SegmentOffset));
-}
-
-void IVF_Part_Storage::Load(LocalFileHandle &file_handle) {
-    file_handle.Read(&part_id_, sizeof(part_id_));
-    file_handle.Read(&embedding_dimension_, sizeof(embedding_dimension_));
-    file_handle.Read(&embedding_num_, sizeof(embedding_num_));
-    embedding_segment_offsets_.resize(embedding_num_);
-    file_handle.Read(embedding_segment_offsets_.data(), embedding_num_ * sizeof(SegmentOffset));
-}
-
-template <EmbeddingDataType plain_data_type, EmbeddingDataType src_embedding_data_type>
-class IVF_Part_Storage_Plain final : public IVF_Part_Storage {
-    using StorageDataT = EmbeddingDataTypeToCppTypeT<plain_data_type>;
-    static_assert(IsAnyOf<StorageDataT, i8, u8, f32, Float16T, BFloat16T>);
-    using ColumnEmbeddingElementT = EmbeddingDataTypeToCppTypeT<src_embedding_data_type>;
-    static_assert(IsAnyOf<ColumnEmbeddingElementT, i8, u8, f64, f32, Float16T, BFloat16T>);
-    static_assert(std::is_same_v<StorageDataT, ColumnEmbeddingElementT> ||
-                  (!IsAnyOf<StorageDataT, i8, u8> && !IsAnyOf<ColumnEmbeddingElementT, i8, u8>));
-
-    Vector<StorageDataT> data_{};
-
-public:
-    IVF_Part_Storage_Plain(const u32 part_id, const u32 embedding_dimension) : IVF_Part_Storage(part_id, embedding_dimension) {}
-
-    void Save(LocalFileHandle &file_handle) const override {
-        IVF_Part_Storage::Save(file_handle);
-        const u32 element_cnt = embedding_num() * embedding_dimension();
-        assert(element_cnt == data_.size());
-        file_handle.Append(data_.data(), element_cnt * sizeof(StorageDataT));
-    }
-    void Load(LocalFileHandle &file_handle) override {
-        IVF_Part_Storage::Load(file_handle);
-        const u32 element_cnt = embedding_num() * embedding_dimension();
-        data_.resize(element_cnt);
-        file_handle.Read(data_.data(), element_cnt * sizeof(StorageDataT));
-    }
-
-    void AppendOneEmbedding(const void *embedding_ptr, const SegmentOffset segment_offset, const IVF_Centroids_Storage *) override {
-        const auto *src_embedding_data = static_cast<const ColumnEmbeddingElementT *>(embedding_ptr);
-        if constexpr (std::is_same_v<StorageDataT, ColumnEmbeddingElementT>) {
-            data_.insert(data_.end(), src_embedding_data, src_embedding_data + embedding_dimension());
-        } else {
-            static_assert(IsAnyOf<StorageDataT, f32, Float16T, BFloat16T> && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>);
-            data_.reserve(data_.size() + embedding_dimension());
-            for (u32 i = 0; i < embedding_dimension(); ++i) {
-                if constexpr (std::is_same_v<f64, ColumnEmbeddingElementT>) {
-                    data_.push_back(static_cast<StorageDataT>(static_cast<f32>(src_embedding_data[i])));
-                } else {
-                    data_.push_back(static_cast<StorageDataT>(src_embedding_data[i]));
-                }
-            }
-        }
-        embedding_segment_offsets_.push_back(segment_offset);
-        ++embedding_num_;
-    }
-
-    void SearchIndex(const KnnDistanceBase1 *knn_distance,
-                     const void *query_ptr,
-                     const EmbeddingDataType query_element_type,
-                     const std::function<bool(SegmentOffset)> &satisfy_filter_func,
-                     const std::function<void(f32, SegmentOffset)> &add_result_func) const override {
-        auto ReturnT = [&]<EmbeddingDataType query_element_type> {
-            if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
-                          (query_element_type == src_embedding_data_type &&
-                           (query_element_type == EmbeddingDataType::kElemInt8 || query_element_type == EmbeddingDataType::kElemUInt8))) {
-                return SearchIndexT<query_element_type>(knn_distance,
-                                                        static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr),
-                                                        satisfy_filter_func,
-                                                        add_result_func);
-
-            } else {
-                UnrecoverableError("Invalid Query EmbeddingDataType");
-            }
-        };
-        switch (query_element_type) {
-            case EmbeddingDataType::kElemFloat: {
-                return ReturnT.template operator()<EmbeddingDataType::kElemFloat>();
-            }
-            case EmbeddingDataType::kElemUInt8: {
-                return ReturnT.template operator()<EmbeddingDataType::kElemUInt8>();
-            }
-            case EmbeddingDataType::kElemInt8: {
-                return ReturnT.template operator()<EmbeddingDataType::kElemInt8>();
-            }
-            default: {
-                UnrecoverableError("Invalid EmbeddingDataType");
-            }
-        }
-    }
-
-    template <EmbeddingDataType query_element_type>
-    void SearchIndexT(const KnnDistanceBase1 *knn_distance,
-                      const EmbeddingDataTypeToCppTypeT<query_element_type> *query_ptr,
-                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
-                      const std::function<void(f32, SegmentOffset)> &add_result_func) const {
-        using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
-        auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
-        if (!knn_distance_1) [[unlikely]] {
-            UnrecoverableError("Invalid KnnDistance1");
-        }
-        auto dist_func = knn_distance_1->dist_func_;
-        const auto total_embedding_num = embedding_num();
-        for (u32 i = 0; i < total_embedding_num; ++i) {
-            const auto segment_offset = embedding_segment_offset(i);
-            if (!satisfy_filter_func(segment_offset)) {
-                continue;
-            }
-            auto v_ptr = data_.data() + i * embedding_dimension();
-            auto [calc_ptr, _] = GetSearchCalcPtr<QueryDataType>(v_ptr, embedding_dimension());
-            auto d = dist_func(calc_ptr, query_ptr, embedding_dimension());
-            add_result_func(d, segment_offset);
-        }
-    }
-
-    // only for unit-test, return f32 / i8 / u8 embedding data
-    Pair<const void *, SharedPtr<void>> GetDataForTest(const u32 embedding_id) const override {
-        if constexpr (IsAnyOf<StorageDataT, i8, u8, f32>) {
-            return {data_.data() + embedding_id * embedding_dimension(), nullptr};
-        } else if constexpr (IsAnyOf<StorageDataT, Float16T, BFloat16T>) {
-            auto tmp_data = MakeUniqueForOverwrite<f32[]>(embedding_dimension());
-            const auto *start_ptr = data_.data() + embedding_id * embedding_dimension();
-            for (u32 i = 0; i < embedding_dimension(); ++i) {
-                tmp_data[i] = static_cast<f32>(start_ptr[i]);
-            }
-            Pair<const void *, SharedPtr<void>> result(tmp_data.get(),
-                                                       SharedPtr<void>(tmp_data.get(), [](void *ptr) { delete[] static_cast<f32 *>(ptr); }));
-            tmp_data.release();
-            return result;
-        } else {
-            static_assert(false, "unexpected type");
-            return {};
-        }
-    }
-};
-
-UniquePtr<IVF_Part_Storage>
-IVF_Part_Storage::Make(u32 part_id, u32 embedding_dimension, EmbeddingDataType embedding_data_type, const IndexIVFStorageOption &ivf_storage_option) {
-    switch (ivf_storage_option.type_) {
-        case IndexIVFStorageOption::Type::kPlain: {
-            auto GetPlainResult =
-                [part_id, embedding_dimension, embedding_data_type]<EmbeddingDataType plain_data_type>() -> UniquePtr<IVF_Part_Storage> {
-                return ApplyEmbeddingDataTypeToFunc(
-                    embedding_data_type,
-                    [part_id, embedding_dimension]<EmbeddingDataType src_embedding_data_type>() -> UniquePtr<IVF_Part_Storage> {
-                        auto not_i8_u8 = [](EmbeddingDataType t) consteval {
-                            return t != EmbeddingDataType::kElemInt8 && t != EmbeddingDataType::kElemUInt8;
-                        };
-                        if constexpr (plain_data_type == src_embedding_data_type ||
-                                      (not_i8_u8(plain_data_type) && not_i8_u8(src_embedding_data_type))) {
-                            return MakeUnique<IVF_Part_Storage_Plain<plain_data_type, src_embedding_data_type>>(part_id, embedding_dimension);
-                        } else {
-                            return nullptr;
-                        }
-                    },
-                    [] { return UniquePtr<IVF_Part_Storage>(); });
-            };
-            switch (ivf_storage_option.plain_storage_data_type_) {
-                case EmbeddingDataType::kElemInt8: {
-                    return GetPlainResult.template operator()<EmbeddingDataType::kElemInt8>();
-                }
-                case EmbeddingDataType::kElemUInt8: {
-                    return GetPlainResult.template operator()<EmbeddingDataType::kElemUInt8>();
-                }
-                case EmbeddingDataType::kElemFloat: {
-                    return GetPlainResult.template operator()<EmbeddingDataType::kElemFloat>();
-                }
-                case EmbeddingDataType::kElemFloat16: {
-                    return GetPlainResult.template operator()<EmbeddingDataType::kElemFloat16>();
-                }
-                case EmbeddingDataType::kElemBFloat16: {
-                    return GetPlainResult.template operator()<EmbeddingDataType::kElemBFloat16>();
-                }
-                case EmbeddingDataType::kElemDouble:
-                case EmbeddingDataType::kElemBit:
-                case EmbeddingDataType::kElemInt16:
-                case EmbeddingDataType::kElemInt32:
-                case EmbeddingDataType::kElemInt64:
-                case EmbeddingDataType::kElemInvalid: {
-                    UnrecoverableError("Invalid IVF plain_data_type");
-                    return {};
-                }
-            }
-        }
-        case IndexIVFStorageOption::Type::kScalarQuantization: {
-            UnrecoverableError("Not implemented");
-            return {};
-        }
-        case IndexIVFStorageOption::Type::kProductQuantization: {
-            UnrecoverableError("Not implemented");
-            return {};
-        }
-    }
-}
-
 // IVF_Index_Storage
 
 void IVF_Index_Storage::Save(LocalFileHandle &file_handle) const {
     file_handle.Append(&row_count_, sizeof(row_count_));
     file_handle.Append(&embedding_count_, sizeof(embedding_count_));
     ivf_centroids_storage_.Save(file_handle);
-    assert(ivf_centroids_storage_.centroids_num() == ivf_part_storages_.size());
-    for (u32 part_id = 0; part_id < ivf_centroids_storage_.centroids_num(); ++part_id) {
-        ivf_part_storages_[part_id]->Save(file_handle);
-    }
+    assert(ivf_centroids_storage_.centroids_num() == ivf_parts_storage_->centroids_num());
+    ivf_parts_storage_->Save(file_handle);
 }
 
 void IVF_Index_Storage::Load(LocalFileHandle &file_handle) {
     file_handle.Read(&row_count_, sizeof(row_count_));
     file_handle.Read(&embedding_count_, sizeof(embedding_count_));
     ivf_centroids_storage_.Load(file_handle);
-    ivf_part_storages_.resize(ivf_centroids_storage_.centroids_num());
-    for (u32 part_id = 0; part_id < ivf_centroids_storage_.centroids_num(); ++part_id) {
-        ivf_part_storages_[part_id] = IVF_Part_Storage::Make(part_id, embedding_dimension_, embedding_data_type_, ivf_option_.storage_option_);
-        ivf_part_storages_[part_id]->Load(file_handle);
-    }
+    ivf_parts_storage_ =
+        IVF_Parts_Storage::Make(embedding_dimension_, ivf_centroids_storage_.centroids_num(), embedding_data_type_, ivf_option_.storage_option_);
+    ivf_parts_storage_->Load(file_handle);
 }
 
 void IVF_Index_Storage::GetMemData(IVF_Index_Storage &&mem_data) {
@@ -320,7 +86,7 @@ void IVF_Index_Storage::GetMemData(IVF_Index_Storage &&mem_data) {
     row_count_ = mem_data.row_count_;
     embedding_count_ = mem_data.embedding_count_;
     ivf_centroids_storage_ = std::move(mem_data.ivf_centroids_storage_);
-    ivf_part_storages_ = std::move(mem_data.ivf_part_storages_);
+    ivf_parts_storage_ = std::move(mem_data.ivf_parts_storage_);
 }
 
 IVF_Index_Storage::IVF_Index_Storage(const IndexIVFOption &ivf_option,
@@ -347,10 +113,9 @@ void IVF_Index_Storage::Train(const u32 training_embedding_num, const f32 *train
     ivf_centroids_storage_ = IVF_Centroids_Storage(embedding_dimension_, partition_num, std::move(output_centroids));
     assert(ivf_centroids_storage_.centroids_num() == partition_num);
     assert(ivf_centroids_storage_.embedding_dimension() == embedding_dimension_);
-    ivf_part_storages_.resize(partition_num);
-    for (u32 part_id = 0; part_id < partition_num; ++part_id) {
-        ivf_part_storages_[part_id] = IVF_Part_Storage::Make(part_id, embedding_dimension_, embedding_data_type_, ivf_option_.storage_option_);
-    }
+    ivf_parts_storage_ =
+        IVF_Parts_Storage::Make(embedding_dimension_, ivf_centroids_storage_.centroids_num(), embedding_data_type_, ivf_option_.storage_option_);
+    ivf_parts_storage_->Train(training_embedding_num, training_data, &ivf_centroids_storage_);
 }
 
 void IVF_Index_Storage::AddEmbedding(const SegmentOffset segment_offset, const void *embedding_ptr) {
@@ -419,7 +184,7 @@ void IVF_Index_Storage::AddEmbeddingBatchT(const SegmentOffset start_segment_off
                                            const u32 embedding_num) {
     assert(embedding_data_type == embedding_data_type_);
     assert(ivf_centroids_storage_.embedding_dimension() == embedding_dimension_);
-    assert(ivf_centroids_storage_.centroids_num() == ivf_part_storages_.size());
+    assert(ivf_centroids_storage_.centroids_num() == ivf_parts_storage_->centroids_num());
     const auto [embedding_f32_ptr, _] = GetF32Ptr(embedding_ptr, embedding_num * embedding_dimension_);
     auto part_ids = Vector<u32>(embedding_num, std::numeric_limits<u32>::max());
     search_top_1_without_dis<f32>(embedding_dimension_,
@@ -429,9 +194,10 @@ void IVF_Index_Storage::AddEmbeddingBatchT(const SegmentOffset start_segment_off
                                   ivf_centroids_storage_.data(),
                                   part_ids.data());
     for (u32 i = 0; i < embedding_num; ++i) {
-        ivf_part_storages_[part_ids[i]]->AppendOneEmbedding(embedding_ptr + i * embedding_dimension_,
-                                                            start_segment_offset + i,
-                                                            &ivf_centroids_storage_);
+        ivf_parts_storage_->AppendOneEmbedding(part_ids[i],
+                                               embedding_ptr + i * embedding_dimension_,
+                                               start_segment_offset + i,
+                                               &ivf_centroids_storage_);
     }
     embedding_count_ += embedding_num;
     row_count_ += embedding_num;
@@ -443,7 +209,7 @@ void IVF_Index_Storage::AddEmbeddingBatchT(const SegmentOffset *segment_offset_p
                                            const u32 embedding_num) {
     assert(embedding_data_type == embedding_data_type_);
     assert(ivf_centroids_storage_.embedding_dimension() == embedding_dimension_);
-    assert(ivf_centroids_storage_.centroids_num() == ivf_part_storages_.size());
+    assert(ivf_centroids_storage_.centroids_num() == ivf_parts_storage_->centroids_num());
     const auto [embedding_f32_ptr, _] = GetF32Ptr(embedding_ptr, embedding_num * embedding_dimension_);
     auto part_ids = Vector<u32>(embedding_num, std::numeric_limits<u32>::max());
     search_top_1_without_dis<f32>(embedding_dimension_,
@@ -453,7 +219,7 @@ void IVF_Index_Storage::AddEmbeddingBatchT(const SegmentOffset *segment_offset_p
                                   ivf_centroids_storage_.data(),
                                   part_ids.data());
     for (u32 i = 0; i < embedding_num; ++i) {
-        ivf_part_storages_[part_ids[i]]->AppendOneEmbedding(embedding_ptr + i * embedding_dimension_, segment_offset_ptr[i], &ivf_centroids_storage_);
+        ivf_parts_storage_->AppendOneEmbedding(part_ids[i], embedding_ptr + i * embedding_dimension_, segment_offset_ptr[i], &ivf_centroids_storage_);
     }
     embedding_count_ += embedding_num;
     row_count_ += embedding_num;
@@ -465,7 +231,7 @@ void IVF_Index_Storage::AddMultiVectorT(const SegmentOffset segment_offset,
                                         const u32 embedding_num) {
     assert(embedding_data_type == embedding_data_type_);
     assert(ivf_centroids_storage_.embedding_dimension() == embedding_dimension_);
-    assert(ivf_centroids_storage_.centroids_num() == ivf_part_storages_.size());
+    assert(ivf_centroids_storage_.centroids_num() == ivf_parts_storage_->centroids_num());
     const auto [embedding_f32_ptr, _] = GetF32Ptr(multi_vector_ptr, embedding_num * embedding_dimension_);
     auto part_ids = Vector<u32>(embedding_num, std::numeric_limits<u32>::max());
     search_top_1_without_dis<f32>(embedding_dimension_,
@@ -475,7 +241,7 @@ void IVF_Index_Storage::AddMultiVectorT(const SegmentOffset segment_offset,
                                   ivf_centroids_storage_.data(),
                                   part_ids.data());
     for (u32 i = 0; i < embedding_num; ++i) {
-        ivf_part_storages_[part_ids[i]]->AppendOneEmbedding(multi_vector_ptr + i * embedding_dimension_, segment_offset, &ivf_centroids_storage_);
+        ivf_parts_storage_->AppendOneEmbedding(part_ids[i], multi_vector_ptr + i * embedding_dimension_, segment_offset, &ivf_centroids_storage_);
     }
     embedding_count_ += embedding_num;
     ++row_count_;
@@ -505,7 +271,7 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
         search_top_k_with_dis(nprobe, dimension, 1, query_f32_ptr, centroids_num, centroids_data, nprobe_result.data(), centroid_dists.get(), false);
     }
     for (const auto part_id : nprobe_result) {
-        ivf_part_storages_[part_id]->SearchIndex(knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func);
+        ivf_parts_storage_->SearchIndex(part_id, knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func);
     }
 }
 

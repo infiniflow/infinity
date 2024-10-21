@@ -44,12 +44,12 @@ statement ok
 INSERT INTO test_varchar_filter VALUES ('abc', 'abcd', 5);
 
 query VI
-SELECT * FROM test_varchar_filter where char_length(c1) = 8;
+SELECT *, char_length(c1) FROM test_varchar_filter where char_length(c1) = 8;
 ----
-abcddddd abcddddd 1
-abcddddc abcddddd 2
-abcdddde abcddddd 3
-abcdddde abcdddde 4
+abcddddd abcddddd 1 8
+abcddddc abcddddd 2 8
+abcdddde abcddddd 3 8
+abcdddde abcdddde 4 8
 
 query VII
 SELECT * FROM test_varchar_filter where char_length(c1) = 3;
@@ -72,10 +72,10 @@ statement ok
 INSERT INTO test_varchar_filter VALUES ('regex@regex.com', 'gmail@gmail.com', 6);
 
 query X
-SELECT * FROM test_varchar_filter where regex(c1, 'abc\w+e');
+SELECT *, regex(c1, 'abc\w+e') FROM test_varchar_filter where regex(c1, 'abc\w+e');
 ----
-abcdddde abcddddd 3
-abcdddde abcdddde 4
+abcdddde abcddddd 3 true
+abcdddde abcdddde 4 true
 
 query XI
 SELECT * FROM test_varchar_filter where regex(c1, 'ddddc');
@@ -88,12 +88,12 @@ SELECT * FROM test_varchar_filter where regex(c1, '(\w+([-+.]\w+)*)@(\w+([-.]\w+
 regex@regex.com gmail@gmail.com 6
 
 query XIII
-SELECT * FROM test_varchar_filter where substring(c1, 0, 4) = 'abcd';
+SELECT *, substring(c1, 0, 4) FROM test_varchar_filter where substring(c1, 0, 4) = 'abcd';
 ----
-abcddddd abcddddd 1
-abcddddc abcddddd 2
-abcdddde abcddddd 3
-abcdddde abcdddde 4
+abcddddd abcddddd 1 abcd
+abcddddc abcddddd 2 abcd
+abcdddde abcddddd 3 abcd
+abcdddde abcdddde 4 abcd
 
 query XIV
 SELECT * FROM test_varchar_filter where substring(c1, 0, 0) = '';
@@ -106,14 +106,42 @@ abc abcd 5
 regex@regex.com gmail@gmail.com 6
 
 query XV
-SELECT * FROM test_varchar_filter where upper(c1) = 'ABCDDDDD';
+SELECT *, upper(c1) FROM test_varchar_filter where upper(c1) = 'ABCDDDDD';
 ----
-abcddddd abcddddd 1
+abcddddd abcddddd 1 ABCDDDDD
 
 query XVI
-SELECT * FROM test_varchar_filter where lower('ABCDDDDD') = c1;
+SELECT *, lower(c1) FROM test_varchar_filter where lower('ABCDDDDD') = c1;
 ----
-abcddddd abcddddd 1
+abcddddd abcddddd 1 abcddddd
+
+statement ok
+INSERT INTO test_varchar_filter VALUES (' a b c', 'abc', 7), ('a b c ', 'abc', 8), (' a b c ', 'abc', 9);
+
+query XVII
+SELECT *, ltrim(c1) FROM test_varchar_filter where ltrim(c1) = 'a b c';
+----
+ a b c abc 7 a b c
+
+query XVIII
+SELECT *, rtrim(c1) FROM test_varchar_filter where rtrim(c1) = 'a b c';
+----
+a b c  abc 8 a b c
+
+query XIX
+SELECT *, trim(c1) FROM test_varchar_filter where trim(c1) = 'a b c';
+----
+ a b c abc 7 a b c
+a b c  abc 8 a b c
+ a b c  abc 9 a b c
+
+query XX
+SELECT *, char_position(c1, 'abcd') FROM test_varchar_filter where char_position(c1, 'abcd')  = 1;
+----
+abcddddd abcddddd 1 1
+abcddddc abcddddd 2 1
+abcdddde abcddddd 3 1 
+abcdddde abcdddde 4 1
 
 statement ok
 DROP TABLE test_varchar_filter;
