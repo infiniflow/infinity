@@ -54,6 +54,8 @@ public:
 
     bool Eq(const CachedNodeBase &other) const override;
 
+    const BaseExpression *query_expression() const { return query_expression_.get(); }
+
 private:
     SharedPtr<BaseExpression> query_expression_{};
     SharedPtr<BaseExpression> filter_expression_{};

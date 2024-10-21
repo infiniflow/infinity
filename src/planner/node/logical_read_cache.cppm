@@ -34,7 +34,8 @@ public:
                      LogicalNodeType origin_type,
                      SharedPtr<BaseTableRef> base_table_ref,
                      SharedPtr<CacheContent> cache_content,
-                     Vector<SizeT> column_map);
+                     Vector<SizeT> column_map,
+                     bool is_min_heap);
 
 public:
     virtual Vector<ColumnBinding> GetColumnBindings() const;
@@ -52,6 +53,7 @@ public:
     SharedPtr<BaseTableRef> base_table_ref_;
     SharedPtr<CacheContent> cache_content_;
     Vector<SizeT> column_map_; // result column id -> cache column id
+    bool is_min_heap_;
 };
 
 } // namespace infinity

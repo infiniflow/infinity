@@ -30,6 +30,7 @@ bool ValueExpression::Eq(const BaseExpression &other_base) const {
         return false;
     }
     const auto &other = static_cast<const ValueExpression &>(other_base);
-    return value_ == other.value_; }
+    return value_ == other.value_;
+}
 
 } // namespace infinity

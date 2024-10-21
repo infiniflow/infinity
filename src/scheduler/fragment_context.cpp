@@ -1446,6 +1446,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
                 result_table->UpdateRowCount(data_block->row_count());
                 result_table->data_blocks_.emplace_back(std::move(data_block));
             }
+            materialize_sink_state->data_block_array_.clear();
             //            result_table->data_blocks_ = std::move(materialize_sink_state->data_block_array_);
             return result_table;
         }
@@ -1528,6 +1529,7 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
         for (auto &result_data_block : materialize_sink_state->data_block_array_) {
             result_table->Append(std::move(result_data_block));
         }
+        materialize_sink_state->data_block_array_.clear();
     }
 
     return result_table;
@@ -1577,6 +1579,7 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
         for (auto &result_data_block : materialize_sink_state->data_block_array_) {
             result_table->Append(std::move(result_data_block));
         }
+        materialize_sink_state->data_block_array_.clear();
     }
 
     return result_table;
