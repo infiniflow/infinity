@@ -61,7 +61,7 @@ public:
                 auto left_ptr = ColumnValueReader<LeftType>(left);
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
-                Operator::template Execute(left_ptr[0], right_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr);
+                Operator::template Execute(left_ptr[0], right_ptr[0], result_ptr[0], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 result_null->SetAllTrue();
             } else {
                 result_null->SetAllFalse();
@@ -74,7 +74,7 @@ public:
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    Operator::template Execute(left_ptr[i], right_ptr[i], result_ptr[i], result_null.get(), 0, state_ptr);
+                    Operator::template Execute(left_ptr[i], right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr,state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left, right, result, count, state_ptr);
@@ -89,7 +89,7 @@ public:
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    Operator::template Execute(left_c, right_ptr[i], result_ptr[i], result_null.get(), 0, state_ptr);
+                    Operator::template Execute(left_c, right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr,state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left_c, right, result, count, state_ptr);
@@ -104,7 +104,7 @@ public:
                 auto left_ptr = ColumnValueReader<LeftType>(left);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    Operator::template Execute(left_ptr[i], right_c, result_ptr[i], result_null.get(), 0, state_ptr);
+                    Operator::template Execute(left_ptr[i], right_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr,state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left, right_c, result, count, state_ptr);
@@ -131,7 +131,7 @@ private:
             if (row_index >= count) {
                 return false;
             }
-            Operator::template Execute(left_ptr[row_index], right_ptr[row_index], result_ptr[row_index], result_null.get(), row_index, state_ptr);
+            Operator::template Execute(left_ptr[row_index], right_ptr[row_index], result_ptr[row_index], result_null.get(), row_index, nullptr, nullptr, state_ptr);
             return row_index + 1 < count;
         });
     }
@@ -150,7 +150,7 @@ private:
             if (row_index >= count) {
                 return false;
             }
-            Operator::template Execute(left_constant, right_ptr[row_index], result_ptr[row_index], result_null.get(), row_index, state_ptr);
+            Operator::template Execute(left_constant, right_ptr[row_index], result_ptr[row_index], result_null.get(), row_index, nullptr, nullptr, state_ptr);
             return row_index + 1 < count;
         });
     }
@@ -169,7 +169,7 @@ private:
             if (row_index >= count) {
                 return false;
             }
-            Operator::template Execute(left_ptr[row_index], right_constant, result_ptr[row_index], result_null.get(), row_index, state_ptr);
+            Operator::template Execute(left_ptr[row_index], right_constant, result_ptr[row_index], result_null.get(), row_index, nullptr, nullptr, state_ptr);
             return row_index + 1 < count;
         });
     }
@@ -198,7 +198,7 @@ public:
                                            right->buffer_->GetCompactBit(0),
                                            answer,
                                            result_null.get(),
-                                           0,
+                                           0, nullptr, nullptr,
                                            state_ptr);
                 result->buffer_->SetCompactBit(0, answer);
                 result_null->SetAllTrue();
@@ -215,12 +215,12 @@ public:
                 auto right_u8 = reinterpret_cast<const u8 *>(right->data());
                 auto result_u8 = reinterpret_cast<u8 *>(result->data());
                 for (SizeT i = 0; i < count_bytes; ++i) {
-                    Operator::template Execute(left_u8[i], right_u8[i], result_u8[i], result_null.get(), 0, state_ptr);
+                    Operator::template Execute(left_u8[i], right_u8[i], result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
                 if (count_tail > 0) {
                     u8 &tail_u8 = result_u8[count_bytes];
                     u8 ans;
-                    Operator::template Execute(left_u8[count_bytes], right_u8[count_bytes], ans, result_null.get(), 0, state_ptr);
+                    Operator::template Execute(left_u8[count_bytes], right_u8[count_bytes], ans, result_null.get(), 0, nullptr, nullptr, state_ptr);
                     u8 keep_mask = u8(0xff) << count_tail;
                     tail_u8 = (tail_u8 & keep_mask) | (ans & ~keep_mask);
                 }
@@ -240,12 +240,12 @@ public:
                 auto right_u8 = reinterpret_cast<const u8 *>(right->data());
                 auto result_u8 = reinterpret_cast<u8 *>(result->data());
                 for (SizeT i = 0; i < count_bytes; ++i) {
-                    Operator::template Execute(left_u8, right_u8[i], result_u8[i], result_null.get(), 0, state_ptr);
+                    Operator::template Execute(left_u8, right_u8[i], result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
                 if (count_tail > 0) {
                     u8 &tail_u8 = result_u8[count_bytes];
                     u8 ans;
-                    Operator::template Execute(left_u8, right_u8[count_bytes], ans, result_null.get(), 0, state_ptr);
+                    Operator::template Execute(left_u8, right_u8[count_bytes], ans, result_null.get(), 0, nullptr, nullptr, state_ptr);
                     u8 keep_mask = u8(0xff) << count_tail;
                     tail_u8 = (tail_u8 & keep_mask) | (ans & ~keep_mask);
                 }
@@ -265,12 +265,12 @@ public:
                 auto left_u8 = reinterpret_cast<const u8 *>(left->data());
                 auto result_u8 = reinterpret_cast<u8 *>(result->data());
                 for (SizeT i = 0; i < count_bytes; ++i) {
-                    Operator::template Execute(left_u8[i], right_u8, result_u8[i], result_null.get(), 0, state_ptr);
+                    Operator::template Execute(left_u8[i], right_u8, result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
                 if (count_tail > 0) {
                     u8 &tail_u8 = result_u8[count_bytes];
                     u8 ans;
-                    Operator::template Execute(left_u8[count_bytes], right_u8, ans, result_null.get(), 0, state_ptr);
+                    Operator::template Execute(left_u8[count_bytes], right_u8, ans, result_null.get(), 0, nullptr, nullptr, state_ptr);
                     u8 keep_mask = u8(0xff) << count_tail;
                     tail_u8 = (tail_u8 & keep_mask) | (ans & ~keep_mask);
                 }
@@ -304,7 +304,7 @@ private:
                                        right->buffer_->GetCompactBit(row_index),
                                        answer,
                                        result_null.get(),
-                                       row_index,
+                                       row_index, nullptr, nullptr,
                                        state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
@@ -325,7 +325,7 @@ private:
                 return false;
             }
             BooleanT answer;
-            Operator::template Execute(left->buffer_->GetCompactBit(row_index), right_boolean, answer, result_null.get(), row_index, state_ptr);
+            Operator::template Execute(left->buffer_->GetCompactBit(row_index), right_boolean, answer, result_null.get(), row_index, nullptr, nullptr, state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
         });
@@ -345,7 +345,7 @@ private:
                 return false;
             }
             BooleanT answer;
-            Operator::template Execute(left_boolean, right->buffer_->GetCompactBit(row_index), answer, result_null.get(), row_index, state_ptr);
+            Operator::template Execute(left_boolean, right->buffer_->GetCompactBit(row_index), answer, result_null.get(), row_index, nullptr, nullptr, state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
         });
@@ -361,6 +361,8 @@ public:
                                const SharedPtr<ColumnVector> &right,
                                SharedPtr<ColumnVector> &result,
                                SizeT count,
+                               void *state_ptr_left,
+                               void *state_ptr_right,
                                void *state_ptr,
                                bool nullable) {
         String error_message = "MixedType needs to be specialized.";
@@ -373,6 +375,8 @@ public:
                                const SharedPtr<ColumnVector> &right,
                                SharedPtr<ColumnVector> &result,
                                SizeT count,
+                               void *state_ptr_left,
+                               void *state_ptr_right,
                                void *state_ptr,
                                bool nullable) {
         return BooleanResultBinaryOperator<LeftType, RightType, Operator>::Execute(left, right, result, count, state_ptr, nullable);
@@ -384,6 +388,8 @@ public:
                                const SharedPtr<ColumnVector> &right,
                                SharedPtr<ColumnVector> &result,
                                SizeT count,
+                               void *state_ptr_left,
+                               void *state_ptr_right,
                                void *state_ptr,
                                bool nullable) {
         switch (left->vector_type()) {
@@ -396,13 +402,13 @@ public:
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kFlat: {
-                return ExecuteFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kConstant: {
-                return ExecuteConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kHeterogeneous: {
-                return ExecuteHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
         }
     }
@@ -414,6 +420,8 @@ private:
                                    const SharedPtr<ColumnVector> &right,
                                    SharedPtr<ColumnVector> &result,
                                    SizeT count,
+                                   void *state_ptr_left,
+                                   void *state_ptr_right,
                                    void *state_ptr,
                                    bool nullable) {
 
@@ -423,13 +431,13 @@ private:
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kFlat: {
-                return ExecuteFlatFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteFlatFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kConstant: {
-                return ExecuteFlatConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteFlatConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kHeterogeneous: {
-                return ExecuteFlatHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteFlatHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "CompactBit isn't implemented.";
@@ -443,6 +451,8 @@ private:
                                        const SharedPtr<ColumnVector> &right,
                                        SharedPtr<ColumnVector> &result,
                                        SizeT count,
+                                       void *state_ptr_left,
+                                       void *state_ptr_right,
                                        void *state_ptr,
                                        bool nullable) {
 
@@ -452,13 +462,13 @@ private:
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kFlat: {
-                return ExecuteConstantFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteConstantFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kConstant: {
-                return ExecuteConstantConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteConstantConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kHeterogeneous: {
-                return ExecuteConstantHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteConstantHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "CompactBit isn't implemented.";
@@ -473,6 +483,8 @@ private:
                                             const SharedPtr<ColumnVector> &right,
                                             SharedPtr<ColumnVector> &result,
                                             SizeT count,
+                                            void *state_ptr_left,
+                                            void *state_ptr_right,
                                             void *state_ptr,
                                             bool nullable) {
 
@@ -483,13 +495,13 @@ private:
                 break;
             }
             case ColumnVectorType::kFlat: {
-                return ExecuteHeterogeneousFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteHeterogeneousFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kConstant: {
-                return ExecuteHeterogeneousConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteHeterogeneousConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kHeterogeneous: {
-                return ExecuteHeterogeneousHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+                return ExecuteHeterogeneousHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "CompactBit isn't implemented.";
@@ -506,6 +518,8 @@ private:
                                        const SharedPtr<ColumnVector> &right,
                                        SharedPtr<ColumnVector> &result,
                                        SizeT count,
+                                       void *state_ptr_left,
+                                       void *state_ptr_right,
                                        void *state_ptr,
                                        bool nullable) {
 
@@ -521,6 +535,8 @@ private:
                                                                                result_ptr,
                                                                                result_null,
                                                                                count,
+                                                                               state_ptr_left,
+                                                                               state_ptr_right,
                                                                                state_ptr);
         } else {
             result_null->SetAllTrue();
@@ -530,6 +546,8 @@ private:
                                                                             result_ptr[i],
                                                                             result_null.get(),
                                                                             i,
+                                                                            state_ptr_left,
+                                                                            state_ptr_right,
                                                                             state_ptr);
             }
         }
@@ -544,6 +562,8 @@ private:
                                                ResultType *__restrict result_ptr,
                                                SharedPtr<Bitmask> &result_null,
                                                SizeT count,
+                                               void *state_ptr_left,
+                                               void *state_ptr_right,
                                                void *state_ptr) {
         *result_null = *left_null;
         result_null->MergeAnd(*right_null);
@@ -556,6 +576,8 @@ private:
                                                                         result_ptr[row_index],
                                                                         result_null.get(),
                                                                         row_index,
+                                                                        state_ptr_left,
+                                                                        state_ptr_right,
                                                                         state_ptr);
             return row_index + 1 < count;
         });
@@ -566,6 +588,8 @@ private:
                                            const SharedPtr<ColumnVector> &right,
                                            SharedPtr<ColumnVector> &result,
                                            SizeT count,
+                                           void *state_ptr_left,
+                                           void *state_ptr_right,
                                            void *state_ptr,
                                            bool nullable) {
         const auto *left_ptr = (const LeftType *)(left->data());
@@ -580,6 +604,8 @@ private:
                                                                                    result_ptr,
                                                                                    result_null,
                                                                                    count,
+                                                                                   state_ptr_left,
+                                                                                   state_ptr_right,
                                                                                    state_ptr);
         } else {
             result_null->SetAllTrue();
@@ -589,6 +615,8 @@ private:
                                                                             result_ptr[i],
                                                                             result_null.get(),
                                                                             i,
+                                                                            state_ptr_left,
+                                                                            state_ptr_right,
                                                                             state_ptr);
             }
         }
@@ -603,6 +631,8 @@ private:
                                                    ResultType *__restrict result_ptr,
                                                    SharedPtr<Bitmask> &result_null,
                                                    SizeT count,
+                                                   void *state_ptr_left,
+                                                   void *state_ptr_right,
                                                    void *state_ptr) {
 
         if (right_null->IsAllTrue()) {
@@ -619,6 +649,8 @@ private:
                                                                         result_ptr[row_index],
                                                                         result_null.get(),
                                                                         row_index,
+                                                                        state_ptr_left,
+                                                                        state_ptr_right,
                                                                         state_ptr);
             return row_index + 1 < count;
         });
@@ -630,6 +662,8 @@ private:
                                                 SharedPtr<ColumnVector> &,
                                                 SizeT,
                                                 void *,
+                                                void *,
+                                                void *,
                                                 bool) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
@@ -640,6 +674,8 @@ private:
                                            const SharedPtr<ColumnVector> &right,
                                            SharedPtr<ColumnVector> &result,
                                            SizeT count,
+                                           void *state_ptr_left,
+                                           void *state_ptr_right,
                                            void *state_ptr,
                                            bool nullable) {
 
@@ -655,6 +691,8 @@ private:
                                                                                    result_ptr,
                                                                                    result_null,
                                                                                    count,
+                                                                                   state_ptr_left,
+                                                                                   state_ptr_right,
                                                                                    state_ptr);
         } else {
             result_null->SetAllTrue();
@@ -664,6 +702,8 @@ private:
                                                                             result_ptr[i],
                                                                             result_null.get(),
                                                                             i,
+                                                                            state_ptr_left,
+                                                                            state_ptr_right,
                                                                             state_ptr);
             }
         }
@@ -678,6 +718,8 @@ private:
                                                    ResultType *__restrict result_ptr,
                                                    SharedPtr<Bitmask> &result_null,
                                                    SizeT count,
+                                                   void *state_ptr_left,
+                                                   void *state_ptr_right,
                                                    void *state_ptr) {
         if (left_null->IsAllTrue()) {
             *result_null = *right_null;
@@ -694,6 +736,8 @@ private:
                                                                         result_ptr[row_index],
                                                                         result_null.get(),
                                                                         row_index,
+                                                                        state_ptr_left,
+                                                                        state_ptr_right,
                                                                         state_ptr);
             return row_index + 1 < count;
         });
@@ -704,6 +748,8 @@ private:
                                                const SharedPtr<ColumnVector> &right,
                                                SharedPtr<ColumnVector> &result,
                                                SizeT,
+                                               void *state_ptr_left,
+                                               void *state_ptr_right,
                                                void *state_ptr,
                                                bool nullable) {
         const auto *left_ptr = (const LeftType *)(left->data());
@@ -714,7 +760,7 @@ private:
             result_null->SetAllFalse();
         } else {
             result_null->SetAllTrue();
-            Operator::template Execute<LeftType, RightType, ResultType>(left_ptr[0], right_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr);
+            Operator::template Execute<LeftType, RightType, ResultType>(left_ptr[0], right_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr_left, state_ptr_right, state_ptr);
         }
         result->Finalize(1);
     }
@@ -724,6 +770,8 @@ private:
                                                     const SharedPtr<ColumnVector> &,
                                                     SharedPtr<ColumnVector> &,
                                                     SizeT,
+                                                    void *,
+                                                    void *,
                                                     void *,
                                                     bool) {
         Status status = Status::NotSupport("Not implemented");
@@ -736,6 +784,8 @@ private:
                                                 SharedPtr<ColumnVector> &,
                                                 SizeT,
                                                 void *,
+                                                void *,
+                                                void *,
                                                 bool) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
@@ -747,6 +797,8 @@ private:
                                                     SharedPtr<ColumnVector> &,
                                                     SizeT,
                                                     void *,
+                                                    void *,
+                                                    void *,
                                                     bool) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
@@ -757,6 +809,8 @@ private:
                                                          const SharedPtr<ColumnVector> &,
                                                          SharedPtr<ColumnVector> &,
                                                          SizeT,
+                                                         void *,
+                                                         void *,
                                                          void *,
                                                          bool) {
         Status status = Status::NotSupport("Not implemented");
