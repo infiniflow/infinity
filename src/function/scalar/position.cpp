@@ -43,7 +43,7 @@ inline void PositionFunction::Run(VarcharT &first, VarcharT &second, IntegerT &r
 
 
 void RegisterPositionFunction(const UniquePtr<Catalog> &catalog_ptr) {
-    String func_name = "position";
+    String func_name = "str_position";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
