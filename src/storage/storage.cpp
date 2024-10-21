@@ -178,11 +178,15 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             // Replay wal file wrap init catalog
             TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(target_mode);
             if (system_start_ts == 0) {
+                if (current_storage_mode_ == StorageMode::kReadable) {
+                    LOG_INFO("No checkpoint found in READER mode, waiting for log replication");
+                    return;
+                }
                 // Init database, need to create default_db
                 LOG_INFO(fmt::format("Init a new catalog"));
                 new_catalog_ = Catalog::NewCatalog();
             }
-            if (compact_interval > 0) {
+            if (compact_interval > 0 and current_storage_mode_ == StorageMode::kWritable) {
                 LOG_INFO(fmt::format("Init compaction alg"));
                 new_catalog_->InitCompactionAlg(system_start_ts);
             } else {
@@ -292,6 +296,9 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
+                wal_mgr_->Stop();
+                wal_mgr_.reset();
+
                 switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
                         // Not init remote store
@@ -308,8 +315,14 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     }
                 }
 
-                wal_mgr_->Stop();
-                wal_mgr_.reset();
+                txn_mgr_->Stop();
+                txn_mgr_.reset();
+
+                buffer_mgr_->Stop();
+                buffer_mgr_.reset();
+
+                persistence_manager_.reset();
+
                 if (target_mode == StorageMode::kAdmin) {
                     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
                     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -319,14 +332,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                                                       config_ptr_->DeltaCheckpointThreshold(),
                                                       config_ptr_->FlushMethodAtCommit());
                 }
-
-                txn_mgr_->Stop();
-                txn_mgr_.reset();
-
-                buffer_mgr_->Stop();
-                buffer_mgr_.reset();
-
-                persistence_manager_.reset();
             }
 
             if (target_mode == StorageMode::kWritable) {
@@ -360,10 +365,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from Writable to Writable");
             }
 
-            if (target_mode == StorageMode::kUnInitialized) {
-                UnrecoverableError("Attempt to set storage mode from Writeable to UnInit");
-            }
-
             {
                 std::unique_lock<std::mutex> lock(mutex_);
                 current_storage_mode_ = target_mode;
@@ -383,6 +384,9 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
+                wal_mgr_->Stop();
+                wal_mgr_.reset();
+
                 switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
                         // Not init remote store
@@ -399,8 +403,14 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     }
                 }
 
-                wal_mgr_->Stop();
-                wal_mgr_.reset();
+                txn_mgr_->Stop();
+                txn_mgr_.reset();
+
+                buffer_mgr_->Stop();
+                buffer_mgr_.reset();
+
+                persistence_manager_.reset();
+
                 if (target_mode == StorageMode::kAdmin) {
                     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
                     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -410,14 +420,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                                                       config_ptr_->DeltaCheckpointThreshold(),
                                                       config_ptr_->FlushMethodAtCommit());
                 }
-
-                txn_mgr_->Stop();
-                txn_mgr_.reset();
-
-                buffer_mgr_->Stop();
-                buffer_mgr_.reset();
-
-                persistence_manager_.reset();
             }
 
             if (target_mode == StorageMode::kReadable) {
