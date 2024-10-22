@@ -769,12 +769,13 @@ public:
                     }
                     pq_code_storage_->ExtractCodes(i, encoded_codes.get());
                     f32 ip = query_centroid_ip;
-                    f32 target_l2 = centroid_l2;
+                    f32 target_l2 = centroid_l2 * 0.5f;
                     for (u32 j = 0; j < subspace_num; ++j) {
                         ip += query_ip_table[j * real_subspace_centroid_num + encoded_codes[j]];
-                        target_l2 -= 2.0f * (centroid_ip_table[j * real_subspace_centroid_num + encoded_codes[j]] +
-                                             ivf_parts_storage.subspace_centroid_norms_neg_half_at_subspace(j)[encoded_codes[j]]);
+                        target_l2 += centroid_ip_table[j * real_subspace_centroid_num + encoded_codes[j]] -
+                                     ivf_parts_storage.subspace_centroid_norms_neg_half_at_subspace(j)[encoded_codes[j]];
                     }
+                    target_l2 *= 2.0f;
                     const auto d = ip / std::sqrt(query_l2 * target_l2);
                     add_result_func(d, segment_offset);
                 }
@@ -795,11 +796,12 @@ public:
                         continue;
                     }
                     pq_code_storage_->ExtractCodes(i, encoded_codes.get());
-                    f32 d = residual_query_l2;
+                    f32 d = residual_query_l2 * 0.5f;
                     for (u32 j = 0; j < subspace_num; ++j) {
-                        d -= 2.0f * (residual_ip_table[j * real_subspace_centroid_num + encoded_codes[j]] +
-                                     ivf_parts_storage.subspace_centroid_norms_neg_half_at_subspace(j)[encoded_codes[j]]);
+                        d -= residual_ip_table[j * real_subspace_centroid_num + encoded_codes[j]] +
+                             ivf_parts_storage.subspace_centroid_norms_neg_half_at_subspace(j)[encoded_codes[j]];
                     }
+                    d *= 2.0f;
                     add_result_func(d, segment_offset);
                 }
                 break;
