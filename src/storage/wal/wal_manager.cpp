@@ -385,6 +385,7 @@ void WalManager::Flush() {
 }
 
 void WalManager::FlushLogByReplication(const Vector<String> &synced_logs) {
+    // Rename the old WAL file and open new WAL file.
     for (const String &synced_log : synced_logs) {
         ofs_.write(synced_log.c_str(), synced_log.size());
     }
