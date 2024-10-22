@@ -33,7 +33,8 @@ public:
                       SharedPtr<BaseTableRef> base_table_ref,
                       SharedPtr<CacheContent> cache_content,
                       Vector<SizeT> column_map,
-                      SharedPtr<Vector<LoadMeta>> load_metas);
+                      SharedPtr<Vector<LoadMeta>> load_metas,
+                      bool is_min_heap);
 
     void Init() override {};
 
@@ -54,6 +55,8 @@ public:
 
     PhysicalOperatorType origin_type() const { return origin_type_; }
 
+    bool is_min_heap() const { return is_min_heap_; }
+
 private:
     SharedPtr<BaseTableRef> base_table_ref_;
 
@@ -61,6 +64,7 @@ private:
 
     PhysicalOperatorType origin_type_;
     Vector<SizeT> column_map_; // result column id -> cache column id
+    bool is_min_heap_;
 };
 
 } // namespace infinity

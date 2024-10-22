@@ -1177,7 +1177,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildReadCache(const SharedPtr<Logi
                                          logical_read_cache->base_table_ref_,
                                          logical_read_cache->cache_content_,
                                          logical_read_cache->column_map_,
-                                         logical_read_cache->load_metas());
+                                         logical_read_cache->load_metas(),
+                                         logical_read_cache->is_min_heap_);
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const {

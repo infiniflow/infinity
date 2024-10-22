@@ -181,7 +181,7 @@ bool CastExpression::Eq(const BaseExpression &other_base) const {
         return false;
     }
     const auto &other = static_cast<const CastExpression &>(other_base);
-    return func_.function == other.func_.function && target_type_ == other.target_type_;
+    return func_.function == other.func_.function && arguments_[0]->Eq(*other.arguments_[0]);
 }
 
 } // namespace infinity

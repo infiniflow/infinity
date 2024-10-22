@@ -33,6 +33,7 @@ import cached_index_scan;
 import third_party;
 import logger;
 import base_table_ref;
+import knn_expression;
 
 namespace infinity {
 
@@ -48,6 +49,7 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
         }
         Optional<CacheOutput> cache_output;
         SharedPtr<BaseTableRef> base_table_ref;
+        bool is_min_heap = false;
         switch (op->operator_type()) {
             case LogicalNodeType::kMatch: {
                 auto *logical_match = static_cast<LogicalMatch *>(op.get());
@@ -55,6 +57,7 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
                 TxnTimeStamp query_ts = std::min(begin_ts, logical_match->base_table_ref_->max_commit_ts());
                 CachedMatch cached_match(query_ts, logical_match);
                 cache_output = cache_mgr->GetCache(cached_match);
+                is_min_heap = true;
                 break;
             }
             case LogicalNodeType::kMatchTensorScan: {
@@ -63,6 +66,7 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
                 TxnTimeStamp query_ts = std::min(begin_ts, logical_match_tensor_scan->base_table_ref_->max_commit_ts());
                 CachedMatchTensorScan cached_match_tensor_scan(query_ts, logical_match_tensor_scan);
                 cache_output = cache_mgr->GetCache(cached_match_tensor_scan);
+                is_min_heap = true;
                 break;
             }
             case LogicalNodeType::kMatchSparseScan: {
@@ -71,6 +75,7 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
                 TxnTimeStamp query_ts = std::min(begin_ts, logical_match_sparse_scan->base_table_ref_->max_commit_ts());
                 CachedMatchSparseScan cached_match_sparse_scan(query_ts, logical_match_sparse_scan);
                 cache_output = cache_mgr->GetCache(cached_match_sparse_scan);
+                is_min_heap = true;
                 break;
             }
             case LogicalNodeType::kKnnScan: {
@@ -79,6 +84,7 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
                 TxnTimeStamp query_ts = std::min(begin_ts, logical_knn_scan->base_table_ref_->max_commit_ts());
                 CachedKnnScan cached_knn_scan(query_ts, logical_knn_scan);
                 cache_output = cache_mgr->GetCache(cached_knn_scan);
+                is_min_heap = static_cast<const KnnExpression *>(cached_knn_scan.query_expression())->IsKnnMinHeap();
                 break;
             }
             case LogicalNodeType::kIndexScan: {
@@ -101,7 +107,8 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
                                                                    op->operator_type(),
                                                                    base_table_ref,
                                                                    std::move(cache_output->cache_content_),
-                                                                   std::move(cache_output->column_map_));
+                                                                   std::move(cache_output->column_map_),
+                                                                   is_min_heap);
             logical_read_cache->set_left_node(op->left_node());
             logical_read_cache->set_right_node(op->right_node());
             op = logical_read_cache;

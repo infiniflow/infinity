@@ -232,9 +232,6 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
             else
                 child_op = other_children_[i - 2].get();
             auto child_type = child_op->operator_type();
-            if (child_type == PhysicalOperatorType::kReadCache) {
-                child_type = static_cast<PhysicalReadCache *>(child_op)->origin_type();
-            }
             switch (child_type) {
                 case PhysicalOperatorType::kKnnScan: {
                     PhysicalKnnScan *phy_knn_scan = static_cast<PhysicalKnnScan *>(child_op);
@@ -252,6 +249,11 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                 case PhysicalOperatorType::kMergeMatchSparse:
                 case PhysicalOperatorType::kMatch: {
                     min_heaps[i] = true;
+                    break;
+                }
+                case PhysicalOperatorType::kReadCache: {
+                    PhysicalReadCache *phy_read_cache = static_cast<PhysicalReadCache *>(child_op);
+                    min_heaps[i] = phy_read_cache->is_min_heap();
                     break;
                 }
                 default: {

@@ -27,9 +27,10 @@ PhysicalReadCache::PhysicalReadCache(u64 id,
                                      SharedPtr<BaseTableRef> base_table_ref,
                                      SharedPtr<CacheContent> cache_content,
                                      Vector<SizeT> column_map,
-                                     SharedPtr<Vector<LoadMeta>> load_metas)
+                                     SharedPtr<Vector<LoadMeta>> load_metas,
+                                     bool is_min_heap)
     : PhysicalOperator(PhysicalOperatorType::kReadCache, nullptr, nullptr, id, load_metas), base_table_ref_(base_table_ref),
-      cache_content_(cache_content), column_map_(column_map) {
+      cache_content_(cache_content), column_map_(column_map), is_min_heap_(is_min_heap) {
     switch (origin_type) {
         case LogicalNodeType::kMatch: {
             origin_type_ = PhysicalOperatorType::kMatch;

@@ -92,6 +92,7 @@ u64 KnnExpression::Hash() const {
     h ^= std::hash<EmbeddingDataType>()(embedding_data_type_);
     h ^= std::hash<KnnDistanceType>()(distance_type_);
     h ^= std::hash<i32>()(topn_);
+    h ^= std::hash<String>()(using_index_);
     if (optional_filter_) {
         h ^= optional_filter_->Hash();
     }
@@ -105,7 +106,7 @@ bool KnnExpression::Eq(const BaseExpression &other_base) const {
     const auto &other = static_cast<const KnnExpression &>(other_base);
     bool eq = dimension_ == other.dimension_ && embedding_data_type_ == other.embedding_data_type_ && distance_type_ == other.distance_type_ &&
               query_embedding_.Eq(other.query_embedding_, embedding_data_type_, dimension_) && topn_ == other.topn_ &&
-              opt_params_ == other.opt_params_;
+              opt_params_ == other.opt_params_ && using_index_ == other.using_index_ && ignore_index_ == other.ignore_index_;
     if (!eq) {
         return false;
     }
