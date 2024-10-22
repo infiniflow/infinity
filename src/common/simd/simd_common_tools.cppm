@@ -150,6 +150,7 @@ export inline __m512i abs_sub_epu8_avx512(const __m512i a, const __m512i b) {
 }
 #endif
 
+// https://github.com/WojciechMula/sse-popcount/blob/master/popcnt-avx2-harley-seal.cpp
 #if defined(__AVX2__)
 export inline int popcount_avx2(const __m256i v) {
     const __m256i m1 = _mm256_set1_epi8(0x55);
@@ -171,6 +172,7 @@ export inline int popcount_avx2(const __m256i v) {
 }
 #endif // defined (__AVX2__)
 
+// https://github.com/WojciechMula/sse-popcount/blob/master/popcnt-sse-harley-seal.cpp
 #if defined(__SSE2__)
 export inline int popcount_sse2(const __m128i x) {
     const __m128i m1 = _mm_set1_epi8(0x55);
