@@ -57,6 +57,7 @@ import options;
 import cluster_manager;
 import utility;
 import peer_task;
+import infinity_exception;
 
 namespace infinity {
 
@@ -3984,7 +3985,15 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 return query_result;
             }
             status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, node_name);
-            LOG_INFO("Start in LEADER mode");
+            if (!status.ok()) {
+                LOG_INFO("Fail to change to LEADER role");
+                Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+                if (!restore_status.ok()) {
+                    UnrecoverableError(fmt::format("Fail to change node role to LEADER, then fail to restore to ADMIN."));
+                }
+            } else {
+                LOG_INFO("Start in LEADER role");
+            }
             break;
         }
         case AdminNodeRole::kFollower: {
@@ -4019,7 +4028,15 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             }
 
             status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, node_name, leader_ip, leader_port);
-            LOG_INFO("Start in FOLLOWER mode");
+            if (!status.ok()) {
+                LOG_INFO("Fail to change to FOLLOWER role");
+                Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+                if (!restore_status.ok()) {
+                    UnrecoverableError(fmt::format("Fail to change node role to FOLLOWER, then fail to restore to ADMIN."));
+                }
+            } else {
+                LOG_INFO("Start in FOLLOWER role");
+            }
             break;
         }
         case AdminNodeRole::kLearner: {
@@ -4054,7 +4071,15 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             }
 
             status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, node_name, leader_ip, leader_port);
-            LOG_INFO("Start in LEARNER mode");
+            if (!status.ok()) {
+                LOG_INFO("Fail to change to LEARNER role");
+                Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+                if (!restore_status.ok()) {
+                    UnrecoverableError(fmt::format("Fail to change node role to FOLLOWER, then fail to restore to ADMIN."));
+                }
+            } else {
+                LOG_INFO("Start in LEARNER role");
+            }
             break;
         }
     }

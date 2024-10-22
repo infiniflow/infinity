@@ -287,15 +287,26 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             }
 
             if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
-                periodic_trigger_thread_->Stop();
-                periodic_trigger_thread_.reset();
+
+                if (periodic_trigger_thread_ != nullptr) {
+                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                        UnrecoverableError("Error reader init phase");
+                    }
+                    periodic_trigger_thread_->Stop();
+                    periodic_trigger_thread_.reset();
+                }
 
                 if (compact_processor_ != nullptr) {
                     UnrecoverableError("Compact processor shouldn't be set before");
                 }
 
-                bg_processor_->Stop();
-                bg_processor_.reset();
+                if (bg_processor_ != nullptr) {
+                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                        UnrecoverableError("Error reader init phase");
+                    }
+                    bg_processor_->Stop();
+                    bg_processor_.reset();
+                }
 
                 new_catalog_.reset();
 
@@ -320,8 +331,13 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     }
                 }
 
-                txn_mgr_->Stop();
-                txn_mgr_.reset();
+                if (txn_mgr_ != nullptr) {
+                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                        UnrecoverableError("Error reader init phase");
+                    }
+                    txn_mgr_->Stop();
+                    txn_mgr_.reset();
+                }
 
                 buffer_mgr_->Stop();
                 buffer_mgr_.reset();

@@ -1175,7 +1175,7 @@ void WalManager::WalCmdCheckpointReplay(const WalCmdCheckpoint &cmd, Transaction
     if (cmd.is_full_checkpoint_) {
         storage_->LoadFullCheckpoint(fmt::format("{}/{}", cmd.catalog_path_, cmd.catalog_name_));
     } else {
-        storage_->AttachDeltaCheckpoint(cmd.catalog_path_);
+        storage_->AttachDeltaCheckpoint(fmt::format("{}/{}", cmd.catalog_path_, cmd.catalog_name_));
     }
     return;
 }

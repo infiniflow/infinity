@@ -571,7 +571,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const String &catalog_pa
 
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
     if (!status.ok()) {
-        UnrecoverableError(status.message());
+        UnrecoverableError(fmt::format("{}:{}", catalog_path, status.message()));
     }
 
     i64 file_size = catalog_file_handle->FileSize();
