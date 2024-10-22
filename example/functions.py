@@ -23,6 +23,8 @@ table_obj.insert(
         {"c1": 'test@gmail.com', "c2": 'email'}, {"c1": 'test@hotmail.com', "c2": 'email'},
         {"c1": ' abc', "c2": 'abc'}, {"c1": 'abc ', "c2": 'abc'}, {"c1": ' abc ', "c2": 'abc'}])
 
+# varchar functions
+
 #function char_length
 res = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 1").to_df()
 print(res)
@@ -72,6 +74,35 @@ print(res)
 
 #function char_position
 res = table_obj.output(["*", "char_position(c1, 'bc')"]).filter("char_position(c1, c1) <> 0").to_df()
+print(res)
+
+# math functions
+db_obj.drop_table("function_example", ConflictType.Ignore)
+db_obj.create_table("function_example",
+                    {"c1": {"type": "integer"},
+                        "c2": {"type": "double"}}, ConflictType.Error)
+table_obj = db_obj.get_table("function_example")
+table_obj.insert(
+    [{"c1": 1, "c2": 2.4}, {"c1": 3, "c2": 4.5}, {"c1": 5, "c2": 6.6}, {"c1": 7, "c2": 8},
+        {"c1": 9, "c2": 10}, {"c1": 11, "c2": 12}, {"c1": 13, "c2": 14}, {"c1": 15, "c2": 16},])
+
+#function sqrt
+res = table_obj.output(["*", "sqrt(c1)", "sqrt(c2)"]).to_df()
+print(res)
+
+res = table_obj.output(["*", "sqrt(c1)", "sqrt(c2)"]).filter("sqrt(c1) = 3").to_df()
+print(res)
+
+#function round
+res = table_obj.output(["*", "round(c1)", "round(c2)"]).to_df()
+print(res)
+
+#function ceiling
+res = table_obj.output(["*", "ceil(c1)", "ceil(c2)"]).to_df()
+print(res)
+
+#function floor
+res = table_obj.output(["*", "floor(c1)", "floor(c2)"]).to_df()
 print(res)
 
 res = db_obj.drop_table("function_example")
