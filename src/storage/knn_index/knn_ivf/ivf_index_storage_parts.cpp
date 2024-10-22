@@ -42,6 +42,10 @@ import simd_functions;
 
 namespace infinity {
 
+struct SearchIndexPartsReuseContext {
+    UniquePtr<f32[]> pq_query_ip_table_ = {};
+};
+
 class IVF_Part_Storage {
     const u32 part_id_ = std::numeric_limits<u32>::max();
 
@@ -81,7 +85,8 @@ public:
                              const void *query_ptr,
                              EmbeddingDataType query_element_type,
                              const std::function<bool(SegmentOffset)> &satisfy_filter_func,
-                             const std::function<void(f32, SegmentOffset)> &add_result_func) const = 0;
+                             const std::function<void(f32, SegmentOffset)> &add_result_func,
+                             SearchIndexPartsReuseContext &context) const = 0;
 };
 
 template <IndexIVFStorageOption::Type t>
@@ -109,8 +114,6 @@ class IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> 
     const u32 expect_subspace_centroid_num_ = 1u << subspace_centroid_bits_;
 
     u32 real_subspace_centroid_num_ = 0;
-    // (-0.5 * norm) for each centroid
-    UniquePtr<f32[]> centroid_norms_neg_half_ = MakeUniqueForOverwrite<f32[]>(centroids_num());
     // centroids for each subspace, size: subspace_dimension_ * real_subspace_centroid_num_ * subspace_num_
     UniquePtr<f32[]> subspace_centroids_data_ = {};
     // size: real_subspace_centroid_num_ * subspace_num_
@@ -147,14 +150,12 @@ public:
 
     void Save(LocalFileHandle &file_handle) const override {
         file_handle.Append(&real_subspace_centroid_num_, sizeof(real_subspace_centroid_num_));
-        file_handle.Append(centroid_norms_neg_half_.get(), centroids_num() * sizeof(f32));
         file_handle.Append(subspace_centroids_data_.get(), embedding_dimension() * real_subspace_centroid_num_ * sizeof(f32));
         file_handle.Append(subspace_centroid_norms_neg_half_.get(), real_subspace_centroid_num_ * subspace_num_ * sizeof(f32));
     }
 
     void Load(LocalFileHandle &file_handle) override {
         file_handle.Read(&real_subspace_centroid_num_, sizeof(real_subspace_centroid_num_));
-        file_handle.Read(centroid_norms_neg_half_.get(), centroids_num() * sizeof(f32));
         subspace_centroids_data_ = MakeUniqueForOverwrite<f32[]>(embedding_dimension() * real_subspace_centroid_num_);
         file_handle.Read(subspace_centroids_data_.get(), embedding_dimension() * real_subspace_centroid_num_ * sizeof(f32));
         subspace_centroid_norms_neg_half_ = MakeUniqueForOverwrite<f32[]>(real_subspace_centroid_num_ * subspace_num_);
@@ -162,17 +163,19 @@ public:
     }
 
     void Train(const u32 training_embedding_num, const f32 *training_data, const IVF_Centroids_Storage *ivf_centroids_storage) final {
-        const f32 *centroids_data = ivf_centroids_storage->data();
-        {
-            // prepare centroid_norms_neg_half_
-            const f32 *centroids_data_ptr = centroids_data;
-            for (u32 i = 0; i < centroids_num(); ++i) {
-                centroid_norms_neg_half_[i] = -0.5f * L2NormSquare<f32, f32, u32>(centroids_data_ptr, embedding_dimension());
-                centroids_data_ptr += embedding_dimension();
-            }
-        }
         const auto residuals = MakeUniqueForOverwrite<f32[]>(training_embedding_num * embedding_dimension());
         {
+            const f32 *centroids_data = ivf_centroids_storage->data();
+            // (-0.5 * norm) for each centroid
+            UniquePtr<f32[]> centroid_norms_neg_half = MakeUniqueForOverwrite<f32[]>(centroids_num());
+            {
+                // prepare centroid_norms_neg_half_
+                const f32 *centroids_data_ptr = centroids_data;
+                for (u32 i = 0; i < centroids_num(); ++i) {
+                    centroid_norms_neg_half[i] = -0.5f * L2NormSquare<f32, f32, u32>(centroids_data_ptr, embedding_dimension());
+                    centroids_data_ptr += embedding_dimension();
+                }
+            }
             // distance: for every embedding, e * c - 0.5 * c^2, find max
             const auto dist_table = MakeUniqueForOverwrite<f32[]>(training_embedding_num * centroids_num());
             matrixA_multiply_transpose_matrixB_output_to_C(training_data,
@@ -188,7 +191,7 @@ public:
                 u64 max_id = 0;
                 const f32 *dist_ptr = dist_table.get() + i * centroids_num();
                 for (u32 k = 0; k < centroids_num(); ++k) {
-                    if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
+                    if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half[k]; neg_distance > max_neg_distance) {
                         max_neg_distance = neg_distance;
                         max_id = k;
                     }
@@ -333,15 +336,18 @@ public:
         return ivf_part_storages_[part_id]->AppendOneEmbedding(embedding_ptr, segment_offset, ivf_centroids_storage, this);
     }
 
-    void SearchIndex(const u32 part_id,
+    void SearchIndex(const Vector<u32> &part_ids,
                      const IVF_Index_Storage *ivf_index_storage,
                      const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      const EmbeddingDataType query_element_type,
                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                      const std::function<void(f32, SegmentOffset)> &add_result_func) const override {
-        return ivf_part_storages_[part_id]
-            ->SearchIndex(ivf_index_storage, knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func);
+        SearchIndexPartsReuseContext context;
+        for (const auto part_id : part_ids) {
+            ivf_part_storages_[part_id]
+                ->SearchIndex(ivf_index_storage, knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func, context);
+        }
     }
 };
 
@@ -425,7 +431,8 @@ public:
                      const void *query_ptr,
                      const EmbeddingDataType query_element_type,
                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
-                     const std::function<void(f32, SegmentOffset)> &add_result_func) const override {
+                     const std::function<void(f32, SegmentOffset)> &add_result_func,
+                     SearchIndexPartsReuseContext &) const override {
         auto ReturnT = [&]<EmbeddingDataType query_element_type> {
             if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
                           (query_element_type == src_embedding_data_type &&
@@ -636,7 +643,7 @@ UniquePtr<PQ_Code_Storage> GetPQCodeStorage(const u32 subspace_num, const u32 su
 template <EmbeddingDataType src_embedding_data_type>
 class IVF_Part_Storage_PQ final : public IVF_Part_Storage {
     using ColumnEmbeddingElementT = EmbeddingDataTypeToCppTypeT<src_embedding_data_type>;
-    static_assert(IsAnyOf<ColumnEmbeddingElementT, i8, u8, f64, f32, Float16T, BFloat16T>);
+    static_assert(IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>);
 
     const u32 subspace_num_ = 0;
     const u32 subspace_bits_ = 0;
@@ -685,7 +692,8 @@ public:
                      const void *query_ptr,
                      const EmbeddingDataType query_element_type,
                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
-                     const std::function<void(f32, SegmentOffset)> &add_result_func) const override {
+                     const std::function<void(f32, SegmentOffset)> &add_result_func,
+                     SearchIndexPartsReuseContext &context) const override {
         auto ReturnT = [&]<EmbeddingDataType query_element_type> {
             if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
                           (query_element_type == src_embedding_data_type &&
@@ -694,7 +702,8 @@ public:
                                                         knn_distance,
                                                         static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr),
                                                         satisfy_filter_func,
-                                                        add_result_func);
+                                                        add_result_func,
+                                                        context);
             } else {
                 UnrecoverableError("Invalid Query EmbeddingDataType");
             }
@@ -720,8 +729,10 @@ public:
                       const KnnDistanceBase1 *knn_distance,
                       const EmbeddingDataTypeToCppTypeT<query_element_type> *query_ptr,
                       const std::function<bool(SegmentOffset)> &satisfy_filter_func,
-                      const std::function<void(f32, SegmentOffset)> &add_result_func) const {
+                      const std::function<void(f32, SegmentOffset)> &add_result_func,
+                      SearchIndexPartsReuseContext &context) const {
         using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
+        static_assert(std::is_same_v<QueryDataType, f32>);
         auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
         if (!knn_distance_1) [[unlikely]] {
             UnrecoverableError("Invalid KnnDistance1");
@@ -733,11 +744,13 @@ public:
         const auto dimension = ivf_index_storage->embedding_dimension();
         const auto [query_f32, _] = GetF32Ptr(query_ptr, dimension);
         const auto centroid_data = ivf_index_storage->ivf_centroids_storage().data() + part_id() * dimension;
-        const auto ip_func = GetSIMD_FUNCTIONS().IPDistance_func_ptr_;
         switch (const KnnDistanceType dist_type = knn_distance_1->dist_type_; dist_type) {
             case KnnDistanceType::kInnerProduct: {
-                const auto query_centroid_ip = ip_func(query_f32, centroid_data, dimension);
-                const auto ip_table = ivf_parts_storage.GetIPTable(query_f32);
+                const auto query_centroid_ip = IPDistance<f32>(query_f32, centroid_data, dimension);
+                auto &ip_table = context.pq_query_ip_table_;
+                if (!ip_table) {
+                    ip_table = ivf_parts_storage.GetIPTable(query_f32);
+                }
                 const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
                 const auto total_embedding_num = embedding_num();
                 for (u32 i = 0; i < total_embedding_num; ++i) {
@@ -755,10 +768,13 @@ public:
                 break;
             }
             case KnnDistanceType::kCosine: {
-                const auto query_l2 = L2NormSquare<f32, f32, u32>(query_f32, dimension);
-                const auto centroid_l2 = L2NormSquare<f32, f32, u32>(centroid_data, dimension);
-                const auto query_centroid_ip = ip_func(query_f32, centroid_data, dimension);
-                const auto query_ip_table = ivf_parts_storage.GetIPTable(query_f32);
+                const auto query_l2 = L2NormSquare<f32>(query_f32, dimension);
+                const auto centroid_l2 = L2NormSquare<f32>(centroid_data, dimension);
+                const auto query_centroid_ip = IPDistance<f32>(query_f32, centroid_data, dimension);
+                auto &query_ip_table = context.pq_query_ip_table_;
+                if (!query_ip_table) {
+                    query_ip_table = ivf_parts_storage.GetIPTable(query_f32);
+                }
                 const auto centroid_ip_table = ivf_parts_storage.GetIPTable(centroid_data);
                 const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
                 const auto total_embedding_num = embedding_num();
@@ -771,9 +787,9 @@ public:
                     f32 ip = query_centroid_ip;
                     f32 target_l2 = centroid_l2 * 0.5f;
                     for (u32 j = 0; j < subspace_num; ++j) {
-                        ip += query_ip_table[j * real_subspace_centroid_num + encoded_codes[j]];
-                        target_l2 += centroid_ip_table[j * real_subspace_centroid_num + encoded_codes[j]] -
-                                     ivf_parts_storage.subspace_centroid_norms_neg_half_at_subspace(j)[encoded_codes[j]];
+                        const auto idx = j * real_subspace_centroid_num + encoded_codes[j];
+                        ip += query_ip_table[idx];
+                        target_l2 += centroid_ip_table[idx] - ivf_parts_storage.subspace_centroid_norms_neg_half_at_subspace(j)[encoded_codes[j]];
                     }
                     target_l2 *= 2.0f;
                     const auto d = ip / std::sqrt(query_l2 * target_l2);
@@ -786,7 +802,7 @@ public:
                 for (u32 i = 0; i < dimension; ++i) {
                     residual_query[i] = query_f32[i] - centroid_data[i];
                 }
-                const auto residual_query_l2 = L2NormSquare<f32, f32, u32>(residual_query.get(), dimension);
+                const auto residual_query_l2 = L2NormSquare<f32>(residual_query.get(), dimension);
                 const auto residual_ip_table = ivf_parts_storage.GetIPTable(residual_query.get());
                 const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
                 const auto total_embedding_num = embedding_num();
@@ -872,12 +888,28 @@ UniquePtr<IVF_Part_Storage> IVF_Part_Storage::Make(const u32 part_id,
         case IndexIVFStorageOption::Type::kProductQuantization: {
             const auto subspace_num = ivf_storage_option.product_quantization_subspace_num_;
             const auto subspace_bits = ivf_storage_option.product_quantization_subspace_bits_;
-            return ApplyEmbeddingDataTypeToFunc(
-                embedding_data_type,
-                [part_id, subspace_num, subspace_bits]<EmbeddingDataType src_embedding_data_type>() -> UniquePtr<IVF_Part_Storage> {
-                    return MakeUnique<IVF_Part_Storage_PQ<src_embedding_data_type>>(part_id, subspace_num, subspace_bits);
-                },
-                [] { return UniquePtr<IVF_Part_Storage>(); });
+            auto GetPQResult = [part_id, subspace_num, subspace_bits]<EmbeddingDataType src_embedding_data_type>() {
+                return MakeUnique<IVF_Part_Storage_PQ<src_embedding_data_type>>(part_id, subspace_num, subspace_bits);
+            };
+            switch (embedding_data_type) {
+                case EmbeddingDataType::kElemDouble: {
+                    return GetPQResult.template operator()<EmbeddingDataType::kElemDouble>();
+                }
+                case EmbeddingDataType::kElemFloat: {
+                    return GetPQResult.template operator()<EmbeddingDataType::kElemFloat>();
+                }
+                case EmbeddingDataType::kElemFloat16: {
+                    return GetPQResult.template operator()<EmbeddingDataType::kElemFloat16>();
+                }
+                case EmbeddingDataType::kElemBFloat16: {
+                    return GetPQResult.template operator()<EmbeddingDataType::kElemBFloat16>();
+                }
+                default: {
+                    UnrecoverableError("Unsupported embedding data type for IVFPQ.");
+                    return {};
+                }
+            }
+            break;
         }
     }
     return {};
