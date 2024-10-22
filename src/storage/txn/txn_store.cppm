@@ -222,6 +222,8 @@ public:
 
     bool ReadOnly() const;
 
+    Catalog *GetCatalog() const { return catalog_; }
+
     std::mutex mtx_{};
 
 private:

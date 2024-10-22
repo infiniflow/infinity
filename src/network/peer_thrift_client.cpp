@@ -48,7 +48,7 @@ Status PeerClient::Init() {
 
 /// TODO: comment
 Status PeerClient::UnInit(bool sync) {
-    LOG_INFO(fmt::format("Peer client: {} is stopping.", sending_node_name_));
+    LOG_INFO(fmt::format("Peer client: {} is stopping.", from_node_name_));
 
     if (processor_thread_.get() != nullptr) {
         SharedPtr<TerminatePeerTask> terminate_task = MakeShared<TerminatePeerTask>(!sync);
@@ -61,7 +61,7 @@ Status PeerClient::UnInit(bool sync) {
         }
     }
 
-    LOG_INFO(fmt::format("Peer client: {} is stopped.", sending_node_name_));
+    LOG_INFO(fmt::format("Peer client: {} is stopped.", from_node_name_));
     return Disconnect();
 }
 
@@ -76,6 +76,8 @@ Status PeerClient::Reconnect() {
 
         TSocket *socket = static_cast<TSocket *>(socket_.get());
         socket->setConnTimeout(2000); // 2s to timeout
+        socket->setRecvTimeout(2000);
+        socket->setSendTimeout(2000);
         transport_ = MakeShared<TBufferedTransport>(socket_);
         protocol_ = MakeShared<TBinaryProtocol>(transport_);
         client_ = MakeUnique<PeerServiceClient>(protocol_);
@@ -310,7 +312,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
         for (SizeT idx = 0; idx < node_count; ++idx) {
             SharedPtr<NodeInfo> node_info = MakeShared<NodeInfo>();
             auto &other_node = response.other_nodes[idx];
-            if (sending_node_name_ == other_node.node_name) {
+            if (from_node_name_ == other_node.node_name) {
                 continue;
             }
             node_info->node_name_ = other_node.node_name;
@@ -361,6 +363,7 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
     request.node_name = peer_task->node_name_;
     SizeT log_count = peer_task->log_strings_.size();
     request.log_entries.reserve(log_count);
+    request.on_startup = peer_task->on_register_;
     for (SizeT i = 0; i < log_count; ++i) {
         request.log_entries.emplace_back(*peer_task->log_strings_[i]);
     }
@@ -376,11 +379,21 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
         peer_task->error_message_ = thrift_exception.what();
         peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
-        LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
+        LOG_ERROR(fmt::format("Sync log to node, transport error: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
         if (!status.ok()) {
             LOG_ERROR(status.message());
         }
+    } catch (apache::thrift::TApplicationException &application_exception) {
+        peer_task->error_message_ = application_exception.what();
+        peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
+        LOG_ERROR(fmt::format("Sync log to node, application: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
+        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
+        if (!status.ok()) {
+            LOG_ERROR(status.message());
+        }
+    } catch (const std::exception &e) {
+        LOG_ERROR(e.what());
     }
 }
 

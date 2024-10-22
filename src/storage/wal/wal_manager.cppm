@@ -39,10 +39,32 @@ export enum class StorageMode {
     kWritable,
 };
 
+export String ToString(StorageMode storage_mode) {
+    switch (storage_mode) {
+        case StorageMode::kUnInitialized: {
+            return "Uninitialized";
+        }
+        case StorageMode::kAdmin: {
+            return "Admin";
+        }
+        case StorageMode::kReadable: {
+            return "Readable";
+        }
+        case StorageMode::kWritable: {
+            return "Writable";
+        }
+    }
+}
+
 export class WalManager {
 public:
     WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
-    WalManager(Storage *storage, String wal_dir, String data_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
+    WalManager(Storage *storage,
+               String wal_dir,
+               String data_dir,
+               u64 wal_size_threshold,
+               u64 delta_checkpoint_interval_wal_bytes,
+               FlushOptionType flush_option);
 
     ~WalManager();
 
@@ -60,6 +82,8 @@ public:
     // checkpoint for a batch of sync.
     void Flush();
 
+    void FlushLogByReplication(const Vector<String> &synced_logs);
+
     bool TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task);
 
     void Checkpoint(bool is_full_checkpoint);
@@ -76,7 +100,7 @@ public:
 
     Vector<SharedPtr<WalEntry>> CollectWalEntries() const;
 
-    void ReplayWalEntry(const WalEntry &entry);
+    void ReplayWalEntry(const WalEntry &entry, bool on_startup);
 
     TxnTimeStamp GetCheckpointedTS();
 
@@ -104,6 +128,7 @@ private:
 
     void WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
+    void WalCmdCheckpointReplay(const WalCmdCheckpoint &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     // void WalCmdSetSegmentStatusSealedReplay(const WalCmdSetSegmentStatusSealed &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     // void WalCmdUpdateSegmentBloomFilterDataReplay(const WalCmdUpdateSegmentBloomFilterData &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);

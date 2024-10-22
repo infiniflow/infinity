@@ -197,7 +197,7 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
                 std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
                 catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
                 log_entries.push_back(wal_entry);
-                if(checkpoint_cmd->is_full_checkpoint_) {
+                if (checkpoint_cmd->is_full_checkpoint_) {
                     // Full checkpoint, OK
                     break;
                 }
@@ -309,7 +309,7 @@ void WalManager::Flush() {
             ofs_.write(buf->data(), ptr - buf->data());
 
             if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
-                if(cluster_manager == nullptr) {
+                if (cluster_manager == nullptr) {
                     cluster_manager = InfinityContext::instance().cluster_manager();
                 }
                 cluster_manager->PrepareLogs(buf);
@@ -376,6 +376,13 @@ void WalManager::Flush() {
         LOG_TRACE("WAL flush is finished.");
     }
     LOG_TRACE("WalManager::Flush mainloop end");
+}
+
+void WalManager::FlushLogByReplication(const Vector<String> &synced_logs) {
+    for (const String &synced_log : synced_logs) {
+        ofs_.write(synced_log.c_str(), synced_log.size());
+    }
+    ofs_.flush();
 }
 
 bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task) {
@@ -676,7 +683,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
         switch (targe_storage_mode) {
             case StorageMode::kWritable: {
                 // once wal is not empty, a checkpoint should always be found in leader or standalone mode.
-                String error_message = "No checkpoint found in wal";
+                String error_message = "WAL replay: No checkpoint found in wal";
                 UnrecoverableError(error_message);
                 break;
             }
@@ -714,7 +721,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
         LOG_DEBUG(replay_entries[replay_count]->ToString());
-        ReplayWalEntry(*replay_entries[replay_count]);
+        ReplayWalEntry(*replay_entries[replay_count], false);
     }
 
     LOG_INFO(fmt::format("Latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
@@ -780,7 +787,7 @@ Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::Ge
 
     if (system_start_ts == 0) {
         // once wal is not empty, a checkpoint should always be found.
-        String error_message = "No checkpoint found in wal";
+        String error_message = "No checkpoint is found WAL";
         UnrecoverableError(error_message);
     }
     LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
@@ -870,7 +877,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
     return wal_entries;
 }
 
-void WalManager::ReplayWalEntry(const WalEntry &entry) {
+void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup) {
     for (const auto &cmd : entry.cmds_) {
         LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
         switch (cmd->GetType()) {
@@ -924,10 +931,12 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             //                                              entry.commit_ts_);
             //     break;
             case WalCommandType::CHECKPOINT: {
-                if(storage_->GetStorageMode() == StorageMode::kReadable) {
-                    LOG_DEBUG("Load the checkpoint");
-                } else {
-                    UnrecoverableError("Checkpoint");
+                if(on_startup) {
+                    if (storage_->GetStorageMode() == StorageMode::kReadable) {
+                        WalCmdCheckpointReplay(*static_cast<const WalCmdCheckpoint *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                    } else {
+                        UnrecoverableError("Checkpoint");
+                    }
                 }
                 break;
             }
@@ -1064,7 +1073,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
         txn_id,
         begin_ts);
 
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
     auto base_table_ref = MakeShared<BaseTableRef>(table_entry, table_entry->GetBlockIndex(fake_txn.get()));
     table_index_entry->CreateIndexPrepare(base_table_ref.get(), fake_txn.get(), false, true);
 
@@ -1154,11 +1163,21 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
         UnrecoverableError(error_message);
     }
 
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
     auto table_store = fake_txn->GetTxnTableStore(table_entry);
     table_store->Delete(cmd.row_ids_);
     Catalog::Delete(table_store->GetTableEntry(), fake_txn->TxnID(), (void *)table_store, fake_txn->CommitTS(), table_store->GetDeleteStateRef());
     Catalog::CommitWrite(table_store->GetTableEntry(), fake_txn->TxnID(), commit_ts, table_store->txn_segments(), table_store->GetDeleteStatePtr());
+}
+
+void WalManager::WalCmdCheckpointReplay(const WalCmdCheckpoint &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    //  Only used in follower / learner startup and received the replicate logs phase
+    if (cmd.is_full_checkpoint_) {
+        storage_->LoadFullCheckpoint(fmt::format("{}/{}", cmd.catalog_path_, cmd.catalog_name_));
+    } else {
+        storage_->AttachDeltaCheckpoint(fmt::format("{}/{}", cmd.catalog_path_, cmd.catalog_name_));
+    }
+    return;
 }
 
 void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -1197,7 +1216,7 @@ void WalManager::WalCmdOptimizeReplay(WalCmdOptimize &cmd, TransactionID txn_id,
         String error_message = fmt::format("Wal Replay: Get index failed {}", status.message());
         UnrecoverableError(error_message);
     }
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
 
     TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
@@ -1273,7 +1292,7 @@ void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn
     }
 
     SharedPtr<TableEntry> new_table_entry = table_entry->Clone();
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
     auto *txn_table_store = fake_txn->GetTxnTableStore(table_entry);
     new_table_entry->AddColumns(cmd.column_defs_, txn_table_store);
     new_table_entry->commit_ts_ = commit_ts;
@@ -1302,7 +1321,7 @@ void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID t
     }
 
     SharedPtr<TableEntry> new_table_entry = table_entry->Clone();
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
     auto *txn_table_store = fake_txn->GetTxnTableStore(table_entry);
     new_table_entry->DropColumns(cmd.column_names_, txn_table_store);
     new_table_entry->commit_ts_ = commit_ts;
@@ -1325,7 +1344,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
         UnrecoverableError(error_message);
     }
 
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
     auto table_store = fake_txn->GetTxnTableStore(table_entry);
     table_store->Append(cmd.block_);
 

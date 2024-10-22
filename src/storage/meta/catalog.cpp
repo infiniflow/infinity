@@ -546,32 +546,32 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
     // 1. load json
     // 2. load entries
     LOG_INFO(fmt::format("Load base FULL catalog json from: {}", full_ckp_info.path_));
-    auto catalog = Catalog::LoadFromFile(full_ckp_info, buffer_mgr);
+    auto catalog = Catalog::LoadFullCheckpoint(full_ckp_info.path_);
 
     // Load catalogs delta checkpoints and merge.
     for (const auto &delta_ckp_info : delta_ckp_infos) {
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", delta_ckp_info.path_));
-        UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_info);
-
-        catalog->LoadFromEntryDelta(std::move(catalog_delta_entry), buffer_mgr);
+        catalog->AttachDeltaCheckpoint(delta_ckp_info.path_);
     }
 
     LOG_TRACE(fmt::format("Catalog Delta Op is done"));
-
     return catalog;
+}
+void Catalog::AttachDeltaCheckpoint(const String &file_name) {
+    UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(file_name);
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    this->LoadFromEntryDelta(std::move(catalog_delta_entry), buffer_mgr);
 }
 
 // called by Replay
-UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info) {
-    const auto &catalog_path = delta_ckp_info.path_;
-
+UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const String &catalog_path) {
     if (!VirtualStore::Exists(catalog_path)) {
         VirtualStore::DownloadObject(catalog_path, catalog_path);
     }
 
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
     if (!status.ok()) {
-        UnrecoverableError(status.message());
+        UnrecoverableError(fmt::format("{}:{}", catalog_path, status.message()));
     }
 
     i64 file_size = catalog_file_handle->FileSize();
@@ -658,7 +658,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 SegmentID unsealed_id = add_table_entry_op->unsealed_id_;
                 SegmentID next_segment_id = add_table_entry_op->next_segment_id_;
                 ColumnID next_column_id = add_table_entry_op->next_column_id_;
-                const SharedPtr<String>& table_comment = add_table_entry_op->table_comment_;
+                const SharedPtr<String> &table_comment = add_table_entry_op->table_comment_;
 
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
@@ -975,8 +975,8 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
     }
 }
 
-UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
-    const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / full_ckp_info.path_;
+UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
+    const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / file_name;
 
     if (!VirtualStore::Exists(catalog_path)) {
         VirtualStore::DownloadObject(catalog_path, catalog_path);
@@ -999,6 +999,8 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
+
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     return Deserialize(catalog_json, buffer_mgr);
 }
 

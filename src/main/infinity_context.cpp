@@ -116,7 +116,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
                     if (cluster_manager_ != nullptr) {
                         UnrecoverableError("cluster manager was initialized before.");
                     }
-                    cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
+                    cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
                     Status init_status = cluster_manager_->InitAsLeader(node_name);
                     if (!init_status.ok()) {
                         return init_status;
@@ -130,7 +130,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
                     }
 
                     // TODO: connect to leader;
-                    cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
+                    cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
                     Status init_status = cluster_manager_->InitAsFollower(node_name, node_ip, node_port);
                     if (!init_status.ok()) {
                         cluster_manager_->UnInit();
@@ -146,7 +146,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
                     }
 
                     // TODO: connect to leader;
-                    cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
+                    cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
                     Status init_status = cluster_manager_->InitAsLearner(node_name, node_ip, node_port);
                     if (!init_status.ok()) {
                         cluster_manager_->UnInit();
@@ -211,6 +211,44 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
                     StopThriftServers();
                     break;
                 }
+                case NodeRole::kFollower: {
+                    cluster_manager_->UnInit();
+                    cluster_manager_.reset();
+
+                    storage_->SetStorageMode(StorageMode::kReadable);
+                    if (cluster_manager_ != nullptr) {
+                        UnrecoverableError("cluster manager was initialized before.");
+                    }
+
+                    // TODO: connect to leader;
+                    cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
+                    Status init_status = cluster_manager_->InitAsFollower(node_name, node_ip, node_port);
+                    if (!init_status.ok()) {
+                        cluster_manager_->UnInit();
+                        cluster_manager_.reset();
+                        return init_status;
+                    }
+                    break;
+                }
+                case NodeRole::kLearner: {
+                    cluster_manager_->UnInit();
+                    cluster_manager_.reset();
+
+                    storage_->SetStorageMode(StorageMode::kReadable);
+                    if (cluster_manager_ != nullptr) {
+                        UnrecoverableError("cluster manager was initialized before.");
+                    }
+
+                    // TODO: connect to leader;
+                    cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
+                    Status init_status = cluster_manager_->InitAsLearner(node_name, node_ip, node_port);
+                    if (!init_status.ok()) {
+                        cluster_manager_->UnInit();
+                        cluster_manager_.reset();
+                        return init_status;
+                    }
+                    break;
+                }
                 default: {
                     Status status = Status::InvalidNodeRole("Can't switch infinity role");
                     return status;
@@ -261,7 +299,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
                     if (cluster_manager_ != nullptr) {
                         UnrecoverableError("cluster manager was initialized before.");
                     }
-                    cluster_manager_ = MakeUnique<ClusterManager>(storage_->txn_manager());
+                    cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
                     Status init_status = cluster_manager_->InitAsLeader(node_name);
                     if (!init_status.ok()) {
                         cluster_manager_->UnInit();
@@ -281,7 +319,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
     StartThriftServers();
 
     Status status = Status::OK();
-    if(target_role == NodeRole::kFollower or target_role == NodeRole::kLearner) {
+    if (target_role == NodeRole::kFollower or target_role == NodeRole::kLearner) {
         status = cluster_manager_->RegisterToLeader();
     } else if (target_role == NodeRole::kLeader) {
         cluster_manager_->CheckHeartBeat();
@@ -375,7 +413,7 @@ void InfinityContext::StartThriftServers() {
 
 void InfinityContext::StopThriftServers() {
     if (current_server_role_ == NodeRole::kUnInitialized) {
-        return ;
+        return;
     }
 
     if (current_server_role_ != NodeRole::kAdmin) {
