@@ -221,8 +221,6 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
         }
     }
 
-    std::reverse(log_entries.begin(), log_entries.end());
-
     auto catalog_fileinfo = CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_checkpoint_ts);
     if (!catalog_fileinfo.has_value()) {
         String error_message = fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir);
@@ -230,13 +228,16 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
     }
     auto &[full_catalog_fileinfo, delta_catalog_fileinfo_array] = catalog_fileinfo.value();
 
-    LOG_INFO(fmt::format("full_checkpoint: {}", full_catalog_fileinfo.path_));
-    for(const auto& delta_catalog_file: delta_catalog_fileinfo_array) {
-        LOG_INFO(fmt::format("delta_checkpoint: {}", delta_catalog_file.path_));
+    SharedPtr<WalEntry> ckp_wal_entry = MakeShared<WalEntry>();
+    String full_ckp_filename = std::filesystem::path(full_catalog_fileinfo.path_).filename();
+    ckp_wal_entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(full_catalog_fileinfo.max_commit_ts_, true, "catalog", full_ckp_filename));
+    for (const auto &delta_catalog_file : delta_catalog_fileinfo_array) {
+        String delta_ckp_filename = std::filesystem::path(delta_catalog_file.path_).filename();
+        ckp_wal_entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(delta_catalog_file.max_commit_ts_, false, "catalog", delta_ckp_filename));
     }
+    log_entries.emplace_back(ckp_wal_entry);
 
-    // TODO: create full checkpoint entry and delta checkpoint entry
-
+    std::reverse(log_entries.begin(), log_entries.end());
     log_strings.reserve(log_entries.size());
 
     for (const auto &log_entry : log_entries) {
