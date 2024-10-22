@@ -14,8 +14,8 @@
 
 module;
 
-#include <cmath>
 #include "simd_common_intrin_include.h"
+#include <cmath>
 
 /*
 #if defined(__x86_64__) && (defined(__clang_major__) && (__clang_major__ > 10))
@@ -75,6 +75,57 @@ f32 CosineDistance_common(const f32 *x, const f32 *y, SizeT d) {
     }
     return dot ? dot / sqrt(sqr_x * sqr_y) : 0.0f;
 }
+
+f32 HammingDistance_common(const u8 *x, const u8 *y, SizeT d) {
+    f32 result = 0;
+    for (SizeT i = 0; i < d; ++i) {
+        u8 xor_result = x[i] ^ y[i];
+        result += __builtin_popcount(xor_result);
+    }
+    return result;
+}
+
+#if defined(__AVX2__)
+
+f32 HammingDistance_avx2(const u8 *x, const u8 *y, SizeT d) {
+    f32 result = 0;
+    SizeT pos = 0;
+    // 8 * 32 = 256
+    for (; pos + 32 < d; pos += 32) {
+        __m256i xor_result =
+            _mm256_xor_si256(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(x)), _mm256_loadu_si256(reinterpret_cast<const __m256i *>(y)));
+        result += popcount_avx2(xor_result);
+        x += 32;
+        y += 32;
+    }
+    if (pos < d) {
+        result += HammingDistance_common(x, y, d - pos);
+    }
+    return result;
+}
+
+#endif // defined (__AVX2__)
+
+#if defined(__SSE2__)
+
+f32 HammingDistance_sse2(const u8 *x, const u8 *y, SizeT d) {
+    f32 result = 0;
+    SizeT pos = 0;
+    // 8 * 16 = 128
+    for (; pos + 16 < d; pos += 16) {
+        __m128i xor_result =
+            _mm_xor_si128(_mm_loadu_si128(reinterpret_cast<const __m128i *>(x)), _mm_loadu_si128(reinterpret_cast<const __m128i *>(y)));
+        result += popcount_sse2(xor_result);
+        x += 16;
+        y += 16;
+    }
+    if (pos < d) {
+        result += HammingDistance_common(x, y, d - pos);
+    }
+    return result;
+}
+
+#endif // defined (__SSE2__)
 
 #if defined(__AVX2__)
 inline f32 L2Distance_avx2_128(const f32 *vector1, const f32 *vector2, SizeT) {
