@@ -66,7 +66,13 @@ F32DistanceFuncType GetCosineDistanceFuncPtr() {
     return &CosineDistance_common;
 }
 
- U8HammingDistanceFuncType GetHammingDistanceFuncPtr() {
+U8HammingDistanceFuncType GetHammingDistanceFuncPtr() {
+#ifdef __AVX2__
+    return &HammingDistance_avx2;
+#endif
+#ifdef __SSE2__
+    return &HammingDistance_sse2;
+#endif
     return &HammingDistance_common;
 }
 

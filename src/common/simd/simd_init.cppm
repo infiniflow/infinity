@@ -31,6 +31,7 @@ export using F32DistanceFuncType = f32(*)(const f32 *, const f32 *, SizeT);
 export using I8DistanceFuncType = i32(*)(const i8 *, const i8 *, SizeT);
 export using I8CosDistanceFuncType = f32(*)(const i8 *, const i8 *, SizeT);
 export using U8DistanceFuncType = i32(*)(const u8 *, const u8 *, SizeT);
+//dimension in hamming distance is in bytes
 export using U8HammingDistanceFuncType = f32(*)(const u8 *, const u8 *, SizeT);
 export using U8CosDistanceFuncType = f32(*)(const u8 *, const u8 *, SizeT);
 export using MaxSimF32BitIPFuncType = f32(*)(const f32 *, const u8 *, SizeT);

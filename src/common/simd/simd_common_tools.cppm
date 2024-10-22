@@ -26,12 +26,12 @@ export U8MaskPtr GetU8MasksForAVX2();
 
 #ifdef __SSE__
 // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
-export inline float hsum_ps_sse1(__m128 v) {                    // v = [ D C | B A ]
-    __m128 shuf   = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 3, 0, 1));  // [ C D | A B ]
-    __m128 sums   = _mm_add_ps(v, shuf);      // sums = [ D+C C+D | B+A A+B ]
-    shuf          = _mm_movehl_ps(shuf, sums);      //  [   C   D | D+C C+D ]  // let the compiler avoid a mov by reusing shuf
-    sums          = _mm_add_ss(sums, shuf);
-    return    _mm_cvtss_f32(sums);
+export inline float hsum_ps_sse1(__m128 v) {                     // v = [ D C | B A ]
+    __m128 shuf = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 3, 0, 1)); // [ C D | A B ]
+    __m128 sums = _mm_add_ps(v, shuf);                           // sums = [ D+C C+D | B+A A+B ]
+    shuf = _mm_movehl_ps(shuf, sums);                            //  [   C   D | D+C C+D ]  // let the compiler avoid a mov by reusing shuf
+    sums = _mm_add_ss(sums, shuf);
+    return _mm_cvtss_f32(sums);
 }
 #endif
 
@@ -60,41 +60,37 @@ export inline float hsum256_ps_avx(__m256 v) {
 #ifdef __SSE2__
 // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
 export int hsum_epi32_sse2(__m128i x) {
-    __m128i hi64  = _mm_shuffle_epi32(x, _MM_SHUFFLE(1, 0, 3, 2));
+    __m128i hi64 = _mm_shuffle_epi32(x, _MM_SHUFFLE(1, 0, 3, 2));
     __m128i sum64 = _mm_add_epi32(hi64, x);
-    __m128i hi32  = _mm_shufflelo_epi16(sum64, _MM_SHUFFLE(1, 0, 3, 2));    // Swap the low two elements
+    __m128i hi32 = _mm_shufflelo_epi16(sum64, _MM_SHUFFLE(1, 0, 3, 2)); // Swap the low two elements
     __m128i sum32 = _mm_add_epi32(sum64, hi32);
-    return _mm_cvtsi128_si32(sum32);       // SSE2 movd
+    return _mm_cvtsi128_si32(sum32); // SSE2 movd
 }
 #endif
 
 #ifdef __AVX__
 // https://stackoverflow.com/questions/60108658/fastest-method-to-calculate-sum-of-all-packed-32-bit-integers-using-avx512-or-av/60109639#60109639
-export int hsum_epi32_avx(__m128i x)
-{
-    __m128i hi64  = _mm_unpackhi_epi64(x, x);           // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
+export int hsum_epi32_avx(__m128i x) {
+    __m128i hi64 = _mm_unpackhi_epi64(x, x); // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
     __m128i sum64 = _mm_add_epi32(hi64, x);
-    __m128i hi32  = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1));    // Swap the low two elements
+    __m128i hi32 = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1)); // Swap the low two elements
     __m128i sum32 = _mm_add_epi32(sum64, hi32);
-    return _mm_cvtsi128_si32(sum32);       // movd
+    return _mm_cvtsi128_si32(sum32); // movd
 }
 #endif
 
 #ifdef __AVX2__
 // https://stackoverflow.com/questions/60108658/fastest-method-to-calculate-sum-of-all-packed-32-bit-integers-using-avx512-or-av/60109639#60109639
 // only needs AVX2
-export int hsum_8x32_avx2(__m256i v)
-{
-    __m128i sum128 = _mm_add_epi32(
-                 _mm256_castsi256_si128(v),
-                 _mm256_extracti128_si256(v, 1)); // silly GCC uses a longer AXV512VL instruction if AVX512 is enabled :/
+export int hsum_8x32_avx2(__m256i v) {
+    __m128i sum128 = _mm_add_epi32(_mm256_castsi256_si128(v),
+                                   _mm256_extracti128_si256(v, 1)); // silly GCC uses a longer AXV512VL instruction if AVX512 is enabled :/
     return hsum_epi32_avx(sum128);
 }
 #endif
 
 #ifdef __AVX512F__
-export int hsum_epi32_avx512(__m512i v)
-{
+export int hsum_epi32_avx512(__m512i v) {
     __m256i lo = _mm512_castsi512_si256(v);
     __m256i hi = _mm512_extracti64x4_epi64(v, 1);
     __m256i sum = _mm256_add_epi32(lo, hi);
@@ -153,5 +149,44 @@ export inline __m512i abs_sub_epu8_avx512(const __m512i a, const __m512i b) {
     return _mm512_or_si512(ab, ba);
 }
 #endif
+
+#if defined(__AVX2__)
+export inline int popcount_avx2(const __m256i v) {
+    const __m256i m1 = _mm256_set1_epi8(0x55);
+    const __m256i m2 = _mm256_set1_epi8(0x33);
+    const __m256i m4 = _mm256_set1_epi8(0x0F);
+
+    const __m256i t1 = _mm256_sub_epi8(v, (_mm256_srli_epi16(v, 1) & m1));
+    const __m256i t2 = _mm256_add_epi8(t1 & m2, (_mm256_srli_epi16(t1, 2) & m2));
+    const __m256i t3 = _mm256_add_epi8(t2, _mm256_srli_epi16(t2, 4)) & m4;
+    __m256i sad = _mm256_sad_epu8(t3, _mm256_setzero_si256());
+
+    __m128i sad_low = _mm256_extracti128_si256(sad, 0);
+    __m128i sad_high = _mm256_extracti128_si256(sad, 1);
+
+    sad_low = _mm_add_epi64(sad_low, sad_high);
+
+    int result = _mm_extract_epi64(sad_low, 0) + _mm_extract_epi64(sad_low, 1);
+    return result;
+}
+#endif // defined (__AVX2__)
+
+#if defined(__SSE2__)
+export inline int popcount_sse2(const __m128i x) {
+    const __m128i m1 = _mm_set1_epi8(0x55);
+    const __m128i m2 = _mm_set1_epi8(0x33);
+    const __m128i m4 = _mm_set1_epi8(0x0F);
+
+    const __m128i t1 = x;
+    const __m128i t2 = _mm_sub_epi8(t1, _mm_srli_epi16(t1, 1) & m1);
+    const __m128i t3 = _mm_add_epi8(t2 & m2, _mm_srli_epi16(t2, 2) & m2);
+    const __m128i t4 = _mm_add_epi8(t3, _mm_srli_epi16(t3, 4)) & m4;
+
+    __m128i sad = _mm_sad_epu8(t4, _mm_setzero_si128());
+
+    int result = _mm_extract_epi64(sad, 0) + _mm_extract_epi64(sad, 1);
+    return result;
+}
+#endif // defined (__SSE2__)
 
 } // namespace infinity

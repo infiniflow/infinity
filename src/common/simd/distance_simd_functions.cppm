@@ -34,6 +34,12 @@ export f32 L2Distance_avx2(const f32 *vector1, const f32 *vector2, SizeT dimensi
 export f32 IPDistance_avx2(const f32 *vector1, const f32 *vector2, SizeT dimension);
 
 export f32 CosineDistance_avx2(const f32 *vector1, const f32 *vector2, SizeT dimension);
+
+export f32 HammingDistance_avx2(const u8 *vector1, const u8 *vector2, SizeT dimension);
+#endif
+
+#if defined(__SSE2__)
+export f32 HammingDistance_sse2(const u8 *vector1, const u8 *vector2, SizeT dimesion);
 #endif
 
 } // namespace infinity
