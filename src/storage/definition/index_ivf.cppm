@@ -46,7 +46,7 @@ export struct IndexIVFStorageOption {
     // kScalarQuantization
     u32 scalar_quantization_bits_ = 0; // 4 or 8
     // kProductQuantization
-    u32 product_quantization_subspace_num_ = 0;  // in range [1, dim]
+    u32 product_quantization_subspace_num_ = 0;  // divisor of embedding dimension
     u32 product_quantization_subspace_bits_ = 0; // in range [4, 16]
     bool operator==(const IndexIVFStorageOption &other) const = default;
     String ToString() const;

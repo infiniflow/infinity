@@ -24,6 +24,24 @@ export module diskann_simd_func;
 
 namespace infinity {
 
+#if defined(__aarch64__)
+inline float hsum256_ps_avx(__m256 v) {
+    const __m128 x128 = _mm_add_ps(_mm256_extractf128_ps(v, 1), _mm256_castps256_ps128(v));
+    const __m128 x64 = _mm_add_ps(x128, _mm_movehl_ps(x128, x128));
+    const __m128 x32 = _mm_add_ss(x64, _mm_shuffle_ps(x64, x64, 0x55));
+    return _mm_cvtss_f32(x32);
+}
+
+inline float hsum_ps_sse1(__m128 v) { // v = [ D C | B A ]
+    __m128 shuf = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 3, 0, 1)); // [ C D | A B ]
+    __m128 sums = _mm_add_ps(v, shuf); // sums = [ D+C C+D | B+A A+B ]
+    shuf = _mm_movehl_ps(shuf, sums);  //  [   C   D | D+C C+D ]  // let the
+                                     //  compiler avoid a mov by reusing shuf
+    sums = _mm_add_ss(sums, shuf);
+    return _mm_cvtss_f32(sums);
+}
+#endif
+
 export float hsumFloatVec(const float* array, size_t size) {
     float sum = 0.0f;
     size_t i = 0;

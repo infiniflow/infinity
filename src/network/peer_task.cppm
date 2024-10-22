@@ -42,7 +42,7 @@ export enum class PeerTaskType {
     kNewLeader,
 };
 
-export enum class NodeStatus { kAlive, kTimeout, kInvalid };
+export enum class NodeStatus { kAlive, kTimeout, kLostConnection, kInvalid };
 
 export String ToString(NodeStatus);
 
@@ -98,7 +98,7 @@ protected:
 
 export class TerminatePeerTask final : public PeerTask {
 public:
-    TerminatePeerTask() : PeerTask(PeerTaskType::kTerminate) {}
+    TerminatePeerTask(bool force_async) : PeerTask(PeerTaskType::kTerminate, force_async) {}
 
     String ToString() const final;
 };
@@ -157,11 +157,13 @@ public:
     String error_message_{};
     i64 leader_term_{};
     Vector<SharedPtr<NodeInfo>> other_nodes_{};
+    NodeStatus sender_status_{NodeStatus::kInvalid};
 };
 
 export class SyncLogTask final : public PeerTask {
 public:
-    SyncLogTask(const String& node_name, const Vector<SharedPtr<String>>& log_strings) : PeerTask(PeerTaskType::kLogSync), node_name_(node_name), log_strings_(log_strings) {}
+    SyncLogTask(const String &node_name, const Vector<SharedPtr<String>> &log_strings)
+        : PeerTask(PeerTaskType::kLogSync), node_name_(node_name), log_strings_(log_strings) {}
 
     String ToString() const final;
 
