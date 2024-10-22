@@ -143,6 +143,10 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
 
 void PeerServerThriftService::SyncLog(infinity_peer_server::SyncLogResponse &response, const infinity_peer_server::SyncLogRequest &request) {
     LOG_INFO("Get SyncLog request");
+    if(request.log_entries.size() == 0) {
+        UnrecoverableError("No log is synced from leader node");
+    }
+
     InfinityContext::instance().storage()->wal_manager()->FlushLogByReplication(request.log_entries);
 
     Status status = Status::OK();
