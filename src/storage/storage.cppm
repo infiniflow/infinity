@@ -64,7 +64,7 @@ public:
 
     [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
 
-    [[nodiscard]] inline ResultCacheManager *result_cache_manager() const noexcept { return result_cache_manager_.get(); }
+    [[nodiscard]] ResultCacheManager *result_cache_manager() const noexcept;
 
     StorageMode GetStorageMode() const;
     void SetStorageMode(StorageMode mode);

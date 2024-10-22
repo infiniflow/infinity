@@ -42,10 +42,10 @@ MatchSparseExpression::MatchSparseExpression(Vector<SharedPtr<BaseExpression>> s
                                              SparseMetricType metric_type,
                                              SizeT query_n,
                                              SizeT topn,
-                                             const Vector<UniquePtr<InitParameter>> &opt_params,
+                                             Vector<UniquePtr<InitParameter>> opt_params,
                                              SharedPtr<BaseExpression> optional_filter)
     : BaseExpression(ExpressionType::kMatchSparse, std::move(search_column)), metric_type_(metric_type), query_n_(query_n), topn_(topn),
-      opt_params_(opt_params), optional_filter_(std::move(optional_filter)) {
+      opt_params_(std::move(opt_params)), optional_filter_(std::move(optional_filter)) {
     column_expr_ = static_cast<const ColumnExpression *>(arguments_[0].get());
     this->MakeQuery(query_sparse_expr);
 }
@@ -91,6 +91,51 @@ DataType MatchSparseExpression::Type() const {
         }
     }
     return DataType(LogicalType::kInvalid);
+}
+
+u64 MatchSparseExpression::Hash() const {
+    u64 h = 0;
+    for (const auto &arg : arguments_) {
+        h ^= arg->Hash();
+    }
+    h ^= column_expr_->Hash();
+    h ^= query_sparse_expr_->Hash();
+    h ^= std::hash<SparseMetricType>()(metric_type_);
+    h ^= std::hash<SizeT>()(query_n_);
+    h ^= std::hash<SizeT>()(topn_);
+    if (optional_filter_) {
+        h ^= optional_filter_->Hash();
+    }
+    return h;
+}
+
+bool MatchSparseExpression::Eq(const BaseExpression &other_base) const {
+    if (other_base.type() != ExpressionType::kMatchSparse) {
+        return false;
+    }
+    const auto &other = static_cast<const MatchSparseExpression &>(other_base);
+    if (arguments_.size() != other.arguments_.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < arguments_.size(); ++i) {
+        if (!arguments_[i]->Eq(*other.arguments_[i])) {
+            return false;
+        }
+    }
+    bool eq = column_expr_->Eq(*other.column_expr_) && query_sparse_expr_->Eq(*other.query_sparse_expr_) && metric_type_ == other.metric_type_ &&
+              query_n_ == other.query_n_ && topn_ == other.topn_;
+    if (!eq) {
+        return false;
+    }
+    if (opt_params_.size() != other.opt_params_.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < opt_params_.size(); ++i) {
+        if (*(opt_params_[i]) != *(other.opt_params_[i])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void MatchSparseExpression::MakeQuery(SharedPtr<BaseExpression> query_sparse_expr) {
