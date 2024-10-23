@@ -558,7 +558,8 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
     return catalog;
 }
 void Catalog::AttachDeltaCheckpoint(const String &file_name) {
-    UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(file_name);
+    const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / file_name;
+    UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(catalog_path);
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     this->LoadFromEntryDelta(std::move(catalog_delta_entry), buffer_mgr);
 }

@@ -114,7 +114,6 @@ private:
 
     SharedPtr<PeerClient> client_to_leader_{}; // Used by follower and learner to connect leader server;
 
-
     SharedPtr<Thread> hb_periodic_thread_{};
     std::mutex hb_mutex_;
     std::condition_variable hb_cv_;

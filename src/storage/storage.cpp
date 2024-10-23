@@ -179,15 +179,16 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                                                     config_ptr_->LRUNum());
             buffer_mgr_->Start();
 
+            if (current_storage_mode_ == StorageMode::kReadable) {
+                LOG_INFO("No checkpoint found in READER mode, waiting for log replication");
+                reader_init_phase_ = ReaderInitPhase::kPhase1;
+                return;
+            }
+
             // Must init catalog before txn manager.
             // Replay wal file wrap init catalog
             TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(target_mode);
             if (system_start_ts == 0) {
-                if (current_storage_mode_ == StorageMode::kReadable) {
-                    LOG_INFO("No checkpoint found in READER mode, waiting for log replication");
-                    reader_init_phase_ = ReaderInitPhase::kPhase1;
-                    return;
-                }
                 // Init database, need to create default_db
                 LOG_INFO(fmt::format("Init a new catalog"));
                 new_catalog_ = Catalog::NewCatalog();
