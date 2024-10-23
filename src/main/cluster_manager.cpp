@@ -118,7 +118,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     return client_status;
 }
 
-Status ClusterManager::UnInit() {
+Status ClusterManager::UnInit(bool not_unregister) {
 
     if (hb_periodic_thread_.get() != nullptr) {
         {
@@ -131,7 +131,9 @@ Status ClusterManager::UnInit() {
     }
 
     std::unique_lock<std::mutex> lock(mutex_);
-    Status status = UnregisterToLeaderNoLock();
+    if(!not_unregister) {
+        Status status = UnregisterToLeaderNoLock();
+    }
 
     other_node_map_.clear();
     this_node_.reset();
@@ -419,7 +421,7 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
         std::unique_lock<std::mutex> lock(mutex_);
         auto iter = other_node_map_.find(node_name);
         if (iter != other_node_map_.end()) {
-            other_node_map_.erase(node_name);
+            iter->second->node_status_ = NodeStatus::kRemoved;
         } else {
             return Status::NotExistNode(node_name);
         }
@@ -427,9 +429,14 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
         client_ = reader_client_map_[node_name];
         reader_client_map_.erase(node_name);
     }
-    SharedPtr<ChangeRoleTask> change_role_task = MakeShared<ChangeRoleTask>("admin");
+    SharedPtr<ChangeRoleTask> change_role_task = MakeShared<ChangeRoleTask>(node_name, "admin");
     client_->Send(change_role_task);
     change_role_task->Wait();
+
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        other_node_map_.erase(node_name);
+    }
 
     Status status = Status::OK();
     if (change_role_task->error_code_ != 0) {
@@ -518,6 +525,9 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
                     ++other_node->heartbeat_count_;
                     sender_status = infinity_peer_server::NodeStatus::type::kAlive;
                     break;
+                }
+                case NodeStatus::kRemoved: {
+                    sender_status = infinity_peer_server::NodeStatus::type::kRemoved;
                 }
                 case NodeStatus::kLostConnection: {
                     LOG_ERROR(fmt::format("Node {} from {}:{} can't connected, but still can receive heartbeat.",

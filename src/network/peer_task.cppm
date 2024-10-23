@@ -42,7 +42,7 @@ export enum class PeerTaskType {
     kNewLeader,
 };
 
-export enum class NodeStatus { kAlive, kTimeout, kLostConnection, kInvalid };
+export enum class NodeStatus { kAlive, kTimeout, kLostConnection, kRemoved, kInvalid };
 
 export String ToString(NodeStatus);
 
@@ -178,10 +178,12 @@ public:
 
 export class ChangeRoleTask final : public PeerTask {
 public:
-    ChangeRoleTask(String role_name) : PeerTask(PeerTaskType::kChangeRole), role_name_(std::move(role_name)) {}
+    ChangeRoleTask(String node_name, String role_name)
+        : PeerTask(PeerTaskType::kChangeRole), node_name_(node_name), role_name_(std::move(role_name)) {}
 
     String ToString() const final;
 
+    String node_name_{};
     String role_name_{};
 
     // response

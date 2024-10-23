@@ -14,18 +14,20 @@
 namespace infinity_peer_server {
 
 int _kNodeTypeValues[] = {
+  NodeType::kAdmin,
   NodeType::kLeader,
   NodeType::kFollower,
   NodeType::kLearner,
   NodeType::kInvalid
 };
 const char* _kNodeTypeNames[] = {
+  "kAdmin",
   "kLeader",
   "kFollower",
   "kLearner",
   "kInvalid"
 };
-const std::map<int, const char*> _NodeType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(4, _kNodeTypeValues, _kNodeTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _NodeType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(5, _kNodeTypeValues, _kNodeTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const NodeType::type& val) {
   std::map<int, const char*>::const_iterator it = _NodeType_VALUES_TO_NAMES.find(val);
@@ -50,15 +52,17 @@ int _kNodeStatusValues[] = {
   NodeStatus::kInvalid,
   NodeStatus::kAlive,
   NodeStatus::kLostConnection,
+  NodeStatus::kRemoved,
   NodeStatus::kTimeout
 };
 const char* _kNodeStatusNames[] = {
   "kInvalid",
   "kAlive",
   "kLostConnection",
+  "kRemoved",
   "kTimeout"
 };
-const std::map<int, const char*> _NodeStatus_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(4, _kNodeStatusValues, _kNodeStatusNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _NodeStatus_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(5, _kNodeStatusValues, _kNodeStatusNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const NodeStatus::type& val) {
   std::map<int, const char*>::const_iterator it = _NodeStatus_VALUES_TO_NAMES.find(val);
@@ -1616,8 +1620,12 @@ ChangeRoleResponse::~ChangeRoleResponse() noexcept {
 }
 
 
-void ChangeRoleResponse::__set_node_name(const std::string& val) {
-  this->node_name = val;
+void ChangeRoleResponse::__set_error_code(const int64_t val) {
+  this->error_code = val;
+}
+
+void ChangeRoleResponse::__set_error_message(const std::string& val) {
+  this->error_message = val;
 }
 std::ostream& operator<<(std::ostream& out, const ChangeRoleResponse& obj)
 {
@@ -1648,9 +1656,17 @@ uint32_t ChangeRoleResponse::read(::apache::thrift::protocol::TProtocol* iprot) 
     switch (fid)
     {
       case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->error_code);
+          this->__isset.error_code = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->node_name);
-          this->__isset.node_name = true;
+          xfer += iprot->readString(this->error_message);
+          this->__isset.error_message = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -1672,8 +1688,12 @@ uint32_t ChangeRoleResponse::write(::apache::thrift::protocol::TProtocol* oprot)
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("ChangeRoleResponse");
 
-  xfer += oprot->writeFieldBegin("node_name", ::apache::thrift::protocol::T_STRING, 1);
-  xfer += oprot->writeString(this->node_name);
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->error_code);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("error_message", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_message);
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldStop();
@@ -1683,23 +1703,27 @@ uint32_t ChangeRoleResponse::write(::apache::thrift::protocol::TProtocol* oprot)
 
 void swap(ChangeRoleResponse &a, ChangeRoleResponse &b) {
   using ::std::swap;
-  swap(a.node_name, b.node_name);
+  swap(a.error_code, b.error_code);
+  swap(a.error_message, b.error_message);
   swap(a.__isset, b.__isset);
 }
 
 ChangeRoleResponse::ChangeRoleResponse(const ChangeRoleResponse& other38) {
-  node_name = other38.node_name;
+  error_code = other38.error_code;
+  error_message = other38.error_message;
   __isset = other38.__isset;
 }
 ChangeRoleResponse& ChangeRoleResponse::operator=(const ChangeRoleResponse& other39) {
-  node_name = other39.node_name;
+  error_code = other39.error_code;
+  error_message = other39.error_message;
   __isset = other39.__isset;
   return *this;
 }
 void ChangeRoleResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "ChangeRoleResponse(";
-  out << "node_name=" << to_string(node_name);
+  out << "error_code=" << to_string(error_code);
+  out << ", " << "error_message=" << to_string(error_message);
   out << ")";
 }
 

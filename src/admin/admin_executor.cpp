@@ -4006,7 +4006,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 query_result.status_ = status;
                 return query_result;
             }
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, node_name);
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, false, node_name);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to LEADER role");
                 Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
@@ -4049,7 +4049,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 return query_result;
             }
 
-            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, node_name, leader_ip, leader_port);
+            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to FOLLOWER role");
                 Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
@@ -4092,7 +4092,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 return query_result;
             }
 
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, node_name, leader_ip, leader_port);
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to LEARNER role");
                 Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);

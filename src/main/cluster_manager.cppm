@@ -37,7 +37,7 @@ public:
     Status InitAsLeader(const String &node_name);
     Status InitAsFollower(const String &node_name, const String &leader_ip, i64 leader_port);
     Status InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port);
-    Status UnInit();
+    Status UnInit(bool not_unregister);
 
 public:
     Status RegisterToLeader();

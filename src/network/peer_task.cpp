@@ -48,6 +48,8 @@ String ToString(NodeStatus status) {
             return "invalid";
         case NodeStatus::kLostConnection:
             return "lost connection";
+        case NodeStatus::kRemoved:
+            return "removed";
     }
 }
 

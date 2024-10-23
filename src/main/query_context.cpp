@@ -144,6 +144,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
                 case AdminStmtType::kShowNode:
                 case AdminStmtType::kShowCurrentNode:
                 case AdminStmtType::kListNodes:
+                case AdminStmtType::kRemoveNode:
                 case AdminStmtType::kSetRole: {
                     return HandleAdminStatement(admin_statement);
                 }
