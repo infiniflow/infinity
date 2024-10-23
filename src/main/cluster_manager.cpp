@@ -319,8 +319,7 @@ Status ClusterManager::UnregisterToLeaderNoLock() {
     return status;
 }
 
-Tuple<SharedPtr<PeerClient>, Status>
-ClusterManager::ConnectToServerNoLock(const String &from_node_name, const String &server_ip, i64 server_port) {
+Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const String &from_node_name, const String &server_ip, i64 server_port) {
     SharedPtr<PeerClient> client = MakeShared<PeerClient>(from_node_name, server_ip, server_port);
     Status client_status = client->Init();
     if (!client_status.ok()) {
@@ -377,8 +376,15 @@ Status ClusterManager::GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     // Only used by Leader on follower/learner registration.
 
-    SharedPtr<PeerClient> peer_client{};
-    {
+    // Connect to follower/learner server.
+    auto [client_to_follower, client_status] =
+        ClusterManager::ConnectToServerNoLock(this_node_->node_name_, node_info->ip_address_, node_info->port_);
+    if (!client_status.ok()) {
+        return client_status;
+    }
+
+    Status log_sending_status = SyncLogsOnRegistration(node_info, client_to_follower);
+    if (log_sending_status.ok()) {
         std::unique_lock<std::mutex> lock(mutex_);
         if (this_node_->node_role_ != NodeRole::kLeader) {
             String error_message = "Invalid node role.";
@@ -392,21 +398,13 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
             other_node_map_.emplace(node_info->node_name_, node_info);
         } else {
             // Duplicated node
+            // TODO: If the exist node lost connection, or other malfunction, use new node_info to replace it.
             return Status::DuplicateNode(node_info->node_name_);
         }
 
-        // Connect to follower/learner server.
-        auto [client_to_follower, client_status] =
-            ClusterManager::ConnectToServerNoLock(this_node_->node_name_, node_info->ip_address_, node_info->port_);
-        if (!client_status.ok()) {
-            return client_status;
-        }
-
         reader_client_map_.emplace(node_info->node_name_, client_to_follower);
-        peer_client = client_to_follower;
     }
 
-    Status log_sending_status = SyncLogsOnRegistration(node_info, peer_client);
     return log_sending_status;
 }
 
