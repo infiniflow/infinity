@@ -48,6 +48,8 @@ String ToString(NodeStatus status) {
             return "invalid";
         case NodeStatus::kLostConnection:
             return "lost connection";
+        case NodeStatus::kRemoved:
+            return "removed";
     }
 }
 
@@ -98,6 +100,10 @@ String HeartBeatPeerTask::ToString() const {
 
 String SyncLogTask::ToString() const {
     return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, log_strings_.size());
+}
+
+String ChangeRoleTask::ToString() const {
+    return fmt::format("{} to {}", infinity::ToString(type_), role_name_);
 }
 
 

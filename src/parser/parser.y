@@ -398,7 +398,7 @@ struct SQL_LTYPE {
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
-%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE
+%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
 
 %token NUMBER
@@ -2517,6 +2517,12 @@ admin_statement: ADMIN SHOW CATALOGS {
 | ADMIN SHOW NODE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowCurrentNode;
+}
+| ADMIN REMOVE NODE STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kRemoveNode;
+     $$->node_name_ = $4;
+     free($4);
 }
 | ADMIN SET ADMIN {
      $$ = new infinity::AdminStatement();

@@ -143,7 +143,7 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
 
 void PeerServerThriftService::SyncLog(infinity_peer_server::SyncLogResponse &response, const infinity_peer_server::SyncLogRequest &request) {
     LOG_INFO("Get SyncLog request");
-    if(request.log_entries.size() == 0) {
+    if (request.log_entries.size() == 0) {
         UnrecoverableError("No log is synced from leader node");
     }
 
@@ -164,7 +164,21 @@ void PeerServerThriftService::SyncLog(infinity_peer_server::SyncLogResponse &res
 }
 
 void PeerServerThriftService::ChangeRole(infinity_peer_server::ChangeRoleResponse &response, const infinity_peer_server::ChangeRoleRequest &request) {
-    LOG_INFO("Get ChangeRole request");
+    Status status = Status::OK();
+    switch (request.node_type) {
+        case infinity_peer_server::NodeType::kAdmin: {
+            status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin, true);
+            break;
+        }
+        default: {
+            UnrecoverableError("Not support to change to other type of node");
+        }
+    }
+
+    if (!status.ok()) {
+        response.error_code = static_cast<i64>(status.code());
+        response.error_message = status.message();
+    }
     return;
 }
 

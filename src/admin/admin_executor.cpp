@@ -143,6 +143,9 @@ QueryResult AdminExecutor::Execute(QueryContext *query_context, const AdminState
         case AdminStmtType::kShowCurrentNode: {
             return ShowCurrentNode(query_context, admin_statement);
         }
+        case AdminStmtType::kRemoveNode: {
+            return RemoveNode(query_context, admin_statement);
+        }
         case AdminStmtType::kSetRole: {
             return SetRole(query_context, admin_statement);
         }
@@ -3815,6 +3818,25 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     return query_result;
 }
 
+QueryResult AdminExecutor::RemoveNode(QueryContext *query_context, const AdminStatement *admin_statement) {
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+
+    String node_name = admin_statement->node_name_.value();
+    QueryResult query_result;
+
+    Status status = InfinityContext::instance().cluster_manager()->RemoveNodeInfo(node_name);
+
+    if (status.ok()) {
+        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
+        query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+    } else {
+        query_result.status_ = status;
+    }
+
+    return query_result;
+}
+
 QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const AdminStatement *admin_statement) {
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -3945,6 +3967,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 }
 
 QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminStatement *admin_statement) {
+    //TODO: check if current role is same as the target role.
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
 
@@ -3984,7 +4007,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 query_result.status_ = status;
                 return query_result;
             }
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, node_name);
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, false, node_name);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to LEADER role");
                 Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
@@ -4027,7 +4050,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 return query_result;
             }
 
-            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, node_name, leader_ip, leader_port);
+            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to FOLLOWER role");
                 Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
@@ -4070,7 +4093,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 return query_result;
             }
 
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, node_name, leader_ip, leader_port);
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to LEARNER role");
                 Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
