@@ -438,7 +438,7 @@ EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 
     return query_token_num_helper<J...>(query_ptr, query_embedding_num, std::forward<decltype(query_args)>(query_args)...);
 }
 
-template <>
+template <typename>
 EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto &&...query_args) const {
     auto error_msg = fmt::format("EMVBIndex::GetQueryResult: query_embedding_num max value: {}, got {} instead.",
                                  current_max_query_token_num,

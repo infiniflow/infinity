@@ -110,7 +110,7 @@ private:
     template <u32 I, u32... J>
     EMVBQueryResultType query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto &&...query_args) const;
 
-    template <>
+    template <typename = void>
     EMVBQueryResultType query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto &&...query_args) const;
 
     template <u32 FIXED_QUERY_TOKEN_NUM>
