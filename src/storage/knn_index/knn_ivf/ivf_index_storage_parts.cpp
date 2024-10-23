@@ -739,7 +739,8 @@ public:
             }
             case KnnDistanceType::kCosine: {
                 // dot(x, v) = dot(x, c + b) + dot((x * a), n) + dot(v, e)
-                // dot(v, v) = dot(c + b, c + b) + dot(a^2, n^2) + 2 * dot ((c + b) * a, n) + 2 * dot(v, e)
+                // dot(v, v) = dot(c + b, c + b) + dot(a^2, n^2) + 2 * dot ((c + b) * a, n) + 2 * dot(v, e) + dot(e, e)
+                // Sift1M shows that it is better to not consider dot(v, e) and dot(e, e)
                 const auto x_l2 = L2NormSquare<f32>(x_ptr, dimension);
                 const auto c_plus_b = MakeUniqueForOverwrite<f32[]>(dimension);
                 const auto x_mult_a = MakeUniqueForOverwrite<f32[]>(dimension);
@@ -758,8 +759,8 @@ public:
                     if (!satisfy_filter_func(segment_offset)) {
                         continue;
                     }
-                    f32 x_v_ip = dot_x_c_b + dot_v_e_[i];
-                    f32 v_l2 = c_plus_b_l2 + 2.0f * dot_v_e_[i];
+                    f32 x_v_ip = dot_x_c_b;
+                    f32 v_l2 = c_plus_b_l2;
                     const u8 *sq_data = sq_data_.data() + i * embedding_sq_bytes_;
                     for (u32 j = 0; j < dimension; ++j) {
                         const auto n = sq_decode(sq_data, j);
