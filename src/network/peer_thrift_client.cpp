@@ -76,8 +76,8 @@ Status PeerClient::Reconnect() {
 
         TSocket *socket = static_cast<TSocket *>(socket_.get());
         socket->setConnTimeout(2000); // 2s to timeout
-        socket->setRecvTimeout(2000);
-        socket->setSendTimeout(2000);
+//        socket->setRecvTimeout(2000);
+//        socket->setSendTimeout(2000);
         transport_ = MakeShared<TBufferedTransport>(socket_);
         protocol_ = MakeShared<TBinaryProtocol>(transport_);
         client_ = MakeUnique<PeerServiceClient>(protocol_);

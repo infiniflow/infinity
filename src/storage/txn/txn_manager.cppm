@@ -36,9 +36,7 @@ export struct TxnInfo {
 
 export class TxnManager {
 public:
-    explicit TxnManager(BufferManager *buffer_mgr,
-                        WalManager *wal_mgr,
-                        TxnTimeStamp start_ts);
+    explicit TxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts);
 
     ~TxnManager() = default;
 
@@ -104,6 +102,9 @@ public:
 
     bool InCheckpointProcess(TxnTimeStamp commit_ts);
 
+    // Only used by follower and learner when received the replicated log from leader
+    void SetStartTS(TxnTimeStamp new_start_ts) { start_ts_ = new_start_ts; }
+
 private:
     mutable std::mutex locker_{};
     BufferManager *buffer_mgr_{};
@@ -113,7 +114,7 @@ private:
 
     Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
     HashSet<Txn *> finishing_txns_;     // the txns in committing stage, can use flat_map
-    Set<TxnTimeStamp> checking_ts_{}; // the begin ts of txn that is used to check conflict
+    Set<TxnTimeStamp> checking_ts_{};   // the begin ts of txn that is used to check conflict
 
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 

@@ -231,9 +231,13 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
     SharedPtr<WalEntry> ckp_wal_entry = MakeShared<WalEntry>();
     String full_ckp_filename = std::filesystem::path(full_catalog_fileinfo.path_).filename();
     ckp_wal_entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(full_catalog_fileinfo.max_commit_ts_, true, "catalog", full_ckp_filename));
+    // Use max ckp commit ts
+    ckp_wal_entry->commit_ts_ = std::max(ckp_wal_entry->commit_ts_, full_catalog_fileinfo.max_commit_ts_);
+    ckp_wal_entry->txn_id_ = storage_->catalog()->next_txn_id();
     for (const auto &delta_catalog_file : delta_catalog_fileinfo_array) {
         String delta_ckp_filename = std::filesystem::path(delta_catalog_file.path_).filename();
         ckp_wal_entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(delta_catalog_file.max_commit_ts_, false, "catalog", delta_ckp_filename));
+        ckp_wal_entry->commit_ts_ = std::max(ckp_wal_entry->commit_ts_, delta_catalog_file.max_commit_ts_);
     }
     log_entries.emplace_back(ckp_wal_entry);
 
