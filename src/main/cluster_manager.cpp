@@ -377,6 +377,7 @@ Status ClusterManager::GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
 
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     // Only used by Leader on follower/learner registration.
+    // TODO: check if the node was already connected before doing other things.
 
     // Connect to follower/learner server.
     auto [client_to_follower, client_status] =

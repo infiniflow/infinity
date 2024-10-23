@@ -3967,6 +3967,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 }
 
 QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminStatement *admin_statement) {
+    //TODO: check if current role is same as the target role.
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
 
