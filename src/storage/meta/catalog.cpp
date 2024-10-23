@@ -60,7 +60,7 @@ import chunk_index_entry;
 import log_file;
 import persist_result_handler;
 import local_file_handle;
-import peer_task;
+import admin_statement;
 
 namespace infinity {
 

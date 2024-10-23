@@ -1258,7 +1258,7 @@ QueryResult Infinity::AdminSetAdmin() {
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kAdmin;
+    admin_statement->node_role_ = NodeRole::kAdmin;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
@@ -1274,7 +1274,7 @@ QueryResult Infinity::AdminSetStandalone() {
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kStandalone;
+    admin_statement->node_role_ = NodeRole::kStandalone;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
@@ -1290,7 +1290,7 @@ QueryResult Infinity::AdminSetLeader(String node_name) {
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kLeader;
+    admin_statement->node_role_ = NodeRole::kLeader;
     ToLower(node_name);
     admin_statement->node_name_ = node_name;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
@@ -1308,7 +1308,7 @@ QueryResult Infinity::AdminSetFollower(String node_name, const String &leader_ad
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kFollower;
+    admin_statement->node_role_ = NodeRole::kFollower;
     admin_statement->leader_address_ = leader_address;
     ToLower(node_name);
     admin_statement->node_name_ = node_name;
@@ -1327,7 +1327,7 @@ QueryResult Infinity::AdminSetLearner(String node_name, const String &leader_add
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kLearner;
+    admin_statement->node_role_ = NodeRole::kLearner;
     admin_statement->leader_address_ = leader_address;
     ToLower(node_name);
     admin_statement->node_name_ = node_name;

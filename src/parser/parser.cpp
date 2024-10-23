@@ -7004,7 +7004,7 @@ yyreduce:
                   {
      (yyval.admin_stmt) = new infinity::AdminStatement();
      (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kSetRole;
-     (yyval.admin_stmt)->admin_node_role_ = infinity::AdminNodeRole::kAdmin;
+     (yyval.admin_stmt)->node_role_ = infinity::NodeRole::kAdmin;
 }
 #line 7010 "parser.cpp"
     break;
@@ -7014,7 +7014,7 @@ yyreduce:
                        {
      (yyval.admin_stmt) = new infinity::AdminStatement();
      (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kSetRole;
-     (yyval.admin_stmt)->admin_node_role_ = infinity::AdminNodeRole::kStandalone;
+     (yyval.admin_stmt)->node_role_ = infinity::NodeRole::kStandalone;
 }
 #line 7020 "parser.cpp"
     break;
@@ -7024,7 +7024,7 @@ yyreduce:
                                 {
      (yyval.admin_stmt) = new infinity::AdminStatement();
      (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kSetRole;
-     (yyval.admin_stmt)->admin_node_role_ = infinity::AdminNodeRole::kLeader;
+     (yyval.admin_stmt)->node_role_ = infinity::NodeRole::kLeader;
      (yyval.admin_stmt)->node_name_ = (yyvsp[0].str_value);
      free((yyvsp[0].str_value));
 }
@@ -7036,7 +7036,7 @@ yyreduce:
                                                 {
      (yyval.admin_stmt) = new infinity::AdminStatement();
      (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kSetRole;
-     (yyval.admin_stmt)->admin_node_role_ = infinity::AdminNodeRole::kFollower;
+     (yyval.admin_stmt)->node_role_ = infinity::NodeRole::kFollower;
      (yyval.admin_stmt)->leader_address_ = (yyvsp[-4].str_value);
      (yyval.admin_stmt)->node_name_ = (yyvsp[0].str_value);
      free((yyvsp[-4].str_value));
@@ -7050,7 +7050,7 @@ yyreduce:
                                                {
      (yyval.admin_stmt) = new infinity::AdminStatement();
      (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kSetRole;
-     (yyval.admin_stmt)->admin_node_role_ = infinity::AdminNodeRole::kLearner;
+     (yyval.admin_stmt)->node_role_ = infinity::NodeRole::kLearner;
      (yyval.admin_stmt)->leader_address_ = (yyvsp[-4].str_value);
      (yyval.admin_stmt)->node_name_ = (yyvsp[0].str_value);
      free((yyvsp[-4].str_value));

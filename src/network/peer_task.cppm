@@ -17,19 +17,9 @@ module;
 export module peer_task;
 
 import stl;
+import admin_statement;
 
 namespace infinity {
-
-export enum class NodeRole {
-    kUnInitialized,
-    kAdmin,
-    kStandalone,
-    kLeader,
-    kFollower,
-    kLearner,
-};
-
-export String ToString(NodeRole);
 
 export enum class PeerTaskType {
     kInvalid,

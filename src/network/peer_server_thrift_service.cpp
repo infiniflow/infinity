@@ -25,6 +25,7 @@ import peer_task;
 import status;
 import infinity_exception;
 import cluster_manager;
+import admin_statement;
 
 namespace infinity {
 
