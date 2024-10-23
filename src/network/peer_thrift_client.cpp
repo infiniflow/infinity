@@ -26,6 +26,7 @@ import infinity_exception;
 import peer_task;
 import infinity_context;
 import cluster_manager;
+import admin_statement;
 
 namespace infinity {
 

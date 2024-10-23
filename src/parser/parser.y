@@ -2527,24 +2527,24 @@ admin_statement: ADMIN SHOW CATALOGS {
 | ADMIN SET ADMIN {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kAdmin;
+     $$->node_role_ = infinity::NodeRole::kAdmin;
 }
 | ADMIN SET STANDALONE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kStandalone;
+     $$->node_role_ = infinity::NodeRole::kStandalone;
 }
 | ADMIN SET LEADER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kLeader;
+     $$->node_role_ = infinity::NodeRole::kLeader;
      $$->node_name_ = $5;
      free($5);
 }
 | ADMIN CONNECT STRING AS FOLLOWER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kFollower;
+     $$->node_role_ = infinity::NodeRole::kFollower;
      $$->leader_address_ = $3;
      $$->node_name_ = $7;
      free($3);
@@ -2553,7 +2553,7 @@ admin_statement: ADMIN SHOW CATALOGS {
 | ADMIN CONNECT STRING AS LEARNER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kLearner;
+     $$->node_role_ = infinity::NodeRole::kLearner;
      $$->leader_address_ = $3;
      $$->node_name_ = $7;
      free($3);

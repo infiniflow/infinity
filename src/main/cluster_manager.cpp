@@ -25,6 +25,7 @@ import infinity_exception;
 import peer_server_thrift_types;
 import wal_manager;
 import wal_entry;
+import admin_statement;
 
 namespace infinity {
 
@@ -131,7 +132,7 @@ Status ClusterManager::UnInit(bool not_unregister) {
     }
 
     std::unique_lock<std::mutex> lock(mutex_);
-    if(!not_unregister) {
+    if (!not_unregister) {
         Status status = UnregisterToLeaderNoLock();
     }
 
@@ -377,7 +378,20 @@ Status ClusterManager::GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
 
 Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
     // Only used by Leader on follower/learner registration.
-    // TODO: check if the node was already connected before doing other things.
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (this_node_->node_role_ != NodeRole::kLeader) {
+            String error_message = "Non-leader role can't add other node.";
+            UnrecoverableError(error_message);
+        }
+
+        // Add by register
+        auto iter = other_node_map_.find(node_info->node_name_);
+        if (iter != other_node_map_.end()) {
+            // Duplicated node
+            return Status::DuplicateNode(node_info->node_name_);
+        }
+    }
 
     // Connect to follower/learner server.
     auto [client_to_follower, client_status] =

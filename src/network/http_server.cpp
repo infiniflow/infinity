@@ -60,7 +60,6 @@ import status;
 import constant_expr;
 import command_statement;
 import physical_import;
-import peer_task;
 
 namespace {
 

@@ -77,9 +77,9 @@ import memindex_tracer;
 import persistence_manager;
 import global_resource_usage;
 import infinity_context;
-import peer_task;
 import cleanup_scanner;
 import obj_status;
+import admin_statement;
 
 namespace infinity {
 

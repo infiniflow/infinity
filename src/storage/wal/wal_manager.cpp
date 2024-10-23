@@ -56,7 +56,8 @@ import defer_op;
 import index_base;
 import base_table_ref;
 import cluster_manager;
-import peer_task;
+import admin_statement;
+import cleanup_scanner;
 
 module wal_manager;
 

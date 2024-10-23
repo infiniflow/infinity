@@ -21,23 +21,6 @@ import third_party;
 
 namespace infinity {
 
-String ToString(NodeRole role) {
-    switch (role) {
-        case NodeRole::kUnInitialized:
-            return "uninitialized";
-        case NodeRole::kAdmin:
-            return "admin";
-        case NodeRole::kStandalone:
-            return "standalone";
-        case NodeRole::kLeader:
-            return "leader";
-        case NodeRole::kFollower:
-            return "follower";
-        case NodeRole::kLearner:
-            return "learner";
-    }
-}
-
 String ToString(NodeStatus status) {
     switch (status) {
         case NodeStatus::kAlive:

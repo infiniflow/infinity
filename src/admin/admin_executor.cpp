@@ -3967,25 +3967,30 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 }
 
 QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminStatement *admin_statement) {
-    //TODO: check if current role is same as the target role.
+    // TODO: check if current role is same as the target role.
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
 
-    AdminNodeRole admin_server_role = admin_statement->admin_node_role_.value();
-    Status status;
+    NodeRole target_node_role = admin_statement->node_role_.value();
     QueryResult query_result;
-    switch (admin_server_role) {
-        case AdminNodeRole::kAdmin: {
+    NodeRole current_node_role = InfinityContext::instance().GetServerRole();
+    if (current_node_role == target_node_role) {
+        query_result.status_ = Status::InvalidNodeRole(fmt::format("Infinity is already the role of {}", ToString(current_node_role)));
+        return query_result;
+    }
+    Status status;
+    switch (target_node_role) {
+        case NodeRole::kAdmin: {
             status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
             LOG_INFO("Start in ADMIN mode");
             break;
         }
-        case AdminNodeRole::kStandalone: {
+        case NodeRole::kStandalone: {
             status = InfinityContext::instance().ChangeRole(NodeRole::kStandalone);
             LOG_INFO("Start in STANDALONE mode");
             break;
         }
-        case AdminNodeRole::kLeader: {
+        case NodeRole::kLeader: {
             String node_name = admin_statement->node_name_.value();
             switch (IdentifierValidation(node_name)) {
                 case IdentifierValidationStatus::kOk:
@@ -4019,7 +4024,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             }
             break;
         }
-        case AdminNodeRole::kFollower: {
+        case NodeRole::kFollower: {
             String node_name = admin_statement->node_name_.value();
             switch (IdentifierValidation(node_name)) {
                 case IdentifierValidationStatus::kOk:
@@ -4062,7 +4067,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             }
             break;
         }
-        case AdminNodeRole::kLearner: {
+        case NodeRole::kLearner: {
             String node_name = admin_statement->node_name_.value();
             switch (IdentifierValidation(node_name)) {
                 case IdentifierValidationStatus::kOk:
@@ -4104,6 +4109,9 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 LOG_INFO("Start in LEARNER role");
             }
             break;
+        }
+        default: {
+            UnrecoverableError("Unsupported role");
         }
     }
 
