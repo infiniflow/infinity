@@ -669,13 +669,22 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
 
 Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
     WalManager *wal_manager = storage_->wal_manager();
+    TransactionID last_txn_id = 0;
+    TxnTimeStamp last_commit_ts = 0;
     for (auto &log_str : synced_logs) {
         const i32 entry_size = log_str.size();
         const char *ptr = log_str.data();
         SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
         LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
+        last_txn_id = entry->txn_id_;
+        last_commit_ts = entry->commit_ts_;
         wal_manager->ReplayWalEntry(*entry, false);
     }
+
+    LOG_INFO(fmt::format("Replicated from leader: latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
+    storage_->catalog()->next_txn_id_ = last_txn_id;
+    storage_->wal_manager()->UpdateCommitState(last_commit_ts, 0);
+    storage_->txn_manager()->SetStartTS(last_commit_ts);
     return Status::OK();
 }
 
