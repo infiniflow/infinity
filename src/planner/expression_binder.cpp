@@ -14,6 +14,8 @@
 
 module;
 
+#include <string>
+
 module expression_binder;
 
 import stl;
