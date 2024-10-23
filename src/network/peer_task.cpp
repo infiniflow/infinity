@@ -100,5 +100,9 @@ String SyncLogTask::ToString() const {
     return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, log_strings_.size());
 }
 
+String ChangeRoleTask::ToString() const {
+    return fmt::format("{} to {}", infinity::ToString(type_), role_name_);
+}
+
 
 } // namespace infinity

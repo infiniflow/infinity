@@ -45,6 +45,7 @@ enum class AdminStmtType {
     kListNodes,
     kShowNode,
     kShowCurrentNode,
+    kRemoveNode,
     kSetRole,
     kInvalid,
 };

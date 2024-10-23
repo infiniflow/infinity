@@ -176,4 +176,17 @@ public:
     String error_message_{};
 };
 
+export class ChangeRoleTask final : public PeerTask {
+public:
+    ChangeRoleTask(String role_name) : PeerTask(PeerTaskType::kChangeRole), role_name_(std::move(role_name)) {}
+
+    String ToString() const final;
+
+    String role_name_{};
+
+    // response
+    i64 error_code_{};
+    String error_message_{};
+};
+
 } // namespace infinity

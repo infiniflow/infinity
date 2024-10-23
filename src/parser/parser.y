@@ -2518,6 +2518,12 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowCurrentNode;
 }
+| ADMIN REMOVE NODE STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kRemoveNode;
+     $$->node_name_ = $4;
+     free($4);
+}
 | ADMIN SET ADMIN {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;

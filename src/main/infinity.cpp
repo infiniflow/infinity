@@ -1230,6 +1230,23 @@ QueryResult Infinity::AdminShowCurrentNode() {
     return result;
 }
 
+QueryResult Infinity::AdminRemoveNode(String node_name) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    ToLower(node_name);
+    admin_statement->admin_type_ = AdminStmtType::kRemoveNode;
+    admin_statement->node_name_ = node_name;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
 QueryResult Infinity::AdminSetAdmin() {
     auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),

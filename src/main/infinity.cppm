@@ -218,6 +218,7 @@ public:
     QueryResult AdminSetLeader(String node_name);
     QueryResult AdminSetFollower(String node_name, const String &leader_address);
     QueryResult AdminSetLearner(String node_name, const String &leader_address);
+    QueryResult AdminRemoveNode(String var_name);
 
 private:
     UniquePtr<QueryContext> GetQueryContext() const;

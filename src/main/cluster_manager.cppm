@@ -63,6 +63,7 @@ private:
 public:
     // Used by leader to add non-leader node in register phase
     Status AddNodeInfo(const SharedPtr<NodeInfo> &new_node);
+    Status RemoveNodeInfo(const String &node_name);
 
     // Used by leader to remove unregister node
     Status UpdateNodeByLeader(const String &node_name, UpdateNodeOp update_node_op);

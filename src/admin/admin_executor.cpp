@@ -143,6 +143,9 @@ QueryResult AdminExecutor::Execute(QueryContext *query_context, const AdminState
         case AdminStmtType::kShowCurrentNode: {
             return ShowCurrentNode(query_context, admin_statement);
         }
+        case AdminStmtType::kRemoveNode: {
+            return RemoveNode(query_context, admin_statement);
+        }
         case AdminStmtType::kSetRole: {
             return SetRole(query_context, admin_statement);
         }
@@ -3812,6 +3815,25 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
 
     output_block_ptr->Finalize();
     query_result.result_table_->Append(std::move(output_block_ptr));
+    return query_result;
+}
+
+QueryResult AdminExecutor::RemoveNode(QueryContext *query_context, const AdminStatement *admin_statement) {
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+
+    String node_name = admin_statement->node_name_.value();
+    QueryResult query_result;
+
+    Status status = InfinityContext::instance().cluster_manager()->RemoveNodeInfo(node_name);
+
+    if (status.ok()) {
+        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
+        query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+    } else {
+        query_result.status_ = status;
+    }
+
     return query_result;
 }
 

@@ -58,6 +58,7 @@ private:
     void Unregister(UnregisterPeerTask *peer_task);
     void HeartBeat(HeartBeatPeerTask *peer_task);
     void SyncLogs(SyncLogTask *peer_task);
+    void ChangeRole(ChangeRoleTask* change_role_task);
 
 private:
     String from_node_name_{};
