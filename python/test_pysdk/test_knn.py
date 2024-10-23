@@ -1736,3 +1736,27 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_with_index"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_bits.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("knn_distance_type", ["hamming"])
+    def test_binary_embedding_hamming_distance(self, check_data, knn_distance_type, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_binary_knn_hamming_distance" + suffix)
+        table_obj = db_obj.create_table("test_binary_knn_hamming_distance" + suffix, {
+            "c1" : {"type" : "int"},
+            "c2" : {"type" : "vector, 16, bit"}
+        }, ConflictType.Error)
+
+        table_obj.insert([{"c1" : 0, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}])
+        table_obj.insert([{"c1" : 1, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]}])
+        table_obj.insert([{"c1" : 2, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2]}])
+        table_obj.insert([{"c1" : 3, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3]}])
+        table_obj.insert([{"c1" : 4, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4]}])
+        table_obj.insert([{"c1" : 5, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5]}])
+
+        res = table_obj.output(["*", "_distance"]).match_dense("c2", [0] * 16, "bit", "hamming", 3).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1' : (0, 1, 2), 'c2' : (['0000000000000000'], ['0000000000000001'], ['0000000000000011']), 'DISTANCE' : (0.0, 1.0, 2.0)}
+        ).astype({'c1': dtype('int32'), 'DISTANCE' : dtype('float32')})) 

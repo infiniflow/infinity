@@ -14,8 +14,6 @@
 
 module;
 
-#include <string>
-
 module expression_binder;
 
 import stl;
@@ -898,8 +896,8 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
             }
             case ParsedExprType::kMatchSparse: {
                 auto &match_sparse = const_cast<MatchSparseExpr &>(*static_cast<const MatchSparseExpr *>(match_expr));
-                for(auto &param : match_sparse.opt_params_){
-                    if(param->param_name_ != "alpha" and param->param_name_ != "beta" and param->param_name_ != "tail"){
+                for (auto &param : match_sparse.opt_params_) {
+                    if (param->param_name_ != "alpha" and param->param_name_ != "beta" and param->param_name_ != "tail") {
                         RecoverableError(Status::SyntaxError(fmt::format("Unsupported optional parameter: {}", param->param_name_)));
                     }
                 }
