@@ -1,0 +1,115 @@
+statement ok
+DROP TABLE IF EXISTS cached_sparse_scan;
+
+statement ok
+CREATE TABLE cached_sparse_scan(col1 INT, col2 SPARSE(FLOAT,100));
+
+statement ok
+COPY cached_sparse_scan FROM '/var/infinity/test_data/sparse_knn.csv' WITH (FORMAT CSV);
+
+query I
+EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [col1 (#0)]
+ -> MatchSparseScan (2)
+    - table index: #1
+    - output columns: [col1, __score, __rowid]
+
+query I
+SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+2
+1
+
+query I
+EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [col1 (#0)]
+ -> Read cache (2)
+    - table name: (default_db.cached_sparse_scan)
+    - output columns: [col1, __score, __rowid]
+
+query I
+SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+2
+1
+
+query I
+EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3) WHERE col1 < 4;
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [col1 (#0)]
+ -> MatchSparseScan (2)
+    - table index: #1
+    - output columns: [col1, __score, __rowid]
+
+statement ok
+COPY cached_sparse_scan FROM '/var/infinity/test_data/sparse_knn.csv' WITH (FORMAT CSV);
+
+query I
+EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [col1 (#0)]
+ -> MERGE MatchSparse (5)
+    - table name: cached_sparse_scan(default_db.cached_sparse_scan)
+    - table index: #1
+    - MatchSparse expression: MATCH SPARSE (col2, [Cast([0:1.000000,20:2.000000,80:3.000000] AS Sparse(float,int8,100))], INNER_PRODUCT, 3) WITH ()
+    - Top N: 3
+    - output columns: [col1, __score, __rowid]
+   -> MatchSparseScan (2)
+      - table index: #1
+      - output columns: [col1, __score, __rowid]
+
+query I
+SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+4
+2
+
+query I
+EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [col1 (#0)]
+ -> Read cache (2)
+    - table name: (default_db.cached_sparse_scan)
+    - output columns: [col1, __score, __rowid]
+
+query I
+SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+4
+2
+
+query I
+EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3) WHERE col1 < 4;
+----
+ PROJECT (3)
+  - table index: #4
+  - expressions: [col1 (#0)]
+ -> MERGE MatchSparse (5)
+    - table name: cached_sparse_scan(default_db.cached_sparse_scan)
+    - table index: #1
+    - MatchSparse expression: MATCH SPARSE (col2, [Cast([0:1.000000,20:2.000000,80:3.000000] AS Sparse(float,int8,100))], INNER_PRODUCT, 3) WITH ()
+    - Top N: 3
+    - output columns: [col1, __score, __rowid]
+   -> MatchSparseScan (2)
+      - table index: #1
+      - output columns: [col1, __score, __rowid]
+
+statement ok
+DROP TABLE cached_sparse_scan;
+

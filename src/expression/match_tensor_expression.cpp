@@ -13,6 +13,7 @@
 // limitations under the License.
 
 module;
+#include<vector>
 
 module match_tensor_expression;
 
@@ -57,6 +58,39 @@ String MatchTensorExpression::ToString() const {
     const auto options_str = options_text_.empty() ? "" : fmt::format(", '{}'", options_text_);
     const auto filter_str = optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "";
     return fmt::format("MATCH TENSOR ({}, {}, {}{}{})", column_expr_->Name(), tensor_str, MethodToString(search_method_), options_str, filter_str);
+}
+
+u64 MatchTensorExpression::Hash() const {
+    u64 h = 0;
+    for (const auto &arg : arguments_) {
+        h ^= arg->Hash();
+    }
+    h ^= std::hash<MatchTensorSearchMethod>()(search_method_);
+    h ^= column_expr_->Hash();
+    h ^= std::hash<EmbeddingDataType>()(embedding_data_type_);
+    h ^= std::hash<u32>()(dimension_);
+    h ^= std::hash<u32>()(tensor_basic_embedding_dimension_);
+    h ^= std::hash<String>()(options_text_);
+    return h;
+}
+
+bool MatchTensorExpression::Eq(const BaseExpression &other_base) const {
+    if (other_base.type() != ExpressionType::kMatchTensor) {
+        return false;
+    }
+    const auto &other = static_cast<const MatchTensorExpression &>(other_base);
+    if (arguments_.size() != other.arguments_.size()) {
+        return false;
+    }
+    for (SizeT i = 0; i < arguments_.size(); ++i) {
+        if (!arguments_[i]->Eq(*other.arguments_[i])) {
+            return false;
+        }
+    }
+    bool eq = search_method_ == other.search_method_ && column_expr_->Eq(*other.column_expr_) && embedding_data_type_ == other.embedding_data_type_ &&
+              dimension_ == other.dimension_ && query_embedding_.Eq(other.query_embedding_, embedding_data_type_, dimension_) &&
+              tensor_basic_embedding_dimension_ == other.tensor_basic_embedding_dimension_ && options_text_ == other.options_text_;
+    return eq;
 }
 
 } // namespace infinity

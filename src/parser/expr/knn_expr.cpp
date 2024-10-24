@@ -23,8 +23,8 @@ KnnExpr::~KnnExpr() {
         column_expr_ = nullptr;
     }
 
-    if(opt_params_ != nullptr) {
-        for(auto* param_ptr: *opt_params_) {
+    if (opt_params_ != nullptr) {
+        for (auto *param_ptr : *opt_params_) {
             delete param_ptr;
             param_ptr = nullptr;
         }

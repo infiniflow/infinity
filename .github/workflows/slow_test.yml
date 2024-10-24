@@ -4,7 +4,7 @@ on:
   # Schedule the workflow to run at 00:30 UTC+8 every day
   # https://docs.github.com/zh/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule
   schedule:
-    - cron: '30 16 * * *' # 00:30 - 8 = 16:30
+    - cron: '30 10,18,2 * * *' # utc-8: 18:30, 2:30, 10:30
   # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
   create:
     tags:
@@ -20,7 +20,7 @@ on:
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+#   cancel-in-progress: true
 
 jobs:
   slow_tests:
@@ -43,7 +43,7 @@ jobs:
 
       - name: Check out code
         if: ${{ !cancelled() && !failure() }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}

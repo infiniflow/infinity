@@ -44,6 +44,10 @@ curl --request POST \
              {
                   "name": "tensor",
                   "type": "tensor,4,float"
+             },
+             {
+                  "name": "decimal",
+                  "type": "double"
              }
         ]
     } '
@@ -62,7 +66,8 @@ curl --request POST \
              "vec": [1.0, 1.2, 0.8, 0.9],
              "sparse_column": {"10":1.1, "20":2.2, "30": 3.3},
              "year": 2024,
-             "tensor": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]
+             "tensor": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
+             "decimal": 1.4
          },
          {
              "num": 2,
@@ -70,7 +75,8 @@ curl --request POST \
              "vec": [4.0, 4.2, 4.3, 4.5],
              "sparse_column": {"40":4.4, "50":5.5, "60": 6.6},
              "year": 2023,
-             "tensor": [[4.0, 0.0, 4.3, 4.5], [4.0, 4.2, 4.4, 5.0]]
+             "tensor": [[4.0, 0.0, 4.3, 4.5], [4.0, 4.2, 4.4, 5.0]],
+             "decimal": 1.5
          },
          {
              "num": 3,
@@ -78,7 +84,8 @@ curl --request POST \
              "vec": [4.0, 4.2, 4.3, 4.2],
              "sparse_column":  {"70":7.7, "80":8.8, "90": 9.9},
              "year": 2019,
-             "tensor": [[0.9, 0.1, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]
+             "tensor": [[0.9, 0.1, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
+             "decimal": -1.4
          },
          {
              "num": 4,
@@ -86,7 +93,8 @@ curl --request POST \
              "vec": [4.0, 4.2, 4.3, 4.5],
              "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
              "year": 2018,
-             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
+             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]],
+             "decimal": -1.5
          },
          {
              "num": 5,
@@ -94,7 +102,8 @@ curl --request POST \
              "vec": [4.0, 4.2, 4.3, 4.5],
              "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
              "year": 2018,
-             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
+             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]],
+             "decimal": 1
          },
          {
              "num": 6,
@@ -102,7 +111,8 @@ curl --request POST \
              "vec": [4.0, 4.2, 4.3, 4.5],
              "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
              "year": 2018,
-             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
+             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]],
+             "decimal": -1
          },
          {
              "num": 7,
@@ -110,7 +120,8 @@ curl --request POST \
              "vec": [4.0, 4.2, 4.3, 4.5],
              "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
              "year": 2018,
-             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
+             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]],
+             "decimal": 0.4
          },
          {
              "num": 8,
@@ -118,7 +129,8 @@ curl --request POST \
              "vec": [4.0, 4.2, 4.3, 4.5],
              "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
              "year": 2018,
-             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
+             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]],
+             "decimal": 0.5
          }
      ] '
 
@@ -300,6 +312,50 @@ curl --request GET \
          ],
         "filter": "trim(body) = '\''this is an example for trim'\''"
      } '
+
+# show rows of 'tbl1' where char_position(body, '123') = 1
+echo -e '\n\n-- show rows of 'tbl1' where char_position(body, '123') = 1'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "body"
+         ],
+        "filter": "char_position(body, '123') = 1"
+     } '
+
+# show rows of 'tbl1' with sqrt(num)
+echo -e '\n\n-- show rows of 'tbl1' with sqrt(num)'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "num", "sqrt(num)"
+         ]
+     } '
+
+# show rows of 'tbl1' with decimal, round(decimal), ceil(decimal), floor(decimal)
+echo -e '\n\n-- show rows of 'tbl1' with decimal, round(decimal), ceil(decimal), floor(decimal)'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "decimal", "round(decimal)", "ceil(decimal)", "floor(decimal)"
+         ]
+     } '
+
 
 # drop tbl1
 echo -e '\n\n-- drop tbl1'

@@ -42,7 +42,7 @@ public:
                                UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                                SharedPtr<Vector<LoadMeta>> load_metas,
                                bool add_row_id = false)
-        : PhysicalScanBase(id, PhysicalOperatorType::kTableScan, nullptr, nullptr, base_table_ref, load_metas),
+        : PhysicalScanBase(id, PhysicalOperatorType::kTableScan, nullptr, nullptr, 0, base_table_ref, load_metas),
           fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)), add_row_id_(add_row_id) {}
 
     ~PhysicalTableScan() override = default;
@@ -68,10 +68,6 @@ public:
     bool ParallelExchange() const override { return true; }
 
     bool IsExchange() const override { return true; }
-
-    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
-        table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
-    }
 
 private:
     void ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state);

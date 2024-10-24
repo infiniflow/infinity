@@ -26,7 +26,6 @@ import default_values;
 namespace infinity {
 
 class BGTaskProcessor;
-struct Catalog;
 class WalManager;
 class CatalogDeltaEntry;
 
@@ -37,12 +36,7 @@ export struct TxnInfo {
 
 export class TxnManager {
 public:
-    explicit TxnManager(Catalog *catalog,
-                        BufferManager *buffer_mgr,
-                        BGTaskProcessor *task_processor,
-                        WalManager *wal_mgr,
-                        TransactionID start_txn_id,
-                        TxnTimeStamp start_ts);
+    explicit TxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts);
 
     ~TxnManager() = default;
 
@@ -60,10 +54,6 @@ public:
 
     BufferManager *GetBufferMgr() const { return buffer_mgr_; }
 
-    Catalog *GetCatalog() const { return catalog_; }
-
-    BGTaskProcessor *bg_task_processor() const { return bg_task_processor_; }
-
     TxnTimeStamp GetCommitTimeStampR(Txn *txn);
 
     TxnTimeStamp GetCommitTimeStampW(Txn *txn);
@@ -71,8 +61,6 @@ public:
     bool CheckConflict(Txn *txn);
 
     void SendToWAL(Txn *txn);
-
-    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     void Start();
 
@@ -114,17 +102,19 @@ public:
 
     bool InCheckpointProcess(TxnTimeStamp commit_ts);
 
+    // Only used by follower and learner when received the replicated log from leader
+    void SetStartTS(TxnTimeStamp new_start_ts) { start_ts_ = new_start_ts; }
+
 private:
-    Catalog *catalog_{};
     mutable std::mutex locker_{};
     BufferManager *buffer_mgr_{};
-    BGTaskProcessor *bg_task_processor_{};
+
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 
     Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
     HashSet<Txn *> finishing_txns_;     // the txns in committing stage, can use flat_map
-    Set<TxnTimeStamp> checking_ts_{}; // the begin ts of txn that is used to check conflict
+    Set<TxnTimeStamp> checking_ts_{};   // the begin ts of txn that is used to check conflict
 
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 

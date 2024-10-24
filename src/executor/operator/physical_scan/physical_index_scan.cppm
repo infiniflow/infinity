@@ -59,7 +59,8 @@ public:
                                SharedPtr<Vector<LoadMeta>> load_metas,
                                SharedPtr<Vector<String>> output_names,
                                SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                               bool add_row_id = true);
+                               bool add_row_id = true,
+                               bool cache_result = false);
 
     ~PhysicalIndexScan() final = default;
 
@@ -77,11 +78,6 @@ public:
     SizeT TaskletCount() final { return base_table_ref_->block_index_->SegmentCount(); }
 
     Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64) const override;
-
-    // for InputLoad
-    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
-        table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
-    }
 
     Vector<UniquePtr<Vector<SegmentID>>> PlanSegments(u32 parallel_count) const;
 

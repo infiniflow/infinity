@@ -149,8 +149,8 @@ public:
 
     void Prefetch(SizeT idx, const Meta &meta) const {
         const SparseVecEle &vec = vecs_[idx];
-        _mm_prefetch(vec.indices_.get(), _MM_HINT_T0);
-        _mm_prefetch(vec.data_.get(), _MM_HINT_T0);
+        _mm_prefetch((const char*)vec.indices_.get(), _MM_HINT_T0);
+        _mm_prefetch((const char*)vec.data_.get(), _MM_HINT_T0);
     }
 
 private:

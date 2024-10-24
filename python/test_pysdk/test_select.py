@@ -816,8 +816,6 @@ class TestInfinity:
             [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
              {"c1": 'abc', "c2": 'abc'}, {"c1": 'bbc', "c2": 'bbc'}, {"c1": 'cbc', "c2": 'cbc'}, {"c1": 'dbc', "c2": 'dbc'}])
 
-
-
         res = table_obj.output(["*"]).filter("char_length(c1) = 1").to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a', 'b', 'c', 'd'),
@@ -852,4 +850,149 @@ class TestInfinity:
 
 
         res = db_obj.drop_table("test_select_regex"+suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_upper_lower(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_upper_lower"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_upper_lower"+suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_upper_lower"+suffix)
+        table_obj.insert(
+            [{"c1": 'a', "c2": 'A'}, {"c1": 'b', "c2": 'B'}, {"c1": 'c', "c2": 'C'}, {"c1": 'd', "c2": 'D'},
+             {"c1": 'abc', "c2": 'ABC'}, {"c1": 'bbc', "c2": 'bbc'}, {"c1": 'cbc', "c2": 'cbc'}, {"c1": 'dbc', "c2": 'dbc'},])
+
+        res = table_obj.output(["*"]).filter("upper(c1) = c2").to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a', 'b', 'c', 'd', 'abc'),
+                                                         'c2': ('A', 'B', 'C', 'D', 'ABC')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+
+        res = db_obj.drop_table("test_select_upper_lower"+suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_substring(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_substring"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_substring"+suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_substring"+suffix)
+        table_obj.insert(
+            [{"c1": 'a', "c2": 'A'}, {"c1": 'b', "c2": 'B'}, {"c1": 'c', "c2": 'C'}, {"c1": 'd', "c2": 'D'},
+             {"c1": 'abc', "c2": 'ABC'}, {"c1": 'bbcc', "c2": 'bbc'}, {"c1": 'cbcc', "c2": 'cbc'}, {"c1": 'dbcc', "c2": 'dbc'},])
+
+        res = table_obj.output(["*"]).filter("substring(c1, 0, 3) = c2").to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('bbcc', 'cbcc', 'dbcc'),
+                                                         'c2': ('bbc', 'cbc', 'dbc')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+        res = db_obj.drop_table("test_select_substring"+suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_trim(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_trim"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_trim"+suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_trim"+suffix)
+        table_obj.insert(
+            [{"c1": ' a', "c2": 'a'}, {"c1": ' b', "c2": 'b'}, {"c1": ' c', "c2": 'c'}, 
+             {"c1": 'ab ', "c2": 'ab'}, {"c1": 'bcc ', "c2": 'bcc'}, {"c1": 'cbc ', "c2": 'cbc'}, {"c1": ' dbc ', "c2": 'dbc'},])
+
+        res = table_obj.output(["*"]).filter("ltrim(c1) = c2").to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (' a', ' b', ' c'),
+                                                         'c2': ('a', 'b', 'c')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+        
+        res = table_obj.output(["*"]).filter("rtrim(c1) = c2").to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('ab ', 'bcc ', 'cbc '),
+                                                         'c2': ('ab', 'bcc', 'cbc')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+        res = table_obj.output(["*"]).filter("trim(c1) = c2").to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (' a', ' b', ' c', 'ab ', 'bcc ', 'cbc ', ' dbc '),
+                                                         'c2': ('a', 'b', 'c', 'ab', 'bcc', 'cbc', 'dbc')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+        res = db_obj.drop_table("test_select_trim"+suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_position(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_position"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_position"+suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_position"+suffix)
+        table_obj.insert(
+            [{"c1": 'a', "c2": 'A'}, {"c1": 'b', "c2": 'B'}, {"c1": 'c', "c2": 'C'}, {"c1": 'd', "c2": 'D'},
+             {"c1": 'abc', "c2": 'ABC'}, {"c1": 'bbcc', "c2": 'bbc'}, {"c1": 'cbcc', "c2": 'cbc'}, {"c1": 'dbcc', "c2": 'dbc'},])
+
+        res = table_obj.output(["*"]).filter("char_position(c1, c2) <> 0").to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('bbcc', 'cbcc', 'dbcc'),
+                                                         'c2': ('bbc', 'cbc', 'dbc')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+        res = db_obj.drop_table("test_select_position"+suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_sqrt(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_sqrt"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_sqrt"+suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "double"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_sqrt"+suffix)
+        table_obj.insert(
+            [{"c1": '1', "c2": '2'}, {"c1": '4', "c2": '5'}, {"c1": '9', "c2": '10'}, {"c1": '16', "c2": '17'}])
+
+        res = table_obj.output(["*", "sqrt(c1)", "sqrt(c2)"]).to_df()
+        print(res)
+
+        res = table_obj.output(["*"]).filter("sqrt(c1) = 2").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (4,),
+                                                         'c2': (5,)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('double')}))
+
+        res = db_obj.drop_table("test_select_sqrt"+suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_round(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_round"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_round"+suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "double"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_round"+suffix)
+        table_obj.insert(
+            [{"c1": '1', "c2": '2.4'}, {"c1": '4', "c2": '-2.4'}, {"c1": '9', "c2": '2.5'}, {"c1": '16', "c2": '-2.5'}])
+
+        res = table_obj.output(["c1", "round(c2)"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
+                                                         'round(c2)': (2, -2, 3, -3)})
+                                      .astype({'c1': dtype('int32'), 'round(c2)': dtype('double')}))
+
+        res = table_obj.output(["c1", "ceil(c2)"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
+                                                         'ceil(c2)': (3, -2, 3, -2)})
+                                      .astype({'c1': dtype('int32'), 'ceil(c2)': dtype('double')}))
+
+        res = table_obj.output(["c1", "floor(c2)"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
+                                                         'floor(c2)': (2, -3, 2, -3)})
+                                      .astype({'c1': dtype('int32'), 'floor(c2)': dtype('double')}))
+
+        res = db_obj.drop_table("test_select_round"+suffix)
         assert res.error_code == ErrorCode.OK

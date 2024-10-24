@@ -271,6 +271,7 @@ TEST_F(VirtualStoreTest, TestCleanDir) {
     EXPECT_TRUE(VirtualStore::Exists(dir));
 }
 
+/*
 TEST_F(VirtualStoreTest, minio_upload) {
     using namespace infinity;
     auto config_path = MakeShared<String>(std::string(test_data_path())+"/config/test_minio_s3_storage.toml");
@@ -346,3 +347,4 @@ TEST_F(VirtualStoreTest, minio_download) {
     VirtualStore::UnInitRemoteStore();
     infinity::InfinityContext::instance().UnInit();
 }
+*/

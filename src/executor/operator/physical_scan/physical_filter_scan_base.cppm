@@ -32,10 +32,12 @@ public:
                            PhysicalOperatorType type,
                            UniquePtr<PhysicalOperator> left,
                            UniquePtr<PhysicalOperator> right,
+                           u64 table_index,
                            SharedPtr<BaseTableRef> base_table_ref,
                            SharedPtr<CommonQueryFilter> common_query_filter,
                            SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalScanBase(id, type, std::move(left), std::move(right), base_table_ref, load_metas), common_query_filter_(common_query_filter) {}
+        : PhysicalScanBase(id, type, std::move(left), std::move(right), table_index, base_table_ref, load_metas),
+          common_query_filter_(common_query_filter) {}
 
     bool CalculateFilterBitmask(SegmentID segment_id, BlockID block_id, BlockOffset row_count, Bitmask &bitmask) const;
 

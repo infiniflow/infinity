@@ -63,4 +63,20 @@ SharedPtr<FilterFulltextExpression> FilterFulltextExpression::BuildFilterFulltex
     return MakeShared<FilterFulltextExpression>(std::move(fields), std::move(matching_text), std::move(options_text));
 }
 
+u64 FilterFulltextExpression::Hash() const {
+    u64 h = 0;
+    h ^= std::hash<String>()(fields_);
+    h ^= std::hash<String>()(matching_text_);
+    h ^= std::hash<String>()(options_text_);
+    return h;
+}
+
+bool FilterFulltextExpression::Eq(const BaseExpression &other_base) const {
+    if (other_base.type() != ExpressionType::kFilterFullText) {
+        return false;
+    }
+    const auto &other = static_cast<const FilterFulltextExpression &>(other_base);
+    return fields_ == other.fields_ && matching_text_ == other.matching_text_ && options_text_ == other.options_text_;
+}
+
 } // namespace infinity
