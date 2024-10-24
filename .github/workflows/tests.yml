@@ -111,20 +111,27 @@ jobs:
           failure="${{ steps.run_tests_debug.outcome == 'failure' || steps.stop_tests_debug.outcome == 'failure' }}"
           sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=debug.log --stderror_path=debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
-      - name: Start infinity debug version with vfs off
+      - name: Start minio container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
+          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ~/minio_data && sudo mkdir ~/minio_data && sudo docker run  --name ${MINIO_CONTAINER}  -p 9000:9000    -p 9001:9001  --restart always -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ~/minio_data:/data    quay.io/minio/minio server /data --console-address ":9001"
+
+      - name: Start infinity debug version with minio
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_vfs_off.toml > vfs_debug.log 2> vfs_debug_error.log" &
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > vfs_debug.log 2> vfs_debug_error.log" &
 
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test debug version
         if: ${{ !cancelled() && !failure() }}
-        id: run_tests_debug_vfs_off
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
+        id: run_tests_debug_minio
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install minio && python3 tools/make_s3_bucket && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
 
       - name: Stop infinity pysdk & http_api & sqllogictest debug
         if: ${{ !cancelled() }}
-        id: stop_tests_debug_vfs_off
+        id: stop_tests_debug_minio
         run: |
           pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
@@ -154,6 +161,13 @@ jobs:
         run: |
           if [ -n "${BUILDER_CONTAINER}" ]; then
             sudo docker rm -f -v ${BUILDER_CONTAINER}
+          fi
+
+      - name: Destroy minio container
+        if: always()  # always run this step even if previous steps failed
+        run: |
+          if [ -n "${MINIO_CONTAINER}" ]; then
+            sudo docker rm -f -v ${MINIO_CONTAINER}
           fi
 
   release_tests:
@@ -255,20 +269,27 @@ jobs:
           failure="${{ steps.run_tests_release.outcome == 'failure' || steps.stop_tests_release.outcome == 'failure' }}"
           sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
-      - name: Start infinity release version with vfs off
+      - name: Start minio container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
+          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ~/minio_data && sudo mkdir ~/minio_data && sudo docker run  --name ${MINIO_CONTAINER}  -p 9000:9000    -p 9001:9001  --restart always -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ~/minio_data:/data    quay.io/minio/minio server /data --console-address ":9001"
+
+      - name: Start infinity release version with minio
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_vfs_off.toml > vfs_release.log 2> vfs_release_error.log" &
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > vfs_release.log 2> vfs_release_error.log" &
 
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version
         if: ${{ !cancelled() }}
-        id: run_tests_release_vfs_off
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel.py" && sleep 1s
+        id: run_tests_release_minio
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install minio && python3 tools/make_s3_bucket && python3 tools/run_pytest_parallel.py" && sleep 1s
 
       - name: Stop infinity release
         if: ${{ !cancelled() }}
-        id: stop_tests_release_vfs_off
+        id: stop_tests_release_minio
         run: |
           pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
@@ -327,4 +348,11 @@ jobs:
         run: |
           if [ -n "${BUILDER_CONTAINER}" ]; then
             sudo docker rm -f -v ${BUILDER_CONTAINER}
+          fi
+
+      - name: Destroy minio container
+        if: always()  # always run this step even if previous steps failed
+        run: |
+          if [ -n "${MINIO_CONTAINER}" ]; then
+            sudo docker rm -f -v ${MINIO_CONTAINER}
           fi
