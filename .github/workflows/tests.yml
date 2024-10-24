@@ -127,7 +127,7 @@ jobs:
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_tests_debug_minio
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install minio -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && python3 tools/make_s3_bucket && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install minio -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && python3 tools/make_s3_bucket.py && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
 
       - name: Stop infinity pysdk & http_api & sqllogictest debug
         if: ${{ !cancelled() }}
@@ -285,7 +285,7 @@ jobs:
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version
         if: ${{ !cancelled() }}
         id: run_tests_release_minio
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install minio -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && python3 tools/make_s3_bucket && python3 tools/run_pytest_parallel.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install minio -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && python3 tools/make_s3_bucket.py && python3 tools/run_pytest_parallel.py" && sleep 1s
 
       - name: Stop infinity release
         if: ${{ !cancelled() }}
