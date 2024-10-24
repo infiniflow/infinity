@@ -145,27 +145,25 @@ class InfinityCluster:
 class MockInfinityCluster(InfinityCluster):
     def __init__(self, executable_path: str):
         super().__init__(executable_path)
-        self.__check_prerequisites()
         self.ns_prefix = "ns"
         self.bridge_name = "br0"
-        self.__prepare_ns()
+        self.mock_ip_prefix = "17.0.0."
+        self.mock_port = 24
+        self.cur_ip_suffix = 1
+        self.__check_prerequisites()
+        self.__prepare_bridge()
 
-    def __check_prerequisites(self):
-        if platform.system() != "Linux":
-            print("Network namespaces are only supported on Linux.")
-            exit()
-        # check if ip, brctl is installed
-        subprocess.run("ip --version".split(), check=True)
-        subprocess.run("brctl --version".split(), check=True)
-
-    def __prepare_ns(self):
-        subprocess.run("sudo ip netns delete ns*".split())
+    def __del__(self):
         subprocess.run(f"sudo ip link set {self.bridge_name} down".split())
         subprocess.run(f"sudo brctl delbr {self.bridge_name}".split())
+        for ns_name in self.runners:
+            subprocess.run(f"sudo ip netns delete {ns_name}".split())
+            veht_name, veth_br_name = self.__veth_name_pair(ns_name)
+            subprocess.run(f"sudo ip link delete {veht_name}".split())
 
     def add_node(self, node_name: str, config_path: str):
         ns_name = f"{self.ns_prefix}_{node_name}"
-        self.__ns_connect(ns_name)
+        self.__connect_to_bridge(ns_name, ping=False)
         runner = MockedInfinityRunner(
             ns_name, node_name, self.executable_path, config_path
         )
@@ -173,11 +171,42 @@ class MockInfinityCluster(InfinityCluster):
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner
 
-    def __ns_connect(self, ns_name: str):
-        subprocess.run(f"sudo ip netns add {ns_name}".split(), check=True)
+    def __next_mock_addr(self):
+        addr = f"{self.mock_ip_prefix}{self.cur_ip_suffix}/{self.mock_port}"
+        self.cur_ip_suffix += 1
+        return addr
+
+    def __check_prerequisites(self):
+        if platform.system() != "Linux":
+            print("Network namespaces are only supported on Linux.")
+            exit()
+        if subprocess.run("command -v ip", shell=True).returncode != 0:
+            subprocess.run("sudo apt-get install iproute2".split(), check=True)
+        if subprocess.run("command -v brctl", shell=True).returncode != 0:
+            subprocess.run("sudo apt-get install bridge_utils".split(), check=True)
+
+    def __prepare_bridge(self):
+        subprocess.run(f"sudo ip link set {self.bridge_name} down".split())
+        subprocess.run(f"sudo brctl delbr {self.bridge_name}".split())
         subprocess.run(f"sudo brctl addbr {self.bridge_name}".split(), check=True)
-        veth_name = f"veth-{ns_name}"
-        veth_br_name = f"veth-{ns_name}-br"
+        subprocess.run(f"sudo ip link set {self.bridge_name} up".split(), check=True)
+        subprocess.run(
+            f"sudo iptables -A FORWARD -i {self.bridge_name} -j ACCEPT".split(),
+            check=True,
+        )
+
+    def __veth_name_pair(self, ns_name: str):
+        veth_name = f"{ns_name}_v"
+        veth_br_name = f"{ns_name}_vbr"
+        if len(veth_name) > 15 or len(veth_br_name) > 15:
+            raise ValueError(f"veth name too long: {veth_name}, {veth_br_name}")
+        return veth_name, veth_br_name
+
+    def __connect_to_bridge(self, ns_name: str, ping: bool = False):
+        subprocess.run(f"sudo ip netns delete {ns_name}".split())
+        subprocess.run(f"sudo ip netns add {ns_name}".split(), check=True)
+        veth_name, veth_br_name = self.__veth_name_pair(ns_name)
+        subprocess.run(f"sudo ip link delete {veth_name}".split())
         subprocess.run(
             f"sudo ip link add {veth_name} type veth peer name {veth_br_name}".split(),
             check=True,
@@ -188,11 +217,24 @@ class MockInfinityCluster(InfinityCluster):
         subprocess.run(
             f"sudo brctl addif {self.bridge_name} {veth_br_name}".split(), check=True
         )
+        mock_addr = self.__next_mock_addr()
+        print(f"ns_name: {ns_name}, mock_addr: {mock_addr}")
+        subprocess.run(
+            f"sudo ip netns exec {ns_name} ip addr add {mock_addr} dev {veth_name}".split(),
+        )
         subprocess.run(
             f"sudo ip netns exec {ns_name} ip link set {veth_name} up".split(),
             check=True,
         )
         subprocess.run(f"sudo ip link set {veth_br_name} up".split(), check=True)
+
+        if ping:
+            if self.cur_ip_suffix == 2:
+                return
+            ping_addr = f"{self.mock_ip_prefix}1"
+            subprocess.run(
+                f"sudo ip netns exec {ns_name} ping -c 3 {ping_addr}".split()
+            )
 
 
 if __name__ == "__main__":
