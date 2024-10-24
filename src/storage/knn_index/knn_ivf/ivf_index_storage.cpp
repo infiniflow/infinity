@@ -14,8 +14,10 @@
 
 module;
 
+#include <algorithm>
 #include <cassert>
 #include <vector>
+
 module ivf_index_storage;
 
 import stl;
@@ -34,6 +36,9 @@ import search_top_k;
 import column_vector;
 import knn_scan_data;
 import ivf_index_util_func;
+import knn_expr;
+import vector_distance;
+import mlas_matrix_multiply;
 
 namespace infinity {
 
@@ -57,6 +62,34 @@ void IVF_Centroids_Storage::Load(LocalFileHandle &file_handle) {
     const auto vec_size = centroids_num_ * embedding_dimension_;
     centroids_data_.resize(vec_size);
     file_handle.Read(centroids_data_.data(), vec_size * sizeof(f32));
+}
+
+Pair<u32, const f32 *> IVF_Centroids_Storage::GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const {
+    switch (knn_distance->dist_type_) {
+        case KnnDistanceType::kInnerProduct:
+        case KnnDistanceType::kL2: {
+            return {centroids_num_, data()};
+        }
+        case KnnDistanceType::kCosine: {
+            if (normalized_centroids_data_cache_.empty()) {
+                normalized_centroids_data_cache_ = centroids_data_;
+                assert(normalized_centroids_data_cache_.size() == embedding_dimension_ * centroids_num_);
+                for (u32 i = 0; i < centroids_num_; ++i) {
+                    f32 *centroid_data = normalized_centroids_data_cache_.data() + i * embedding_dimension_;
+                    const f32 l2_rev = 1.0f / std::sqrt(L2NormSquare<f32>(centroid_data, embedding_dimension_));
+                    for (u32 j = 0; j < embedding_dimension_; ++j) {
+                        centroid_data[j] *= l2_rev;
+                    }
+                }
+            }
+            return {centroids_num_, normalized_centroids_data_cache_.data()};
+        }
+        default: {
+            RecoverableError(
+                Status::NotSupport(fmt::format("IVF does not support {} metric now.", KnnExpr::KnnDistanceType2Str(knn_distance->dist_type_))));
+        }
+    }
+    return {};
 }
 
 // IVF_Index_Storage
@@ -254,8 +287,7 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
                                     const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                                     const std::function<void(f32, SegmentOffset)> &add_result_func) const {
     const auto dimension = embedding_dimension();
-    const auto centroids_num = ivf_centroids_storage_.centroids_num();
-    const auto *centroids_data = ivf_centroids_storage_.data();
+    const auto [centroids_num, centroids_data] = ivf_centroids_storage_.GetCentroidDataForMetric(knn_distance);
     nprobe = std::min<u32>(nprobe, centroids_num);
     auto [query_f32_ptr, _] = ApplyEmbeddingDataTypeToFunc(
         query_element_type,
@@ -263,12 +295,41 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
             return GetF32Ptr(static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr), dimension);
         },
         [] { return Pair<const f32 *, UniquePtr<f32[]>>(); });
-    Vector<u32> nprobe_result(nprobe);
-    if (nprobe == 1) {
-        search_top_1_without_dis<f32>(dimension, 1, query_f32_ptr, centroids_num, centroids_data, nprobe_result.data());
-    } else {
-        const auto centroid_dists = MakeUniqueForOverwrite<f32[]>(nprobe);
-        search_top_k_with_dis(nprobe, dimension, 1, query_f32_ptr, centroids_num, centroids_data, nprobe_result.data(), centroid_dists.get(), false);
+    Vector<u32> nprobe_result;
+    switch (knn_distance->dist_type_) {
+        case KnnDistanceType::kL2: {
+            nprobe_result.resize(nprobe);
+            if (nprobe == 1) {
+                search_top_1_without_dis<f32>(dimension, 1, query_f32_ptr, centroids_num, centroids_data, nprobe_result.data());
+            } else {
+                const auto centroid_dists = MakeUniqueForOverwrite<f32[]>(nprobe);
+                search_top_k_with_dis(nprobe,
+                                      dimension,
+                                      1,
+                                      query_f32_ptr,
+                                      centroids_num,
+                                      centroids_data,
+                                      nprobe_result.data(),
+                                      centroid_dists.get(),
+                                      false);
+            }
+            break;
+        }
+        case KnnDistanceType::kCosine:
+        case KnnDistanceType::kInnerProduct: {
+            const auto ip_result = MakeUniqueForOverwrite<f32[]>(centroids_num);
+            matrixA_multiply_matrixB_output_to_C(centroids_data, query_f32_ptr, centroids_num, 1, dimension, ip_result.get());
+            nprobe_result.resize(centroids_num);
+            std::iota(nprobe_result.begin(), nprobe_result.end(), static_cast<u32>(0));
+            std::nth_element(nprobe_result.begin(), nprobe_result.begin() + nprobe, nprobe_result.end(), [&ip_result](const u32 a, const u32 b) {
+                return ip_result[a] > ip_result[b];
+            });
+            nprobe_result.resize(nprobe);
+            break;
+        }
+        default: {
+            UnrecoverableError("Unsupported distance type");
+        }
     }
     ivf_parts_storage_->SearchIndex(nprobe_result, this, knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func);
 }

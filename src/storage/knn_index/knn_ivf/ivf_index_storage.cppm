@@ -36,6 +36,7 @@ class IVF_Centroids_Storage {
     u32 embedding_dimension_ = 0;
     u32 centroids_num_ = 0;
     Vector<f32> centroids_data_ = {};
+    mutable Vector<f32> normalized_centroids_data_cache_ = {};
 
 public:
     IVF_Centroids_Storage() = default;
@@ -45,6 +46,7 @@ public:
     u32 centroids_num() const { return centroids_num_; }
     void Save(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
+    Pair<u32, const f32 *> GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const;
 };
 
 class IVF_Parts_Storage {

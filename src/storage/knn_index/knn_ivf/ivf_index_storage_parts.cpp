@@ -40,7 +40,6 @@ import mlas_matrix_multiply;
 import vector_distance;
 import index_base;
 import knn_expr;
-import simd_functions;
 
 namespace infinity {
 
@@ -701,10 +700,6 @@ public:
                       SearchIndexPartsReuseContext &context) const {
         using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
         static_assert(std::is_same_v<QueryDataType, f32>);
-        auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
-        if (!knn_distance_1) [[unlikely]] {
-            UnrecoverableError("Invalid KnnDistance1");
-        }
         const auto &ivf_parts_storage =
             static_cast<const IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kScalarQuantization> &>(ivf_index_storage->ivf_parts_storage());
         const auto dimension = embedding_dimension_;
@@ -713,7 +708,7 @@ public:
         const auto c_ptr = ivf_index_storage->ivf_centroids_storage().data() + part_id() * dimension;
         const auto [x_ptr, _] = GetF32Ptr(query_ptr, dimension);
         const auto total_embedding_num = embedding_num();
-        switch (const KnnDistanceType dist_type = knn_distance_1->dist_type_; dist_type) {
+        switch (knn_distance->dist_type_) {
             case KnnDistanceType::kInnerProduct: {
                 // dot(x, v) = dot(x, c + b) + dot((x * a), n) + dot(v, e)
                 const auto c_plus_b = MakeUniqueForOverwrite<f32[]>(dimension);
@@ -799,7 +794,8 @@ public:
                 break;
             }
             default: {
-                RecoverableError(Status::SyntaxError(fmt::format("IVFSQ does not support {} metric now.", KnnExpr::KnnDistanceType2Str(dist_type))));
+                RecoverableError(Status::SyntaxError(
+                    fmt::format("IVFSQ does not support {} metric now.", KnnExpr::KnnDistanceType2Str(knn_distance->dist_type_))));
                 break;
             }
         }
@@ -1053,10 +1049,6 @@ public:
                       SearchIndexPartsReuseContext &context) const {
         using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
         static_assert(std::is_same_v<QueryDataType, f32>);
-        auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
-        if (!knn_distance_1) [[unlikely]] {
-            UnrecoverableError("Invalid KnnDistance1");
-        }
         const auto &ivf_parts_storage =
             static_cast<const IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> &>(ivf_index_storage->ivf_parts_storage());
         const auto subspace_num = subspace_num_;
@@ -1065,7 +1057,7 @@ public:
         const auto [query_f32, _] = GetF32Ptr(query_ptr, dimension);
         const auto centroid_data = ivf_index_storage->ivf_centroids_storage().data() + part_id() * dimension;
         const auto total_embedding_num = embedding_num();
-        switch (const KnnDistanceType dist_type = knn_distance_1->dist_type_; dist_type) {
+        switch (knn_distance->dist_type_) {
             case KnnDistanceType::kInnerProduct: {
                 const auto query_centroid_ip = IPDistance<f32>(query_f32, centroid_data, dimension);
                 auto &ip_table = context.pq_query_ip_table_;
@@ -1141,7 +1133,8 @@ public:
                 break;
             }
             default: {
-                RecoverableError(Status::SyntaxError(fmt::format("IVFPQ does not support {} metric now.", KnnExpr::KnnDistanceType2Str(dist_type))));
+                RecoverableError(Status::SyntaxError(
+                    fmt::format("IVFPQ does not support {} metric now.", KnnExpr::KnnDistanceType2Str(knn_distance->dist_type_))));
                 break;
             }
         }
