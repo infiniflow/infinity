@@ -187,6 +187,7 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
     RegisterResponse response;
 
     try {
+        LOG_INFO(fmt::format("Register to leader {}:{}", request.node_ip, request.node_port));
         client_->Register(response, request);
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
