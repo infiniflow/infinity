@@ -202,8 +202,8 @@ void PersistenceManager::CheckValid() {
 }
 
 void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, Vector<String> &drop_keys) {
-    persist_keys.push_back(current_object_key_);
     if (current_object_size_ > 0) {
+        persist_keys.push_back(current_object_key_);
         if (current_object_parts_ > 1) {
             // Add footer to composed object -- format version 1
             fs::path dst_fp = workspace_;
@@ -224,6 +224,8 @@ void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, 
         current_object_size_ = 0;
         current_object_parts_ = 0;
         current_object_ref_count_ = 0;
+    } else {
+        LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added empty object {}", current_object_key_));
     }
 }
 
