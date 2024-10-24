@@ -661,15 +661,13 @@ class infinity_http:
 
         for res in self.output_res:
             for k in res:
-                print(res[k])
+                # print(res[k])
                 if k not in df_dict:
                     df_dict[k] = ()
                 tup = df_dict[k]
                 if res[k].isdigit() or is_float(res[k]):
-                    print('number')
                     new_tup = tup + (eval(res[k]),)
                 elif is_list(res[k]):
-                    print('list')
                     new_tup = tup + (ast.literal_eval(res[k]),)
                 elif is_date(res[k]):
                     new_tup = tup + (res[k],)
@@ -678,11 +676,9 @@ class infinity_http:
                 elif is_datetime(res[k]):
                     new_tup = tup + (res[k],)
                 elif is_sparse(res[k]):  # sparse vector
-                    print('sparse')
                     sparse_vec = str2sparse(res[k])
                     new_tup = tup + (sparse_vec,)
                 else:
-                    print('str')
                     if res[k].lower() == 'true':
                         res[k] = True
                     elif res[k].lower() == 'false':
