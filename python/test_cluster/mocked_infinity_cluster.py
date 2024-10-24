@@ -29,8 +29,8 @@ class mocked_infinity_http(infinity_http):
         print(f"cmd: {cmd}")
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.stdout
-    
-    def raise_exception(self, resp, expect = {}):
+
+    def raise_exception(self, resp, expect={}):
         # todo: handle curl exception
         pass
 
@@ -105,6 +105,42 @@ class MockInfinityCluster(InfinityCluster):
         if node_name in self.runners:
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner
+
+    def remove(self, node_name: str):
+        if node_name not in self.runners:
+            raise ValueError(f"Node {node_name} not found in the cluster.")
+        cur_runner: MockedInfinityRunner = self.runners[node_name]
+        ns_name = cur_runner.ns_name
+        veth_name, veth_br_name = self.__veth_name_pair(ns_name)
+
+        subprocess.run(
+            f"sudo ip netns exec {ns_name} ip link set {veth_name} down".split(),
+            check=True,
+        )
+        subprocess.run(
+            f"sudo brctl delif {self.bridge_name} {veth_br_name}".split(), check=True
+        )
+        subprocess.run(f"sudo ip link delete {veth_br_name}".split(), check=True)
+        subprocess.run(f"sudo ip netns delete {ns_name}".split(), check=True)
+
+        cur_runner.uninit()
+        del self.runners[node_name]
+
+    def disconnect(self, node_name: str):
+        if node_name not in self.runners:
+            raise ValueError(f"Node {node_name} not found in the cluster.")
+        cur_runner: MockedInfinityRunner = self.runners[node_name]
+        veth_name, veth_br_name = self.__veth_name_pair(cur_runner.ns_name)
+        subprocess.run(f"sudo ip link set {veth_br_name} down".split())
+        subprocess.run(f"sudo brctl delif {self.bridge_name} {veth_br_name}".split())
+
+    def reconnect(self, node_name: str):
+        if node_name not in self.runners:
+            raise ValueError(f"Node {node_name} not found in the cluster.")
+        cur_runner: MockedInfinityRunner = self.runners[node_name]
+        veth_name, veth_br_name = self.__veth_name_pair(cur_runner.ns_name)
+        subprocess.run(f"sudo brctl addif {self.bridge_name} {veth_br_name}".split())
+        subprocess.run(f"sudo ip link set {veth_br_name} up".split())
 
     def __next_mock_ip(self):
         mock_ip = f"{self.mock_ip_prefix}{self.cur_ip_suffix}/{self.mock_ip_mask}"

@@ -69,7 +69,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run : |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/test_cluster/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "sudo yum install iproute2 bridge-utils -y"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "yum install iproute2 bridge-utils -y"
 
       - name: Run cluster test
         if: ${{ !cancelled() && !failure() }}

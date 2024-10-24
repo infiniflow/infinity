@@ -46,7 +46,9 @@ class InfinityRunner:
         script_path = "./scripts/timeout_kill.sh"
         timeout = 60
 
-        ret = os.system(f"sudo bash {script_path} {timeout} {' '.join(map(str, self.pids))}")
+        ret = os.system(
+            f"sudo bash {script_path} {timeout} {' '.join(map(str, self.pids))}"
+        )
         if ret != 0:
             raise Exception("An error occurred.")
         self.process = None
@@ -126,6 +128,13 @@ class InfinityCluster:
         if self.leader_runner is None:
             raise ValueError("Leader runner is not initialized.")
         return self.leader_runner.peer_uri()
+
+    def remove(self, node_name: str):
+        if node_name not in self.runners:
+            raise ValueError(f"Node {node_name} not found in the cluster.")
+        runner = self.runners[node_name]
+        runner.uninit()
+        del self.runners[node_name]
 
 
 if __name__ == "__main__":
