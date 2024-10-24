@@ -110,12 +110,11 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
         case NodeRole::kAdmin: {
             switch (target_role) {
                 case NodeRole::kStandalone: {
-                    storage_->SetStorageMode(StorageMode::kWritable);
                     SetServerRole(NodeRole::kStandalone);
+                    storage_->SetStorageMode(StorageMode::kWritable);
                     break;
                 }
                 case NodeRole::kLeader: {
-                    storage_->SetStorageMode(StorageMode::kWritable);
                     if (cluster_manager_ != nullptr) {
                         UnrecoverableError("cluster manager was initialized before.");
                     }
@@ -125,6 +124,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                         return init_status;
                     }
                     SetServerRole(NodeRole::kLeader);
+                    storage_->SetStorageMode(StorageMode::kWritable);
                     break;
                 }
                 case NodeRole::kFollower: {
