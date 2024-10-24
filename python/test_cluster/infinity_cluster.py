@@ -20,6 +20,7 @@ class InfinityRunner:
         self.__load_config()
         self.process = None
         self.client = None
+        self.pids = []
 
     def __del__(self):
         self.uninit()
@@ -34,20 +35,22 @@ class InfinityRunner:
         run_cmd = f"{self.executable_path} --config={self.config_path} 2>&1"
         self.process = subprocess.Popen(run_cmd, shell=True)
 
+        for child in psutil.Process(self.process.pid).children(recursive=True):
+            self.pids.append(child.pid)
+        if len(self.pids) == 0:
+            raise Exception("Cannot find infinity process.")
+
     def uninit(self):
         if self.process is None:
             return
         script_path = "./scripts/timeout_kill.sh"
         timeout = 60
-        pids = []
-        for child in psutil.Process(self.process.pid).children(recursive=True):
-            pids.append(child.pid)
-        if len(pids) == 0:
-            raise Exception("Cannot find infinity process.")
-        ret = os.system(f"sudo bash {script_path} {timeout} {' '.join(map(str, pids))}")
+
+        ret = os.system(f"sudo bash {script_path} {timeout} {' '.join(map(str, self.pids))}")
         if ret != 0:
             raise Exception("An error occurred.")
         self.process = None
+        self.pids = []
 
     def init_as_leader(self, config_path: str | None = None):
         self.init(config_path)
