@@ -254,7 +254,7 @@ QueryResult Infinity::SetVariableOrConfig(const String &name, String value, SetS
     ToLower(var_name);
 
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kDouble, var_name, value);
+    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kString, var_name, value);
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }

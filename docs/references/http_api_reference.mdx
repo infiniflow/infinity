@@ -2217,14 +2217,14 @@ The response includes a JSON object like the following:
 
 ## Set config
 
-**PUT** `/configs/{config_name}`
+**PUT** `/configs`
 
 Assigns a value to a configuration parameter.
 
 ### Request
 
 - Method: PUT
-- URL: `/config/{config_name}`
+- URL: `/configs`
 - Headers:
   - `accept: application/json`
   - `content-Type: application/json`
@@ -2234,7 +2234,7 @@ Assigns a value to a configuration parameter.
 
 ```shell
 curl --request POST \
-     --url http://localhost:23820/configs/{config_name} \
+     --url http://localhost:23820/configs \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' { "log_level": "trace" } '
@@ -2242,15 +2242,6 @@ curl --request POST \
 
 #### Request parameter
 
-- `config_name`: (*Path parameter*)  
-  The name of the configuration parameter, which must adhere to the following requirements:  
-  - Permitted characters include:
-    - English letters (a-z, A-Z)
-    - Digits (0-9)
-    - "_" (underscore)
-  - Must begin with an English letter or underscore.
-  - Maximum 65,535 characters.
-  - Case-insensitive.
 - `Body`:  (*Body parameter*),  `object`, *Required*  
   The configuration parameters to update, where each key (`string`) in the JSON object represents an entry, and the corresponding value (`string`) represents its value. 
 
@@ -3384,12 +3375,11 @@ curl --request POST \
     --url http://localhost:23822/admin/node/current \
     --header 'accept: application/json' \
     --header 'content-type: application/json' \
-    --data \
-    '{
+    --data ' {
         "role" : "follower",
         "name" : "following",
         "address" : "0.0.0.0:23851"
-    }'
+    } '
 ```
 
 #### Request parameters
@@ -3641,7 +3631,7 @@ Gets information about the currently connected node.
 
 ```shell
 curl --request GET \
-    --url http://localhost:23821/admin/node/learning \
+    --url http://localhost:23821/admin/node/current \
     --header 'accept: application/json'
 ```
 
