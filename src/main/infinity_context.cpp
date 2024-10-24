@@ -101,23 +101,21 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                 Status status = Status::InvalidNodeRole("Un-init role can only be switch to Admin role");
                 return status;
             }
-            SetServerRole(target_role);
             storage_ = MakeUnique<Storage>(config_.get());
+            etServerRole(NodeRole::kAdmin);
             storage_->SetStorageMode(StorageMode::kAdmin);
-            SetServerRole(NodeRole::kAdmin);
             StartThriftServers();
             break;
         }
         case NodeRole::kAdmin: {
             switch (target_role) {
                 case NodeRole::kStandalone: {
-                    SetServerRole(target_role);
-                    storage_->SetStorageMode(StorageMode::kWritable);
                     SetServerRole(NodeRole::kStandalone);
+                    storage_->SetStorageMode(StorageMode::kWritable);
                     break;
                 }
                 case NodeRole::kLeader: {
-                    SetServerRole(target_role);
+                    SetServerRole(NodeRole::kLeader);
                     storage_->SetStorageMode(StorageMode::kWritable);
                     if (cluster_manager_ != nullptr) {
                         UnrecoverableError("cluster manager was initialized before.");
@@ -127,11 +125,10 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     if (!init_status.ok()) {
                         return init_status;
                     }
-                    SetServerRole(NodeRole::kLeader);
                     break;
                 }
                 case NodeRole::kFollower: {
-                    SetServerRole(target_role);
+                    SetServerRole(NodeRole::kFollower);
                     storage_->SetStorageMode(StorageMode::kReadable);
                     if (cluster_manager_ != nullptr) {
                         UnrecoverableError("cluster manager was initialized before.");
@@ -145,11 +142,10 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                         cluster_manager_.reset();
                         return init_status;
                     }
-                    SetServerRole(NodeRole::kFollower);
                     break;
                 }
                 case NodeRole::kLearner: {
-                    SetServerRole(target_role);
+                    SetServerRole(NodeRole::kLearner);
                     storage_->SetStorageMode(StorageMode::kReadable);
                     if (cluster_manager_ != nullptr) {
                         UnrecoverableError("cluster manager was initialized before.");
@@ -163,7 +159,6 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                         cluster_manager_.reset();
                         return init_status;
                     }
-                    SetServerRole(NodeRole::kLearner);
                     break;
                 }
                 case NodeRole::kUnInitialized: {
@@ -188,13 +183,12 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
         case NodeRole::kStandalone: {
             switch (target_role) {
                 case NodeRole::kAdmin: {
-                    SetServerRole(target_role);
+                    SetServerRole(NodeRole::kAdmin);
                     storage_->SetStorageMode(StorageMode::kAdmin);
                     RestoreIndexThreadPoolToDefault();
 
                     task_scheduler_->UnInit();
                     task_scheduler_.reset();
-                    SetServerRole(NodeRole::kAdmin);
                     break;
                 }
                 case NodeRole::kUnInitialized: {
@@ -217,19 +211,18 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     // TODO: disconnect with all follower/learner
                     cluster_manager_->UnInit(from_leader);
                     cluster_manager_.reset();
-                    SetServerRole(target_role);
+                    SetServerRole(NodeRole::kAdmin);
                     storage_->SetStorageMode(StorageMode::kAdmin);
                     RestoreIndexThreadPoolToDefault();
 
                     task_scheduler_->UnInit();
                     task_scheduler_.reset();
-                    SetServerRole(NodeRole::kAdmin);
                     break;
                 }
                 case NodeRole::kFollower: {
                     cluster_manager_->UnInit(from_leader);
                     cluster_manager_.reset();
-
+                    SetServerRole(NodeRole::kFollower);
                     storage_->SetStorageMode(StorageMode::kReadable);
                     if (cluster_manager_ != nullptr) {
                         UnrecoverableError("cluster manager was initialized before.");
@@ -243,13 +236,12 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                         cluster_manager_.reset();
                         return init_status;
                     }
-                    SetServerRole(NodeRole::kFollower);
                     break;
                 }
                 case NodeRole::kLearner: {
                     cluster_manager_->UnInit(from_leader);
                     cluster_manager_.reset();
-
+                    SetServerRole(NodeRole::kLearner);
                     storage_->SetStorageMode(StorageMode::kReadable);
                     if (cluster_manager_ != nullptr) {
                         UnrecoverableError("cluster manager was initialized before.");
@@ -263,7 +255,6 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                         cluster_manager_.reset();
                         return init_status;
                     }
-                    SetServerRole(NodeRole::kLearner);
                     break;
                 }
                 default: {
@@ -283,14 +274,13 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     // TODO: disconnect from leader;
                     cluster_manager_->UnInit(from_leader);
                     cluster_manager_.reset();
-                    SetServerRole(target_role);
+                    SetServerRole(NodeRole::kAdmin);
                     storage_->SetStorageMode(StorageMode::kAdmin);
                     RestoreIndexThreadPoolToDefault();
 
                     task_scheduler_->UnInit();
                     task_scheduler_.reset();
 
-                    SetServerRole(NodeRole::kAdmin);
                     break;
                 }
                 case NodeRole::kStandalone: {
@@ -310,7 +300,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     // TODO: disconnect from leader;
                     cluster_manager_->UnInit(from_leader);
                     cluster_manager_.reset();
-                    SetServerRole(target_role);
+                    SetServerRole(NodeRole::kLeader);
                     storage_->SetStorageMode(StorageMode::kWritable);
 
                     if (cluster_manager_ != nullptr) {
@@ -323,7 +313,6 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                         cluster_manager_.reset();
                         return init_status;
                     }
-                    SetServerRole(NodeRole::kLeader);
                     break;
                 }
                 default: {
