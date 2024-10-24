@@ -1,7 +1,8 @@
 import time
 
-import pytest
-from infinity_cluster import InfinityCluster, MockInfinityCluster
+# import pytest
+from infinity_cluster import InfinityCluster
+from mocked_infinity_cluster import MockInfinityCluster
 
 
 def test_0(infinity_path: str):
@@ -14,7 +15,7 @@ def test_0(infinity_path: str):
 
     time.sleep(1)
 
-@pytest.mark.skip(reason="bug")
+# @pytest.mark.skip(reason="bug")
 def test_mock(infinity_path: str):
     cluster = MockInfinityCluster(infinity_path)
     cluster.add_node("node1", "conf/leader.toml")
