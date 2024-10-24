@@ -431,11 +431,11 @@ String VirtualStore::bucket_ = "infinity";
 UniquePtr<S3Client> VirtualStore::s3_client_ = nullptr;
 
 Status VirtualStore::InitRemoteStore(StorageType storage_type,
-                                   const String &URL,
-                                   bool HTTPS,
-                                   const String &access_key,
-                                   const String &secret_key,
-                                   const String &bucket) {
+                                     const String &URL,
+                                     bool HTTPS,
+                                     const String &access_key,
+                                     const String &secret_key,
+                                     const String &bucket) {
     switch (storage_type) {
         case StorageType::kMinio: {
             storage_type_ = StorageType::kMinio;
@@ -446,8 +446,13 @@ Status VirtualStore::InitRemoteStore(StorageType storage_type,
             return Status::NotSupport("Not support storage type");
         }
     }
+
     bucket_ = bucket;
-    return Status::OK();
+    if (s3_client_->BucketExists(bucket)) {
+        return Status::OK();
+    } else {
+        return s3_client_->MakeBucket(bucket);
+    }
 }
 
 Status VirtualStore::UnInitRemoteStore() {
@@ -456,9 +461,7 @@ Status VirtualStore::UnInitRemoteStore() {
     return Status::OK();
 }
 
-bool VirtualStore::IsInit() {
-    return s3_client_.get() != nullptr;
-}
+bool VirtualStore::IsInit() { return s3_client_.get() != nullptr; }
 
 Status VirtualStore::DownloadObject(const String &file_path, const String &object_name) {
     if (VirtualStore::storage_type_ == StorageType::kLocal) {

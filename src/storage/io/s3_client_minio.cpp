@@ -36,7 +36,7 @@ Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &ob
     if (resp) {
         LOG_INFO(fmt::format("{} downloaded to {} successfully", file_path, object_name));
     } else {
-        UnrecoverableError("unable to download object; " + resp.Error().String());
+        UnrecoverableError(fmt::format("Unable to download object: {}", resp.Error().String()));
     }
     return Status::OK();
 }
@@ -56,7 +56,7 @@ Status S3ClientMinio::UploadObject(const String &bucket_name, const String &obje
     if (resp) {
         LOG_INFO(fmt::format("{} uploaded to {} successfully", file_path, object_name));
     } else {
-        UnrecoverableError("unable to upload object; " + resp.Error().String());
+        UnrecoverableError(fmt::format("Unable to upload object: {}", resp.Error().String()));
     }
     return Status::OK();
 }
@@ -75,7 +75,7 @@ Status S3ClientMinio::RemoveObject(const String &bucket_name, const String &obje
     if (resp) {
         LOG_INFO(fmt::format("{} is removed from {} successfully", object_name, bucket_name));
     } else {
-        UnrecoverableError("unable to remove object; " + resp.Error().String());
+        UnrecoverableError(fmt::format("Unable to remove object: {}", resp.Error().String()));
     }
     return Status::OK();
 }
@@ -101,7 +101,7 @@ Status S3ClientMinio::CopyObject(const String &src_bucket_name,
     if (resp) {
         LOG_TRACE(fmt::format("{} is copied to {} successfully", src_object_name, dst_object_name));
     } else {
-        UnrecoverableError("unable to do copy object; " + resp.Error().String());
+        UnrecoverableError(fmt::format("Unable to do copy object: {}", resp.Error().String()));
     }
     return Status::OK();
 }
@@ -114,13 +114,29 @@ bool S3ClientMinio::BucketExists(const String &bucket_name) {
     // Call bucket exists.
     minio::s3::BucketExistsResponse resp = client_->BucketExists(args);
     // Handle response.
-    if (resp && resp.exist) {
-        return true;
+    if (resp) {
+        return resp.exist;
     } else {
+        UnrecoverableError(fmt::format("Unable to do bucket existence check: {}", resp.Error().String()));
         return false;
     }
+}
 
-    return false;
+Status S3ClientMinio::MakeBucket(const String &bucket_name) {
+    // Create make bucket arguments.
+    minio::s3::MakeBucketArgs args;
+    args.bucket = bucket_name;
+
+    // Call make bucket.
+    minio::s3::MakeBucketResponse resp = client_->MakeBucket(args);
+
+    // Handle response.
+    if (resp) {
+        LOG_TRACE(fmt::format("{} is created successfully", bucket_name));
+    } else {
+        UnrecoverableError(fmt::format("Unable to create bucket: {}", resp.Error().String()));
+    }
+    return Status::OK();
 }
 
 } // namespace infinity
