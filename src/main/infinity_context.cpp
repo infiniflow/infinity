@@ -102,8 +102,8 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                 return status;
             }
             storage_ = MakeUnique<Storage>(config_.get());
-            SetServerRole(NodeRole::kAdmin);
             storage_->SetStorageMode(StorageMode::kAdmin);
+            SetServerRole(NodeRole::kAdmin);
             StartThriftServers();
             break;
         }
