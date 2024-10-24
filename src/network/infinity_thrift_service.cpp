@@ -2082,7 +2082,11 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
 
     auto [embedding_data_ptr, dimension, status2] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
     knn_expr->embedding_data_ptr_ = embedding_data_ptr;
-    knn_expr->dimension_ = dimension;
+    if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemBit) {
+        knn_expr->dimension_ = dimension * 8;
+    } else {
+        knn_expr->dimension_ = dimension;
+    }
     if (!status2.ok()) {
         status = status2;
         return nullptr;

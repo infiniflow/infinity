@@ -308,7 +308,11 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
         return nullptr;
     }
     knn_expr->embedding_data_ptr_ = embedding_data_ptr;
-    knn_expr->dimension_ = dimension;
+    if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemBit) {
+        knn_expr->dimension_ = dimension * 8;
+    } else {
+        knn_expr->dimension_ = dimension;
+    }
 
     knn_expr->topn_ = topn;
     if (knn_expr->topn_ <= 0) {
@@ -539,7 +543,7 @@ UpdateExpr *WrapUpdateExpr::GetUpdateExpr(Status &status) {
     return update_expr;
 }
 
-WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options, const String& comment) {
+WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options, const String &comment) {
     auto query_result = instance.CreateDatabase(db_name, options, comment);
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
     return result;
@@ -692,7 +696,12 @@ Optional<WrapQueryResult> UnwrapColumnDefs(Vector<WrapColumnDef> &column_defs, V
             }
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
-        auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints, wrap_column_def.comment, default_expr);
+        auto column_def = new ColumnDef(wrap_column_def.id,
+                                        column_type,
+                                        wrap_column_def.column_name,
+                                        wrap_column_def.constraints,
+                                        wrap_column_def.comment,
+                                        default_expr);
         column_defs_ptr.push_back(column_def);
     }
     return None;
