@@ -789,20 +789,23 @@ QueryResult Infinity::ShowFunction(const String &function_name) {
     return result;
 }
 
-QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values) {
+QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *insert_rows) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<InsertStatement> insert_statement = MakeUnique<InsertStatement>();
     insert_statement->schema_name_ = db_name;
     ToLower(insert_statement->schema_name_);
-
     insert_statement->table_name_ = table_name;
     ToLower(insert_statement->table_name_);
-
-    insert_statement->columns_ = columns;
-    for (String &column_name : *insert_statement->columns_) {
-        ToLower(column_name);
+    insert_statement->insert_rows_.reserve(insert_rows->size());
+    for (auto &insert_row_expr_ptr : *insert_rows) {
+        for (auto &column_name : insert_row_expr_ptr->columns_) {
+            ToLower(column_name);
+        }
+        insert_statement->insert_rows_.emplace_back(insert_row_expr_ptr);
+        insert_row_expr_ptr = nullptr;
     }
-    insert_statement->values_ = values;
+    delete insert_rows;
+    insert_rows = nullptr;
     QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
     return result;
 }
