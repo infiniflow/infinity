@@ -43,7 +43,7 @@ jobs:
 
       - name: Check out code
         if: ${{ !cancelled() && !failure() }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
