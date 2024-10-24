@@ -116,7 +116,7 @@ jobs:
         run: |
           MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
-          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ~/minio_data && sudo mkdir ~/minio_data && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER}  -p 9000:9000    -p 9001:9001  --restart always -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ~/minio_data:/data    quay.io/minio/minio server /data --console-address ":9001"
+          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ~/minio_data && sudo mkdir ~/minio_data && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ~/minio_data:/data    quay.io/minio/minio server /data --console-address ":9001"
 
       - name: Start infinity debug version with minio
         if: ${{ !cancelled() && !failure() }}
@@ -274,7 +274,7 @@ jobs:
         run: |
           MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> $GITHUB_ENV
-          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ~/minio_data && sudo mkdir ~/minio_data && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER}  -p 9000:9000    -p 9001:9001  --restart always -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ~/minio_data:/data    quay.io/minio/minio server /data --console-address ":9001"
+          sudo docker rm -f -v ${MINIO_CONTAINER} && sudo rm -fr ~/minio_data && sudo mkdir ~/minio_data && sudo docker run -d --net=container:${BUILDER_CONTAINER} --name ${MINIO_CONTAINER} -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin"  -v ~/minio_data:/data    quay.io/minio/minio server /data --console-address ":9001"
 
       - name: Start infinity release version with minio
         if: ${{ !cancelled() && !failure() }}
