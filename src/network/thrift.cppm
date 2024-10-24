@@ -20,11 +20,14 @@ module;
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/protocol/TCompactProtocol.h>
+#include <thrift/TApplicationException.h>
 
 export module thrift;
 
 export namespace apache {
     namespace thrift {
+        using apache::thrift::TApplicationException;
+
         namespace concurrency {
             using apache::thrift::concurrency::Thread;
             using apache::thrift::concurrency::ThreadFactory;

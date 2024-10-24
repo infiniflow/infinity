@@ -33,7 +33,9 @@ public:
     CacheContent(Vector<UniquePtr<DataBlock>> data_blocks, SharedPtr<Vector<String>> column_names)
         : data_blocks_(std::move(data_blocks)), column_names_(std::move(column_names)) {}
 
-    bool AppendColumns(const CacheContent &other, const Vector<SizeT> &column_idxes);
+    UniquePtr<CacheContent> AppendColumns(const CacheContent &other, const Vector<SizeT> &column_idxes) const;
+
+    UniquePtr<CacheContent> Clone() const;
 
     Vector<UniquePtr<DataBlock>> data_blocks_;
     SharedPtr<Vector<String>> column_names_;
@@ -44,24 +46,48 @@ export struct CacheOutput {
     Vector<SizeT> column_map_;
 };
 
-export class ResultCacheManager {
+class CacheResultMap {
 public:
     struct CachedLogicalMatchBaseHash {
         using is_transparent = std::true_type;
 
-        SizeT operator()(const UniquePtr<CachedNodeBase> &key) const { return key->Hash(); }
         SizeT operator()(const CachedNodeBase *key) const { return key->Hash(); }
     };
 
     struct CachedLogicalMatchBaseEq {
         using is_transparent = std::true_type;
 
-        bool operator()(const UniquePtr<CachedNodeBase> &key1, const UniquePtr<CachedNodeBase> &key2) const { return key1->Eq(*key2); }
-        bool operator()(const UniquePtr<CachedNodeBase> &key1, const CachedNodeBase *key2) const { return key1->Eq(*key2); }
+        bool operator()(const CachedNodeBase *key1, const CachedNodeBase *key2) const { return key1->Eq(*key2); }
     };
 
+    CacheResultMap(SizeT cache_num_capacity) : cache_num_capacity_(cache_num_capacity) {}
+
+    bool AddCache(UniquePtr<CachedNodeBase> cached_node,
+                  Vector<UniquePtr<DataBlock>> data_blocks,
+                  const std::function<void(UniquePtr<CachedNodeBase>, CacheContent &, Vector<UniquePtr<DataBlock>>)> &update_content_func);
+
+    SharedPtr<CacheContent> GetCache(const CachedNodeBase &cached_node);
+
+    SizeT DropIF(std::function<bool(const CachedNodeBase &)> pred);
+
+private:
+    struct LRUEntry {
+        UniquePtr<CachedNodeBase> cached_node_;
+        SharedPtr<CacheContent> cache_content_;
+    };
+    using LRUList = List<LRUEntry>;
+    using LRUMap = HashMap<CachedNodeBase *, LRUList::iterator, CachedLogicalMatchBaseHash, CachedLogicalMatchBaseEq>;
+
+    std::mutex mtx_;
+
+    SizeT cache_num_capacity_;
+    LRUList lru_list_;
+    LRUMap lru_map_;
+};
+
+export class ResultCacheManager {
 public:
-    ResultCacheManager() = default;
+    ResultCacheManager(SizeT cache_num_capacity) : cache_map_(cache_num_capacity) {}
 
     bool AddCache(UniquePtr<CachedNodeBase> cached_node, Vector<UniquePtr<DataBlock>> data_blocks);
 
@@ -70,8 +96,7 @@ public:
     SizeT DropTable(const String &schema_name, const String &table_name);
 
 private:
-    HashMap<UniquePtr<CachedNodeBase>, SharedPtr<CacheContent>, CachedLogicalMatchBaseHash, CachedLogicalMatchBaseEq> cache_map_;
-    std::mutex mtx_;
+    CacheResultMap cache_map_;
 };
 
 } // namespace infinity

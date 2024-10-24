@@ -1359,7 +1359,7 @@ TEST_F(SelectStatementParsingTest, bad_search_test) {
 
     {
         // bit only support hamming
-        String input_sql = "SELECT b FROM t1 SEARCH MATCH TEXT ('author^2,name^5', 'frank dune') LIMIT 5;";
+        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'l2', 3) WHERE a > 0 LIMIT 5;";
         parser->Parse(input_sql, result.get());
 //        std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());

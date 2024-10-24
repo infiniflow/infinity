@@ -14,7 +14,7 @@
 
 module;
 
-#include <xmmintrin.h>
+#include "common/simd/simd_common_intrin_include.h"
 
 module bm_posting;
 
@@ -41,8 +41,8 @@ void BlockData<DataType, BMPCompressType::kCompressed>::AddBlock(BMPBlockID bloc
 
 template <typename DataType>
 void BlockData<DataType, BMPCompressType::kCompressed>::Prefetch() const {
-    _mm_prefetch(block_ids_.data(), _MM_HINT_T0);
-    _mm_prefetch(max_scores_.data(), _MM_HINT_T0);
+    _mm_prefetch((const char*)block_ids_.data(), _MM_HINT_T0);
+    _mm_prefetch((const char*)max_scores_.data(), _MM_HINT_T0);
 }
 
 template struct BlockData<f32, BMPCompressType::kCompressed>;
@@ -67,7 +67,7 @@ void BlockData<DataType, BMPCompressType::kRaw>::AddBlock(BMPBlockID block_id, D
 
 template <typename DataType>
 void BlockData<DataType, BMPCompressType::kRaw>::Prefetch() const {
-    _mm_prefetch(max_scores_.data(), _MM_HINT_T0);
+    _mm_prefetch((const char*)max_scores_.data(), _MM_HINT_T0);
 }
 
 template struct BlockData<f32, BMPCompressType::kRaw>;

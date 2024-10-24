@@ -21,7 +21,8 @@ export module admin_statement;
 namespace infinity {
 
 export using infinity::AdminStatement;
-export using infinity::AdminNodeRole;
+export using infinity::NodeRole;
 export using infinity::AdminStmtType;
+export using infinity::ToString;
 
-}
+} // namespace infinity

@@ -168,6 +168,7 @@ QUERIES         { return QUERIES; }
 QUERY           { return QUERY; }
 REAL            { return REAL; }
 RENAME          { return RENAME; }
+REMOVE          { return REMOVE; }
 RIGHT           { return RIGHT; }
 ROWLIMIT        { return ROWLIMIT; }
 SEARCH          { return SEARCH; }

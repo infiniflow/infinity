@@ -21,6 +21,8 @@ import stl;
 import expression_type;
 import data_type;
 import internal_types;
+import infinity_exception;
+import third_party;
 
 namespace infinity {
 
@@ -69,6 +71,16 @@ public:
     String alias_{};
 
     [[nodiscard]] virtual String ToString() const = 0;
+
+    virtual u64 Hash() const {
+        UnrecoverableError(fmt::format("Not implemented {}'s Hash", int(type_)));
+        return 0;
+    }
+
+    virtual bool Eq(const BaseExpression &other) const {
+        UnrecoverableError(fmt::format("Not implemented {}'s Eq", int(type_)));
+        return false;
+    }
 
 protected:
     ExpressionType type_{};

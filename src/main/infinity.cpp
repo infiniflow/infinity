@@ -1230,6 +1230,23 @@ QueryResult Infinity::AdminShowCurrentNode() {
     return result;
 }
 
+QueryResult Infinity::AdminRemoveNode(String node_name) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    ToLower(node_name);
+    admin_statement->admin_type_ = AdminStmtType::kRemoveNode;
+    admin_statement->node_name_ = node_name;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
 QueryResult Infinity::AdminSetAdmin() {
     auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
@@ -1241,7 +1258,7 @@ QueryResult Infinity::AdminSetAdmin() {
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kAdmin;
+    admin_statement->node_role_ = NodeRole::kAdmin;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
@@ -1257,7 +1274,7 @@ QueryResult Infinity::AdminSetStandalone() {
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kStandalone;
+    admin_statement->node_role_ = NodeRole::kStandalone;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
@@ -1273,7 +1290,7 @@ QueryResult Infinity::AdminSetLeader(String node_name) {
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kLeader;
+    admin_statement->node_role_ = NodeRole::kLeader;
     ToLower(node_name);
     admin_statement->node_name_ = node_name;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
@@ -1291,7 +1308,7 @@ QueryResult Infinity::AdminSetFollower(String node_name, const String &leader_ad
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kFollower;
+    admin_statement->node_role_ = NodeRole::kFollower;
     admin_statement->leader_address_ = leader_address;
     ToLower(node_name);
     admin_statement->node_name_ = node_name;
@@ -1310,7 +1327,7 @@ QueryResult Infinity::AdminSetLearner(String node_name, const String &leader_add
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kLearner;
+    admin_statement->node_role_ = NodeRole::kLearner;
     admin_statement->leader_address_ = leader_address;
     ToLower(node_name);
     admin_statement->node_name_ = node_name;

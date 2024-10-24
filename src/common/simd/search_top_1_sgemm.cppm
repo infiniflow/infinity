@@ -199,8 +199,8 @@ void inner_search_top_1_with_sgemm_sse2(u32 dimension,
                 u32 x_id = i + x_part_begin;
                 float *ip_line = x_y_inner_product_buffer.get() + i * y_part_size;
 
-                _mm_prefetch(ip_line, _MM_HINT_NTA);
-                _mm_prefetch(ip_line + 8, _MM_HINT_NTA);
+                _mm_prefetch((const char *)(ip_line), _MM_HINT_NTA);
+                _mm_prefetch((const char *)(ip_line + 8), _MM_HINT_NTA);
 
                 const __m128 mul_minus2 = _mm_set1_ps(-2);
 
@@ -214,8 +214,8 @@ void inner_search_top_1_with_sgemm_sse2(u32 dimension,
                 u32 j = 0;
                 for (; j < (y_part_size / 8) * 8; j += 8, ip_line += 8) {
                     u32 j_id = j + y_part_begin;
-                    _mm_prefetch(ip_line + 16, _MM_HINT_NTA);
-                    _mm_prefetch(ip_line + 24, _MM_HINT_NTA);
+                    _mm_prefetch((const char *)(ip_line + 16), _MM_HINT_NTA);
+                    _mm_prefetch((const char *)(ip_line + 24), _MM_HINT_NTA);
 
                     __m128 y_norm_0 = _mm_loadu_ps(square_y.get() + j_id);
                     __m128 y_norm_1 = _mm_loadu_ps(square_y.get() + j_id + 4);

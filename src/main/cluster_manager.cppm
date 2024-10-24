@@ -22,7 +22,7 @@ import status;
 import peer_thrift_client;
 import peer_server_thrift_types;
 import peer_task;
-import txn_manager;
+import storage;
 
 namespace infinity {
 
@@ -30,14 +30,14 @@ export enum class UpdateNodeOp { kRemove, kLostConnection };
 
 export class ClusterManager {
 public:
-    explicit ClusterManager(TxnManager *txn_manager) : txn_manager_(txn_manager) {}
+    explicit ClusterManager(Storage *storage) : storage_(storage) {}
     ~ClusterManager();
 
 public:
     Status InitAsLeader(const String &node_name);
     Status InitAsFollower(const String &node_name, const String &leader_ip, i64 leader_port);
     Status InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port);
-    Status UnInit();
+    Status UnInit(bool not_unregister);
 
 public:
     Status RegisterToLeader();
@@ -48,8 +48,12 @@ private:
     void CheckHeartBeatInner();
     Status RegisterToLeaderNoLock();
     Status UnregisterToLeaderNoLock();
-    Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &sending_node_name, const String &server_ip, i64 server_port);
-    Status SendLogs(const String &node_name, const SharedPtr<PeerClient> &peer_client, const Vector<SharedPtr<String>> &logs, bool synchronize);
+    Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &from_node_name, const String &server_ip, i64 server_port);
+    Status SendLogs(const String &node_name,
+                    const SharedPtr<PeerClient> &peer_client,
+                    const Vector<SharedPtr<String>> &logs,
+                    bool synchronize,
+                    bool on_register);
 
     Status GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
                           Vector<SharedPtr<PeerClient>> &follower_clients,
@@ -59,6 +63,7 @@ private:
 public:
     // Used by leader to add non-leader node in register phase
     Status AddNodeInfo(const SharedPtr<NodeInfo> &new_node);
+    Status RemoveNodeInfo(const String &node_name);
 
     // Used by leader to remove unregister node
     Status UpdateNodeByLeader(const String &node_name, UpdateNodeOp update_node_op);
@@ -82,6 +87,7 @@ public:
     // Use by follower / learner to update all node info when get HB response from leader
     Status UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &info_of_nodes);
 
+    Status ContinueStartup(const Vector<String> &synced_logs);
     Status ApplySyncedLogNolock(const Vector<String> &synced_logs);
 
     // Used by all nodes ADMIN SHOW NODES
@@ -94,7 +100,7 @@ public:
     SharedPtr<NodeInfo> ThisNode() const;
 
 private:
-    TxnManager *txn_manager_{};
+    Storage *storage_{};
     mutable std::mutex mutex_;
 
     SharedPtr<NodeInfo> leader_node_; // Used by follower / learner

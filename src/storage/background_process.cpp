@@ -29,6 +29,7 @@ import catalog;
 import third_party;
 import buffer_manager;
 import periodic_trigger;
+import infinity_context;
 
 namespace infinity {
 
@@ -58,6 +59,10 @@ void BGTaskProcessor::Process() {
     Deque<SharedPtr<BGTask>> tasks;
     while (running) {
         task_queue_.DequeueBulk(tasks);
+        StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+        if (storage_mode == StorageMode::kUnInitialized) {
+            UnrecoverableError("Uninitialized storage mode");
+        }
         for (const auto &bg_task : tasks) {
             switch (bg_task->type_) {
                 case BGTaskType::kStopProcessor: {
@@ -70,67 +75,77 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kForceCheckpoint: {
-                    LOG_DEBUG("Force checkpoint in background");
-                    ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
-                    if (cleanup_trigger_.get() != nullptr && force_ckp_task->is_full_checkpoint_) {
-                        LOG_INFO("Do cleanup before force checkpoint");
-                        auto cleanup_task = cleanup_trigger_->CreateCleanupTask(force_ckp_task->cleanup_ts_);
-                        if (cleanup_task.get() != nullptr) {
-                            cleanup_task->Execute();
-                            LOG_DEBUG("Cleanup before force checkpoint done");
-                        } else {
-                            LOG_DEBUG("Skip cleanup before force checkpoint");
+                    if (storage_mode == StorageMode::kWritable) {
+                        LOG_DEBUG("Force checkpoint in background");
+                        ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
+                        if (cleanup_trigger_.get() != nullptr && force_ckp_task->is_full_checkpoint_) {
+                            LOG_INFO("Do cleanup before force checkpoint");
+                            auto cleanup_task = cleanup_trigger_->CreateCleanupTask(force_ckp_task->cleanup_ts_);
+                            if (cleanup_task.get() != nullptr) {
+                                cleanup_task->Execute();
+                                LOG_DEBUG("Cleanup before force checkpoint done");
+                            } else {
+                                LOG_DEBUG("Skip cleanup before force checkpoint");
+                            }
                         }
+                        {
+                            std::unique_lock<std::mutex> locker(task_mutex_);
+                            task_text_ = force_ckp_task->ToString();
+                        }
+                        wal_manager_->Checkpoint(force_ckp_task);
+                        LOG_DEBUG("Force checkpoint in background done");
                     }
-                    {
-                        std::unique_lock<std::mutex> locker(task_mutex_);
-                        task_text_ = force_ckp_task->ToString();
-                    }
-                    wal_manager_->Checkpoint(force_ckp_task);
-                    LOG_DEBUG("Force checkpoint in background done");
                     break;
                 }
                 case BGTaskType::kAddDeltaEntry: {
-                    auto *task = static_cast<AddDeltaEntryTask *>(bg_task.get());
-                    {
-                        std::unique_lock<std::mutex> locker(task_mutex_);
-                        task_text_ = task->ToString();
+                    if (storage_mode == StorageMode::kWritable) {
+                        auto *task = static_cast<AddDeltaEntryTask *>(bg_task.get());
+                        {
+                            std::unique_lock<std::mutex> locker(task_mutex_);
+                            task_text_ = task->ToString();
+                        }
+                        catalog_->AddDeltaEntry(std::move(task->delta_entry_));
                     }
-                    catalog_->AddDeltaEntry(std::move(task->delta_entry_));
                     break;
                 }
                 case BGTaskType::kCheckpoint: {
-                    LOG_DEBUG("Checkpoint in background");
-                    auto *task = static_cast<CheckpointTask *>(bg_task.get());
-                    bool is_full_checkpoint = task->is_full_checkpoint_;
-                    {
-                        std::unique_lock<std::mutex> locker(task_mutex_);
-                        task_text_ = task->ToString();
+                    if (storage_mode == StorageMode::kWritable) {
+                        LOG_DEBUG("Checkpoint in background");
+                        auto *task = static_cast<CheckpointTask *>(bg_task.get());
+                        bool is_full_checkpoint = task->is_full_checkpoint_;
+                        {
+                            std::unique_lock<std::mutex> locker(task_mutex_);
+                            task_text_ = task->ToString();
+                        }
+                        wal_manager_->Checkpoint(is_full_checkpoint);
+                        LOG_DEBUG("Checkpoint in background done");
                     }
-                    wal_manager_->Checkpoint(is_full_checkpoint);
-                    LOG_DEBUG("Checkpoint in background done");
                     break;
                 }
                 case BGTaskType::kCleanup: {
-                    LOG_DEBUG("Cleanup in background");
-                    auto task = static_cast<CleanupTask *>(bg_task.get());
-                    {
-                        std::unique_lock<std::mutex> locker(task_mutex_);
-                        task_text_ = task->ToString();
+                    if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
+                        LOG_DEBUG("Cleanup in background");
+                        auto task = static_cast<CleanupTask *>(bg_task.get());
+                        {
+                            std::unique_lock<std::mutex> locker(task_mutex_);
+                            task_text_ = task->ToString();
+                        }
+                        task->Execute();
+                        LOG_DEBUG("Cleanup in background done");
                     }
-                    task->Execute();
-                    LOG_DEBUG("Cleanup in background done");
                     break;
                 }
                 case BGTaskType::kUpdateSegmentBloomFilterData: {
-                    LOG_DEBUG("Update segment bloom filter");
-                    auto *task = static_cast<UpdateSegmentBloomFilterTask *>(bg_task.get());
-                    {
-                        std::unique_lock<std::mutex> locker(task_mutex_);
-                        task_text_ = task->ToString();
+                    if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
+                        LOG_DEBUG("Update segment bloom filter");
+                        auto *task = static_cast<UpdateSegmentBloomFilterTask *>(bg_task.get());
+                        {
+                            std::unique_lock<std::mutex> locker(task_mutex_);
+                            task_text_ = task->ToString();
+                        }
+                        task->Execute();
+                        LOG_DEBUG("Update segment bloom filter done");
                     }
-                    task->Execute();
-                    LOG_DEBUG("Update segment bloom filter done");
                     break;
                 }
                 default: {

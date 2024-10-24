@@ -26,11 +26,13 @@ import infinity_exception;
 namespace infinity {
 
 LogicalReadCache::LogicalReadCache(u64 node_id,
+                                   LogicalNodeType origin_type,
                                    SharedPtr<BaseTableRef> base_table_ref,
                                    SharedPtr<CacheContent> cache_content,
-                                   Vector<SizeT> column_map)
-    : LogicalNode(node_id, LogicalNodeType::kReadCache), base_table_ref_(std::move(base_table_ref)), cache_content_(std::move(cache_content)),
-      column_map_(std::move(column_map)) {}
+                                   Vector<SizeT> column_map,
+                                   bool is_min_heap)
+    : LogicalNode(node_id, LogicalNodeType::kReadCache), origin_type_(origin_type), base_table_ref_(std::move(base_table_ref)),
+      cache_content_(std::move(cache_content)), column_map_(std::move(column_map)), is_min_heap_(is_min_heap) {}
 
 Vector<ColumnBinding> LogicalReadCache::GetColumnBindings() const {
     Vector<ColumnBinding> result;

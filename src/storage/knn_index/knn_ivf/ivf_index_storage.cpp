@@ -270,9 +270,7 @@ void IVF_Index_Storage::SearchIndex(const KnnDistanceBase1 *knn_distance,
         const auto centroid_dists = MakeUniqueForOverwrite<f32[]>(nprobe);
         search_top_k_with_dis(nprobe, dimension, 1, query_f32_ptr, centroids_num, centroids_data, nprobe_result.data(), centroid_dists.get(), false);
     }
-    for (const auto part_id : nprobe_result) {
-        ivf_parts_storage_->SearchIndex(part_id, knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func);
-    }
+    ivf_parts_storage_->SearchIndex(nprobe_result, this, knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func);
 }
 
 } // namespace infinity

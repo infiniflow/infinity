@@ -25,6 +25,7 @@ export struct SIMD_FUNCTIONS {
     F32DistanceFuncType L2Distance_func_ptr_ = GetL2DistanceFuncPtr();
     F32DistanceFuncType IPDistance_func_ptr_ = GetIPDistanceFuncPtr();
     F32DistanceFuncType CosineDistance_func_ptr_ = GetCosineDistanceFuncPtr();
+    U8HammingDistanceFuncType HammingDistance_func_ptr_ = GetHammingDistanceFuncPtr();
 
     // HNSW F32
     F32DistanceFuncType HNSW_F32L2_ptr_ = Get_HNSW_F32L2_ptr();

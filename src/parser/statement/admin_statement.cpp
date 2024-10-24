@@ -124,6 +124,10 @@ std::string AdminStatement::ToString() const {
             ss << "Admin show current node";
             break;
         }
+        case AdminStmtType::kRemoveNode: {
+            ss << "Admin remove node";
+            break;
+        }
         case AdminStmtType::kSetRole: {
             ss << "Admin set role";
             break;
@@ -134,6 +138,23 @@ std::string AdminStatement::ToString() const {
         }
     }
     return ss.str();
+}
+
+std::string ToString(NodeRole role) {
+    switch (role) {
+        case NodeRole::kUnInitialized:
+            return "uninitialized";
+        case NodeRole::kAdmin:
+            return "admin";
+        case NodeRole::kStandalone:
+            return "standalone";
+        case NodeRole::kLeader:
+            return "leader";
+        case NodeRole::kFollower:
+            return "follower";
+        case NodeRole::kLearner:
+            return "learner";
+    }
 }
 
 } // namespace infinity

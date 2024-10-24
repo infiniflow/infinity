@@ -50,7 +50,6 @@ struct ScanParam {
 
 class TxnManager;
 struct Catalog;
-class BGTaskProcessor;
 struct TableEntry;
 struct DBEntry;
 struct BaseEntry;
@@ -67,18 +66,12 @@ struct SegmentIndexEntry;
 export class Txn : public EnableSharedFromThis<Txn> {
 public:
     // For new txn
-    explicit Txn(TxnManager *txn_manager,
-                 BufferManager *buffer_manager,
-                 Catalog *catalog,
-                 BGTaskProcessor *bg_task_processor,
-                 TransactionID txn_id,
-                 TxnTimeStamp begin_ts,
-                 SharedPtr<String> txn_text);
+    explicit Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<String> txn_text);
 
     // For replay txn
-    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
+    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
+    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // Txn steps:
     // 1. CreateTxn
@@ -95,7 +88,7 @@ public:
 
     TxnTimeStamp Commit();
 
-    bool CheckConflict(Catalog *catalog);
+    bool CheckConflict();
 
     bool CheckConflict(Txn *txn);
 
@@ -244,7 +237,6 @@ private:
     // Reference to external class
     TxnManager *txn_mgr_{};
     BufferManager *buffer_mgr_{}; // This BufferManager ptr Only for replaying wal
-    BGTaskProcessor *bg_task_processor_{};
     Catalog *catalog_{};
 
     TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
