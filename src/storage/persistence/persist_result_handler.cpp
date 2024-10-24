@@ -25,6 +25,7 @@ import virtual_store;
 import infinity_context;
 import peer_task;
 import logger;
+import admin_statement;
 
 namespace fs = std::filesystem;
 

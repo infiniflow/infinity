@@ -69,7 +69,7 @@ public:
     virtual void
     AppendOneEmbedding(u32 part_id, const void *embedding_ptr, SegmentOffset segment_offset, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
 
-    virtual void SearchIndex(u32 part_id,
+    virtual void SearchIndex(const Vector<u32> &part_ids,
                              const IVF_Index_Storage *ivf_index_storage,
                              const KnnDistanceBase1 *knn_distance,
                              const void *query_ptr,

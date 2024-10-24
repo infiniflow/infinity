@@ -37,7 +37,7 @@ public:
     Status InitAsLeader(const String &node_name);
     Status InitAsFollower(const String &node_name, const String &leader_ip, i64 leader_port);
     Status InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port);
-    Status UnInit();
+    Status UnInit(bool not_unregister);
 
 public:
     Status RegisterToLeader();
@@ -63,6 +63,7 @@ private:
 public:
     // Used by leader to add non-leader node in register phase
     Status AddNodeInfo(const SharedPtr<NodeInfo> &new_node);
+    Status RemoveNodeInfo(const String &node_name);
 
     // Used by leader to remove unregister node
     Status UpdateNodeByLeader(const String &node_name, UpdateNodeOp update_node_op);
@@ -113,7 +114,6 @@ private:
     Vector<SharedPtr<String>> logs_to_sync_{};
 
     SharedPtr<PeerClient> client_to_leader_{}; // Used by follower and learner to connect leader server;
-
 
     SharedPtr<Thread> hb_periodic_thread_{};
     std::mutex hb_mutex_;

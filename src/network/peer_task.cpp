@@ -21,23 +21,6 @@ import third_party;
 
 namespace infinity {
 
-String ToString(NodeRole role) {
-    switch (role) {
-        case NodeRole::kUnInitialized:
-            return "uninitialized";
-        case NodeRole::kAdmin:
-            return "admin";
-        case NodeRole::kStandalone:
-            return "standalone";
-        case NodeRole::kLeader:
-            return "leader";
-        case NodeRole::kFollower:
-            return "follower";
-        case NodeRole::kLearner:
-            return "learner";
-    }
-}
-
 String ToString(NodeStatus status) {
     switch (status) {
         case NodeStatus::kAlive:
@@ -48,6 +31,8 @@ String ToString(NodeStatus status) {
             return "invalid";
         case NodeStatus::kLostConnection:
             return "lost connection";
+        case NodeStatus::kRemoved:
+            return "removed";
     }
 }
 
@@ -98,6 +83,10 @@ String HeartBeatPeerTask::ToString() const {
 
 String SyncLogTask::ToString() const {
     return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, log_strings_.size());
+}
+
+String ChangeRoleTask::ToString() const {
+    return fmt::format("{} to {}", infinity::ToString(type_), role_name_);
 }
 
 

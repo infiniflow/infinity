@@ -26,6 +26,7 @@ import infinity_exception;
 import peer_task;
 import infinity_context;
 import cluster_manager;
+import admin_statement;
 
 namespace infinity {
 
@@ -76,8 +77,8 @@ Status PeerClient::Reconnect() {
 
         TSocket *socket = static_cast<TSocket *>(socket_.get());
         socket->setConnTimeout(2000); // 2s to timeout
-        socket->setRecvTimeout(2000);
-        socket->setSendTimeout(2000);
+                                      //        socket->setRecvTimeout(2000);
+                                      //        socket->setSendTimeout(2000);
         transport_ = MakeShared<TBufferedTransport>(socket_);
         protocol_ = MakeShared<TBinaryProtocol>(transport_);
         client_ = MakeUnique<PeerServiceClient>(protocol_);
@@ -147,6 +148,12 @@ void PeerClient::Process() {
                     LOG_TRACE(peer_task->ToString());
                     SyncLogTask *sync_log_task = static_cast<SyncLogTask *>(peer_task.get());
                     SyncLogs(sync_log_task);
+                    break;
+                }
+                case PeerTaskType::kChangeRole: {
+                    LOG_TRACE(peer_task->ToString());
+                    ChangeRoleTask *change_role_task = static_cast<ChangeRoleTask *>(peer_task.get());
+                    ChangeRole(change_role_task);
                     break;
                 }
                 default: {
@@ -301,6 +308,10 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                 peer_task->sender_status_ = NodeStatus::kLostConnection;
                 break;
             }
+            case infinity_peer_server::NodeStatus::type::kRemoved: {
+                peer_task->sender_status_ = NodeStatus::kRemoved;
+                break;
+            }
             default: {
                 String error_message = "Invalid sender status";
                 UnrecoverableError(error_message);
@@ -390,6 +401,44 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
         peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
         LOG_ERROR(fmt::format("Sync log to node, application: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
+        if (!status.ok()) {
+            LOG_ERROR(status.message());
+        }
+    } catch (const std::exception &e) {
+        LOG_ERROR(e.what());
+    }
+}
+
+void PeerClient::ChangeRole(ChangeRoleTask *change_role_task) {
+    ChangeRoleRequest request;
+    ChangeRoleResponse response;
+    request.node_name = change_role_task->node_name_;
+    request.node_type = infinity_peer_server::NodeType::kInvalid;
+    ToLower(change_role_task->role_name_);
+    if (IsEqual(change_role_task->role_name_, "admin")) {
+        request.node_type = infinity_peer_server::NodeType::kAdmin;
+    }
+    try {
+        client_->ChangeRole(response, request);
+        if (response.error_code != 0) {
+            // Error
+            change_role_task->error_code_ = response.error_code;
+            change_role_task->error_message_ = response.error_message;
+            LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", change_role_task->node_name_, change_role_task->error_message_));
+        }
+    } catch (apache::thrift::transport::TTransportException &thrift_exception) {
+        change_role_task->error_message_ = thrift_exception.what();
+        change_role_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
+        LOG_ERROR(fmt::format("Sync log to node, transport error: {}, error: {}", change_role_task->node_name_, change_role_task->error_message_));
+        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(change_role_task->node_name_, UpdateNodeOp::kLostConnection);
+        if (!status.ok()) {
+            LOG_ERROR(status.message());
+        }
+    } catch (apache::thrift::TApplicationException &application_exception) {
+        change_role_task->error_message_ = application_exception.what();
+        change_role_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
+        LOG_ERROR(fmt::format("Sync log to node, application: {}, error: {}", change_role_task->node_name_, change_role_task->error_message_));
+        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(change_role_task->node_name_, UpdateNodeOp::kLostConnection);
         if (!status.ok()) {
             LOG_ERROR(status.message());
         }

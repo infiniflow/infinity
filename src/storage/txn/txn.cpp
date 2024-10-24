@@ -52,7 +52,7 @@ import chunk_index_entry;
 import memory_indexer;
 import persistence_manager;
 import infinity_context;
-import peer_task;
+import admin_statement;
 
 namespace infinity {
 
