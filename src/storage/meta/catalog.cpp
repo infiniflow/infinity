@@ -18,6 +18,7 @@ module;
 #include <fstream>
 #include <thread>
 #include <vector>
+#include <filesystem>
 
 module catalog;
 
@@ -567,7 +568,9 @@ void Catalog::AttachDeltaCheckpoint(const String &file_name) {
 // called by Replay
 UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const String &catalog_path) {
     if (!VirtualStore::Exists(catalog_path)) {
-        VirtualStore::DownloadObject(catalog_path, catalog_path);
+        std::filesystem::path filePath = catalog_path;
+        String fileName = filePath.filename();
+        VirtualStore::DownloadObject(catalog_path, fileName);
     }
 
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
@@ -980,7 +983,9 @@ UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
     const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / file_name;
 
     if (!VirtualStore::Exists(catalog_path)) {
-        VirtualStore::DownloadObject(catalog_path, catalog_path);
+        std::filesystem::path filePath = catalog_path;
+        String fileName = filePath.filename();
+        VirtualStore::DownloadObject(catalog_path, fileName);
     }
 
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
@@ -1053,7 +1058,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
     // Rename temp file to regular catalog file
     VirtualStore::Rename(catalog_tmp_path, full_path);
     if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader or InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
-        VirtualStore::UploadObject(full_path, full_path);
+        VirtualStore::UploadObject(full_path, full_catalog_name);
     }
 
     global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
@@ -1141,7 +1146,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
     out_file_handle->Append((reinterpret_cast<const char *>(buf.data())), act_size);
     out_file_handle->Sync();
     if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader or InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
-        VirtualStore::UploadObject(full_path, full_path);
+        VirtualStore::UploadObject(full_path, delta_catalog_name);
     }
     // {
     // log for delta op debug
