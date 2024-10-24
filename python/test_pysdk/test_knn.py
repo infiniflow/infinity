@@ -1749,7 +1749,7 @@ class TestInfinity:
             "c2" : {"type" : "vector, 16, bit"}
         }, ConflictType.Error)
 
-        table_obj.insert([{"c1" : 0, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}])
+        table_obj.insert([{"c1" : 0, "c2" : [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}])
         table_obj.insert([{"c1" : 1, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]}])
         table_obj.insert([{"c1" : 2, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2]}])
         table_obj.insert([{"c1" : 3, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3]}])
@@ -1757,6 +1757,10 @@ class TestInfinity:
         table_obj.insert([{"c1" : 5, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5]}])
 
         res = table_obj.output(["*", "_distance"]).match_dense("c2", [0] * 16, "bit", "hamming", 3).to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame(
-            {'c1' : (0, 1, 2), 'c2' : (['0000000000000000'], ['0000000000000001'], ['0000000000000011']), 'DISTANCE' : (0.0, 1.0, 2.0)}
-        ).astype({'c1': dtype('int32'), 'DISTANCE' : dtype('float32')})) 
+        if suffix == "_http":
+            pd.testing.assert_frame_equal(res, pd.DataFrame(
+                {'c1' : (0, 1, 2), 'c2' : ('[0100000000000000]', '[0000000000000001]', '[0000000000000011]'), 'DISTANCE' : (1.0, 1.0, 2.0)}).astype({'c1': dtype('int32'), 'DISTANCE' : dtype('float32')})) 
+        else:
+            pd.testing.assert_frame_equal(res, pd.DataFrame(
+                {'c1' : (0, 1, 2), 'c2' : (['0100000000000000'], ['0000000000000001'], ['0000000000000011']), 'DISTANCE' : (1.0, 1.0, 2.0)}
+            ).astype({'c1': dtype('int32'), 'DISTANCE' : dtype('float32')})) 
