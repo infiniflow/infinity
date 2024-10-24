@@ -28,7 +28,7 @@ jobs:
     runs-on: [ "self-hosted", "debug" ]
     steps:
       # https://github.com/hmarr/debug-action
-      #- uses: hmarr/debug-action@v2
+      #- uses: hmarr/debug-action@v3
 
       - name: Show PR labels
         if: ${{ !cancelled() && !failure() }}
@@ -178,7 +178,7 @@ jobs:
     runs-on: [ "self-hosted", "benchmark" ]
     steps:
       # https://github.com/hmarr/debug-action
-      #- uses: hmarr/debug-action@v2
+      #- uses: hmarr/debug-action@v3
 
       - name: Show PR labels
         if: ${{ !cancelled() && !failure() }}
