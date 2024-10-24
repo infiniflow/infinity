@@ -1743,7 +1743,7 @@ class TestInfinity:
     @pytest.mark.parametrize("knn_distance_type", ["hamming"])
     def test_binary_embedding_hamming_distance(self, check_data, knn_distance_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_binary_knn_hamming_distance" + suffix)
+        db_obj.drop_table("test_binary_knn_hamming_distance" + suffix, ConflictType.Ignore)
         table_obj = db_obj.create_table("test_binary_knn_hamming_distance" + suffix, {
             "c1" : {"type" : "int"},
             "c2" : {"type" : "vector, 16, bit"}

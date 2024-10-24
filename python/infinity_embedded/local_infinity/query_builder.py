@@ -101,6 +101,22 @@ class InfinityLocalQueryBuilder(ABC):
                 ErrorCode.INVALID_TOPK_TYPE, f"Invalid topn, type should be embedded, but get {type(topn)}"
             )
 
+        if embedding_data_type == "bit":
+            if len(embedding_data) % 8 != 0:
+                raise InfinityException(
+                    ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Embeddings with data bit must have dimension of times of 8!"
+                )
+            else:
+                new_embedding_data = []
+                dimesions = int(len(embedding_data) / 8)
+                for i in range(dimesions):
+                    bitunit = 0
+                    for bit_idx in range(8):
+                        if embedding_data[i * 8 + bit_idx] > 0:
+                            bitunit |= (1 << bit_idx)
+                    new_embedding_data.append(bitunit)
+                embedding_data = new_embedding_data
+
         # type casting
         if isinstance(embedding_data, list):
             embedding_data = embedding_data
@@ -125,7 +141,7 @@ class InfinityLocalQueryBuilder(ABC):
         elem_type = EmbeddingDataType.kElemFloat
         if embedding_data_type == "bit":
             elem_type = EmbeddingDataType.kElemBit
-            raise Exception(f"Invalid embedding {embedding_data[0]} type")
+            data.u8_array_value = embedding_data
         elif embedding_data_type in ["unsigned tinyint", "uint8"]:
             elem_type = EmbeddingDataType.kElemUInt8
             data.u8_array_value = embedding_data
