@@ -5,6 +5,8 @@ import tomllib
 import sys
 import os
 
+import psutil
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
@@ -35,21 +37,20 @@ class InfinityRunner:
         self.process = subprocess.Popen(run_cmd, shell=True)
 
     def uninit(self):
-        self.client = None
         if self.process is None:
             return
+        script_path = "./scripts/timeout_kill.sh"
         timeout = 60
-        try:
-            print(f"Terminating node {self.node_name}")
-            self.process.terminate()
-            self.process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired as e:
-            self.process.kill()
-            print(
-                f"Process {self.process.pid} killed after timeout of {timeout} seconds"
-            )
-            raise e
+        pids = []
+        for child in psutil.Process(self.process.pid).children(recursive=True):
+            pids.append(child.pid)
+        if len(pids) == 0:
+            raise Exception("Cannot find infinity process.")
+        ret = os.system(f"bash {script_path} {timeout} {' '.join(map(str, pids))}")
+        if ret != 0:
+            raise Exception("An error occurred.")
         self.process = None
+
 
     def init_as_leader(self, config_path: str | None = None):
         self.init(config_path)

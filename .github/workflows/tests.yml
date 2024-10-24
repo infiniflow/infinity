@@ -64,6 +64,17 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
     
+      - name: Run cluster test
+        if: ${{ !cancelled() && !failure() }}
+        id: run_cluster_test
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity"
+
+      - name: Collect cluster test
+        if: ${{ !cancelled() }}
+        run: |
+          failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
+          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+    
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -110,36 +121,6 @@ jobs:
         run: |
           failure="${{ steps.run_tests_debug.outcome == 'failure' || steps.stop_tests_debug.outcome == 'failure' }}"
           sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=debug.log --stderror_path=debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Start infinity debug version with vfs off
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_vfs_off.toml > vfs_debug.log 2> vfs_debug_error.log" &
-
-      - name: Run pysdk remote infinity & parallel & http_api & sqllogic test debug version
-        if: ${{ !cancelled() && !failure() }}
-        id: run_tests_debug_vfs_off
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
-
-      - name: Stop infinity pysdk & http_api & sqllogictest debug
-        if: ${{ !cancelled() }}
-        id: stop_tests_debug_vfs_off
-        run: |
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
-          sudo chmod +x scripts/timeout_kill.sh
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Collect infinity debug output
-        if: ${{ !cancelled() }}
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_tests_debug_vfs_off.outcome == 'failure' || steps.stop_tests_debug_vfs_off.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=vfs_debug.log --stderror_path=vfs_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -199,6 +180,17 @@ jobs:
       - name: Install pysdk for Python 3.10
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
+
+      - name: Run cluster test
+        if: ${{ !cancelled() && !failure() }}
+        id: run_cluster_test
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-release/src/infinity"
+
+      - name: Collect cluster test
+        if: ${{ !cancelled() }}
+        run: |
+          failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
+          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-release/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
     
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}
@@ -254,36 +246,6 @@ jobs:
         run: |
           failure="${{ steps.run_tests_release.outcome == 'failure' || steps.stop_tests_release.outcome == 'failure' }}"
           sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Start infinity release version with vfs off
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_vfs_off.toml > vfs_release.log 2> vfs_release_error.log" &
-
-      - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version
-        if: ${{ !cancelled() }}
-        id: run_tests_release_vfs_off
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel.py" && sleep 1s
-
-      - name: Stop infinity release
-        if: ${{ !cancelled() }}
-        id: stop_tests_release_vfs_off
-        run: |
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo chmod +x scripts/timeout_kill.sh
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Collect infinity release output
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        run: |
-          failure="${{ steps.run_tests_release_vfs_off.outcome == 'failure' || steps.stop_tests_release_vfs_off.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stderror_path=vfs_release_error.log --stdout_path=vfs_release.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
     
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}

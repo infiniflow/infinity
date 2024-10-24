@@ -10,4 +10,4 @@ def test_0(infinity_path: str):
     cluster.init_leader("node1")
     cluster.init_follower("node2")
 
-    time.sleep(3)
+    time.sleep(1)
