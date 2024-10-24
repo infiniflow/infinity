@@ -19,7 +19,6 @@ def pytest_generate_tests(metafunc):
         infinity_path = metafunc.config.getoption("infinity_path")
         runner = InfinityRunner(infinity_path)
         metafunc.parametrize("infinity_runner", [runner])
-        pass
 
 
 # def pytest_collection_modifyitems(config, items):

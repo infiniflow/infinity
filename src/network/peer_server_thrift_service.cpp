@@ -95,7 +95,7 @@ void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterRespons
 }
 
 void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse &response, const infinity_peer_server::HeartBeatRequest &request) {
-    LOG_TRACE("Get HeartBeat request");
+    LOG_DEBUG("Get HeartBeat request");
     NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
     if (leader_node->node_role_ == NodeRole::kLeader) {
         SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
