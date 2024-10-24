@@ -1,10 +1,9 @@
 import platform
 import subprocess
 import time
-import tomllib
+import tomli
 import sys
 import os
-
 import psutil
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -51,7 +50,6 @@ class InfinityRunner:
             raise Exception("An error occurred.")
         self.process = None
 
-
     def init_as_leader(self, config_path: str | None = None):
         self.init(config_path)
         http_ip, http_port = self.http_uri()
@@ -68,7 +66,7 @@ class InfinityRunner:
 
     def __load_config(self):
         with open(self.config_path, "rb") as f:
-            config = tomllib.load(f)
+            config = tomli.load(f)
             self.network_config = config["network"]
 
     def http_uri(self):
@@ -198,13 +196,4 @@ class MockInfinityCluster(InfinityCluster):
 
 
 if __name__ == "__main__":
-    executable_path = "build/Debug/src/infinity"
-    cluster = InfinityCluster(executable_path)
-    cluster.add_node("node1", "conf/leader.toml")
-    cluster.add_node("node2", "conf/follower.toml")
-
-    cluster.init_leader("node1")
-    cluster.init_follower("node2")
-
-    while True:
-        time.sleep(1)
+    pass
