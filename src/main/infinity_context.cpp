@@ -94,7 +94,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
     if (current_role == target_role) {
         return Status::InvalidNodeRole(fmt::format("Infinity is already the role of {}", ToString(current_role)));
     }
-
+    SetServerRole(target_role);
     switch (current_role) {
         case NodeRole::kUnInitialized: {
             if (target_role != NodeRole::kAdmin) {
@@ -277,7 +277,6 @@ Status InfinityContext::ChangeRole(NodeRole target_role, const String &node_name
             break;
         }
     }
-    SetServerRole(target_role);
     StartThriftServers();
 
     Status status = Status::OK();
