@@ -40,12 +40,41 @@ import mlas_matrix_multiply;
 import vector_distance;
 import index_base;
 import knn_expr;
-import simd_functions;
 
 namespace infinity {
 
 struct SearchIndexPartsReuseContext {
-    UniquePtr<f32[]> pq_query_ip_table_ = {};
+    UniquePtr<f32[]> pq_query_ip_table_;
+    u32 dim_ = 0;
+    const f32 *x_ptr_ = nullptr;
+    const f32 *a_ptr_ = nullptr;
+    f32 x_l2_ = 0.0f;
+    UniquePtr<f32[]> x_mult_a_;
+    UniquePtr<f32[]> a_square_;
+    f32 get_x_l2() {
+        if (x_l2_ == 0.0f) {
+            x_l2_ = L2NormSquare<f32>(x_ptr_, dim_);
+        }
+        return x_l2_;
+    }
+    const auto &get_x_mult_a() {
+        if (!x_mult_a_) {
+            x_mult_a_ = MakeUniqueForOverwrite<f32[]>(dim_);
+            for (u32 i = 0; i < dim_; ++i) {
+                x_mult_a_[i] = x_ptr_[i] * a_ptr_[i];
+            }
+        }
+        return x_mult_a_;
+    }
+    const auto &get_a_square() {
+        if (!a_square_) {
+            a_square_ = MakeUniqueForOverwrite<f32[]>(dim_);
+            for (u32 i = 0; i < dim_; ++i) {
+                a_square_[i] = a_ptr_[i] * a_ptr_[i];
+            }
+        }
+        return a_square_;
+    }
 };
 
 class IVF_Part_Storage {
@@ -701,10 +730,6 @@ public:
                       SearchIndexPartsReuseContext &context) const {
         using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
         static_assert(std::is_same_v<QueryDataType, f32>);
-        auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
-        if (!knn_distance_1) [[unlikely]] {
-            UnrecoverableError("Invalid KnnDistance1");
-        }
         const auto &ivf_parts_storage =
             static_cast<const IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kScalarQuantization> &>(ivf_index_storage->ivf_parts_storage());
         const auto dimension = embedding_dimension_;
@@ -713,16 +738,18 @@ public:
         const auto c_ptr = ivf_index_storage->ivf_centroids_storage().data() + part_id() * dimension;
         const auto [x_ptr, _] = GetF32Ptr(query_ptr, dimension);
         const auto total_embedding_num = embedding_num();
-        switch (const KnnDistanceType dist_type = knn_distance_1->dist_type_; dist_type) {
+        context.dim_ = dimension;
+        context.x_ptr_ = x_ptr;
+        context.a_ptr_ = a_ptr;
+        switch (knn_distance->dist_type_) {
             case KnnDistanceType::kInnerProduct: {
                 // dot(x, v) = dot(x, c + b) + dot((x * a), n) + dot(v, e)
                 const auto c_plus_b = MakeUniqueForOverwrite<f32[]>(dimension);
-                const auto x_mult_a = MakeUniqueForOverwrite<f32[]>(dimension);
                 for (u32 i = 0; i < dimension; ++i) {
                     c_plus_b[i] = c_ptr[i] + b_ptr[i];
-                    x_mult_a[i] = x_ptr[i] * a_ptr[i];
                 }
                 const auto dot_x_c_b = IPDistance<f32>(x_ptr, c_plus_b.get(), dimension);
+                const auto &x_mult_a = context.get_x_mult_a();
                 for (u32 i = 0; i < total_embedding_num; ++i) {
                     const auto segment_offset = embedding_segment_offset(i);
                     if (!satisfy_filter_func(segment_offset)) {
@@ -739,16 +766,15 @@ public:
             }
             case KnnDistanceType::kCosine: {
                 // dot(x, v) = dot(x, c + b) + dot((x * a), n) + dot(v, e)
-                // dot(v, v) = dot(c + b, c + b) + dot(a^2, n^2) + 2 * dot ((c + b) * a, n) + 2 * dot(v, e)
-                const auto x_l2 = L2NormSquare<f32>(x_ptr, dimension);
+                // dot(v, v) = dot(c + b, c + b) + dot(a^2, n^2) + 2 * dot ((c + b) * a, n) + 2 * dot(v, e) + dot(e, e)
+                // Sift1M shows that it is better to not consider dot(v, e) and dot(e, e)
+                const auto x_l2 = context.get_x_l2();
+                const auto &x_mult_a = context.get_x_mult_a();
+                const auto &a_square = context.get_a_square();
                 const auto c_plus_b = MakeUniqueForOverwrite<f32[]>(dimension);
-                const auto x_mult_a = MakeUniqueForOverwrite<f32[]>(dimension);
-                const auto a_square = MakeUniqueForOverwrite<f32[]>(dimension);
                 const auto c_plus_b_mult_a_2 = MakeUniqueForOverwrite<f32[]>(dimension);
                 for (u32 i = 0; i < dimension; ++i) {
                     c_plus_b[i] = c_ptr[i] + b_ptr[i];
-                    x_mult_a[i] = x_ptr[i] * a_ptr[i];
-                    a_square[i] = a_ptr[i] * a_ptr[i];
                     c_plus_b_mult_a_2[i] = 2.0f * c_plus_b[i] * a_ptr[i];
                 }
                 const auto dot_x_c_b = IPDistance<f32>(x_ptr, c_plus_b.get(), dimension);
@@ -758,8 +784,8 @@ public:
                     if (!satisfy_filter_func(segment_offset)) {
                         continue;
                     }
-                    f32 x_v_ip = dot_x_c_b + dot_v_e_[i];
-                    f32 v_l2 = c_plus_b_l2 + 2.0f * dot_v_e_[i];
+                    f32 x_v_ip = dot_x_c_b;
+                    f32 v_l2 = c_plus_b_l2;
                     const u8 *sq_data = sq_data_.data() + i * embedding_sq_bytes_;
                     for (u32 j = 0; j < dimension; ++j) {
                         const auto n = sq_decode(sq_data, j);
@@ -773,11 +799,10 @@ public:
             }
             case KnnDistanceType::kL2: {
                 // l2(a * n + b + c - x) = dot(a^2, n^2) + l2(b + c - x) + 2 * dot(a * (b + c - x), n)
-                const auto a_square = MakeUniqueForOverwrite<f32[]>(dimension);
+                const auto &a_square = context.get_a_square();
                 const auto b_plus_c_minus_x = MakeUniqueForOverwrite<f32[]>(dimension);
                 const auto a_mult_b_plus_c_minus_x_2 = MakeUniqueForOverwrite<f32[]>(dimension);
                 for (u32 i = 0; i < dimension; ++i) {
-                    a_square[i] = a_ptr[i] * a_ptr[i];
                     b_plus_c_minus_x[i] = b_ptr[i] + c_ptr[i] - x_ptr[i];
                     a_mult_b_plus_c_minus_x_2[i] = 2.0f * a_ptr[i] * b_plus_c_minus_x[i];
                 }
@@ -798,7 +823,8 @@ public:
                 break;
             }
             default: {
-                RecoverableError(Status::SyntaxError(fmt::format("IVFSQ does not support {} metric now.", KnnExpr::KnnDistanceType2Str(dist_type))));
+                RecoverableError(Status::SyntaxError(
+                    fmt::format("IVFSQ does not support {} metric now.", KnnExpr::KnnDistanceType2Str(knn_distance->dist_type_))));
                 break;
             }
         }
@@ -1052,10 +1078,6 @@ public:
                       SearchIndexPartsReuseContext &context) const {
         using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
         static_assert(std::is_same_v<QueryDataType, f32>);
-        auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
-        if (!knn_distance_1) [[unlikely]] {
-            UnrecoverableError("Invalid KnnDistance1");
-        }
         const auto &ivf_parts_storage =
             static_cast<const IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> &>(ivf_index_storage->ivf_parts_storage());
         const auto subspace_num = subspace_num_;
@@ -1064,7 +1086,9 @@ public:
         const auto [query_f32, _] = GetF32Ptr(query_ptr, dimension);
         const auto centroid_data = ivf_index_storage->ivf_centroids_storage().data() + part_id() * dimension;
         const auto total_embedding_num = embedding_num();
-        switch (const KnnDistanceType dist_type = knn_distance_1->dist_type_; dist_type) {
+        context.dim_ = dimension;
+        context.x_ptr_ = query_f32;
+        switch (knn_distance->dist_type_) {
             case KnnDistanceType::kInnerProduct: {
                 const auto query_centroid_ip = IPDistance<f32>(query_f32, centroid_data, dimension);
                 auto &ip_table = context.pq_query_ip_table_;
@@ -1087,7 +1111,7 @@ public:
                 break;
             }
             case KnnDistanceType::kCosine: {
-                const auto query_l2 = L2NormSquare<f32>(query_f32, dimension);
+                const auto query_l2 = context.get_x_l2();
                 const auto centroid_l2 = L2NormSquare<f32>(centroid_data, dimension);
                 const auto query_centroid_ip = IPDistance<f32>(query_f32, centroid_data, dimension);
                 auto &query_ip_table = context.pq_query_ip_table_;
@@ -1140,7 +1164,8 @@ public:
                 break;
             }
             default: {
-                RecoverableError(Status::SyntaxError(fmt::format("IVFPQ does not support {} metric now.", KnnExpr::KnnDistanceType2Str(dist_type))));
+                RecoverableError(Status::SyntaxError(
+                    fmt::format("IVFPQ does not support {} metric now.", KnnExpr::KnnDistanceType2Str(knn_distance->dist_type_))));
                 break;
             }
         }

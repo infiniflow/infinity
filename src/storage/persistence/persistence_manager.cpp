@@ -202,8 +202,8 @@ void PersistenceManager::CheckValid() {
 }
 
 void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, Vector<String> &drop_keys) {
-    persist_keys.push_back(current_object_key_);
     if (current_object_size_ > 0) {
+        persist_keys.push_back(current_object_key_);
         if (current_object_parts_ > 1) {
             // Add footer to composed object -- format version 1
             fs::path dst_fp = workspace_;
@@ -224,6 +224,8 @@ void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, 
         current_object_size_ = 0;
         current_object_parts_ = 0;
         current_object_ref_count_ = 0;
+    } else {
+        LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added empty object {}", current_object_key_));
     }
 }
 
@@ -256,7 +258,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
         if(!obj_stat->cached_){
             String read_path = GetObjPath(result.obj_addr_.obj_key_);
-            VirtualStore::DownloadObject(read_path, read_path);
+            VirtualStore::DownloadObject(read_path, result.obj_addr_.obj_key_);
             if(VirtualStore::Exists(read_path)){
                 LOG_TRACE(fmt::format("GetObjCache download object {}", read_path));
                 obj_stat->cached_ = true;

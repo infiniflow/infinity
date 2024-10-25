@@ -105,6 +105,10 @@ print(res)
 res = table_obj.output(["*", "floor(c1)", "floor(c2)"]).to_df()
 print(res)
 
+#function ln
+res = table_obj.output(["*", "ln(c1)", "ln(c2)"]).to_df()
+print(res)
+
 res = db_obj.drop_table("function_example")
 
 infinity_obj.disconnect()
