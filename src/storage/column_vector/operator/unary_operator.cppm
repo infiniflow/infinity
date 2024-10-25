@@ -68,9 +68,7 @@ public:
                 //    String error_message = "Target vector type isn't flat.";
                 //    UnrecoverableError(error_message);
                 //}
-                if constexpr (std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                    //String error_message = "BooleanT type should not be kFlat.";
-                    //UnrecoverableError(error_message);
+                if constexpr (std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
                     if (nullable)
                         ExecuteFlatToBooleanWithNull<InputType, ResultType, Operator>(input_ptr, result, count, state_ptr_input, state_ptr);
                     else 
@@ -99,6 +97,10 @@ public:
                     if constexpr (std::is_same_v<InputType, BooleanT> and std::is_same_v<ResultType, BooleanT>) {
                         BooleanT result_value;
                         Operator::template Execute(input->buffer_->GetCompactBit(0), result_value, result_null.get(), 0, state_ptr_input, state_ptr);
+                        result->buffer_->SetCompactBit(0, result_value);
+                    } else if constexpr (std::is_same_v<ResultType, BooleanT>) {
+                        BooleanT result_value;
+                        Operator::template Execute(input_ptr[0], result_value, result_null.get(), 0, state_ptr_input, state_ptr);
                         result->buffer_->SetCompactBit(0, result_value);
                     } else if constexpr (std::is_same_v<InputType, EmbeddingT>) {
                         EmbeddingT embedding_input(input->data(), false);

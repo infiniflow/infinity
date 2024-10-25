@@ -24,16 +24,6 @@ struct IsnanFunction {
     static inline void Run(TA &left, TB &result) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
-        /*
-        if constexpr (std::is_same_v<std::remove_cv_t<TA>, Float16T> || std::is_same_v<std::remove_cv_t<TA>, BFloat16T>) {
-            result = std::isnan(static_cast<float>(left));
-        } else if constexpr(std::is_same_v<std::remove_cv_t<TA>, FloatT> || std::is_same_v<std::remove_cv_t<TA>, DoubleT>){
-            result = std::isnan(left);
-        } else {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
-        */
     }
 };
 
