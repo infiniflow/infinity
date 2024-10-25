@@ -17,9 +17,8 @@ from typing import List
 
 
 class infinity_http:
-    def __init__(self, url: str = default_url, proxy = None | dict[str, str]):
+    def __init__(self, url: str = default_url):
         self.base_url = url
-        self.proxy = proxy
         self.header_dict = baseHeader
         self.response_dict = baseResponse
         self.data_dict = baseData
@@ -771,9 +770,10 @@ class infinity_http:
 
 
 class database_result(infinity_http):
-    def __init__(self, list=[], error_code=ErrorCode.OK, database_name="", columns=[], table_name="",
+    def __init__(self, url: str = default_url, list=[], error_code=ErrorCode.OK, database_name="", columns=[], table_name="",
                  index_list=[], output=["*"], filter="", fusion=[], knn={}, match={}, match_tensor={}, match_sparse={},
                  sort=[], output_res=[]):
+        super().__init__(url)
         self.db_names = list
         self.error_code = error_code
         self.database_name = database_name  # get database

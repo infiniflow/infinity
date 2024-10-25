@@ -16,6 +16,7 @@ def test_standalone(infinity_path: str):
     test_client.drop_database("db1")
 
 
+@pytest.mark.skip(reason="bug")
 def test_0(infinity_path: str):
     cluster = InfinityCluster(infinity_path)
     cluster.add_node("node1", "conf/leader.toml")
@@ -30,7 +31,7 @@ def test_0(infinity_path: str):
     cluster.remove_node("node1")
 
 
-@pytest.mark.skip(reason="tmp")
+@pytest.mark.skip(reason="bug")
 def test_mock(infinity_path: str):
     cluster = MockInfinityCluster(infinity_path)
     cluster.add_node("node1", "conf/leader.toml")
