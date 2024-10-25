@@ -212,6 +212,11 @@ export {
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT_STR = "128GB"; // 128GB
     constexpr SizeT DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT = 128 * 1024lu * 1024lu * 1024lu; // 128GB
 
+    // network
+    constexpr SizeT DEFAULT_HTTP_PORT = 23820;
+    constexpr SizeT DEFAULT_PEER_PORT = 23850;
+    constexpr SizeT DEFAULT_POSTGRES_PORT = 5432;
+    constexpr SizeT DEFAULT_CLIENT_PORT = 23817;
 
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";

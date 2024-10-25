@@ -46,6 +46,8 @@
 *.tab.hh
 *.tar
 *.tgz
+*.zip
+*.tar.bz2
 *.xz
 *_BACKUP_*
 *_BASE_*
