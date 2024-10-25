@@ -569,8 +569,8 @@ void Catalog::AttachDeltaCheckpoint(const String &file_name) {
 UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const String &catalog_path) {
     if (!VirtualStore::Exists(catalog_path)) {
         std::filesystem::path filePath = catalog_path;
-        String fileName = filePath.filename();
-        VirtualStore::DownloadObject(catalog_path, fileName);
+        String dst_file_name = filePath.filename();
+        VirtualStore::DownloadObject(catalog_path, dst_file_name);
     }
 
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
@@ -981,11 +981,15 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
 
 UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
     const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / file_name;
+    String dst_dir = catalog_path.parent_path().string();
+    String dst_file_name = catalog_path.filename().string();
+
+    if (!VirtualStore::Exists(dst_dir)){
+        VirtualStore::MakeDirectory(dst_dir);
+    }
 
     if (!VirtualStore::Exists(catalog_path)) {
-        std::filesystem::path filePath = catalog_path;
-        String fileName = filePath.filename();
-        VirtualStore::DownloadObject(catalog_path, fileName);
+        VirtualStore::DownloadObject(catalog_path, dst_file_name);
     }
 
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
