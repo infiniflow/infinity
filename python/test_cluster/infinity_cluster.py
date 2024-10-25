@@ -3,7 +3,9 @@ import time
 import tomli
 import sys
 import os
-import psutil
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+from scripts import timeout_kill
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -31,41 +33,45 @@ class InfinityRunner:
             self.config_path = config_path
             self.__load_config()
 
-        run_cmd = f"{self.executable_path} --config={self.config_path} 2>&1"
-        self.process = subprocess.Popen(run_cmd, shell=True)
+        cmd = [self.executable_path, f"--config={self.config_path}"]
+        my_env = os.environ.copy()
+        my_env["LD_PRELOAD"] = ""
+        my_env["ASAN_OPTIONS"] = ""
+        self.process = subprocess.Popen(cmd, shell=False, env=my_env)
+        time.sleep(1)  # Give the process a moment to start
+        if self.process.poll() is not None:
+            raise RuntimeError(
+                f"Failed to start process for node {self.node_name}, return code: {self.process.returncode}"
+            )
+        print(f"Launch {self.node_name} successfully. pid: {self.process.pid}")
 
     def uninit(self):
+        print(f"Uniting node {self.node_name}")
         if self.process is None:
             return
-        script_path = "./scripts/timeout_kill.sh"
         timeout = 60
+        timeout_kill.timeout_kill(timeout, self.process)
 
-        pids = []
-        for child in psutil.Process(self.process.pid).children(recursive=True):
-            pids.append(child.pid)
-        if len(pids) == 0:
-            raise Exception("Cannot find infinity process.")
-
-        ret = os.system(
-            f"sudo bash {script_path} {timeout} {' '.join(map(str, pids))}"
-        )
-        if ret != 0:
-            raise Exception("An error occurred.")
-        self.process = None
+    def init_as_standalone(self, config_path: str | None = None):
+        self.init(config_path)
+        http_ip, http_port = self.http_uri()
+        print(f"add client: http://{http_ip}:{http_port}/")
+        self.add_client(f"http://{http_ip}:{http_port}/")
+        self.__init_cmd(lambda: self.client.set_role_standalone(self.node_name))
 
     def init_as_leader(self, config_path: str | None = None):
         self.init(config_path)
         http_ip, http_port = self.http_uri()
         self.add_client(f"http://{http_ip}:{http_port}/")
-        time.sleep(1)
-        self.client.set_role_leader(self.node_name)
+        self.__init_cmd(lambda: self.client.set_role_leader(self.node_name))
 
     def init_as_follower(self, leader_addr: str, config_path: str | None = None):
         self.init(config_path)
         http_ip, http_port = self.http_uri()
         self.add_client(f"http://{http_ip}:{http_port}/")
-        time.sleep(1)
-        self.client.set_role_follower(self.node_name, leader_addr)
+        self.__init_cmd(
+            lambda: self.client.set_role_follower(self.node_name, leader_addr)
+        )
 
     def add_client(self, http_addr: str):
         self.client = infinity_http(http_addr)
@@ -85,6 +91,19 @@ class InfinityRunner:
             config = tomli.load(f)
             self.network_config = config["network"]
 
+    def __init_cmd(self, send_f, timeout=30):
+        t1 = time.time()
+        while True:
+            try:
+                send_f()
+            except Exception as e:
+                print(e)
+                time.sleep(1)
+                if time.time() - t1 > timeout:
+                    raise Exception("Timeout")
+                continue
+            break
+
 
 class InfinityCluster:
     def __init__(self, executable_path: str):
@@ -97,6 +116,12 @@ class InfinityCluster:
         if node_name in self.runners:
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner
+
+    def init_standalone(self, node_name: str):
+        if node_name not in self.runners:
+            raise ValueError(f"Node {node_name} not found in the runners.")
+        runner = self.runners[node_name]
+        runner.init_as_standalone()
 
     def init_leader(self, leader_name: str):
         if self.leader_runner is not None:
@@ -121,14 +146,14 @@ class InfinityCluster:
     def client(self, node_name: str) -> infinity_http | None:
         if node_name not in self.runners:
             raise ValueError(f"Node {node_name} not found in the runners.")
-        return self.runners[node_name]
+        return self.runners[node_name].client
 
     def leader_addr(self):
         if self.leader_runner is None:
             raise ValueError("Leader runner is not initialized.")
         return self.leader_runner.peer_uri()
 
-    def remove(self, node_name: str):
+    def remove_node(self, node_name: str):
         if node_name not in self.runners:
             raise ValueError(f"Node {node_name} not found in the cluster.")
         runner = self.runners[node_name]

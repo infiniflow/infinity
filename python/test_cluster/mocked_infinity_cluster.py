@@ -106,7 +106,7 @@ class MockInfinityCluster(InfinityCluster):
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner
 
-    def remove(self, node_name: str):
+    def remove_node(self, node_name: str):
         if node_name not in self.runners:
             raise ValueError(f"Node {node_name} not found in the cluster.")
         cur_runner: MockedInfinityRunner = self.runners[node_name]
@@ -153,10 +153,6 @@ class MockInfinityCluster(InfinityCluster):
         if platform.system() != "Linux":
             print("Network namespaces are only supported on Linux.")
             exit()
-        if subprocess.run("command -v ip", shell=True).returncode != 0:
-            subprocess.run("sudo apt-get install iproute2".split(), check=True)
-        if subprocess.run("command -v brctl", shell=True).returncode != 0:
-            subprocess.run("sudo apt-get install bridge_utils".split(), check=True)
 
     def __prepare_bridge(self):
         subprocess.run(f"sudo ip link set {self.bridge_name} down".split())

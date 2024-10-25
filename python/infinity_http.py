@@ -111,6 +111,14 @@ class infinity_http:
             print(e)
             return database_result(error_code=e.error_code)
         
+    def set_role_standalone(self, node_name):
+        url = f"admin/node/current"
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data([], {"role": "standalone", "name": node_name})
+        r = self.request(url, "post", h, d)
+        self.raise_exception(r)
+        return database_result()
+        
     def set_role_leader(self, node_name):
         url = f"admin/node/current"
         h = self.set_up_header(["accept", "content-type"])
