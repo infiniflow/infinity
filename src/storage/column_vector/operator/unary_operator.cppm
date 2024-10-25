@@ -64,19 +64,22 @@ public:
                 return;
             }
             case ColumnVectorType::kFlat: {
-                if (result->vector_type() != ColumnVectorType::kFlat) {
-                    String error_message = "Target vector type isn't flat.";
-                    UnrecoverableError(error_message);
-                }
-                if constexpr (std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                    String error_message = "BooleanT type should not be kFlat.";
-                    UnrecoverableError(error_message);
-                }
-                if (nullable) {
-                    ExecuteFlatWithNull<InputType, ResultType, Operator>(input_ptr, input_null, result_ptr, result_null, count, state_ptr_input, state_ptr);
-
+                //if (result->vector_type() != ColumnVectorType::kFlat) {
+                //    String error_message = "Target vector type isn't flat.";
+                //    UnrecoverableError(error_message);
+                //}
+                if constexpr (std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
+                    if (nullable)
+                        ExecuteFlatToBooleanWithNull<InputType, ResultType, Operator>(input_ptr, result, count, state_ptr_input, state_ptr);
+                    else 
+                        ExecuteFlatToBoolean<InputType, ResultType, Operator>(input_ptr, result, count, state_ptr_input, state_ptr);
                 } else {
-                    ExecuteFlat<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr_input, state_ptr);
+                    if (nullable) {
+                        ExecuteFlatWithNull<InputType, ResultType, Operator>(input_ptr, input_null, result_ptr, result_null, count, state_ptr_input, state_ptr);
+
+                    } else {
+                        ExecuteFlat<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr_input, state_ptr);
+                    }
                 }
                 // Result tail_index need to update.
                 result->Finalize(count);
@@ -94,6 +97,10 @@ public:
                     if constexpr (std::is_same_v<InputType, BooleanT> and std::is_same_v<ResultType, BooleanT>) {
                         BooleanT result_value;
                         Operator::template Execute(input->buffer_->GetCompactBit(0), result_value, result_null.get(), 0, state_ptr_input, state_ptr);
+                        result->buffer_->SetCompactBit(0, result_value);
+                    } else if constexpr (std::is_same_v<ResultType, BooleanT>) {
+                        BooleanT result_value;
+                        Operator::template Execute(input_ptr[0], result_value, result_null.get(), 0, state_ptr_input, state_ptr);
                         result->buffer_->SetCompactBit(0, result_value);
                     } else if constexpr (std::is_same_v<InputType, EmbeddingT>) {
                         EmbeddingT embedding_input(input->data(), false);
@@ -189,6 +196,37 @@ private:
             // This row isn't null
             BooleanT answer;
             Operator::template Execute(input->buffer_->GetCompactBit(row_index), answer, result_null.get(), row_index, state_ptr_input, state_ptr);
+            result->buffer_->SetCompactBit(row_index, answer);
+            return row_index + 1 < count;
+        });
+    }
+
+    template <typename InputType, typename ResultType, typename Operator>
+    static void inline ExecuteFlatToBoolean(const InputType *__restrict input_ptr,
+                                           SharedPtr<ColumnVector> &result,
+                                           SizeT count,
+                                           void *state_ptr_input,
+                                           void *state_ptr) {
+        for (SizeT i = 0; i < count; i++){
+            BooleanT answer;
+            Operator::template Execute(input_ptr[i], answer, result->nulls_ptr_.get(), i, state_ptr_input, state_ptr);
+            result->buffer_->SetCompactBit(i, answer);
+        }
+    }
+
+    template <typename InputType, typename ResultType, typename Operator>
+    static void inline ExecuteFlatToBooleanWithNull(const InputType *__restrict input_ptr,
+                                           SharedPtr<ColumnVector> &result,
+                                           SizeT count,
+                                           void *state_ptr_input,
+                                           void *state_ptr) {
+        auto &result_null = result->nulls_ptr_;
+        result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
+            if (row_index >= count) {
+                return false;
+            }
+            BooleanT answer;
+            Operator::template Execute(input_ptr[row_index], answer, result_null.get(), row_index, state_ptr_input, state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
         });
