@@ -34,7 +34,7 @@ Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &ob
 
     // Handle response.
     if (resp) {
-        LOG_INFO(fmt::format("{} downloaded to {} successfully", file_path, object_name));
+        LOG_INFO(fmt::format("{} downloaded to {} successfully", object_name, file_path));
     } else {
         UnrecoverableError(fmt::format("Unable to download object: {}", resp.Error().String()));
     }
