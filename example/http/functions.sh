@@ -356,6 +356,20 @@ curl --request GET \
          ]
      } '
 
+# show rows of 'tbl1' with num, ln(num)
+echo -e '\n\n-- show rows of 'tbl1' with decimal, round(decimal), ceil(decimal), floor(decimal)'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "num", "ln(num)"
+         ]
+     } '
+
 
 # drop tbl1
 echo -e '\n\n-- drop tbl1'

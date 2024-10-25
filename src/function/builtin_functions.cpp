@@ -31,6 +31,7 @@ import sqrt;
 import round;
 import ceil;
 import floor;
+import log;
 import isnan;
 import and_func;
 import divide;
@@ -111,6 +112,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterRoundFunction(catalog_ptr_);
     RegisterCeilFunction(catalog_ptr_);
     RegisterFloorFunction(catalog_ptr_);
+    RegisterLogFunction(catalog_ptr_);
     RegisterIsnanFunction(catalog_ptr_);
 
     // register comparison operator
