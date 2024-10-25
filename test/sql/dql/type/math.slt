@@ -45,5 +45,12 @@ SELECT c2, floor(c2) FROM test_math WHERE c1 > 9;
 2.500000 2.000000
 -2.500000 -3.000000
 
+query VI
+SELECT c1, ln(c1) FROM test_math WHERE c1 < 10;
+----
+1 0.000000
+4 1.386294
+9 2.197225
+
 statement ok
 DROP TABLE test_math;
