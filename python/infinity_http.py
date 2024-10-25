@@ -688,7 +688,7 @@ class infinity_http:
 
         for res in self.output_res:
             for k in res:
-                #print(res[k])
+                # print(res[k])
                 if k not in df_dict:
                     df_dict[k] = ()
                 tup = df_dict[k]

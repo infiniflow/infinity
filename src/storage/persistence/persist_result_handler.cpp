@@ -36,7 +36,7 @@ void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
         String persist_path = pm_->GetObjPath(persist_key);
         if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader or
            InfinityContext::instance().GetServerRole() == NodeRole::kStandalone){
-            VirtualStore::UploadObject(persist_path, persist_path);
+            VirtualStore::UploadObject(persist_path, persist_key);
         }
     }
     for (const String &drop_key : result.drop_keys_) {
@@ -48,7 +48,7 @@ void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
         fs::remove(drop_path);
         if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader or
            InfinityContext::instance().GetServerRole() == NodeRole::kStandalone){
-            VirtualStore::RemoveObject(drop_path);
+            VirtualStore::RemoveObject(drop_key);
         }
     }
 }
