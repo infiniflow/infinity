@@ -116,7 +116,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 if (output_columns == nullptr) {
                     return;
                 }
-            } else if(IsEqual(key, "highlight")) {
+            } else if (IsEqual(key, "highlight")) {
                 auto &highlight_list = elem.value();
                 if (!highlight_list.is_array()) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
@@ -313,7 +313,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                 if (output_columns == nullptr) {
                     return;
                 }
-            } else if(IsEqual(key, "highlight")) {
+            } else if (IsEqual(key, "highlight")) {
                 auto &highlight_list = elem.value();
                 if (!highlight_list.is_array()) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1288,6 +1288,45 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
     }
 
     switch (elem_type) {
+        case EmbeddingDataType::kElemBit: {
+            if (dimension % 8 != 0) {
+                response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                response["error_message"] = fmt::format("bit embeddings should have dimension of times of 8");
+                return {0, nullptr};
+            }
+            u8 *embedding_data_ptr = new u8[dimension / 8];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT i = 0; i < dimension / 8; ++i) {
+                u8 unit = 0;
+                for (SizeT bit_idx = 0; bit_idx < 8; bit_idx++) {
+                    const auto &value_ref = json_object[i * 8 + bit_idx];
+                    const auto &value_type = value_ref.type();
+                    switch (value_type) {
+                        case nlohmann::json::value_t::number_integer:
+                        case nlohmann::json::value_t::number_unsigned: {
+                            if (value_ref.template get<i64>() > 0) {
+                                unit |= (1 << bit_idx);
+                            }
+                            break;
+                        }
+                        default: {
+                            response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                            response["error_message"] = fmt::format("Embedding element type should be integer");
+                            return {0, nullptr};
+                        }
+                    }
+                }
+                embedding_data_ptr[i] = unit;
+            }
+            u8 *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
         case EmbeddingDataType::kElemInt32: {
             i32 *embedding_data_ptr = new i32[dimension];
             DeferFn defer_free_embedding([&]() {

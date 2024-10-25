@@ -76,7 +76,8 @@ bool FilterFulltextExpression::Eq(const BaseExpression &other_base) const {
         return false;
     }
     const auto &other = static_cast<const FilterFulltextExpression &>(other_base);
-    return fields_ == other.fields_ && matching_text_ == other.matching_text_ && options_text_ == other.options_text_;
+    return std::strcmp(fields_.c_str(), other.fields_.c_str()) == 0 && std::strcmp(matching_text_.c_str(), other.matching_text_.c_str()) == 0 &&
+           std::strcmp(options_text_.c_str(), other.options_text_.c_str()) == 0;
 }
 
 } // namespace infinity

@@ -160,6 +160,8 @@ def is_sparse(str_input):
     pairs = tmp.split(",")
     for pair in pairs:
         t = pair.split(":")
+        if(len(t) != 2):
+            return False
         if not (t[0].isdigit() or is_float(t[0])):
             return False
         if not (t[1].isdigit() or is_float(t[1])):
