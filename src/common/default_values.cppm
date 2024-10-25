@@ -95,17 +95,17 @@ export {
     constexpr SizeT MIN_CLEANUP_INTERVAL_SEC = 0; // 0 means disable the function
     constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
     constexpr std::string_view DEFAULT_CLEANUP_INTERVAL_SEC_STR = "10s"; // 10 seconds
-    constexpr SizeT MAX_CLEANUP_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+    constexpr SizeT MAX_CLEANUP_INTERVAL_SEC = 60 * 60 * 24 * 30;        // 1 month
 
     constexpr SizeT MIN_COMPACT_INTERVAL_SEC = 0; // 0 means disable the function
     constexpr SizeT DEFAULT_COMPACT_INTERVAL_SEC = 10;
     constexpr std::string_view DEFAULT_COMPACT_INTERVAL_SEC_STR = "10s"; // 10 seconds
-    constexpr SizeT MAX_COMPACT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+    constexpr SizeT MAX_COMPACT_INTERVAL_SEC = 60 * 60 * 24 * 30;        // 1 month
 
     constexpr SizeT MIN_OPTIMIZE_INTERVAL_SEC = 1;
     constexpr SizeT DEFAULT_OPTIMIZE_INTERVAL_SEC = 10;
     constexpr std::string_view DEFAULT_OPTIMIZE_INTERVAL_SEC_STR = "10s"; // 10 seconds
-    constexpr SizeT MAX_OPTIMIZE_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+    constexpr SizeT MAX_OPTIMIZE_INTERVAL_SEC = 60 * 60 * 24 * 30;        // 1 month
 
     constexpr SizeT MIN_MEMINDEX_CAPACITY = DEFAULT_BLOCK_CAPACITY;           // 1 Block
     constexpr SizeT DEFAULT_MEMINDEX_CAPACITY = 128 * DEFAULT_BLOCK_CAPACITY; // 128 * 8192 = 1M rows
@@ -113,24 +113,23 @@ export {
 
     constexpr i64 MIN_WAL_FILE_SIZE_THRESHOLD = 1024;                                    // 1KB
     constexpr i64 DEFAULT_WAL_FILE_SIZE_THRESHOLD = 1 * 1024l * 1024l * 1024l;           // 1GB
-    constexpr std::string_view DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR = "1GB";           // 1GB
+    constexpr std::string_view DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR = "1GB";              // 1GB
     constexpr i64 MAX_WAL_FILE_SIZE_THRESHOLD = 1024l * DEFAULT_WAL_FILE_SIZE_THRESHOLD; // 1TB
 
-    constexpr i64 MIN_FULL_CHECKPOINT_INTERVAL_SEC = 0; // 0 means disable full checkpoint
-    constexpr i64 DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC = 30; // 30 seconds
+    constexpr i64 MIN_FULL_CHECKPOINT_INTERVAL_SEC = 0;                          // 0 means disable full checkpoint
+    constexpr i64 DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC = 30;                     // 30 seconds
     constexpr std::string_view DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR = "30s"; // 30 seconds
-    constexpr i64 MAX_FULL_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+    constexpr i64 MAX_FULL_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30;          // 1 month
 
-    constexpr i64 MIN_DELTA_CHECKPOINT_INTERVAL_SEC = 0; // 0 means disable delta checkpoint
-    constexpr i64 DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC = 5; // 5 seconds
+    constexpr i64 MIN_DELTA_CHECKPOINT_INTERVAL_SEC = 0;                         // 0 means disable delta checkpoint
+    constexpr i64 DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC = 5;                     // 5 seconds
     constexpr std::string_view DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR = "5s"; // 5 seconds
-    constexpr i64 MAX_DELTA_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+    constexpr i64 MAX_DELTA_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30;         // 1 month
 
-    constexpr i64 MIN_CHECKPOINT_INTERVAL_WAL_BYTES = 1024; // 1K
-    constexpr i64 DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024l * 1024l; // 64 MB
+    constexpr i64 MIN_CHECKPOINT_INTERVAL_WAL_BYTES = 1024;                      // 1K
+    constexpr i64 DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024l * 1024l;      // 64 MB
     constexpr std::string_view DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR = "64MB"; // 64 MB
-    constexpr i64 MAX_CHECKPOINT_INTERVAL_WAL_BYTES = 1024l * 1024l * 1024l; // 1GB
-
+    constexpr i64 MAX_CHECKPOINT_INTERVAL_WAL_BYTES = 1024l * 1024l * 1024l;     // 1GB
 
     constexpr std::string_view WAL_FILE_TEMP_FILE = "wal.log";
     constexpr std::string_view WAL_FILE_PREFIX = "wal.log";
@@ -154,16 +153,16 @@ export {
     constexpr SizeT DISKANN_NUM_PQ_CHUNKS = 4;
     constexpr SizeT DISKANN_NUM_PARTS = 1;
     constexpr SizeT DISKANN_MAX_PQ_CHUNKS = 100;
-    constexpr SizeT DISKANN_TRAINING_SET_SIZE = 100000; // sample rate = data_size/TRAINING_SET_SIZE
+    constexpr SizeT DISKANN_TRAINING_SET_SIZE = 100000;        // sample rate = data_size/TRAINING_SET_SIZE
     constexpr f64 DISKANN_SPACE_FOR_CACHED_NODES_IN_GB = 0.25; // cache vector memory in GB
-    constexpr f64 DISKANN_THRESHOLD_FOR_CACHING_IN_GB = 1.0; // 
-    constexpr u32 DISKANN_NUM_NODES_TO_CACHE = 250000; // cache node num
-    constexpr u32 DISKANN_WARMUP_L = 20; 
-    constexpr u32 DISKANN_NUM_KMEANS_REPS = 12; // max iterations of lloyds kmeans
-    constexpr u32 DISKANN_NUM_CENTERS = 256; // number of centers for pq chunk
-    constexpr f32 DISKANN_GRAPH_SLACK_FACTOR = 1.3f; // In-mem index reserve factor
-    constexpr SizeT DISKANN_MAX_GRAPH_DEGREE = 512; // SSD index max degree
-    constexpr SizeT DISKANN_SECTOR_LEN = 4096u; // SSD index sector size
+    constexpr f64 DISKANN_THRESHOLD_FOR_CACHING_IN_GB = 1.0;   //
+    constexpr u32 DISKANN_NUM_NODES_TO_CACHE = 250000;         // cache node num
+    constexpr u32 DISKANN_WARMUP_L = 20;
+    constexpr u32 DISKANN_NUM_KMEANS_REPS = 12;       // max iterations of lloyds kmeans
+    constexpr u32 DISKANN_NUM_CENTERS = 256;          // number of centers for pq chunk
+    constexpr f32 DISKANN_GRAPH_SLACK_FACTOR = 1.3f;  // In-mem index reserve factor
+    constexpr SizeT DISKANN_MAX_GRAPH_DEGREE = 512;   // SSD index max degree
+    constexpr SizeT DISKANN_SECTOR_LEN = 4096u;       // SSD index sector size
     constexpr SizeT DISKANN_MAX_N_SECTOR_READS = 128; // SSD index max sector reads
 
     // default hnsw parameter
@@ -191,24 +190,23 @@ export {
     constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "8GB"; // 8Gib
 
     constexpr SizeT DEFAULT_MEMINDEX_MEMORY_QUOTA = 4 * 1024lu * 1024lu * 1024lu; // 4GB
-    constexpr std::string_view DEFAULT_MEMINDEX_MEMORY_QUOTA_STR = "4GB"; // 4GB
+    constexpr std::string_view DEFAULT_MEMINDEX_MEMORY_QUOTA_STR = "4GB";         // 4GB
 
-    constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
+    constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu;  // 64MB
     constexpr std::string_view DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
 
     constexpr SizeT INSERT_BATCH_ROW_LIMIT = 8192;
 
     // default persistence parameter
     constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence"; // Empty means disabled
-    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "100MB"; // 100MB
-    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 100 * 1024lu * 1024lu;  // 100MB
+    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "100MB";   // 100MB
+    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 100 * 1024lu * 1024lu;    // 100MB
 
     constexpr std::string_view DEFAULT_STORAGE_TYPE = "local";
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_BUCKET = "infinity";
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_DIR = "/var/infinity/localdiskcache";
-    constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT_STR = "100GB"; // 100GB
+    constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT_STR = "100GB";         // 100GB
     constexpr SizeT DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT = 100 * 1024lu * 1024lu * 1024lu; // 100GB
-
 
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";
@@ -270,30 +268,30 @@ export {
     constexpr std::string_view RECORD_RUNNING_QUERY_OPTION_NAME = "record_running_query";
 
     // Variable name
-    constexpr std::string_view QUERY_COUNT_VAR_NAME = "query_count";        // global and session
-    constexpr std::string_view SESSION_COUNT_VAR_NAME = "session_count";    // global
-    constexpr std::string_view BUFFER_USAGE_VAR_NAME = "buffer_usage";    // global
-    constexpr std::string_view SCHEDULE_POLICY_VAR_NAME = "schedule_policy";    // global
-    constexpr std::string_view DELTA_LOG_COUNT_VAR_NAME = "delta_log_count";    // global
-    constexpr std::string_view NEXT_TXN_ID_VAR_NAME = "next_transaction_id";    // global
-    constexpr std::string_view BUFFER_OBJECT_COUNT_VAR_NAME = "buffer_object_count";    // global
-    constexpr std::string_view UNUSED_BUFFER_OBJECT_COUNT_VAR_NAME = "unused_buffer_object";    // global
-    constexpr std::string_view ACTIVE_TXN_COUNT_VAR_NAME = "active_txn_count";    // global
-    constexpr std::string_view CURRENT_TS_VAR_NAME = "current_timestamp";    // global
-    constexpr std::string_view TOTAL_COMMIT_COUNT_VAR_NAME = "total_commit_count"; // global and session
-    constexpr std::string_view TOTAL_ROLLBACK_COUNT_VAR_NAME = "total_rollback_count"; // global and session
-    constexpr std::string_view CONNECTED_TS_VAR_NAME = "connected_timestamp"; // session
-    constexpr std::string_view CATALOG_VERSION_VAR_NAME = "catalog_version";   // global
-    constexpr std::string_view ACTIVE_WAL_FILENAME_VAR_NAME = "active_wal_filename";   // global
-    constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "enable_profile";  // session
-    constexpr std::string_view PROFILE_RECORD_CAPACITY_VAR_NAME = "profile_record_capacity";  // session
-    constexpr std::string_view BG_TASK_COUNT_VAR_NAME = "bg_task_count";  // global
-    constexpr std::string_view RUNNING_BG_TASK_VAR_NAME = "running_bg_task";  // global
-    constexpr std::string_view RUNNING_COMPACT_TASK_VAR_NAME = "running_compact_task";  // global
-    constexpr std::string_view SYSTEM_MEMORY_USAGE_VAR_NAME = "system_memory_usage";  // global
-    constexpr std::string_view OPEN_FILE_COUNT_VAR_NAME = "open_file_count";  // global
-    constexpr std::string_view CPU_USAGE_VAR_NAME = "cpu_usage";  // global
-    constexpr std::string_view FOLLOWER_NUMBER = "follower_number";  // global
+    constexpr std::string_view QUERY_COUNT_VAR_NAME = "query_count";                         // global and session
+    constexpr std::string_view SESSION_COUNT_VAR_NAME = "session_count";                     // global
+    constexpr std::string_view BUFFER_USAGE_VAR_NAME = "buffer_usage";                       // global
+    constexpr std::string_view SCHEDULE_POLICY_VAR_NAME = "schedule_policy";                 // global
+    constexpr std::string_view DELTA_LOG_COUNT_VAR_NAME = "delta_log_count";                 // global
+    constexpr std::string_view NEXT_TXN_ID_VAR_NAME = "next_transaction_id";                 // global
+    constexpr std::string_view BUFFER_OBJECT_COUNT_VAR_NAME = "buffer_object_count";         // global
+    constexpr std::string_view UNUSED_BUFFER_OBJECT_COUNT_VAR_NAME = "unused_buffer_object"; // global
+    constexpr std::string_view ACTIVE_TXN_COUNT_VAR_NAME = "active_txn_count";               // global
+    constexpr std::string_view CURRENT_TS_VAR_NAME = "current_timestamp";                    // global
+    constexpr std::string_view TOTAL_COMMIT_COUNT_VAR_NAME = "total_commit_count";           // global and session
+    constexpr std::string_view TOTAL_ROLLBACK_COUNT_VAR_NAME = "total_rollback_count";       // global and session
+    constexpr std::string_view CONNECTED_TS_VAR_NAME = "connected_timestamp";                // session
+    constexpr std::string_view CATALOG_VERSION_VAR_NAME = "catalog_version";                 // global
+    constexpr std::string_view ACTIVE_WAL_FILENAME_VAR_NAME = "active_wal_filename";         // global
+    constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "enable_profile";                   // session
+    constexpr std::string_view PROFILE_RECORD_CAPACITY_VAR_NAME = "profile_record_capacity"; // session
+    constexpr std::string_view BG_TASK_COUNT_VAR_NAME = "bg_task_count";                     // global
+    constexpr std::string_view RUNNING_BG_TASK_VAR_NAME = "running_bg_task";                 // global
+    constexpr std::string_view RUNNING_COMPACT_TASK_VAR_NAME = "running_compact_task";       // global
+    constexpr std::string_view SYSTEM_MEMORY_USAGE_VAR_NAME = "system_memory_usage";         // global
+    constexpr std::string_view OPEN_FILE_COUNT_VAR_NAME = "open_file_count";                 // global
+    constexpr std::string_view CPU_USAGE_VAR_NAME = "cpu_usage";                             // global
+    constexpr std::string_view FOLLOWER_NUMBER = "follower_number";                          // global
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;

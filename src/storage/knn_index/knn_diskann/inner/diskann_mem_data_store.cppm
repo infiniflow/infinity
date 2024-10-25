@@ -239,8 +239,6 @@ public:
     // retun the index of min distance point from the center as the enter point
     SizeT CalculateMedoid() const {
         UniquePtr<f32[]> center = MakeUnique<f32[]>(aligned_dim_);
-        for (SizeT i = 0; i < aligned_dim_; i++)
-            center[i] = 0.0f;
 
         for (SizeT i = 0; i < capacity_; i++) {
             for (SizeT j = 0; j < aligned_dim_; j++) {
