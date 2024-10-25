@@ -32,6 +32,9 @@ import round;
 import ceil;
 import floor;
 import log;
+import isnan;
+import isinf;
+import isfinite;
 import and_func;
 import divide;
 import equals;
@@ -112,6 +115,9 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterCeilFunction(catalog_ptr_);
     RegisterFloorFunction(catalog_ptr_);
     RegisterLogFunction(catalog_ptr_);
+    RegisterIsnanFunction(catalog_ptr_);
+    RegisterIsinfFunction(catalog_ptr_);
+    RegisterIsfiniteFunction(catalog_ptr_);
 
     // register comparison operator
     RegisterEqualsFunction(catalog_ptr_);

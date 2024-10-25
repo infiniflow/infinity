@@ -17,10 +17,11 @@ from typing import List
 
 
 class infinity_http:
-    url = default_url
-    header_dict = baseHeader
-    response_dict = baseResponse
-    data_dict = baseData
+    def __init__(self, url: str = default_url):
+        self.base_url = url
+        self.header_dict = baseHeader
+        self.response_dict = baseResponse
+        self.data_dict = baseData
 
     def disconnect(self):
         print("disconnect")
@@ -60,7 +61,7 @@ class infinity_http:
     def request(self, url, method, header={}, data={}):
         if header is None:
             header = {}
-        url = default_url + url
+        url = self.base_url + url
         logging.debug("url: " + url)
         match method:
             case "get":
@@ -108,6 +109,31 @@ class infinity_http:
         except InfinityException as e:
             print(e)
             return database_result(error_code=e.error_code)
+        
+    def set_role_standalone(self, node_name):
+        url = f"admin/node/current"
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data([], {"role": "standalone", "name": node_name})
+        r = self.request(url, "post", h, d)
+        self.raise_exception(r)
+        return database_result()
+        
+    def set_role_leader(self, node_name):
+        url = f"admin/node/current"
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data([], {"role": "leader", "name": node_name})
+        r = self.request(url, "post", h, d)
+        self.raise_exception(r)
+        return database_result()
+    
+    def set_role_follower(self, node_name, leader_addr):
+        url = f"admin/node/current"
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data([], {"role": "follower", "name": node_name, "address": leader_addr})
+        r = self.request(url, "post", h, d)
+        self.raise_exception(r)
+        return database_result()
+
 
     # database
     def create_database(self, db_name, opt=ConflictType.Error):
@@ -744,9 +770,10 @@ class infinity_http:
 
 
 class database_result(infinity_http):
-    def __init__(self, list=[], error_code=ErrorCode.OK, database_name="", columns=[], table_name="",
+    def __init__(self, url: str = default_url, list=[], error_code=ErrorCode.OK, database_name="", columns=[], table_name="",
                  index_list=[], output=["*"], filter="", fusion=[], knn={}, match={}, match_tensor={}, match_sparse={},
                  sort=[], output_res=[]):
+        super().__init__(url)
         self.db_names = list
         self.error_code = error_code
         self.database_name = database_name  # get database
