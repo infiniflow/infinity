@@ -20,9 +20,9 @@ namespace infinity {
 struct SqrtFunction {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType value, TargetType &result) {
-        if (value < static_cast<SourceType>(0.0f)) {
-            return false;
-        }
+        //if (value < static_cast<SourceType>(0.0f)) {
+        //    return false;
+        //}
         result = sqrt(static_cast<double>(value));
         return true;
     }
