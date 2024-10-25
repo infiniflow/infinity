@@ -164,8 +164,10 @@ class LocalTable():
                 column_names.append(column_name)
                 constant_expression = get_local_constant_expr_from_python_value(value)
                 parse_exprs.append(constant_expression)
-
-            fields.append(WrapInsertRowExpr(columns=column_names, values=parse_exprs))
+            insert_row = WrapInsertRowExpr()
+            insert_row.columns=column_names
+            insert_row.values=parse_exprs
+            fields.append(insert_row)
 
         res = self._conn.insert(db_name=db_name, table_name=table_name, fields=fields)
         if res.error_code == ErrorCode.OK:
