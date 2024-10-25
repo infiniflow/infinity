@@ -77,9 +77,15 @@ export template <typename ElemType, typename CentroidsOutputType>
                                      u32 max_points_per_centroid = 256,
                                      float centroids_num_ratio = 1.0f) {
     using CentroidsType = f32;
-    if (metric == MetricType::kInvalid) {
-        String error_message = "Metric type not implemented";
-        UnrecoverableError(error_message);
+    switch (metric) {
+        case MetricType::kMetricL2:
+        case MetricType::kMetricCosine:
+        case MetricType::kMetricInnerProduct: {
+            break;
+        }
+        case MetricType::kInvalid: {
+            UnrecoverableError("Metric type not implemented");
+        }
     }
     if (dimension <= 0 || vector_count <= 0) {
         String error_message = "Dimension and vector_count must be positive";
@@ -234,19 +240,17 @@ export template <typename ElemType, typename CentroidsOutputType>
             }
             // For L2 metric, divide the count. If there is no vector in a partition, the centroid of this partition will not be updated.
             // For IP metric, normalize centroids.
-            if (metric == MetricType::kMetricL2) {
+            if ((iter < iteration_max) && (metric == MetricType::kMetricInnerProduct || metric == MetricType::kMetricCosine)) {
+                NormalizeCentroids(dimension, partition_num, centroids);
+            } else {
                 for (u32 i = 0; i < partition_num; ++i) {
-                    if (auto cnt = partition_element_count[i]; cnt > 0) {
-                        f32 inv = 1.0f / (f32)cnt;
+                    if (const auto cnt = partition_element_count[i]; cnt > 0) {
+                        const f32 inv = 1.0f / static_cast<f32>(cnt);
                         for (u32 j = 0; j < dimension; ++j) {
                             centroids[i * dimension + j] *= inv;
                         }
                     }
                 }
-            } else if (metric == MetricType::kMetricInnerProduct || metric == MetricType::kMetricCosine) {
-                NormalizeCentroids(dimension, partition_num, centroids);
-            } else {
-                UnrecoverableError("Unexpected type");
             }
         }
 

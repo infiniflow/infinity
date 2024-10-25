@@ -398,7 +398,7 @@ struct SQL_LTYPE {
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
-%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE
+%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
 
 %token NUMBER
@@ -1546,7 +1546,7 @@ select_clause_with_modifier: select_clause_without_modifier order_by_clause limi
         yyerror(&yyloc, scanner, result, "Offset expression isn't valid without Limit expression");
         YYERROR;
     }
-    if($1->search_expr_ != nullptr and ($2 != nullptr or $3 != nullptr or $4 != nullptr)) {
+    if($1->search_expr_ != nullptr and ($2 != nullptr /*or $3 != nullptr or $4 != nullptr*/)) {
         delete $1;
         if ($2) {
             for (auto ptr : *($2)) {
@@ -1556,7 +1556,7 @@ select_clause_with_modifier: select_clause_without_modifier order_by_clause limi
         }
         delete $3;
         delete $4;
-        yyerror(&yyloc, scanner, result, "Result modifier(ORDER BY, LIMIT, OFFSET) is conflict with SEARCH expression.");
+        yyerror(&yyloc, scanner, result, "Result modifier(ORDER BY) is conflict with SEARCH expression.");
         YYERROR;
     }
     $1->order_by_list = $2;
@@ -2518,27 +2518,33 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowCurrentNode;
 }
+| ADMIN REMOVE NODE STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kRemoveNode;
+     $$->node_name_ = $4;
+     free($4);
+}
 | ADMIN SET ADMIN {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kAdmin;
+     $$->node_role_ = infinity::NodeRole::kAdmin;
 }
 | ADMIN SET STANDALONE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kStandalone;
+     $$->node_role_ = infinity::NodeRole::kStandalone;
 }
 | ADMIN SET LEADER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kLeader;
+     $$->node_role_ = infinity::NodeRole::kLeader;
      $$->node_name_ = $5;
      free($5);
 }
 | ADMIN CONNECT STRING AS FOLLOWER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kFollower;
+     $$->node_role_ = infinity::NodeRole::kFollower;
      $$->leader_address_ = $3;
      $$->node_name_ = $7;
      free($3);
@@ -2547,7 +2553,7 @@ admin_statement: ADMIN SHOW CATALOGS {
 | ADMIN CONNECT STRING AS LEARNER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kLearner;
+     $$->node_role_ = infinity::NodeRole::kLearner;
      $$->leader_address_ = $3;
      $$->node_name_ = $7;
      free($3);

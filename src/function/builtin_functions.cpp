@@ -27,6 +27,10 @@ import sum;
 
 import add;
 import abs;
+import sqrt;
+import round;
+import ceil;
+import floor;
 import log;
 import and_func;
 import divide;
@@ -103,6 +107,10 @@ void BuiltinFunctions::RegisterScalarFunction() {
     // Math functions
     RegisterAbsFunction(catalog_ptr_);
     RegisterPowFunction(catalog_ptr_);
+    RegisterSqrtFunction(catalog_ptr_);
+    RegisterRoundFunction(catalog_ptr_);
+    RegisterCeilFunction(catalog_ptr_);
+    RegisterFloorFunction(catalog_ptr_);
     RegisterLogFunction(catalog_ptr_);
 
     // register comparison operator

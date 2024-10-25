@@ -23,10 +23,11 @@ namespace infinity_peer_server {
 
 struct NodeType {
   enum type {
-    kLeader = 0,
-    kFollower = 1,
-    kLearner = 2,
-    kInvalid = 3
+    kAdmin = 0,
+    kLeader = 1,
+    kFollower = 2,
+    kLearner = 3,
+    kInvalid = 4
   };
 };
 
@@ -41,7 +42,8 @@ struct NodeStatus {
     kInvalid = 0,
     kAlive = 1,
     kLostConnection = 2,
-    kTimeout = 3
+    kRemoved = 3,
+    kTimeout = 4
   };
 };
 
@@ -559,9 +561,10 @@ void swap(HeartBeatResponse &a, HeartBeatResponse &b);
 std::ostream& operator<<(std::ostream& out, const HeartBeatResponse& obj);
 
 typedef struct _SyncLogRequest__isset {
-  _SyncLogRequest__isset() : node_name(false), log_entries(false) {}
+  _SyncLogRequest__isset() : node_name(false), log_entries(false), on_startup(false) {}
   bool node_name :1;
   bool log_entries :1;
+  bool on_startup :1;
 } _SyncLogRequest__isset;
 
 class SyncLogRequest : public virtual ::apache::thrift::TBase {
@@ -570,12 +573,14 @@ class SyncLogRequest : public virtual ::apache::thrift::TBase {
   SyncLogRequest(const SyncLogRequest&);
   SyncLogRequest& operator=(const SyncLogRequest&);
   SyncLogRequest() noexcept
-                 : node_name() {
+                 : node_name(),
+                   on_startup(0) {
   }
 
   virtual ~SyncLogRequest() noexcept;
   std::string node_name;
   std::vector<std::string>  log_entries;
+  bool on_startup;
 
   _SyncLogRequest__isset __isset;
 
@@ -583,11 +588,15 @@ class SyncLogRequest : public virtual ::apache::thrift::TBase {
 
   void __set_log_entries(const std::vector<std::string> & val);
 
+  void __set_on_startup(const bool val);
+
   bool operator == (const SyncLogRequest & rhs) const
   {
     if (!(node_name == rhs.node_name))
       return false;
     if (!(log_entries == rhs.log_entries))
+      return false;
+    if (!(on_startup == rhs.on_startup))
       return false;
     return true;
   }
@@ -719,8 +728,9 @@ void swap(ChangeRoleRequest &a, ChangeRoleRequest &b);
 std::ostream& operator<<(std::ostream& out, const ChangeRoleRequest& obj);
 
 typedef struct _ChangeRoleResponse__isset {
-  _ChangeRoleResponse__isset() : node_name(false) {}
-  bool node_name :1;
+  _ChangeRoleResponse__isset() : error_code(false), error_message(false) {}
+  bool error_code :1;
+  bool error_message :1;
 } _ChangeRoleResponse__isset;
 
 class ChangeRoleResponse : public virtual ::apache::thrift::TBase {
@@ -729,19 +739,25 @@ class ChangeRoleResponse : public virtual ::apache::thrift::TBase {
   ChangeRoleResponse(const ChangeRoleResponse&);
   ChangeRoleResponse& operator=(const ChangeRoleResponse&);
   ChangeRoleResponse() noexcept
-                     : node_name() {
+                     : error_code(0),
+                       error_message() {
   }
 
   virtual ~ChangeRoleResponse() noexcept;
-  std::string node_name;
+  int64_t error_code;
+  std::string error_message;
 
   _ChangeRoleResponse__isset __isset;
 
-  void __set_node_name(const std::string& val);
+  void __set_error_code(const int64_t val);
+
+  void __set_error_message(const std::string& val);
 
   bool operator == (const ChangeRoleResponse & rhs) const
   {
-    if (!(node_name == rhs.node_name))
+    if (!(error_code == rhs.error_code))
+      return false;
+    if (!(error_message == rhs.error_message))
       return false;
     return true;
   }

@@ -39,7 +39,7 @@ CREATE INDEX idx_ivf__l2 ON test_knn_ivf_l2 (c2) USING IVF WITH (metric = l2);
 
 # the query will return row 4 from block 1, 2 and 3
 query I
-SELECT c1 FROM test_knn_ivf_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_ivf_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (nprobe = 10);
 ----
 8
 8
@@ -51,7 +51,35 @@ COPY test_knn_ivf_l2 FROM '/var/infinity/test_data/embedding_float_dim4.csv' WIT
 
 # the query will return row 4 from block 1, 2 and 3
 query I
-SELECT c1 FROM test_knn_ivf_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_ivf_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (nprobe = 10);
+----
+8
+8
+8
+
+statement ok
+DROP INDEX idx_ivf__l2 ON test_knn_ivf_l2;
+
+statement ok
+CREATE INDEX idx_ivf_l2_pq ON test_knn_ivf_l2 (c2) USING IVF WITH (metric = l2, storage_type = product_quantization, product_quantization_subspace_num = 2, product_quantization_subspace_bits = 12);
+
+# the query will return row 4 from block 1, 2 and 3
+query I
+SELECT c1 FROM test_knn_ivf_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (nprobe = 10);
+----
+8
+8
+8
+
+statement ok
+DROP INDEX idx_ivf_l2_pq ON test_knn_ivf_l2;
+
+statement ok
+CREATE INDEX idx_ivf_l2_sq ON test_knn_ivf_l2 (c2) USING IVF WITH (metric = l2, storage_type = scalar_quantization, scalar_quantization_bits = 8);
+
+# the query will return row 4 from block 1, 2 and 3
+query I
+SELECT c1 FROM test_knn_ivf_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (nprobe = 10);
 ----
 8
 8

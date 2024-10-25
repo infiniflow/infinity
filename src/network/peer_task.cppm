@@ -17,19 +17,9 @@ module;
 export module peer_task;
 
 import stl;
+import admin_statement;
 
 namespace infinity {
-
-export enum class NodeRole {
-    kUnInitialized,
-    kAdmin,
-    kStandalone,
-    kLeader,
-    kFollower,
-    kLearner,
-};
-
-export String ToString(NodeRole);
 
 export enum class PeerTaskType {
     kInvalid,
@@ -42,7 +32,7 @@ export enum class PeerTaskType {
     kNewLeader,
 };
 
-export enum class NodeStatus { kAlive, kTimeout, kLostConnection, kInvalid };
+export enum class NodeStatus { kAlive, kTimeout, kLostConnection, kRemoved, kInvalid };
 
 export String ToString(NodeStatus);
 
@@ -162,13 +152,29 @@ public:
 
 export class SyncLogTask final : public PeerTask {
 public:
-    SyncLogTask(const String &node_name, const Vector<SharedPtr<String>> &log_strings)
-        : PeerTask(PeerTaskType::kLogSync), node_name_(node_name), log_strings_(log_strings) {}
+    SyncLogTask(const String &node_name, const Vector<SharedPtr<String>> &log_strings, bool on_register)
+        : PeerTask(PeerTaskType::kLogSync), node_name_(node_name), log_strings_(log_strings), on_register_(on_register) {}
 
     String ToString() const final;
 
-    String node_name_;
+    String node_name_{};
     Vector<SharedPtr<String>> log_strings_;
+    bool on_register_{false};
+
+    // response
+    i64 error_code_{};
+    String error_message_{};
+};
+
+export class ChangeRoleTask final : public PeerTask {
+public:
+    ChangeRoleTask(String node_name, String role_name)
+        : PeerTask(PeerTaskType::kChangeRole), node_name_(node_name), role_name_(std::move(role_name)) {}
+
+    String ToString() const final;
+
+    String node_name_{};
+    String role_name_{};
 
     // response
     i64 error_code_{};

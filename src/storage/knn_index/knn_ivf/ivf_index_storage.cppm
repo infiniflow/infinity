@@ -29,11 +29,14 @@ namespace infinity {
 class LocalFileHandle;
 class KnnDistanceBase1;
 
+export class IVF_Index_Storage;
+
 // always use float for centroids
 class IVF_Centroids_Storage {
     u32 embedding_dimension_ = 0;
     u32 centroids_num_ = 0;
     Vector<f32> centroids_data_ = {};
+    mutable Vector<f32> normalized_centroids_data_cache_ = {};
 
 public:
     IVF_Centroids_Storage() = default;
@@ -43,6 +46,7 @@ public:
     u32 centroids_num() const { return centroids_num_; }
     void Save(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
+    Pair<u32, const f32 *> GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const;
 };
 
 class IVF_Parts_Storage {
@@ -67,7 +71,8 @@ public:
     virtual void
     AppendOneEmbedding(u32 part_id, const void *embedding_ptr, SegmentOffset segment_offset, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
 
-    virtual void SearchIndex(u32 part_id,
+    virtual void SearchIndex(const Vector<u32> &part_ids,
+                             const IVF_Index_Storage *ivf_index_storage,
                              const KnnDistanceBase1 *knn_distance,
                              const void *query_ptr,
                              EmbeddingDataType query_element_type,
@@ -75,7 +80,7 @@ public:
                              const std::function<void(f32, SegmentOffset)> &add_result_func) const = 0;
 };
 
-export class IVF_Index_Storage {
+class IVF_Index_Storage {
     const IndexIVFOption ivf_option_ = {};
     const LogicalType column_logical_type_ = LogicalType::kInvalid;
     const EmbeddingDataType embedding_data_type_ = EmbeddingDataType::kElemInvalid;
@@ -94,6 +99,8 @@ public:
     [[nodiscard]] LogicalType column_logical_type() const { return column_logical_type_; }
     [[nodiscard]] EmbeddingDataType embedding_data_type() const { return embedding_data_type_; }
     [[nodiscard]] u32 embedding_dimension() const { return embedding_dimension_; }
+    [[nodiscard]] const IVF_Centroids_Storage &ivf_centroids_storage() const { return ivf_centroids_storage_; }
+    [[nodiscard]] const IVF_Parts_Storage &ivf_parts_storage() const { return *ivf_parts_storage_; }
 
     void Train(u32 training_embedding_num, const f32 *training_data, u32 expect_centroid_num = 0);
     void AddEmbedding(SegmentOffset segment_offset, const void *embedding_ptr);

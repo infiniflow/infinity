@@ -60,7 +60,6 @@ import status;
 import constant_expr;
 import command_statement;
 import physical_import;
-import peer_task;
 
 namespace {
 
@@ -109,6 +108,8 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
                     e_data_type = EmbeddingDataType::kElemFloat16;
                 } else if (etype == "bfloat16") {
                     e_data_type = EmbeddingDataType::kElemBFloat16;
+                } else if (etype == "bit") {
+                    e_data_type = EmbeddingDataType::kElemBit;
                 } else {
                     return infinity::Status::InvalidEmbeddingDataType(etype);
                 }

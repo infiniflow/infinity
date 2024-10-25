@@ -15,7 +15,9 @@
 module;
 
 #include <cassert>
+#include <cmath>
 #include <vector>
+
 module ivf_index_storage;
 
 import stl;
@@ -37,8 +39,43 @@ import ivf_index_util_func;
 import mlas_matrix_multiply;
 import vector_distance;
 import index_base;
+import knn_expr;
 
 namespace infinity {
+
+struct SearchIndexPartsReuseContext {
+    UniquePtr<f32[]> pq_query_ip_table_;
+    u32 dim_ = 0;
+    const f32 *x_ptr_ = nullptr;
+    const f32 *a_ptr_ = nullptr;
+    f32 x_l2_ = 0.0f;
+    UniquePtr<f32[]> x_mult_a_;
+    UniquePtr<f32[]> a_square_;
+    f32 get_x_l2() {
+        if (x_l2_ == 0.0f) {
+            x_l2_ = L2NormSquare<f32>(x_ptr_, dim_);
+        }
+        return x_l2_;
+    }
+    const auto &get_x_mult_a() {
+        if (!x_mult_a_) {
+            x_mult_a_ = MakeUniqueForOverwrite<f32[]>(dim_);
+            for (u32 i = 0; i < dim_; ++i) {
+                x_mult_a_[i] = x_ptr_[i] * a_ptr_[i];
+            }
+        }
+        return x_mult_a_;
+    }
+    const auto &get_a_square() {
+        if (!a_square_) {
+            a_square_ = MakeUniqueForOverwrite<f32[]>(dim_);
+            for (u32 i = 0; i < dim_; ++i) {
+                a_square_[i] = a_ptr_[i] * a_ptr_[i];
+            }
+        }
+        return a_square_;
+    }
+};
 
 class IVF_Part_Storage {
     const u32 part_id_ = std::numeric_limits<u32>::max();
@@ -74,12 +111,13 @@ public:
                                     const IVF_Centroids_Storage *ivf_centroids_storage,
                                     const IVF_Parts_Storage *ivf_parts_storage) = 0;
 
-    virtual void SearchIndex(const KnnDistanceBase1 *knn_distance,
+    virtual void SearchIndex(const IVF_Index_Storage *ivf_index_storage,
+                             const KnnDistanceBase1 *knn_distance,
                              const void *query_ptr,
                              EmbeddingDataType query_element_type,
                              const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                              const std::function<void(f32, SegmentOffset)> &add_result_func,
-                             const IVF_Parts_Storage *ivf_parts_storage) const = 0;
+                             SearchIndexPartsReuseContext &context) const = 0;
 };
 
 template <IndexIVFStorageOption::Type t>
@@ -99,6 +137,125 @@ public:
     void Train(const u32 training_embedding_num, const f32 *training_data, const IVF_Centroids_Storage *ivf_centroids_storage) final {}
 };
 
+UniquePtr<f32[]> GetTrainingResidual(const u32 training_embedding_num,
+                                     const f32 *training_data,
+                                     const IVF_Centroids_Storage *ivf_centroids_storage,
+                                     const u32 embedding_dimension,
+                                     const u32 centroids_num) {
+    auto residuals = MakeUniqueForOverwrite<f32[]>(training_embedding_num * embedding_dimension);
+    const f32 *centroids_data = ivf_centroids_storage->data();
+    // (-0.5 * norm) for each centroid
+    UniquePtr<f32[]> centroid_norms_neg_half = MakeUniqueForOverwrite<f32[]>(centroids_num);
+    {
+        // prepare centroid_norms_neg_half_
+        const f32 *centroids_data_ptr = centroids_data;
+        for (u32 i = 0; i < centroids_num; ++i) {
+            centroid_norms_neg_half[i] = -0.5f * L2NormSquare<f32, f32, u32>(centroids_data_ptr, embedding_dimension);
+            centroids_data_ptr += embedding_dimension;
+        }
+    }
+    // distance: for every embedding, e * c - 0.5 * c^2, find max
+    const auto dist_table = MakeUniqueForOverwrite<f32[]>(training_embedding_num * centroids_num);
+    matrixA_multiply_transpose_matrixB_output_to_C(training_data,
+                                                   centroids_data,
+                                                   training_embedding_num,
+                                                   centroids_num,
+                                                   embedding_dimension,
+                                                   dist_table.get());
+    for (u32 i = 0; i < training_embedding_num; ++i) {
+        const f32 *embedding_data_ptr = training_data + i * embedding_dimension;
+        f32 *output_ptr = residuals.get() + i * embedding_dimension;
+        f32 max_neg_distance = std::numeric_limits<f32>::lowest();
+        u64 max_id = 0;
+        const f32 *dist_ptr = dist_table.get() + i * centroids_num;
+        for (u32 k = 0; k < centroids_num; ++k) {
+            if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half[k]; neg_distance > max_neg_distance) {
+                max_neg_distance = neg_distance;
+                max_id = k;
+            }
+        }
+        const f32 *centroids_data_ptr = centroids_data + max_id * embedding_dimension;
+        for (u32 j = 0; j < embedding_dimension; ++j) {
+            output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
+        }
+    }
+    return residuals;
+}
+
+// quantize with middle 99% range
+// r = a * n + b (*: Hadamard product), v = c + r + e
+// common a, b for all residuals
+// n in [0, 15) or [0, 255)
+// query x, centroid c
+// dot(x, v) = dot(x, (c + r + e)) = dot(x, c + b) + dot((x * a), n) + dot(v, e)
+// dot(v, v) = dot(c + b + a * n + e, v) = dot(c + b, c + b) + dot(a^2, n^2) + 2 * dot ((c + b) * a, n) + 2 * dot(v, e)
+// l2(a * n + b + c - x) = dot(a^2, n^2) + l2(b + c - x) + 2 * dot(a * (b + c - x), n)
+
+template <>
+class IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kScalarQuantization> : public IVF_Parts_Storage {
+    const u32 sq_bits_ = 0; // 4 or 8
+    Vector<f32> common_vec_a_;
+    Vector<f32> common_vec_b_;
+
+public:
+    IVF_Parts_Storage_Info(const u32 embedding_dimension,
+                           const u32 centroids_num,
+                           const EmbeddingDataType embedding_data_type,
+                           const IndexIVFStorageOption &ivf_storage_option)
+        : IVF_Parts_Storage(embedding_dimension, centroids_num), sq_bits_(ivf_storage_option.scalar_quantization_bits_),
+          common_vec_a_(embedding_dimension), common_vec_b_(embedding_dimension) {
+        assert(sq_bits_ == 4 || sq_bits_ == 8);
+    }
+    ~IVF_Parts_Storage_Info() override = default;
+
+    const f32 *data_a() const { return common_vec_a_.data(); }
+    const f32 *data_b() const { return common_vec_b_.data(); }
+
+    void Save(LocalFileHandle &file_handle) const override {
+        file_handle.Append(common_vec_a_.data(), embedding_dimension() * sizeof(f32));
+        file_handle.Append(common_vec_b_.data(), embedding_dimension() * sizeof(f32));
+    }
+    void Load(LocalFileHandle &file_handle) override {
+        file_handle.Read(common_vec_a_.data(), embedding_dimension() * sizeof(f32));
+        file_handle.Read(common_vec_b_.data(), embedding_dimension() * sizeof(f32));
+    }
+    void Train(const u32 training_embedding_num, const f32 *training_data, const IVF_Centroids_Storage *ivf_centroids_storage) final {
+        const auto residuals =
+            GetTrainingResidual(training_embedding_num, training_data, ivf_centroids_storage, embedding_dimension(), centroids_num());
+        const auto exclude_num_each_end = std::min<u32>((training_embedding_num / 200u) + 1u, training_embedding_num);
+        for (u32 i = 0; i < embedding_dimension(); ++i) {
+            std::priority_queue<f32> min_heap;                              // biggest on top
+            std::priority_queue<f32, Vector<f32>, std::greater<>> max_heap; // smallest on top
+            const f32 *residual_data = residuals.get() + i;
+            for (u32 j = 0; j < exclude_num_each_end; ++j) {
+                const f32 x = *residual_data;
+                min_heap.push(x);
+                max_heap.push(x);
+                residual_data += embedding_dimension();
+            }
+            for (u32 j = exclude_num_each_end; j < training_embedding_num; ++j) {
+                const f32 x = *residual_data;
+                if (x < min_heap.top()) {
+                    min_heap.pop();
+                    min_heap.push(x);
+                }
+                if (x > max_heap.top()) {
+                    max_heap.pop();
+                    max_heap.push(x);
+                }
+                residual_data += embedding_dimension();
+            }
+            const f32 range_start = min_heap.top();
+            const f32 range_end = max_heap.top();
+            assert(range_start <= range_end);
+            const u32 range_parts = 1u << sq_bits_;
+            const f32 range_stride = (range_end - range_start) / range_parts;
+            common_vec_a_[i] = range_stride;
+            common_vec_b_[i] = range_start + 0.5f * range_stride;
+        }
+    }
+};
+
 template <>
 class IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> : public IVF_Parts_Storage {
     const u32 subspace_num_ = 0;
@@ -107,12 +264,13 @@ class IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> 
     const u32 expect_subspace_centroid_num_ = 1u << subspace_centroid_bits_;
 
     u32 real_subspace_centroid_num_ = 0;
-    // (-0.5 * norm) for each centroid
-    UniquePtr<f32[]> centroid_norms_neg_half_ = MakeUniqueForOverwrite<f32[]>(centroids_num());
     // centroids for each subspace, size: subspace_dimension_ * real_subspace_centroid_num_ * subspace_num_
     UniquePtr<f32[]> subspace_centroids_data_ = {};
     // size: real_subspace_centroid_num_ * subspace_num_
     UniquePtr<f32[]> subspace_centroid_norms_neg_half_ = {};
+
+public:
+    auto real_subspace_centroid_num() const { return real_subspace_centroid_num_; }
 
     const f32 *subspace_centroids_data_at_subspace(const u32 subspace_id) const {
         return subspace_centroids_data_.get() + subspace_id * subspace_dimension_ * real_subspace_centroid_num_;
@@ -128,7 +286,6 @@ class IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> 
     NON_CONST_VERSION_MEMBER_FUNC(subspace_centroids_data_at_subspace);
     NON_CONST_VERSION_MEMBER_FUNC(subspace_centroid_norms_neg_half_at_subspace);
 
-public:
     IVF_Parts_Storage_Info(const u32 embedding_dim,
                            const u32 centroids_num,
                            const EmbeddingDataType embedding_data_type,
@@ -143,14 +300,12 @@ public:
 
     void Save(LocalFileHandle &file_handle) const override {
         file_handle.Append(&real_subspace_centroid_num_, sizeof(real_subspace_centroid_num_));
-        file_handle.Append(centroid_norms_neg_half_.get(), centroids_num() * sizeof(f32));
         file_handle.Append(subspace_centroids_data_.get(), embedding_dimension() * real_subspace_centroid_num_ * sizeof(f32));
         file_handle.Append(subspace_centroid_norms_neg_half_.get(), real_subspace_centroid_num_ * subspace_num_ * sizeof(f32));
     }
 
     void Load(LocalFileHandle &file_handle) override {
         file_handle.Read(&real_subspace_centroid_num_, sizeof(real_subspace_centroid_num_));
-        file_handle.Read(centroid_norms_neg_half_.get(), centroids_num() * sizeof(f32));
         subspace_centroids_data_ = MakeUniqueForOverwrite<f32[]>(embedding_dimension() * real_subspace_centroid_num_);
         file_handle.Read(subspace_centroids_data_.get(), embedding_dimension() * real_subspace_centroid_num_ * sizeof(f32));
         subspace_centroid_norms_neg_half_ = MakeUniqueForOverwrite<f32[]>(real_subspace_centroid_num_ * subspace_num_);
@@ -158,43 +313,8 @@ public:
     }
 
     void Train(const u32 training_embedding_num, const f32 *training_data, const IVF_Centroids_Storage *ivf_centroids_storage) final {
-        const f32 *centroids_data = ivf_centroids_storage->data();
-        {
-            // prepare centroid_norms_neg_half_
-            const f32 *centroids_data_ptr = centroids_data;
-            for (u32 i = 0; i < centroids_num(); ++i) {
-                centroid_norms_neg_half_[i] = -0.5f * L2NormSquare<f32, f32, u32>(centroids_data_ptr, embedding_dimension());
-                centroids_data_ptr += embedding_dimension();
-            }
-        }
-        const auto residuals = MakeUniqueForOverwrite<f32[]>(training_embedding_num * embedding_dimension());
-        {
-            // distance: for every embedding, e * c - 0.5 * c^2, find max
-            const auto dist_table = MakeUniqueForOverwrite<f32[]>(training_embedding_num * centroids_num());
-            matrixA_multiply_transpose_matrixB_output_to_C(training_data,
-                                                           centroids_data,
-                                                           training_embedding_num,
-                                                           centroids_num(),
-                                                           embedding_dimension(),
-                                                           dist_table.get());
-            for (u32 i = 0; i < training_embedding_num; ++i) {
-                const f32 *embedding_data_ptr = training_data + i * embedding_dimension();
-                f32 *output_ptr = residuals.get() + i * embedding_dimension();
-                f32 max_neg_distance = std::numeric_limits<f32>::lowest();
-                u64 max_id = 0;
-                const f32 *dist_ptr = dist_table.get() + i * centroids_num();
-                for (u32 k = 0; k < centroids_num(); ++k) {
-                    if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
-                        max_neg_distance = neg_distance;
-                        max_id = k;
-                    }
-                }
-                const f32 *centroids_data_ptr = centroids_data + max_id * embedding_dimension();
-                for (u32 j = 0; j < embedding_dimension(); ++j) {
-                    output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
-                }
-            }
-        }
+        const auto residuals =
+            GetTrainingResidual(training_embedding_num, training_data, ivf_centroids_storage, embedding_dimension(), centroids_num());
         // train residuals
         TrainResidual(training_embedding_num, residuals.get());
     }
@@ -249,6 +369,42 @@ public:
             }
         }
     }
+
+    void EncodeResidual(const f32 *residual, u32 *encode_output) const {
+        const auto xy_buffer = MakeUniqueForOverwrite<f32[]>(real_subspace_centroid_num_);
+        for (u32 j = 0; j < subspace_num_; ++j) {
+            matrixA_multiply_transpose_matrixB_output_to_C(residual + j * subspace_dimension_,
+                                                           subspace_centroids_data_at_subspace(j),
+                                                           1,
+                                                           real_subspace_centroid_num_,
+                                                           subspace_dimension_,
+                                                           xy_buffer.get());
+            // find max id (for every embedding, find centroid with min l2 distance, and equivalently max (x*y - 0.5*y^2))
+            const auto *c_norm_data = subspace_centroid_norms_neg_half_at_subspace(j);
+            f32 max_neg_distance = std::numeric_limits<f32>::lowest();
+            u32 max_id = 0;
+            for (u32 k = 0; k < real_subspace_centroid_num_; ++k) {
+                if (const f32 neg_distance = xy_buffer[k] + c_norm_data[k]; neg_distance > max_neg_distance) {
+                    max_neg_distance = neg_distance;
+                    max_id = k;
+                }
+            }
+            encode_output[j] = max_id;
+        }
+    }
+
+    UniquePtr<f32[]> GetIPTable(const f32 *query) const {
+        auto ip_table = MakeUniqueForOverwrite<f32[]>(subspace_num_ * real_subspace_centroid_num_);
+        for (u32 i = 0; i < subspace_num_; ++i) {
+            matrixA_multiply_matrixB_output_to_C(subspace_centroids_data_at_subspace(i),
+                                                 query + i * subspace_dimension_,
+                                                 real_subspace_centroid_num_,
+                                                 1,
+                                                 subspace_dimension_,
+                                                 ip_table.get() + i * real_subspace_centroid_num_);
+        }
+        return ip_table;
+    }
 };
 
 template <IndexIVFStorageOption::Type t>
@@ -293,13 +449,18 @@ public:
         return ivf_part_storages_[part_id]->AppendOneEmbedding(embedding_ptr, segment_offset, ivf_centroids_storage, this);
     }
 
-    void SearchIndex(const u32 part_id,
+    void SearchIndex(const Vector<u32> &part_ids,
+                     const IVF_Index_Storage *ivf_index_storage,
                      const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      const EmbeddingDataType query_element_type,
                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                      const std::function<void(f32, SegmentOffset)> &add_result_func) const override {
-        return ivf_part_storages_[part_id]->SearchIndex(knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func, this);
+        SearchIndexPartsReuseContext context;
+        for (const auto part_id : part_ids) {
+            ivf_part_storages_[part_id]
+                ->SearchIndex(ivf_index_storage, knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func, context);
+        }
     }
 };
 
@@ -315,8 +476,7 @@ UniquePtr<IVF_Parts_Storage> IVF_Parts_Storage::Make(const u32 embedding_dimensi
             return GetPartsStorageT.template operator()<IndexIVFStorageOption::Type::kPlain>();
         }
         case IndexIVFStorageOption::Type::kScalarQuantization: {
-            UnrecoverableError("Not implemented now.");
-            // return GetPartsStorageT.template operator()<IndexIVFStorageOption::Type::kScalarQuantization>();
+            return GetPartsStorageT.template operator()<IndexIVFStorageOption::Type::kScalarQuantization>();
         }
         case IndexIVFStorageOption::Type::kProductQuantization: {
             return GetPartsStorageT.template operator()<IndexIVFStorageOption::Type::kProductQuantization>();
@@ -378,12 +538,13 @@ public:
         ++embedding_num_;
     }
 
-    void SearchIndex(const KnnDistanceBase1 *knn_distance,
+    void SearchIndex(const IVF_Index_Storage *,
+                     const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      const EmbeddingDataType query_element_type,
                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                      const std::function<void(f32, SegmentOffset)> &add_result_func,
-                     const IVF_Parts_Storage *) const override {
+                     SearchIndexPartsReuseContext &) const override {
         auto ReturnT = [&]<EmbeddingDataType query_element_type> {
             if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
                           (query_element_type == src_embedding_data_type &&
@@ -433,6 +594,239 @@ public:
             auto [calc_ptr, _] = GetSearchCalcPtr<QueryDataType>(v_ptr, embedding_dimension());
             auto d = dist_func(calc_ptr, query_ptr, embedding_dimension());
             add_result_func(d, segment_offset);
+        }
+    }
+};
+
+// SQ storage
+template <u32 sq_bits, EmbeddingDataType src_embedding_data_type>
+class IVF_Part_Storage_SQ final : public IVF_Part_Storage {
+    static_assert(sq_bits == 4 || sq_bits == 8);
+    static constexpr u32 sq_encode_start = 0;
+    static constexpr u32 sq_encode_end = (1u << sq_bits) - 1u;
+    using ColumnEmbeddingElementT = EmbeddingDataTypeToCppTypeT<src_embedding_data_type>;
+    static_assert(IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>);
+
+    const u32 embedding_dimension_ = 0;
+    const u32 embedding_sq_bytes_ = (sq_bits == 8) ? embedding_dimension_ : ((embedding_dimension_ + 1) / 2);
+    Vector<u8> sq_data_{};
+    Vector<f32> dot_v_e_{};
+
+public:
+    IVF_Part_Storage_SQ(const u32 part_id, const u32 embedding_dimension) : IVF_Part_Storage(part_id), embedding_dimension_(embedding_dimension) {}
+
+    void Save(LocalFileHandle &file_handle) const override {
+        IVF_Part_Storage::Save(file_handle);
+        const u32 element_cnt = embedding_num() * embedding_sq_bytes_;
+        assert(element_cnt == sq_data_.size());
+        file_handle.Append(sq_data_.data(), element_cnt * sizeof(u8));
+        assert(embedding_num() == dot_v_e_.size());
+        file_handle.Append(dot_v_e_.data(), embedding_num() * sizeof(f32));
+    }
+
+    void Load(LocalFileHandle &file_handle) override {
+        IVF_Part_Storage::Load(file_handle);
+        const u32 element_cnt = embedding_num() * embedding_sq_bytes_;
+        sq_data_.resize(element_cnt);
+        file_handle.Read(sq_data_.data(), element_cnt * sizeof(u8));
+        dot_v_e_.resize(embedding_num());
+        file_handle.Read(dot_v_e_.data(), embedding_num() * sizeof(f32));
+    }
+
+    void AppendOneEmbedding(const void *embedding_ptr,
+                            const SegmentOffset segment_offset,
+                            const IVF_Centroids_Storage *ivf_centroids_storage,
+                            const IVF_Parts_Storage *ivf_parts_storage) override {
+        const auto *src_embedding_data = static_cast<const ColumnEmbeddingElementT *>(embedding_ptr);
+        const auto [src_embedding_f32, _] = GetF32Ptr(src_embedding_data, embedding_dimension_);
+        Vector<u8> encode_output(embedding_sq_bytes_);
+        Vector<f32> error_v(embedding_dimension_);
+        const auto *ivf_parts_storage_info =
+            dynamic_cast<const IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kScalarQuantization> *>(ivf_parts_storage);
+        assert(ivf_parts_storage_info);
+        const auto centroid_data = ivf_centroids_storage->data() + part_id() * embedding_dimension_;
+        for (u32 i = 0; i < embedding_dimension_; ++i) {
+            const f32 residual_i = src_embedding_f32[i] - centroid_data[i];
+            const f32 a = ivf_parts_storage_info->data_a()[i];
+            const f32 b = ivf_parts_storage_info->data_b()[i];
+            u32 n = {};
+            if (const f32 n_f = std::round((residual_i - b) / (a > 0.0f ? a : 1.0f)); n_f < sq_encode_start) {
+                n = sq_encode_start;
+            } else if (n_f >= sq_encode_end) {
+                n = sq_encode_end;
+            } else {
+                n = static_cast<u32>(n_f);
+            }
+            if constexpr (sq_bits == 8) {
+                encode_output[i] = static_cast<u8>(n);
+            } else {
+                static_assert(sq_bits == 4);
+                encode_output[i / 2] |= (i & 1) ? (n << 4) : n;
+            }
+            error_v[i] = residual_i - (a * n + b);
+        }
+        const auto v_e_ip = IPDistance<f32>(src_embedding_f32, error_v.data(), embedding_dimension_);
+        dot_v_e_.push_back(v_e_ip);
+        sq_data_.insert(sq_data_.end(), encode_output.begin(), encode_output.end());
+        embedding_segment_offsets_.push_back(segment_offset);
+        ++embedding_num_;
+    }
+
+    void SearchIndex(const IVF_Index_Storage *ivf_index_storage,
+                     const KnnDistanceBase1 *knn_distance,
+                     const void *query_ptr,
+                     const EmbeddingDataType query_element_type,
+                     const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                     const std::function<void(f32, SegmentOffset)> &add_result_func,
+                     SearchIndexPartsReuseContext &context) const override {
+        auto ReturnT = [&]<EmbeddingDataType query_element_type> {
+            if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
+                          (query_element_type == src_embedding_data_type &&
+                           (query_element_type == EmbeddingDataType::kElemInt8 || query_element_type == EmbeddingDataType::kElemUInt8))) {
+                return SearchIndexT<query_element_type>(ivf_index_storage,
+                                                        knn_distance,
+                                                        static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr),
+                                                        satisfy_filter_func,
+                                                        add_result_func,
+                                                        context);
+            } else {
+                UnrecoverableError("Invalid Query EmbeddingDataType");
+            }
+        };
+        switch (query_element_type) {
+            case EmbeddingDataType::kElemFloat: {
+                return ReturnT.template operator()<EmbeddingDataType::kElemFloat>();
+            }
+            case EmbeddingDataType::kElemUInt8: {
+                return ReturnT.template operator()<EmbeddingDataType::kElemUInt8>();
+            }
+            case EmbeddingDataType::kElemInt8: {
+                return ReturnT.template operator()<EmbeddingDataType::kElemInt8>();
+            }
+            default: {
+                UnrecoverableError("Invalid EmbeddingDataType");
+            }
+        }
+    }
+
+    static inline u32 sq_decode(const u8 *sq_data, const u32 pos)
+        requires(sq_bits == 8)
+    {
+        return sq_data[pos];
+    }
+
+    static inline u32 sq_decode(const u8 *sq_data, const u32 pos)
+        requires(sq_bits == 4)
+    {
+        return (pos & 1) ? (sq_data[pos / 2] >> 4) : (sq_data[pos / 2] & 0xf);
+    }
+
+    template <EmbeddingDataType query_element_type>
+    void SearchIndexT(const IVF_Index_Storage *ivf_index_storage,
+                      const KnnDistanceBase1 *knn_distance,
+                      const EmbeddingDataTypeToCppTypeT<query_element_type> *query_ptr,
+                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
+                      const std::function<void(f32, SegmentOffset)> &add_result_func,
+                      SearchIndexPartsReuseContext &context) const {
+        using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
+        static_assert(std::is_same_v<QueryDataType, f32>);
+        const auto &ivf_parts_storage =
+            static_cast<const IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kScalarQuantization> &>(ivf_index_storage->ivf_parts_storage());
+        const auto dimension = embedding_dimension_;
+        const auto a_ptr = ivf_parts_storage.data_a();
+        const auto b_ptr = ivf_parts_storage.data_b();
+        const auto c_ptr = ivf_index_storage->ivf_centroids_storage().data() + part_id() * dimension;
+        const auto [x_ptr, _] = GetF32Ptr(query_ptr, dimension);
+        const auto total_embedding_num = embedding_num();
+        context.dim_ = dimension;
+        context.x_ptr_ = x_ptr;
+        context.a_ptr_ = a_ptr;
+        switch (knn_distance->dist_type_) {
+            case KnnDistanceType::kInnerProduct: {
+                // dot(x, v) = dot(x, c + b) + dot((x * a), n) + dot(v, e)
+                const auto c_plus_b = MakeUniqueForOverwrite<f32[]>(dimension);
+                for (u32 i = 0; i < dimension; ++i) {
+                    c_plus_b[i] = c_ptr[i] + b_ptr[i];
+                }
+                const auto dot_x_c_b = IPDistance<f32>(x_ptr, c_plus_b.get(), dimension);
+                const auto &x_mult_a = context.get_x_mult_a();
+                for (u32 i = 0; i < total_embedding_num; ++i) {
+                    const auto segment_offset = embedding_segment_offset(i);
+                    if (!satisfy_filter_func(segment_offset)) {
+                        continue;
+                    }
+                    f32 d = dot_x_c_b + dot_v_e_[i];
+                    const u8 *sq_data = sq_data_.data() + i * embedding_sq_bytes_;
+                    for (u32 j = 0; j < dimension; ++j) {
+                        d += x_mult_a[j] * sq_decode(sq_data, j);
+                    }
+                    add_result_func(d, segment_offset);
+                }
+                break;
+            }
+            case KnnDistanceType::kCosine: {
+                // dot(x, v) = dot(x, c + b) + dot((x * a), n) + dot(v, e)
+                // dot(v, v) = dot(c + b, c + b) + dot(a^2, n^2) + 2 * dot ((c + b) * a, n) + 2 * dot(v, e) + dot(e, e)
+                // Sift1M shows that it is better to not consider dot(v, e) and dot(e, e)
+                const auto x_l2 = context.get_x_l2();
+                const auto &x_mult_a = context.get_x_mult_a();
+                const auto &a_square = context.get_a_square();
+                const auto c_plus_b = MakeUniqueForOverwrite<f32[]>(dimension);
+                const auto c_plus_b_mult_a_2 = MakeUniqueForOverwrite<f32[]>(dimension);
+                for (u32 i = 0; i < dimension; ++i) {
+                    c_plus_b[i] = c_ptr[i] + b_ptr[i];
+                    c_plus_b_mult_a_2[i] = 2.0f * c_plus_b[i] * a_ptr[i];
+                }
+                const auto dot_x_c_b = IPDistance<f32>(x_ptr, c_plus_b.get(), dimension);
+                const auto c_plus_b_l2 = L2NormSquare<f32>(c_plus_b.get(), dimension);
+                for (u32 i = 0; i < total_embedding_num; ++i) {
+                    const auto segment_offset = embedding_segment_offset(i);
+                    if (!satisfy_filter_func(segment_offset)) {
+                        continue;
+                    }
+                    f32 x_v_ip = dot_x_c_b;
+                    f32 v_l2 = c_plus_b_l2;
+                    const u8 *sq_data = sq_data_.data() + i * embedding_sq_bytes_;
+                    for (u32 j = 0; j < dimension; ++j) {
+                        const auto n = sq_decode(sq_data, j);
+                        x_v_ip += x_mult_a[j] * n;
+                        v_l2 += (a_square[j] * n + c_plus_b_mult_a_2[j]) * n;
+                    }
+                    const f32 d = x_v_ip / std::sqrt(x_l2 * v_l2);
+                    add_result_func(d, segment_offset);
+                }
+                break;
+            }
+            case KnnDistanceType::kL2: {
+                // l2(a * n + b + c - x) = dot(a^2, n^2) + l2(b + c - x) + 2 * dot(a * (b + c - x), n)
+                const auto &a_square = context.get_a_square();
+                const auto b_plus_c_minus_x = MakeUniqueForOverwrite<f32[]>(dimension);
+                const auto a_mult_b_plus_c_minus_x_2 = MakeUniqueForOverwrite<f32[]>(dimension);
+                for (u32 i = 0; i < dimension; ++i) {
+                    b_plus_c_minus_x[i] = b_ptr[i] + c_ptr[i] - x_ptr[i];
+                    a_mult_b_plus_c_minus_x_2[i] = 2.0f * a_ptr[i] * b_plus_c_minus_x[i];
+                }
+                const auto b_plus_c_minus_x_l2 = L2NormSquare<f32>(b_plus_c_minus_x.get(), dimension);
+                for (u32 i = 0; i < total_embedding_num; ++i) {
+                    const auto segment_offset = embedding_segment_offset(i);
+                    if (!satisfy_filter_func(segment_offset)) {
+                        continue;
+                    }
+                    f32 d = b_plus_c_minus_x_l2;
+                    const u8 *sq_data = sq_data_.data() + i * embedding_sq_bytes_;
+                    for (u32 j = 0; j < dimension; ++j) {
+                        const auto n = sq_decode(sq_data, j);
+                        d += (a_square[j] * n + a_mult_b_plus_c_minus_x_2[j]) * n;
+                    }
+                    add_result_func(d, segment_offset);
+                }
+                break;
+            }
+            default: {
+                RecoverableError(Status::SyntaxError(
+                    fmt::format("IVFSQ does not support {} metric now.", KnnExpr::KnnDistanceType2Str(knn_distance->dist_type_))));
+                break;
+            }
         }
     }
 };
@@ -594,7 +988,7 @@ UniquePtr<PQ_Code_Storage> GetPQCodeStorage(const u32 subspace_num, const u32 su
 template <EmbeddingDataType src_embedding_data_type>
 class IVF_Part_Storage_PQ final : public IVF_Part_Storage {
     using ColumnEmbeddingElementT = EmbeddingDataTypeToCppTypeT<src_embedding_data_type>;
-    static_assert(IsAnyOf<ColumnEmbeddingElementT, i8, u8, f64, f32, Float16T, BFloat16T>);
+    static_assert(IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>);
 
     const u32 subspace_num_ = 0;
     const u32 subspace_bits_ = 0;
@@ -617,29 +1011,44 @@ public:
 
     void AppendOneEmbedding(const void *embedding_ptr,
                             const SegmentOffset segment_offset,
-                            const IVF_Centroids_Storage *,
-                            const IVF_Parts_Storage *) override {
-        const auto *src_embedding_data = static_cast<const ColumnEmbeddingElementT *>(embedding_ptr);
-        (void)(src_embedding_data);
-        // TODO
+                            const IVF_Centroids_Storage *ivf_centroids_storage,
+                            const IVF_Parts_Storage *ivf_parts_storage) override {
+        const auto dimension = ivf_centroids_storage->embedding_dimension();
+        const auto residual = MakeUniqueForOverwrite<f32[]>(dimension);
+        const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
+        {
+            const auto [src_embedding_f32, _] = GetF32Ptr(static_cast<const ColumnEmbeddingElementT *>(embedding_ptr), dimension);
+            const auto centroid_data = ivf_centroids_storage->data() + part_id() * dimension;
+            for (u32 i = 0; i < dimension; ++i) {
+                residual[i] = src_embedding_f32[i] - centroid_data[i];
+            }
+        }
+        const auto *ivf_parts_storage_info =
+            dynamic_cast<const IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> *>(ivf_parts_storage);
+        assert(ivf_parts_storage_info);
+        ivf_parts_storage_info->EncodeResidual(residual.get(), encoded_codes.get());
+        pq_code_storage_->AppendCodes(encoded_codes.get());
         embedding_segment_offsets_.push_back(segment_offset);
         ++embedding_num_;
     }
 
-    void SearchIndex(const KnnDistanceBase1 *knn_distance,
+    void SearchIndex(const IVF_Index_Storage *ivf_index_storage,
+                     const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      const EmbeddingDataType query_element_type,
                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                      const std::function<void(f32, SegmentOffset)> &add_result_func,
-                     const IVF_Parts_Storage *) const override {
+                     SearchIndexPartsReuseContext &context) const override {
         auto ReturnT = [&]<EmbeddingDataType query_element_type> {
             if constexpr ((query_element_type == EmbeddingDataType::kElemFloat && IsAnyOf<ColumnEmbeddingElementT, f64, f32, Float16T, BFloat16T>) ||
                           (query_element_type == src_embedding_data_type &&
                            (query_element_type == EmbeddingDataType::kElemInt8 || query_element_type == EmbeddingDataType::kElemUInt8))) {
-                return SearchIndexT<query_element_type>(knn_distance,
+                return SearchIndexT<query_element_type>(ivf_index_storage,
+                                                        knn_distance,
                                                         static_cast<const EmbeddingDataTypeToCppTypeT<query_element_type> *>(query_ptr),
                                                         satisfy_filter_func,
-                                                        add_result_func);
+                                                        add_result_func,
+                                                        context);
             } else {
                 UnrecoverableError("Invalid Query EmbeddingDataType");
             }
@@ -661,28 +1070,105 @@ public:
     }
 
     template <EmbeddingDataType query_element_type>
-    void SearchIndexT(const KnnDistanceBase1 *knn_distance,
+    void SearchIndexT(const IVF_Index_Storage *ivf_index_storage,
+                      const KnnDistanceBase1 *knn_distance,
                       const EmbeddingDataTypeToCppTypeT<query_element_type> *query_ptr,
                       const std::function<bool(SegmentOffset)> &satisfy_filter_func,
-                      const std::function<void(f32, SegmentOffset)> &add_result_func) const {
+                      const std::function<void(f32, SegmentOffset)> &add_result_func,
+                      SearchIndexPartsReuseContext &context) const {
         using QueryDataType = EmbeddingDataTypeToCppTypeT<query_element_type>;
-        auto knn_distance_1 = dynamic_cast<const KnnDistance1<QueryDataType, f32> *>(knn_distance);
-        if (!knn_distance_1) [[unlikely]] {
-            UnrecoverableError("Invalid KnnDistance1");
+        static_assert(std::is_same_v<QueryDataType, f32>);
+        const auto &ivf_parts_storage =
+            static_cast<const IVF_Parts_Storage_Info<IndexIVFStorageOption::Type::kProductQuantization> &>(ivf_index_storage->ivf_parts_storage());
+        const auto subspace_num = subspace_num_;
+        const auto real_subspace_centroid_num = ivf_parts_storage.real_subspace_centroid_num();
+        const auto dimension = ivf_index_storage->embedding_dimension();
+        const auto [query_f32, _] = GetF32Ptr(query_ptr, dimension);
+        const auto centroid_data = ivf_index_storage->ivf_centroids_storage().data() + part_id() * dimension;
+        const auto total_embedding_num = embedding_num();
+        context.dim_ = dimension;
+        context.x_ptr_ = query_f32;
+        switch (knn_distance->dist_type_) {
+            case KnnDistanceType::kInnerProduct: {
+                const auto query_centroid_ip = IPDistance<f32>(query_f32, centroid_data, dimension);
+                auto &ip_table = context.pq_query_ip_table_;
+                if (!ip_table) {
+                    ip_table = ivf_parts_storage.GetIPTable(query_f32);
+                }
+                const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
+                for (u32 i = 0; i < total_embedding_num; ++i) {
+                    const auto segment_offset = embedding_segment_offset(i);
+                    if (!satisfy_filter_func(segment_offset)) {
+                        continue;
+                    }
+                    pq_code_storage_->ExtractCodes(i, encoded_codes.get());
+                    f32 d = query_centroid_ip;
+                    for (u32 j = 0; j < subspace_num; ++j) {
+                        d += ip_table[j * real_subspace_centroid_num + encoded_codes[j]];
+                    }
+                    add_result_func(d, segment_offset);
+                }
+                break;
+            }
+            case KnnDistanceType::kCosine: {
+                const auto query_l2 = context.get_x_l2();
+                const auto centroid_l2 = L2NormSquare<f32>(centroid_data, dimension);
+                const auto query_centroid_ip = IPDistance<f32>(query_f32, centroid_data, dimension);
+                auto &query_ip_table = context.pq_query_ip_table_;
+                if (!query_ip_table) {
+                    query_ip_table = ivf_parts_storage.GetIPTable(query_f32);
+                }
+                const auto centroid_ip_table = ivf_parts_storage.GetIPTable(centroid_data);
+                const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
+                for (u32 i = 0; i < total_embedding_num; ++i) {
+                    const auto segment_offset = embedding_segment_offset(i);
+                    if (!satisfy_filter_func(segment_offset)) {
+                        continue;
+                    }
+                    pq_code_storage_->ExtractCodes(i, encoded_codes.get());
+                    f32 ip = query_centroid_ip;
+                    f32 target_l2 = centroid_l2 * 0.5f;
+                    for (u32 j = 0; j < subspace_num; ++j) {
+                        const auto idx = j * real_subspace_centroid_num + encoded_codes[j];
+                        ip += query_ip_table[idx];
+                        target_l2 += centroid_ip_table[idx] - ivf_parts_storage.subspace_centroid_norms_neg_half_at_subspace(j)[encoded_codes[j]];
+                    }
+                    target_l2 *= 2.0f;
+                    const auto d = ip / std::sqrt(query_l2 * target_l2);
+                    add_result_func(d, segment_offset);
+                }
+                break;
+            }
+            case KnnDistanceType::kL2: {
+                const auto residual_query = MakeUniqueForOverwrite<f32[]>(dimension);
+                for (u32 i = 0; i < dimension; ++i) {
+                    residual_query[i] = query_f32[i] - centroid_data[i];
+                }
+                const auto residual_query_l2 = L2NormSquare<f32>(residual_query.get(), dimension);
+                const auto residual_ip_table = ivf_parts_storage.GetIPTable(residual_query.get());
+                const auto encoded_codes = MakeUniqueForOverwrite<u32[]>(subspace_num_);
+                for (u32 i = 0; i < total_embedding_num; ++i) {
+                    const auto segment_offset = embedding_segment_offset(i);
+                    if (!satisfy_filter_func(segment_offset)) {
+                        continue;
+                    }
+                    pq_code_storage_->ExtractCodes(i, encoded_codes.get());
+                    f32 d = residual_query_l2 * 0.5f;
+                    for (u32 j = 0; j < subspace_num; ++j) {
+                        d -= residual_ip_table[j * real_subspace_centroid_num + encoded_codes[j]] +
+                             ivf_parts_storage.subspace_centroid_norms_neg_half_at_subspace(j)[encoded_codes[j]];
+                    }
+                    d *= 2.0f;
+                    add_result_func(d, segment_offset);
+                }
+                break;
+            }
+            default: {
+                RecoverableError(Status::SyntaxError(
+                    fmt::format("IVFPQ does not support {} metric now.", KnnExpr::KnnDistanceType2Str(knn_distance->dist_type_))));
+                break;
+            }
         }
-        // TODO
-        // auto dist_func = knn_distance_1->dist_func_;
-        // const auto total_embedding_num = embedding_num();
-        // for (u32 i = 0; i < total_embedding_num; ++i) {
-        //     const auto segment_offset = embedding_segment_offset(i);
-        //     if (!satisfy_filter_func(segment_offset)) {
-        //         continue;
-        //     }
-        //     auto v_ptr = data_.data() + i * embedding_dimension();
-        //     auto [calc_ptr, _] = GetSearchCalcPtr<QueryDataType>(v_ptr, embedding_dimension());
-        //     auto d = dist_func(calc_ptr, query_ptr, embedding_dimension());
-        //     add_result_func(d, segment_offset);
-        // }
     }
 };
 
@@ -738,18 +1224,66 @@ UniquePtr<IVF_Part_Storage> IVF_Part_Storage::Make(const u32 part_id,
             break;
         }
         case IndexIVFStorageOption::Type::kScalarQuantization: {
-            UnrecoverableError("Not implemented");
+            const auto sq_bits = ivf_storage_option.scalar_quantization_bits_;
+            auto GetSQResult = [part_id, embedding_dimension, sq_bits]<EmbeddingDataType src_embedding_data_type>() -> UniquePtr<IVF_Part_Storage> {
+                switch (sq_bits) {
+                    case 4: {
+                        return MakeUnique<IVF_Part_Storage_SQ<4, src_embedding_data_type>>(part_id, embedding_dimension);
+                    }
+                    case 8: {
+                        return MakeUnique<IVF_Part_Storage_SQ<8, src_embedding_data_type>>(part_id, embedding_dimension);
+                    }
+                    default: {
+                        UnrecoverableError(fmt::format("Invalid scalar quantization bits: {}", sq_bits));
+                        return {};
+                    }
+                }
+            };
+            switch (embedding_data_type) {
+                case EmbeddingDataType::kElemDouble: {
+                    return GetSQResult.template operator()<EmbeddingDataType::kElemDouble>();
+                }
+                case EmbeddingDataType::kElemFloat: {
+                    return GetSQResult.template operator()<EmbeddingDataType::kElemFloat>();
+                }
+                case EmbeddingDataType::kElemFloat16: {
+                    return GetSQResult.template operator()<EmbeddingDataType::kElemFloat16>();
+                }
+                case EmbeddingDataType::kElemBFloat16: {
+                    return GetSQResult.template operator()<EmbeddingDataType::kElemBFloat16>();
+                }
+                default: {
+                    UnrecoverableError("Unsupported embedding data type for IVFSQ.");
+                    return {};
+                }
+            }
             break;
         }
         case IndexIVFStorageOption::Type::kProductQuantization: {
             const auto subspace_num = ivf_storage_option.product_quantization_subspace_num_;
             const auto subspace_bits = ivf_storage_option.product_quantization_subspace_bits_;
-            return ApplyEmbeddingDataTypeToFunc(
-                embedding_data_type,
-                [part_id, subspace_num, subspace_bits]<EmbeddingDataType src_embedding_data_type>() -> UniquePtr<IVF_Part_Storage> {
-                    return MakeUnique<IVF_Part_Storage_PQ<src_embedding_data_type>>(part_id, subspace_num, subspace_bits);
-                },
-                [] { return UniquePtr<IVF_Part_Storage>(); });
+            auto GetPQResult = [part_id, subspace_num, subspace_bits]<EmbeddingDataType src_embedding_data_type>() {
+                return MakeUnique<IVF_Part_Storage_PQ<src_embedding_data_type>>(part_id, subspace_num, subspace_bits);
+            };
+            switch (embedding_data_type) {
+                case EmbeddingDataType::kElemDouble: {
+                    return GetPQResult.template operator()<EmbeddingDataType::kElemDouble>();
+                }
+                case EmbeddingDataType::kElemFloat: {
+                    return GetPQResult.template operator()<EmbeddingDataType::kElemFloat>();
+                }
+                case EmbeddingDataType::kElemFloat16: {
+                    return GetPQResult.template operator()<EmbeddingDataType::kElemFloat16>();
+                }
+                case EmbeddingDataType::kElemBFloat16: {
+                    return GetPQResult.template operator()<EmbeddingDataType::kElemBFloat16>();
+                }
+                default: {
+                    UnrecoverableError("Unsupported embedding data type for IVFPQ.");
+                    return {};
+                }
+            }
+            break;
         }
     }
     return {};

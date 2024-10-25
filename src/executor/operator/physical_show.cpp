@@ -77,9 +77,9 @@ import memindex_tracer;
 import persistence_manager;
 import global_resource_usage;
 import infinity_context;
-import peer_task;
 import cleanup_scanner;
 import obj_status;
+import admin_statement;
 
 namespace infinity {
 
@@ -1524,7 +1524,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append entry dir to the 1 column
             const String *db_entry_dir = database_detail.db_entry_dir_.get();
@@ -1533,7 +1533,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append comment to the 2 column
             const String *db_comment = database_detail.db_comment_.get();
@@ -3788,6 +3788,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
 
             Catalog *catalog_ptr = query_context->storage()->catalog();
+
             Value value = Value::MakeBigInt(catalog_ptr->next_txn_id());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
@@ -4533,8 +4534,12 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    CompactionProcessor *compaction_processor = query_context->storage()->compaction_processor();
-                    Value value = Value::MakeVarchar(std::to_string(compaction_processor->RunningTaskCount()));
+                    String task_count = "N/A";
+                    if (query_context->storage()->GetStorageMode() == StorageMode::kWritable) {
+                        CompactionProcessor *compaction_processor = query_context->storage()->compaction_processor();
+                        task_count = std::to_string(compaction_processor->RunningTaskCount());
+                    }
+                    Value value = Value::MakeVarchar(task_count);
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }

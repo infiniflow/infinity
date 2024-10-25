@@ -1,4 +1,7 @@
 statement ok
+SET CONFIG result_cache_mode "off";
+
+statement ok
 DROP TABLE IF EXISTS str_index_scan_insert;
 
 statement ok
@@ -54,3 +57,6 @@ PROJECT (4)
 
 statement ok
 DROP TABLE str_index_scan_insert;
+
+statement ok
+SET CONFIG result_cache_mode "on";

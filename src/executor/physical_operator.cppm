@@ -75,6 +75,8 @@ public:
 
     bool cache_result() const { return cache_result_; }
 
+    void SetCacheResult(bool cache_result) { cache_result_ = cache_result; }
+
 protected:
     u64 operator_id_;
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};

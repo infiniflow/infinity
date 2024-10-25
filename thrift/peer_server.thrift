@@ -3,6 +3,7 @@ namespace cpp infinity_peer_server
 // https://github.com/apache/thrift/blob/master/test/Recursive.thrift
 
 enum NodeType {
+kAdmin,
 kLeader,
 kFollower,
 kLearner,
@@ -13,6 +14,7 @@ enum NodeStatus {
 kInvalid,
 kAlive,
 kLostConnection,
+kRemoved,
 kTimeout
 }
 
@@ -70,6 +72,7 @@ struct HeartBeatResponse {
 struct SyncLogRequest {
 1: string node_name,
 2: list<binary> log_entries,
+3: bool on_startup,
 }
 
 struct SyncLogResponse {
@@ -84,7 +87,8 @@ struct ChangeRoleRequest {
 }
 
 struct ChangeRoleResponse {
-1: string node_name,
+1: i64 error_code,
+2: string error_message,
 }
 
 struct NewLeaderRequest {

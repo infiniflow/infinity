@@ -74,13 +74,17 @@ public:
 
 export class KnnDistanceBase1 {
 public:
+    const KnnDistanceType dist_type_{};
+    explicit KnnDistanceBase1(const KnnDistanceType dist_type) : dist_type_(dist_type) {}
     virtual ~KnnDistanceBase1() = default;
 };
 
 export template <typename QueryDataType, typename DistType>
 class KnnDistance1 : public KnnDistanceBase1 {
 public:
-    KnnDistance1(KnnDistanceType dist_type);
+    explicit KnnDistance1(const KnnDistanceType dist_type) : KnnDistanceBase1(dist_type) { InitKnnDistance1(dist_type); }
+
+    void InitKnnDistance1(KnnDistanceType dist_type);
 
     Vector<DistType> Calculate(const QueryDataType *datas, SizeT data_count, const QueryDataType *query, SizeT dim) const {
         Vector<DistType> res(data_count);
@@ -107,19 +111,19 @@ public:
 };
 
 template <>
-KnnDistance1<f32, f32>::KnnDistance1(KnnDistanceType dist_type);
+void KnnDistance1<f32, f32>::InitKnnDistance1(KnnDistanceType dist_type);
 
 template <>
-KnnDistance1<u8, i32>::KnnDistance1(KnnDistanceType dist_type);
+void KnnDistance1<u8, i32>::InitKnnDistance1(KnnDistanceType dist_type);
 
 template <>
-KnnDistance1<u8, f32>::KnnDistance1(KnnDistanceType dist_type);
+void KnnDistance1<u8, f32>::InitKnnDistance1(KnnDistanceType dist_type);
 
 template <>
-KnnDistance1<i8, i32>::KnnDistance1(KnnDistanceType dist_type);
+void KnnDistance1<i8, i32>::InitKnnDistance1(KnnDistanceType dist_type);
 
 template <>
-KnnDistance1<i8, f32>::KnnDistance1(KnnDistanceType dist_type);
+void KnnDistance1<i8, f32>::InitKnnDistance1(KnnDistanceType dist_type);
 
 //-------------------------------------------------------------------
 

@@ -1033,10 +1033,11 @@ bool Value::operator==(const Value &other) const {
             });
         }
         case LogicalType::kSparse: {
-            // TODO
-            String error_message = "Not implemented yet.";
-            UnrecoverableError(error_message);
-            break;
+            const auto &sparse1 = GetSparse();
+            const auto &sparse2 = other.GetSparse();
+            const auto &[nnz1, raw_idx1, raw_data1] = sparse1;
+            const auto &[nnz2, raw_idx2, raw_data2] = sparse2;
+            return nnz1 == nnz2 && std::ranges::equal(raw_idx1, raw_idx2) && std::ranges::equal(raw_data1, raw_data2);
         }
         case LogicalType::kInterval:
         case LogicalType::kArray:
