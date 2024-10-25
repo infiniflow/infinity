@@ -29,7 +29,7 @@ struct LogFunction {
 };
 
 void RegisterLogFunction(const UniquePtr<Catalog> &catalog_ptr) {
-    String func_name = "loge";
+    String func_name = "ln";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
