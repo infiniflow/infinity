@@ -4239,6 +4239,31 @@ public:
     }
 };
 
+class AdminRemoveNodeHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+        String node_name = request->getPathVariable("node_name");
+        auto result = infinity->AdminRemoveNode(node_name);
+
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            json_response["message"] = fmt::format("Node {} removed successfully.", node_name);
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 } // namespace
 
 namespace infinity {
@@ -4348,6 +4373,7 @@ void HTTPServer::Start(const String &ip_address, u16 port) {
     router->route("GET", "/admin/node/current", MakeShared<AdminShowCurrentNodeHandler>());
     router->route("GET", "/admin/node/{node_name}", MakeShared<AdminShowNodeByNameHandler>());
     router->route("GET", "/admin/nodes", MakeShared<AdminListAllNodesHandler>());
+    router->route("DELETE", "/admin/node/{node_name}", MakeShared<AdminRemoveNodeHandler>());
 
     SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({ip_address, port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler = HttpConnectionHandler::createShared(router);
