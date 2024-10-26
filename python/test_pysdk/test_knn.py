@@ -6,7 +6,6 @@ from common import common_values
 from common import common_index
 import infinity
 import infinity_embedded
-from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException, SparseVector
@@ -760,6 +759,19 @@ class TestInfinity:
                .to_pl())
         print(res_filter_2)
         pl_assert_frame_equal(res_filter_1, res_filter_2)
+
+        # filter_fulltext = "num!=98 AND num != 12 AND filter_fulltext('body', 'harmful chemical')"
+        # filter_fulltext = """num!=98 AND num != 12 AND filter_fulltext('body', '(harmful OR chemical)')"""
+        # filter_fulltext = """num!=98 AND num != 12 AND filter_fulltext('body', '("harmful" OR "chemical")')"""
+        # filter_fulltext = """(num!=98 AND num != 12) AND filter_fulltext('body', '(("harmful" OR "chemical"))')"""
+        filter_fulltext = """(num!=98 AND num != 12) AND filter_fulltext('body^3,body,body^2', '(("harmful" OR "chemical"))')"""
+        _ = (table_obj
+               .output(["*"])
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1, {"filter": filter_fulltext})
+               .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12"})
+               .fusion(method='rrf', topn=10)
+               .to_pl())
+
         with pytest.raises(InfinityException) as e_info:
             res_filter_3 = (table_obj
                .output(["*"])
