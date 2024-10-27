@@ -288,6 +288,33 @@ res = infinity_object.list_databases()
 print(res.db_names) # ['my_database', 'database_1']
 ```
 
+
+---
+
+## show_database
+
+```python
+db_object.show_database(database_name)
+```
+
+Show detail information of a database.
+
+### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+    - `0`: The operation succeeds.
+    - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+### Examples
+
+```python
+res = db_object.show_database('my_database')
+```
+
 ---
 
 ## get_database
@@ -767,6 +794,32 @@ res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 
 ---
 
+## show_table
+
+```python
+db_object.show_table(table_name)
+```
+
+Show detail information of a table.
+
+### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+### Examples
+
+```python
+res = db_object.show_table('my_table')
+```
+
+---
+
 ## create_index
 
 ```python
@@ -1116,6 +1169,32 @@ A structure containing the following attributes:
 ```python
 res = table_object.list_indexes()
 res.index_names # ['my_index', 'tensor_index', 'sparse_index']
+```
+
+---
+
+## show_index
+
+```python
+db_object.show_index(index_name)
+```
+
+Show detail information of a index.
+
+### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+    - `0`: The operation succeeds.
+    - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+### Examples
+
+```python
+res = table_object.show_index('my_index')
 ```
 
 ---
