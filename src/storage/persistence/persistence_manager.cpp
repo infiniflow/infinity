@@ -258,7 +258,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
         if(!obj_stat->cached_){
             String read_path = GetObjPath(result.obj_addr_.obj_key_);
-            VirtualStore::DownloadObject(read_path, read_path);
+            VirtualStore::DownloadObject(read_path, result.obj_addr_.obj_key_);
             if(VirtualStore::Exists(read_path)){
                 LOG_TRACE(fmt::format("GetObjCache download object {}", read_path));
                 obj_stat->cached_ = true;

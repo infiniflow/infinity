@@ -3975,7 +3975,8 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     QueryResult query_result;
     NodeRole current_node_role = InfinityContext::instance().GetServerRole();
     if (current_node_role == target_node_role) {
-        query_result.status_ = Status::InvalidNodeRole(fmt::format("Infinity is already the role of {}", ToString(current_node_role)));
+        LOG_INFO(fmt::format("Infinity is already the role of {}", ToString(current_node_role)));
+        query_result.status_ = Status::OK();
         return query_result;
     }
     Status status;

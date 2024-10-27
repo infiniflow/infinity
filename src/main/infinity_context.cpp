@@ -94,6 +94,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
     if (current_role == target_role) {
         return Status::InvalidNodeRole(fmt::format("Infinity is already the role of {}", ToString(current_role)));
     }
+    LOG_INFO(fmt::format("ChangeRole from {} to {}", ToString(current_role), ToString(target_role)));
 
     switch (current_role) {
         case NodeRole::kUnInitialized: {
