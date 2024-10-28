@@ -18,6 +18,8 @@ export module memindex_tracer;
 
 import stl;
 import bg_task;
+import third_party;
+import logger;
 
 namespace infinity {
 
@@ -82,6 +84,7 @@ protected:
 };
 
 inline void MemIndexTracer::AddMemUsed(SizeT add) {
+    LOG_TRACE(fmt::format("Add mem used: {}, mem index limit: {}", add, index_memory_limit_));
     if (add == 0 || index_memory_limit_ == 0) {
         return;
     }

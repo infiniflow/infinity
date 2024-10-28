@@ -99,6 +99,7 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
     Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(txn);
 
     if (mem_indexes.empty()) {
+        LOG_WARN("Cannot find memindex to dump");
         return nullptr;
     }
     SizeT dump_idx = ChooseDump(mem_indexes);
@@ -143,10 +144,8 @@ Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(Txn *scan_txn) {
         for (auto *table_entry : table_entries) {
             Vector<TableIndexEntry *> table_index_entries = table_entry->TableIndexes(txn_id, begin_ts);
             for (auto *table_index_entry : table_index_entries) {
-                auto *memindex = table_index_entry->GetMemIndex();
-                if (memindex != nullptr) {
-                    mem_indexes.push_back(memindex);
-                }
+                Vector<BaseMemIndex *> memindex_list = table_index_entry->GetMemIndex();
+                mem_indexes.insert(mem_indexes.end(), memindex_list.begin(), memindex_list.end());
             }
         }
     }
