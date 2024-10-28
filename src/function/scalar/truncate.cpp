@@ -3,7 +3,7 @@ module;
 #include <cmath>
 #include <utility>
 
-moudle truncate;
+module truncate;
 
 import stl;
 import catalog;
@@ -12,7 +12,6 @@ import scalar_function;
 import scalar_function_set;
 
 import third_party;
-import logical_type;
 import internal_types;
 import data_type;
 import logger;
@@ -35,7 +34,7 @@ struct TruncateFunction {
     }
 };
 
-void RegisterTruncateFunction(const UniquePtr<Catalog> &ccatalog_ptr) {
+void RegisterTruncateFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "truncate";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
