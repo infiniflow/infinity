@@ -99,6 +99,7 @@ import statement_common;
 import block_index;
 import column_expr;
 import function_expr;
+import insert_row_expr;
 import catalog;
 import special_function;
 import utility;
@@ -208,161 +209,132 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
     }
 
-    // Create value list
-    Vector<Vector<SharedPtr<BaseExpression>>> value_list_array;
-    SizeT value_count = statement->values_->size();
-    if (value_count > INSERT_BATCH_ROW_LIMIT) {
+    // check
+    const auto row_count = statement->insert_rows_.size();
+    if (row_count == 0) {
+        RecoverableError(Status::NotSupport("No insert batch row found!"));
+    } else if (row_count > INSERT_BATCH_ROW_LIMIT) {
         RecoverableError(Status::NotSupport("Insert batch row limit shouldn't more than 8192."));
     }
 
-    for (SizeT idx = 0; idx < value_count; ++idx) {
-        const auto *parsed_expr_list = (*(statement->values_))[idx];
-        if (parsed_expr_list == nullptr) {
+    for (SizeT idx = 0; idx < row_count; ++idx) {
+        const auto &insert_row = statement->insert_rows_[idx];
+        if (insert_row->values_.empty()) {
             RecoverableError(Status::SyntaxError("INSERT: Input value list is empty."));
         }
-        SizeT expr_count = parsed_expr_list->size();
-        Vector<SharedPtr<BaseExpression>> value_list;
-        value_list.reserve(expr_count);
-        for (SizeT expr_idx = 0; expr_idx < expr_count; ++expr_idx) {
-            const auto *parsed_expr = (*parsed_expr_list)[expr_idx];
-            if (parsed_expr == nullptr) {
-                RecoverableError(Status::SyntaxError("INSERT: Input value count mismatch across rows."));
-            }
-            SharedPtr<BaseExpression> value_expr =
-                bind_context_ptr->expression_binder_->BuildExpression(*parsed_expr, bind_context_ptr.get(), 0, true);
-            value_list.emplace_back(value_expr);
+        if ((!insert_row->columns_.empty()) && insert_row->columns_.size() != insert_row->values_.size()) {
+            RecoverableError(Status::SyntaxError("INSERT: Input column name count mismatch with value count."));
         }
-        value_list_array.push_back(value_list);
     }
 
+    // Create value list
+    Vector<Vector<SharedPtr<BaseExpression>>> value_list_array(row_count);
     // Rearrange the inserted value to match the table.
     // SELECT INTO TABLE (c, a) VALUES (1, 2); => SELECT INTO TABLE (a, b, c) VALUES( 2, NULL, 1);
-    SizeT value_list_count = value_list_array.size();
-    for (SizeT idx = 0; idx < value_list_count; ++idx) {
-        auto &value_list = value_list_array[idx];
-        if (statement->columns_ != nullptr) {
-            SizeT column_count = statement->columns_->size();
-            if (column_count != value_list.size()) {
-                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Target column count ({}) and "
-                                                                 "input value count mismatch ({})",
-                                                                 column_count,
-                                                                 value_list.size())));
+    for (SizeT idx = 0; idx < row_count; ++idx) {
+        const InsertRowExpr &insert_row = *(statement->insert_rows_[idx]);
+        Vector<SharedPtr<BaseExpression>> src_value_list;
+        src_value_list.reserve(insert_row.values_.size());
+        for (const auto &val : insert_row.values_) {
+            if (!val) {
+                RecoverableError(Status::SyntaxError("INSERT: Invalid input value! Got nullptr expr"));
             }
-
+            auto value_expr = bind_context_ptr->expression_binder_->BuildExpression(*val, bind_context_ptr.get(), 0, true);
+            src_value_list.emplace_back(std::move(value_expr));
+        }
+        auto &dst_value_list = value_list_array[idx];
+        if (!insert_row.columns_.empty()) {
+            // use column names
+            assert(insert_row.columns_.size() == src_value_list.size());
+            const auto column_count = src_value_list.size();
             SizeT table_column_count = table_entry->ColumnCount();
-
             // Create value list with table column size and null value
-            Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
-
+            Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count);
             Vector<bool> has_value(table_column_count, false);
             for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
-                const auto &column_name = statement->columns_->at(column_idx);
+                const auto &column_name = insert_row.columns_[column_idx];
                 const SharedPtr<ColumnDef> &column_def = table_entry->GetColumnDefByName(column_name);
                 SizeT table_column_idx = table_entry->GetColumnIdxByID(column_def->id());
                 const SharedPtr<DataType> &table_column_type = column_def->column_type_;
-                DataType value_type = value_list[column_idx]->Type();
-                if (value_type == *table_column_type) {
-                    rewrite_value_list[table_column_idx] = value_list[column_idx];
+                auto &src_value = src_value_list[column_idx];
+                auto &dst_value = rewrite_value_list[table_column_idx];
+                DataType value_type = src_value->Type();
+                if ((value_type != *table_column_type) && LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
+                    // If the inserted value type mismatches with table
+                    // column type, cast the inserted value type to correct
+                    // one.
+                    BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
+                    auto cast_expr = MakeShared<CastExpression>(cast, src_value, *table_column_type);
+                    dst_value = std::move(cast_expr);
                 } else {
-                    if (LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
-                        // If the inserted value type mismatches with table
-                        // column type, cast the inserted value type to correct
-                        // one.
-                        BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
-                        SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, value_list[column_idx], *table_column_type);
-                        rewrite_value_list[table_column_idx] = cast_expr;
-                    } else {
-                        // LogicalType are same and type info is also OK.
-                        rewrite_value_list[column_idx] = value_list[column_idx];
-                    }
+                    // LogicalType are same and type info is also OK.
+                    dst_value = std::move(src_value);
                 }
                 has_value[table_column_idx] = true;
             }
-
             for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
                 if (has_value[column_idx]) {
                     continue;
                 }
-
                 auto column_def = table_entry->GetColumnDefByIdx(column_idx);
-                if (column_def->has_default_value()) {
-                    SharedPtr<BaseExpression> value_expr =
-                        bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
-                    value_list.emplace_back(value_expr);
-                } else {
-                    RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
-                                                                     "input value count mismatch ({})",
-                                                                     table_column_count,
-                                                                     column_count)));
+                if (!column_def->has_default_value()) {
+                    RecoverableError(Status::SyntaxError(fmt::format("INSERT: No default value found for column {}.", column_def->ToString())));
                 }
-
+                auto &dst_value = rewrite_value_list[column_idx];
+                auto default_value_expr =
+                    bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
                 const SharedPtr<DataType> &table_column_type = column_def->column_type_;
-                auto &value = value_list.back();
-                DataType value_type = value->Type();
-                if (*table_column_type == value_type) {
-                    rewrite_value_list[column_idx] = value;
+                DataType value_type = default_value_expr->Type();
+                if ((*table_column_type != value_type) && LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
+                    BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
+                    auto cast_expr = MakeShared<CastExpression>(cast, default_value_expr, *table_column_type);
+                    dst_value = std::move(cast_expr);
                 } else {
-                    if (LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
-                        BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
-                        SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, value, *table_column_type);
-                        rewrite_value_list[column_idx] = cast_expr;
-                    } else {
-                        // LogicalType are same and type info is also OK.
-                        rewrite_value_list[column_idx] = value;
-                    }
+                    // LogicalType are same and type info is also OK.
+                    dst_value = std::move(default_value_expr);
                 }
             }
-
-            value_list = rewrite_value_list;
+            dst_value_list = std::move(rewrite_value_list);
         } else {
-            SizeT table_column_count = table_entry->ColumnCount();
-            for (SizeT column_idx = value_list.size(); column_idx < table_column_count; ++column_idx) {
+            // append default values
+            const auto table_column_count = table_entry->ColumnCount();
+            dst_value_list = std::move(src_value_list);
+            dst_value_list.reserve(table_column_count);
+            for (SizeT column_idx = dst_value_list.size(); column_idx < table_column_count; ++column_idx) {
                 auto column_def = table_entry->GetColumnDefByIdx(column_idx);
                 if (column_def->has_default_value()) {
-                    SharedPtr<BaseExpression> value_expr =
+                    auto value_expr =
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
-                    value_list.emplace_back(value_expr);
-                }
-            }
-
-            if (value_list.size() != table_column_count) {
-                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
-                                                                 "input value count mismatch ({})",
-                                                                 table_column_count,
-                                                                 value_list.size())));
-            }
-
-            // Create value list with table column size and null value
-            Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
-
-            for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
-                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByIdx(column_idx)->column_type_;
-                DataType value_type = value_list[column_idx]->Type();
-                if (*table_column_type == value_type) {
-                    rewrite_value_list[column_idx] = value_list[column_idx];
+                    dst_value_list.emplace_back(std::move(value_expr));
                 } else {
-                    if (LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
-                        BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
-                        SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, value_list[column_idx], *table_column_type);
-                        rewrite_value_list[column_idx] = cast_expr;
-                    } else {
-                        // LogicalType are same and type info is also OK.
-                        rewrite_value_list[column_idx] = value_list[column_idx];
-                    }
+                    RecoverableError(Status::SyntaxError(fmt::format("INSERT: No default value found for column {}.", column_def->ToString())));
                 }
             }
-            value_list = rewrite_value_list;
+            assert(dst_value_list.size() == table_column_count);
+            for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
+                auto &dst_value = dst_value_list[column_idx];
+                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByIdx(column_idx)->column_type_;
+                DataType value_type = dst_value->Type();
+                if (*table_column_type != value_type && LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
+                    // need cast
+                    BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
+                    auto cast_expr = MakeShared<CastExpression>(cast, dst_value, *table_column_type);
+                    dst_value = std::move(cast_expr);
+                }
+            }
         }
     }
 
     // Create logical insert node.
-    SharedPtr<LogicalNode> logical_insert =
-        MakeShared<LogicalInsert>(bind_context_ptr->GetNewLogicalNodeId(), table_entry, bind_context_ptr->GenerateTableIndex(), value_list_array);
+    auto logical_insert = MakeShared<LogicalInsert>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                    table_entry,
+                                                    bind_context_ptr->GenerateTableIndex(),
+                                                    std::move(value_list_array));
 
     // FIXME: check if we need to append operator
     //    this->AppendOperator(logical_insert, bind_context_ptr);
 
-    this->logical_plan_ = logical_insert;
+    this->logical_plan_ = std::move(logical_insert);
     return Status::OK();
 }
 

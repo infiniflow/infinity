@@ -163,7 +163,7 @@ class ThriftInfinityClient:
                                                       db_name=db_name,
                                                       table_name=table_name))
 
-    def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
+    def insert(self, db_name: str, table_name: str, fields: list[Field]):
         retry = 0
         inner_ex = None
         while retry <= 2:
@@ -171,7 +171,6 @@ class ThriftInfinityClient:
                 res = self.client.Insert(InsertRequest(session_id=self.session_id,
                                                        db_name=db_name,
                                                        table_name=table_name,
-                                                       column_names=column_names,
                                                        fields=fields))
                 return res
             except TTransportException as ex:
