@@ -169,26 +169,25 @@ class RemoteTable():
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
         db_name = self._db_name
         table_name = self._table_name
-        column_names: list[str] = []
         fields: list[ttypes.Field] = []
 
         if isinstance(data, dict):
             data = [data]
 
         for row in data:
-            column_names = list(row.keys())
+            column_names = []
             parse_exprs = []
             for column_name, value in row.items():
+                column_names.append(column_name)
                 constant_expression = get_remote_constant_expr_from_python_value(value)
                 expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
                 paser_expr = ttypes.ParsedExpr(type=expr_type)
                 parse_exprs.append(paser_expr)
 
-            field = ttypes.Field(parse_exprs=parse_exprs)
+            field = ttypes.Field(column_names=column_names, parse_exprs=parse_exprs)
             fields.append(field)
 
-        res = self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
-                                fields=fields)
+        res = self._conn.insert(db_name=db_name, table_name=table_name, fields=fields)
         if res.error_code == ErrorCode.OK:
             return res
         else:

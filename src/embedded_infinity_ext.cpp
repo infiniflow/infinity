@@ -230,6 +230,12 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("expr", &WrapOrderByExpr::expr)
         .def_rw("asc", &WrapOrderByExpr::asc);
 
+    // Bind WrapInsertRowExpr
+    nb::class_<WrapInsertRowExpr>(m, "WrapInsertRowExpr")
+        .def(nb::init<>())
+        .def_rw("columns", &WrapInsertRowExpr::columns)
+        .def_rw("values", &WrapInsertRowExpr::values);
+
     // infinity
     nb::class_<Infinity>(m, "Infinity")
         .def(nb::init<>()) // bind constructor

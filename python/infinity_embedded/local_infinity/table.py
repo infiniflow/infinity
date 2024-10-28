@@ -17,7 +17,7 @@ from typing import Optional, Union, List, Any
 
 from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity_embedded.embedded_infinity_ext import ImportOptions, CopyFileType, WrapParsedExpr, \
-    ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions, WrapOrderByExpr
+    ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions, WrapOrderByExpr, WrapInsertRowExpr
 from infinity_embedded.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN, SortType
 from infinity_embedded.common import INSERT_DATA, VEC, SparseVector, InfinityException
 from infinity_embedded.errors import ErrorCode
@@ -152,23 +152,24 @@ class LocalTable():
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
         db_name = self._db_name
         table_name = self._table_name
-        column_names: list[str] = []
         fields = []
 
         if isinstance(data, dict):
             data = [data]
 
         for row in data:
-            column_names = list(row.keys())
+            column_names = []
             parse_exprs = []
             for column_name, value in row.items():
+                column_names.append(column_name)
                 constant_expression = get_local_constant_expr_from_python_value(value)
                 parse_exprs.append(constant_expression)
+            insert_row = WrapInsertRowExpr()
+            insert_row.columns=column_names
+            insert_row.values=parse_exprs
+            fields.append(insert_row)
 
-            fields.append(parse_exprs)
-
-        res = self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
-                                fields=fields)
+        res = self._conn.insert(db_name=db_name, table_name=table_name, fields=fields)
         if res.error_code == ErrorCode.OK:
             return res
         else:
