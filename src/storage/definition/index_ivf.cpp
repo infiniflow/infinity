@@ -60,8 +60,12 @@ String IndexIVF::ToString() const {
     return std::move(ss).str();
 }
 
-IndexIVF::IndexIVF(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const IndexIVFOption &ivf_option)
-    : IndexBase(IndexType::kIVF, std::move(index_name), file_name, std::move(column_names)), ivf_option_(ivf_option) {}
+IndexIVF::IndexIVF(SharedPtr<String> index_name,
+                   SharedPtr<String> index_comment,
+                   const String &file_name,
+                   Vector<String> column_names,
+                   const IndexIVFOption &ivf_option)
+    : IndexBase(IndexType::kIVF, std::move(index_name), index_comment, file_name, std::move(column_names)), ivf_option_(ivf_option) {}
 
 template <std::integral T, T min_v = std::numeric_limits<T>::min(), T max_v = std::numeric_limits<T>::max()>
     requires(min_v <= max_v)
@@ -81,8 +85,11 @@ auto GetMandatoryParamNodeHandler(Map<String, String> &params_map, std::string_v
     return nh;
 }
 
-SharedPtr<IndexIVF>
-IndexIVF::Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
+SharedPtr<IndexIVF> IndexIVF::Make(SharedPtr<String> index_name,
+                                   SharedPtr<String> index_comment,
+                                   const String &file_name,
+                                   Vector<String> column_names,
+                                   const Vector<InitParameter *> &index_param_list) {
     Map<String, String> params_map;
     for (const auto *para : index_param_list) {
         String param_name = para->param_name_;
@@ -157,7 +164,7 @@ IndexIVF::Make(SharedPtr<String> index_name, const String &file_name, Vector<Str
         oss << '.';
         RecoverableError(Status::InvalidIndexDefinition(std::move(oss).str()));
     }
-    return MakeShared<IndexIVF>(std::move(index_name), file_name, std::move(column_names), ivf_option);
+    return MakeShared<IndexIVF>(std::move(index_name), index_comment, file_name, std::move(column_names), ivf_option);
 }
 
 void CheckIndexIVFStorageOption(IndexIVFStorageOption &storage_option, const DataType *column_data_type) {
@@ -207,9 +214,10 @@ void CheckIndexIVFStorageOption(IndexIVFStorageOption &storage_option, const Dat
                 case EmbeddingDataType::kElemBit:
                 case EmbeddingDataType::kElemInt16:
                 case EmbeddingDataType::kElemInt32:
-                case EmbeddingDataType::kElemInt64:{
+                case EmbeddingDataType::kElemInt64: {
                     RecoverableError(Status::InvalidIndexDefinition(
-                        std::format("Invalid plain storage type: {}.", EmbeddingT::EmbeddingDataType2String(storage_option.plain_storage_data_type_)) +
+                        std::format("Invalid plain storage type: {}.",
+                                    EmbeddingT::EmbeddingDataType2String(storage_option.plain_storage_data_type_)) +
                         " Can only choose: int8 for int8, uint8 for uint8, float, float16 or bfloat16 for floating type"));
                     break;
                 }

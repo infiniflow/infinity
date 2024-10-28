@@ -191,10 +191,11 @@ void PhysicalShow::Init() {
         }
         case ShowStmtType::kIndexes: {
 
-            output_names_->reserve(7);
-            output_types_->reserve(7);
+            output_names_->reserve(8);
+            output_types_->reserve(8);
 
             output_names_->emplace_back("index_name");
+            output_names_->emplace_back("index_comment");
             output_names_->emplace_back("index_type");
             output_names_->emplace_back("column_id");
             output_names_->emplace_back("column_name");
@@ -202,6 +203,7 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("index segments");
             output_names_->emplace_back("other_parameters");
 
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
@@ -3257,7 +3259,8 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
+    Vector<SharedPtr<DataType>>
+        column_types{varchar_type, varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
@@ -3282,6 +3285,14 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             {
                 // Append index name to the first column
                 Value value = Value::MakeVarchar(index_name);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+            ++column_id;
+            {
+                // Append index_comment to output
+                String comment = *index_base->index_comment_;
+                Value value = Value::MakeVarchar(comment);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }

@@ -51,12 +51,11 @@ public:
 
     SharedPtr<String> db_name() const { return db_name_; }
 
-    List<SharedPtr<DBEntry>> GetAllEntries() const {
-        return db_entry_list_.GetAllEntries();
-    }
+    List<SharedPtr<DBEntry>> GetAllEntries() const { return db_entry_list_.GetAllEntries(); }
+
 private:
     Tuple<DBEntry *, Status> CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                            const SharedPtr<String>& comment,
+                                            const SharedPtr<String> &comment,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
                                             TxnManager *txn_mgr,
@@ -85,9 +84,9 @@ private:
 
     DBEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void PushBackEntry(const SharedPtr<DBEntry>& new_db_entry);
+    void PushBackEntry(const SharedPtr<DBEntry> &new_db_entry);
 
-    void PushFrontEntry(const SharedPtr<DBEntry>& new_db_entry);
+    void PushFrontEntry(const SharedPtr<DBEntry> &new_db_entry);
 
     void Sort();
 

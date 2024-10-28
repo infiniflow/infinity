@@ -28,13 +28,22 @@ namespace infinity {
 
 export class IndexBMP final : public IndexBase {
 public:
-    static SharedPtr<IndexBMP>
-    Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
+    static SharedPtr<IndexBMP> Make(SharedPtr<String> index_name,
+                                    SharedPtr<String> index_comment,
+                                    const String &file_name,
+                                    Vector<String> column_names,
+                                    const Vector<InitParameter *> &index_param_list);
 
     static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 
-    IndexBMP(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, SizeT block_size, BMPCompressType compress_type)
-        : IndexBase(IndexType::kBMP, std::move(index_name), file_name, column_names), block_size_(block_size), compress_type_(compress_type) {}
+    IndexBMP(SharedPtr<String> index_name,
+             SharedPtr<String> index_comment,
+             const String &file_name,
+             Vector<String> column_names,
+             SizeT block_size,
+             BMPCompressType compress_type)
+        : IndexBase(IndexType::kBMP, std::move(index_name), index_comment, file_name, column_names), block_size_(block_size),
+          compress_type_(compress_type) {}
 
 public:
     virtual i32 GetSizeInBytes() const override;
