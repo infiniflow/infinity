@@ -2228,7 +2228,8 @@ void swap(ColumnDef &a, ColumnDef &b);
 std::ostream& operator<<(std::ostream& out, const ColumnDef& obj);
 
 typedef struct _Field__isset {
-  _Field__isset() : parse_exprs(true) {}
+  _Field__isset() : column_names(true), parse_exprs(true) {}
+  bool column_names :1;
   bool parse_exprs :1;
 } _Field__isset;
 
@@ -2239,17 +2240,23 @@ class Field : public virtual ::apache::thrift::TBase {
   Field& operator=(const Field&);
   Field() noexcept {
 
+
   }
 
   virtual ~Field() noexcept;
+  std::vector<std::string>  column_names;
   std::vector<ParsedExpr>  parse_exprs;
 
   _Field__isset __isset;
+
+  void __set_column_names(const std::vector<std::string> & val);
 
   void __set_parse_exprs(const std::vector<ParsedExpr> & val);
 
   bool operator == (const Field & rhs) const
   {
+    if (!(column_names == rhs.column_names))
+      return false;
     if (!(parse_exprs == rhs.parse_exprs))
       return false;
     return true;
@@ -4150,10 +4157,9 @@ void swap(DropTableRequest &a, DropTableRequest &b);
 std::ostream& operator<<(std::ostream& out, const DropTableRequest& obj);
 
 typedef struct _InsertRequest__isset {
-  _InsertRequest__isset() : db_name(false), table_name(false), column_names(true), fields(true), session_id(false) {}
+  _InsertRequest__isset() : db_name(false), table_name(false), fields(true), session_id(false) {}
   bool db_name :1;
   bool table_name :1;
-  bool column_names :1;
   bool fields :1;
   bool session_id :1;
 } _InsertRequest__isset;
@@ -4168,13 +4174,11 @@ class InsertRequest : public virtual ::apache::thrift::TBase {
                   table_name(),
                   session_id(0) {
 
-
   }
 
   virtual ~InsertRequest() noexcept;
   std::string db_name;
   std::string table_name;
-  std::vector<std::string>  column_names;
   std::vector<Field>  fields;
   int64_t session_id;
 
@@ -4183,8 +4187,6 @@ class InsertRequest : public virtual ::apache::thrift::TBase {
   void __set_db_name(const std::string& val);
 
   void __set_table_name(const std::string& val);
-
-  void __set_column_names(const std::vector<std::string> & val);
 
   void __set_fields(const std::vector<Field> & val);
 
@@ -4195,8 +4197,6 @@ class InsertRequest : public virtual ::apache::thrift::TBase {
     if (!(db_name == rhs.db_name))
       return false;
     if (!(table_name == rhs.table_name))
-      return false;
-    if (!(column_names == rhs.column_names))
       return false;
     if (!(fields == rhs.fields))
       return false;

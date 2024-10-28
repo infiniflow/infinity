@@ -675,6 +675,25 @@ class TestInfinity:
         self._test_insert_tensor(suffix)
         self._test_insert_tensor_array(suffix)
 
+    def test_insert_rows_mismatch(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("python_test_insert_rows_mismatch" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("python_test_insert_rows_mismatch" + suffix,
+                                        {"num": {"type": "integer", "default": 33},
+                                         "body": {"type": "varchar", "default": "ABC"},
+                                         "vec": {"type": "vector,1,float"}},
+                                        ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"body": "", "vec": [1.0]}, {"vec": [2.0], "body": "DEF"}, {"vec": [4.0]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'num': (33, 33, 33), 'body': ("", "DEF", "ABC"), 'vec': ([1.0], [2.0], [4.0])}).astype(
+            {'num': dtype('int32')}))
+        res = db_obj.drop_table("python_test_insert_rows_mismatch"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("types", ["vector,16384,int", "vector,16384,float"])
     @pytest.mark.parametrize("types_examples", [[{"c1": [1] * 16384}],
                                                 [{"c1": [4] * 16384}],
