@@ -149,6 +149,24 @@ QueryResult AdminExecutor::Execute(QueryContext *query_context, const AdminState
         case AdminStmtType::kSetRole: {
             return SetRole(query_context, admin_statement);
         }
+        case AdminStmtType::kCreateSnapshot: {
+            return CreateSnapshot(query_context, admin_statement);
+        }
+        case AdminStmtType::kListSnapshots: {
+            return ListSnapshots(query_context, admin_statement);
+        }
+        case AdminStmtType::kShowSnapshot: {
+            return ShowSnapshot(query_context, admin_statement);
+        }
+        case AdminStmtType::kDeleteSnapshot: {
+            return DeleteSnapshot(query_context, admin_statement);
+        }
+        case AdminStmtType::kExportSnapshot: {
+            return ExportSnapshot(query_context, admin_statement);
+        }
+        case AdminStmtType::kRecoverFromSnapshot: {
+            return RecoverFromSnapshot(query_context, admin_statement);
+        }
         case AdminStmtType::kInvalid: {
             QueryResult query_result;
             query_result.result_table_ = nullptr;
@@ -4123,6 +4141,48 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
         query_result.status_ = status;
     }
 
+    return query_result;
+}
+
+QueryResult AdminExecutor::CreateSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: create snapshot"));
+    return query_result;
+}
+
+QueryResult AdminExecutor::ListSnapshots(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: list snapshots"));
+    return query_result;
+}
+
+QueryResult AdminExecutor::ShowSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: show snapshot"));
+    return query_result;
+}
+
+QueryResult AdminExecutor::DeleteSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: delete snapshot"));
+    return query_result;
+}
+
+QueryResult AdminExecutor::ExportSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: export snapshot"));
+    return query_result;
+}
+
+QueryResult AdminExecutor::RecoverFromSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: recover from snapshot"));
     return query_result;
 }
 
