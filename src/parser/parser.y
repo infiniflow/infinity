@@ -1192,8 +1192,10 @@ insert_statement: INSERT INTO table_name optional_identifier_array VALUES insert
     $$->table_name_ = $3->table_name_ptr_;
     free($3->table_name_ptr_);
     delete $3;
-    $$->columns_for_select_ = std::move(*($4));
-    delete $4;
+    if ($4) {
+        $$->columns_for_select_ = std::move(*($4));
+        delete $4;
+    }
     $$->select_.reset($5);
 }
 
