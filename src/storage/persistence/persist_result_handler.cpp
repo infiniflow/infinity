@@ -55,7 +55,10 @@ void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
 
 ObjAddr PersistResultHandler::HandleReadResult(const PersistReadResult &result) {
     if (!result.cached_) {
-        UnrecoverableError(fmt::format("HandleReadResult: object {} is not cached", result.obj_addr_.obj_key_));
+        String read_path = InfinityContext::instance().persistence_manager()->GetObjPath(result.obj_addr_.obj_key_);
+        VirtualStore::DownloadObject(read_path, result.obj_addr_.obj_key_);
+        LOG_TRACE(fmt::format("GetObjCache download object {}", read_path));
+        result.obj_stat_->cached_ = true;
     }
     return result.obj_addr_;
 }

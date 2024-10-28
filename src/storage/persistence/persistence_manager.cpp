@@ -256,15 +256,14 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         result.cached_ = true;
     } else if (ObjStat *obj_stat = objects_->Get(it->second.obj_key_); obj_stat != nullptr) {
         LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
-        if(!obj_stat->cached_){
-            String read_path = GetObjPath(result.obj_addr_.obj_key_);
-            VirtualStore::DownloadObject(read_path, result.obj_addr_.obj_key_);
-            if(VirtualStore::Exists(read_path)){
-                LOG_TRACE(fmt::format("GetObjCache download object {}", read_path));
-                obj_stat->cached_ = true;
-            }
+        String read_path = GetObjPath(result.obj_addr_.obj_key_);
+        if(!VirtualStore::Exists(read_path)){
+            obj_stat->cached_ = false;
+            result.cached_ = false;
+            result.obj_stat_ = obj_stat;
+        } else {
+            result.cached_ = true;
         }
-        result.cached_ = obj_stat->cached_;
     } else {
         if (it->second.obj_key_ != current_object_key_) {
             String error_message = fmt::format("GetObjCache object {} not found", it->second.obj_key_);

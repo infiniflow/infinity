@@ -238,6 +238,9 @@ void BufferObj::UnloadInner() {
             --rc_;
             if (rc_ == 0) {
                 buffer_mgr_->PushGCQueue(this);
+                if (file_worker_->GetData() == nullptr) {
+                    UnrecoverableError("error");
+                }
                 status_ = BufferStatus::kUnloaded;
             }
             break;

@@ -53,14 +53,14 @@ export struct NodeInfo {
 
 export class PeerTask {
 public:
-    explicit PeerTask(PeerTaskType type, bool async = false) : type_(type), async_(async) {}
+    explicit PeerTask(PeerTaskType type, bool async = false) : type_(type), async_(async), complete_(false) //complete_ should not be assigned false in wait(), otherwise it might be stuck in wait() forever if complete() is called before wait().
+    {}
     virtual ~PeerTask() = default;
 
     void Wait() {
         if (async_) {
             return;
         }
-        complete_ = false;
         std::unique_lock<std::mutex> locker(mutex_);
         cv_.wait(locker, [this] { return complete_; });
     }
@@ -82,8 +82,8 @@ protected:
     PeerTaskType type_{PeerTaskType::kInvalid};
     mutable std::mutex mutex_{};
     std::condition_variable cv_{};
-    bool complete_{false};
     bool async_{false};
+    bool complete_{false};
 };
 
 export class TerminatePeerTask final : public PeerTask {

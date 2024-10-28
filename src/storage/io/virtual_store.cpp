@@ -34,6 +34,7 @@ import stream_reader;
 import s3_client_minio;
 import infinity_context;
 import object_storage_task;
+import admin_statement;
 
 namespace infinity {
 
@@ -448,11 +449,14 @@ Status VirtualStore::InitRemoteStore(StorageType storage_type,
     }
 
     bucket_ = bucket;
-    if (s3_client_->BucketExists(bucket)) {
-        return Status::OK();
-    } else {
-        return s3_client_->MakeBucket(bucket);
+    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader or InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
+        if (s3_client_->BucketExists(bucket)) {
+            return Status::OK();
+        } else {
+            return s3_client_->MakeBucket(bucket);
+        }
     }
+    return Status::OK();
 }
 
 Status VirtualStore::UnInitRemoteStore() {

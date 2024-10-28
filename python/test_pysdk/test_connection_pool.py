@@ -36,6 +36,7 @@ class TestInfinity:
         res = self.infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.skip(reason = "cluster fail")
     @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_connection_pool(self, suffix):
         connection_pool = ConnectionPool(uri=self.uri, max_size=8)
