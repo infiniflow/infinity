@@ -3994,16 +3994,26 @@ public:
         auto result = infinity->AdminShowCurrentNode();
 
         nlohmann::json json_response;
+        nlohmann::json node_info;
         HTTPStatus http_status;
 
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-            Value value = data_block->GetValue(1, 1);
-            const String &variable_value = value.ToString();
-            json_response["role"] = variable_value;
-
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+                    // variable name
+                    const String &attrib_name = data_block->GetValue(0, row).ToString();
+                    // variable value
+                    const String &attrib_value = data_block->GetValue(1, row).ToString();
+                    node_info[attrib_name] = attrib_value;
+                }
+            }
             http_status = HTTPStatus::CODE_200;
+            json_response["error_code"] = ErrorCode::kOk;
+            json_response["node"] = node_info;
+
         } else {
             json_response["error_code"] = result.ErrorCode();
             json_response["error_message"] = result.ErrorMsg();
@@ -4020,22 +4030,31 @@ public:
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
         nlohmann::json json_response;
+        nlohmann::json node_info;
         HTTPStatus http_status;
 
         String node_name = request->getPathVariable("node_name");
         QueryResult result = infinity->AdminShowNode(node_name);
 
         if (result.IsOk()) {
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-            Value value = data_block->GetValue(1, 1);
-            const String &node_role = value.ToString();
-
-            json_response["error_code"] = ErrorCode::kOk;
-            json_response["role"] = node_role;
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+                    // variable name
+                    const String &attrib_name = data_block->GetValue(0, row).ToString();
+                    // variable value
+                    const String &attrib_value = data_block->GetValue(1, row).ToString();
+                    node_info[attrib_name] = attrib_value;
+                }
+            }
             http_status = HTTPStatus::CODE_200;
+            json_response["node"] = node_info;
+            json_response["error_code"] = ErrorCode::kOk;
         } else {
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_msg"] = result.ErrorMsg();
+            json_response["error_message"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
 
@@ -4060,9 +4079,32 @@ public:
                 DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
                 for (int row = 0; row < row_count; ++row) {
-                    String node_name = data_block->GetValue(0, row).ToString();
-                    String node_role = data_block->GetValue(1, row).ToString();
-                    nodes_json.push_back({node_name, node_role});
+                    nlohmann::json node_json;
+                    {
+                        String node_name = data_block->GetValue(0, row).ToString();
+                        node_json["name"] = node_name;
+                    }
+                    {
+                        String node_role = data_block->GetValue(1, row).ToString();
+                        node_json["role"] = node_role;
+                    }
+                    {
+                        String node_status = data_block->GetValue(2, row).ToString();
+                        node_json["status"] = node_status;
+                    }
+                    {
+                        String node_address = data_block->GetValue(3, row).ToString();
+                        node_json["address"] = node_address;
+                    }
+                    {
+                        String last_update = data_block->GetValue(4, row).ToString();
+                        node_json["last_update"] = last_update;
+                    }
+                    {
+                        String heartbeat = data_block->GetValue(5, row).ToString();
+                        node_json["heartbeat"] = heartbeat;
+                    }
+                    nodes_json.push_back(node_json);
                 }
             }
             http_status = HTTPStatus::CODE_200;
