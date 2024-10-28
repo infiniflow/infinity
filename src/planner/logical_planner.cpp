@@ -211,7 +211,9 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 
     // check
     const auto row_count = statement->insert_rows_.size();
-    if (row_count > INSERT_BATCH_ROW_LIMIT) {
+    if (row_count == 0) {
+        RecoverableError(Status::NotSupport("No insert batch row found!"));
+    } else if (row_count > INSERT_BATCH_ROW_LIMIT) {
         RecoverableError(Status::NotSupport("Insert batch row limit shouldn't more than 8192."));
     }
 
@@ -223,18 +225,6 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         if ((!insert_row->columns_.empty()) && insert_row->columns_.size() != insert_row->values_.size()) {
             RecoverableError(Status::SyntaxError("INSERT: Input column name count mismatch with value count."));
         }
-        // Vector<SharedPtr<BaseExpression>> value_list;
-        // value_list.reserve(expr_count);
-        // for (SizeT expr_idx = 0; expr_idx < expr_count; ++expr_idx) {
-        //     const auto *parsed_expr = (*parsed_expr_list)[expr_idx];
-        //     if (parsed_expr == nullptr) {
-        //         RecoverableError(Status::SyntaxError("INSERT: Input value count mismatch across rows."));
-        //     }
-        //     SharedPtr<BaseExpression> value_expr =
-        //         bind_context_ptr->expression_binder_->BuildExpression(*parsed_expr, bind_context_ptr.get(), 0, true);
-        //     value_list.emplace_back(std::move(value_expr));
-        // }
-        // value_list_array.push_back(std::move(value_list));
     }
 
     // Create value list
