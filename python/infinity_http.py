@@ -801,8 +801,9 @@ class table_http_result(table_http):
 
 
 class database_result():
-    def __init__(self, list=[], error_code=ErrorCode.OK, columns=[], index_list=[]):
+    def __init__(self, list=[], database_name: str="", error_code=ErrorCode.OK, columns=[], index_list=[]):
         self.db_names = list
+        self.database_name = database_name  # get database
         self.error_code = error_code
         self.columns = columns
         self.index_list = index_list
