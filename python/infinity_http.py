@@ -15,17 +15,13 @@ from infinity.table import ExplainType
 from datetime import date, time, datetime
 from typing import List
 
+class infinity_http_network:
+    header_dict = baseHeader
+    response_dict = baseResponse
+    data_dict = baseData
 
-class infinity_http:
     def __init__(self, url: str = default_url):
         self.base_url = url
-        self.header_dict = baseHeader
-        self.response_dict = baseResponse
-        self.data_dict = baseData
-
-    def disconnect(self):
-        print("disconnect")
-        return database_result(error_code=ErrorCode.OK)
 
     def set_up_header(self, param=[], tp={}):
         header = {}
@@ -101,7 +97,7 @@ class infinity_http:
 
         logging.debug("----------------------------------------------")
         return
-
+    
     def get_database_result(self, resp, expect={}):
         try:
             self.raise_exception(resp, expect)
@@ -109,15 +105,22 @@ class infinity_http:
         except InfinityException as e:
             print(e)
             return database_result(error_code=e.error_code)
-        
+
+class infinity_http(infinity_http_network):
+    def __init__(self, url: str = default_url):
+        super().__init__(url)
+
+    def disconnect(self):
+        print("disconnect")
+        return database_result()
+
     def set_role_standalone(self, node_name):
         url = f"admin/node/current"
         h = self.set_up_header(["accept", "content-type"])
         d = self.set_up_data([], {"role": "standalone", "name": node_name})
         r = self.request(url, "post", h, d)
         self.raise_exception(r)
-        return database_result()
-        
+
     def set_role_leader(self, node_name):
         url = f"admin/node/current"
         h = self.set_up_header(["accept", "content-type"])
@@ -125,7 +128,7 @@ class infinity_http:
         r = self.request(url, "post", h, d)
         self.raise_exception(r)
         return database_result()
-    
+
     def set_role_follower(self, node_name, leader_addr):
         url = f"admin/node/current"
         h = self.set_up_header(["accept", "content-type"])
@@ -183,7 +186,7 @@ class infinity_http:
         r = self.request(url, "get", h, {})
         try:
             self.raise_exception(r)
-            return database_result(database_name=r.json()["database_name"])
+            return database_http(self, database_name=r.json()["database_name"])
         except:
             raise InfinityException(ErrorCode.DB_NOT_EXIST)
 
@@ -200,6 +203,15 @@ class infinity_http:
         r = self.request(url, "get", h, {})
         self.raise_exception(r)
         return database_result(database_name=r.json()["database_name"])
+
+
+####################3####################3####################3####################3####################3####################3####################3####################3
+
+class database_http(infinity_http_network):
+    def __init__(self, network_util: infinity_http_network, database_name: str):
+        super().__init__(network_util.base_url)
+        self.database_name = database_name
+        self._db_name = database_name
 
     # table
     def create_table(
@@ -238,7 +250,7 @@ class infinity_http:
         r = self.request(url, "post", h, d)
         self.raise_exception(r)
         self.table_name = table_name
-        return database_result(database_name=self.database_name, table_name=self.table_name)
+        return table_http(self, self.database_name, table_name)
 
     def drop_table(
             self,
@@ -256,14 +268,14 @@ class infinity_http:
         d = self.set_up_data(["drop_option"], {"drop_option": copt})
         r = self.request(url, "delete", h, d)
         self.raise_exception(r)
-        return self
+        return database_result()
 
     def list_tables(self):
         url = f"databases/{self.database_name}/tables"
         h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.raise_exception(r)
-        return self
+        return database_result()
 
     def show_table(self, table_name):
         check_valid_name(table_name)
@@ -271,8 +283,7 @@ class infinity_http:
         h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.raise_exception(r)
-        self.table_name = table_name
-        return database_result(database_name=self.database_name, table_name=self.table_name)
+        # self.table_name = table_name
 
     def get_all_tables(self):
         url = f"databases/{self.database_name}/tables"
@@ -289,7 +300,24 @@ class infinity_http:
         return ret
 
     def get_table(self, table_name):
-        return self.show_table(table_name)
+        check_valid_name(table_name)
+        url = f"databases/{self.database_name}/tables/{table_name}"
+        h = self.set_up_header(["accept"])
+        r = self.request(url, "get", h)
+        self.raise_exception(r)
+        return table_http(self, self.database_name, table_name)
+    
+    # not implemented, just to pass test
+    def show_tables(self):
+        self.get_all_tables()
+        return database_result(columns=["database", "table", "type", "column_count", "block_count", "block_capacity",
+                                        "segment_count", "segment_capacity", "comment"])
+    
+class table_http(infinity_http_network):
+    def __init__(self, network_util: infinity_http_network, database_name: str, table_name: str):
+        super().__init__(network_util.base_url)
+        self.database_name = database_name
+        self.table_name = table_name
 
     def show_columns(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
@@ -315,12 +343,6 @@ class infinity_http:
         for col in r.json()["columns"]:
             res[col["name"]] = col["type"]
         return res
-
-    # not implemented, just to pass test
-    def show_tables(self):
-        self.get_all_tables()
-        return database_result(columns=["database", "table", "type", "column_count", "block_count", "block_capacity",
-                                        "segment_count", "segment_capacity", "comment"])
 
     # index
     def create_index(
@@ -356,7 +378,7 @@ class infinity_http:
         )
         r = self.request(url, "post", h, d)
         self.raise_exception(r)
-        return self
+        return database_result()
 
     def drop_index(
             self,
@@ -375,14 +397,14 @@ class infinity_http:
         d = self.set_up_data([], {"drop_option": copt})
         r = self.request(url, "delete", h, d)
         self.raise_exception(r)
-        return self
+        return database_result()
 
     def show_index(self, index_name):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
         h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.raise_exception(r)
-        return self
+        return database_result()
 
     def list_indexes(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes"
@@ -395,8 +417,7 @@ class infinity_http:
         if exists is not None:
             for t in r_json["tables"]:
                 index_list.append(t)
-        self.index_list = index_list
-        return self
+        return database_result(index_list=index_list)
 
     def optimize(self, index_name="", optimize_options={}):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
@@ -406,7 +427,7 @@ class infinity_http:
         opt_opt = {"optimize_options": optimize_options}
         r = self.request(url, "put", h, opt_opt)
         self.raise_exception(r)
-        return self
+        return database_result()
 
     def insert(self, values=[]):
         if isinstance(values, list):
@@ -431,7 +452,7 @@ class infinity_http:
         h = self.set_up_header(["accept", "content-type"])
         r = self.request(url, "post", h, values)
         self.raise_exception(r)
-        return self
+        return database_result()
 
     def import_data(self, data_path="/home/infiniflow/Documents/development/infinity/test/data/csv/pysdk_test.csv",
                     import_options={}):
@@ -453,7 +474,7 @@ class infinity_http:
         d = self.set_up_data([], data)
         r = self.request(url, "put", h, d)
         self.raise_exception(r)
-        return self
+        return database_result()
 
     def export_data(self, data_path="", export_options={}, columns=[]):
         data = {}
@@ -481,69 +502,7 @@ class infinity_http:
         d = self.set_up_data([], data)
         r = self.request(url, "get", h, d)
         self.raise_exception(r)
-        return self
-
-    def select(self):
-        url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
-        h = self.set_up_header(["accept", "content-type"])
-        tmp = {}
-        if len(self._filter):
-            tmp.update({"filter": self._filter})
-        if len(self._search_exprs):
-            tmp.update({"search": self._search_exprs})
-        if len(self._output):
-            tmp.update({"output": self._output})
-        if len(self._highlight):
-            tmp.update({"highlight": self._highlight})
-        if len(self._sort):
-            tmp.update({"sort": self._sort})
-        # print(tmp)
-        d = self.set_up_data([], tmp)
-        r = self.request(url, "get", h, d)
-        self.raise_exception(r)
-        # print(r.json())
-        if "output" in r.json():
-            self.output_res = r.json()["output"]
-        else:
-            self.output_res = []
-        return self
-
-    def explain(self, ExplainType=ExplainType.Physical):
-        url = f"databases/{self.database_name}/tables/{self.table_name}/meta"
-        h = self.set_up_header(["accept", "content-type"])
-        tmp = {}
-        if len(self._filter):
-            tmp.update({"filter": self._filter})
-        if len(self._fusion):
-            tmp.update({"fusion": self._fusion})
-        if len(self._knn):
-            tmp.update({"knn": self._knn})
-        if len(self._match):
-            tmp.update({"match": self._match})
-        if len(self._match_tensor):
-            tmp.update({"match_tensor": self._match_tensor})
-        if len(self._match_sparse):
-            tmp.update({"match_sparse": self._match_sparse})
-        if len(self._output):
-            tmp.update({"output": self._output})
-        if len(self._highlight):
-            tmp.update({"highlight": self._highlight})
-        tmp.update({"explain_type": ExplainType_transfrom(ExplainType)})
-        # print(tmp)
-        d = self.set_up_data([], tmp)
-        r = self.request(url, "get", h, d)
-        self.raise_exception(r)
-        message = ""
-        sign = 0
-        for res in r.json()["output"]:
-            for k in res:
-                if sign == 0:
-                    message = message + k + "\n"
-                    message = message + res[k] + "\n"
-                    sign = 1
-                else:
-                    message = message + res[k] + "\n"
-        return message
+        return database_result()
 
     def add_columns(self, columns_definition={}):
         url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
@@ -571,13 +530,101 @@ class infinity_http:
             self,
             output=[],
     ):
+        return table_http_result(output, self)
+    
+    def delete(self, filter=""):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data([], {"filter": filter})
+        r = self.request(url, "delete", h, d)
+        self.raise_exception(r)
+        return database_result()
+
+    def update(self, filter_str: str, update: dict[str, Any]):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data([], {"update": update, "filter": filter_str})
+        r = self.request(url, "put", h, d)
+        self.raise_exception(r)
+        return database_result()
+
+class table_http_result(table_http):
+    def __init__(self, output: list, table_http: table_http):
+        super().__init__(table_http, table_http.database_name, table_http.table_name)
+
         self.output_res = []
         self._output = output
         self._highlight = []
         self._filter = ""
+        self._fusion = []
+        self._knn = []
+        self._match = []
+        self._match_tensor = []
+        self._match_sparse = []
         self._search_exprs = []
         self._sort = []
+
+    def select(self):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
+        h = self.set_up_header(["accept", "content-type"])
+        tmp = {}
+        if len(self._filter):
+            tmp["filter"] = self._filter
+        if len(self._search_exprs):
+            tmp["search"] = self._search_exprs
+        if len(self._output):
+            tmp["output"] = self._output
+        if len(self._highlight):
+            tmp["highlight"] = self._highlight
+        if len(self._sort):
+            tmp["sort"] = self._sort
+        # print(tmp)
+        d = self.set_up_data([], tmp)
+        r = self.request(url, "get", h, d)
+        self.raise_exception(r)
+        # print(r.json())
+        if "output" in r.json():
+            self.output_res = r.json()["output"]
+        else:
+            self.output_res = []
         return self
+
+    def explain(self, ExplainType=ExplainType.Physical):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/meta"
+        h = self.set_up_header(["accept", "content-type"])
+        tmp = {}
+        if len(self._filter):
+            tmp["filter"] = self._filter
+        if len(self._fusion):
+            tmp["fusion"] = self._fusion
+        if len(self._knn):
+            tmp["knn"] = self._knn
+        if len(self._match):
+            tmp["match"] = self._match
+        if len(self._match_tensor):
+            tmp["match_tensor"] = self._match_tensor
+        if len(self._match_sparse):
+            tmp["match_sparse"] = self._match_sparse
+        if len(self._output):
+            tmp["output"] = self._output
+        if len(self._highlight):
+            tmp["highlight"] = self._highlight
+        tmp["explain_type"] = ExplainType_transfrom(ExplainType)
+        # print(tmp)
+        d = self.set_up_data([], tmp)
+        r = self.request(url, "get", h, d)
+        self.raise_exception(r)
+        message = ""
+        sign = 0
+        for res in r.json()["output"]:
+            for k in res:
+                if sign == 0:
+                    message = message + k + "\n"
+                    message = message + res[k] + "\n"
+                    sign = 1
+                else:
+                    message = message + res[k] + "\n"
+        return message
 
     def highlight(
             self,
@@ -752,44 +799,13 @@ class infinity_http:
     def to_arrow(self):
         return pa.Table.from_pandas(self.to_df())
 
-    def delete(self, filter=""):
-        url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data([], {"filter": filter})
-        r = self.request(url, "delete", h, d)
-        self.raise_exception(r)
-        return self
 
-    def update(self, filter_str: str, update: dict[str, Any]):
-        url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data([], {"update": update, "filter": filter_str})
-        r = self.request(url, "put", h, d)
-        self.raise_exception(r)
-        return self
-
-
-class database_result(infinity_http):
-    def __init__(self, url: str = default_url, list=[], error_code=ErrorCode.OK, database_name="", columns=[], table_name="",
-                 index_list=[], output=["*"], filter="", fusion=[], knn={}, match={}, match_tensor={}, match_sparse={},
-                 sort=[], output_res=[]):
-        super().__init__(url)
+class database_result():
+    def __init__(self, list=[], error_code=ErrorCode.OK, columns=[], index_list=[]):
         self.db_names = list
         self.error_code = error_code
-        self.database_name = database_name  # get database
-        self._db_name = database_name
         self.columns = columns
-        self.table_name = table_name
         self.index_list = index_list
-        self._output = output
-        self._filter = filter
-        self._fusion = fusion
-        self._knn = knn
-        self._match = match
-        self._match_tensor = match_tensor
-        self._match_sparse = match_sparse
-        self._sort = sort
-        self.output_res = output_res
 
 
 identifier_limit = 65536
