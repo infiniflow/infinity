@@ -323,8 +323,10 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
-                wal_mgr_->Stop();
-                wal_mgr_.reset();
+                if(wal_mgr_ != nullptr) {
+                    wal_mgr_->Stop();
+                    wal_mgr_.reset();
+                }
 
                 switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
@@ -332,9 +334,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                         break;
                     }
                     case StorageType::kMinio: {
-                        object_storage_processor_->Stop();
-                        object_storage_processor_.reset();
-                        VirtualStore::UnInitRemoteStore();
+                        if(object_storage_processor_ != nullptr) {
+                            object_storage_processor_->Stop();
+                            object_storage_processor_.reset();
+                            VirtualStore::UnInitRemoteStore();
+                        }
                         break;
                     }
                     default: {
@@ -350,8 +354,10 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     txn_mgr_.reset();
                 }
 
-                buffer_mgr_->Stop();
-                buffer_mgr_.reset();
+                if(buffer_mgr_ != nullptr) {
+                    buffer_mgr_->Stop();
+                    buffer_mgr_.reset();
+                }
 
                 persistence_manager_.reset();
 
@@ -403,21 +409,30 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             }
 
             if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
-                periodic_trigger_thread_->Stop();
-                periodic_trigger_thread_.reset();
 
-                compact_processor_->Stop(); // Different from Readable
-                compact_processor_.reset(); // Different from Readable
+                if(periodic_trigger_thread_ != nullptr) {
+                    periodic_trigger_thread_->Stop();
+                    periodic_trigger_thread_.reset();
+                }
 
-                bg_processor_->Stop();
-                bg_processor_.reset();
+                if(compact_processor_ != nullptr) {
+                    compact_processor_->Stop(); // Different from Readable
+                    compact_processor_.reset(); // Different from Readable
+                }
+
+                if(bg_processor_ != nullptr) {
+                    bg_processor_->Stop();
+                    bg_processor_.reset();
+                }
 
                 new_catalog_.reset();
 
                 memory_index_tracer_.reset();
 
-                wal_mgr_->Stop();
-                wal_mgr_.reset();
+                if(wal_mgr_ != nullptr) {
+                    wal_mgr_->Stop();
+                    wal_mgr_.reset();
+                }
 
                 switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
@@ -425,9 +440,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                         break;
                     }
                     case StorageType::kMinio: {
-                        object_storage_processor_->Stop();
-                        object_storage_processor_.reset();
-                        VirtualStore::UnInitRemoteStore();
+                        if(object_storage_processor_ != nullptr) {
+                            object_storage_processor_->Stop();
+                            object_storage_processor_.reset();
+                            VirtualStore::UnInitRemoteStore();
+                        }
                         break;
                     }
                     default: {
@@ -435,11 +452,15 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     }
                 }
 
-                txn_mgr_->Stop();
-                txn_mgr_.reset();
+                if(txn_mgr_ != nullptr) {
+                    txn_mgr_->Stop();
+                    txn_mgr_.reset();
+                }
 
-                buffer_mgr_->Stop();
-                buffer_mgr_.reset();
+                if(buffer_mgr_ != nullptr) {
+                    buffer_mgr_->Stop();
+                    buffer_mgr_.reset();
+                }
 
                 persistence_manager_.reset();
 
@@ -455,11 +476,15 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             }
 
             if (target_mode == StorageMode::kReadable) {
-                periodic_trigger_thread_->Stop();
-                periodic_trigger_thread_.reset();
+                if(periodic_trigger_thread_ != nullptr) {
+                    periodic_trigger_thread_->Stop();
+                    periodic_trigger_thread_.reset();
+                }
 
-                compact_processor_->Stop();
-                compact_processor_.reset();
+                if(compact_processor_ != nullptr) {
+                    compact_processor_->Stop(); // Different from Readable
+                    compact_processor_.reset(); // Different from Readable
+                }
 
                 i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
 

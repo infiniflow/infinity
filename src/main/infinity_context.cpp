@@ -187,8 +187,11 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     storage_->SetStorageMode(StorageMode::kAdmin);
                     RestoreIndexThreadPoolToDefault();
 
-                    task_scheduler_->UnInit();
-                    task_scheduler_.reset();
+                    if(task_scheduler_ != nullptr) {
+                        task_scheduler_->UnInit();
+                        task_scheduler_.reset();
+                    }
+
                     SetServerRole(NodeRole::kAdmin);
                     break;
                 }
@@ -215,8 +218,10 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     storage_->SetStorageMode(StorageMode::kAdmin);
                     RestoreIndexThreadPoolToDefault();
 
-                    task_scheduler_->UnInit();
-                    task_scheduler_.reset();
+                    if(task_scheduler_ != nullptr) {
+                        task_scheduler_->UnInit();
+                        task_scheduler_.reset();
+                    }
                     SetServerRole(NodeRole::kAdmin);
                     break;
                 }
@@ -281,8 +286,10 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     storage_->SetStorageMode(StorageMode::kAdmin);
                     RestoreIndexThreadPoolToDefault();
 
-                    task_scheduler_->UnInit();
-                    task_scheduler_.reset();
+                    if(task_scheduler_ != nullptr) {
+                        task_scheduler_->UnInit();
+                        task_scheduler_.reset();
+                    }
 
                     SetServerRole(NodeRole::kAdmin);
                     break;
