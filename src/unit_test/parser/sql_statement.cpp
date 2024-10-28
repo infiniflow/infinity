@@ -143,11 +143,11 @@ TEST_F(StatementParsingTest, good_test1) {
             auto *insert_statement = (InsertStatement *)(statement);
             EXPECT_EQ(insert_statement->table_name_, "t1");
             EXPECT_EQ(insert_statement->schema_name_, "");
-            EXPECT_EQ(insert_statement->values_->size(), 1u);
+            EXPECT_EQ(insert_statement->insert_rows_.size(), 1u);
 
-            ConstantExpr *insert0_expr = (ConstantExpr *)(*insert_statement->values_->at(0))[0];
+            ConstantExpr *insert0_expr = (ConstantExpr *)(insert_statement->insert_rows_.at(0)->values_[0].get());
             EXPECT_STREQ(insert0_expr->str_value_, "abc");
-            ConstantExpr *insert1_expr = (ConstantExpr *)(*insert_statement->values_->at(0))[1];
+            ConstantExpr *insert1_expr = (ConstantExpr *)(insert_statement->insert_rows_.at(0)->values_[1].get());
             EXPECT_EQ(insert1_expr->integer_value_, 333);
         }
 
@@ -166,16 +166,16 @@ TEST_F(StatementParsingTest, good_test1) {
             auto *insert_statement = (InsertStatement *)(statement);
             EXPECT_EQ(insert_statement->table_name_, "t1");
             EXPECT_EQ(insert_statement->schema_name_, "");
-            EXPECT_EQ(insert_statement->values_->size(), 2u);
+            EXPECT_EQ(insert_statement->insert_rows_.size(), 2u);
 
-            ConstantExpr *insert0_expr = (ConstantExpr *)(*insert_statement->values_->at(0))[0];
+            ConstantExpr *insert0_expr = (ConstantExpr *)(insert_statement->insert_rows_.at(0)->values_[0].get());
             EXPECT_STREQ(insert0_expr->str_value_, "abc");
-            ConstantExpr *insert1_expr = (ConstantExpr *)(*insert_statement->values_->at(0))[1];
+            ConstantExpr *insert1_expr = (ConstantExpr *)(insert_statement->insert_rows_.at(0)->values_[1].get());
             EXPECT_EQ(insert1_expr->integer_value_, 333);
 
-            ConstantExpr *insert2_expr = (ConstantExpr *)(*insert_statement->values_->at(1))[0];
+            ConstantExpr *insert2_expr = (ConstantExpr *)(insert_statement->insert_rows_.at(1)->values_[0].get());
             EXPECT_STREQ(insert2_expr->str_value_, "def");
-            ConstantExpr *insert3_expr = (ConstantExpr *)(*insert_statement->values_->at(1))[1];
+            ConstantExpr *insert3_expr = (ConstantExpr *)(insert_statement->insert_rows_.at(1)->values_[1].get());
             EXPECT_EQ(insert3_expr->integer_value_, 444);
         }
 

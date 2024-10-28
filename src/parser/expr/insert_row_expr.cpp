@@ -12,35 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "insert_statement.h"
+#include "insert_row_expr.h"
+#include <sstream>
 
 namespace infinity {
 
-InsertStatement::~InsertStatement() {
-    if (select_ != nullptr) {
-        delete select_;
-        select_ = nullptr;
-    }
-
-    if (columns_ != nullptr) {
-        delete columns_;
-        columns_ = nullptr;
-    }
-
-    if (values_ != nullptr) {
-        for(auto& value_array: *values_) {
-            for(auto& value_ptr: *value_array) {
-                delete value_ptr;
-                value_ptr = nullptr;
-            }
-            delete value_array;
-            value_array = nullptr;
+std::string InsertRowExpr::ToString() const {
+    std::ostringstream oss;
+    oss << "InsertRowExpr(columns: [";
+    for (size_t i = 0; i < columns_.size(); ++i) {
+        if (i > 0) {
+            oss << ", ";
         }
-        delete values_;
-        values_ = nullptr;
+        oss << columns_[i];
     }
+    oss << "], values: [";
+    for (size_t i = 0; i < values_.size(); ++i) {
+        if (i > 0) {
+            oss << ", ";
+        }
+        oss << values_[i]->ToString();
+    }
+    oss << "])";
+    return std::move(oss).str();
 }
-
-std::string InsertStatement::ToString() const { return "insert statement"; }
 
 } // namespace infinity

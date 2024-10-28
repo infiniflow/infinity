@@ -27,6 +27,7 @@ import infinity_context;
 import session;
 import parsed_expr;
 import search_expr;
+import insert_row_expr;
 import column_def;
 import create_index_info;
 import update_statement;
@@ -157,7 +158,7 @@ public:
     QueryResult ShowMemoryAllocations();
     QueryResult ShowFunction(const String &function_name);
 
-    QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
+    QueryResult Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *insert_rows);
 
     QueryResult Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
 

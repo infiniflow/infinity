@@ -194,7 +194,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     def test_insert_multi_column(self, suffix):
-        with pytest.raises(Exception, match=r".*value count mismatch*"):
+        with pytest.raises(Exception, match=r".*No default value found*"):
             db_obj = self.infinity_obj.get_database("default_db")
             db_obj.drop_table("test_insert_multi_column"+suffix,
                               conflict_type=ConflictType.Ignore)
