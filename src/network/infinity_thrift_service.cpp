@@ -49,6 +49,7 @@ import match_tensor_expr;
 import match_expr;
 import fusion_expr;
 import parsed_expr;
+import insert_row_expr;
 import update_statement;
 import search_expr;
 import explain_statement;
@@ -292,59 +293,35 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
         return;
     }
 
-    auto columns = new Vector<String>();
-    columns->reserve(request.column_names.size());
-    for (auto &column : request.column_names) {
-        columns->emplace_back(column);
-    }
-
     Status constant_status;
 
-    Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
-    values->reserve(request.fields.size());
-    for (auto &value : request.fields) {
-        auto value_list = new Vector<ParsedExpr *>();
-        value_list->reserve(value.parse_exprs.size());
-        for (auto &expr : value.parse_exprs) {
-            auto parsed_expr = GetConstantFromProto(constant_status, *expr.type.constant_expr);
+    auto insert_rows = new Vector<InsertRowExpr *>();
+    DeferFn delete_insert_rows([&insert_rows] {
+        if (insert_rows) {
+            for (auto *insert_row : *insert_rows) {
+                delete insert_row;
+            }
+            delete insert_rows;
+            insert_rows = nullptr;
+        }
+    });
+    insert_rows->reserve(request.fields.size());
+    for (auto &field : request.fields) {
+        auto insert_row = std::make_unique<InsertRowExpr>();
+        insert_row->columns_ = std::move(field.column_names);
+        insert_row->values_.reserve(field.parse_exprs.size());
+        for (auto &expr : field.parse_exprs) {
+            auto parsed_expr = std::unique_ptr<ConstantExpr>(GetConstantFromProto(constant_status, *expr.type.constant_expr));
             if (!constant_status.ok()) {
-                // Free values memory
-                if (values != nullptr) {
-                    for (auto &value_array : *values) {
-                        for (auto &value_ptr : *value_array) {
-                            delete value_ptr;
-                            value_ptr = nullptr;
-                        }
-                        delete value_array;
-                        value_array = nullptr;
-                    }
-                    delete values;
-                    values = nullptr;
-                }
-                // Free current value list memory
-                if (value_list != nullptr) {
-                    for (auto &value_ptr : *value_list) {
-                        delete value_ptr;
-                        value_ptr = nullptr;
-                    }
-                    delete value_list;
-                    value_list = nullptr;
-                }
-
-                if (parsed_expr != nullptr) {
-                    delete parsed_expr;
-                    parsed_expr = nullptr;
-                }
-
                 ProcessStatus(response, constant_status);
                 return;
             }
-            value_list->emplace_back(parsed_expr);
+            insert_row->values_.emplace_back(parsed_expr.release());
         }
-        values->emplace_back(value_list);
+        insert_rows->emplace_back(insert_row.release());
     }
-
-    auto result = infinity->Insert(request.db_name, request.table_name, columns, values);
+    auto result = infinity->Insert(request.db_name, request.table_name, insert_rows);
+    insert_rows = nullptr;
     ProcessQueryResult(response, result);
 }
 
