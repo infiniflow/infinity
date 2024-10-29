@@ -118,17 +118,17 @@ SELECT *, truncate(c2, 1), truncate(c1, 0) FROM test_math;
 9 10.111000 3.000000 10.100000
 16 15.555000 4.000000 15.500000
 
-query X III
+query XIII
 SELECT c2 FROM test_math WHERE truncate(c2, 1) = 3.7;
 ----
 4.000000
 
-query X IV
+query XIV
 SELECT c2 FROM test_math WHERE truncate(c2, 0) = 10;
 ----
 10.000000
 
-query X V
+query XV
 SELECT *, truncate(c1, -1) FROM test_math;
 ----
 1 4.000000 0.000000
