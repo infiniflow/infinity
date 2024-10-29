@@ -1,5 +1,5 @@
 [general]
-version                  = "0.4.0"
+version                  = "0.5.0"
 time_zone                = "utc-8"
 server_mode              = "cluster"
 
@@ -47,7 +47,7 @@ secret_key               = "minioadmin"
 enable_https             = false
 
 [buffer]
-buffer_manager_size      = "4GB"
+buffer_manager_size      = "8GB"
 lru_num                  = 7
 temp_dir                 = "/var/infinity/leader/tmp"
 result_cache_mode       = "on"
