@@ -37,6 +37,7 @@ import internal_types;
 import third_party;
 import segment_index_entry;
 import doc_iterator;
+import score_threshold_iterator;
 
 namespace infinity {
 
@@ -55,7 +56,8 @@ void AddToFulltextEvaluator(UniquePtr<IndexFilterEvaluatorFulltext> &target_full
         target_fulltext_evaluator = std::move(input);
     } else {
         if (target_fulltext_evaluator->HaveMinimumShouldMatchOption() || input->HaveMinimumShouldMatchOption() ||
-            (target_fulltext_evaluator->early_term_algo_ != input->early_term_algo_)) {
+            target_fulltext_evaluator->score_threshold_ > 0.0f || input->score_threshold_ > 0.0f ||
+            target_fulltext_evaluator->early_term_algo_ != input->early_term_algo_) {
             // put into others
             other_children_evaluators.push_back(std::move(input));
         } else {
@@ -472,8 +474,12 @@ Bitmask IndexFilterEvaluatorFulltext::Evaluate(const SegmentID segment_id, const
     result.SetAllFalse();
     const RowID begin_rowid(segment_id, 0);
     const RowID end_rowid(segment_id, segment_row_count);
-    if (const auto ft_iter = query_tree_->CreateSearch(table_entry_, index_reader_, early_term_algo_, minimum_should_match_);
-        ft_iter && ft_iter->Next(begin_rowid)) {
+    auto ft_iter = query_tree_->CreateSearch(table_entry_, index_reader_, early_term_algo_, minimum_should_match_);
+    if (ft_iter && score_threshold_ > 0.0f) {
+        auto new_ft_iter = MakeUnique<ScoreThresholdIterator>(std::move(ft_iter), score_threshold_);
+        ft_iter = std::move(new_ft_iter);
+    }
+    if (ft_iter && ft_iter->Next(begin_rowid)) {
         while (ft_iter->DocID() < end_rowid) {
             result.SetTrue(ft_iter->DocID().segment_offset_);
             ft_iter->Next();
@@ -506,10 +512,14 @@ Bitmask IndexFilterEvaluatorAND::Evaluate(const SegmentID segment_id, const Segm
             if (!fulltext_evaluator_->after_optimize_.test(std::memory_order_acquire)) {
                 UnrecoverableError(std::format("{}: Not optimized!", __func__));
             }
-            const auto ft_iter = fulltext_evaluator_->query_tree_->CreateSearch(fulltext_evaluator_->table_entry_,
-                                                                                fulltext_evaluator_->index_reader_,
-                                                                                fulltext_evaluator_->early_term_algo_,
-                                                                                fulltext_evaluator_->minimum_should_match_);
+            auto ft_iter = fulltext_evaluator_->query_tree_->CreateSearch(fulltext_evaluator_->table_entry_,
+                                                                          fulltext_evaluator_->index_reader_,
+                                                                          fulltext_evaluator_->early_term_algo_,
+                                                                          fulltext_evaluator_->minimum_should_match_);
+            if (ft_iter && fulltext_evaluator_->score_threshold_ > 0.0f) {
+                auto new_ft_iter = MakeUnique<ScoreThresholdIterator>(std::move(ft_iter), fulltext_evaluator_->score_threshold_);
+                ft_iter = std::move(new_ft_iter);
+            }
             if (ft_iter) {
                 const RowID end_rowid(segment_id, segment_row_count);
                 while (roaring_begin != roaring_end && ft_iter->Next(RowID(segment_id, *roaring_begin))) {

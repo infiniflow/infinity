@@ -102,6 +102,9 @@ SELECT COUNT(*) FROM simple_agg;
 ----
 3
 
+statement error
+SELECT COUNT() FROM simple_agg;
+
 
 statement ok
 DROP TABLE simple_agg;
