@@ -167,6 +167,7 @@ PROPERTIES      { return PROPERTIES; }
 QUERIES         { return QUERIES; }
 QUERY           { return QUERY; }
 REAL            { return REAL; }
+RECOVER         { return RECOVER; }
 RENAME          { return RENAME; }
 REMOVE          { return REMOVE; }
 RIGHT           { return RIGHT; }
@@ -181,6 +182,8 @@ SEGMENT         { return SEGMENT; }
 SEGMENTS        { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
+SNAPSHOT        { return SNAPSHOT; }
+SNAPSHOTS       { return SNAPSHOTS; }
 SPARSE          { return SPARSE; }
 STANDALONE      { return STANDALONE; }
 TABLE           { return TABLE; }
