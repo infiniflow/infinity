@@ -96,8 +96,8 @@ void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterRespons
 
 void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse &response, const infinity_peer_server::HeartBeatRequest &request) {
     LOG_DEBUG("Get HeartBeat request");
-    NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
-    if (leader_node->node_role_ == NodeRole::kLeader) {
+    NodeRole server_role = InfinityContext::instance().GetServerRole();
+    if (server_role == NodeRole::kLeader) {
         SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
         non_leader_node_info->node_name_ = request.node_name;
         switch (request.node_type) {
@@ -137,7 +137,7 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(leader_node->node_role_));
+        response.error_message = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(server_role));
     }
     return;
 }
