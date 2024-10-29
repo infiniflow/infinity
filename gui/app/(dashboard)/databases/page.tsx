@@ -5,9 +5,7 @@ import { listDatabase } from '../actions';
 import { DatabaseCard } from '../database-card';
 import { DatabaseCreatingDialog } from '../database-creating-dialog';
 
-export default async function HomePage({}: {
-  searchParams: { q: string; offset: string };
-}) {
+export default async function HomePage() {
   const ret = await listDatabase();
 
   return (

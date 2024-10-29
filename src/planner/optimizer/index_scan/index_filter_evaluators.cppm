@@ -92,16 +92,18 @@ export struct IndexFilterEvaluatorFulltext final : IndexFilterEvaluator {
     MinimumShouldMatchOption minimum_should_match_option_;
     u32 minimum_should_match_ = 0;
     std::atomic_flag after_optimize_ = {};
+    f32 score_threshold_ = {};
 
     IndexFilterEvaluatorFulltext(const FilterFulltextExpression *src_filter_fulltext_expression,
                                  const TableEntry *table_entry,
                                  const EarlyTermAlgo early_term_algo,
                                  IndexReader &&index_reader,
                                  UniquePtr<QueryNode> &&query_tree,
-                                 MinimumShouldMatchOption &&minimum_should_match_option)
+                                 MinimumShouldMatchOption &&minimum_should_match_option,
+                                 const f32 score_threshold)
         : IndexFilterEvaluator(Type::kFulltextIndex), src_filter_fulltext_expressions_({src_filter_fulltext_expression}), table_entry_(table_entry),
           early_term_algo_(early_term_algo), index_reader_(std::move(index_reader)), query_tree_(std::move(query_tree)),
-          minimum_should_match_option_(std::move(minimum_should_match_option)) {}
+          minimum_should_match_option_(std::move(minimum_should_match_option)), score_threshold_(score_threshold) {}
     Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count, Txn *txn) const override;
     bool HaveMinimumShouldMatchOption() const { return !minimum_should_match_option_.empty(); }
     void OptimizeQueryTree();

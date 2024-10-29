@@ -4,7 +4,7 @@ import { ITableIndex } from '@/lib/databse-interface';
 import { ColumnDef } from '@tanstack/react-table';
 import { useFetchTableIndexes } from 'app/(dashboard)/database/hooks';
 import { DataTable } from 'app/(dashboard)/database/infinity-table';
-import { DatabaseRouteParams } from 'app/(dashboard)/database/interface';
+import { PureDatabaseRouteParams } from 'app/(dashboard)/database/interface';
 
 export const columns: ColumnDef<ITableIndex>[] = [
   {
@@ -21,10 +21,7 @@ export const columns: ColumnDef<ITableIndex>[] = [
   }
 ];
 
-export function TableIndexes({
-  tableId,
-  databaseId
-}: DatabaseRouteParams['params']) {
+export function TableIndexes({ tableId, databaseId }: PureDatabaseRouteParams) {
   const { tableIndexes } = useFetchTableIndexes({ tableId, databaseId });
 
   return (
