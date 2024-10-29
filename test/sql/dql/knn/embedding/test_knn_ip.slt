@@ -35,6 +35,17 @@ SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3
 6 2 0.250000
 4 1 0.230000
 
+query II
+SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WITH (threshold = 0.24);
+----
+8 3 0.270000
+6 2 0.250000
+
+query II
+SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WITH (threshold = 0.26);
+----
+8 3 0.270000
+
 statement error
 SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 
