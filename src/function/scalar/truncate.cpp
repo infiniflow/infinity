@@ -1,5 +1,3 @@
-module;
-
 #include <cmath>
 #include <utility>
 
@@ -19,16 +17,16 @@ import logger;
 namespace infinity {
 
 struct TruncateFunction {
-    template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType value, int32_t decimals, TargetType &result) {
+    template <typename LeftType, typename RightType, typename OutputType>
+    static inline bool Run(LeftType value, RightType decimals, OutputType &result) {
         if (decimals > 0) {
             double scale = pow(10.0, decimals);
-            result = static_cast<TargetType>(std::trunc(value * scale) / scale);
+            result = static_cast<OutputType>(std::trunc(value * scale) / scale);
         } else if (decimals == 0) {
-            result = static_cast<TargetType>(std::trunc(value));
+            result = static_cast<OutputType>(std::trunc(value));
         } else {
             double scale = pow(10.0, -decimals);
-            result = static_cast<TargetType>(std::trunc(value / scale) * scale);
+            result = static_cast<OutputType>(std::trunc(value / scale) * scale);
         }
         return true;
     }
