@@ -543,6 +543,20 @@ UpdateExpr *WrapUpdateExpr::GetUpdateExpr(Status &status) {
     return update_expr;
 }
 
+InsertRowExpr *WrapInsertRowExpr::GetInsertRowExpr(Status &status) {
+    auto insert_row_expr = std::make_unique<InsertRowExpr>();
+    insert_row_expr->columns_ = std::move(columns);
+    insert_row_expr->values_.reserve(values.size());
+    for (auto &value : values) {
+        auto parsed_value_expr = std::unique_ptr<ParsedExpr>(value.GetParsedExpr(status));
+        if (status.code_ != ErrorCode::kOk) {
+            return nullptr;
+        }
+        insert_row_expr->values_.push_back(std::move(parsed_value_expr));
+    }
+    return insert_row_expr.release();
+}
+
 WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options, const String &comment) {
     auto query_result = instance.CreateDatabase(db_name, options, comment);
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
@@ -839,35 +853,31 @@ WrapQueryResult WrapShowBlockColumn(Infinity &instance,
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult
-WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<String> &columns, Vector<Vector<WrapConstantExpr>> &values) {
-    if (values.empty()) {
+WrapQueryResult WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<WrapInsertRowExpr> &insert_rows) {
+    if (insert_rows.empty()) {
         return WrapQueryResult(ErrorCode::kInsertWithoutValues, "insert values is empty");
     }
-    Vector<Vector<ParsedExpr *> *> *value_ptr = new Vector<Vector<ParsedExpr *> *>(values.size());
-    for (SizeT i = 0; i < values.size(); ++i) {
-        auto value_list = new Vector<ParsedExpr *>(values[i].size());
-        for (SizeT j = 0; j < values[i].size(); ++j) {
-            auto &wrap_constant_expr = values[i][j];
-            Status status;
-            (*value_list)[j] = wrap_constant_expr.GetParsedExpr(status);
-            if (status.code_ != ErrorCode::kOk) {
-                for (SizeT k = 0; k < i; ++k) {
-                    if ((*value_ptr)[k] != nullptr) {
-                        delete (*value_ptr)[k];
-                    }
-                }
-                if (value_list != nullptr) {
-                    delete value_list;
-                }
-                delete value_ptr;
-                return WrapQueryResult(status.code_, status.msg_->c_str());
+    auto insert_rows_ptr = new Vector<InsertRowExpr *>();
+    DeferFn delete_insert_rows([&insert_rows_ptr] {
+        if (insert_rows_ptr) {
+            for (auto *p : *insert_rows_ptr) {
+                delete p;
             }
+            delete insert_rows_ptr;
+            insert_rows_ptr = nullptr;
         }
-        (*value_ptr)[i] = value_list;
+    });
+    insert_rows_ptr->reserve(insert_rows.size());
+    for (auto &row_expr : insert_rows) {
+        Status status;
+        auto row_expr_ptr = std::unique_ptr<InsertRowExpr>(row_expr.GetInsertRowExpr(status));
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+        insert_rows_ptr->push_back(row_expr_ptr.release());
     }
-    Vector<String> *insert_columns = new Vector<String>(columns);
-    auto query_result = instance.Insert(db_name, table_name, insert_columns, value_ptr);
+    auto query_result = instance.Insert(db_name, table_name, insert_rows_ptr);
+    insert_rows_ptr = nullptr;
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

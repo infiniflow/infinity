@@ -278,7 +278,8 @@ struct ColumnDef {
 
 
 struct Field {
-1: list<ParsedExpr> parse_exprs = [],
+1: list<string> column_names = [],
+2: list<ParsedExpr> parse_exprs = [],
 }
 
 enum CopyFileType {
@@ -531,9 +532,8 @@ struct DropTableRequest {
 struct InsertRequest {
 1:  string db_name,
 2:  string table_name,
-3:  list<string> column_names = [],
-4:  list<Field> fields = [],
-5:  i64 session_id,
+3:  list<Field> fields = [],
+4:  i64 session_id,
 }
 
 struct ImportRequest{

@@ -100,7 +100,7 @@ public:
     // Getter
     const SharedPtr<String> &GetIndexName() const { return index_base_->index_name_; }
 
-    BaseMemIndex *GetMemIndex() const;
+    Vector<BaseMemIndex *> GetMemIndex() const;
 
     inline TableIndexMeta *table_index_meta() { return table_index_meta_; }
     inline const IndexBase *index_base() const { return index_base_.get(); }

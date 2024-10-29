@@ -402,6 +402,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
 
     // Check if it is count(*)
     if (function_set_ptr->name() == "COUNT") {
+        if (!expr.arguments_ || expr.arguments_->empty()) {
+            RecoverableError(Status::SyntaxError("No arguments for COUNT function found."));
+        }
         if (expr.arguments_->size() == 1) {
             if ((*expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
                 ColumnExpr *col_expr = (ColumnExpr *)(*expr.arguments_)[0];

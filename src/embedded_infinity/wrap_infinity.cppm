@@ -19,6 +19,7 @@ import infinity_context;
 import session;
 import parsed_expr;
 import search_expr;
+import insert_row_expr;
 import column_def;
 import create_index_info;
 import update_statement;
@@ -290,6 +291,13 @@ export struct WrapUpdateExpr {
     UpdateExpr *GetUpdateExpr(Status &status);
 };
 
+export struct WrapInsertRowExpr {
+    Vector<String> columns;
+    Vector<WrapConstantExpr> values;
+
+    InsertRowExpr *GetInsertRowExpr(Status &status);
+};
+
 export WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options, const String &comment);
 
 export WrapQueryResult WrapDropDatabase(Infinity &instance, const String &db_name, const DropDatabaseOptions &options);
@@ -376,8 +384,7 @@ export WrapQueryResult WrapShowBlockColumn(Infinity &instance,
                                            const BlockID &block_id,
                                            const SizeT &column_id);
 
-export WrapQueryResult
-WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<String> &columns, Vector<Vector<WrapConstantExpr>> &values);
+export WrapQueryResult WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<WrapInsertRowExpr> &insert_rows);
 
 export WrapQueryResult
 WrapImport(Infinity &instance, const String &db_name, const String &table_name, const String &path, ImportOptions import_options);

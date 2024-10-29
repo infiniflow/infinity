@@ -389,7 +389,7 @@ union SQLSTYPE
     infinity::ParsedExpr*             expr_t;
     infinity::ConstantExpr*           const_expr_t;
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
-    std::vector<std::vector<infinity::ParsedExpr*>*>*    expr_array_list_t;
+    std::vector<infinity::InsertRowExpr*>*    insert_row_list_t;
 
     std::vector<infinity::WhenThen*>*     case_check_array_t;
 

@@ -209,3 +209,52 @@ class TestMemIdx:
         part2()
 
         infinity_runner.clear()
+
+    def test_recover_memindex_with_dump(self, infinity_runner: InfinityRunner):
+        config1 = "test/data/config/restart_test/test_memidx/4.toml"
+        config2 = "test/data/config/restart_test/test_memidx/1.toml"
+        uri = common_values.TEST_LOCAL_HOST
+        decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
+        decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
+
+        table_name = "test_memidx3"
+
+        @decorator1
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, conflict_type=ConflictType.Ignore)
+            table_obj = db_obj.create_table(
+                table_name,
+                {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}},
+            )
+            res = table_obj.create_index(
+                "idx1",
+                index.IndexInfo(
+                    "c2",
+                    index.IndexType.Hnsw,
+                    {
+                        "M": "16",
+                        "ef_construction": "20",
+                        "metric": "l2",
+                        "block_size": "1",
+                    },
+                ),
+            )
+            assert res.error_code == infinity.ErrorCode.OK
+
+            # big enough to trigger dump in part2 memindex recover, but no dump in part1
+            table_obj.insert(
+                [{"c1": 2, "c2": [0.1, 0.2, 0.3, -0.2]} for i in range(50)]
+            )
+            print("insert 50 rows")
+
+        part1()
+
+        @decorator2
+        def part2(infinity_obj):
+            time.sleep(1) # wait dump task triggered
+
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name)
+
+        part2()

@@ -160,14 +160,14 @@ class LocalInfinityClient:
         drop_index_options.conflict_type = conflict_type
         return self.convert_res(self.client.DropIndex(db_name, table_name, index_name, drop_index_options))
 
-    def insert(self, db_name: str, table_name: str, column_names: list[str], fields):
+    def insert(self, db_name: str, table_name: str, fields):
         if self.client is None:
             raise Exception("Local infinity is not connected")
         retry = 0
         inner_ex = None
         while retry <= 2:
             try:
-                res = self.client.Insert(db_name, table_name, column_names, fields)
+                res = self.client.Insert(db_name, table_name, fields)
                 return self.convert_res(res)
             except Exception as ex:
                 inner_ex = ex

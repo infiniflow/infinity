@@ -53,7 +53,7 @@ export struct NodeInfo {
 
 export class PeerTask {
 public:
-    explicit PeerTask(PeerTaskType type, bool async = false) : type_(type), async_(async), complete_(false) //complete_ should not be assigned false in wait(), otherwise it might be stuck in wait() forever if complete() is called before wait().
+    explicit PeerTask(PeerTaskType type, bool async = false) : type_(type), complete_(false), async_(async) //complete_ should not be assigned false in wait(), otherwise it might be stuck in wait() forever if complete() is called before wait().
     {}
     virtual ~PeerTask() = default;
 
