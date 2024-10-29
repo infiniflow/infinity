@@ -105,7 +105,6 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
                                                   buffer_mgr->persistence_manager());
 
     block_column_entry->buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-    LOG_TRACE(fmt::format("Allocate column {}",block_column_entry->encode()));
     return block_column_entry;
 }
 
@@ -133,7 +132,6 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                   buffer_manager->persistence_manager());
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker), true /*restart*/);
-    LOG_TRACE(fmt::format("Get column {}", column_entry->encode()));
 
     if (next_outline_idx > 0) {
         SizeT buffer_size = last_chunk_offset;
@@ -170,7 +168,6 @@ ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, c
                                                       this->file_name_,
                                                       0,
                                                       buffer_mgr->persistence_manager());
-        LOG_TRACE(fmt::format("Get column2 {}", encode()));
         this->buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
 

@@ -82,8 +82,8 @@ protected:
     PeerTaskType type_{PeerTaskType::kInvalid};
     mutable std::mutex mutex_{};
     std::condition_variable cv_{};
-    bool async_{false};
     bool complete_{false};
+    bool async_{false};
 };
 
 export class TerminatePeerTask final : public PeerTask {
