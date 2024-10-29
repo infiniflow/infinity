@@ -58,7 +58,6 @@ import analyzer;
 import term;
 import fulltext_score_result_heap;
 import physical_index_scan;
-import explain_logical_plan;
 import column_index_reader;
 import filter_value_type_classification;
 import common_analyzer;
@@ -70,117 +69,10 @@ import highlighter;
 import parse_fulltext_options;
 import result_cache_manager;
 import cached_match;
+import filter_iterator;
+import score_threshold_iterator;
 
 namespace infinity {
-
-class FilterIterator final : public DocIterator {
-public:
-    explicit FilterIterator(CommonQueryFilter *common_query_filter, UniquePtr<DocIterator> &&query_iterator)
-        : common_query_filter_(common_query_filter), query_iterator_(std::move(query_iterator)) {}
-
-    DocIteratorType GetType() const override { return DocIteratorType::kFilterIterator; }
-    String Name() const override { return "FilterIterator"; };
-
-    bool Next(RowID doc_id) override {
-        bool ok = false;
-        while (true) {
-            ok = query_iterator_->Next(doc_id);
-            if (!ok) {
-                break;
-            }
-            doc_id = query_iterator_->DocID();
-
-            // check filter
-            if (common_query_filter_ == nullptr || common_query_filter_->PassFilter(doc_id)) {
-                doc_id_ = doc_id;
-                return true;
-            }
-            ++doc_id;
-        }
-        doc_id_ = INVALID_ROWID;
-        return false;
-    }
-    float BM25Score() override { return query_iterator_->BM25Score(); }
-
-    void UpdateScoreThreshold(float threshold) override { query_iterator_->UpdateScoreThreshold(threshold); }
-
-    // for minimum_should_match parameter
-    u32 MatchCount() const override { return query_iterator_->MatchCount(); }
-
-    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
-        os << prefix;
-        os << (is_final ? "└──" : "├──");
-        os << "FilterIterator (fake_doc_freq: " << common_query_filter_->filter_result_count_ << ") (filter expression: ";
-        String filter_str;
-        if (common_query_filter_->original_filter_.get()) {
-            ExplainLogicalPlan::Explain(common_query_filter_->original_filter_.get(), filter_str);
-        } else {
-            filter_str = "None";
-        }
-        os << filter_str << ")\n";
-        const String next_prefix = prefix + (is_final ? "    " : "│   ");
-        query_iterator_->PrintTree(os, next_prefix, true);
-    }
-
-private:
-    CommonQueryFilter *common_query_filter_;
-    UniquePtr<DocIterator> query_iterator_;
-};
-
-// use QueryNodeType::FILTER
-struct FilterQueryNode final : public QueryNode {
-    // search iterator
-    UniquePtr<QueryNode> query_tree_;
-    // filter info
-    CommonQueryFilter *common_query_filter_;
-    const SizeT filter_result_count_ = common_query_filter_->filter_result_count_;
-    const Map<SegmentID, Bitmask> *filter_result_ptr_ = &common_query_filter_->filter_result_;
-    const BaseExpression *filter_expression = common_query_filter_->original_filter_.get();
-
-    explicit FilterQueryNode(CommonQueryFilter *common_query_filter, UniquePtr<QueryNode> &&query_tree)
-        : QueryNode(QueryNodeType::FILTER), query_tree_(std::move(query_tree)), common_query_filter_(common_query_filter) {}
-
-    void FilterOptimizeQueryTree() override {
-        auto new_query_tree = GetOptimizedQueryTree(std::move(query_tree_));
-        query_tree_ = std::move(new_query_tree);
-    }
-
-    uint32_t LeafCount() const override { return query_tree_->LeafCount(); }
-
-    void PushDownWeight(float factor) override { MultiplyWeight(factor); }
-
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry,
-                                              const IndexReader &index_reader,
-                                              const EarlyTermAlgo early_term_algo,
-                                              const u32 minimum_should_match) const override {
-        assert(common_query_filter_ != nullptr);
-        if (!common_query_filter_->AlwaysTrue() && common_query_filter_->filter_result_count_ == 0)
-            return nullptr;
-        auto search_iter = query_tree_->CreateSearch(table_entry, index_reader, early_term_algo, minimum_should_match);
-        if (!search_iter) {
-            return nullptr;
-        }
-        if (common_query_filter_->AlwaysTrue()) {
-            return search_iter;
-        }
-        return MakeUnique<FilterIterator>(common_query_filter_, std::move(search_iter));
-    }
-
-    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override {
-        os << prefix;
-        os << (is_final ? "└──" : "├──");
-        os << "Filter (expression: ";
-        String filter_str;
-        if (filter_expression) {
-            ExplainLogicalPlan::Explain(filter_expression, filter_str);
-        } else {
-            filter_str = "None";
-        }
-        os << filter_str << ") (filter_result_count: " << filter_result_count_ << ")\n";
-    }
-
-    void GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const override {}
-};
 
 void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
     float diff_percent = std::abs(a - b) / std::max(std::abs(a), std::abs(b));
@@ -292,11 +184,20 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     if (use_block_max_iter) {
         et_iter = query_builder.CreateSearch(full_text_query_context, early_term_algo_, minimum_should_match_option_);
         // et_iter is nullptr if fulltext index is present but there's no data
-        if (et_iter != nullptr)
-            et_iter->UpdateScoreThreshold(begin_threshold_);
+        if (et_iter != nullptr) {
+            et_iter->UpdateScoreThreshold(std::max(begin_threshold_, score_threshold_));
+            if (score_threshold_ > 0.0f) {
+                auto new_et_iter = MakeUnique<ScoreThresholdIterator>(std::move(et_iter), score_threshold_);
+                et_iter = std::move(new_et_iter);
+            }
+        }
     }
     if (use_ordinary_iter) {
         doc_iterator = query_builder.CreateSearch(full_text_query_context, EarlyTermAlgo::kNaive, minimum_should_match_option_);
+        if (doc_iterator && score_threshold_ > 0.0f) {
+            auto new_doc_iter = MakeUnique<ScoreThresholdIterator>(std::move(doc_iterator), score_threshold_);
+            doc_iterator = std::move(new_doc_iter);
+        }
     }
 
     // 3 full text search
@@ -439,23 +340,25 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 }
 #pragma clang diagnostic pop
 
-PhysicalMatch::PhysicalMatch(u64 id,
+PhysicalMatch::PhysicalMatch(const u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,
                              SharedPtr<MatchExpression> match_expr,
                              IndexReader index_reader,
                              UniquePtr<QueryNode> &&query_tree,
-                             float begin_threshold,
-                             EarlyTermAlgo early_term_algo,
-                             u32 top_n,
+                             const float begin_threshold,
+                             const EarlyTermAlgo early_term_algo,
+                             const u32 top_n,
                              const SharedPtr<CommonQueryFilter> &common_query_filter,
                              MinimumShouldMatchOption &&minimum_should_match_option,
-                             u64 match_table_index,
+                             const f32 score_threshold,
+                             const u64 match_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas,
-                             bool cache_result)
+                             const bool cache_result)
     : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, std::move(load_metas), cache_result), table_index_(match_table_index),
-      base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), index_reader_(index_reader), query_tree_(std::move(query_tree)),
-      begin_threshold_(begin_threshold), early_term_algo_(early_term_algo), top_n_(top_n), common_query_filter_(common_query_filter),
-      minimum_should_match_option_(std::move(minimum_should_match_option)) {}
+      base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), index_reader_(std::move(index_reader)),
+      query_tree_(std::move(query_tree)), begin_threshold_(begin_threshold), early_term_algo_(early_term_algo), top_n_(top_n),
+      common_query_filter_(common_query_filter), minimum_should_match_option_(std::move(minimum_should_match_option)),
+      score_threshold_(score_threshold) {}
 
 PhysicalMatch::~PhysicalMatch() = default;
 
