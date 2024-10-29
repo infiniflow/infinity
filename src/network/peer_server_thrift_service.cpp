@@ -33,8 +33,8 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
 
     LOG_TRACE("Get Register request");
     // This must be a leader node.
-    NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
-    if (leader_node->node_role_ == NodeRole::kLeader) {
+    NodeRole server_role = InfinityContext::instance().GetServerRole();
+    if (server_role == NodeRole::kLeader) {
         SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
         non_leader_node_info->node_name_ = request.node_name;
         switch (request.node_type) {
@@ -62,6 +62,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         Status status = InfinityContext::instance().cluster_manager()->AddNodeInfo(non_leader_node_info);
         if (status.ok()) {
             LOG_INFO(fmt::format("Node: {} registered as {}.", request.node_name, infinity_peer_server::to_string(request.node_type)));
+            NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
             response.leader_name = leader_node->node_name_;
             response.leader_term = leader_node->leader_term_;
             response.heart_beat_interval = leader_node->heartbeat_interval_;
@@ -71,7 +72,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = fmt::format("Attempt to register a non-leader node: {}", ToString(leader_node->node_role_));
+        response.error_message = "Attempt to register a non-leader node";
     }
 
     return;
@@ -79,8 +80,8 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
 
 void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterResponse &response, const infinity_peer_server::UnregisterRequest &request) {
     LOG_TRACE("Get Unregister request");
-    NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
-    if (leader_node->node_role_ == NodeRole::kLeader) {
+    NodeRole server_role = InfinityContext::instance().GetServerRole();
+    if (server_role == NodeRole::kLeader) {
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(request.node_name, UpdateNodeOp::kRemove);
         if (!status.ok()) {
             response.error_code = static_cast<i64>(status.code_);
@@ -89,15 +90,15 @@ void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterRespons
         LOG_INFO(fmt::format("Node: {} unregistered from leader.", request.node_name));
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = fmt::format("Attempt to unregister from a non-leader node: {}", ToString(leader_node->node_role_));
+        response.error_message = "Attempt to unregister from a non-leader node";
     }
     return;
 }
 
 void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse &response, const infinity_peer_server::HeartBeatRequest &request) {
     LOG_DEBUG("Get HeartBeat request");
-    NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
-    if (leader_node->node_role_ == NodeRole::kLeader) {
+    NodeRole server_role = InfinityContext::instance().GetServerRole();
+    if (server_role == NodeRole::kLeader) {
         SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
         non_leader_node_info->node_name_ = request.node_name;
         switch (request.node_type) {
@@ -137,7 +138,7 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(leader_node->node_role_));
+        response.error_message = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(server_role));
     }
     return;
 }

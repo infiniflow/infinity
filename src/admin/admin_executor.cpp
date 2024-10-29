@@ -3994,6 +3994,8 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     NodeRole current_node_role = InfinityContext::instance().GetServerRole();
     if (current_node_role == target_node_role) {
         LOG_INFO(fmt::format("Infinity is already the role of {}", ToString(current_node_role)));
+        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
+        query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
         query_result.status_ = Status::OK();
         return query_result;
     }
