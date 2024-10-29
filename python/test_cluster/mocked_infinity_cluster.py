@@ -65,7 +65,7 @@ class MockedInfinityRunner(InfinityRunner):
         self.process = subprocess.Popen(run_cmd, shell=True)
 
     def add_client(self, http_addr: str):
-        self.client = infinity_http(mocked_http_network(self.ns_name, http_addr))
+        self.client = infinity_http(net=mocked_http_network(self.ns_name, http_addr))
 
     def peer_uri(self):
         peer_port = self.network_config["peer_port"]

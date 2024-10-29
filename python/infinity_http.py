@@ -106,8 +106,11 @@ class http_network_util:
             return database_result(error_code=e.error_code)
 
 class infinity_http:
-    def __init__(self, net: http_network_util = http_network_util(url=default_url)):
-        self.net = net
+    def __init__(self, *, net: http_network_util = None):
+        if net is not None:
+            self.net = net
+        else:
+            self.net = http_network_util(default_url)
 
     def disconnect(self):
         print("disconnect")

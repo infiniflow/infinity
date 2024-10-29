@@ -71,7 +71,7 @@ class DockerInfinityRunner(BaseInfinityRunner):
         self.container.remove(force=True, v=True)
 
     def add_client(self, http_addr: str):
-        self.client = infinity_http(docker_http_network(self.container, http_addr))
+        self.client = infinity_http(net=docker_http_network(self.container, http_addr))
 
     def peer_uri(self):
         peer_port = self.network_config["peer_port"]

@@ -6,6 +6,7 @@ from mocked_infinity_cluster import MockInfinityCluster
 from docker_infinity_cluster import DockerInfinityCluster
 
 
+@pytest.mark.usefixtures("skip_if_docker")
 def test_standalone(infinity_path: str):
     cluster = InfinityCluster(infinity_path)
     cluster.add_node("test", "conf/pytest_parallel_infinity_conf.toml")
@@ -19,6 +20,7 @@ def test_standalone(infinity_path: str):
     cluster.clear()
 
 
+@pytest.mark.usefixtures("skip_if_docker")
 @pytest.mark.skip(reason="bug")
 def test_0(infinity_path: str):
     cluster = InfinityCluster(infinity_path)
@@ -36,7 +38,8 @@ def test_0(infinity_path: str):
     cluster.clear()
 
 
-@pytest.mark.skip(reason="tmp")
+@pytest.mark.usefixtures("skip_if_docker")
+@pytest.mark.skip(reason="bug")
 def test_mock(infinity_path: str):
     cluster = MockInfinityCluster(infinity_path)
     cluster.add_node("node1", "conf/leader.toml")
@@ -59,6 +62,7 @@ def test_mock(infinity_path: str):
     cluster.clear()
 
 
+@pytest.mark.usefixtures("skip_if_not_docker")
 def test_docker(infinity_path: str):
     cluster = DockerInfinityCluster(infinity_path)
 

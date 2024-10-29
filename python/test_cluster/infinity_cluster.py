@@ -12,7 +12,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity_http import infinity_http, http_network_util
 
 class BaseInfinityRunner:
     def __init__(self, node_name: str, executable_path: str, config_path: str):
@@ -51,8 +51,9 @@ class BaseInfinityRunner:
             lambda: self.client.set_role_follower(self.node_name, leader_addr)
         )
 
+    @abstractmethod
     def add_client(self, http_addr: str):
-        self.client = infinity_http(http_addr)
+        pass
 
     def http_uri(self):
         http_ip = self.network_config["server_address"]
@@ -86,6 +87,7 @@ class BaseInfinityRunner:
 class InfinityRunner(BaseInfinityRunner):
     def __init__(self, node_name: str, executable_path: str, config_path: str):
         super().__init__(node_name, executable_path, config_path)
+        self.process = None
 
     def init(self, config_path: str | None):
         if self.process is not None:
@@ -112,6 +114,9 @@ class InfinityRunner(BaseInfinityRunner):
             return
         timeout = 60
         timeout_kill.timeout_kill(timeout, self.process)
+
+    def add_client(self, http_addr: str):
+        self.client = infinity_http(net=http_network_util(http_addr))
 
 
 class InfinityCluster:
