@@ -1,30 +1,30 @@
 [general]
 version                  = "0.5.0"
 time_zone                = "utc-8"
-server_mode              = "standalone"
+server_mode              = "cluster"
 
 [network]
 server_address           = "0.0.0.0"
-postgres_port            = 5433
-http_port                = 23820
-client_port              = 23817
+postgres_port            = 5434
+http_port                = 23822
+client_port              = 23819
 connection_pool_size     = 128
 peer_ip                  = "0.0.0.0"
-peer_port                = 23851
+peer_port                = 23852
 
 [log]
 log_filename             = "infinity.log"
-log_dir                  = "/var/infinity/leader/log"
+log_dir                  = "/var/infinity/follower/log"
 log_to_stdout            = true
 log_file_max_size        = "10GB"
 log_file_rotate_count    = 10
 
 # trace/debug/info/warning/error/critical 6 log levels, default: info
-log_level               = "debug"
+log_level               = "trace"
 
 [storage]
-persistence_dir         = "/var/infinity/leader/persistence"
-data_dir                = "/var/infinity/leader/data"
+persistence_dir         = "/var/infinity/follower/persistence"
+data_dir                = "/var/infinity/follower/data"
 # periodically activates garbage collection:
 # 0 means real-time,
 # s means seconds, for example "60s", 60 seconds
@@ -36,24 +36,26 @@ compact_interval         = "120s"
 
 # dump memory index entry when it reachs the capacity
 mem_index_capacity       = 1048576
+
 storage_type             = "minio"
 
 [storage.object_storage]
-url                      = "192.168.200.165:9000"
+url                      = "127.0.0.1:9000"
 bucket_name              = "infinity"
-access_key               = "minioadmin"
-secret_key               = "minioadmin"
+access_key               = "pk9s2oJFX1qXLYObwIcz"
+secret_key               = "ho1G9xh2iKup4Xj9Ja3eRgg8bfwMyDv4fvkQGcZl"
 enable_https             = false
 
 [buffer]
-buffer_manager_size      = "4GB"
+buffer_manager_size      = "8GB"
 lru_num                  = 7
-temp_dir                 = "/var/infinity/leader/tmp"
+temp_dir                 = "/var/infinity/follower/tmp"
+result_cache_mode       = "on"
 
 memindex_memory_quota   = "1GB"
 
 [wal]
-wal_dir                       = "/var/infinity/leader/wal"
+wal_dir                       = "/var/infinity/follower/wal"
 full_checkpoint_interval      = "86400s"
 delta_checkpoint_interval     = "60s"
 # delta_checkpoint_threshold  = 1000000000
@@ -65,4 +67,4 @@ wal_compact_threshold         = "1GB"
 wal_flush                     = "only_write"
 
 [resource]
-resource_dir                  = "/var/infinity/leader/resource"
+resource_dir                  = "/var/infinity/follower/resource"

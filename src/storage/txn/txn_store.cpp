@@ -39,6 +39,9 @@ import bg_task;
 import compact_statement;
 import build_fast_rough_filter_task;
 import create_index_info;
+import persistence_manager;
+import infinity_context;
+import persist_result_handler;
 
 namespace infinity {
 
@@ -634,6 +637,15 @@ void TxnStore::PrepareCommit1() {
     }
     for (const auto &[table_name, table_store] : txn_tables_store_) {
         table_store->PrepareCommit1(segment_infos);
+    }
+    if(!segment_infos.empty()) {
+        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        if (pm != nullptr) {
+            PersistResultHandler handler(pm);
+            PersistWriteResult result = pm->CurrentObjFinalize(true);
+            handler.HandleWriteResult(result);
+        }
+        LOG_TRACE("Finalize current object to ensure PersistenceManager be in a consistent state");
     }
 }
 

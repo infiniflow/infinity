@@ -18,6 +18,7 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
         "pytest",
         # "--capture=tee-sys",
         "--tb=short",
+        #"-v",
         "-x",
         "-m",
         pytest_mark,
