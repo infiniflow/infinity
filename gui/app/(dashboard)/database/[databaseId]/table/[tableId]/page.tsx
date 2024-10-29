@@ -16,10 +16,15 @@ const Empty = () => {
   return <div>empty</div>;
 };
 
-export default async function DatabasePage({
-  searchParams: { tab },
-  params: { tableId, databaseId }
-}: DatabaseRouteParams) {
+export default async function DatabasePage(props: DatabaseRouteParams) {
+  const params = await props.params;
+
+  const { tableId, databaseId } = params;
+
+  const searchParams = await props.searchParams;
+
+  const { tab } = searchParams;
+
   const DatabaseTable: React.FunctionComponent<DatabaseRouteParams['params']> =
     TableMap[tab] ?? Empty;
 
