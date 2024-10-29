@@ -13,7 +13,7 @@ import {
   showTableIndexes,
   showTableSegments
 } from '../actions';
-import { DatabaseRouteParams, TreeParentId } from './interface';
+import { PureDatabaseRouteParams, TreeParentId } from './interface';
 import { buildLeafData, getParentIdById, updateTreeData } from './utils';
 
 export const useHandleClickTreeName = () => {
@@ -186,7 +186,7 @@ export const useBuildTreeData = () => {
 export const useFetchTableColumns = ({
   databaseId,
   tableId
-}: DatabaseRouteParams['params']) => {
+}: PureDatabaseRouteParams) => {
   const [tableColumns, setTableColumns] = useState<ITableColumns[]>([]);
 
   const fetchTableColumns = useCallback(async () => {
@@ -208,7 +208,7 @@ export const useFetchTableColumns = ({
 export const useFetchTableIndexes = ({
   databaseId,
   tableId
-}: DatabaseRouteParams['params']) => {
+}: PureDatabaseRouteParams) => {
   const [tableIndexes, setTableIndexes] = useState<ITableIndex[]>([]);
 
   const fetchTableIndexes = useCallback(async () => {
@@ -230,7 +230,7 @@ export const useFetchTableIndexes = ({
 export const useFetchTableSegments = ({
   databaseId,
   tableId
-}: DatabaseRouteParams['params']) => {
+}: PureDatabaseRouteParams) => {
   const [tableSegments, setTableSegments] = useState<ITableSegment[]>([]);
 
   const fetchTableSegments = useCallback(async () => {
