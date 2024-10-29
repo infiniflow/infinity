@@ -229,9 +229,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             }
             memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
 
-            new_catalog_->StartMemoryIndexCommit();
-            new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
-
             bg_processor_->Start();
 
             if (target_mode == StorageMode::kWritable) {
@@ -247,6 +244,10 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
                 compact_processor_->Start();
             }
+
+            // recover index after start compact process
+            new_catalog_->StartMemoryIndexCommit();
+            new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
             if (periodic_trigger_thread_ != nullptr) {
                 UnrecoverableError("periodic trigger was initialized before.");
