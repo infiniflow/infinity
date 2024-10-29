@@ -5,9 +5,9 @@ server_mode              = "cluster"
 
 [network]
 server_address           = "0.0.0.0"
-postgres_port            = 5432
-http_port                = 23820
-client_port              = 23817
+postgres_port            = 5433
+http_port                = 23821
+client_port              = 23818
 connection_pool_size     = 128
 peer_ip                  = "0.0.0.0"
 peer_port                = 23851
@@ -42,8 +42,8 @@ storage_type             = "minio"
 [storage.object_storage]
 url                      = "127.0.0.1:9000"
 bucket_name              = "infinity"
-access_key               = "rag_flow"
-secret_key               = "infini_rag_flow"
+access_key               = "minioadmin"
+secret_key               = "minioadmin"
 enable_https             = false
 
 [buffer]
