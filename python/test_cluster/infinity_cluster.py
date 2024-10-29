@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import subprocess
 import time
 import tomli
@@ -13,44 +14,21 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
-
-class InfinityRunner:
+class BaseInfinityRunner:
     def __init__(self, node_name: str, executable_path: str, config_path: str):
         self.node_name = node_name
         self.executable_path = executable_path
         self.config_path = config_path
-        self.__load_config()
-        self.process = None
+        self.load_config()
         self.client = None
 
-    def __del__(self):
-        self.uninit()
-
+    @abstractmethod
     def init(self, config_path: str | None):
-        if self.process is not None:
-            raise ValueError("Process is already initialized.")
-        if config_path:
-            self.config_path = config_path
-            self.__load_config()
+        pass
 
-        cmd = [self.executable_path, f"--config={self.config_path}"]
-        my_env = os.environ.copy()
-        my_env["LD_PRELOAD"] = ""
-        my_env["ASAN_OPTIONS"] = ""
-        self.process = subprocess.Popen(cmd, shell=False, env=my_env)
-        time.sleep(1)  # Give the process a moment to start
-        if self.process.poll() is not None:
-            raise RuntimeError(
-                f"Failed to start process for node {self.node_name}, return code: {self.process.returncode}"
-            )
-        print(f"Launch {self.node_name} successfully. pid: {self.process.pid}")
-
+    @abstractmethod
     def uninit(self):
-        print(f"Uniting node {self.node_name}")
-        if self.process is None:
-            return
-        timeout = 60
-        timeout_kill.timeout_kill(timeout, self.process)
+        pass
 
     def init_as_standalone(self, config_path: str | None = None):
         self.init(config_path)
@@ -86,7 +64,7 @@ class InfinityRunner:
         peer_port = self.network_config["peer_port"]
         return peer_ip, peer_port
 
-    def __load_config(self):
+    def load_config(self):
         with open(self.config_path, "rb") as f:
             config = tomli.load(f)
             self.network_config = config["network"]
@@ -105,11 +83,46 @@ class InfinityRunner:
             break
 
 
+class InfinityRunner(BaseInfinityRunner):
+    def __init__(self, node_name: str, executable_path: str, config_path: str):
+        super().__init__(node_name, executable_path, config_path)
+
+    def init(self, config_path: str | None):
+        if self.process is not None:
+            raise ValueError("Process is already initialized.")
+        if config_path:
+            self.config_path = config_path
+            self.load_config()
+
+        cmd = [self.executable_path, f"--config={self.config_path}"]
+        my_env = os.environ.copy()
+        my_env["LD_PRELOAD"] = ""
+        my_env["ASAN_OPTIONS"] = ""
+        self.process = subprocess.Popen(cmd, shell=False, env=my_env)
+        time.sleep(1)  # Give the process a moment to start
+        if self.process.poll() is not None:
+            raise RuntimeError(
+                f"Failed to start process for node {self.node_name}, return code: {self.process.returncode}"
+            )
+        print(f"Launch {self.node_name} successfully. pid: {self.process.pid}")
+
+    def uninit(self):
+        print(f"Uniting node {self.node_name}")
+        if self.process is None:
+            return
+        timeout = 60
+        timeout_kill.timeout_kill(timeout, self.process)
+
+
 class InfinityCluster:
     def __init__(self, executable_path: str):
         self.executable_path = executable_path
         self.runners: dict[str, InfinityRunner] = {}
         self.leader_runner: InfinityRunner | None = None
+
+    def clear(self):
+        for runner in self.runners.values():
+            runner.uninit()
 
     def add_node(self, node_name: str, config_path: str):
         runner = InfinityRunner(node_name, self.executable_path, config_path)
