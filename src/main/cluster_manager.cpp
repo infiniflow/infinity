@@ -137,11 +137,15 @@ Status ClusterManager::UnInit(bool not_unregister) {
     }
 
     other_node_map_.clear();
+    leader_node_.reset();
     this_node_.reset();
     if (client_to_leader_.get() != nullptr) {
         client_to_leader_->UnInit(true);
     }
     client_to_leader_.reset();
+
+    reader_client_map_.clear();
+    logs_to_sync_.clear();
 
     return Status::OK();
 }
