@@ -1,3 +1,5 @@
+module;
+
 #include <cmath>
 #include <utility>
 
@@ -18,7 +20,7 @@ namespace infinity {
 
 struct TruncateFunction {
     template <typename LeftType, typename RightType, typename OutputType>
-    static inline bool Run(LeftType value, RightType decimals, OutputType &result) {
+    static inline void Run(LeftType value, RightType decimals, OutputType &result) {
         if (decimals > 0) {
             double scale = pow(10.0, decimals);
             result = static_cast<OutputType>(std::trunc(value * scale) / scale);
@@ -28,7 +30,6 @@ struct TruncateFunction {
             double scale = pow(10.0, -decimals);
             result = static_cast<OutputType>(std::trunc(value / scale) * scale);
         }
-        return true;
     }
 };
 
