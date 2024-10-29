@@ -147,7 +147,7 @@ class DockerInfinityCluster(InfinityCluster):
         cur_runner.mock_ip = mock_ip
 
     def __init_docker_params(self):
-        container_name = f"infinity_build_{"".join(random.choices(string.ascii_lowercase + string.digits, k=8))}"
+        container_name = f"infinity_build_{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}"
         cpus = os.cpu_count()
         tz = os.readlink("/etc/localtime").split("/zoneinfo/")[1]
         return container_name, cpus, tz

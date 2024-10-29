@@ -86,3 +86,5 @@ def test_docker(infinity_path: str):
 
     cluster.remove_node("node2")
     cluster.remove_node("node1")
+
+    cluster.clear()
