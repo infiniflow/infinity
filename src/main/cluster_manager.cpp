@@ -428,7 +428,12 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
 Status ClusterManager::RemoveNodeInfo(const String &node_name) {
     // Used by leader to remove node
     if (node_name == this_node_->node_name_) {
-        return Status::UnexpectedError(fmt::format("Can't remove leader node: {}", node_name));
+        return Status::InvalidNodeRole(fmt::format("Can't remove current node: {}", node_name));
+    }
+
+    NodeRole server_role = InfinityContext::instance().GetServerRole();
+    if (server_role != NodeRole::kLeader) {
+        return Status::InvalidNodeRole(fmt::format("Can't remove node in {} mode", ToString(server_role)));
     }
 
     SharedPtr<PeerClient> client_{nullptr};
