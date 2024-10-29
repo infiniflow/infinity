@@ -1,5 +1,8 @@
 import { Leaf } from 'app/(dashboard)/database/constants';
-import { DatabaseRouteParams } from 'app/(dashboard)/database/interface';
+import {
+  DatabaseRouteParams,
+  PureDatabaseRouteParams
+} from 'app/(dashboard)/database/interface';
 import React from 'react';
 // import { TableColumns } from './columns';
 import { TableIndexes } from './indexes';
@@ -25,7 +28,7 @@ export default async function DatabasePage(props: DatabaseRouteParams) {
 
   const { tab } = searchParams;
 
-  const DatabaseTable: React.FunctionComponent<DatabaseRouteParams['params']> =
+  const DatabaseTable: React.FunctionComponent<PureDatabaseRouteParams> =
     TableMap[tab] ?? Empty;
 
   return (
