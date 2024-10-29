@@ -187,7 +187,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     storage_->SetStorageMode(StorageMode::kAdmin);
                     RestoreIndexThreadPoolToDefault();
 
-                    if(task_scheduler_ != nullptr) {
+                    if (task_scheduler_ != nullptr) {
                         task_scheduler_->UnInit();
                         task_scheduler_.reset();
                     }
@@ -200,7 +200,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     return status;
                 }
                 default: {
-                    Status status = Status::InvalidNodeRole("Can't switch Infinity to cluster mode");
+                    Status status = Status::InvalidNodeRole("Can't switch Infinity from standalone to cluster mode");
                     return status;
                 }
             }
@@ -218,7 +218,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     storage_->SetStorageMode(StorageMode::kAdmin);
                     RestoreIndexThreadPoolToDefault();
 
-                    if(task_scheduler_ != nullptr) {
+                    if (task_scheduler_ != nullptr) {
                         task_scheduler_->UnInit();
                         task_scheduler_.reset();
                     }
@@ -265,8 +265,11 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     SetServerRole(NodeRole::kLearner);
                     break;
                 }
+                case NodeRole::kStandalone: {
+                    return Status::InvalidNodeRole("Can't switch infinity role from leader to standalone");
+                }
                 default: {
-                    Status status = Status::InvalidNodeRole("Can't switch infinity role");
+                    Status status = Status::InvalidNodeRole(fmt::format("Can't switch infinity role from leader to {}", ToString(target_role)));
                     return status;
                 }
             }
@@ -286,7 +289,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     storage_->SetStorageMode(StorageMode::kAdmin);
                     RestoreIndexThreadPoolToDefault();
 
-                    if(task_scheduler_ != nullptr) {
+                    if (task_scheduler_ != nullptr) {
                         task_scheduler_->UnInit();
                         task_scheduler_.reset();
                     }
