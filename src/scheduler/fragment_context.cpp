@@ -112,7 +112,8 @@ UniquePtr<OperatorState> MakeMatchTensorScanState(const PhysicalMatchTensorScan 
         UnrecoverableError(error_message);
     }
     auto operator_state = MakeUnique<MatchTensorScanOperatorState>();
-    operator_state->match_tensor_scan_function_data_ = MakeUnique<MatchTensorScanFunctionData>(physical_match_tensor_scan->GetTopN());
+    operator_state->match_tensor_scan_function_data_ =
+        MakeUnique<MatchTensorScanFunctionData>(physical_match_tensor_scan->GetTopN(), physical_match_tensor_scan->GetKnnThreshold());
     return operator_state;
 }
 

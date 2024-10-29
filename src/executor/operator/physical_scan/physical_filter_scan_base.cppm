@@ -28,16 +28,16 @@ namespace infinity {
 
 export class PhysicalFilterScanBase : public PhysicalScanBase {
 public:
-    PhysicalFilterScanBase(u64 id,
-                           PhysicalOperatorType type,
+    PhysicalFilterScanBase(const u64 id,
+                           const PhysicalOperatorType type,
                            UniquePtr<PhysicalOperator> left,
                            UniquePtr<PhysicalOperator> right,
-                           u64 table_index,
+                           const u64 table_index,
                            SharedPtr<BaseTableRef> base_table_ref,
                            SharedPtr<CommonQueryFilter> common_query_filter,
                            SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalScanBase(id, type, std::move(left), std::move(right), table_index, base_table_ref, load_metas),
-          common_query_filter_(common_query_filter) {}
+        : PhysicalScanBase(id, type, std::move(left), std::move(right), table_index, std::move(base_table_ref), std::move(load_metas)),
+          common_query_filter_(std::move(common_query_filter)) {}
 
     bool CalculateFilterBitmask(SegmentID segment_id, BlockID block_id, BlockOffset row_count, Bitmask &bitmask) const;
 

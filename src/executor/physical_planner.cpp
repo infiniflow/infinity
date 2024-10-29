@@ -977,6 +977,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
                                             std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
                                             logical_match_tensor->common_query_filter_,
                                             logical_match_tensor->topn_,
+                                            logical_match_tensor->knn_threshold_,
                                             logical_match_tensor->index_options_,
                                             logical_operator->load_metas());
     match_tensor_scan_op->CheckColumn();

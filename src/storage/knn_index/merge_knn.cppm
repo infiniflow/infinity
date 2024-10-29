@@ -24,6 +24,7 @@ import infinity_exception;
 import roaring_bitmap;
 import default_values;
 import internal_types;
+import statement_common;
 
 namespace infinity {
 
@@ -32,19 +33,79 @@ public:
     virtual ~MergeKnnBase() = default;
 };
 
+export template <typename DistType>
+class MergeKnnResultHandler {
+public:
+    virtual void Begin() = 0;
+    virtual void End() = 0;
+    virtual void EndWithoutSort() = 0;
+    virtual u32 GetSize(SizeT q_id) const = 0;
+    virtual void AddResult(SizeT q_id, DistType d, RowID i) = 0;
+    virtual ~MergeKnnResultHandler() = default;
+};
+
+template <bool use_threshold>
+struct KnnThresholdT {};
+
+template <>
+struct KnnThresholdT<true> {
+    f32 knn_threshold_ = {};
+};
+
+template <template <typename> typename ResultHandler, template <typename, typename> typename C, typename DistType, bool use_threshold>
+class MergeKnnResultHandlerT final : public MergeKnnResultHandler<DistType>, ResultHandler<C<DistType, RowID>>, KnnThresholdT<use_threshold> {
+    using RH = ResultHandler<C<DistType, RowID>>;
+
+public:
+    MergeKnnResultHandlerT(SizeT n_queries, SizeT top_k, DistType *distance, RowID *id)
+        requires(!use_threshold)
+        : RH(n_queries, top_k, distance, id) {}
+    MergeKnnResultHandlerT(SizeT n_queries, SizeT top_k, DistType *distance, RowID *id, f32 threshold)
+        requires(use_threshold)
+        : RH(n_queries, top_k, distance, id), KnnThresholdT<use_threshold>(threshold) {}
+    void Begin() override { RH::Begin(); }
+    void End() override { RH::End(); }
+    void EndWithoutSort() override { RH::EndWithoutSort(); }
+    u32 GetSize(SizeT q_id) const override { return RH::GetSize(q_id); }
+    void AddResult(SizeT q_id, DistType d, RowID i) override {
+        if constexpr (use_threshold) {
+            if (C<DistType, RowID>::Compare(d, this->knn_threshold_)) {
+                return;
+            }
+        }
+        RH::AddResult(q_id, d, i);
+    }
+};
+
+export template <template <typename> typename ResultHandler, template <typename, typename> typename C, typename DistType>
+UniquePtr<MergeKnnResultHandler<DistType>>
+GetMergeKnnResultHandler(const SizeT n_queries, const SizeT top_k, DistType *distance, RowID *id, const Optional<f32> threshold) {
+    if (threshold.has_value()) {
+        return MakeUnique<MergeKnnResultHandlerT<ResultHandler, C, DistType, true>>(n_queries, top_k, distance, id, threshold.value());
+    }
+    return MakeUnique<MergeKnnResultHandlerT<ResultHandler, C, DistType, false>>(n_queries, top_k, distance, id);
+}
+
+export Optional<f32> GetKnnThreshold(const Vector<InitParameter> &opt_params);
+
+export Optional<f32> GetKnnThreshold(const Vector<UniquePtr<InitParameter>> &opt_params);
+
 export template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
 class MergeKnn final : public MergeKnnBase {
-    using ResultHandler = HeapResultHandler<C<DistType, RowID>>;
     using DistFunc = DistType (*)(const QueryElemType *, const QueryElemType *, SizeT);
 
 public:
-    explicit MergeKnn(u64 query_count, u64 topk)
+    explicit MergeKnn(const u64 query_count, const u64 topk, const Optional<f32> knn_threshold)
         : total_count_(0), query_count_(query_count), topk_(topk), idx_array_(MakeUniqueForOverwrite<RowID[]>(topk * query_count)),
           distance_array_(MakeUniqueForOverwrite<DistType[]>(topk * query_count)) {
-        result_handler_ = MakeUnique<ResultHandler>(query_count, topk, this->distance_array_.get(), this->idx_array_.get());
+        result_handler_ = GetMergeKnnResultHandler<HeapResultHandler, C, DistType>(query_count,
+                                                                                   topk,
+                                                                                   this->distance_array_.get(),
+                                                                                   this->idx_array_.get(),
+                                                                                   knn_threshold);
     }
 
-    ~MergeKnn() final = default;
+    ~MergeKnn() override = default;
 
 public:
     void Search(const QueryElemType *query, const QueryElemType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id);
@@ -63,6 +124,8 @@ public:
 
     void EndWithoutSort();
 
+    u32 GetSize() const;
+
     DistType *GetDistances() const;
 
     RowID *GetIDs() const;
@@ -71,7 +134,7 @@ public:
 
     RowID *GetIDsByIdx(u64 idx) const;
 
-    i64 total_count() const { return total_count_; }
+    i64 total_input_count() const { return total_count_; }
 
 private:
     i64 total_count_{};
@@ -80,9 +143,10 @@ private:
     i64 topk_{};
     UniquePtr<RowID[]> idx_array_{};
     UniquePtr<DistType[]> distance_array_{};
+    Optional<u32> result_size_;
 
 private:
-    UniquePtr<ResultHandler> result_handler_{};
+    UniquePtr<MergeKnnResultHandler<DistType>> result_handler_{};
 };
 
 template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
@@ -171,22 +235,30 @@ void MergeKnn<QueryElemType, C, DistType>::Begin() {
 
 template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
 void MergeKnn<QueryElemType, C, DistType>::End() {
-    if (!this->begin_)
+    if (!this->begin_) {
         return;
-
+    }
+    result_size_ = std::min<u32>(topk_, result_handler_->GetSize(0));
     result_handler_->End();
-
     this->begin_ = false;
 }
 
 template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
 void MergeKnn<QueryElemType, C, DistType>::EndWithoutSort() {
-    if (!this->begin_)
+    if (!this->begin_) {
         return;
-
+    }
+    result_size_ = std::min<u32>(topk_, result_handler_->GetSize(0));
     result_handler_->EndWithoutSort();
-
     this->begin_ = false;
+}
+
+template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
+u32 MergeKnn<QueryElemType, C, DistType>::GetSize() const {
+    if (result_size_.has_value()) {
+        return result_size_.value();
+    }
+    return result_handler_->GetSize(0);
 }
 
 template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
