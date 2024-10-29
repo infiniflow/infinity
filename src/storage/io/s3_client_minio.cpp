@@ -36,10 +36,7 @@ Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &ob
     if (resp) {
         LOG_INFO(fmt::format("{} downloaded to {} successfully", object_name, file_path));
     } else {
-        //UnrecoverableError(fmt::format("Unable to download object: {}", resp.Error().String()));
-        LOG_ERROR(fmt::format("Unable to download object: {}, retry", resp.Error().String()));
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        return DownloadObject(bucket_name, object_name, file_path);
+        UnrecoverableError(fmt::format("Unable to download object: {}", resp.Error().String()));
     }
     return Status::OK();
 }
