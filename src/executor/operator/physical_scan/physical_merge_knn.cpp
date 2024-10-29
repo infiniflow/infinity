@@ -114,7 +114,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
     if (merge_knn_state->input_complete_) {
         merge_knn->End(); // reorder the heap
-        i64 result_n = std::min(merge_knn_data.topk_, merge_knn->total_count());
+        i64 result_n = merge_knn->GetSize();
 
         if (merge_knn_state->data_block_array_.empty()) {
             merge_knn_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());

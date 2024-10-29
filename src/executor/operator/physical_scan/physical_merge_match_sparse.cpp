@@ -120,7 +120,7 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
 
     using MergeHeap = MergeKnn<ResultType, C, ResultType>;
     if (match_sparse_data.merge_knn_base_.get() == nullptr) {
-        auto merge_knn = MakeUnique<MergeHeap>(query_n, topn);
+        auto merge_knn = MakeUnique<MergeHeap>(query_n, topn, Optional<f32>());
         merge_knn->Begin();
         match_sparse_data.merge_knn_base_ = std::move(merge_knn);
     }
@@ -143,7 +143,7 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
 
     if (operator_state->input_complete_) {
         merge_knn->End(); // reorder the heap
-        i64 result_n = std::min(topn, (SizeT)merge_knn->total_count());
+        i64 result_n = merge_knn->GetSize();
 
         if (operator_state->data_block_array_.empty()) {
             operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());

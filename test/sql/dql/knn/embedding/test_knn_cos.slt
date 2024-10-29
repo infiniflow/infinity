@@ -35,6 +35,17 @@ SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_cos SEARCH MATCH VECTOR (c2, [0.
 6 2 0.895144
 4 1 0.823532
 
+query II
+SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_cos SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3) WITH (threshold = 0.85);
+----
+8 3 0.966755
+6 2 0.895144
+
+query II
+SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_cos SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3) WITH (threshold = 0.9);
+----
+8 3 0.966755
+
 statement error
 SELECT c1, ROW_ID() DISTANCE() FROM test_knn_cos SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3);
 

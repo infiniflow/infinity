@@ -25,37 +25,40 @@ import internal_types;
 import knn_result_handler;
 import infinity_exception;
 import logger;
+import merge_knn;
 
 namespace infinity {
 
 export class MatchTensorScanFunctionData final : public TableFunctionData {
 public:
-    using ResultHandler = ReservoirResultHandler<CompareMin<float, RowID>>;
-    explicit MatchTensorScanFunctionData(const u32 topn) : topn_(topn) { Init(); }
+    using TensorResultHandler = MergeKnnResultHandler<float>;
+
+    explicit MatchTensorScanFunctionData(const u32 topn, const Optional<f32> knn_threshold) : topn_(topn), knn_threshold_(knn_threshold) { Init(); }
 
     void Init() {
         score_result_ = MakeUniqueForOverwrite<float[]>(topn_);
         row_id_result_ = MakeUniqueForOverwrite<RowID[]>(topn_);
-        result_handler_ = MakeUnique<ResultHandler>(1, topn_, score_result_.get(), row_id_result_.get());
+        result_handler_ =
+            GetMergeKnnResultHandler<ReservoirResultHandler, CompareMin, float>(1, topn_, score_result_.get(), row_id_result_.get(), knn_threshold_);
         result_handler_->Begin();
     }
 
     u32 End() {
         if (finished_) {
-            String error_message = "End() is called twice!";
-            UnrecoverableError(error_message);
+            UnrecoverableError("End() is called twice!");
             return 0;
         }
         finished_ = true;
         result_handler_->End();
-        return result_handler_->GetSize(0);
+        return result_handler_->GetSize(0); // WARNING: This relies on ReservoirResultHandler
     }
 
     bool finished_ = false;
     const u32 topn_ = 0;
+    const Optional<f32> knn_threshold_;
     UniquePtr<float[]> score_result_;
     UniquePtr<RowID[]> row_id_result_;
-    UniquePtr<ResultHandler> result_handler_;
+    UniquePtr<TensorResultHandler> result_handler_;
 };
 
 } // namespace infinity

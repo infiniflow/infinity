@@ -84,12 +84,13 @@ using AlignedMatchTensorExprHolderT =
 
 AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpression &src_match_tensor_expr, EmbeddingDataType column_embedding_type);
 
-PhysicalMatchTensorScan::PhysicalMatchTensorScan(u64 id,
-                                                 u64 table_index,
+PhysicalMatchTensorScan::PhysicalMatchTensorScan(const u64 id,
+                                                 const u64 table_index,
                                                  SharedPtr<BaseTableRef> base_table_ref,
                                                  SharedPtr<MatchTensorExpression> match_tensor_expression,
                                                  const SharedPtr<CommonQueryFilter> &common_query_filter,
-                                                 u32 topn,
+                                                 const u32 topn,
+                                                 const Optional<f32> knn_threshold,
                                                  const SharedPtr<MatchTensorScanIndexOptions> &index_options,
                                                  SharedPtr<Vector<LoadMeta>> load_metas)
     : PhysicalFilterScanBase(id,
@@ -97,10 +98,10 @@ PhysicalMatchTensorScan::PhysicalMatchTensorScan(u64 id,
                              nullptr,
                              nullptr,
                              table_index,
-                             base_table_ref,
+                             std::move(base_table_ref),
                              common_query_filter,
-                             load_metas),
-      src_match_tensor_expr_(std::move(match_tensor_expression)), topn_(topn), index_options_(index_options) {
+                             std::move(load_metas)),
+      src_match_tensor_expr_(std::move(match_tensor_expression)), topn_(topn), knn_threshold_(knn_threshold), index_options_(index_options) {
     search_column_id_ = std::numeric_limits<ColumnID>::max();
 }
 
@@ -211,7 +212,8 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     }
     if (!block_column_entries_.empty()) {
         // check unused option text
-        if (const SearchOptions options(src_match_tensor_expr_->options_text_); options.size() != options.options_.count("topn")) {
+        if (const SearchOptions options(src_match_tensor_expr_->options_text_);
+            options.size() != options.options_.count("topn") + options.options_.count("threshold")) {
             RecoverableError(Status::SyntaxError(fmt::format(R"(Input option text "{}" has unused part.)", src_match_tensor_expr_->options_text_)));
         }
     }

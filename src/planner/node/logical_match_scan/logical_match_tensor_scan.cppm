@@ -63,6 +63,7 @@ public:
     // extra options
     // will be parsed in InitExtraOptions()
     u32 topn_ = 0;
+    Optional<f32> knn_threshold_;
     SharedPtr<MatchTensorScanIndexOptions> index_options_;
 };
 
