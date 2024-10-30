@@ -320,8 +320,9 @@ public:
 
         // query <-> PQ chunk centers distances
         pq_table_->PreprocessQuery(query_rotated);
-        f32 *pq_dists = pq_query_scratch->aligned_pqtable_dist_scratch_;
-        pq_table_->PopulateChunkDistances(query_rotated, pq_dists);
+        f32 *pq_dists =
+            pq_query_scratch->aligned_pqtable_dist_scratch_;        // pq_dists stores query to each PQ chunk centers distances (n_chunks * n_centers)
+        pq_table_->PopulateChunkDistances(query_rotated, pq_dists); // populate pq_dists
 
         // query <-> neighbor list
         f32 *dist_scratch = pq_query_scratch->aligned_dist_scratch_;
@@ -329,8 +330,12 @@ public:
 
         // lamda to batch compute query<-> node distances in PQ space
         auto compute_dists = [this, pq_coord_scratch, pq_dists](const SizeT *ids, const SizeT n_ids, f32 *dists_out) {
-            AggregateCoords(ids, n_ids, this->data_.get(), this->n_chunks_, pq_coord_scratch); // aggregate pq compressed coords of ids into pq_coord_scratch
-            PqDistLookup(pq_coord_scratch, n_ids, this->n_chunks_, pq_dists, dists_out); // compute distances in PQ
+            AggregateCoords(ids,
+                            n_ids,
+                            this->data_.get(),
+                            this->n_chunks_,
+                            pq_coord_scratch); // aggregate pq compressed coords of ids into pq_coord_scratch
+            PqDistLookup(pq_coord_scratch, n_ids, this->n_chunks_, pq_dists, dists_out); // lookup distances in pq_dists
         };
 
         // bind query scratch data
@@ -500,11 +505,10 @@ public:
 
             hops++;
         } // beam search end
-        
-        LOG_DEBUG(fmt::format("Beam search hops {}: {} nodes expanded, {} cmps, {} hops, {} ios", hops, full_retset.size(), cmps, hops, num_ios));
+
+        // LOG_DEBUG(fmt::format("Beam search hops {}: {} nodes expanded, {} cmps,  {} ios", hops, full_retset.size(), cmps, num_ios));
         // copy the top k results to the output buffer
         std::sort(full_retset.begin(), full_retset.end());
-        LOG_DEBUG(fmt::format("full_retset[0]={},{}, full_retset[1]={},{}", full_retset[0].id, full_retset[0].distance, full_retset[1].id, full_retset[1].distance));
         for (u64 i = 0; i < k_search; i++) {
             indices[i] = full_retset[i].id;
             auto key = indices[i];
@@ -521,18 +525,24 @@ public:
                 }
             }
         }
+
+        // delete[] data;
     }
 
 private:
     // read pq compressed vectors from disk to this->data_
     void LoadPqCompressedVec(std::string pq_compressed_vectors_path) {
         this->data_ = MakeUnique<u8[]>(this->num_points_ * this->n_chunks_);
+        auto read_buf = MakeUnique<u32[]>(this->num_points_ * this->n_chunks_ * sizeof(u32));
         auto [pq_data_handle, status] = VirtualStore::Open(pq_compressed_vectors_path, FileAccessMode::kRead);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
 
-        pq_data_handle->Read(this->data_.get(), this->num_points_ * this->n_chunks_);
+        pq_data_handle->Read(read_buf.get(), this->num_points_ * this->n_chunks_ * sizeof(u32));
+        for (u64 i = 0; i < this->num_points_ * this->n_chunks_; i++) {
+            this->data_[i] = static_cast<u8>(read_buf[i]);
+        }
     }
 
     // read the data of the medoid nodes

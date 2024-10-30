@@ -443,24 +443,24 @@ public:
         pq_table_handle->Read(file_offset_data.get(), 4 * sizeof(SizeT));
 
         // read table data
-        LOG_DEBUG(fmt::format("read table data"));
         u64 num_centers = (file_offset_data[1] - file_offset_data[0]) / (ndims_ * sizeof(f32)); // rows of table
         this->num_centers_ = num_centers;
         pq_table_handle->Seek(file_offset_data[0]);
         this->tables_ = MakeUnique<f32[]>(num_centers * ndims_);
         pq_table_handle->Read(tables_.get(), num_centers * ndims_ * sizeof(f32));
+        LOG_DEBUG(fmt::format("FixedChunkPQTable read table data, num_centers: {}", num_centers));
 
         // read centroid
-        LOG_DEBUG(fmt::format("read centroid"));
         pq_table_handle->Seek(file_offset_data[1]);
         this->centroid_ = MakeUnique<f32[]>(ndims_);
         pq_table_handle->Read(centroid_.get(), ndims_ * sizeof(f32));
+        LOG_DEBUG(fmt::format("read centroid, centroid_[0]: {}", centroid_[0]));
 
         // read chunk offsets
-        LOG_DEBUG(fmt::format("read chunk offsets"));
         pq_table_handle->Seek(file_offset_data[2]);
         this->chunk_offsets_ = MakeUnique<u32[]>(num_chunks + 1);
         pq_table_handle->Read(chunk_offsets_.get(), file_offset_data[3] - file_offset_data[2]);
+        LOG_DEBUG(fmt::format("read chunk offsets, chunk_offsets_[0]: {}, chunk_offsets_[1]: {}", chunk_offsets_[0], chunk_offsets_[1]));
 
         pq_table_handle.reset();
 

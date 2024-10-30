@@ -91,7 +91,7 @@ private:
         SizeT npts = data_num_;
         SizeT ndims = dimension_;
         SizeT actual_file_size = 0;
-        u32 width; 
+        u32 width;
         SizeT medoid, vamana_frozen_num, vamana_frozen_loc = 0;
         mem_index_file_handle.Read(&actual_file_size, sizeof(SizeT));
         mem_index_file_handle.Read(&width, sizeof(u32));

@@ -38,7 +38,7 @@ public:
         u32 dim = 100;
         u32 num_points = 10000;
         u32 R = 32;
-        u32 L = 1000;
+        u32 L = 100;
         u32 num_pq_chunks = 4;
         u32 num_parts = 1;
         u32 num_centers = 256;
@@ -48,11 +48,6 @@ public:
             labels[i] = i;
         }
         auto data = MakeUnique<f32[]>(dim * num_points);
-        // std::fill(data.get(), data.get() + dim * num_points, 1.0f);
-        // for (u32 i = 0; i < num_points; i++) {
-        //     u32 non_zero_dim = i / 1000;
-        //     data[i * dim + non_zero_dim] = 1.0f;
-        // }
         std::mt19937 rng;
         rng.seed(0);
         std::uniform_real_distribution<float> distrib_real;
@@ -77,21 +72,17 @@ public:
                 auto disk_data = DiskAnnIndexDataType::Make(dim, num_points, R, L, num_pq_chunks, num_parts, num_centers);
 
                 disk_data->BuildIndex(dim,
-                                    num_points,
-                                    labels,
-                                    Path(data_file_path),
-                                    Path(mem_index_path),
-                                    Path(index_file_path),
-                                    Path(pqCompressed_data_path),
-                                    Path(sample_data_path),
-                                    Path(pq_pivot_data_path));
-
-                std::cout << "Index built successfully" << std::endl;
-
+                                      num_points,
+                                      labels,
+                                      Path(data_file_path),
+                                      Path(mem_index_path),
+                                      Path(index_file_path),
+                                      Path(pqCompressed_data_path),
+                                      Path(sample_data_path),
+                                      Path(pq_pivot_data_path));
                 // disk_data->UnitTest();
             }
         }
-        
 
         // Test search index
         {
@@ -109,23 +100,20 @@ public:
             pq_flash_index->LoadCacheList(cache_node_list);
             // 4. search and coompute recall
             u64 hits = 0;
-            u32 num_queries = 100;
+            u32 num_queries = 10000;
+            std::vector<u32> hit_labels;
+            u64 beam_width = 2;
+            UniquePtr<u64[]> indices = MakeUnique<u64[]>(1);
+            UniquePtr<f32[]> distances = MakeUnique<f32[]>(1);
             for (u32 i = 0; i < num_queries; i++) {
-            // for (u32 i = 0; i < 1; i++) {
-                UniquePtr<u64[]> indices = MakeUnique<u64[]>(1);
-                UniquePtr<f32[]> distances = MakeUnique<f32[]>(1);
-                u64 beam_width = 2;
                 pq_flash_index->CachedBeamSearch(data.get() + i * dim, 1, 100, indices.get(), distances.get(), beam_width);
                 if (indices[0] == i) {
                     hits++;
+                    hit_labels.push_back(i);
                 }
             }
-            f32 recall = (f32)hits / (f32)num_queries;
-            std::cout << "Recall: " << recall << std::endl;
-            // EXPECT_EQ(hits, 1);
             EXPECT_GT(recall, 0.95);
         }
-        
     }
 };
 
