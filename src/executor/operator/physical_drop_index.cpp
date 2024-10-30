@@ -42,7 +42,7 @@ bool PhysicalDropIndex::Execute(QueryContext *query_context, OperatorState *oper
     }
 
     if (storage_mode != StorageMode::kWritable) {
-        operator_state->status_ = Status::InvalidNodeRole("Attempt to flush on non-writable node");
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
         operator_state->SetComplete();
         return true;
     }
