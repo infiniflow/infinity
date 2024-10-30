@@ -42,8 +42,8 @@ storage_type             = "minio"
 [storage.object_storage]
 url                      = "127.0.0.1:9000"
 bucket_name              = "infinity"
-access_key               = "rag_flow"
-secret_key               = "infini_rag_flow"
+access_key               = "minioadmin"
+secret_key               = "minioadmin"
 enable_https             = false
 
 [buffer]
