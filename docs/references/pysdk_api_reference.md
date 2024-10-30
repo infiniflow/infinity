@@ -855,7 +855,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
 - **index_type**: `IndexType`, *Required*  
   Index type. You may want to import `infinity.index` to set `IndexType`: `from infinity.index import IndexType`  
   - `Hnsw`: An HNSW index. Works with dense vectors, and multivectors only.
-  - `IVF`: An IVF index. Works with dense vectors, and multivectors only.
+  - `IVF`: An IVF index. Works with dense vectors and multivectors only.
   - `FullText`: A full-text index.  
   - `Secondary`: A secondary index. Works with structured data only.
   - `BMP`: A Block-Max Pruning index. Works with sparse vectors only.
@@ -872,7 +872,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"plain"`: (Default) Plain encoding.
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
   - Parameter settings for an IVF index:
-    - `"metric"` *Required* - The distance metric to use in similarity search.
+    - `"metric"` *Required* - The distance metric to use in a similarity search.
       - `"ip"`: Inner product.
       - `"l2"`: Euclidean distance.
       - `"cosine"`: Cosine similarity.

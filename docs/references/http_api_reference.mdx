@@ -1945,7 +1945,7 @@ curl --request GET \
         - If you do not set `"ef"` or set it to a value lower than `topn`, the search uses the `topn` value as the value for `"ef"`.
       - `"threshold"`: `str`, *Optional* A threshold value for the search.
         - For example, if you use the `"cosine"` distance metric and set `"threshold"` to `"0.5"`, the search will return only those rows with a cosine similarity greater than `0.5`.
-      - `"nprobe"`: `str`, *Optional* The number of cells to search for the IVF index. The default value is `"1"`.
+      - `"nprobe"`: `str`, *Optional* The number of cells to search in the IVF index. The default value is `"1"`.
     - If you set `"match_method"` to `"sparse"`:  
       - `"alpha"`: `str`  
         `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Termination Conditions" parameter. The smaller the value, the more aggressive the pruning.
