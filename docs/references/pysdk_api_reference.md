@@ -1778,12 +1778,15 @@ An integer indicating the number of nearest neighbours to return.
 
 #### knn_params: `dict[str, str]`, *Optional*
 
-A dictionary representing additional KNN or ANN search parameters. Currently only `"ef"` is supported.
+A dictionary representing additional KNN or ANN search parameters.
 
 - `"ef"`: `str`, Recommended value: one to ten times the value of `topn`.  
   - For example, if you set `topn` to `10`, you can set `"ef"` to `"50"`.
   - If you set `"ef"` too high, search performance may worsen.  
   - If you do not set `"ef"` or set it to a value lower than `topn`, the search uses the `topn` value as the value for `"ef"`.
+- `"threshold"`: `str`, *Optional* A threshold value for the search.
+  - For example, if you use the `"cosine"` distance metric and set `"threshold"` to `"0.5"`, the search will return only those rows with a cosine similarity greater than `0.5`.
+- `"nprobe"`: `str`, *Optional* The number of cells to search for the IVF index. The default value is `"1"`.
 
 ### Returns
 
