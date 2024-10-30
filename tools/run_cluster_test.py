@@ -40,6 +40,14 @@ if __name__ == "__main__":
         cmd.append("--docker")
     process = subprocess.Popen(cmd)
     process.wait()
+
+    cmd = [
+        python_executable,
+        f"{python_test_dir}/test_cluster/clear_docker.py",
+    ]
+    if docker:
+        cmd.append("--docker")
+    process2 = subprocess.run(cmd)
     if process.returncode != 0:
         print(f"An error occurred: {process.stderr}")
         sys.exit(-1)

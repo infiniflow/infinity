@@ -107,8 +107,8 @@ class DockerInfinityRunner(BaseInfinityRunner):
         exit_code, output = self.container.exec_run(f"bash -c '{run_cmds}'")
         print(f"uninit infinity: {output}")
         # assert exit_code is None or exit_code == 0
-        self.container.stop()
-        self.container.remove(force=True, v=True)
+        # self.container.stop()
+        # self.container.remove(force=True, v=True)
 
         if os.path.exists(self.config_path):
             os.remove(self.config_path)
@@ -162,14 +162,19 @@ class DockerInfinityCluster(InfinityCluster):
         docker_client = docker.from_env()
         self.image_name = image_name
 
-        self.network = docker_client.networks.create(
-            "infinity_network",
-            driver="bridge",
-        )
+        network_name = "infinity_network"
+        try:
+            self.network = docker_client.networks.get(network_name)
+        except docker.errors.NotFound:
+            self.network = docker_client.networks.create(
+                network_name,
+                driver="bridge",
+            )
 
         if minio_params is not None:
-            self.add_minio(minio_params, False)
-            self.network.connect(self.minio_container)
+            add = self.add_minio(minio_params, False)
+            if add:
+                self.network.connect(self.minio_container)
             info = docker_client.api.inspect_network(self.network.id)
             minio_ip = info["Containers"][self.minio_container.id]["IPv4Address"]
             minio_ip = minio_ip.split("/")[0]
@@ -177,10 +182,10 @@ class DockerInfinityCluster(InfinityCluster):
             self.minio_params = minio_params
 
     def clear(self):
+        super().clear()
         for runner in self.runners.values():
             runner.uninit()
-        self.minio_container.remove(force=True, v=True)
-        self.network.remove()
+        # self.network.remove()
 
     def add_node(self, node_name: str, config_path: str):
         if node_name in self.runners:
@@ -188,16 +193,23 @@ class DockerInfinityCluster(InfinityCluster):
         container_name, cpus, tz = self.__init_docker_params()
         pwd = os.getcwd()
         docker_client = docker.from_env()
-        container = docker_client.containers.run(
-            image=self.image_name,
-            name=container_name,
-            detach=True,
-            cpuset_cpus=f"0-{cpus - 1}",
-            volumes=[f"{pwd}:/infinity", "/boot:/boot"],
-            environment=[f"TZ={tz}"],
-        )
 
-        self.network.connect(container)
+        try:
+            container = docker_client.containers.get(container_name)
+            added = False
+        except docker.errors.NotFound:
+            container = docker_client.containers.run(
+                image=self.image_name,
+                name=container_name,
+                detach=True,
+                cpuset_cpus=f"0-{cpus - 1}",
+                volumes=[f"{pwd}:/infinity", "/boot:/boot"],
+                environment=[f"TZ={tz}"],
+            )
+            added = True
+
+        if added:
+            self.network.connect(container)
         info = docker_client.api.inspect_network(self.network.id)
         # print(info)
         mock_ip = info["Containers"][container.id]["IPv4Address"]
@@ -239,7 +251,7 @@ class DockerInfinityCluster(InfinityCluster):
         cur_runner.mock_ip = mock_ip
 
     def __init_docker_params(self):
-        container_name = f"infinity_build_{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}"
+        container_name = f"infinity_build_{len(self.runners)}"
         cpus = os.cpu_count()
         tz = os.readlink("/etc/localtime").split("/zoneinfo/")[1]
         return container_name, cpus, tz

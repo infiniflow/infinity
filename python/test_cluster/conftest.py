@@ -44,13 +44,18 @@ def pytest_generate_tests(metafunc):
     minio_dir = metafunc.config.getoption("minio_dir")
     minio_port = metafunc.config.getoption("minio_port")
     minio_params = MinioParams(minio_dir, minio_port)
-    print(metafunc.fixturenames)
-    if "cluster" in metafunc.fixturenames:
-        infinity_cluster = InfinityCluster(infinity_path, minio_params=minio_params)
-        metafunc.parametrize("cluster", [infinity_cluster])
-    elif "mock_cluster" in metafunc.fixturenames:
-        mock_infinity_cluster = MockInfinityCluster(infinity_path, minio_params=minio_params)
-        metafunc.parametrize("mock_cluster", [mock_infinity_cluster])
-    elif "docker_cluster" in metafunc.fixturenames:
-        docker_infinity_cluster = DockerInfinityCluster(infinity_path, minio_params=minio_params)
-        metafunc.parametrize("docker_cluster", [docker_infinity_cluster])
+    # print(metafunc.fixturenames)
+
+    if metafunc.config.getoption("--docker"):
+        print("Docker argument is provided")
+        if "docker_cluster" in metafunc.fixturenames:
+            docker_infinity_cluster = DockerInfinityCluster(infinity_path, minio_params=minio_params)
+            metafunc.parametrize("docker_cluster", [docker_infinity_cluster])
+    else:
+        print("Docker argument is not provided")
+        if "cluster" in metafunc.fixturenames:
+            infinity_cluster = InfinityCluster(infinity_path, minio_params=minio_params)
+            metafunc.parametrize("cluster", [infinity_cluster])
+        elif "mock_cluster" in metafunc.fixturenames:
+            mock_infinity_cluster = MockInfinityCluster(infinity_path, minio_params=minio_params)
+            metafunc.parametrize("mock_cluster", [mock_infinity_cluster])

@@ -154,6 +154,8 @@ class InfinityCluster:
     def clear(self):
         for runner in self.runners.values():
             runner.uninit()
+        # if self.minio_container is not None:
+        #     self.minio_container.remove(force=True, v=True)
 
     def add_node(self, node_name: str, config_path: str):
         runner = InfinityRunner(node_name, self.executable_path, config_path)
@@ -161,27 +163,35 @@ class InfinityCluster:
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner
 
-    def add_minio(self, minio_params: MinioParams, host_net: bool):
+    def add_minio(self, minio_params: MinioParams, host_net: bool) -> bool:
         minio_image_name = "quay.io/minio/minio"
-        container_name = f"minio_{"".join(random.choices(string.ascii_lowercase + string.digits, k=8))}"
 
         minio_cmd = f'server /data --console-address ":{minio_params.minio_port}"'
         docker_client = docker.from_env()
         kargs = {}
         if host_net:
             kargs = {"network": "host"}
-        self.minio_container = docker_client.containers.run(
-            image=minio_image_name,
-            name=container_name,
-            detach=True,
-            environment=[
-                "MINIO_ROOT_PASSWORD=minioadmin",
-                "MINIO_ROOT_USER=minioadmin",
-            ],
-            volumes=[f"{minio_params.minio_dir}:/data"],
-            command=minio_cmd,
-            **kargs,
-        )
+            container_name = "minio_host"
+        else:
+            container_name = "minio_docker"
+
+        try:
+            self.minio_container = docker_client.containers.get(container_name)
+            return False
+        except docker.errors.NotFound:
+            self.minio_container = docker_client.containers.run(
+                image=minio_image_name,
+                name=container_name,
+                detach=True,
+                environment=[
+                    "MINIO_ROOT_PASSWORD=minioadmin",
+                    "MINIO_ROOT_USER=minioadmin",
+                ],
+                volumes=[f"{minio_params.minio_dir}:/data"],
+                command=minio_cmd,
+                **kargs,
+            )
+            return True
 
     def init_standalone(self, node_name: str):
         if node_name not in self.runners:
