@@ -53,11 +53,10 @@ public:
     [[nodiscard]] inline ThreadPool &GetHnswBuildThreadPool() { return hnsw_build_thread_pool_; }
 
     NodeRole GetServerRole() const;
-    void SetServerRole(NodeRole server_role);
 
     void Init(const SharedPtr<String> &config_path, bool admin_flag = false, DefaultConfig *default_config = nullptr);
-//    void InitAdminMode(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
-    Status ChangeRole(NodeRole target_role, bool from_leader = false, const String& node_name = {}, String leader_ip = {}, i16 leader_port = {});
+    //    void InitAdminMode(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
+    Status ChangeRole(NodeRole target_role, bool from_leader = false, const String &node_name = {}, String leader_ip = {}, i16 leader_port = {});
     bool IsAdminRole() const { return GetServerRole() == NodeRole::kAdmin; }
     bool IsClusterRole() const;
 
@@ -69,6 +68,7 @@ public:
     void AddThriftServerFn(std::function<void()> start_func, std::function<void()> stop_func);
     void StartThriftServers();
     void StopThriftServers();
+
 private:
     friend class Singleton;
 
@@ -89,7 +89,6 @@ private:
     ThreadPool hnsw_build_thread_pool_{4};
 
     mutable std::mutex mutex_;
-    NodeRole current_server_role_{NodeRole::kUnInitialized};
 
     std::function<void()> start_servers_func_{};
     std::function<void()> stop_servers_func_{};

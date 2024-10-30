@@ -138,6 +138,7 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
+        response.sender_status = infinity_peer_server::NodeStatus::type::kRemoved;
         response.error_message = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(server_role));
     }
     return;
