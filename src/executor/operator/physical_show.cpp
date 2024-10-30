@@ -1051,7 +1051,21 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("index_comment");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
 
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(*(table_index_info->index_comment_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
     {
         SizeT column_id = 0;
         {
