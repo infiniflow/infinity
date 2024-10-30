@@ -761,6 +761,7 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER COMMENT STRING {
 
     create_index_info->index_info_ = $6;
     create_index_info->comment_ = $8;
+    free($8);
 
     if(create_index_info->index_name_.empty()) {
         yyerror(&yyloc, scanner, result, "No index name");
