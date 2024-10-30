@@ -53,6 +53,8 @@ class TableMeta;
 class Txn;
 struct Catalog;
 class AddTableEntryOp;
+class SegmentIndexEntry;
+class ChunkIndexEntry;
 
 export struct TableEntry final : public BaseEntry {
     friend struct Catalog;
@@ -288,6 +290,10 @@ public:
     }
 
     void InvalidateFullTextIndexCache(TableIndexEntry *table_index_entry);
+
+    void InvalidateFullTextSegmentIndexCache(SegmentIndexEntry *segment_index_entry);
+
+    void InvalidateFullTextChunkIndexCache(ChunkIndexEntry *chunk_index_entry);
 
 private:
     TableMeta *table_meta_{};

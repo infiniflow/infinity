@@ -41,6 +41,11 @@ public:
     Pair<u64, float> GetTotalDfAndAvgColumnLength();
 
     optionflag_t GetOptionFlag() const { return flag_; }
+
+    void InvalidateSegment(SegmentID segment_id);
+
+    void InvalidateChunk(SegmentID segment_id, ChunkID chunk_id);
+
 private:
     optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
@@ -82,6 +87,10 @@ public:
     void Invalidate();
 
     void InvalidateColumn(u64 column_id, const String &column_name);
+
+    void InvalidateSegmentColumn(u64 column_id, SegmentID segment_id);
+
+    void InvalidateChunkColumn(u64 column_id, SegmentID segment_id, ChunkID chunk_id);
 
 private:
     std::mutex mutex_;

@@ -28,7 +28,7 @@ import internal_types;
 namespace infinity {
 export class InMemIndexSegmentReader : public IndexSegmentReader {
 public:
-    InMemIndexSegmentReader(MemoryIndexer *memory_indexer);
+    InMemIndexSegmentReader(SegmentID segment_id, MemoryIndexer *memory_indexer);
     virtual ~InMemIndexSegmentReader() = default;
 
     bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position = true) const override;
