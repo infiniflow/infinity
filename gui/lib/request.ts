@@ -2,20 +2,20 @@ const baseUrl = 'http://127.0.0.1:23820/';
 
 export const request = async (
   url: string,
-  params: Record<string, any> = {},
+  params: Record<string, unknown> = {},
   method: string = 'GET'
 ) => {
   let nextUrl = `${baseUrl}${url}`;
-  const options: any = {
+  const options: RequestInit = {
     headers: {
       accept: 'application/json'
     },
-    cache: 'no-store',
     method
   };
 
   if (method === 'GET') {
-    nextUrl += '?' + new URLSearchParams(params).toString();
+    nextUrl +=
+      '?' + new URLSearchParams(params as Record<string, string>).toString();
   } else {
     options.body = JSON.stringify(params);
   }
@@ -32,7 +32,7 @@ export const request = async (
 export const get = (url: string, params?: Record<string, string>) =>
   request(url, params, 'GET');
 
-export const post = (url: string, params: Record<string, any>) =>
+export const post = (url: string, params: Record<string, unknown>) =>
   request(url, params, 'POST');
 
 export const drop = (url: string, params: Record<string, string>) =>

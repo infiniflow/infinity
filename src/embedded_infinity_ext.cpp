@@ -50,7 +50,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("column_fields", &WrapQueryResult::column_fields)
         .def_rw("database_name", &WrapQueryResult::database_name)
         .def_rw("store_dir", &WrapQueryResult::store_dir)
-        .def_rw("table_count", &WrapQueryResult::table_count);
+        .def_rw("table_count", &WrapQueryResult::table_count)
+        .def_rw("comment", &WrapQueryResult::comment);
 
     nb::class_<WrapColumnField>(m, "WrapColumnField")
         .def(nb::init<>())
@@ -90,7 +91,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("column_type", &WrapColumnDef::column_type)
         .def_rw("column_name", &WrapColumnDef::column_name)
         .def_rw("constraints", &WrapColumnDef::constraints)
-        .def_rw("constant_expr", &WrapColumnDef::constant_expr);
+        .def_rw("constant_expr", &WrapColumnDef::constant_expr)
+        .def_rw("comment", &WrapColumnDef::comment);
 
     nb::class_<WrapEmbeddingType>(m, "WrapEmbeddingType")
         .def(nb::init<>())
@@ -222,11 +224,17 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("search_expr", &WrapParsedExpr::search_expr)
         .def_rw("in_expr", &WrapParsedExpr::in_expr);
 
-    //Bind WrapOrderByExpr
+    // Bind WrapOrderByExpr
     nb::class_<WrapOrderByExpr>(m, "WrapOrderByExpr")
         .def(nb::init<WrapParsedExpr, bool>())
         .def_rw("expr", &WrapOrderByExpr::expr)
         .def_rw("asc", &WrapOrderByExpr::asc);
+
+    // Bind WrapInsertRowExpr
+    nb::class_<WrapInsertRowExpr>(m, "WrapInsertRowExpr")
+        .def(nb::init<>())
+        .def_rw("columns", &WrapInsertRowExpr::columns)
+        .def_rw("values", &WrapInsertRowExpr::values);
 
     // infinity
     nb::class_<Infinity>(m, "Infinity")
@@ -259,6 +267,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def("ShowVariables", &WrapShowVariables)
         .def("ShowConfig", &WrapShowConfig)
         .def("ShowConfigs", &WrapShowConfigs)
+        .def("ShowInfo", &WrapShowInfo, nb::arg("info_name"))
 
         .def("Query", &WrapQuery)
 
@@ -295,15 +304,22 @@ NB_MODULE(embedded_infinity_ext, m) {
              nb::arg("db_name"),
              nb::arg("table_name"),
              nb::arg("explain_type"),
-             nb::arg("wrap_output_columns"),
+             nb::arg("select_list"),
+             nb::arg("highlight_list"),
+             nb::arg("order_by_list"),
+             nb::arg("group_by_list"),
              nb::arg("wrap_search_expr") = nullptr,
-             nb::arg("wrap_filter") = nullptr)
+             nb::arg("where_expr") = nullptr,
+             nb::arg("limit_expr") = nullptr,
+             nb::arg("offset_expr") = nullptr)
         .def("Search",
              &WrapSearch,
              nb::arg("db_name"),
              nb::arg("table_name"),
              nb::arg("select_list"),
+             nb::arg("highlight_list"),
              nb::arg("order_by_list"),
+             nb::arg("group_by_list"),
              nb::arg("wrap_search_expr") = nullptr,
              nb::arg("where_expr") = nullptr,
              nb::arg("limit_expr") = nullptr,

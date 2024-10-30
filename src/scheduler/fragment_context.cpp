@@ -112,7 +112,8 @@ UniquePtr<OperatorState> MakeMatchTensorScanState(const PhysicalMatchTensorScan 
         UnrecoverableError(error_message);
     }
     auto operator_state = MakeUnique<MatchTensorScanOperatorState>();
-    operator_state->match_tensor_scan_function_data_ = MakeUnique<MatchTensorScanFunctionData>(physical_match_tensor_scan->GetTopN());
+    operator_state->match_tensor_scan_function_data_ =
+        MakeUnique<MatchTensorScanFunctionData>(physical_match_tensor_scan->GetTopN(), physical_match_tensor_scan->GetKnnThreshold());
     return operator_state;
 }
 
@@ -479,6 +480,9 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         }
         case PhysicalOperatorType::kAlter: {
             return MakeTaskStateTemplate<AlterOperatorState>(physical_ops[operator_id]);
+        }
+        case PhysicalOperatorType::kReadCache: {
+            return MakeTaskStateTemplate<ReadCacheState>(physical_ops[operator_id]);
         }
         default: {
             String error_message = fmt::format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type()));
@@ -1005,7 +1009,8 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kOptimize:
         case PhysicalOperatorType::kFlush:
         case PhysicalOperatorType::kCompactFinish:
-        case PhysicalOperatorType::kCompactIndexPrepare: {
+        case PhysicalOperatorType::kCompactIndexPrepare:
+        case PhysicalOperatorType::kReadCache: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -1115,7 +1120,6 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             tasks_[0]->sink_state_ = MakeUnique<QueueSinkState>(plan_fragment_ptr_->FragmentID(), 0);
             break;
         }
-
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kShow: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
@@ -1134,6 +1138,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             sink_state_ptr->column_names_ = last_operator->GetOutputNames();
             break;
         }
+        case PhysicalOperatorType::kReadCache:
         case PhysicalOperatorType::kMatch: {
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
                 tasks_[task_id]->sink_state_ = MakeUnique<QueueSinkState>(plan_fragment_ptr_->FragmentID(), task_id);
@@ -1322,6 +1327,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count, FragmentCon
             }
             break;
         }
+        case PhysicalOperatorType::kReadCache:
         case PhysicalOperatorType::kMatch:
         case PhysicalOperatorType::kMergeKnn:
         case PhysicalOperatorType::kMergeMatchTensor:
@@ -1441,6 +1447,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
                 result_table->UpdateRowCount(data_block->row_count());
                 result_table->data_blocks_.emplace_back(std::move(data_block));
             }
+            materialize_sink_state->data_block_array_.clear();
             //            result_table->data_blocks_ = std::move(materialize_sink_state->data_block_array_);
             return result_table;
         }
@@ -1523,6 +1530,7 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
         for (auto &result_data_block : materialize_sink_state->data_block_array_) {
             result_table->Append(std::move(result_data_block));
         }
+        materialize_sink_state->data_block_array_.clear();
     }
 
     return result_table;
@@ -1572,6 +1580,7 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
         for (auto &result_data_block : materialize_sink_state->data_block_array_) {
             result_table->Append(std::move(result_data_block));
         }
+        materialize_sink_state->data_block_array_.clear();
     }
 
     return result_table;

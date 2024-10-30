@@ -112,7 +112,7 @@ TEST_P(TableEntryTest, decode_index_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
 
@@ -147,7 +147,7 @@ TEST_P(TableEntryTest,  create_no_name_index_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
@@ -204,7 +204,7 @@ TEST_P(TableEntryTest,  remove_index_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
@@ -270,7 +270,7 @@ TEST_P(TableEntryTest,  table_indexes_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
@@ -336,7 +336,7 @@ TEST_P(TableEntryTest,  get_fulltext_analyzers_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -404,7 +404,7 @@ TEST_P(TableEntryTest,  optimize_fulltext_index_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -481,7 +481,7 @@ TEST_P(TableEntryTest,  roll_back_committed_write_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -568,7 +568,7 @@ TEST_P(TableEntryTest,  roll_back_uncommitted_write_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -653,7 +653,7 @@ TEST_P(TableEntryTest,  compact_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -701,7 +701,7 @@ TEST_P(TableEntryTest,  check_any_delete_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -759,7 +759,7 @@ TEST_P(TableEntryTest, serialize_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints, std::shared_ptr<ParsedExpr>(const_expr));
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -827,7 +827,7 @@ TEST_P(TableEntryTest, deserialize_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints, std::shared_ptr<ParsedExpr>(const_expr));
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -895,7 +895,7 @@ TEST_P(TableEntryTest, get_colunm_id_by_name_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints, std::shared_ptr<ParsedExpr>(const_expr));
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);

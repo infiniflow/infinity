@@ -25,6 +25,7 @@ import peer_task;
 import status;
 import infinity_exception;
 import cluster_manager;
+import admin_statement;
 
 namespace infinity {
 
@@ -32,8 +33,8 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
 
     LOG_TRACE("Get Register request");
     // This must be a leader node.
-    NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
-    if (leader_node->node_role_ == NodeRole::kLeader) {
+    NodeRole server_role = InfinityContext::instance().GetServerRole();
+    if (server_role == NodeRole::kLeader) {
         SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
         non_leader_node_info->node_name_ = request.node_name;
         switch (request.node_type) {
@@ -47,7 +48,6 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
             }
             default: {
                 String error_message = fmt::format("Invalid node type: {}", infinity_peer_server::to_string(request.node_type));
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -62,6 +62,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         Status status = InfinityContext::instance().cluster_manager()->AddNodeInfo(non_leader_node_info);
         if (status.ok()) {
             LOG_INFO(fmt::format("Node: {} registered as {}.", request.node_name, infinity_peer_server::to_string(request.node_type)));
+            NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
             response.leader_name = leader_node->node_name_;
             response.leader_term = leader_node->leader_term_;
             response.heart_beat_interval = leader_node->heartbeat_interval_;
@@ -71,7 +72,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = fmt::format("Attempt to register a non-leader node: {}", ToString(leader_node->node_role_));
+        response.error_message = "Attempt to register a non-leader node";
     }
 
     return;
@@ -79,9 +80,9 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
 
 void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterResponse &response, const infinity_peer_server::UnregisterRequest &request) {
     LOG_TRACE("Get Unregister request");
-    NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
-    if (leader_node->node_role_ == NodeRole::kLeader) {
-        Status status = InfinityContext::instance().cluster_manager()->RemoveNode(request.node_name);
+    NodeRole server_role = InfinityContext::instance().GetServerRole();
+    if (server_role == NodeRole::kLeader) {
+        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(request.node_name, UpdateNodeOp::kRemove);
         if (!status.ok()) {
             response.error_code = static_cast<i64>(status.code_);
             response.error_message = status.message();
@@ -89,15 +90,15 @@ void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterRespons
         LOG_INFO(fmt::format("Node: {} unregistered from leader.", request.node_name));
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = fmt::format("Attempt to unregister from a non-leader node: {}", ToString(leader_node->node_role_));
+        response.error_message = "Attempt to unregister from a non-leader node";
     }
     return;
 }
 
 void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse &response, const infinity_peer_server::HeartBeatRequest &request) {
-    LOG_TRACE("Get HeartBeat request");
-    NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
-    if (leader_node->node_role_ == NodeRole::kLeader) {
+    LOG_DEBUG("Get HeartBeat request");
+    NodeRole server_role = InfinityContext::instance().GetServerRole();
+    if (server_role == NodeRole::kLeader) {
         SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
         non_leader_node_info->node_name_ = request.node_name;
         switch (request.node_type) {
@@ -115,7 +116,6 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
             }
             default: {
                 String error_message = "Invalid node type";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -130,21 +130,34 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
 
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeInfoByHeartBeat(non_leader_node_info,
                                                                                                  response.other_nodes,
-                                                                                                 response.leader_term);
+                                                                                                 response.leader_term,
+                                                                                                 response.sender_status);
         if (!status.ok()) {
             response.error_code = static_cast<i64>(status.code());
             response.error_message = status.message();
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = fmt::format("Attempt to heatbeat from a non-leader node: {}", ToString(leader_node->node_role_));
+        response.error_message = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(server_role));
     }
     return;
 }
 
 void PeerServerThriftService::SyncLog(infinity_peer_server::SyncLogResponse &response, const infinity_peer_server::SyncLogRequest &request) {
     LOG_INFO("Get SyncLog request");
-    Status status = InfinityContext::instance().cluster_manager()->ApplySyncedLogNolock(request.log_entries);
+    if (request.log_entries.size() == 0) {
+        UnrecoverableError("No log is synced from leader node");
+    }
+
+    InfinityContext::instance().storage()->wal_manager()->FlushLogByReplication(request.log_entries);
+
+    Status status = Status::OK();
+    if (request.on_startup) {
+        status = InfinityContext::instance().cluster_manager()->ContinueStartup(request.log_entries);
+    } else {
+        status = InfinityContext::instance().cluster_manager()->ApplySyncedLogNolock(request.log_entries);
+    }
+
     if (!status.ok()) {
         response.error_code = static_cast<i64>(status.code());
         response.error_message = status.message();
@@ -153,7 +166,21 @@ void PeerServerThriftService::SyncLog(infinity_peer_server::SyncLogResponse &res
 }
 
 void PeerServerThriftService::ChangeRole(infinity_peer_server::ChangeRoleResponse &response, const infinity_peer_server::ChangeRoleRequest &request) {
-    LOG_INFO("Get ChangeRole request");
+    Status status = Status::OK();
+    switch (request.node_type) {
+        case infinity_peer_server::NodeType::kAdmin: {
+            status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin, true);
+            break;
+        }
+        default: {
+            UnrecoverableError("Not support to change to other type of node");
+        }
+    }
+
+    if (!status.ok()) {
+        response.error_code = static_cast<i64>(status.code());
+        response.error_message = status.message();
+    }
     return;
 }
 

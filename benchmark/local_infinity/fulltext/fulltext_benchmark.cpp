@@ -107,7 +107,7 @@ SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
     CreateDatabaseOptions create_db_options;
     create_db_options.conflict_type_ = ConflictType::kIgnore;
-    infinity->CreateDatabase(db_name, std::move(create_db_options));
+    infinity->CreateDatabase(db_name, std::move(create_db_options), "");
 
     DropTableOptions drop_tb_options;
     drop_tb_options.conflict_type_ = ConflictType::kIgnore;
@@ -119,10 +119,7 @@ SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_
     return infinity;
 }
 
-void BenchmarkImport(SharedPtr<Infinity> infinity,
-                     const String &db_name,
-                     const String &table_name,
-                     const String &import_from) {
+void BenchmarkImport(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, const String &import_from) {
     if (!VirtualStore::Exists(import_from)) {
         LOG_ERROR(fmt::format("Data file doesn't exist: {}", import_from));
         return;
@@ -172,8 +169,8 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
         Vector<String> *columns = new Vector<String>(orig_columns);
         Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         values->reserve(insert_batch);
-        for (SizeT i = 0; i<insert_batch && (num_inserted+i)<num_rows; i++){
-            auto &t = batch_cache[num_inserted+i];
+        for (SizeT i = 0; i < insert_batch && (num_inserted + i) < num_rows; i++) {
+            auto &t = batch_cache[num_inserted + i];
             auto value_list = new Vector<ParsedExpr *>(columns->size());
             const_expr = new ConstantExpr(LiteralType::kString);
             const_expr->str_value_ = std::get<0>(t);
@@ -195,10 +192,7 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
     profiler.End();
 }
 
-void BenchmarkCreateIndex(SharedPtr<Infinity> infinity,
-                          const String &db_name,
-                          const String &table_name,
-                          const String &index_name) {
+void BenchmarkCreateIndex(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, const String &index_name) {
     BaseProfiler profiler;
     profiler.Begin();
     auto index_info = new IndexInfo();
@@ -229,7 +223,11 @@ void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, cons
 
 void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
     std::string fields = "text";
-    std::vector<std::string> query_vec = {"harmful \"social custom\"", "social custom \"harmful chemical\"", "\"annual American awards\"", "harmful chemical", "\"one of\""};
+    std::vector<std::string> query_vec = {"harmful \"social custom\"",
+                                          "social custom \"harmful chemical\"",
+                                          "\"annual American awards\"",
+                                          "harmful chemical",
+                                          "\"one of\""};
 
     for (auto match_text : query_vec) {
         BaseProfiler profiler;
@@ -254,7 +252,7 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
             output_columns->emplace_back(select_rowid_expr);
             output_columns->emplace_back(select_score_expr);
         }
-        infinity->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr);
+        infinity->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr);
         /*
         auto result = infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
         {
@@ -313,12 +311,7 @@ int main(int argc, char *argv[]) {
     // https://github.com/CLIUtils/CLI11/blob/main/examples/enum.cpp
     // Using enumerations in an option
     enum class Mode : u8 { kInsert, kImport, kMerge, kQuery };
-    Map<String, Mode> mode_map{
-        {"insert", Mode::kInsert},
-        {"import", Mode::kImport},
-        {"merge", Mode::kMerge},
-        {"query", Mode::kQuery}
-    };
+    Map<String, Mode> mode_map{{"insert", Mode::kInsert}, {"import", Mode::kImport}, {"merge", Mode::kMerge}, {"query", Mode::kQuery}};
     Mode mode(Mode::kInsert);
     SizeT insert_batch = 500;
     app.add_option("--mode", mode, "Benchmark mode, one of insert, import, merge, query")

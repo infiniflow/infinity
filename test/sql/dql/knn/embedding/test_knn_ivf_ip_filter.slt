@@ -39,21 +39,21 @@ CREATE INDEX idx_ivf__ip ON test_knn_ivf_ip_filter (c2) USING IVF WITH (metric =
 
 # the query will return row 4 from block 1, 2 and 3
 query I
-SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WITH (nprobe = 10);
 ----
 8
 8
 6
 
 query I
-SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WHERE c1 < 7;
+SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WITH (nprobe = 10) WHERE c1 < 7;
 ----
 6
 6
 4
 
 query I
-SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 13) WHERE c1 < 7;
+SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 13) WITH (nprobe = 10) WHERE c1 < 7;
 ----
 6
 6
@@ -68,21 +68,21 @@ COPY test_knn_ivf_ip_filter FROM '/var/infinity/test_data/embedding_float_dim4.c
 
 # the query will return row 4 from block 1, 2 and 3
 query I
-SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WITH (nprobe = 10);
 ----
 8
 8
 8
 
 query I
-SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WHERE c1 < 7;
+SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WITH (nprobe = 10) WHERE c1 < 7;
 ----
 6
 6
 6
 
 query I
-SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 13) WHERE c1 < 7;
+SELECT c1 FROM test_knn_ivf_ip_filter SEARCH MATCH VECTOR  (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 13) WITH (nprobe = 10) WHERE c1 < 7;
 ----
 6
 6

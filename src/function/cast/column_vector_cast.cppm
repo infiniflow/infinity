@@ -50,7 +50,7 @@ struct ColumnVectorCastData {
 template <typename Operator>
 struct TryCastValue {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void*, void *state_ptr) {
         if (Operator::template Run<SourceValueType, TargetValueType>(std::move(input), result)) {
             return;
         }
@@ -70,7 +70,7 @@ struct TryCastValue {
 template <typename Operator>
 struct TryCastVarlenToValue {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void*, void *state_ptr) {
         auto *cast_data_ptr = (ColumnVectorCastData *)(state_ptr);
 
         if (Operator::template Run<SourceValueType, TargetValueType>(std::move(input), cast_data_ptr->source_column_vector_ptr_, result)) {
@@ -90,7 +90,7 @@ struct TryCastVarlenToValue {
 template <typename Operator>
 struct TryCastValueToVarlen {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void*, void *state_ptr) {
         auto *cast_data_ptr = (ColumnVectorCastData *)(state_ptr);
         if (Operator::template Run<SourceValueType, TargetValueType>(input, result, cast_data_ptr->target_column_vector_ptr_)) {
             return;
@@ -132,7 +132,7 @@ struct TryCastValueWithType {
 template <typename Operator>
 struct TryCastValueToVarlenWithType {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void*, void *state_ptr) {
         auto *cast_data_ptr = (ColumnVectorCastData *)(state_ptr);
         // LOG_INFO(fmt::format("{}, {}", cast_data_ptr->source_type_.ToString(), cast_data_ptr->target_type_.ToString()));
         if (Operator::template Run<SourceValueType, TargetValueType>(input,
@@ -157,7 +157,7 @@ struct TryCastValueToVarlenWithType {
 template <typename Operator>
 struct TryCastVarlenWithTypeToVarlenWithType {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void*, void *state_ptr) {
         auto *cast_data_ptr = (ColumnVectorCastData *)(state_ptr);
         // LOG_INFO(fmt::format("{}, {}", cast_data_ptr->source_type_.ToString(), cast_data_ptr->target_type_.ToString()));
         if (Operator::template Run<SourceValueType, TargetValueType>(input,
@@ -204,7 +204,7 @@ export struct ColumnVectorCast {
     static bool
     GenericTryCastColumnVector(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &result, SizeT count, CastParameters &parameters) {
         ColumnVectorCastData input(parameters.strict, source.get(), result.get(), *source->data_type(), *result->data_type());
-        UnaryOperator::Execute<SourceType, TargetType, Operator>(source, result, count, &input, true);
+        UnaryOperator::Execute<SourceType, TargetType, Operator>(source, result, count, nullptr, &input, true);
         return input.all_converted_;
     }
 

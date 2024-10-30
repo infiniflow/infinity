@@ -359,12 +359,14 @@ MergeFlag CatalogDeltaOperation::NextDeleteFlag(MergeFlag new_merge_flag) const 
 };
 
 AddDBEntryOp::AddDBEntryOp(DBEntry *db_entry, TxnTimeStamp commit_ts)
-    : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, db_entry, commit_ts), db_entry_dir_(db_entry->db_entry_dir()) {}
+    : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, db_entry, commit_ts), db_entry_dir_(db_entry->db_entry_dir()),
+      comment_(db_entry->db_comment_ptr()) {}
 
 AddTableEntryOp::AddTableEntryOp(TableEntry *table_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, table_entry, commit_ts), table_entry_dir_(table_entry->TableEntryDir()),
       column_defs_(table_entry->column_defs()), row_count_(table_entry->row_count()), // TODO: fix it
-      unsealed_id_(table_entry->unsealed_id()), next_segment_id_(table_entry->next_segment_id()), next_column_id_(table_entry->next_column_id()) {}
+      unsealed_id_(table_entry->unsealed_id()), next_segment_id_(table_entry->next_segment_id()), next_column_id_(table_entry->next_column_id()),
+      table_comment_(table_entry->GetTableComment()) {}
 
 AddSegmentEntryOp::AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp commit_ts, String segment_filter_binary_data)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, segment_entry, commit_ts), status_(segment_entry->status()),
@@ -433,6 +435,7 @@ UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(const char *&ptr) {
     add_db_op->ReadAdvBase(ptr);
 
     add_db_op->db_entry_dir_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+    add_db_op->comment_ = MakeShared<String>(ReadBufAdv<String>(ptr));
     return add_db_op;
 }
 
@@ -459,8 +462,9 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(const char *&ptr, const char
             ConstraintType ct = ReadBufAdv<ConstraintType>(ptr);
             constraints.insert(ct);
         }
+        String column_comment = ReadBufAdv<String>(ptr);
         SharedPtr<ParsedExpr> default_expr = ConstantExpr::ReadAdv(ptr, max_bytes);
-        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints, std::move(default_expr));
+        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints, column_comment, std::move(default_expr));
         columns.push_back(cd);
     }
     add_table_op->column_defs_ = std::move(columns);
@@ -468,6 +472,7 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(const char *&ptr, const char
     add_table_op->unsealed_id_ = ReadBufAdv<SegmentID>(ptr);
     add_table_op->next_segment_id_ = ReadBufAdv<SegmentID>(ptr);
     add_table_op->next_column_id_ = ReadBufAdv<ColumnID>(ptr);
+    add_table_op->table_comment_ = MakeShared<String>(ReadBufAdv<String>(ptr));
     return add_table_op;
 }
 
@@ -545,7 +550,7 @@ UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(const char *&ptr) 
 
 SizeT AddDBEntryOp::GetSizeInBytes() const {
     auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-    total_size += sizeof(i32) + db_entry_dir_->size();
+    total_size += sizeof(i32) + db_entry_dir_->size() + sizeof(i32) + comment_->size();
     return total_size;
 }
 
@@ -562,6 +567,7 @@ SizeT AddTableEntryOp::GetSizeInBytes() const {
         total_size += sizeof(i32) + cd.name_.length();
         total_size += sizeof(i32);
         total_size += cd.constraints_.size() * sizeof(ConstraintType);
+        total_size += sizeof(i32) + cd.comment_.length();
         auto const_expr = dynamic_cast<ConstantExpr *>(cd.default_expr_.get());
         total_size += const_expr->GetSizeInBytes();
     }
@@ -569,6 +575,7 @@ SizeT AddTableEntryOp::GetSizeInBytes() const {
     total_size += sizeof(SizeT);
     total_size += sizeof(SegmentID) * 2;
     total_size += sizeof(ColumnID);
+    total_size += sizeof(i32) + this->table_comment_->size();
     return total_size;
 }
 
@@ -628,6 +635,7 @@ void AddDBEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->type_);
     WriteAdvBase(buf);
     WriteBufAdv(buf, *this->db_entry_dir_);
+    WriteBufAdv(buf, *this->comment_);
 }
 
 void AddTableEntryOp::WriteAdv(char *&buf) const {
@@ -646,12 +654,14 @@ void AddTableEntryOp::WriteAdv(char *&buf) const {
         for (const auto &cons : cd.constraints_) {
             WriteBufAdv(buf, cons);
         }
+        WriteBufAdv(buf, cd.comment_);
         (dynamic_cast<ConstantExpr *>(cd.default_expr_.get()))->WriteAdv(buf);
     }
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->unsealed_id_);
     WriteBufAdv(buf, this->next_segment_id_);
     WriteBufAdv(buf, this->next_column_id_);
+    WriteBufAdv(buf, *this->table_comment_);
 }
 
 void AddSegmentEntryOp::WriteAdv(char *&buf) const {
@@ -716,16 +726,18 @@ void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
 }
 
 const String AddDBEntryOp::ToString() const {
-    return fmt::format("AddDBEntryOp {} db_entry_dir: {}",
+    return fmt::format("AddDBEntryOp {} db_entry_dir: {} comment: {}",
                        CatalogDeltaOperation::ToString(),
-                       db_entry_dir_.get() != nullptr ? *db_entry_dir_ : "nullptr");
+                       db_entry_dir_.get() != nullptr ? *db_entry_dir_ : "nullptr",
+                       comment_->empty() ? "" : *comment_);
 }
 
 const String AddTableEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddTableEntryOp {} table_entry_dir: {}",
+    sstream << fmt::format("AddTableEntryOp {} table_entry_dir: {} comment: {}",
                            CatalogDeltaOperation::ToString(),
-                           table_entry_dir_.get() != nullptr ? *table_entry_dir_ : "nullptr");
+                           table_entry_dir_.get() != nullptr ? *table_entry_dir_ : "nullptr",
+                           *table_comment_);
     for (const auto &column_def : column_defs_) {
         sstream << fmt::format(" column_def: {}", column_def->ToString());
     }
@@ -790,7 +802,8 @@ const String AddSegmentIndexEntryOp::ToString() const {
 }
 
 const String AddChunkIndexEntryOp::ToString() const {
-    return fmt::format("AddChunkIndexEntryOp base_name: {} base_rowid: {} row_count: {} commit_ts: {} deprecate_ts: {}",
+    return fmt::format("AddChunkIndexEntryOp {} base_name: {} base_rowid: {} row_count: {} commit_ts: {} deprecate_ts: {}",
+                       CatalogDeltaOperation::ToString(),
                        base_name_,
                        base_rowid_.ToUint64(),
                        row_count_,
@@ -800,7 +813,8 @@ const String AddChunkIndexEntryOp::ToString() const {
 
 bool AddDBEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddDBEntryOp *>(&rhs);
-    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_entry_dir_, *rhs_op->db_entry_dir_);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_entry_dir_, *rhs_op->db_entry_dir_) &&
+           IsEqual(*comment_, *rhs_op->comment_);
 }
 
 bool AddTableEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
@@ -808,7 +822,7 @@ bool AddTableEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     bool res = rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*table_entry_dir_, *rhs_op->table_entry_dir_) &&
                table_entry_type_ == rhs_op->table_entry_type_ && row_count_ == rhs_op->row_count_ && unsealed_id_ == rhs_op->unsealed_id_ &&
                next_segment_id_ == rhs_op->next_segment_id_ && next_column_id_ == rhs_op->next_column_id_ &&
-               column_defs_.size() == rhs_op->column_defs_.size();
+               column_defs_.size() == rhs_op->column_defs_.size() && IsEqual(*table_comment_, *rhs_op->table_comment_);
     if (!res) {
         return false;
     }

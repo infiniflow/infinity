@@ -6,25 +6,25 @@ constexpr static int32_t DAY_HOUR = 24;
 constexpr static int32_t DAY_MINUTE = DAY_HOUR * 60;
 constexpr static int32_t DAY_SECOND = DAY_MINUTE * 60;
 
-namespace infinity{
+namespace infinity {
 
 void DateTypeStd::FromString(const char *date_ptr, size_t length) {
     size_t end_length_unused;
     if (!ConvertFromString(date_ptr, length, *this, end_length_unused)) {
-        ParserError("Invalid date format (YYYY-MM-DD or YYYY/MM/DD).");
+        ParserError("Invalid date format (expecting YYYY-MM-DD or YYYY/MM/DD).");
     }
 }
 
 void DateTypeStd::FromString(const char *date_ptr, size_t length, size_t &end_length) {
     if (!ConvertFromString(date_ptr, length, *this, end_length)) {
-        ParserError("Invalid date format (YYYY-MM-DD or YYYY/MM/DD).");
+        ParserError("Invalid date format (expecting YYYY-MM-DD or YYYY/MM/DD).");
     }
 }
 
 std::string DateTypeStd::ToString() const {
     std::stringstream ss;
-    std::chrono::sys_days sysdays {std::chrono::days{value}};
-    std::chrono::year_month_day ymd {sysdays};
+    std::chrono::sys_days sysdays{std::chrono::days{value}};
+    std::chrono::year_month_day ymd{sysdays};
     ss << ymd;
     return ss.str();
 }
@@ -110,7 +110,7 @@ bool DateTypeStd::ConvertFromString(const char *date_ptr, size_t length, DateTyp
 }
 
 bool DateTypeStd::YMD2Date(const std::chrono::year_month_day &ymd, DateTypeStd &date) {
-    if(!ymd.ok()) {
+    if (!ymd.ok()) {
         return false;
     }
     auto sd = std::chrono::sys_days{ymd};
@@ -118,14 +118,14 @@ bool DateTypeStd::YMD2Date(const std::chrono::year_month_day &ymd, DateTypeStd &
     return true;
 }
 
-bool DateTypeStd::Date2YMD(int32_t days, std::chrono::year_month_day& ymd) {
+bool DateTypeStd::Date2YMD(int32_t days, std::chrono::year_month_day &ymd) {
     auto sd = std::chrono::sys_days{std::chrono::days{days}};
     ymd = std::chrono::year_month_day{sd};
     return ymd.ok();
 }
 
 std::chrono::year_month_day DateTypeStd::YMD2YMD(int32_t year, unsigned month, unsigned day) {
-    return std::chrono::year_month_day {
+    return std::chrono::year_month_day{
         std::chrono::year{year},
         std::chrono::month{month},
         std::chrono::day{day},
@@ -145,16 +145,16 @@ bool DateTypeStd::Add(DateTypeStd input, IntervalType interval, DateTypeStd &out
     switch (interval.unit) {
         case kYear: {
             ymd += std::chrono::years{interval.value};
-            if(!ymd.ok()) {
-                ymd = ymd.year()/ymd.month()/std::chrono::last;
+            if (!ymd.ok()) {
+                ymd = ymd.year() / ymd.month() / std::chrono::last;
             }
             output.value = std::chrono::sys_days{ymd}.time_since_epoch().count();
             return true;
         }
         case kMonth: {
             ymd += std::chrono::months{interval.value};
-            if(!ymd.ok()) {
-                ymd = ymd.year()/ymd.month()/std::chrono::last;
+            if (!ymd.ok()) {
+                ymd = ymd.year() / ymd.month() / std::chrono::last;
             }
             output.value = std::chrono::sys_days{ymd}.time_since_epoch().count();
             return true;
@@ -217,4 +217,4 @@ int64_t DateTypeStd::GetDatePart(DateTypeStd input, TimeUnit unit) {
     return -1;
 }
 
-}
+} // namespace infinity

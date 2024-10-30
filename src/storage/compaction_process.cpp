@@ -43,6 +43,7 @@ import base_memindex;
 import segment_index_entry;
 import status;
 import default_values;
+import wal_manager;
 
 namespace infinity {
 
@@ -81,9 +82,14 @@ void CompactionProcessor::DoCompact() {
     for (const auto &[statement, txn] : statements) {
         BGQueryContextWrapper wrapper(txn);
         BGQueryState state;
-        bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
-        if (res) {
-            wrappers.emplace_back(std::move(wrapper), std::move(state));
+        try {
+            bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
+            if (res) {
+                wrappers.emplace_back(std::move(wrapper), std::move(state));
+            }
+        } catch (const std::exception &e) {
+            LOG_CRITICAL(fmt::format("DoCompact failed: {}", e.what()));
+            throw;
         }
     }
     for (auto &[wrapper, query_state] : wrappers) {
@@ -219,6 +225,10 @@ void CompactionProcessor::Process() {
     while (running) {
         Deque<SharedPtr<BGTask>> tasks;
         task_queue_.DequeueBulk(tasks);
+        StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+        if (storage_mode == StorageMode::kUnInitialized) {
+            UnrecoverableError("Uninitialized storage mode");
+        }
         for (const auto &bg_task : tasks) {
             switch (bg_task->type_) {
                 case BGTaskType::kStopProcessor: {
@@ -226,29 +236,39 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kNotifyCompact: {
-                    LOG_DEBUG("Do compact start.");
-                    DoCompact();
-                    LOG_DEBUG("Do compact end.");
+                    if (storage_mode == StorageMode::kWritable) {
+                        LOG_DEBUG("Do compact start.");
+                        DoCompact();
+                        LOG_DEBUG("Do compact end.");
+                    }
                     break;
                 }
                 case BGTaskType::kNotifyOptimize: {
-                    LOG_DEBUG("Optimize start.");
-                    ScanAndOptimize();
-                    LOG_DEBUG("Optimize done.");
+                    if (storage_mode == StorageMode::kWritable) {
+                        LOG_DEBUG("Optimize start.");
+                        ScanAndOptimize();
+                        LOG_DEBUG("Optimize done.");
+                    }
                     break;
                 }
                 case BGTaskType::kDumpIndex: {
-                    auto dump_task = static_cast<DumpIndexTask *>(bg_task.get());
-                    LOG_DEBUG(dump_task->ToString());
-                    DoDump(dump_task);
-                    LOG_DEBUG("Dump index done.");
+                    if (storage_mode == StorageMode::kWritable) {
+                        auto dump_task = static_cast<DumpIndexTask *>(bg_task.get());
+                        LOG_DEBUG(dump_task->ToString());
+                        // Trigger transaction to save the mem index
+                        DoDump(dump_task);
+                        LOG_DEBUG("Dump index done.");
+                    }
                     break;
                 }
                 case BGTaskType::kDumpIndexByline: {
-                    auto dump_task = static_cast<DumpIndexBylineTask *>(bg_task.get());
-                    LOG_DEBUG(dump_task->ToString());
-                    DoDumpByline(dump_task);
-                    LOG_DEBUG("Dump index byline done.");
+                    if (storage_mode == StorageMode::kWritable) {
+                        auto dump_task = static_cast<DumpIndexBylineTask *>(bg_task.get());
+                        LOG_DEBUG(dump_task->ToString());
+                        // Trigger transaction to save the mem index
+                        DoDumpByline(dump_task);
+                        LOG_DEBUG("Dump index byline done.");
+                    }
                     break;
                 }
                 default: {

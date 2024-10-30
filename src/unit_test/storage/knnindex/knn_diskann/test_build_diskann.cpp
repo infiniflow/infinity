@@ -112,6 +112,7 @@ public:
                     hit_labels.push_back(i);
                 }
             }
+            float recall = (float)hits / num_queries;
             EXPECT_GT(recall, 0.95);
         }
     }

@@ -179,27 +179,41 @@ Status ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPt
     result->emplace_back(MakeShared<String>(schema_name));
     String table_name = String(intent_size, ' ') + "table: " + insert_statement->table_name_;
     result->emplace_back(MakeShared<String>(table_name));
-    String values = String(intent_size, ' ') + "values: ";
-    SizeT value_count = insert_statement->values_->size();
-    if (value_count == 0) {
-        String error_message = "Insert value list is empty";
-        UnrecoverableError(error_message);
+    String values = String(intent_size, ' ') + "insert rows: (";
+    const SizeT row_count = insert_statement->insert_rows_.size();
+    if (row_count == 0) {
+        UnrecoverableError("Insert rows list is empty");
     }
-    for (SizeT idx = 0; idx < value_count - 1; ++idx) {
+    for (SizeT idx = 0; idx < row_count; ++idx) {
         if (idx != 0)
             values += ", ";
-        Vector<ParsedExpr *> *expr_array = insert_statement->values_->at(idx);
-        SizeT column_count = insert_statement->values_->at(0)->size();
-        for (SizeT idx2 = 0; idx2 < column_count; ++idx2) {
-            if (idx2 == 0)
-                values += "(";
-            else
-                values += ", ";
-            values += expr_array->at(idx2)->ToString();
-            if (idx2 == column_count - 1)
-                values += ")";
+        auto *insert_row_expr = insert_statement->insert_rows_.at(idx).get();
+        SizeT column_count = insert_row_expr->columns_.size();
+        if (column_count && column_count != insert_row_expr->values_.size()) {
+            RecoverableError(Status::SyntaxError("Column count and value count mismatch"));
         }
+        if (column_count) {
+            values += "columns: (";
+            for (SizeT idx2 = 0; idx2 < column_count; ++idx2) {
+                if (idx2) {
+                    values += ", ";
+                }
+                values += insert_row_expr->columns_[idx2];
+            }
+            values += "), values: (";
+        } else {
+            values += "values: (";
+            column_count = insert_row_expr->values_.size();
+        }
+        for (SizeT idx2 = 0; idx2 < column_count; ++idx2) {
+            if (idx2) {
+                values += ", ";
+            }
+            values += insert_row_expr->values_[idx2]->ToString();
+        }
+        values += ")";
     }
+    values += ")";
     result->emplace_back(MakeShared<String>(values));
     return Status::OK();
 }
@@ -306,6 +320,22 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         projection_str += select_statement->select_list_->back()->ToString();
 
         result->emplace_back(MakeShared<String>(projection_str));
+    }
+
+    if (select_statement->highlight_list_ != nullptr) {
+        String highlight_str = String(intent_size, ' ') + "highlight: ";
+        SizeT highlight_count = select_statement->highlight_list_->size();
+        if (highlight_count == 0) {
+            String error_message = "No select list";
+            UnrecoverableError(error_message);
+        }
+        for (SizeT idx = 0; idx < highlight_count - 1; ++idx) {
+            ParsedExpr *expr = select_statement->highlight_list_->at(idx);
+            highlight_str += expr->ToString() + ", ";
+        }
+        highlight_str += select_statement->highlight_list_->back()->ToString();
+
+        result->emplace_back(MakeShared<String>(highlight_str));
     }
 
     status = BuildBaseTableRef(select_statement->table_ref_, result, intent_size);

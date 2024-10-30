@@ -49,6 +49,7 @@ import optimize_statement;
 import alter_statement;
 import statement_common;
 import admin_statement;
+import compact_statement;
 
 import create_schema_info;
 import drop_schema_info;
@@ -131,7 +132,7 @@ void Infinity::RemoteDisconnect() {
     session_.reset();
 }
 
-QueryResult Infinity::CreateDatabase(const String &schema_name, const CreateDatabaseOptions &create_db_options) {
+QueryResult Infinity::CreateDatabase(const String &schema_name, const CreateDatabaseOptions &create_db_options, const String &comment) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
     SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
@@ -140,6 +141,7 @@ QueryResult Infinity::CreateDatabase(const String &schema_name, const CreateData
     ToLower(create_schema_info->schema_name_);
     create_statement->create_info_ = create_schema_info;
     create_statement->create_info_->conflict_type_ = create_db_options.conflict_type_;
+    create_statement->create_info_->comment_ = comment;
     QueryResult query_result = query_context_ptr->QueryStatement(create_statement.get());
     return query_result;
 }
@@ -252,7 +254,7 @@ QueryResult Infinity::SetVariableOrConfig(const String &name, String value, SetS
     ToLower(var_name);
 
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kDouble, var_name, value);
+    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kString, var_name, value);
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
@@ -737,7 +739,7 @@ QueryResult Infinity::ShowObjects() {
     return result;
 }
 
-QueryResult Infinity::ShowObject(const String& filename) {
+QueryResult Infinity::ShowObject(const String &filename) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kPersistenceObject;
@@ -778,7 +780,7 @@ QueryResult Infinity::ShowMemoryAllocations() {
     return result;
 }
 
-QueryResult Infinity::ShowFunction(const String& function_name) {
+QueryResult Infinity::ShowFunction(const String &function_name) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kFunction;
@@ -787,20 +789,23 @@ QueryResult Infinity::ShowFunction(const String& function_name) {
     return result;
 }
 
-QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values) {
+QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *insert_rows) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<InsertStatement> insert_statement = MakeUnique<InsertStatement>();
     insert_statement->schema_name_ = db_name;
     ToLower(insert_statement->schema_name_);
-
     insert_statement->table_name_ = table_name;
     ToLower(insert_statement->table_name_);
-
-    insert_statement->columns_ = columns;
-    for (String &column_name : *insert_statement->columns_) {
-        ToLower(column_name);
+    insert_statement->insert_rows_.reserve(insert_rows->size());
+    for (auto &insert_row_expr_ptr : *insert_rows) {
+        for (auto &column_name : insert_row_expr_ptr->columns_) {
+            ToLower(column_name);
+        }
+        insert_statement->insert_rows_.emplace_back(insert_row_expr_ptr);
+        insert_row_expr_ptr = nullptr;
     }
-    insert_statement->values_ = values;
+    delete insert_rows;
+    insert_rows = nullptr;
     QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
     return result;
 }
@@ -894,7 +899,10 @@ QueryResult Infinity::Explain(const String &db_name,
                               ParsedExpr *filter,
                               ParsedExpr *limit,
                               ParsedExpr *offset,
-                              Vector<ParsedExpr *> *output_columns) {
+                              Vector<ParsedExpr *> *output_columns,
+                              Vector<ParsedExpr *> *highlight_columns,
+                              Vector<OrderByExpr *> *order_by_list,
+                              Vector<ParsedExpr *> *group_by_list) {
 
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<ExplainStatement> explain_statment = MakeUnique<ExplainStatement>();
@@ -914,10 +922,12 @@ QueryResult Infinity::Explain(const String &db_name,
 
     // TODO: to lower expression identifier string
     select_statement->select_list_ = output_columns;
+    select_statement->highlight_list_ = highlight_columns;
     select_statement->where_expr_ = filter;
     select_statement->search_expr_ = search_expr;
     select_statement->limit_expr_ = limit;
     select_statement->offset_expr_ = offset;
+    select_statement->order_by_list = order_by_list;
 
     explain_statment->statement_ = select_statement;
 
@@ -932,7 +942,9 @@ QueryResult Infinity::Search(const String &db_name,
                              ParsedExpr *limit,
                              ParsedExpr *offset,
                              Vector<ParsedExpr *> *output_columns,
-                             Vector<OrderByExpr *> *order_by_list) {
+                             Vector<ParsedExpr *> *highlight_columns,
+                             Vector<OrderByExpr *> *order_by_list,
+                             Vector<ParsedExpr *> *group_by_list) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<SelectStatement> select_statement = MakeUnique<SelectStatement>();
 
@@ -948,6 +960,7 @@ QueryResult Infinity::Search(const String &db_name,
 
     // TODO: to lower expression identifier string
     select_statement->select_list_ = output_columns;
+    select_statement->highlight_list_ = highlight_columns;
     select_statement->where_expr_ = filter;
     select_statement->search_expr_ = search_expr;
     select_statement->limit_expr_ = limit;
@@ -1028,6 +1041,39 @@ QueryResult Infinity::Cleanup() {
     command_statement->command_info_ = MakeUnique<CleanupCmd>();
 
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    return result;
+}
+
+QueryResult Infinity::ForceCheckpoint() {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto flush_statement = MakeUnique<FlushStatement>();
+    flush_statement->type_ = infinity::FlushType::kData;
+
+    QueryResult result = query_context_ptr->QueryStatement(flush_statement.get());
+
+    return result;
+}
+
+QueryResult Infinity::CompactTable(const String &db_name, const String &table_name) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto compact_statement = MakeUnique<ManualCompactStatement>(db_name, table_name);
+
+    QueryResult result = query_context_ptr->QueryStatement(compact_statement.get());
+
     return result;
 }
 
@@ -1187,6 +1233,23 @@ QueryResult Infinity::AdminShowCurrentNode() {
     return result;
 }
 
+QueryResult Infinity::AdminRemoveNode(String node_name) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+
+    auto admin_statement = MakeUnique<AdminStatement>();
+    ToLower(node_name);
+    admin_statement->admin_type_ = AdminStmtType::kRemoveNode;
+    admin_statement->node_name_ = node_name;
+    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
+    return result;
+}
+
 QueryResult Infinity::AdminSetAdmin() {
     auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
@@ -1198,7 +1261,7 @@ QueryResult Infinity::AdminSetAdmin() {
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kAdmin;
+    admin_statement->node_role_ = NodeRole::kAdmin;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
@@ -1214,7 +1277,7 @@ QueryResult Infinity::AdminSetStandalone() {
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kStandalone;
+    admin_statement->node_role_ = NodeRole::kStandalone;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
@@ -1230,7 +1293,7 @@ QueryResult Infinity::AdminSetLeader(String node_name) {
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kLeader;
+    admin_statement->node_role_ = NodeRole::kLeader;
     ToLower(node_name);
     admin_statement->node_name_ = node_name;
     QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
@@ -1248,7 +1311,7 @@ QueryResult Infinity::AdminSetFollower(String node_name, const String &leader_ad
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kFollower;
+    admin_statement->node_role_ = NodeRole::kFollower;
     admin_statement->leader_address_ = leader_address;
     ToLower(node_name);
     admin_statement->node_name_ = node_name;
@@ -1267,7 +1330,7 @@ QueryResult Infinity::AdminSetLearner(String node_name, const String &leader_add
 
     auto admin_statement = MakeUnique<AdminStatement>();
     admin_statement->admin_type_ = AdminStmtType::kSetRole;
-    admin_statement->admin_node_role_ = AdminNodeRole::kLearner;
+    admin_statement->node_role_ = NodeRole::kLearner;
     admin_statement->leader_address_ = leader_address;
     ToLower(node_name);
     admin_statement->node_name_ = node_name;

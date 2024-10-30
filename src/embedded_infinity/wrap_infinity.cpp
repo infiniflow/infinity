@@ -308,7 +308,11 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
         return nullptr;
     }
     knn_expr->embedding_data_ptr_ = embedding_data_ptr;
-    knn_expr->dimension_ = dimension;
+    if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemBit) {
+        knn_expr->dimension_ = dimension * 8;
+    } else {
+        knn_expr->dimension_ = dimension;
+    }
 
     knn_expr->topn_ = topn;
     if (knn_expr->topn_ <= 0) {
@@ -517,12 +521,12 @@ ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
     return nullptr;
 }
 
-OrderByExpr *WrapOrderByExpr::GetOrderByExpr(Status &status){
+OrderByExpr *WrapOrderByExpr::GetOrderByExpr(Status &status) {
     auto order_by_expr = new OrderByExpr();
     order_by_expr->expr_ = expr.GetParsedExpr(status);
-    if(asc){
+    if (asc) {
         order_by_expr->type_ = OrderType::kAsc;
-    }else{
+    } else {
         order_by_expr->type_ = OrderType::kDesc;
     }
     return order_by_expr;
@@ -539,8 +543,22 @@ UpdateExpr *WrapUpdateExpr::GetUpdateExpr(Status &status) {
     return update_expr;
 }
 
-WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options) {
-    auto query_result = instance.CreateDatabase(db_name, options);
+InsertRowExpr *WrapInsertRowExpr::GetInsertRowExpr(Status &status) {
+    auto insert_row_expr = std::make_unique<InsertRowExpr>();
+    insert_row_expr->columns_ = std::move(columns);
+    insert_row_expr->values_.reserve(values.size());
+    for (auto &value : values) {
+        auto parsed_value_expr = std::unique_ptr<ParsedExpr>(value.GetParsedExpr(status));
+        if (status.code_ != ErrorCode::kOk) {
+            return nullptr;
+        }
+        insert_row_expr->values_.push_back(std::move(parsed_value_expr));
+    }
+    return insert_row_expr.release();
+}
+
+WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options, const String &comment) {
+    auto query_result = instance.CreateDatabase(db_name, options, comment);
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
     return result;
 }
@@ -577,7 +595,7 @@ WrapQueryResult WrapShowDatabase(Infinity &instance, const String &db_name) {
     if (query_result.IsOk()) {
         SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 3) {
+        if (row_count != 4) {
             String error_message = "ShowDatabase: query result is invalid.";
             UnrecoverableError(error_message);
         }
@@ -592,6 +610,10 @@ WrapQueryResult WrapShowDatabase(Infinity &instance, const String &db_name) {
         {
             Value value = data_block->GetValue(1, 2);
             result.table_count = std::stol(value.GetVarchar());
+        }
+        {
+            Value value = data_block->GetValue(1, 3);
+            result.comment = value.GetVarchar();
         }
     }
     return result;
@@ -642,6 +664,11 @@ WrapQueryResult WrapShowConfigs(Infinity &instance) {
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
+WrapQueryResult WrapShowInfo(Infinity &instance, const String &info_name) {
+    auto query_result = instance.ShowFunction(info_name);
+    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+}
+
 WrapQueryResult WrapQuery(Infinity &instance, const String &query_text) {
     auto query_result = instance.Query(query_text);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
@@ -683,7 +710,12 @@ Optional<WrapQueryResult> UnwrapColumnDefs(Vector<WrapColumnDef> &column_defs, V
             }
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
-        auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints, default_expr);
+        auto column_def = new ColumnDef(wrap_column_def.id,
+                                        column_type,
+                                        wrap_column_def.column_name,
+                                        wrap_column_def.constraints,
+                                        wrap_column_def.comment,
+                                        default_expr);
         column_defs_ptr.push_back(column_def);
     }
     return None;
@@ -821,35 +853,31 @@ WrapQueryResult WrapShowBlockColumn(Infinity &instance,
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult
-WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<String> &columns, Vector<Vector<WrapConstantExpr>> &values) {
-    if (values.empty()) {
+WrapQueryResult WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<WrapInsertRowExpr> &insert_rows) {
+    if (insert_rows.empty()) {
         return WrapQueryResult(ErrorCode::kInsertWithoutValues, "insert values is empty");
     }
-    Vector<Vector<ParsedExpr *> *> *value_ptr = new Vector<Vector<ParsedExpr *> *>(values.size());
-    for (SizeT i = 0; i < values.size(); ++i) {
-        auto value_list = new Vector<ParsedExpr *>(values[i].size());
-        for (SizeT j = 0; j < values[i].size(); ++j) {
-            auto &wrap_constant_expr = values[i][j];
-            Status status;
-            (*value_list)[j] = wrap_constant_expr.GetParsedExpr(status);
-            if (status.code_ != ErrorCode::kOk) {
-                for (SizeT k = 0; k < i; ++k) {
-                    if ((*value_ptr)[k] != nullptr) {
-                        delete (*value_ptr)[k];
-                    }
-                }
-                if (value_list != nullptr) {
-                    delete value_list;
-                }
-                delete value_ptr;
-                return WrapQueryResult(status.code_, status.msg_->c_str());
+    auto insert_rows_ptr = new Vector<InsertRowExpr *>();
+    DeferFn delete_insert_rows([&insert_rows_ptr] {
+        if (insert_rows_ptr) {
+            for (auto *p : *insert_rows_ptr) {
+                delete p;
             }
+            delete insert_rows_ptr;
+            insert_rows_ptr = nullptr;
         }
-        (*value_ptr)[i] = value_list;
+    });
+    insert_rows_ptr->reserve(insert_rows.size());
+    for (auto &row_expr : insert_rows) {
+        Status status;
+        auto row_expr_ptr = std::unique_ptr<InsertRowExpr>(row_expr.GetInsertRowExpr(status));
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+        insert_rows_ptr->push_back(row_expr_ptr.release());
     }
-    Vector<String> *insert_columns = new Vector<String>(columns);
-    auto query_result = instance.Insert(db_name, table_name, insert_columns, value_ptr);
+    auto query_result = instance.Insert(db_name, table_name, insert_rows_ptr);
+    insert_rows_ptr = nullptr;
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
@@ -1248,6 +1276,7 @@ void HandleColumnDef(WrapQueryResult &wrap_query_result, SizeT column_count, Sha
 
         WrapDataType &proto_data_type = proto_column_def.column_type;
         DataTypeToWrapDataType(proto_data_type, column_def->type());
+        proto_column_def.comment = column_def->comment();
 
         wrap_query_result.column_defs.emplace_back(proto_column_def);
     }
@@ -1266,11 +1295,14 @@ WrapQueryResult WrapSearch(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
                            Vector<WrapParsedExpr> select_list,
+                           Vector<WrapParsedExpr> highlight_list,
                            Vector<WrapOrderByExpr> order_by_list,
+                           Vector<WrapParsedExpr> group_by_list,
                            WrapSearchExpr *wrap_search_expr,
-                           WrapParsedExpr *where_expr,
+                           WrapParsedExpr *filter_expr,
                            WrapParsedExpr *limit_expr,
                            WrapParsedExpr *offset_expr) {
+
     SearchExpr *search_expr = nullptr;
     DeferFn defer_fn1([&]() {
         if (search_expr != nullptr) {
@@ -1292,18 +1324,18 @@ WrapQueryResult WrapSearch(Infinity &instance,
             filter = nullptr;
         }
     });
-    if (where_expr != nullptr) {
+    if (filter_expr != nullptr) {
         Status status;
-        filter = where_expr->GetParsedExpr(status);
+        filter = filter_expr->GetParsedExpr(status);
         if (status.code_ != ErrorCode::kOk) {
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
     }
     Vector<ParsedExpr *> *output_columns = nullptr;
     DeferFn defer_fn3([&]() {
-        if(output_columns != nullptr) {
+        if (output_columns != nullptr) {
             SizeT output_column_len = output_columns->size();
-            for(SizeT i = 0; i < output_column_len; ++ i) {
+            for (SizeT i = 0; i < output_column_len; ++i) {
                 if ((*output_columns)[i] != nullptr) {
                     delete (*output_columns)[i];
                     (*output_columns)[i] = nullptr;
@@ -1318,7 +1350,31 @@ WrapQueryResult WrapSearch(Infinity &instance,
         output_columns->reserve(select_list.size());
         for (SizeT i = 0; i < select_list.size(); ++i) {
             Status status;
-            output_columns->emplace_back(select_list[i].GetParsedExpr(status));
+            output_columns->emplace_back(select_list.at(i).GetParsedExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
+    Vector<ParsedExpr *> *highlight = nullptr;
+    DeferFn defer_fn7([&]() {
+        if (highlight != nullptr) {
+            SizeT highlight_column_len = highlight->size();
+            for (SizeT i = 0; i < highlight_column_len; ++i) {
+                if ((*highlight)[i] != nullptr) {
+                    delete (*highlight)[i];
+                    (*highlight)[i] = nullptr;
+                }
+            }
+        }
+    });
+    if (!highlight_list.empty()) {
+        highlight = new Vector<ParsedExpr *>();
+        highlight->reserve(highlight_list.size());
+        for (SizeT i = 0; i < highlight_list.size(); ++i) {
+            Status status;
+            highlight->emplace_back(highlight_list.at(i).GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
@@ -1355,11 +1411,35 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     }
 
+    Vector<ParsedExpr *> *group_by_exprs = nullptr;
+    DeferFn defer_fn8([&]() {
+        if (group_by_exprs != nullptr) {
+            SizeT group_by_column_len = group_by_exprs->size();
+            for (SizeT i = 0; i < group_by_column_len; ++i) {
+                if ((*group_by_exprs)[i] != nullptr) {
+                    delete (*group_by_exprs)[i];
+                    (*group_by_exprs)[i] = nullptr;
+                }
+            }
+        }
+    });
+    if (!group_by_list.empty()) {
+        group_by_exprs = new Vector<ParsedExpr *>();
+        group_by_exprs->reserve(group_by_list.size());
+        for (SizeT i = 0; i < group_by_list.size(); ++i) {
+            Status status;
+            group_by_exprs->emplace_back(group_by_list.at(i).GetParsedExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
     Vector<OrderByExpr *> *order_by_exprs = nullptr;
     DeferFn defer_fn6([&]() {
-        if(order_by_exprs != nullptr) {
+        if (order_by_exprs != nullptr) {
             SizeT order_by_expr_len = order_by_exprs->size();
-            for(SizeT i = 0; i < order_by_expr_len; ++ i) {
+            for (SizeT i = 0; i < order_by_expr_len; ++i) {
                 if ((*order_by_exprs)[i] != nullptr) {
                     delete (*order_by_exprs)[i];
                     (*order_by_exprs)[i] = nullptr;
@@ -1369,27 +1449,28 @@ WrapQueryResult WrapSearch(Infinity &instance,
             order_by_exprs = nullptr;
         }
     });
-    if (order_by_list.empty()) {
-        ;
-    } else {
+    if (!order_by_list.empty()) {
         order_by_exprs = new Vector<OrderByExpr *>();
         order_by_exprs->reserve(order_by_list.size());
         for (SizeT i = 0; i < order_by_list.size(); ++i) {
             Status status;
-            order_by_exprs->emplace_back(order_by_list[i].GetOrderByExpr(status));
+            order_by_exprs->emplace_back(order_by_list.at(i).GetOrderByExpr(status));
             if (status.code_ != ErrorCode::kOk) {
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
         }
     }
 
-    auto query_result = instance.Search(db_name, table_name, search_expr, filter, limit, offset, output_columns, order_by_exprs);
+    auto query_result =
+        instance.Search(db_name, table_name, search_expr, filter, limit, offset, output_columns, highlight, order_by_exprs, group_by_exprs);
     search_expr = nullptr;
     filter = nullptr;
     limit = nullptr;
     offset = nullptr;
     output_columns = nullptr;
+    highlight = nullptr;
     order_by_exprs = nullptr;
+    group_by_exprs = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }
@@ -1404,9 +1485,15 @@ WrapQueryResult WrapExplain(Infinity &instance,
                             const String &db_name,
                             const String &table_name,
                             ExplainType explain_type,
-                            Vector<WrapParsedExpr> wrap_output_columns,
+                            Vector<WrapParsedExpr> select_list,
+                            Vector<WrapParsedExpr> highlight_list,
+                            Vector<WrapOrderByExpr> order_by_list,
+                            Vector<WrapParsedExpr> group_by_list,
                             WrapSearchExpr *wrap_search_expr,
-                            WrapParsedExpr *wrap_filter) {
+                            WrapParsedExpr *filter_expr,
+                            WrapParsedExpr *limit_expr,
+                            WrapParsedExpr *offset_expr) {
+
     SearchExpr *search_expr = nullptr;
     DeferFn defer_fn1([&]() {
         if (search_expr != nullptr) {
@@ -1428,18 +1515,18 @@ WrapQueryResult WrapExplain(Infinity &instance,
             filter = nullptr;
         }
     });
-    if (wrap_filter != nullptr) {
+    if (filter_expr != nullptr) {
         Status status;
-        filter = wrap_filter->GetParsedExpr(status);
+        filter = filter_expr->GetParsedExpr(status);
         if (status.code_ != ErrorCode::kOk) {
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }
     }
     Vector<ParsedExpr *> *output_columns = nullptr;
     DeferFn defer_fn3([&]() {
-        if(output_columns != nullptr) {
+        if (output_columns != nullptr) {
             SizeT output_column_len = output_columns->size();
-            for(SizeT i = 0; i < output_column_len; ++ i) {
+            for (SizeT i = 0; i < output_column_len; ++i) {
                 if ((*output_columns)[i] != nullptr) {
                     delete (*output_columns)[i];
                     (*output_columns)[i] = nullptr;
@@ -1447,24 +1534,143 @@ WrapQueryResult WrapExplain(Infinity &instance,
             }
         }
     });
-    if (wrap_output_columns.empty()) {
+    if (select_list.empty()) {
         return WrapQueryResult(ErrorCode::kEmptySelectFields, "[error] Select fields are empty");
     } else {
         output_columns = new Vector<ParsedExpr *>();
-        output_columns->reserve(wrap_output_columns.size());
-        for (SizeT i = 0; i < wrap_output_columns.size(); ++i) {
+        output_columns->reserve(select_list.size());
+        for (SizeT i = 0; i < select_list.size(); ++i) {
             Status status;
-            output_columns->emplace_back(wrap_output_columns[i].GetParsedExpr(status));
+            output_columns->emplace_back(select_list[i].GetParsedExpr(status));
             if (status.code_ != ErrorCode::kOk) {
                 return WrapQueryResult(status.code_, status.msg_->c_str());
             }
         }
     }
 
-    auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, nullptr, nullptr, output_columns);
+    Vector<ParsedExpr *> *highlight = nullptr;
+    DeferFn defer_fn11([&]() {
+        if (highlight != nullptr) {
+            SizeT highlight_column_len = highlight->size();
+            for (SizeT i = 0; i < highlight_column_len; ++i) {
+                if ((*highlight)[i] != nullptr) {
+                    delete (*highlight)[i];
+                    (*highlight)[i] = nullptr;
+                }
+            }
+        }
+    });
+    if (!highlight_list.empty()) {
+        highlight = new Vector<ParsedExpr *>();
+        highlight->reserve(highlight_list.size());
+        for (SizeT i = 0; i < highlight_list.size(); ++i) {
+            Status status;
+            highlight->emplace_back(highlight_list.at(i).GetParsedExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
+    ParsedExpr *limit = nullptr;
+    DeferFn defer_fn9([&]() {
+        if (limit != nullptr) {
+            delete limit;
+            limit = nullptr;
+        }
+    });
+    if (limit_expr != nullptr) {
+        Status status;
+        limit = limit_expr->GetParsedExpr(status);
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+
+    ParsedExpr *offset = nullptr;
+    DeferFn defer_fn10([&]() {
+        if (offset != nullptr) {
+            delete offset;
+            offset = nullptr;
+        }
+    });
+    if (offset_expr != nullptr) {
+        Status status;
+        offset = offset_expr->GetParsedExpr(status);
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+
+    Vector<ParsedExpr *> *group_by_exprs = nullptr;
+    DeferFn defer_fn8([&]() {
+        if (group_by_exprs != nullptr) {
+            SizeT group_by_column_len = group_by_exprs->size();
+            for (SizeT i = 0; i < group_by_column_len; ++i) {
+                if ((*group_by_exprs)[i] != nullptr) {
+                    delete (*group_by_exprs)[i];
+                    (*group_by_exprs)[i] = nullptr;
+                }
+            }
+        }
+    });
+    if (!group_by_list.empty()) {
+        group_by_exprs = new Vector<ParsedExpr *>();
+        group_by_exprs->reserve(group_by_list.size());
+        for (SizeT i = 0; i < group_by_list.size(); ++i) {
+            Status status;
+            group_by_exprs->emplace_back(group_by_list.at(i).GetParsedExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
+    Vector<OrderByExpr *> *order_by_exprs = nullptr;
+    DeferFn defer_fn6([&]() {
+        if (order_by_exprs != nullptr) {
+            SizeT order_by_expr_len = order_by_exprs->size();
+            for (SizeT i = 0; i < order_by_expr_len; ++i) {
+                if ((*order_by_exprs)[i] != nullptr) {
+                    delete (*order_by_exprs)[i];
+                    (*order_by_exprs)[i] = nullptr;
+                }
+            }
+            delete order_by_exprs;
+            order_by_exprs = nullptr;
+        }
+    });
+    if (!order_by_list.empty()) {
+        order_by_exprs = new Vector<OrderByExpr *>();
+        order_by_exprs->reserve(order_by_list.size());
+        for (SizeT i = 0; i < order_by_list.size(); ++i) {
+            Status status;
+            order_by_exprs->emplace_back(order_by_list.at(i).GetOrderByExpr(status));
+            if (status.code_ != ErrorCode::kOk) {
+                return WrapQueryResult(status.code_, status.msg_->c_str());
+            }
+        }
+    }
+
+    auto query_result = instance.Explain(db_name,
+                                         table_name,
+                                         explain_type,
+                                         search_expr,
+                                         filter,
+                                         limit,
+                                         offset,
+                                         output_columns,
+                                         highlight,
+                                         order_by_exprs,
+                                         group_by_exprs);
     search_expr = nullptr;
     filter = nullptr;
+    limit = nullptr;
+    offset = nullptr;
     output_columns = nullptr;
+    highlight = nullptr;
+    order_by_exprs = nullptr;
+    group_by_exprs = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }

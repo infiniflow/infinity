@@ -124,8 +124,36 @@ std::string AdminStatement::ToString() const {
             ss << "Admin show current node";
             break;
         }
+        case AdminStmtType::kRemoveNode: {
+            ss << "Admin remove node";
+            break;
+        }
         case AdminStmtType::kSetRole: {
             ss << "Admin set role";
+            break;
+        }
+        case AdminStmtType::kCreateSnapshot: {
+            ss << "Admin create snapshot";
+            break;
+        }
+        case AdminStmtType::kListSnapshots: {
+            ss << "Admin list snapshots";
+            break;
+        }
+        case AdminStmtType::kShowSnapshot: {
+            ss << "Admin show snapshot";
+            break;
+        }
+        case AdminStmtType::kDeleteSnapshot: {
+            ss << "Admin delete snapshot";
+            break;
+        }
+        case AdminStmtType::kExportSnapshot: {
+            ss << "Admin export snapshot";
+            break;
+        }
+        case AdminStmtType::kRecoverFromSnapshot: {
+            ss << "Admin recover from snapshot";
             break;
         }
         case AdminStmtType::kInvalid: {
@@ -134,6 +162,23 @@ std::string AdminStatement::ToString() const {
         }
     }
     return ss.str();
+}
+
+std::string ToString(NodeRole role) {
+    switch (role) {
+        case NodeRole::kUnInitialized:
+            return "uninitialized";
+        case NodeRole::kAdmin:
+            return "admin";
+        case NodeRole::kStandalone:
+            return "standalone";
+        case NodeRole::kLeader:
+            return "leader";
+        case NodeRole::kFollower:
+            return "follower";
+        case NodeRole::kLearner:
+            return "learner";
+    }
 }
 
 } // namespace infinity

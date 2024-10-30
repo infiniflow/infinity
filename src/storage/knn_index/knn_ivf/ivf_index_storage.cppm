@@ -22,17 +22,21 @@ import internal_types;
 import logical_type;
 import data_type;
 import ivf_index_util_func;
+import infinity_exception;
 
 namespace infinity {
 
 class LocalFileHandle;
 class KnnDistanceBase1;
 
+export class IVF_Index_Storage;
+
 // always use float for centroids
 class IVF_Centroids_Storage {
     u32 embedding_dimension_ = 0;
     u32 centroids_num_ = 0;
     Vector<f32> centroids_data_ = {};
+    mutable Vector<f32> normalized_centroids_data_cache_ = {};
 
 public:
     IVF_Centroids_Storage() = default;
@@ -42,42 +46,41 @@ public:
     u32 centroids_num() const { return centroids_num_; }
     void Save(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
+    Pair<u32, const f32 *> GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const;
 };
 
-class IVF_Part_Storage {
-    u32 part_id_ = std::numeric_limits<u32>::max();
-    u32 embedding_dimension_ = 0;
+class IVF_Parts_Storage {
+    const u32 embedding_dimension_ = 0;
+    const u32 centroids_num_ = 0;
 
 protected:
-    u32 embedding_num_ = 0;
-    Vector<SegmentOffset> embedding_segment_offsets_ = {};
+    explicit IVF_Parts_Storage(const u32 embedding_dimension, const u32 centroids_num)
+        : embedding_dimension_(embedding_dimension), centroids_num_(centroids_num) {}
 
 public:
-    IVF_Part_Storage(const u32 part_id, const u32 embedding_dimension) : part_id_(part_id), embedding_dimension_(embedding_dimension) {}
-    virtual ~IVF_Part_Storage() = default;
-    static UniquePtr<IVF_Part_Storage>
-    Make(u32 part_id, u32 embedding_dimension, EmbeddingDataType embedding_data_type, const IndexIVFStorageOption &ivf_storage_option);
-    u32 part_id() const { return part_id_; }
-    u32 embedding_dimension() const { return embedding_dimension_; }
-    u32 embedding_num() const { return embedding_num_; }
-    SegmentOffset embedding_segment_offset(const u32 embedding_index) const { return embedding_segment_offsets_[embedding_index]; }
+    virtual ~IVF_Parts_Storage() = default;
+    static UniquePtr<IVF_Parts_Storage>
+    Make(u32 embedding_dimension, u32 centroids_num, EmbeddingDataType embedding_data_type, const IndexIVFStorageOption &ivf_storage_option);
+    [[nodiscard]] u32 embedding_dimension() const { return embedding_dimension_; }
+    [[nodiscard]] u32 centroids_num() const { return centroids_num_; }
 
-    virtual void Save(LocalFileHandle &file_handle) const;
-    virtual void Load(LocalFileHandle &file_handle);
+    virtual void Save(LocalFileHandle &file_handle) const = 0;
+    virtual void Load(LocalFileHandle &file_handle) = 0;
 
-    virtual void AppendOneEmbedding(const void *embedding_ptr, SegmentOffset segment_offset, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
+    virtual void Train(u32 training_embedding_num, const f32 *training_data, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
+    virtual void
+    AppendOneEmbedding(u32 part_id, const void *embedding_ptr, SegmentOffset segment_offset, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
 
-    virtual void SearchIndex(const KnnDistanceBase1 *knn_distance,
+    virtual void SearchIndex(const Vector<u32> &part_ids,
+                             const IVF_Index_Storage *ivf_index_storage,
+                             const KnnDistanceBase1 *knn_distance,
                              const void *query_ptr,
                              EmbeddingDataType query_element_type,
                              const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                              const std::function<void(f32, SegmentOffset)> &add_result_func) const = 0;
-
-    // only for unit-test, return f32 / i8 / u8 embedding data
-    virtual Pair<const void *, SharedPtr<void>> GetDataForTest(u32 embedding_id) const = 0;
 };
 
-export class IVF_Index_Storage {
+class IVF_Index_Storage {
     const IndexIVFOption ivf_option_ = {};
     const LogicalType column_logical_type_ = LogicalType::kInvalid;
     const EmbeddingDataType embedding_data_type_ = EmbeddingDataType::kElemInvalid;
@@ -85,7 +88,7 @@ export class IVF_Index_Storage {
     u32 row_count_ = 0;
     u32 embedding_count_ = 0;
     IVF_Centroids_Storage ivf_centroids_storage_ = {};
-    Vector<UniquePtr<IVF_Part_Storage>> ivf_part_storages_ = {};
+    UniquePtr<IVF_Parts_Storage> ivf_parts_storage_ = {};
 
 public:
     IVF_Index_Storage(const IndexIVFOption &ivf_option,
@@ -96,8 +99,8 @@ public:
     [[nodiscard]] LogicalType column_logical_type() const { return column_logical_type_; }
     [[nodiscard]] EmbeddingDataType embedding_data_type() const { return embedding_data_type_; }
     [[nodiscard]] u32 embedding_dimension() const { return embedding_dimension_; }
-    // [[nodiscard]] u32 row_count() const { return row_count_; }
-    // [[nodiscard]] u32 embedding_count() const { return embedding_count_; }
+    [[nodiscard]] const IVF_Centroids_Storage &ivf_centroids_storage() const { return ivf_centroids_storage_; }
+    [[nodiscard]] const IVF_Parts_Storage &ivf_parts_storage() const { return *ivf_parts_storage_; }
 
     void Train(u32 training_embedding_num, const f32 *training_data, u32 expect_centroid_num = 0);
     void AddEmbedding(SegmentOffset segment_offset, const void *embedding_ptr);
@@ -129,5 +132,32 @@ private:
     template <EmbeddingDataType embedding_data_type>
     void AddMultiVectorT(SegmentOffset segment_offset, const EmbeddingDataTypeToCppTypeT<embedding_data_type> *multi_vector_ptr, u32 embedding_num);
 };
+
+inline auto ApplyEmbeddingDataTypeToFunc(const EmbeddingDataType embedding_data_type, auto func, auto default_f) {
+    switch (embedding_data_type) {
+        case EmbeddingDataType::kElemUInt8: {
+            return func.template operator()<EmbeddingDataType::kElemUInt8>();
+        }
+        case EmbeddingDataType::kElemInt8: {
+            return func.template operator()<EmbeddingDataType::kElemInt8>();
+        }
+        case EmbeddingDataType::kElemDouble: {
+            return func.template operator()<EmbeddingDataType::kElemDouble>();
+        }
+        case EmbeddingDataType::kElemFloat: {
+            return func.template operator()<EmbeddingDataType::kElemFloat>();
+        }
+        case EmbeddingDataType::kElemFloat16: {
+            return func.template operator()<EmbeddingDataType::kElemFloat16>();
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            return func.template operator()<EmbeddingDataType::kElemBFloat16>();
+        }
+        default: {
+            UnrecoverableError("Unsupported embedding data type");
+            return default_f();
+        }
+    }
+}
 
 } // namespace infinity

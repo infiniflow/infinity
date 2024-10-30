@@ -158,7 +158,7 @@ TEST_P(CheckpointTest, test_cleanup_and_checkpoint) {
         }
     }
     { // create table
-        auto tbl1_def = MakeUnique<TableDef>(db_name, table_name, columns);
+        auto tbl1_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), columns);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
         Status status = txn->CreateTable(*db_name, std::move(tbl1_def), ConflictType::kIgnore);
@@ -231,7 +231,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
             }
         }
         {
-            auto tbl1_def = MakeUnique<TableDef>(db_name, table_name, columns);
+            auto tbl1_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), columns);
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
             Status status = txn->CreateTable(*db_name, std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -344,7 +344,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
             }
         }
         {
-            auto tbl1_def = MakeUnique<TableDef>(db_name, table_name, columns);
+            auto tbl1_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), columns);
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
             Status status = txn->CreateTable(*db_name, std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -447,7 +447,7 @@ TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
 
         {
 
-            auto tbl_def = MakeUnique<TableDef>(db_name, table_name, columns);
+            auto tbl_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), columns);
 
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
             auto status = txn->CreateTable(*db_name, std::move(tbl_def), ConflictType::kIgnore);

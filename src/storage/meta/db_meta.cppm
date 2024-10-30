@@ -56,6 +56,7 @@ public:
     }
 private:
     Tuple<DBEntry *, Status> CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                            const SharedPtr<String>& comment,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
                                             TxnManager *txn_mgr,

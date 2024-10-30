@@ -75,6 +75,7 @@ import physical_merge_match_sparse;
 import physical_merge_aggregate;
 import status;
 import physical_operator_type;
+import physical_read_cache;
 
 import explain_logical_plan;
 import logical_show;
@@ -93,6 +94,7 @@ import common_query_filter;
 import table_entry;
 import logger;
 import show_statement;
+import base_table_ref;
 
 namespace infinity {
 
@@ -303,6 +305,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kMergeAggregate: {
             Explain((PhysicalMergeAggregate *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kReadCache: {
+            Explain(static_cast<const PhysicalReadCache *>(op), result, intent_size);
             break;
         }
         default: {
@@ -814,7 +820,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, SharedPt
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index
-    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(knn_scan_node->knn_table_index_);
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(knn_scan_node->table_index());
     result->emplace_back(MakeShared<String>(table_index));
 
     KnnExpression *knn_expr_raw = knn_scan_node->knn_expression_.get();
@@ -2362,7 +2368,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeKnn *merge_knn_node,
     result->emplace_back(MakeShared<String>(explain_header_str));
 
     // Table index
-    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(merge_knn_node->knn_table_index());
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(merge_knn_node->table_index());
     result->emplace_back(MakeShared<String>(table_index));
 
     // Output columns
@@ -2594,6 +2600,56 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeMatchTensor *merge_match_te
     }
 }
 
+void ExplainPhysicalPlan::Explain(const PhysicalMergeMatchSparse *merge_match_sparse_node,
+                                  SharedPtr<Vector<SharedPtr<String>>> &result,
+                                  i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> MERGE MatchSparse ";
+    } else {
+        explain_header_str = "MERGE MatchSparse ";
+    }
+    explain_header_str += "(" + std::to_string(merge_match_sparse_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(explain_header_str));
+
+    // Table alias and name
+    String table_name = String(intent_size, ' ') + " - table name: " + merge_match_sparse_node->TableAlias() + "(";
+
+    table_name += *merge_match_sparse_node->table_collection_ptr()->GetDBName() + ".";
+    table_name += *merge_match_sparse_node->table_collection_ptr()->GetTableName() + ")";
+    result->emplace_back(MakeShared<String>(table_name));
+
+    // Table index
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(merge_match_sparse_node->table_index());
+    result->emplace_back(MakeShared<String>(table_index));
+
+    String match_sparse_expression =
+        String(intent_size, ' ') + " - MatchSparse expression: " + merge_match_sparse_node->match_sparse_expr()->ToString();
+    result->emplace_back(MakeShared<String>(std::move(match_sparse_expression)));
+
+    String top_n_expression = String(intent_size, ' ') + " - Top N: " + std::to_string(merge_match_sparse_node->GetTopN());
+    result->emplace_back(MakeShared<String>(std::move(top_n_expression)));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = merge_match_sparse_node->GetOutputNames()->size();
+    if (column_count == 0) {
+        String error_message = "No column in PhysicalMergeMatchSparse node.";
+        UnrecoverableError(error_message);
+    }
+    for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += merge_match_sparse_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += merge_match_sparse_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+
+    if (merge_match_sparse_node->left() == nullptr) {
+        String error_message = "PhysicalMergeMatchSparse should have child node!";
+        UnrecoverableError(error_message);
+    }
+}
+
 void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -2644,6 +2700,38 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeAggregate *merge_aggregate_
         output_columns += merge_aggregate_node->GetOutputNames()->at(idx) + ", ";
     }
     output_columns += merge_aggregate_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalReadCache *read_cache_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> Read cache ";
+    } else {
+        explain_header_str = "Read cache ";
+    }
+    explain_header_str += "(" + std::to_string(read_cache_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(explain_header_str));
+
+    const BaseTableRef *base_table_ref = read_cache_node->base_table_ref();
+    // Table alias and name
+    String table_name = String(intent_size, ' ') + " - table name: (";
+    table_name += *base_table_ref->schema_name() + ".";
+    table_name += *base_table_ref->table_name() + ")";
+    result->emplace_back(MakeShared<String>(table_name));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = read_cache_node->GetOutputNames()->size();
+    if (column_count == 0) {
+        String error_message = "No column in read cache node.";
+        UnrecoverableError(error_message);
+    }
+    for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += read_cache_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += read_cache_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 }

@@ -85,6 +85,9 @@ import doc_iterator;
 import status;
 import default_values;
 import parse_fulltext_options;
+import highlighter;
+import data_type;
+import internal_types;
 
 namespace infinity {
 
@@ -144,14 +147,20 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             root = limit;
         }
 
-        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
+        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                  projection_expressions_,
+                                                  projection_index_,
+                                                  Map<SizeT, SharedPtr<HighlightInfo>>());
         project->set_left_node(root);
         root = project;
 
         if (!pruned_expression_.empty()) {
             String error_message = "Projection method changed!";
             UnrecoverableError(error_message);
-            auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), pruned_expression_, result_index_);
+            auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                             pruned_expression_,
+                                                             result_index_,
+                                                             Map<SizeT, SharedPtr<HighlightInfo>>());
             pruned_project->set_left_node(root);
             root = pruned_project;
         }
@@ -196,8 +205,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     const Map<String, String> &column2analyzer = match_node->index_reader_.GetColumn2Analyzer();
                     SearchOptions search_ops(match_node->match_expr_->options_text_);
 
-                    // option: threshold
-                    const String &threshold = search_ops.options_["threshold"];
+                    // option: begin_threshold
+                    const String &threshold = search_ops.options_["begin_threshold"];
                     match_node->begin_threshold_ = strtof(threshold.c_str(), nullptr);
 
                     // option: default field
@@ -253,12 +262,41 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         match_node->minimum_should_match_option_ = ParseMinimumShouldMatchOption(iter->second);
                     }
 
+                    // option: threshold
+                    if (iter = search_ops.options_.find("threshold"); iter != search_ops.options_.end()) {
+                        match_node->score_threshold_ = DataType::StringToValue<FloatT>(iter->second);
+                    }
+
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     UniquePtr<QueryNode> query_tree =
                         search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
                     if (query_tree.get() == nullptr) {
                         Status status = Status::ParseMatchExprFailed(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
                         RecoverableError(status);
+                    }
+
+                    // Initialize highlight info
+                    if (!highlight_columns_.empty()) {
+                        Vector<String> columns, terms;
+                        query_tree->GetQueryColumnsTerms(columns, terms);
+
+                        // Deduplicate columns
+                        std::sort(columns.begin(), columns.end());
+                        columns.erase(std::unique(columns.begin(), columns.end()), columns.end());
+
+                        for (auto &column_name : columns) {
+                            for (auto &[highlight_column_id, highlight_info] : highlight_columns_) {
+                                if (column_name == projection_expressions_[highlight_column_id]->Name()) {
+                                    highlight_info->query_terms_.insert(highlight_info->query_terms_.end(), terms.begin(), terms.end());
+                                    const auto &it = column2analyzer.find(column_name);
+                                    if (it == column2analyzer.end()) {
+                                        highlight_info->analyzer_ = "standard";
+                                    } else {
+                                        highlight_info->analyzer_ = it->second;
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     match_node->query_tree_ = std::move(query_tree);
@@ -341,7 +379,20 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             root = limit;
         }
 
-        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
+        // Finalize highlight info
+        if (!highlight_columns_.empty()) {
+            for (auto &[highlight_column_id, highlight_info] : highlight_columns_) {
+                // Deduplicate terms
+                std::sort(highlight_info->query_terms_.begin(), highlight_info->query_terms_.end());
+                highlight_info->query_terms_.erase(std::unique(highlight_info->query_terms_.begin(), highlight_info->query_terms_.end()),
+                                                   highlight_info->query_terms_.end());
+            }
+        }
+
+        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                  projection_expressions_,
+                                                  projection_index_,
+                                                  std::move(highlight_columns_));
         project->set_left_node(root);
         root = std::move(project);
 

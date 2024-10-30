@@ -28,7 +28,7 @@ import third_party;
 import global_resource_usage;
 import status;
 import cluster_manager;
-import peer_task;
+import admin_statement;
 
 namespace infinity {
 
@@ -57,7 +57,7 @@ public:
 
     void Init(const SharedPtr<String> &config_path, bool admin_flag = false, DefaultConfig *default_config = nullptr);
 //    void InitAdminMode(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
-    Status ChangeRole(NodeRole target_role, const String& node_name = {}, String leader_ip = {}, i16 leader_port = {});
+    Status ChangeRole(NodeRole target_role, bool from_leader = false, const String& node_name = {}, String leader_ip = {}, i16 leader_port = {});
     bool IsAdminRole() const { return GetServerRole() == NodeRole::kAdmin; }
     bool IsClusterRole() const;
 

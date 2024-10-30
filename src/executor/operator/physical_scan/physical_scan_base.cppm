@@ -26,8 +26,12 @@ import load_meta;
 import internal_types;
 import operator_state;
 import query_context;
+import table_entry;
 
 namespace infinity {
+
+class ResultCacheManager;
+class DataBlock;
 
 export class PhysicalScanBase : public PhysicalOperator {
 public:
@@ -35,15 +39,28 @@ public:
                      const PhysicalOperatorType type,
                      UniquePtr<PhysicalOperator> left,
                      UniquePtr<PhysicalOperator> right,
+                     const u64 table_index,
                      SharedPtr<BaseTableRef> base_table_ref,
-                     SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(type, std::move(left), std::move(right), id, std::move(load_metas)), base_table_ref_(std::move(base_table_ref)) {}
+                     SharedPtr<Vector<LoadMeta>> load_metas,
+                     const bool cache_result = false)
+        : PhysicalOperator(type, std::move(left), std::move(right), id, std::move(load_metas), cache_result), table_index_(table_index),
+          base_table_ref_(std::move(base_table_ref)) {}
 
     virtual Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
 
     SizeT TaskletCount() override;
 
     virtual BlockIndex *GetBlockIndex() const;
+
+    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+        table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
+    }
+
+    u64 table_index() const { return table_index_; }
+
+    [[nodiscard]] inline String TableAlias() const { return base_table_ref_->alias_; }
+
+    [[nodiscard]] inline TableEntry *table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
 
 protected:
     void SetOutput(const Vector<char *> &raw_result_dists_list,
@@ -53,7 +70,10 @@ protected:
                    QueryContext *query_context,
                    OperatorState *operator_state);
 
+    void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) const;
+
 public:
+    u64 table_index_ = 0;
     SharedPtr<BaseTableRef> base_table_ref_{};
 };
 

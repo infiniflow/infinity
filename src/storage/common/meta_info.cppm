@@ -25,11 +25,13 @@ export struct DatabaseInfo {
     SharedPtr<String> db_name_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> absolute_db_path_{};
+    SharedPtr<String> db_comment_{};
     i64 table_count_{};
 };
 
 export struct TableInfo {
     SharedPtr<String> table_name_{};
+    SharedPtr<String> table_comment_{};
     SharedPtr<String> table_full_dir_{};
     i64 column_count_{};
     i64 segment_count_{};
@@ -49,6 +51,7 @@ export struct TableIndexInfo {
 export struct TableDetail {
     SharedPtr<String> db_name_{};
     SharedPtr<String> table_name_{};
+    SharedPtr<String> table_comment_{};
     TableEntryType table_entry_type_;
     i64 column_count_{};
     i64 row_count_{};

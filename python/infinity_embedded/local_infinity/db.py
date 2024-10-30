@@ -10,9 +10,10 @@ from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflic
 
 
 class LocalDatabase(Database, ABC):
-    def __init__(self, conn, name: str):
+    def __init__(self, conn, name: str, comment: str = None):
         self._conn = conn
         self._db_name = name
+        self._db_comment = comment
 
     def create_table(self, table_name: str, columns_definition,
                      conflict_type: ConflictType = ConflictType.Error):
@@ -81,14 +82,6 @@ class LocalDatabase(Database, ABC):
         res = self._conn.show_table(db_name=self._db_name, table_name=table_name)
         if res.error_code == ErrorCode.OK:
             return res
-        else:
-            raise InfinityException(res.error_code, res.error_msg)
-
-    @name_validity_check("table_name", "Table")
-    def show_columns(self, table_name):
-        res = self._conn.show_columns(db_name=self._db_name, table_name=table_name)
-        if res.error_code == ErrorCode.OK:
-            return select_res_to_polars(res)
         else:
             raise InfinityException(res.error_code, res.error_msg)
 

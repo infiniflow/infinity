@@ -79,6 +79,8 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
     if (!VirtualStore::Exists(workspace_)) {
         VirtualStore::MakeDirectory(workspace_);
     }
+    String read_path_empty = GetObjPath(ObjAddr::KeyEmpty);
+    VirtualStore::Truncate(read_path_empty, 0);
 }
 
 PersistenceManager::~PersistenceManager() = default;
@@ -114,10 +116,18 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         UnrecoverableError(error_message);
     }
     if (src_size == 0) {
-        String error_message = fmt::format("Persist skipped empty local path {}.", file_path);
+        String error_message = fmt::format("Persist empty local path {}.", file_path);
         LOG_WARN(error_message);
+        ObjAddr obj_addr(ObjAddr::KeyEmpty, 0, 0);
+        fs::remove(tmp_file_path, ec);
+        if (ec) {
+            String error_message = fmt::format("Failed to remove {}.", tmp_file_path);
+            UnrecoverableError(error_message);
+        }
         std::lock_guard<std::mutex> lock(mtx_);
-        local_path_obj_.erase(local_path);
+        local_path_obj_[local_path] = obj_addr;
+        result.persist_keys_.push_back(ObjAddr::KeyEmpty);
+        result.obj_addr_ = obj_addr;
         return result;
     } else if (!try_compose || src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
@@ -192,8 +202,8 @@ void PersistenceManager::CheckValid() {
 }
 
 void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, Vector<String> &drop_keys) {
-    persist_keys.push_back(current_object_key_);
     if (current_object_size_ > 0) {
+        persist_keys.push_back(current_object_key_);
         if (current_object_parts_ > 1) {
             // Add footer to composed object -- format version 1
             fs::path dst_fp = workspace_;
@@ -214,6 +224,8 @@ void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, 
         current_object_size_ = 0;
         current_object_parts_ = 0;
         current_object_ref_count_ = 0;
+    } else {
+        LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added empty object {}", current_object_key_));
     }
 }
 
@@ -235,17 +247,23 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         return result;
     }
     result.obj_addr_ = it->second;
-    if (ObjStat *obj_stat = objects_->Get(it->second.obj_key_); obj_stat != nullptr) {
-        LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
-        if(!obj_stat->cached_){
-            String read_path = GetObjPath(result.obj_addr_.obj_key_);
-            VirtualStore::DownloadObject(read_path, read_path);
-            if(VirtualStore::Exists(read_path)){
-                LOG_TRACE(fmt::format("GetObjCache download object {}", read_path));
-                obj_stat->cached_ = true;
-            }
+    if (it->second.part_size_ == 0) {
+        LOG_TRACE(fmt::format("GetObjCache empty object {} for local path {}", it->second.obj_key_, local_path));
+        if (it->second.obj_key_ != ObjAddr::KeyEmpty) {
+            String error_message = fmt::format("GetObjCache object {} is empty", it->second.obj_key_);
+            UnrecoverableError(error_message);
         }
-        result.cached_ = obj_stat->cached_;
+        result.cached_ = true;
+    } else if (ObjStat *obj_stat = objects_->Get(it->second.obj_key_); obj_stat != nullptr) {
+        LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
+        String read_path = GetObjPath(result.obj_addr_.obj_key_);
+        if (!VirtualStore::Exists(read_path)) {
+            obj_stat->cached_ = false;
+            result.cached_ = false;
+            result.obj_stat_ = obj_stat;
+        } else {
+            result.cached_ = true;
+        }
     } else {
         if (it->second.obj_key_ != current_object_key_) {
             String error_message = fmt::format("GetObjCache object {} not found", it->second.obj_key_);
@@ -308,7 +326,8 @@ PersistWriteResult PersistenceManager::PutObjCache(const String &file_path) {
         UnrecoverableError(error_message);
     }
     if (it->second.part_size_ == 0) {
-        UnrecoverableError(fmt::format("PutObjCache object {} part size is 0", it->second.obj_key_));
+        LOG_TRACE(fmt::format("PutObjCache empty object {} for local path {}", it->second.obj_key_, local_path));
+        return result;
     }
     ObjStat *obj_stat = objects_->Release(it->second.obj_key_, result.drop_keys_);
     if (obj_stat == nullptr) {
@@ -365,7 +384,10 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
                                        bool check_ref_count) {
     ObjStat *obj_stat = objects_->GetNoCount(object_addr.obj_key_);
     if (obj_stat == nullptr) {
-        if (object_addr.obj_key_ == current_object_key_) {
+        if (object_addr.obj_key_ == ObjAddr::KeyEmpty) {
+            assert(object_addr.part_size_ == 0);
+            return;
+        } else if (object_addr.obj_key_ == current_object_key_) {
             CurrentObjFinalizeNoLock(persist_keys, drop_keys);
             obj_stat = objects_->GetNoCount(object_addr.obj_key_);
             assert(obj_stat != nullptr);

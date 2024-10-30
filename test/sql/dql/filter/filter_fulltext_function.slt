@@ -1,3 +1,5 @@
+statement ok
+SET CONFIG result_cache_mode "off";
 
 statement ok
 DROP TABLE IF EXISTS ft_in_filter;
@@ -188,3 +190,6 @@ SELECT * FROM ft_in_filter WHERE filter_text('doc', 'second') OR num < 2 OR num 
 # Clean up
 statement ok
 DROP TABLE ft_in_filter;
+
+statement ok
+SET CONFIG result_cache_mode "on";

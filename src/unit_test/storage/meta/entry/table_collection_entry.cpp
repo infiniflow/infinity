@@ -76,7 +76,7 @@ TEST_P(TableEntryTest, test1) {
             columns.emplace_back(column_def_ptr);
         }
 
-        table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("t1"), columns);
+        table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("t1"), MakeShared<String>(), columns);
 
         EXPECT_EQ(*table_def->table_name(), "t1");
         EXPECT_EQ(table_def->column_count(), 2ul);
@@ -87,6 +87,7 @@ TEST_P(TableEntryTest, test1) {
     SharedPtr<TableEntry> table_entry = MakeShared<TableEntry>(false,
                                                                table_dir,
                                                                table_def->table_name(),
+                                                               table_def->table_comment(),
                                                                table_def->columns(),
                                                                TableEntryType::kTableEntry,
                                                                nullptr,
@@ -106,7 +107,7 @@ TEST_P(TableEntryTest, test2) {
     Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
 
     // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase("db1", ConflictType::kError);
+    Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Create tbl1, OK
@@ -137,7 +138,7 @@ TEST_P(TableEntryTest, test2) {
         }
     }
 
-    UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+    UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
     Status s1 = new_txn->CreateTable("db1", std::move(tbl1_def), ConflictType::kError);
     EXPECT_TRUE(s1.ok());
 

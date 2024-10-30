@@ -83,6 +83,7 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             auto op = MakeUnique<AddDBEntryOp>();
             op->encode_ = MakeUnique<String>(fmt::format("#{}", db_name));
             op->db_entry_dir_ = db_dir;
+            op->comment_ = MakeShared<String>();
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
@@ -92,6 +93,7 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             op->column_defs_ = column_defs;
             op->row_count_ = 0;
             op->unsealed_id_ = 0;
+            op->table_comment_ = MakeShared<String>("test_comment");
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
@@ -200,6 +202,7 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         op2->merge_flag_ = MergeFlag::kDelete;
 
         op1_same_name->db_entry_dir_ = op2->db_entry_dir_ = op1->db_entry_dir_ = db_dir;
+        op1_same_name->comment_  = op2->comment_ = op1->comment_ = MakeShared<String>();
 
         auto op1_copy = MakeUnique<AddDBEntryOp>(*op1);
         op1_copy->merge_flag_ = MergeFlag::kUpdate;
@@ -222,6 +225,8 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
 
         op1_same_name->table_entry_dir_ = op2->table_entry_dir_ = op1->table_entry_dir_ = table_entry_dir;
         op1_same_name->column_defs_ = op2->column_defs_ = op1->column_defs_ = column_defs;
+        op1->table_comment_ = MakeShared<String>("test_comment");
+        op2->table_comment_ = MakeShared<String>("test_comment");
 
         auto op1_copy = MakeUnique<AddTableEntryOp>(*op1);
         op1_copy->merge_flag_ = MergeFlag::kUpdate;
@@ -388,6 +393,7 @@ TEST_P(CatalogDeltaEntryTest, ComplicateMergeEntries) {
         op1->encode_ = MakeUnique<String>(fmt::format("#{}", *db_name));
 
         op1->db_entry_dir_ = db_dir;
+        op1->comment_ = MakeShared<String>();
         op1->merge_flag_ = merge_flag;
         op1->commit_ts_ = commit_ts;
         delta_entry->operations().push_back(std::move(op1));

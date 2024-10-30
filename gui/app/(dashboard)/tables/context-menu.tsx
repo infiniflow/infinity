@@ -8,11 +8,7 @@ import { useSeDialogState } from '@/lib/hooks';
 import { TableCreatingDialog } from './table-creating-dialog';
 import AddIcon from '/public/add.svg';
 
-export function InfinityContextMenuContent({
-  databaseName
-}: {
-  databaseName: string;
-}) {
+export function InfinityContextMenuContent({}: { databaseName: string }) {
   const { showDialog, visible, hideDialog, switchVisible } = useSeDialogState();
   return (
     <>

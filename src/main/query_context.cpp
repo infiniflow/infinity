@@ -61,7 +61,7 @@ import infinity_context;
 
 namespace infinity {
 
-QueryContext::QueryContext(BaseSession *session) : session_ptr_(session){};
+QueryContext::QueryContext(BaseSession *session) : session_ptr_(session) {};
 
 QueryContext::~QueryContext() { UnInit(); }
 
@@ -69,8 +69,8 @@ void QueryContext::Init(Config *global_config_ptr,
                         TaskScheduler *scheduler_ptr,
                         Storage *storage_ptr,
                         ResourceManager *resource_manager_ptr,
-                        SessionManager* session_manager,
-                        PersistenceManager* persistence_manager) {
+                        SessionManager *session_manager,
+                        PersistenceManager *persistence_manager) {
     global_config_ = global_config_ptr;
     scheduler_ = scheduler_ptr;
     storage_ = storage_ptr;
@@ -132,11 +132,11 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
         if (base_statement->Type() == StatementType::kAdmin) {
             const AdminStatement *admin_statement = static_cast<const AdminStatement *>(base_statement);
 
-            switch(admin_statement->admin_type_) {
+            switch (admin_statement->admin_type_) {
                 case AdminStmtType::kShowVariable: {
                     String var_name = admin_statement->variable_name_.value();
                     ToLower(var_name);
-                    if(var_name == "server_role") {
+                    if (var_name == "server_role") {
                         return HandleAdminStatement(admin_statement);
                     }
                     break;
@@ -144,6 +144,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
                 case AdminStmtType::kShowNode:
                 case AdminStmtType::kShowCurrentNode:
                 case AdminStmtType::kListNodes:
+                case AdminStmtType::kRemoveNode:
                 case AdminStmtType::kSetRole: {
                     return HandleAdminStatement(admin_statement);
                 }

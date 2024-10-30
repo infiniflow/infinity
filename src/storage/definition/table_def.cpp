@@ -80,6 +80,7 @@ i32 TableDef::GetSizeInBytes() const {
     i32 size = 0;
     size += sizeof(i32) + schema_name_->length();
     size += sizeof(i32) + table_name_->length();
+    size += sizeof(i32) + table_comment_->length();
     size += sizeof(i32);
     for (u32 i = 0; i < columns_.size(); i++) {
         const ColumnDef &cd = *columns_[i];
@@ -91,6 +92,7 @@ i32 TableDef::GetSizeInBytes() const {
 void TableDef::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, *schema_name_);
     WriteBufAdv(ptr, *table_name_);
+    WriteBufAdv(ptr, *table_comment_);
     WriteBufAdv(ptr, (i32)(columns_.size()));
     SizeT column_count = columns_.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
@@ -108,6 +110,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(const char *&ptr, i32 maxbytes) {
     }
     String schema_name = ReadBufAdv<String>(ptr);
     String table_name = ReadBufAdv<String>(ptr);
+    String table_comment = ReadBufAdv<String>(ptr);
     i32 columns_size = ReadBufAdv<i32>(ptr);
     Vector<SharedPtr<ColumnDef>> columns;
     for (i32 i = 0; i < columns_size; i++) {
@@ -119,7 +122,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(const char *&ptr, i32 maxbytes) {
         String error_message = "ptr goes out of range when reading TableDef";
         UnrecoverableError(error_message);
     }
-    return TableDef::Make(MakeShared<String>(schema_name), MakeShared<String>(table_name), columns);
+    return TableDef::Make(MakeShared<String>(schema_name), MakeShared<String>(table_name), MakeShared<String>(table_comment), columns);
 }
 
 } // namespace infinity

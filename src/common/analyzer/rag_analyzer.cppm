@@ -14,6 +14,8 @@
 
 module;
 
+#include <re2/re2.h>
+
 export module rag_analyzer;
 
 import stl;
@@ -21,13 +23,17 @@ import term;
 import status;
 import darts_trie;
 import lemmatizer;
+import stemmer;
+import analyzer;
 
+class OpenCC;
 namespace infinity {
 
 // C++ reimplementation of
 // https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py
 
-export class RAGAnalyzer {
+class RegexTokenizer;
+export class RAGAnalyzer : public Analyzer {
 public:
     RAGAnalyzer(const String &path);
 
@@ -35,12 +41,20 @@ public:
 
     ~RAGAnalyzer();
 
+    void InitStemmer(Language language) { stemmer_->Init(language); }
+
     Status Load();
 
-    String Tokenize(const String &line, Vector<String> &res);
+    void SetFineGrained(bool fine_grained) { fine_grained_ = fine_grained; }
 
-    String FineGrainedTokenize(const String &tokens);
+    String Tokenize(const String &line);
 
+    void FineGrainedTokenize(const String &tokens, Vector<String> &result);
+
+protected:
+    int AnalyzeImpl(const Term &input, void *data, HookType func) override;
+
+protected:
 private:
     static constexpr float DENOMINATOR = 1000000;
 
@@ -64,7 +78,11 @@ private:
 
     String Merge(const String &tokens);
 
+    void EnglishNormalize(const Vector<String> &tokens, Vector<String> &res);
+
 public:
+    static const SizeT term_string_buffer_limit_ = 4096 * 3;
+
     String dict_path_;
 
     bool own_dict_{};
@@ -74,5 +92,31 @@ public:
     POSTable *pos_table_{nullptr};
 
     Lemmatizer *lemma_{nullptr};
+
+    UniquePtr<Stemmer> stemmer_;
+
+    OpenCC *opencc_{nullptr};
+
+    Vector<char> lowercase_string_buffer_;
+
+    bool fine_grained_{false};
+
+    UniquePtr<RegexTokenizer> regex_tokenizer_;
+
+    RE2 pattern1_{"[a-zA-Z_-]+$"};
+
+    RE2 pattern2_{"[a-z\\.-]+$"};
+
+    RE2 pattern3_{"[0-9\\.-]+$"};
+
+    RE2 pattern4_{"[0-9,\\.-]+$"};
+
+    RE2 pattern5_{"[a-z\\.-]+"};
+
+    RE2 regex_split_pattern_{R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#"};
+
+    RE2 blank_pattern_{"( )"};
+
+    RE2 replace_space_pattern_{R"#(([ ]+))#"};
 };
 } // namespace infinity

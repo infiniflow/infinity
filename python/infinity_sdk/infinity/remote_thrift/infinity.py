@@ -35,7 +35,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             self.disconnect()
 
     @name_validity_check("db_name", "DB")
-    def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.Error):
+    def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.Error, comment: str = None):
         create_database_conflict: ttypes.CreateConflict
         if conflict_type == ConflictType.Error:
             create_database_conflict = ttypes.CreateConflict.Error
@@ -46,7 +46,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         else:
             raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
-        res = self._client.create_database(db_name=db_name, conflict_type=create_database_conflict)
+        res = self._client.create_database(db_name=db_name, conflict_type=create_database_conflict, comment=comment)
         if res.error_code == ErrorCode.OK:
             return RemoteDatabase(self._client, db_name)
         else:
@@ -77,7 +77,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         else:
             raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
-        res = self._client.drop_database(db_name=db_name, conflict_type = drop_database_conflict)
+        res = self._client.drop_database(db_name=db_name, conflict_type=drop_database_conflict)
         if res.error_code == ErrorCode.OK:
             return res
         else:

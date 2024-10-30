@@ -37,12 +37,16 @@ public:
                           SparseMetricType metric_type,
                           SizeT query_n,
                           SizeT topn,
-                          const Vector<UniquePtr<InitParameter>> &opt_params,
+                          Vector<UniquePtr<InitParameter>> opt_params,
                           SharedPtr<BaseExpression> optional_filter);
 
     DataType Type() const override;
 
     String ToString() const override;
+
+    u64 Hash() const override;
+
+    bool Eq(const BaseExpression &other) const override;
 
 private:
     void MakeQuery(SharedPtr<BaseExpression> query_sparse_expr);
@@ -55,7 +59,7 @@ public:
     SizeT query_n_;
     SizeT topn_;
 
-    const Vector<UniquePtr<InitParameter>> &opt_params_;
+    Vector<UniquePtr<InitParameter>> opt_params_;
 
     SharedPtr<BaseExpression> optional_filter_;
 };

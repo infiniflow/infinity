@@ -35,6 +35,10 @@ public:
 
     DataType Type() const override;
 
+    u64 Hash() const override;
+
+    bool Eq(const BaseExpression &other_base) const override;
+
     String fields_;
     String matching_text_;
     String options_text_;

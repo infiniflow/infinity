@@ -6,29 +6,10 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { showConfigs, showVariables } from '../actions';
-// import { getProducts } from '@/lib/db';
 
-export default async function ProductsPage({
-  searchParams
-}: {
-  searchParams: { q: string; offset: string };
-}) {
-  const search = searchParams.q ?? '';
-  const offset = searchParams.offset ?? 0;
+export default async function ProductsPage() {
   const configs = await showConfigs();
   const variables = await showVariables();
-  // const { products, newOffset, totalProducts } = await getProducts(
-  //   search,
-  //   Number(offset)
-  // );
-  console.log(variables);
-  // const products = await request('http://localhost:3000/products');
-
-  const { newOffset, totalProducts, products } = {
-    newOffset: 0,
-    totalProducts: 0,
-    products: []
-  };
 
   return (
     <div>

@@ -57,6 +57,7 @@ CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
 COLUMN          { return COLUMN; }
 COLUMNS         { return COLUMNS; }
+COMMENT         { return COMMENT; }
 COMPACT         { return COMPACT; }
 CONFIGS         { return CONFIGS; }
 CONFIG          { return CONFIG; }
@@ -103,6 +104,7 @@ GLOBAL          { return GLOBAL; }
 GROUP           { return GROUP; }
 HAVING          { return HAVING; }
 HEADER          { return HEADER; }
+HIGHLIGHT       { return HIGHLIGHT; }
 HOUR            { return HOUR; }
 HOURS           { return HOURS; }
 HUGEINT         { return HUGEINT; }
@@ -165,7 +167,9 @@ PROPERTIES      { return PROPERTIES; }
 QUERIES         { return QUERIES; }
 QUERY           { return QUERY; }
 REAL            { return REAL; }
+RECOVER         { return RECOVER; }
 RENAME          { return RENAME; }
+REMOVE          { return REMOVE; }
 RIGHT           { return RIGHT; }
 ROWLIMIT        { return ROWLIMIT; }
 SEARCH          { return SEARCH; }
@@ -178,6 +182,8 @@ SEGMENT         { return SEGMENT; }
 SEGMENTS        { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
+SNAPSHOT        { return SNAPSHOT; }
+SNAPSHOTS       { return SNAPSHOTS; }
 SPARSE          { return SPARSE; }
 STANDALONE      { return STANDALONE; }
 TABLE           { return TABLE; }

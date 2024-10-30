@@ -27,6 +27,7 @@ import infinity_context;
 import session;
 import parsed_expr;
 import search_expr;
+import insert_row_expr;
 import column_def;
 import create_index_info;
 import update_statement;
@@ -61,7 +62,7 @@ public:
 
     void LocalDisconnect();
 
-    QueryResult CreateDatabase(const String &db_name, const CreateDatabaseOptions &options);
+    QueryResult CreateDatabase(const String &db_name, const CreateDatabaseOptions &options, const String& db_comment);
 
     QueryResult DropDatabase(const String &db_name, const DropDatabaseOptions &options);
 
@@ -150,14 +151,14 @@ public:
     QueryResult ShowDeltaCheckpoint();
     QueryResult ShowFullCheckpoint();
     QueryResult ShowObjects();
-    QueryResult ShowObject(const String& object_name);
+    QueryResult ShowObject(const String &object_name);
     QueryResult ShowFilesInObject();
     QueryResult ShowMemory();
     QueryResult ShowMemoryObjects();
     QueryResult ShowMemoryAllocations();
-    QueryResult ShowFunction(const String& function_name);
+    QueryResult ShowFunction(const String &function_name);
 
-    QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
+    QueryResult Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *insert_rows);
 
     QueryResult Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
 
@@ -175,7 +176,10 @@ public:
                         ParsedExpr *filter,
                         ParsedExpr *limit,
                         ParsedExpr *offset,
-                        Vector<ParsedExpr *> *output_columns);
+                        Vector<ParsedExpr *> *output_columns,
+                        Vector<ParsedExpr *> *highlight_columns,
+                        Vector<OrderByExpr *> *order_by_list,
+                        Vector<ParsedExpr *> *group_by_list);
 
     QueryResult Search(const String &db_name,
                        const String &table_name,
@@ -184,7 +188,9 @@ public:
                        ParsedExpr *limit,
                        ParsedExpr *offset,
                        Vector<ParsedExpr *> *output_columns,
-                       Vector<OrderByExpr *> *order_by_list);
+                       Vector<ParsedExpr *> *highlight_columns,
+                       Vector<OrderByExpr *> *order_by_list,
+                       Vector<ParsedExpr *> *group_by_list);
 
     QueryResult Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_options = OptimizeOptions{});
 
@@ -195,7 +201,7 @@ public:
     QueryResult Cleanup();
 
     QueryResult ForceCheckpoint();
-    QueryResult CompactTable(const String &db_name, const String& table_name);
+    QueryResult CompactTable(const String &db_name, const String &table_name);
 
     // Admin interface
     QueryResult AdminShowCatalogs();
@@ -211,8 +217,9 @@ public:
     QueryResult AdminSetAdmin();
     QueryResult AdminSetStandalone();
     QueryResult AdminSetLeader(String node_name);
-    QueryResult AdminSetFollower(String node_name, const String& leader_address);
-    QueryResult AdminSetLearner(String node_name, const String& leader_address);
+    QueryResult AdminSetFollower(String node_name, const String &leader_address);
+    QueryResult AdminSetLearner(String node_name, const String &leader_address);
+    QueryResult AdminRemoveNode(String var_name);
 
 private:
     UniquePtr<QueryContext> GetQueryContext() const;

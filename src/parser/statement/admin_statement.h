@@ -45,17 +45,27 @@ enum class AdminStmtType {
     kListNodes,
     kShowNode,
     kShowCurrentNode,
+    kRemoveNode,
     kSetRole,
+    kCreateSnapshot,
+    kListSnapshots,
+    kShowSnapshot,
+    kDeleteSnapshot,
+    kExportSnapshot,
+    kRecoverFromSnapshot,
     kInvalid,
 };
 
-enum class AdminNodeRole {
+enum class NodeRole {
     kAdmin,
     kStandalone,
     kLeader,
     kFollower,
-    kLearner
+    kLearner,
+    kUnInitialized
 };
+
+std::string ToString(NodeRole);
 
 class AdminStatement : public BaseStatement {
 public:
@@ -78,10 +88,12 @@ public:
     std::optional<int64_t> index_entry_index_{};
     std::optional<int64_t> log_file_index_{};
     std::optional<int64_t> log_index_in_file_{};
-    std::optional<AdminNodeRole> admin_node_role_{};
+    std::optional<NodeRole> node_role_{};
     std::optional<std::string> leader_address_{};
     std::optional<std::string> variable_name_{};
     std::optional<std::string> node_name_{};
+    std::optional<std::string> snapshot_name_{};
+    std::optional<std::string> export_path_{};
 };
 
 } // namespace infinity

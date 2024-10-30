@@ -273,11 +273,13 @@ struct ColumnDef {
 3:  DataType data_type,
 4:  list<Constraint> constraints = [],
 5:  ConstantExpr constant_expr,
+6:  string comment,
 }
 
 
 struct Field {
-1: list<ParsedExpr> parse_exprs = [],
+1: list<string> column_names = [],
+2: list<ParsedExpr> parse_exprs = [],
 }
 
 enum CopyFileType {
@@ -362,6 +364,8 @@ struct ListDatabaseResponse {
 1: i64 error_code,
 2: string error_msg,
 3: list<string> db_names = [],
+4: list<string> db_dirs = [],
+5: list<string> db_comments = [],
 }
 
 struct ListTableRequest {
@@ -398,6 +402,7 @@ struct ShowDatabaseResponse {
 3: string database_name,
 4: string store_dir,
 5: i64 table_count,
+6: string comment
 }
 
 struct ShowTableRequest {
@@ -497,9 +502,10 @@ struct GetDatabaseRequest {
 }
 
 struct CreateDatabaseRequest {
-1:  string db_name,
-2:  i64 session_id,
-3:  CreateOption create_option,
+1: string db_name,
+2: i64 session_id,
+3: CreateOption create_option,
+4: string db_comment,
 }
 
 struct DropDatabaseRequest {
@@ -526,9 +532,8 @@ struct DropTableRequest {
 struct InsertRequest {
 1:  string db_name,
 2:  string table_name,
-3:  list<string> column_names = [],
-4:  list<Field> fields = [],
-5:  i64 session_id,
+3:  list<Field> fields = [],
+4:  i64 session_id,
 }
 
 struct ImportRequest{
@@ -563,14 +568,15 @@ struct ExplainRequest {
 2:  string db_name,
 3:  string table_name,
 4:  list<ParsedExpr> select_list = [],
-5:  optional SearchExpr search_expr,
-6:  optional ParsedExpr where_expr,
-7:  optional list<ParsedExpr> group_by_list = [],
-8:  optional ParsedExpr having_expr,
-9:  optional ParsedExpr limit_expr,
-10:  optional ParsedExpr offset_expr,
-11:  optional list<OrderByExpr> order_by_list = [],
-12:  ExplainType explain_type,
+5:  optional list<ParsedExpr> highlight_list = [],
+6:  optional SearchExpr search_expr,
+7:  optional ParsedExpr where_expr,
+8:  optional list<ParsedExpr> group_by_list = [],
+9:  optional ParsedExpr having_expr,
+10:  optional ParsedExpr limit_expr,
+11:  optional ParsedExpr offset_expr,
+12:  optional list<OrderByExpr> order_by_list = [],
+13:  ExplainType explain_type,
 }
 
 struct ExplainResponse {
@@ -585,13 +591,14 @@ struct SelectRequest {
 2:  string db_name,
 3:  string table_name,
 4:  list<ParsedExpr> select_list = [],
-5:  optional SearchExpr search_expr,
-6:  optional ParsedExpr where_expr,
-7:  optional list<ParsedExpr> group_by_list = [],
-8:  optional ParsedExpr having_expr,
-9:  optional ParsedExpr limit_expr,
-10:  optional ParsedExpr offset_expr,
-11:  optional list<OrderByExpr> order_by_list = [],
+5:  optional list<ParsedExpr> highlight_list = [],
+6:  optional SearchExpr search_expr,
+7:  optional ParsedExpr where_expr,
+8:  optional list<ParsedExpr> group_by_list = [],
+9:  optional ParsedExpr having_expr,
+10:  optional ParsedExpr limit_expr,
+11:  optional ParsedExpr offset_expr,
+12:  optional list<OrderByExpr> order_by_list = [],
 }
 
 struct SelectResponse {

@@ -402,6 +402,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
 
     // Check if it is count(*)
     if (function_set_ptr->name() == "COUNT") {
+        if (!expr.arguments_ || expr.arguments_->empty()) {
+            RecoverableError(Status::SyntaxError("No arguments for COUNT function found."));
+        }
         if (expr.arguments_->size() == 1) {
             if ((*expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
                 ColumnExpr *col_expr = (ColumnExpr *)(*expr.arguments_)[0];
@@ -834,7 +837,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
     return bound_match_tensor_expr;
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSparseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(MatchSparseExpr &&expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
         UnrecoverableError("MatchSparse expression expect a column expression");
     }
@@ -897,16 +900,17 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
                 break;
             }
             case ParsedExprType::kMatchSparse: {
-                const auto &match_sparse = *static_cast<const MatchSparseExpr *>(match_expr);
-                for(auto &param : match_sparse.opt_params_){
-                    if(param->param_name_ != "alpha" and param->param_name_ != "beta" and param->param_name_ != "tail"){
+                auto &match_sparse = const_cast<MatchSparseExpr &>(*static_cast<const MatchSparseExpr *>(match_expr));
+                for (auto &param : match_sparse.opt_params_) {
+                    if (param->param_name_ != "alpha" and param->param_name_ != "beta" and param->param_name_ != "tail" and
+                        param->param_name_ != "threshold") {
                         RecoverableError(Status::SyntaxError(fmt::format("Unsupported optional parameter: {}", param->param_name_)));
                     }
                 }
                 if (match_sparse.filter_expr_) {
                     have_filter_in_subsearch = true;
                 }
-                match_exprs.push_back(BuildMatchSparseExpr(match_sparse, bind_context_ptr, depth, false));
+                match_exprs.push_back(BuildMatchSparseExpr(std::move(match_sparse), bind_context_ptr, depth, false));
                 break;
             }
             default: {

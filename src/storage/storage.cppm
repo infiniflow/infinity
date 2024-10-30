@@ -28,16 +28,26 @@ import log_file;
 import memindex_tracer;
 import persistence_manager;
 import virtual_store;
+import status;
 
 export module storage;
 
 namespace infinity {
 
 class CleanupInfoTracer;
+class ResultCacheManager;
+
+export enum class ReaderInitPhase {
+    kInvalid,
+    kPhase1,
+    kPhase2,
+};
 
 export class Storage {
 public:
     explicit Storage(Config *config_ptr);
+
+    ~Storage();
 
     [[nodiscard]] inline Catalog *catalog() noexcept { return new_catalog_.get(); }
 
@@ -53,18 +63,26 @@ public:
 
     [[nodiscard]] inline BGTaskProcessor *bg_processor() const noexcept { return bg_processor_.get(); }
 
+    [[nodiscard]] inline ObjectStorageProcess *object_storage_processor() const noexcept { return object_storage_processor_.get(); }
+
     [[nodiscard]] inline PeriodicTriggerThread *periodic_trigger_thread() const noexcept { return periodic_trigger_thread_.get(); }
 
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
 
     [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
 
+    [[nodiscard]] ResultCacheManager *result_cache_manager() const noexcept;
+
     StorageMode GetStorageMode() const;
     void SetStorageMode(StorageMode mode);
+    Status SetReaderStorageContinue(TxnTimeStamp system_start_ts);
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
+    void LoadFullCheckpoint(const String &checkpoint_path);
+    void AttachDeltaCheckpoint(const String &checkpoint_path);
 
     Config *config() const { return config_ptr_; }
+    ReaderInitPhase reader_init_phase() const { return reader_init_phase_; }
 
     void CreateDefaultDB();
 
@@ -81,9 +99,11 @@ private:
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
     UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
+    UniquePtr<ResultCacheManager> result_cache_manager_{};
 
     mutable std::mutex mutex_;
     StorageMode current_storage_mode_{StorageMode::kUnInitialized};
+    ReaderInitPhase reader_init_phase_{ReaderInitPhase::kInvalid};
 };
 
 } // namespace infinity

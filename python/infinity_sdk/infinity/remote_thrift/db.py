@@ -103,15 +103,6 @@ class RemoteDatabase(Database, ABC):
             raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("table_name", "Table")
-    def show_columns(self, table_name):
-        res = self._conn.show_columns(
-            db_name=self._db_name, table_name=table_name)
-        if res.error_code == ErrorCode.OK:
-            return select_res_to_polars(res)
-        else:
-            raise InfinityException(res.error_code, res.error_msg)
-
-    @name_validity_check("table_name", "Table")
     def get_table(self, table_name):
         res = self._conn.get_table(
             db_name=self._db_name, table_name=table_name)

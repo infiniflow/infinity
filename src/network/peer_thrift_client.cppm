@@ -32,10 +32,7 @@ using namespace infinity_peer_server;
 
 export class PeerClient {
 public:
-    PeerClient(const String &ip_addr, i64 port, const String &node_name = {}) : this_node_name_(node_name) {
-        node_info_.ip_address_ = ip_addr;
-        node_info_.port_ = port;
-    }
+    PeerClient(const String &from_node_name, const String &ip_addr, i64 port) : from_node_name_(from_node_name), ip_address_(ip_addr), port_(port) {}
     ~PeerClient();
 
     //    void SetPeerNode(NodeRole role, const String& node_name, i64 update_ts) {
@@ -47,7 +44,7 @@ public:
     //
 
     Status Init();
-    Status UnInit();
+    Status UnInit(bool sync);
 
     Status Reconnect();
     Status Disconnect();
@@ -61,10 +58,12 @@ private:
     void Unregister(UnregisterPeerTask *peer_task);
     void HeartBeat(HeartBeatPeerTask *peer_task);
     void SyncLogs(SyncLogTask *peer_task);
+    void ChangeRole(ChangeRoleTask* change_role_task);
 
 private:
-    String this_node_name_;
-    NodeInfo node_info_;
+    String from_node_name_{};
+    String ip_address_{};
+    i64 port_{};
 
     // For message transportation
     SharedPtr<TTransport> socket_{};

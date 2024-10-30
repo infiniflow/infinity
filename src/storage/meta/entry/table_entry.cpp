@@ -98,6 +98,7 @@ String TableEntry::EncodeIndex(const String &table_name, TableMeta *table_meta) 
 TableEntry::TableEntry(bool is_delete,
                        const SharedPtr<String> &table_entry_dir,
                        SharedPtr<String> table_name,
+                       SharedPtr<String> table_comment,
                        const Vector<SharedPtr<ColumnDef>> &columns,
                        TableEntryType table_entry_type,
                        TableMeta *table_meta,
@@ -107,8 +108,8 @@ TableEntry::TableEntry(bool is_delete,
                        SegmentID next_segment_id,
                        ColumnID next_column_id)
     : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
-      table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns), next_column_id_(next_column_id),
-      table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id),
+      table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), table_comment_(std::move(table_comment)), columns_(columns),
+      next_column_id_(next_column_id), table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id),
       fulltext_column_index_cache_(MakeShared<TableIndexReaderCache>(this)) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
@@ -122,7 +123,8 @@ TableEntry::TableEntry(bool is_delete,
 
 TableEntry::TableEntry(const TableEntry &other)
     : BaseEntry(other), table_meta_(other.table_meta_), table_entry_dir_(other.table_entry_dir_), table_name_(other.table_name_),
-      columns_(other.columns_), next_column_id_(other.next_column_id_), table_entry_type_(other.table_entry_type_) {
+      table_comment_(other.table_comment_), columns_(other.columns_), next_column_id_(other.next_column_id_),
+      table_entry_type_(other.table_entry_type_) {
     row_count_ = other.row_count_.load();
     unsealed_id_ = other.unsealed_id_;
     next_segment_id_ = other.next_segment_id_.load();
@@ -147,6 +149,7 @@ UniquePtr<TableEntry> TableEntry::Clone(TableMeta *meta) const {
 SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 const SharedPtr<String> &db_entry_dir,
                                                 SharedPtr<String> table_name,
+                                                SharedPtr<String> table_comment,
                                                 const Vector<SharedPtr<ColumnDef>> &columns,
                                                 TableEntryType table_entry_type,
                                                 TableMeta *table_meta,
@@ -162,6 +165,7 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
     return MakeShared<TableEntry>(is_delete,
                                   std::move(table_entry_dir),
                                   std::move(table_name),
+                                  std::move(table_comment),
                                   columns,
                                   table_entry_type,
                                   table_meta,
@@ -176,6 +180,7 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
                                                    TableMeta *table_meta,
                                                    SharedPtr<String> table_entry_dir,
                                                    SharedPtr<String> table_name,
+                                                   SharedPtr<String> table_comment,
                                                    const Vector<SharedPtr<ColumnDef>> &column_defs,
                                                    TableEntryType table_entry_type,
                                                    TransactionID txn_id,
@@ -188,6 +193,7 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
     auto table_entry = MakeShared<TableEntry>(is_delete,
                                               std::move(table_entry_dir),
                                               std::move(table_name),
+                                              std::move(table_comment),
                                               column_defs,
                                               table_entry_type,
                                               table_meta,
@@ -333,9 +339,6 @@ void TableEntry::AddSegmentReplayWalCompact(SharedPtr<SegmentEntry> segment_entr
 void TableEntry::AddSegmentReplayWal(SharedPtr<SegmentEntry> new_segment) {
     SegmentID segment_id = new_segment->segment_id();
     segment_map_[segment_id] = new_segment;
-    if (compaction_alg_.get() != nullptr) {
-        compaction_alg_->AddSegment(new_segment.get());
-    }
     next_segment_id_++;
 }
 
@@ -346,9 +349,6 @@ void TableEntry::AddSegmentReplay(SharedPtr<SegmentEntry> new_segment) {
     if (!insert_ok) {
         String error_message = fmt::format("Segment {} already exists.", segment_id);
         UnrecoverableError(error_message);
-    }
-    if (compaction_alg_.get() != nullptr) {
-        compaction_alg_->AddSegment(new_segment.get());
     }
     if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);
@@ -540,17 +540,17 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
     }
 
     {
-        // {
-        //     String ss = "Compact commit: " + *this->GetTableName();
-        //     for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
-        //         auto *new_segment = segment_store.segment_entry_;
-        //         ss += ", new segment: " + std::to_string(new_segment->segment_id()) + ", old segment: ";
-        //         for (const auto *old_segment : old_segments) {
-        //             ss += std::to_string(old_segment->segment_id_) + " ";
-        //         }
-        //     }
-        //     LOG_INFO(ss);
-        // }
+        {
+            String ss = "Compact commit: " + *this->GetTableName();
+            for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
+                auto *new_segment = segment_store.segment_entry_;
+                ss += ", new segment: " + std::to_string(new_segment->segment_id()) + ", old segment: ";
+                for (const auto *old_segment : old_segments) {
+                    ss += std::to_string(old_segment->segment_id_) + " ";
+                }
+            }
+            LOG_INFO(ss);
+        }
         std::unique_lock lock(this->rw_locker_);
         for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
 
@@ -563,6 +563,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
                 old_segment->SetDeprecated(commit_ts);
             }
         }
+        max_commit_ts_ = std::max(max_commit_ts_, commit_ts);
     }
 
     // Update fulltext ts so that TableIndexReaderCache::GetIndexReader will update the cache
@@ -670,6 +671,7 @@ Status TableEntry::CommitWrite(TransactionID txn_id,
         auto *segment_entry = segment_store.segment_entry_;
         segment_entry->CommitSegment(txn_id, commit_ts, segment_store, delete_state);
     }
+    max_commit_ts_ = std::max(max_commit_ts_, commit_ts);
     return Status::OK();
 }
 
@@ -974,9 +976,11 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_, index_fulltext->flag_);
                     column_index_merger.Merge(base_names, base_rowids, dst_base_name);
 
+                    Vector<ChunkID> old_ids;
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
                         old_chunks.push_back(chunk_index_entry.get());
+                        old_ids.push_back(chunk_index_entry->chunk_id_);
                     }
                     ChunkID chunk_id = segment_index_entry->GetNextChunkID();
                     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
@@ -992,6 +996,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
                     table_index_entry->UpdateFulltextSegmentTs(ts);
                     LOG_INFO(fmt::format("done merging {} {}", index_name, dst_base_name));
+
+                    segment_index_entry->AddWalIndexDump(merged_chunk_index_entry.get(), txn, std::move(old_ids));
                 }
                 break;
             }
@@ -1131,6 +1137,11 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["table_name"] = *this->GetTableName();
+        String table_comment = *this->GetTableComment();
+        if (!table_comment.empty()) {
+            json_res["table_comment"] = table_comment;
+        }
+
         json_res["table_entry_type"] = this->table_entry_type_;
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
@@ -1146,6 +1157,10 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
                 for (const auto &column_constraint : column_def->constraints_) {
                     column_def_json["constraints"].emplace_back(column_constraint);
+                }
+
+                if (!(column_def->comment().empty())) {
+                    column_def_json["column_comment"] = column_def->comment();
                 }
 
                 if (column_def->has_default_value()) {
@@ -1195,6 +1210,10 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
 UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr) {
     SharedPtr<String> table_name = MakeShared<String>(table_entry_json["table_name"]);
+    SharedPtr<String> table_comment = MakeShared<String>();
+    if (table_entry_json.contains("table_comment")) {
+        table_comment = MakeShared<String>(table_entry_json["table_comment"]);
+    }
     TableEntryType table_entry_type = table_entry_json["table_entry_type"];
 
     bool deleted = table_entry_json["deleted"];
@@ -1217,12 +1236,17 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
                 }
             }
 
+            String comment;
+            if (column_def_json.contains("column_comment")) {
+                comment = column_def_json["column_comment"];
+            }
+
             SharedPtr<ParsedExpr> default_expr = nullptr;
             if (column_def_json.contains("default")) {
                 default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
             }
 
-            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, default_expr);
+            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
             columns.emplace_back(column_def);
         }
         row_count = table_entry_json["row_count"];
@@ -1242,6 +1266,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted,
                                                                table_entry_dir,
                                                                table_name,
+                                                               table_comment,
                                                                columns,
                                                                table_entry_type,
                                                                table_meta,
@@ -1310,8 +1335,15 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Transa
 }
 
 void TableEntry::AddSegmentToCompactionAlg(SegmentEntry *segment_entry) {
+    LOG_INFO(fmt::format("Add segment {} to table {} compaction algorithm. deprecate_ts: {}",
+                         segment_entry->segment_id(),
+                         *table_name_,
+                         segment_entry->deprecate_ts()));
     if (compaction_alg_.get() == nullptr) {
         return;
+    }
+    if (segment_entry->CheckDeprecate(UNCOMMIT_TS)) {
+        UnrecoverableError(fmt::format("Add deprecated segment {} to compaction algorithm", segment_entry->segment_id()));
     }
     compaction_alg_->AddSegment(segment_entry);
 }
@@ -1321,6 +1353,19 @@ void TableEntry::AddDeleteToCompactionAlg(SegmentID segment_id) {
         return;
     }
     compaction_alg_->DeleteInSegment(segment_id);
+}
+
+void TableEntry::InitCompactionAlg(TxnTimeStamp system_start_ts) {
+    for (auto &[segment_id, segment_entry] : segment_map_) {
+        if (segment_entry->CheckDeprecate(system_start_ts)) {
+            continue;
+        }
+        LOG_INFO(fmt::format("Add segment {} to table {} compaction algorithm. deprecate_ts: {}",
+                             segment_entry->segment_id(),
+                             *table_name_,
+                             segment_entry->deprecate_ts()));
+        compaction_alg_->AddSegment(segment_entry.get());
+    }
 }
 
 Vector<SegmentEntry *> TableEntry::CheckCompaction(TransactionID txn_id) {
@@ -1350,7 +1395,14 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
             // If segment is visible by txn, txn.begin_ts < segment.deprecate_ts
             // If segment can be cleaned up, segment.deprecate_ts > visible_ts, and visible_ts must > txn.begin_ts
             // So the used segment will not be cleaned up.
-            if (segment->CheckDeprecate(visible_ts)) {
+            bool deprecate = segment->CheckDeprecate(visible_ts);
+            LOG_INFO(fmt::format("Check deprecate of segment {} in table {}. check_ts: {}, drepcate_ts: {}. result: {}",
+                                 segment->segment_id(),
+                                 *table_name_,
+                                 visible_ts,
+                                 segment->deprecate_ts(),
+                                 deprecate));
+            if (deprecate) {
                 cleanup_segment_ids.push_back(iter->first);
                 scanner->AddEntry(std::move(iter->second));
                 iter = segment_map_.erase(iter);
@@ -1393,15 +1445,15 @@ Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
     Vector<TableIndexEntry *> table_index_entries = TableIndexes(txn_id, begin_ts);
     Vector<String> res;
     res.reserve(table_index_entries.size());
-    for(const auto& table_index_entry: table_index_entries) {
+    for (const auto &table_index_entry : table_index_entries) {
         Vector<String> index_files = table_index_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), index_files.begin(), index_files.end());
     }
 
     std::shared_lock lock(rw_locker_);
     res.reserve(res.size() + segment_map_.size());
-    for(const auto& segment_pair: segment_map_) {
-        const SegmentEntry* segment_entry = segment_pair.second.get();
+    for (const auto &segment_pair : segment_map_) {
+        const SegmentEntry *segment_entry = segment_pair.second.get();
         Vector<String> segment_files = segment_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), segment_files.begin(), segment_files.end());
     }

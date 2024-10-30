@@ -77,7 +77,7 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
     auto db_name = MakeShared<String>("db1");
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
-        txn->CreateDatabase(*db_name, ConflictType::kError);
+        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->CommitTxn(txn);
     }
     WaitFlushDeltaOp(storage);
@@ -106,7 +106,7 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     auto db_name = MakeShared<String>("db1");
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
-        txn->CreateDatabase(*db_name, ConflictType::kError);
+        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -117,12 +117,12 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
-        txn->CreateDatabase(*db_name, ConflictType::kError);
+        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->RollBackTxn(txn);
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
-        txn->CreateDatabase(*db_name, ConflictType::kError);
+        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -157,7 +157,7 @@ TEST_P(CleanupTaskTest, test_delete_table_simple) {
     auto table_name = MakeShared<String>("table1");
     {
 
-        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), column_defs);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table1"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -200,7 +200,7 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
     auto table_name = MakeShared<String>("table1");
     {
 
-        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), column_defs);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table1"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -215,14 +215,14 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), column_defs);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table1"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->RollBackTxn(txn);
     }
     {
-        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), column_defs);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table1"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -268,7 +268,7 @@ TEST_P(CleanupTaskTest, test_compact_and_cleanup) {
     auto table_name = MakeShared<String>("table1");
     {
 
-        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), column_defs);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table1"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -345,7 +345,7 @@ TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), *column_name, constraints));
     }
     {
-        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), column_defs);
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table1"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());

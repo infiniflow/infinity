@@ -36,7 +36,7 @@ private:
 
     void LoadExceptionMap();
 
-    Vector<String> Morphy_(const String &form, const String &pos, bool check_exceptions = true);
+    Vector<String> Morphy(const String &form, const String &pos, bool check_exceptions = true);
 
     Vector<String> ApplyRules(const Vector<String> &forms, const String &pos);
 

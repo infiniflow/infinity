@@ -46,12 +46,15 @@ BlockMaxWandIterator::~BlockMaxWandIterator() {
 BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iterators)
     : MultiDocIterator(std::move(iterators)), pivot_(sorted_iterators_.size()) {
     bm25_score_upper_bound_ = 0.0f;
+    estimate_iterate_cost_ = {};
     SizeT num_iterators = children_.size();
     for (SizeT i = 0; i < num_iterators; i++){
         TermDocIterator *tdi = dynamic_cast<TermDocIterator *>(children_[i].get());
-        if (tdi == nullptr)
-            continue;
+        if (tdi == nullptr) {
+            UnrecoverableError("BMW only supports TermDocIterator");
+        }
         bm25_score_upper_bound_ += tdi->BM25ScoreUpperBound();
+        estimate_iterate_cost_ += tdi->GetEstimateIterateCost();
         sorted_iterators_.push_back(tdi);
     }
     next_sum_score_bm_low_cnt_dist_.resize(100, 0);
@@ -255,12 +258,6 @@ float BlockMaxWandIterator::BM25Score() {
     bm25_score_cache_ = sum_score;
     bm25_score_cached_ = true;
     return sum_score;
-}
-
-u32 BlockMaxWandIterator::LeafCount() const {
-    return std::accumulate(children_.begin(), children_.end(), static_cast<u32>(0), [](const u32 cnt, const auto &it) {
-        return cnt + it->LeafCount();
-    });
 }
 
 u32 BlockMaxWandIterator::MatchCount() const {

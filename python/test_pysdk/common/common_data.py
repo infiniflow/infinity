@@ -37,6 +37,27 @@ types = [
     "double", "varchar", "boolean"
 ]
 
+functions = [
+    "sqrt", "round", "ceil", "floor", "filter_text", "filter_fulltext", "or", "and", "not"
+]
+
+bool_functions = [
+    "filter_text", "filter_fulltext", "or", "and", "not"
+]
+
+def function_return_type(function_name, param_type) :
+    if function_name == "sqrt":
+        return dtype('float64')
+    elif function_name == "round" or function_name == "ceil" or function_name == "floor":
+        if(param_type == dtype('int8') or param_type == dtype('int16') or param_type == dtype('int32') or param_type == dtype('int64')):
+            return param_type
+        else:
+            return dtype('float64')
+    elif function_name == "filter_text" or function_name == "filter_fulltext" or function_name == "or" or function_name == "and" or function_name == "not":
+        return dtype('bool')
+    else:
+        return param_type
+
 unsupport_output = ["_similarity", "_row_id", "_score", "_distance"]
 
 type_transfrom = {
@@ -139,6 +160,8 @@ def is_sparse(str_input):
     pairs = tmp.split(",")
     for pair in pairs:
         t = pair.split(":")
+        if(len(t) != 2):
+            return False
         if not (t[0].isdigit() or is_float(t[0])):
             return False
         if not (t[1].isdigit() or is_float(t[1])):

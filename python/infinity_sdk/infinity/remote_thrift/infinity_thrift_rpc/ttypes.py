@@ -3069,12 +3069,13 @@ class ColumnDef(object):
      - data_type
      - constraints
      - constant_expr
+     - comment
 
     """
 
 
     def __init__(self, id=None, name=None, data_type=None, constraints=[
-    ], constant_expr=None,):
+    ], constant_expr=None, comment=None,):
         self.id = id
         self.name = name
         self.data_type = data_type
@@ -3083,6 +3084,7 @@ class ColumnDef(object):
             ]
         self.constraints = constraints
         self.constant_expr = constant_expr
+        self.comment = comment
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -3125,6 +3127,11 @@ class ColumnDef(object):
                     self.constant_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
+            elif fid == 6:
+                if ftype == TType.STRING:
+                    self.comment = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -3158,6 +3165,10 @@ class ColumnDef(object):
             oprot.writeFieldBegin('constant_expr', TType.STRUCT, 5)
             self.constant_expr.write(oprot)
             oprot.writeFieldEnd()
+        if self.comment is not None:
+            oprot.writeFieldBegin('comment', TType.STRING, 6)
+            oprot.writeString(self.comment.encode('utf-8') if sys.version_info[0] == 2 else self.comment)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -3179,14 +3190,20 @@ class ColumnDef(object):
 class Field(object):
     """
     Attributes:
+     - column_names
      - parse_exprs
 
     """
 
 
-    def __init__(self, parse_exprs=[
+    def __init__(self, column_names=[
+    ], parse_exprs=[
     ],):
-        if parse_exprs is self.thrift_spec[1][4]:
+        if column_names is self.thrift_spec[1][4]:
+            column_names = [
+            ]
+        self.column_names = column_names
+        if parse_exprs is self.thrift_spec[2][4]:
             parse_exprs = [
             ]
         self.parse_exprs = parse_exprs
@@ -3202,12 +3219,22 @@ class Field(object):
                 break
             if fid == 1:
                 if ftype == TType.LIST:
-                    self.parse_exprs = []
+                    self.column_names = []
                     (_etype227, _size224) = iprot.readListBegin()
                     for _i228 in range(_size224):
-                        _elem229 = ParsedExpr()
-                        _elem229.read(iprot)
-                        self.parse_exprs.append(_elem229)
+                        _elem229 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                        self.column_names.append(_elem229)
+                    iprot.readListEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.LIST:
+                    self.parse_exprs = []
+                    (_etype233, _size230) = iprot.readListBegin()
+                    for _i234 in range(_size230):
+                        _elem235 = ParsedExpr()
+                        _elem235.read(iprot)
+                        self.parse_exprs.append(_elem235)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -3221,11 +3248,18 @@ class Field(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('Field')
+        if self.column_names is not None:
+            oprot.writeFieldBegin('column_names', TType.LIST, 1)
+            oprot.writeListBegin(TType.STRING, len(self.column_names))
+            for iter236 in self.column_names:
+                oprot.writeString(iter236.encode('utf-8') if sys.version_info[0] == 2 else iter236)
+            oprot.writeListEnd()
+            oprot.writeFieldEnd()
         if self.parse_exprs is not None:
-            oprot.writeFieldBegin('parse_exprs', TType.LIST, 1)
+            oprot.writeFieldBegin('parse_exprs', TType.LIST, 2)
             oprot.writeListBegin(TType.STRUCT, len(self.parse_exprs))
-            for iter230 in self.parse_exprs:
-                iter230.write(oprot)
+            for iter237 in self.parse_exprs:
+                iter237.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -3282,10 +3316,10 @@ class ColumnField(object):
             elif fid == 2:
                 if ftype == TType.LIST:
                     self.column_vectors = []
-                    (_etype234, _size231) = iprot.readListBegin()
-                    for _i235 in range(_size231):
-                        _elem236 = iprot.readBinary()
-                        self.column_vectors.append(_elem236)
+                    (_etype241, _size238) = iprot.readListBegin()
+                    for _i242 in range(_size238):
+                        _elem243 = iprot.readBinary()
+                        self.column_vectors.append(_elem243)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -3311,8 +3345,8 @@ class ColumnField(object):
         if self.column_vectors is not None:
             oprot.writeFieldBegin('column_vectors', TType.LIST, 2)
             oprot.writeListBegin(TType.STRING, len(self.column_vectors))
-            for iter237 in self.column_vectors:
-                oprot.writeBinary(iter237)
+            for iter244 in self.column_vectors:
+                oprot.writeBinary(iter244)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.column_name is not None:
@@ -3562,11 +3596,11 @@ class OptimizeOptions(object):
             elif fid == 2:
                 if ftype == TType.LIST:
                     self.opt_params = []
-                    (_etype241, _size238) = iprot.readListBegin()
-                    for _i242 in range(_size238):
-                        _elem243 = InitParameter()
-                        _elem243.read(iprot)
-                        self.opt_params.append(_elem243)
+                    (_etype248, _size245) = iprot.readListBegin()
+                    for _i249 in range(_size245):
+                        _elem250 = InitParameter()
+                        _elem250.read(iprot)
+                        self.opt_params.append(_elem250)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -3587,8 +3621,8 @@ class OptimizeOptions(object):
         if self.opt_params is not None:
             oprot.writeFieldBegin('opt_params', TType.LIST, 2)
             oprot.writeListBegin(TType.STRUCT, len(self.opt_params))
-            for iter244 in self.opt_params:
-                iter244.write(oprot)
+            for iter251 in self.opt_params:
+                iter251.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -3865,11 +3899,15 @@ class ListDatabaseResponse(object):
      - error_code
      - error_msg
      - db_names
+     - db_dirs
+     - db_comments
 
     """
 
 
     def __init__(self, error_code=None, error_msg=None, db_names=[
+    ], db_dirs=[
+    ], db_comments=[
     ],):
         self.error_code = error_code
         self.error_msg = error_msg
@@ -3877,6 +3915,14 @@ class ListDatabaseResponse(object):
             db_names = [
             ]
         self.db_names = db_names
+        if db_dirs is self.thrift_spec[4][4]:
+            db_dirs = [
+            ]
+        self.db_dirs = db_dirs
+        if db_comments is self.thrift_spec[5][4]:
+            db_comments = [
+            ]
+        self.db_comments = db_comments
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -3900,10 +3946,30 @@ class ListDatabaseResponse(object):
             elif fid == 3:
                 if ftype == TType.LIST:
                     self.db_names = []
-                    (_etype248, _size245) = iprot.readListBegin()
-                    for _i249 in range(_size245):
-                        _elem250 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                        self.db_names.append(_elem250)
+                    (_etype255, _size252) = iprot.readListBegin()
+                    for _i256 in range(_size252):
+                        _elem257 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                        self.db_names.append(_elem257)
+                    iprot.readListEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.LIST:
+                    self.db_dirs = []
+                    (_etype261, _size258) = iprot.readListBegin()
+                    for _i262 in range(_size258):
+                        _elem263 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                        self.db_dirs.append(_elem263)
+                    iprot.readListEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.LIST:
+                    self.db_comments = []
+                    (_etype267, _size264) = iprot.readListBegin()
+                    for _i268 in range(_size264):
+                        _elem269 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                        self.db_comments.append(_elem269)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -3928,8 +3994,22 @@ class ListDatabaseResponse(object):
         if self.db_names is not None:
             oprot.writeFieldBegin('db_names', TType.LIST, 3)
             oprot.writeListBegin(TType.STRING, len(self.db_names))
-            for iter251 in self.db_names:
-                oprot.writeString(iter251.encode('utf-8') if sys.version_info[0] == 2 else iter251)
+            for iter270 in self.db_names:
+                oprot.writeString(iter270.encode('utf-8') if sys.version_info[0] == 2 else iter270)
+            oprot.writeListEnd()
+            oprot.writeFieldEnd()
+        if self.db_dirs is not None:
+            oprot.writeFieldBegin('db_dirs', TType.LIST, 4)
+            oprot.writeListBegin(TType.STRING, len(self.db_dirs))
+            for iter271 in self.db_dirs:
+                oprot.writeString(iter271.encode('utf-8') if sys.version_info[0] == 2 else iter271)
+            oprot.writeListEnd()
+            oprot.writeFieldEnd()
+        if self.db_comments is not None:
+            oprot.writeFieldBegin('db_comments', TType.LIST, 5)
+            oprot.writeListBegin(TType.STRING, len(self.db_comments))
+            for iter272 in self.db_comments:
+                oprot.writeString(iter272.encode('utf-8') if sys.version_info[0] == 2 else iter272)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -4059,10 +4139,10 @@ class ListTableResponse(object):
             elif fid == 3:
                 if ftype == TType.LIST:
                     self.table_names = []
-                    (_etype255, _size252) = iprot.readListBegin()
-                    for _i256 in range(_size252):
-                        _elem257 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                        self.table_names.append(_elem257)
+                    (_etype276, _size273) = iprot.readListBegin()
+                    for _i277 in range(_size273):
+                        _elem278 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                        self.table_names.append(_elem278)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -4087,8 +4167,8 @@ class ListTableResponse(object):
         if self.table_names is not None:
             oprot.writeFieldBegin('table_names', TType.LIST, 3)
             oprot.writeListBegin(TType.STRING, len(self.table_names))
-            for iter258 in self.table_names:
-                oprot.writeString(iter258.encode('utf-8') if sys.version_info[0] == 2 else iter258)
+            for iter279 in self.table_names:
+                oprot.writeString(iter279.encode('utf-8') if sys.version_info[0] == 2 else iter279)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -4229,10 +4309,10 @@ class ListIndexResponse(object):
             elif fid == 3:
                 if ftype == TType.LIST:
                     self.index_names = []
-                    (_etype262, _size259) = iprot.readListBegin()
-                    for _i263 in range(_size259):
-                        _elem264 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                        self.index_names.append(_elem264)
+                    (_etype283, _size280) = iprot.readListBegin()
+                    for _i284 in range(_size280):
+                        _elem285 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                        self.index_names.append(_elem285)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -4257,8 +4337,8 @@ class ListIndexResponse(object):
         if self.index_names is not None:
             oprot.writeFieldBegin('index_names', TType.LIST, 3)
             oprot.writeListBegin(TType.STRING, len(self.index_names))
-            for iter265 in self.index_names:
-                oprot.writeString(iter265.encode('utf-8') if sys.version_info[0] == 2 else iter265)
+            for iter286 in self.index_names:
+                oprot.writeString(iter286.encode('utf-8') if sys.version_info[0] == 2 else iter286)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -4355,16 +4435,18 @@ class ShowDatabaseResponse(object):
      - database_name
      - store_dir
      - table_count
+     - comment
 
     """
 
 
-    def __init__(self, error_code=None, error_msg=None, database_name=None, store_dir=None, table_count=None,):
+    def __init__(self, error_code=None, error_msg=None, database_name=None, store_dir=None, table_count=None, comment=None,):
         self.error_code = error_code
         self.error_msg = error_msg
         self.database_name = database_name
         self.store_dir = store_dir
         self.table_count = table_count
+        self.comment = comment
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -4400,6 +4482,11 @@ class ShowDatabaseResponse(object):
                     self.table_count = iprot.readI64()
                 else:
                     iprot.skip(ftype)
+            elif fid == 6:
+                if ftype == TType.STRING:
+                    self.comment = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -4429,6 +4516,10 @@ class ShowDatabaseResponse(object):
         if self.table_count is not None:
             oprot.writeFieldBegin('table_count', TType.I64, 5)
             oprot.writeI64(self.table_count)
+            oprot.writeFieldEnd()
+        if self.comment is not None:
+            oprot.writeFieldBegin('comment', TType.STRING, 6)
+            oprot.writeString(self.comment.encode('utf-8') if sys.version_info[0] == 2 else self.comment)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -4860,11 +4951,11 @@ class IndexInfo(object):
             elif fid == 3:
                 if ftype == TType.LIST:
                     self.index_param_list = []
-                    (_etype269, _size266) = iprot.readListBegin()
-                    for _i270 in range(_size266):
-                        _elem271 = InitParameter()
-                        _elem271.read(iprot)
-                        self.index_param_list.append(_elem271)
+                    (_etype290, _size287) = iprot.readListBegin()
+                    for _i291 in range(_size287):
+                        _elem292 = InitParameter()
+                        _elem292.read(iprot)
+                        self.index_param_list.append(_elem292)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -4889,8 +4980,8 @@ class IndexInfo(object):
         if self.index_param_list is not None:
             oprot.writeFieldBegin('index_param_list', TType.LIST, 3)
             oprot.writeListBegin(TType.STRUCT, len(self.index_param_list))
-            for iter272 in self.index_param_list:
-                iter272.write(oprot)
+            for iter293 in self.index_param_list:
+                iter293.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -5560,14 +5651,16 @@ class CreateDatabaseRequest(object):
      - db_name
      - session_id
      - create_option
+     - db_comment
 
     """
 
 
-    def __init__(self, db_name=None, session_id=None, create_option=None,):
+    def __init__(self, db_name=None, session_id=None, create_option=None, db_comment=None,):
         self.db_name = db_name
         self.session_id = session_id
         self.create_option = create_option
+        self.db_comment = db_comment
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -5594,6 +5687,11 @@ class CreateDatabaseRequest(object):
                     self.create_option.read(iprot)
                 else:
                     iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRING:
+                    self.db_comment = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -5615,6 +5713,10 @@ class CreateDatabaseRequest(object):
         if self.create_option is not None:
             oprot.writeFieldBegin('create_option', TType.STRUCT, 3)
             self.create_option.write(oprot)
+            oprot.writeFieldEnd()
+        if self.db_comment is not None:
+            oprot.writeFieldBegin('db_comment', TType.STRING, 4)
+            oprot.writeString(self.db_comment.encode('utf-8') if sys.version_info[0] == 2 else self.db_comment)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -5759,11 +5861,11 @@ class CreateTableRequest(object):
             elif fid == 3:
                 if ftype == TType.LIST:
                     self.column_defs = []
-                    (_etype276, _size273) = iprot.readListBegin()
-                    for _i277 in range(_size273):
-                        _elem278 = ColumnDef()
-                        _elem278.read(iprot)
-                        self.column_defs.append(_elem278)
+                    (_etype297, _size294) = iprot.readListBegin()
+                    for _i298 in range(_size294):
+                        _elem299 = ColumnDef()
+                        _elem299.read(iprot)
+                        self.column_defs.append(_elem299)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -5799,8 +5901,8 @@ class CreateTableRequest(object):
         if self.column_defs is not None:
             oprot.writeFieldBegin('column_defs', TType.LIST, 3)
             oprot.writeListBegin(TType.STRUCT, len(self.column_defs))
-            for iter279 in self.column_defs:
-                iter279.write(oprot)
+            for iter300 in self.column_defs:
+                iter300.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.session_id is not None:
@@ -5925,23 +6027,17 @@ class InsertRequest(object):
     Attributes:
      - db_name
      - table_name
-     - column_names
      - fields
      - session_id
 
     """
 
 
-    def __init__(self, db_name=None, table_name=None, column_names=[
-    ], fields=[
+    def __init__(self, db_name=None, table_name=None, fields=[
     ], session_id=None,):
         self.db_name = db_name
         self.table_name = table_name
-        if column_names is self.thrift_spec[3][4]:
-            column_names = [
-            ]
-        self.column_names = column_names
-        if fields is self.thrift_spec[4][4]:
+        if fields is self.thrift_spec[3][4]:
             fields = [
             ]
         self.fields = fields
@@ -5968,26 +6064,16 @@ class InsertRequest(object):
                     iprot.skip(ftype)
             elif fid == 3:
                 if ftype == TType.LIST:
-                    self.column_names = []
-                    (_etype283, _size280) = iprot.readListBegin()
-                    for _i284 in range(_size280):
-                        _elem285 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                        self.column_names.append(_elem285)
+                    self.fields = []
+                    (_etype304, _size301) = iprot.readListBegin()
+                    for _i305 in range(_size301):
+                        _elem306 = Field()
+                        _elem306.read(iprot)
+                        self.fields.append(_elem306)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
             elif fid == 4:
-                if ftype == TType.LIST:
-                    self.fields = []
-                    (_etype289, _size286) = iprot.readListBegin()
-                    for _i290 in range(_size286):
-                        _elem291 = Field()
-                        _elem291.read(iprot)
-                        self.fields.append(_elem291)
-                    iprot.readListEnd()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 5:
                 if ftype == TType.I64:
                     self.session_id = iprot.readI64()
                 else:
@@ -6010,22 +6096,15 @@ class InsertRequest(object):
             oprot.writeFieldBegin('table_name', TType.STRING, 2)
             oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
             oprot.writeFieldEnd()
-        if self.column_names is not None:
-            oprot.writeFieldBegin('column_names', TType.LIST, 3)
-            oprot.writeListBegin(TType.STRING, len(self.column_names))
-            for iter292 in self.column_names:
-                oprot.writeString(iter292.encode('utf-8') if sys.version_info[0] == 2 else iter292)
-            oprot.writeListEnd()
-            oprot.writeFieldEnd()
         if self.fields is not None:
-            oprot.writeFieldBegin('fields', TType.LIST, 4)
+            oprot.writeFieldBegin('fields', TType.LIST, 3)
             oprot.writeListBegin(TType.STRUCT, len(self.fields))
-            for iter293 in self.fields:
-                iter293.write(oprot)
+            for iter307 in self.fields:
+                iter307.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.session_id is not None:
-            oprot.writeFieldBegin('session_id', TType.I64, 5)
+            oprot.writeFieldBegin('session_id', TType.I64, 4)
             oprot.writeI64(self.session_id)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -6191,10 +6270,10 @@ class ExportRequest(object):
             elif fid == 3:
                 if ftype == TType.LIST:
                     self.columns = []
-                    (_etype297, _size294) = iprot.readListBegin()
-                    for _i298 in range(_size294):
-                        _elem299 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                        self.columns.append(_elem299)
+                    (_etype311, _size308) = iprot.readListBegin()
+                    for _i312 in range(_size308):
+                        _elem313 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                        self.columns.append(_elem313)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -6235,8 +6314,8 @@ class ExportRequest(object):
         if self.columns is not None:
             oprot.writeFieldBegin('columns', TType.LIST, 3)
             oprot.writeListBegin(TType.STRING, len(self.columns))
-            for iter300 in self.columns:
-                oprot.writeString(iter300.encode('utf-8') if sys.version_info[0] == 2 else iter300)
+            for iter314 in self.columns:
+                oprot.writeString(iter314.encode('utf-8') if sys.version_info[0] == 2 else iter314)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.file_name is not None:
@@ -6276,6 +6355,7 @@ class ExplainRequest(object):
      - db_name
      - table_name
      - select_list
+     - highlight_list
      - search_expr
      - where_expr
      - group_by_list
@@ -6289,6 +6369,7 @@ class ExplainRequest(object):
 
 
     def __init__(self, session_id=None, db_name=None, table_name=None, select_list=[
+    ], highlight_list=[
     ], search_expr=None, where_expr=None, group_by_list=[
     ], having_expr=None, limit_expr=None, offset_expr=None, order_by_list=[
     ], explain_type=None,):
@@ -6299,16 +6380,20 @@ class ExplainRequest(object):
             select_list = [
             ]
         self.select_list = select_list
+        if highlight_list is self.thrift_spec[5][4]:
+            highlight_list = [
+            ]
+        self.highlight_list = highlight_list
         self.search_expr = search_expr
         self.where_expr = where_expr
-        if group_by_list is self.thrift_spec[7][4]:
+        if group_by_list is self.thrift_spec[8][4]:
             group_by_list = [
             ]
         self.group_by_list = group_by_list
         self.having_expr = having_expr
         self.limit_expr = limit_expr
         self.offset_expr = offset_expr
-        if order_by_list is self.thrift_spec[11][4]:
+        if order_by_list is self.thrift_spec[12][4]:
             order_by_list = [
             ]
         self.order_by_list = order_by_list
@@ -6341,67 +6426,78 @@ class ExplainRequest(object):
             elif fid == 4:
                 if ftype == TType.LIST:
                     self.select_list = []
-                    (_etype304, _size301) = iprot.readListBegin()
-                    for _i305 in range(_size301):
-                        _elem306 = ParsedExpr()
-                        _elem306.read(iprot)
-                        self.select_list.append(_elem306)
+                    (_etype318, _size315) = iprot.readListBegin()
+                    for _i319 in range(_size315):
+                        _elem320 = ParsedExpr()
+                        _elem320.read(iprot)
+                        self.select_list.append(_elem320)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
             elif fid == 5:
+                if ftype == TType.LIST:
+                    self.highlight_list = []
+                    (_etype324, _size321) = iprot.readListBegin()
+                    for _i325 in range(_size321):
+                        _elem326 = ParsedExpr()
+                        _elem326.read(iprot)
+                        self.highlight_list.append(_elem326)
+                    iprot.readListEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 6:
                 if ftype == TType.STRUCT:
                     self.search_expr = SearchExpr()
                     self.search_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 6:
+            elif fid == 7:
                 if ftype == TType.STRUCT:
                     self.where_expr = ParsedExpr()
                     self.where_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 7:
+            elif fid == 8:
                 if ftype == TType.LIST:
                     self.group_by_list = []
-                    (_etype310, _size307) = iprot.readListBegin()
-                    for _i311 in range(_size307):
-                        _elem312 = ParsedExpr()
-                        _elem312.read(iprot)
-                        self.group_by_list.append(_elem312)
+                    (_etype330, _size327) = iprot.readListBegin()
+                    for _i331 in range(_size327):
+                        _elem332 = ParsedExpr()
+                        _elem332.read(iprot)
+                        self.group_by_list.append(_elem332)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
-            elif fid == 8:
+            elif fid == 9:
                 if ftype == TType.STRUCT:
                     self.having_expr = ParsedExpr()
                     self.having_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 9:
+            elif fid == 10:
                 if ftype == TType.STRUCT:
                     self.limit_expr = ParsedExpr()
                     self.limit_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 10:
+            elif fid == 11:
                 if ftype == TType.STRUCT:
                     self.offset_expr = ParsedExpr()
                     self.offset_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 11:
+            elif fid == 12:
                 if ftype == TType.LIST:
                     self.order_by_list = []
-                    (_etype316, _size313) = iprot.readListBegin()
-                    for _i317 in range(_size313):
-                        _elem318 = OrderByExpr()
-                        _elem318.read(iprot)
-                        self.order_by_list.append(_elem318)
+                    (_etype336, _size333) = iprot.readListBegin()
+                    for _i337 in range(_size333):
+                        _elem338 = OrderByExpr()
+                        _elem338.read(iprot)
+                        self.order_by_list.append(_elem338)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
-            elif fid == 12:
+            elif fid == 13:
                 if ftype == TType.I32:
                     self.explain_type = iprot.readI32()
                 else:
@@ -6431,46 +6527,53 @@ class ExplainRequest(object):
         if self.select_list is not None:
             oprot.writeFieldBegin('select_list', TType.LIST, 4)
             oprot.writeListBegin(TType.STRUCT, len(self.select_list))
-            for iter319 in self.select_list:
-                iter319.write(oprot)
+            for iter339 in self.select_list:
+                iter339.write(oprot)
+            oprot.writeListEnd()
+            oprot.writeFieldEnd()
+        if self.highlight_list is not None:
+            oprot.writeFieldBegin('highlight_list', TType.LIST, 5)
+            oprot.writeListBegin(TType.STRUCT, len(self.highlight_list))
+            for iter340 in self.highlight_list:
+                iter340.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.search_expr is not None:
-            oprot.writeFieldBegin('search_expr', TType.STRUCT, 5)
+            oprot.writeFieldBegin('search_expr', TType.STRUCT, 6)
             self.search_expr.write(oprot)
             oprot.writeFieldEnd()
         if self.where_expr is not None:
-            oprot.writeFieldBegin('where_expr', TType.STRUCT, 6)
+            oprot.writeFieldBegin('where_expr', TType.STRUCT, 7)
             self.where_expr.write(oprot)
             oprot.writeFieldEnd()
         if self.group_by_list is not None:
-            oprot.writeFieldBegin('group_by_list', TType.LIST, 7)
+            oprot.writeFieldBegin('group_by_list', TType.LIST, 8)
             oprot.writeListBegin(TType.STRUCT, len(self.group_by_list))
-            for iter320 in self.group_by_list:
-                iter320.write(oprot)
+            for iter341 in self.group_by_list:
+                iter341.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.having_expr is not None:
-            oprot.writeFieldBegin('having_expr', TType.STRUCT, 8)
+            oprot.writeFieldBegin('having_expr', TType.STRUCT, 9)
             self.having_expr.write(oprot)
             oprot.writeFieldEnd()
         if self.limit_expr is not None:
-            oprot.writeFieldBegin('limit_expr', TType.STRUCT, 9)
+            oprot.writeFieldBegin('limit_expr', TType.STRUCT, 10)
             self.limit_expr.write(oprot)
             oprot.writeFieldEnd()
         if self.offset_expr is not None:
-            oprot.writeFieldBegin('offset_expr', TType.STRUCT, 10)
+            oprot.writeFieldBegin('offset_expr', TType.STRUCT, 11)
             self.offset_expr.write(oprot)
             oprot.writeFieldEnd()
         if self.order_by_list is not None:
-            oprot.writeFieldBegin('order_by_list', TType.LIST, 11)
+            oprot.writeFieldBegin('order_by_list', TType.LIST, 12)
             oprot.writeListBegin(TType.STRUCT, len(self.order_by_list))
-            for iter321 in self.order_by_list:
-                iter321.write(oprot)
+            for iter342 in self.order_by_list:
+                iter342.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.explain_type is not None:
-            oprot.writeFieldBegin('explain_type', TType.I32, 12)
+            oprot.writeFieldBegin('explain_type', TType.I32, 13)
             oprot.writeI32(self.explain_type)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -6538,22 +6641,22 @@ class ExplainResponse(object):
             elif fid == 3:
                 if ftype == TType.LIST:
                     self.column_defs = []
-                    (_etype325, _size322) = iprot.readListBegin()
-                    for _i326 in range(_size322):
-                        _elem327 = ColumnDef()
-                        _elem327.read(iprot)
-                        self.column_defs.append(_elem327)
+                    (_etype346, _size343) = iprot.readListBegin()
+                    for _i347 in range(_size343):
+                        _elem348 = ColumnDef()
+                        _elem348.read(iprot)
+                        self.column_defs.append(_elem348)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
             elif fid == 4:
                 if ftype == TType.LIST:
                     self.column_fields = []
-                    (_etype331, _size328) = iprot.readListBegin()
-                    for _i332 in range(_size328):
-                        _elem333 = ColumnField()
-                        _elem333.read(iprot)
-                        self.column_fields.append(_elem333)
+                    (_etype352, _size349) = iprot.readListBegin()
+                    for _i353 in range(_size349):
+                        _elem354 = ColumnField()
+                        _elem354.read(iprot)
+                        self.column_fields.append(_elem354)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -6578,15 +6681,15 @@ class ExplainResponse(object):
         if self.column_defs is not None:
             oprot.writeFieldBegin('column_defs', TType.LIST, 3)
             oprot.writeListBegin(TType.STRUCT, len(self.column_defs))
-            for iter334 in self.column_defs:
-                iter334.write(oprot)
+            for iter355 in self.column_defs:
+                iter355.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.column_fields is not None:
             oprot.writeFieldBegin('column_fields', TType.LIST, 4)
             oprot.writeListBegin(TType.STRUCT, len(self.column_fields))
-            for iter335 in self.column_fields:
-                iter335.write(oprot)
+            for iter356 in self.column_fields:
+                iter356.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -6614,6 +6717,7 @@ class SelectRequest(object):
      - db_name
      - table_name
      - select_list
+     - highlight_list
      - search_expr
      - where_expr
      - group_by_list
@@ -6626,6 +6730,7 @@ class SelectRequest(object):
 
 
     def __init__(self, session_id=None, db_name=None, table_name=None, select_list=[
+    ], highlight_list=[
     ], search_expr=None, where_expr=None, group_by_list=[
     ], having_expr=None, limit_expr=None, offset_expr=None, order_by_list=[
     ],):
@@ -6636,16 +6741,20 @@ class SelectRequest(object):
             select_list = [
             ]
         self.select_list = select_list
+        if highlight_list is self.thrift_spec[5][4]:
+            highlight_list = [
+            ]
+        self.highlight_list = highlight_list
         self.search_expr = search_expr
         self.where_expr = where_expr
-        if group_by_list is self.thrift_spec[7][4]:
+        if group_by_list is self.thrift_spec[8][4]:
             group_by_list = [
             ]
         self.group_by_list = group_by_list
         self.having_expr = having_expr
         self.limit_expr = limit_expr
         self.offset_expr = offset_expr
-        if order_by_list is self.thrift_spec[11][4]:
+        if order_by_list is self.thrift_spec[12][4]:
             order_by_list = [
             ]
         self.order_by_list = order_by_list
@@ -6677,63 +6786,74 @@ class SelectRequest(object):
             elif fid == 4:
                 if ftype == TType.LIST:
                     self.select_list = []
-                    (_etype339, _size336) = iprot.readListBegin()
-                    for _i340 in range(_size336):
-                        _elem341 = ParsedExpr()
-                        _elem341.read(iprot)
-                        self.select_list.append(_elem341)
+                    (_etype360, _size357) = iprot.readListBegin()
+                    for _i361 in range(_size357):
+                        _elem362 = ParsedExpr()
+                        _elem362.read(iprot)
+                        self.select_list.append(_elem362)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
             elif fid == 5:
+                if ftype == TType.LIST:
+                    self.highlight_list = []
+                    (_etype366, _size363) = iprot.readListBegin()
+                    for _i367 in range(_size363):
+                        _elem368 = ParsedExpr()
+                        _elem368.read(iprot)
+                        self.highlight_list.append(_elem368)
+                    iprot.readListEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 6:
                 if ftype == TType.STRUCT:
                     self.search_expr = SearchExpr()
                     self.search_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 6:
+            elif fid == 7:
                 if ftype == TType.STRUCT:
                     self.where_expr = ParsedExpr()
                     self.where_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 7:
+            elif fid == 8:
                 if ftype == TType.LIST:
                     self.group_by_list = []
-                    (_etype345, _size342) = iprot.readListBegin()
-                    for _i346 in range(_size342):
-                        _elem347 = ParsedExpr()
-                        _elem347.read(iprot)
-                        self.group_by_list.append(_elem347)
+                    (_etype372, _size369) = iprot.readListBegin()
+                    for _i373 in range(_size369):
+                        _elem374 = ParsedExpr()
+                        _elem374.read(iprot)
+                        self.group_by_list.append(_elem374)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
-            elif fid == 8:
+            elif fid == 9:
                 if ftype == TType.STRUCT:
                     self.having_expr = ParsedExpr()
                     self.having_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 9:
+            elif fid == 10:
                 if ftype == TType.STRUCT:
                     self.limit_expr = ParsedExpr()
                     self.limit_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 10:
+            elif fid == 11:
                 if ftype == TType.STRUCT:
                     self.offset_expr = ParsedExpr()
                     self.offset_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 11:
+            elif fid == 12:
                 if ftype == TType.LIST:
                     self.order_by_list = []
-                    (_etype351, _size348) = iprot.readListBegin()
-                    for _i352 in range(_size348):
-                        _elem353 = OrderByExpr()
-                        _elem353.read(iprot)
-                        self.order_by_list.append(_elem353)
+                    (_etype378, _size375) = iprot.readListBegin()
+                    for _i379 in range(_size375):
+                        _elem380 = OrderByExpr()
+                        _elem380.read(iprot)
+                        self.order_by_list.append(_elem380)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -6762,42 +6882,49 @@ class SelectRequest(object):
         if self.select_list is not None:
             oprot.writeFieldBegin('select_list', TType.LIST, 4)
             oprot.writeListBegin(TType.STRUCT, len(self.select_list))
-            for iter354 in self.select_list:
-                iter354.write(oprot)
+            for iter381 in self.select_list:
+                iter381.write(oprot)
+            oprot.writeListEnd()
+            oprot.writeFieldEnd()
+        if self.highlight_list is not None:
+            oprot.writeFieldBegin('highlight_list', TType.LIST, 5)
+            oprot.writeListBegin(TType.STRUCT, len(self.highlight_list))
+            for iter382 in self.highlight_list:
+                iter382.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.search_expr is not None:
-            oprot.writeFieldBegin('search_expr', TType.STRUCT, 5)
+            oprot.writeFieldBegin('search_expr', TType.STRUCT, 6)
             self.search_expr.write(oprot)
             oprot.writeFieldEnd()
         if self.where_expr is not None:
-            oprot.writeFieldBegin('where_expr', TType.STRUCT, 6)
+            oprot.writeFieldBegin('where_expr', TType.STRUCT, 7)
             self.where_expr.write(oprot)
             oprot.writeFieldEnd()
         if self.group_by_list is not None:
-            oprot.writeFieldBegin('group_by_list', TType.LIST, 7)
+            oprot.writeFieldBegin('group_by_list', TType.LIST, 8)
             oprot.writeListBegin(TType.STRUCT, len(self.group_by_list))
-            for iter355 in self.group_by_list:
-                iter355.write(oprot)
+            for iter383 in self.group_by_list:
+                iter383.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.having_expr is not None:
-            oprot.writeFieldBegin('having_expr', TType.STRUCT, 8)
+            oprot.writeFieldBegin('having_expr', TType.STRUCT, 9)
             self.having_expr.write(oprot)
             oprot.writeFieldEnd()
         if self.limit_expr is not None:
-            oprot.writeFieldBegin('limit_expr', TType.STRUCT, 9)
+            oprot.writeFieldBegin('limit_expr', TType.STRUCT, 10)
             self.limit_expr.write(oprot)
             oprot.writeFieldEnd()
         if self.offset_expr is not None:
-            oprot.writeFieldBegin('offset_expr', TType.STRUCT, 10)
+            oprot.writeFieldBegin('offset_expr', TType.STRUCT, 11)
             self.offset_expr.write(oprot)
             oprot.writeFieldEnd()
         if self.order_by_list is not None:
-            oprot.writeFieldBegin('order_by_list', TType.LIST, 11)
+            oprot.writeFieldBegin('order_by_list', TType.LIST, 12)
             oprot.writeListBegin(TType.STRUCT, len(self.order_by_list))
-            for iter356 in self.order_by_list:
-                iter356.write(oprot)
+            for iter384 in self.order_by_list:
+                iter384.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -6865,22 +6992,22 @@ class SelectResponse(object):
             elif fid == 3:
                 if ftype == TType.LIST:
                     self.column_defs = []
-                    (_etype360, _size357) = iprot.readListBegin()
-                    for _i361 in range(_size357):
-                        _elem362 = ColumnDef()
-                        _elem362.read(iprot)
-                        self.column_defs.append(_elem362)
+                    (_etype388, _size385) = iprot.readListBegin()
+                    for _i389 in range(_size385):
+                        _elem390 = ColumnDef()
+                        _elem390.read(iprot)
+                        self.column_defs.append(_elem390)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
             elif fid == 4:
                 if ftype == TType.LIST:
                     self.column_fields = []
-                    (_etype366, _size363) = iprot.readListBegin()
-                    for _i367 in range(_size363):
-                        _elem368 = ColumnField()
-                        _elem368.read(iprot)
-                        self.column_fields.append(_elem368)
+                    (_etype394, _size391) = iprot.readListBegin()
+                    for _i395 in range(_size391):
+                        _elem396 = ColumnField()
+                        _elem396.read(iprot)
+                        self.column_fields.append(_elem396)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -6905,15 +7032,15 @@ class SelectResponse(object):
         if self.column_defs is not None:
             oprot.writeFieldBegin('column_defs', TType.LIST, 3)
             oprot.writeListBegin(TType.STRUCT, len(self.column_defs))
-            for iter369 in self.column_defs:
-                iter369.write(oprot)
+            for iter397 in self.column_defs:
+                iter397.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.column_fields is not None:
             oprot.writeFieldBegin('column_fields', TType.LIST, 4)
             oprot.writeListBegin(TType.STRUCT, len(self.column_fields))
-            for iter370 in self.column_fields:
-                iter370.write(oprot)
+            for iter398 in self.column_fields:
+                iter398.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -7076,11 +7203,11 @@ class UpdateRequest(object):
             elif fid == 4:
                 if ftype == TType.LIST:
                     self.update_expr_array = []
-                    (_etype374, _size371) = iprot.readListBegin()
-                    for _i375 in range(_size371):
-                        _elem376 = UpdateExpr()
-                        _elem376.read(iprot)
-                        self.update_expr_array.append(_elem376)
+                    (_etype402, _size399) = iprot.readListBegin()
+                    for _i403 in range(_size399):
+                        _elem404 = UpdateExpr()
+                        _elem404.read(iprot)
+                        self.update_expr_array.append(_elem404)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -7114,8 +7241,8 @@ class UpdateRequest(object):
         if self.update_expr_array is not None:
             oprot.writeFieldBegin('update_expr_array', TType.LIST, 4)
             oprot.writeListBegin(TType.STRUCT, len(self.update_expr_array))
-            for iter377 in self.update_expr_array:
-                iter377.write(oprot)
+            for iter405 in self.update_expr_array:
+                iter405.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.session_id is not None:
@@ -7183,11 +7310,11 @@ class AddColumnsRequest(object):
             elif fid == 3:
                 if ftype == TType.LIST:
                     self.column_defs = []
-                    (_etype381, _size378) = iprot.readListBegin()
-                    for _i382 in range(_size378):
-                        _elem383 = ColumnDef()
-                        _elem383.read(iprot)
-                        self.column_defs.append(_elem383)
+                    (_etype409, _size406) = iprot.readListBegin()
+                    for _i410 in range(_size406):
+                        _elem411 = ColumnDef()
+                        _elem411.read(iprot)
+                        self.column_defs.append(_elem411)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -7217,8 +7344,8 @@ class AddColumnsRequest(object):
         if self.column_defs is not None:
             oprot.writeFieldBegin('column_defs', TType.LIST, 3)
             oprot.writeListBegin(TType.STRUCT, len(self.column_defs))
-            for iter384 in self.column_defs:
-                iter384.write(oprot)
+            for iter412 in self.column_defs:
+                iter412.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.session_id is not None:
@@ -7286,10 +7413,10 @@ class DropColumnsRequest(object):
             elif fid == 3:
                 if ftype == TType.LIST:
                     self.column_names = []
-                    (_etype388, _size385) = iprot.readListBegin()
-                    for _i389 in range(_size385):
-                        _elem390 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                        self.column_names.append(_elem390)
+                    (_etype416, _size413) = iprot.readListBegin()
+                    for _i417 in range(_size413):
+                        _elem418 = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                        self.column_names.append(_elem418)
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
@@ -7319,8 +7446,8 @@ class DropColumnsRequest(object):
         if self.column_names is not None:
             oprot.writeFieldBegin('column_names', TType.LIST, 3)
             oprot.writeListBegin(TType.STRING, len(self.column_names))
-            for iter391 in self.column_names:
-                oprot.writeString(iter391.encode('utf-8') if sys.version_info[0] == 2 else iter391)
+            for iter419 in self.column_names:
+                oprot.writeString(iter419.encode('utf-8') if sys.version_info[0] == 2 else iter419)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.session_id is not None:
@@ -8536,12 +8663,15 @@ ColumnDef.thrift_spec = (
     (4, TType.LIST, 'constraints', (TType.I32, None, False), [
     ], ),  # 4
     (5, TType.STRUCT, 'constant_expr', [ConstantExpr, None], None, ),  # 5
+    (6, TType.STRING, 'comment', 'UTF8', None, ),  # 6
 )
 all_structs.append(Field)
 Field.thrift_spec = (
     None,  # 0
-    (1, TType.LIST, 'parse_exprs', (TType.STRUCT, [ParsedExpr, None], False), [
+    (1, TType.LIST, 'column_names', (TType.STRING, 'UTF8', False), [
     ], ),  # 1
+    (2, TType.LIST, 'parse_exprs', (TType.STRUCT, [ParsedExpr, None], False), [
+    ], ),  # 2
 )
 all_structs.append(ColumnField)
 ColumnField.thrift_spec = (
@@ -8604,6 +8734,10 @@ ListDatabaseResponse.thrift_spec = (
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
     (3, TType.LIST, 'db_names', (TType.STRING, 'UTF8', False), [
     ], ),  # 3
+    (4, TType.LIST, 'db_dirs', (TType.STRING, 'UTF8', False), [
+    ], ),  # 4
+    (5, TType.LIST, 'db_comments', (TType.STRING, 'UTF8', False), [
+    ], ),  # 5
 )
 all_structs.append(ListTableRequest)
 ListTableRequest.thrift_spec = (
@@ -8648,6 +8782,7 @@ ShowDatabaseResponse.thrift_spec = (
     (3, TType.STRING, 'database_name', 'UTF8', None, ),  # 3
     (4, TType.STRING, 'store_dir', 'UTF8', None, ),  # 4
     (5, TType.I64, 'table_count', None, None, ),  # 5
+    (6, TType.STRING, 'comment', 'UTF8', None, ),  # 6
 )
 all_structs.append(ShowTableRequest)
 ShowTableRequest.thrift_spec = (
@@ -8754,6 +8889,7 @@ CreateDatabaseRequest.thrift_spec = (
     (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
     (2, TType.I64, 'session_id', None, None, ),  # 2
     (3, TType.STRUCT, 'create_option', [CreateOption, None], None, ),  # 3
+    (4, TType.STRING, 'db_comment', 'UTF8', None, ),  # 4
 )
 all_structs.append(DropDatabaseRequest)
 DropDatabaseRequest.thrift_spec = (
@@ -8787,11 +8923,9 @@ InsertRequest.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
-    (3, TType.LIST, 'column_names', (TType.STRING, 'UTF8', False), [
+    (3, TType.LIST, 'fields', (TType.STRUCT, [Field, None], False), [
     ], ),  # 3
-    (4, TType.LIST, 'fields', (TType.STRUCT, [Field, None], False), [
-    ], ),  # 4
-    (5, TType.I64, 'session_id', None, None, ),  # 5
+    (4, TType.I64, 'session_id', None, None, ),  # 4
 )
 all_structs.append(ImportRequest)
 ImportRequest.thrift_spec = (
@@ -8820,16 +8954,18 @@ ExplainRequest.thrift_spec = (
     (3, TType.STRING, 'table_name', 'UTF8', None, ),  # 3
     (4, TType.LIST, 'select_list', (TType.STRUCT, [ParsedExpr, None], False), [
     ], ),  # 4
-    (5, TType.STRUCT, 'search_expr', [SearchExpr, None], None, ),  # 5
-    (6, TType.STRUCT, 'where_expr', [ParsedExpr, None], None, ),  # 6
-    (7, TType.LIST, 'group_by_list', (TType.STRUCT, [ParsedExpr, None], False), [
-    ], ),  # 7
-    (8, TType.STRUCT, 'having_expr', [ParsedExpr, None], None, ),  # 8
-    (9, TType.STRUCT, 'limit_expr', [ParsedExpr, None], None, ),  # 9
-    (10, TType.STRUCT, 'offset_expr', [ParsedExpr, None], None, ),  # 10
-    (11, TType.LIST, 'order_by_list', (TType.STRUCT, [OrderByExpr, None], False), [
-    ], ),  # 11
-    (12, TType.I32, 'explain_type', None, None, ),  # 12
+    (5, TType.LIST, 'highlight_list', (TType.STRUCT, [ParsedExpr, None], False), [
+    ], ),  # 5
+    (6, TType.STRUCT, 'search_expr', [SearchExpr, None], None, ),  # 6
+    (7, TType.STRUCT, 'where_expr', [ParsedExpr, None], None, ),  # 7
+    (8, TType.LIST, 'group_by_list', (TType.STRUCT, [ParsedExpr, None], False), [
+    ], ),  # 8
+    (9, TType.STRUCT, 'having_expr', [ParsedExpr, None], None, ),  # 9
+    (10, TType.STRUCT, 'limit_expr', [ParsedExpr, None], None, ),  # 10
+    (11, TType.STRUCT, 'offset_expr', [ParsedExpr, None], None, ),  # 11
+    (12, TType.LIST, 'order_by_list', (TType.STRUCT, [OrderByExpr, None], False), [
+    ], ),  # 12
+    (13, TType.I32, 'explain_type', None, None, ),  # 13
 )
 all_structs.append(ExplainResponse)
 ExplainResponse.thrift_spec = (
@@ -8849,15 +8985,17 @@ SelectRequest.thrift_spec = (
     (3, TType.STRING, 'table_name', 'UTF8', None, ),  # 3
     (4, TType.LIST, 'select_list', (TType.STRUCT, [ParsedExpr, None], False), [
     ], ),  # 4
-    (5, TType.STRUCT, 'search_expr', [SearchExpr, None], None, ),  # 5
-    (6, TType.STRUCT, 'where_expr', [ParsedExpr, None], None, ),  # 6
-    (7, TType.LIST, 'group_by_list', (TType.STRUCT, [ParsedExpr, None], False), [
-    ], ),  # 7
-    (8, TType.STRUCT, 'having_expr', [ParsedExpr, None], None, ),  # 8
-    (9, TType.STRUCT, 'limit_expr', [ParsedExpr, None], None, ),  # 9
-    (10, TType.STRUCT, 'offset_expr', [ParsedExpr, None], None, ),  # 10
-    (11, TType.LIST, 'order_by_list', (TType.STRUCT, [OrderByExpr, None], False), [
-    ], ),  # 11
+    (5, TType.LIST, 'highlight_list', (TType.STRUCT, [ParsedExpr, None], False), [
+    ], ),  # 5
+    (6, TType.STRUCT, 'search_expr', [SearchExpr, None], None, ),  # 6
+    (7, TType.STRUCT, 'where_expr', [ParsedExpr, None], None, ),  # 7
+    (8, TType.LIST, 'group_by_list', (TType.STRUCT, [ParsedExpr, None], False), [
+    ], ),  # 8
+    (9, TType.STRUCT, 'having_expr', [ParsedExpr, None], None, ),  # 9
+    (10, TType.STRUCT, 'limit_expr', [ParsedExpr, None], None, ),  # 10
+    (11, TType.STRUCT, 'offset_expr', [ParsedExpr, None], None, ),  # 11
+    (12, TType.LIST, 'order_by_list', (TType.STRUCT, [OrderByExpr, None], False), [
+    ], ),  # 12
 )
 all_structs.append(SelectResponse)
 SelectResponse.thrift_spec = (

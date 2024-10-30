@@ -111,7 +111,7 @@ int main() {
         CreateDatabaseOptions create_db_opts;
         auto tims_costing_second =
             Measurement("Create Database", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-                __attribute__((unused)) auto ignored = infinity->CreateDatabase(std::to_string(i), create_db_opts);
+                __attribute__((unused)) auto ignored = infinity->CreateDatabase(std::to_string(i), create_db_opts, "");
             });
         results.push_back(fmt::format("-> Create Database QPS: {}", total_times / tims_costing_second));
     }
@@ -217,7 +217,7 @@ int main() {
                         output_columns->emplace_back(col2);
 
                         [[maybe_unused]] auto ignored =
-                            infinity->Search("default_db", "benchmark_test", nullptr, nullptr, nullptr, nullptr, output_columns, nullptr);
+                            infinity->Search("default_db", "benchmark_test", nullptr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr);
                     });
                 results.push_back(fmt::format("-> Select QPS: {}", total_times / tims_costing_second));
             }
@@ -366,7 +366,7 @@ int main() {
         std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
         CreateDatabaseOptions create_db_options;
         create_db_options.conflict_type_ = ConflictType::kIgnore;
-        auto r1 = infinity->CreateDatabase(db_name, std::move(create_db_options));
+        auto r1 = infinity->CreateDatabase(db_name, std::move(create_db_options), "");
 
         CreateTableOptions create_tb_options;
         create_tb_options.conflict_type_ = ConflictType::kIgnore;

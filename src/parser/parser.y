@@ -156,7 +156,7 @@ struct SQL_LTYPE {
     infinity::ParsedExpr*             expr_t;
     infinity::ConstantExpr*           const_expr_t;
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
-    std::vector<std::vector<infinity::ParsedExpr*>*>*    expr_array_list_t;
+    std::vector<infinity::InsertRowExpr*>*    insert_row_list_t;
 
     std::vector<infinity::WhenThen*>*     case_check_array_t;
 
@@ -252,17 +252,14 @@ struct SQL_LTYPE {
 } <expr_array_t>
 
 %destructor {
-    fprintf(stderr, "destroy expression array list\n");
+    fprintf(stderr, "destroy insert row list\n");
     if (($$) != nullptr) {
-        for (auto arr_ptr : *($$)) {
-            for (auto ptr : *arr_ptr) {
-                delete ptr;
-            }
-            delete (arr_ptr);
+        for (auto ptr : *($$)) {
+            delete ptr;
         }
         delete ($$);
     }
-} <expr_array_list_t>
+} <insert_row_list_t>
 
 %destructor {
     fprintf(stderr, "destroy order by expr list\n");
@@ -389,16 +386,16 @@ struct SQL_LTYPE {
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
-%token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
+%token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TEXT MULTIVECTOR TENSOR SPARSE TENSORARRAY IGNORE
-%token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT
+%token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT COMMENT
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
-%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE
+%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
 
 %token NUMBER
@@ -454,8 +451,8 @@ struct SQL_LTYPE {
 %type <const_expr_t>            empty_array_expr common_sparse_array_expr
 %type <int_sparse_ele_t>        int_sparse_ele
 %type <float_sparse_ele_t>      float_sparse_ele
-%type <expr_array_t>            expr_array group_by_clause sub_search_array
-%type <expr_array_list_t>       expr_array_list
+%type <expr_array_t>            expr_array group_by_clause sub_search_array highlight_clause
+%type <insert_row_list_t>       insert_row_list
 %type <update_expr_t>           update_expr;
 %type <update_expr_array_t>     update_expr_array;
 %type <case_check_array_t>      case_check_array;
@@ -554,7 +551,24 @@ explainable_statement : create_statement { $$ = $1; }
  */
 
 /* CREATE DATABASE schema_name; */
-create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
+create_statement : CREATE DATABASE if_not_exists IDENTIFIER COMMENT STRING {
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateSchemaInfo> create_schema_info = std::make_shared<infinity::CreateSchemaInfo>();
+
+    ParserHelper::ToLower($4);
+    create_schema_info->schema_name_ = $4;
+    free($4);
+    if(create_schema_info->schema_name_.empty()) {
+        yyerror(&yyloc, scanner, result, "Empty database name is given.");
+        YYERROR;
+    }
+
+    $$->create_info_ = create_schema_info;
+    $$->create_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
+    $$->create_info_->comment_ = $6;
+    free($6);
+}
+| CREATE DATABASE if_not_exists IDENTIFIER {
     $$ = new infinity::CreateStatement();
     std::shared_ptr<infinity::CreateSchemaInfo> create_schema_info = std::make_shared<infinity::CreateSchemaInfo>();
 
@@ -629,6 +643,55 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
 
     create_table_info->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     create_table_info->select_ = $6;
+    $$->create_info_ = create_table_info;
+}
+| CREATE TABLE if_not_exists table_name '(' table_element_array ')' optional_table_properties_list COMMENT STRING {
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateTableInfo> create_table_info = std::make_shared<infinity::CreateTableInfo>();
+    if($4->schema_name_ptr_ != nullptr) {
+        create_table_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    create_table_info->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    delete $4;
+
+    for (infinity::TableElement*& element : *$6) {
+        if(element->type_ == infinity::TableElementType::kColumn) {
+            create_table_info->column_defs_.emplace_back((infinity::ColumnDef*)element);
+        } else {
+            create_table_info->constraints_.emplace_back((infinity::TableConstraint*)element);
+        }
+    }
+    delete $6;
+
+    if ($8 != nullptr) {
+        create_table_info->properties_ = std::move(*$8);
+        delete $8;
+    }
+
+    create_table_info->comment_ = $10;
+    free($10);
+
+    $$->create_info_ = create_table_info;
+    $$->create_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
+}
+/* CREATE TABLE table_name AS SELECT .... ; */
+| CREATE TABLE if_not_exists table_name AS select_statement COMMENT STRING {
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateTableInfo> create_table_info = std::make_shared<infinity::CreateTableInfo>();
+    if($4->schema_name_ptr_ != nullptr) {
+        create_table_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    create_table_info->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    delete $4;
+
+    create_table_info->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
+    create_table_info->select_ = $6;
+    create_table_info->comment_ = $8;
+    free($8);
     $$->create_info_ = create_table_info;
 }
 /* CREATE VIEW table_name AS SELECT .... ; */
@@ -748,7 +811,7 @@ IDENTIFIER column_type with_index_param_list default_expr {
     }
 
     std::shared_ptr<infinity::ParsedExpr> default_expr($4);
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, std::move(default_expr));
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, "", std::move(default_expr));
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;
@@ -758,7 +821,7 @@ IDENTIFIER column_type with_index_param_list default_expr {
         yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
     }
     */
-};
+}
 | IDENTIFIER column_type column_constraints default_expr {
     std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
@@ -783,7 +846,97 @@ IDENTIFIER column_type with_index_param_list default_expr {
     }
 
     std::shared_ptr<infinity::ParsedExpr> default_expr($4);
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, default_expr);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, "", default_expr);
+
+    ParserHelper::ToLower($1);
+    $$->name_ = $1;
+    $$->constraints_ = *$3;
+    delete $3;
+    free($1);
+    /*
+    if (!$$->trySetNullableExplicit()) {
+        yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
+    }
+    */
+}
+| IDENTIFIER column_type with_index_param_list default_expr COMMENT STRING {
+    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
+    std::vector<std::unique_ptr<infinity::InitParameter>> index_param_list = infinity::InitParameter::MakeInitParameterList($3);
+    switch($2.logical_type_) {
+        case infinity::LogicalType::kDecimal: {
+            type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
+            if(type_info_ptr == nullptr) {
+                yyerror(&yyloc, scanner, result, "Fail to create decimal info.");
+                free($1);
+                YYERROR;
+            }
+            break;
+        }
+//        case infinity::LogicalType::kBitmap: {
+//            type_info_ptr = infinity::BitmapInfo::Make($2.width);
+//            break;
+//        }
+        case infinity::LogicalType::kEmbedding:
+        case infinity::LogicalType::kMultiVector:
+        case infinity::LogicalType::kTensor:
+        case infinity::LogicalType::kTensorArray: {
+            type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
+            break;
+        }
+        case infinity::LogicalType::kSparse: {
+            auto store_type = infinity::SparseInfo::ParseStoreType(index_param_list);
+            type_info_ptr = infinity::SparseInfo::Make($2.embedding_type_, $2.width, store_type);
+            if (type_info_ptr == nullptr) {
+                yyerror(&yyloc, scanner, result, "Fail to create sparse info.");
+                free($1);
+                YYERROR;
+            }
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+
+    std::shared_ptr<infinity::ParsedExpr> default_expr($4);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, $6, std::move(default_expr));
+    free($6);
+
+    ParserHelper::ToLower($1);
+    $$->name_ = $1;
+    free($1);
+    /*
+    if (!$$->trySetNullableExplicit()) {
+        yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
+    }
+    */
+}
+| IDENTIFIER column_type column_constraints default_expr COMMENT STRING {
+    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
+    switch($2.logical_type_) {
+        case infinity::LogicalType::kDecimal: {
+            type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
+            break;
+        }
+//        case infinity::LogicalType::kBitmap: {
+//            type_info_ptr = infinity::BitmapInfo::Make($2.width);
+//            break;
+//        }
+        case infinity::LogicalType::kEmbedding:
+        case infinity::LogicalType::kMultiVector:
+        case infinity::LogicalType::kTensor:
+        case infinity::LogicalType::kTensorArray: {
+            type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+
+    std::shared_ptr<infinity::ParsedExpr> default_expr($4);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, $6, default_expr);
+    free($6);
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;
@@ -992,10 +1145,10 @@ delete_statement : DELETE FROM table_name where_clause {
 /*
  * INSERT STATEMENT
  */
-insert_statement: INSERT INTO table_name optional_identifier_array VALUES expr_array_list {
+insert_statement: INSERT INTO table_name optional_identifier_array VALUES insert_row_list {
     bool is_error{false};
     for (auto expr_array : *$6) {
-        for (auto expr : *expr_array) {
+        for (const auto &expr : expr_array->values_) {
             if(expr->type_ != infinity::ParsedExprType::kConstant) {
                 yyerror(&yyloc, scanner, result, ("Value list has non-constant expression: " + expr->ToString()).c_str());
                 is_error = true;
@@ -1004,9 +1157,6 @@ insert_statement: INSERT INTO table_name optional_identifier_array VALUES expr_a
     }
     if(is_error) {
         for (auto expr_array : *$6) {
-            for (auto expr : *expr_array) {
-                delete expr;
-            }
             delete (expr_array);
         }
         delete $6;
@@ -1023,8 +1173,15 @@ insert_statement: INSERT INTO table_name optional_identifier_array VALUES expr_a
     $$->table_name_ = $3->table_name_ptr_;
     free($3->table_name_ptr_);
     delete $3;
-    $$->columns_ = $4;
-    $$->values_ = $6;
+    for (infinity::InsertRowExpr* &expr_ptr : *$6) {
+        if ($4) {
+            expr_ptr->columns_ = *($4);
+        }
+        $$->insert_rows_.emplace_back(expr_ptr);
+        expr_ptr = nullptr;
+    }
+    delete $4;
+    delete $6;
 }
 | INSERT INTO table_name optional_identifier_array select_without_paren {
     $$ = new infinity::InsertStatement();
@@ -1035,8 +1192,11 @@ insert_statement: INSERT INTO table_name optional_identifier_array VALUES expr_a
     $$->table_name_ = $3->table_name_ptr_;
     free($3->table_name_ptr_);
     delete $3;
-    $$->columns_ = $4;
-    $$->select_ = $5;
+    if ($4) {
+        $$->columns_for_select_ = std::move(*($4));
+        delete $4;
+    }
+    $$->select_.reset($5);
 }
 
 optional_identifier_array: '(' identifier_array ')' {
@@ -1390,7 +1550,7 @@ select_clause_with_modifier: select_clause_without_modifier order_by_clause limi
         yyerror(&yyloc, scanner, result, "Offset expression isn't valid without Limit expression");
         YYERROR;
     }
-    if($1->search_expr_ != nullptr and ($2 != nullptr or $3 != nullptr or $4 != nullptr)) {
+    if($1->search_expr_ != nullptr and ($2 != nullptr /*or $3 != nullptr or $4 != nullptr*/)) {
         delete $1;
         if ($2) {
             for (auto ptr : *($2)) {
@@ -1400,7 +1560,7 @@ select_clause_with_modifier: select_clause_without_modifier order_by_clause limi
         }
         delete $3;
         delete $4;
-        yyerror(&yyloc, scanner, result, "Result modifier(ORDER BY, LIMIT, OFFSET) is conflict with SEARCH expression.");
+        yyerror(&yyloc, scanner, result, "Result modifier(ORDER BY) is conflict with SEARCH expression.");
         YYERROR;
     }
     $1->order_by_list = $2;
@@ -1417,15 +1577,16 @@ select_clause_without_modifier_paren: '(' select_clause_without_modifier ')' {
 };
 
 select_clause_without_modifier:
-SELECT distinct expr_array from_clause search_clause where_clause group_by_clause having_clause {
+SELECT distinct expr_array highlight_clause from_clause search_clause where_clause group_by_clause having_clause {
     $$ = new infinity::SelectStatement();
-    $$->select_list_ = $3;
     $$->select_distinct_ = $2;
-    $$->table_ref_ = $4;
-    $$->search_expr_ = $5;
-    $$->where_expr_ = $6;
-    $$->group_by_list_ = $7;
-    $$->having_expr_ = $8;
+    $$->select_list_ = $3;
+    $$->highlight_list_ = $4;
+    $$->table_ref_ = $5;
+    $$->search_expr_ = $6;
+    $$->where_expr_ = $7;
+    $$->group_by_list_ = $8;
+    $$->having_expr_ = $9;
 
     if($$->group_by_list_ == nullptr && $$->having_expr_ != nullptr) {
         yyerror(&yyloc, scanner, result, "HAVING clause should follow after GROUP BY clause");
@@ -1482,6 +1643,13 @@ distinct : DISTINCT {
 }
 | {
     $$ = false;
+}
+
+highlight_clause: HIGHLIGHT expr_array {
+    $$ = $2;
+}
+| {
+    $$ = nullptr;
 }
 
 from_clause: FROM table_reference {
@@ -2340,6 +2508,40 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->variable_name_ = $4;
      free($4);
 }
+| ADMIN CREATE SNAPSHOT {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kCreateSnapshot;
+}
+| ADMIN SHOW SNAPSHOTS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListSnapshots;
+}
+| ADMIN SHOW SNAPSHOT STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowSnapshot;
+     $$->snapshot_name_ = $4;
+     free($4);
+}
+| ADMIN DELETE SNAPSHOT STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kDeleteSnapshot;
+     $$->snapshot_name_ = $4;
+     free($4);
+}
+| ADMIN EXPORT SNAPSHOT STRING TO STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kExportSnapshot;
+     $$->snapshot_name_ = $4;
+     $$->export_path_ = $6;
+     free($4);
+     free($6);
+}
+| ADMIN RECOVER FROM SNAPSHOT STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kRecoverFromSnapshot;
+     $$->snapshot_name_ = $5;
+     free($5);
+}
 | ADMIN SHOW NODES {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListNodes;
@@ -2354,27 +2556,33 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowCurrentNode;
 }
+| ADMIN REMOVE NODE STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kRemoveNode;
+     $$->node_name_ = $4;
+     free($4);
+}
 | ADMIN SET ADMIN {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kAdmin;
+     $$->node_role_ = infinity::NodeRole::kAdmin;
 }
 | ADMIN SET STANDALONE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kStandalone;
+     $$->node_role_ = infinity::NodeRole::kStandalone;
 }
 | ADMIN SET LEADER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kLeader;
+     $$->node_role_ = infinity::NodeRole::kLeader;
      $$->node_name_ = $5;
      free($5);
 }
 | ADMIN CONNECT STRING AS FOLLOWER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kFollower;
+     $$->node_role_ = infinity::NodeRole::kFollower;
      $$->leader_address_ = $3;
      $$->node_name_ = $7;
      free($3);
@@ -2383,7 +2591,7 @@ admin_statement: ADMIN SHOW CATALOGS {
 | ADMIN CONNECT STRING AS LEARNER USING STRING {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kSetRole;
-     $$->admin_node_role_ = infinity::AdminNodeRole::kLearner;
+     $$->node_role_ = infinity::NodeRole::kLearner;
      $$->leader_address_ = $3;
      $$->node_name_ = $7;
      free($3);
@@ -2436,30 +2644,25 @@ expr_array : expr_alias {
     $$ = $1;
 };
 
-expr_array_list : '(' expr_array ')' {
-    $$ = new std::vector<std::vector<infinity::ParsedExpr*>*>();
-    $$->push_back($2);
-}
-| expr_array_list ',' '(' expr_array ')' {
-    if(!$1->empty() && $1->back()->size() != $4->size()) {
-        yyerror(&yyloc, scanner, result, "The expr_array in list shall have the same size.");
-        for (auto arr_ptr : *$1) {
-            for (auto ptr : *arr_ptr) {
-                delete ptr;
-            }
-            delete (arr_ptr);
-        }
-        delete $1;
-        $1 = nullptr;
-        for (auto ptr : *$4) {
-            delete ptr;
-        }
-        delete $4;
-        $4 = nullptr;
-        YYERROR;
+insert_row_list : '(' expr_array ')' {
+    auto res = std::make_unique<infinity::InsertRowExpr>();
+    for (auto* &expr : *$2) {
+        res->values_.emplace_back(expr);
+        expr = nullptr;
     }
-    $1->push_back($4);
+    delete $2;
+    $$ = new std::vector<infinity::InsertRowExpr*>();
+    $$->emplace_back(res.release());
+}
+| insert_row_list ',' '(' expr_array ')' {
     $$ = $1;
+    auto res = std::make_unique<infinity::InsertRowExpr>();
+    for (auto* &expr : *$4) {
+        res->values_.emplace_back(expr);
+        expr = nullptr;
+    }
+    delete $4;
+    $$->emplace_back(res.release());
 };
 
 /*

@@ -1234,10 +1234,11 @@ concept PODValueType = IsAnyOf<ValueType,
                                TimestampT,
                                IntervalT,
                                RowID,
-                               UuidT>;
+                               UuidT,
+                               VarcharT>;
 
 export template <typename ValueType>
-concept BinaryGenerateBoolean = PODValueType<ValueType> or IsAnyOf<ValueType, BooleanT, VarcharT>;
+concept BinaryGenerateBoolean = PODValueType<ValueType> or IsAnyOf<ValueType, BooleanT>;
 
 template <typename Unsupported>
 class ColumnVectorPtrAndIdx {
@@ -1311,6 +1312,17 @@ public:
         Span<const char> left_v = left.col_->GetVarchar(left.idx_);
         Span<const char> right_v = right.col_->GetVarchar(right.idx_);
         return left_v.size() == right_v.size() && std::strncmp(left_v.data(), right_v.data(), left_v.size()) == 0;
+    }
+
+    friend void GetReaderValue(const IteratorType &left, const char* &dst, SizeT &dst_len) {
+        Span<const char> left_v = left.col_->GetVarchar(left.idx_);
+        dst = left_v.data();
+        dst_len = left_v.size();
+    }
+
+    friend void SetReaderValue(IteratorType &left, const char* dst, int dst_len) {
+        Span<const char> span(dst, dst_len);
+        left.col_->AppendVarchar(span);
     }
 
 private:

@@ -25,12 +25,11 @@ import internal_types;
 namespace infinity {
 
 AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
-    std::sort(children_.begin() + 1, children_.end(), [](const auto &lhs, const auto &rhs) { return lhs->GetDF() < rhs->GetDF(); });
-    // initialize doc_id_ to first doc
-    Next(0);
-    // init df
-    doc_freq_ = children_[0]->GetDF();
+    std::sort(children_.begin() + 1, children_.end(), [](const auto &lhs, const auto &rhs) {
+        return lhs->GetEstimateIterateCost() < rhs->GetEstimateIterateCost();
+    });
     bm25_score_upper_bound_ = children_[0]->BM25ScoreUpperBound();
+    estimate_iterate_cost_ = children_[0]->GetEstimateIterateCost();
 }
 
 bool AndNotIterator::Next(RowID doc_id) {
@@ -59,8 +58,6 @@ bool AndNotIterator::Next(RowID doc_id) {
 float AndNotIterator::BM25Score() { return children_[0]->BM25Score(); }
 
 void AndNotIterator::UpdateScoreThreshold(float threshold) { children_[0]->UpdateScoreThreshold(threshold); }
-
-u32 AndNotIterator::LeafCount() const { return children_[0]->LeafCount(); }
 
 u32 AndNotIterator::MatchCount() const { return children_[0]->MatchCount(); }
 

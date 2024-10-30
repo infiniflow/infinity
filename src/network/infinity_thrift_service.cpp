@@ -49,6 +49,7 @@ import match_tensor_expr;
 import match_expr;
 import fusion_expr;
 import parsed_expr;
+import insert_row_expr;
 import update_statement;
 import search_expr;
 import explain_statement;
@@ -86,6 +87,9 @@ ClientVersions::ClientVersions() {
     client_version_map_[18] = String("0.4.0.dev1");
     client_version_map_[19] = String("0.4.0.dev2");
     client_version_map_[20] = String("0.4.0.dev3");
+    client_version_map_[21] = String("0.4.0.dev4");
+    client_version_map_[22] = String("0.4.0");
+    client_version_map_[23] = String("0.5.0.dev1");
 }
 
 Pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -166,7 +170,7 @@ void InfinityThriftService::CreateDatabase(infinity_thrift_rpc::CommonResponse &
 
     auto [infinity, status] = GetInfinityBySessionID(request.session_id);
     if (status.ok()) {
-        auto result = infinity->CreateDatabase(request.db_name, create_database_opts);
+        auto result = infinity->CreateDatabase(request.db_name, create_database_opts, request.db_comment);
         ProcessQueryResult(response, result);
     } else {
         ProcessStatus(response, status);
@@ -290,59 +294,35 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
         return;
     }
 
-    auto columns = new Vector<String>();
-    columns->reserve(request.column_names.size());
-    for (auto &column : request.column_names) {
-        columns->emplace_back(column);
-    }
-
     Status constant_status;
 
-    Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
-    values->reserve(request.fields.size());
-    for (auto &value : request.fields) {
-        auto value_list = new Vector<ParsedExpr *>();
-        value_list->reserve(value.parse_exprs.size());
-        for (auto &expr : value.parse_exprs) {
-            auto parsed_expr = GetConstantFromProto(constant_status, *expr.type.constant_expr);
+    auto insert_rows = new Vector<InsertRowExpr *>();
+    DeferFn delete_insert_rows([&insert_rows] {
+        if (insert_rows) {
+            for (auto *insert_row : *insert_rows) {
+                delete insert_row;
+            }
+            delete insert_rows;
+            insert_rows = nullptr;
+        }
+    });
+    insert_rows->reserve(request.fields.size());
+    for (auto &field : request.fields) {
+        auto insert_row = std::make_unique<InsertRowExpr>();
+        insert_row->columns_ = std::move(field.column_names);
+        insert_row->values_.reserve(field.parse_exprs.size());
+        for (auto &expr : field.parse_exprs) {
+            auto parsed_expr = std::unique_ptr<ConstantExpr>(GetConstantFromProto(constant_status, *expr.type.constant_expr));
             if (!constant_status.ok()) {
-                // Free values memory
-                if (values != nullptr) {
-                    for (auto &value_array : *values) {
-                        for (auto &value_ptr : *value_array) {
-                            delete value_ptr;
-                            value_ptr = nullptr;
-                        }
-                        delete value_array;
-                        value_array = nullptr;
-                    }
-                    delete values;
-                    values = nullptr;
-                }
-                // Free current value list memory
-                if (value_list != nullptr) {
-                    for (auto &value_ptr : *value_list) {
-                        delete value_ptr;
-                        value_ptr = nullptr;
-                    }
-                    delete value_list;
-                    value_list = nullptr;
-                }
-
-                if (parsed_expr != nullptr) {
-                    delete parsed_expr;
-                    parsed_expr = nullptr;
-                }
-
                 ProcessStatus(response, constant_status);
                 return;
             }
-            value_list->emplace_back(parsed_expr);
+            insert_row->values_.emplace_back(parsed_expr.release());
         }
-        values->emplace_back(value_list);
+        insert_rows->emplace_back(insert_row.release());
     }
-
-    auto result = infinity->Insert(request.db_name, request.table_name, columns, values);
+    auto result = infinity->Insert(request.db_name, request.table_name, insert_rows);
+    insert_rows = nullptr;
     ProcessQueryResult(response, result);
 }
 
@@ -494,6 +474,39 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         parsed_expr = nullptr;
     }
 
+    // highlight list
+    Vector<ParsedExpr *> *highlight_columns = nullptr;
+    DeferFn defer_fn11([&]() {
+        if (highlight_columns != nullptr) {
+            for (auto &expr_ptr : *highlight_columns) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
+            delete highlight_columns;
+            highlight_columns = nullptr;
+        }
+    });
+    if (!request.highlight_list.empty()) {
+        highlight_columns = new Vector<ParsedExpr *>();
+        highlight_columns->reserve(request.highlight_list.size());
+        for (auto &expr : request.highlight_list) {
+            auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
+            DeferFn defer_fn4([&]() {
+                if (parsed_expr != nullptr) {
+                    delete parsed_expr;
+                    parsed_expr = nullptr;
+                }
+            });
+
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
+            highlight_columns->emplace_back(parsed_expr);
+            parsed_expr = nullptr;
+        }
+    }
+
     // search expr
     SearchExpr *search_expr = nullptr;
     DeferFn defer_fn5([&]() {
@@ -595,8 +608,8 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         }
     }
 
-    //order by
-    Vector<OrderByExpr *> *order_by_list = new Vector<OrderByExpr *>();
+    // order by
+    Vector<OrderByExpr *> *order_by_list = nullptr;
     DeferFn defer_fn9([&]() {
         if (order_by_list != nullptr) {
             for (auto &expr_ptr : *order_by_list) {
@@ -607,24 +620,27 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             order_by_list = nullptr;
         }
     });
-    order_by_list->reserve(request.order_by_list.size());
+    if (!request.order_by_list.empty()) {
+        order_by_list = new Vector<OrderByExpr *>();
+        order_by_list->reserve(request.order_by_list.size());
 
-    Status order_by_status;
-    for (auto &expr : request.order_by_list) {
-        auto order_by_expr = GetOrderByExprFromProto(order_by_status, expr);
-        DeferFn defer_fn4([&]() {
-            if (order_by_expr != nullptr) {
-                delete order_by_expr;
-                order_by_expr = nullptr;
+        Status order_by_status;
+        for (auto &expr : request.order_by_list) {
+            auto order_by_expr = GetOrderByExprFromProto(order_by_status, expr);
+            DeferFn defer_fn4([&]() {
+                if (order_by_expr != nullptr) {
+                    delete order_by_expr;
+                    order_by_expr = nullptr;
+                }
+            });
+
+            if (!order_by_status.ok()) {
+                ProcessStatus(response, order_by_status);
+                return;
             }
-        });
-
-        if (!order_by_status.ok()) {
-            ProcessStatus(response, order_by_status);
-            return;
+            order_by_list->emplace_back(order_by_expr);
+            order_by_expr = nullptr;
         }
-        order_by_list->emplace_back(order_by_expr);
-        order_by_expr = nullptr;
     }
 
     // auto end2 = std::chrono::steady_clock::now();
@@ -632,8 +648,18 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     //
     // auto start3 = std::chrono::steady_clock::now();
 
-    const QueryResult result = infinity->Search(request.db_name, request.table_name, search_expr, filter, limit, offset, output_columns, order_by_list);
+    const QueryResult result = infinity->Search(request.db_name,
+                                                request.table_name,
+                                                search_expr,
+                                                filter,
+                                                limit,
+                                                offset,
+                                                output_columns,
+                                                highlight_columns,
+                                                order_by_list,
+                                                nullptr);
     output_columns = nullptr;
+    highlight_columns = nullptr;
     filter = nullptr;
     search_expr = nullptr;
     limit = nullptr;
@@ -715,6 +741,40 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             return;
         }
         output_columns->emplace_back(parsed_expr);
+    }
+
+    // highlight list
+    Vector<ParsedExpr *> *highlight_columns = nullptr;
+    DeferFn defer_fn11([&]() {
+        if (highlight_columns != nullptr) {
+            for (auto &expr_ptr : *highlight_columns) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
+            delete highlight_columns;
+            highlight_columns = nullptr;
+        }
+    });
+    if (!request.highlight_list.empty()) {
+        highlight_columns = new Vector<ParsedExpr *>();
+        highlight_columns->reserve(request.highlight_list.size());
+
+        for (auto &expr : request.highlight_list) {
+            auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
+            DeferFn defer_fn4([&]() {
+                if (parsed_expr != nullptr) {
+                    delete parsed_expr;
+                    parsed_expr = nullptr;
+                }
+            });
+
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
+            highlight_columns->emplace_back(parsed_expr);
+            parsed_expr = nullptr;
+        }
     }
 
     // search expr
@@ -821,14 +881,61 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
         }
     }
 
+    // order by
+    Vector<OrderByExpr *> *order_by_list = nullptr;
+    DeferFn defer_fn9([&]() {
+        if (order_by_list != nullptr) {
+            for (auto &expr_ptr : *order_by_list) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
+            delete order_by_list;
+            order_by_list = nullptr;
+        }
+    });
+    if (!request.order_by_list.empty()) {
+        order_by_list = new Vector<OrderByExpr *>();
+        order_by_list->reserve(request.order_by_list.size());
+
+        Status order_by_status;
+        for (auto &expr : request.order_by_list) {
+            auto order_by_expr = GetOrderByExprFromProto(order_by_status, expr);
+            DeferFn defer_fn4([&]() {
+                if (order_by_expr != nullptr) {
+                    delete order_by_expr;
+                    order_by_expr = nullptr;
+                }
+            });
+
+            if (!order_by_status.ok()) {
+                ProcessStatus(response, order_by_status);
+                return;
+            }
+            order_by_list->emplace_back(order_by_expr);
+            order_by_expr = nullptr;
+        }
+    }
+
     // Explain type
     auto explain_type = GetExplainTypeFromProto(request.explain_type);
-    const QueryResult result = infinity->Explain(request.db_name, request.table_name, explain_type, search_expr, filter, limit, offset, output_columns);
+    const QueryResult result = infinity->Explain(request.db_name,
+                                                 request.table_name,
+                                                 explain_type,
+                                                 search_expr,
+                                                 filter,
+                                                 limit,
+                                                 offset,
+                                                 output_columns,
+                                                 highlight_columns,
+                                                 order_by_list,
+                                                 nullptr);
     output_columns = nullptr;
+    highlight_columns = nullptr;
     search_expr = nullptr;
     filter = nullptr;
     limit = nullptr;
     offset = nullptr;
+    order_by_list = nullptr;
 
     if (result.IsOk()) {
         auto &columns = response.column_fields;
@@ -1019,7 +1126,7 @@ void InfinityThriftService::ShowDatabase(infinity_thrift_rpc::ShowDatabaseRespon
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 3) {
+        if (row_count != 4) {
             String error_message = "ShowDatabase: query result is invalid.";
             UnrecoverableError(error_message);
         }
@@ -1039,6 +1146,11 @@ void InfinityThriftService::ShowDatabase(infinity_thrift_rpc::ShowDatabaseRespon
             response.table_count = std::stol(value.GetVarchar());
         }
 
+        {
+            Value value = data_block->GetValue(1, 3);
+            response.comment = value.GetVarchar();
+        }
+
         response.__set_error_code((i64)(result.ErrorCode()));
     } else {
         ProcessQueryResult(response, result);
@@ -1056,38 +1168,50 @@ void InfinityThriftService::ShowTable(infinity_thrift_rpc::ShowTableResponse &re
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 6) {
+        if (row_count != 7) {
             String error_message = "ShowTable: query result is invalid.";
             UnrecoverableError(error_message);
         }
 
         {
+            // db name
             Value value = data_block->GetValue(1, 0);
             response.database_name = value.GetVarchar();
         }
 
         {
+            // table name
             Value value = data_block->GetValue(1, 1);
             response.table_name = value.GetVarchar();
         }
 
         {
+            // table comment
             Value value = data_block->GetValue(1, 2);
             response.store_dir = value.GetVarchar();
         }
 
         {
+            // storage directory
             Value value = data_block->GetValue(1, 3);
+            response.store_dir = value.GetVarchar();
+        }
+
+        {
+            // column count
+            Value value = data_block->GetValue(1, 4);
             response.column_count = std::stol(value.GetVarchar());
         }
 
         {
-            Value value = data_block->GetValue(1, 4);
+            // segment count
+            Value value = data_block->GetValue(1, 5);
             response.segment_count = std::stol(value.GetVarchar());
         }
 
         {
-            Value value = data_block->GetValue(1, 5);
+            // row count
+            Value value = data_block->GetValue(1, 6);
             response.row_count = std::stol(value.GetVarchar());
         }
 
@@ -1584,7 +1708,8 @@ Tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const in
         return {nullptr, status};
     }
 
-    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def.name, constraints, const_expr);
+    String comment = column_def.comment;
+    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def.name, constraints, std::move(comment), const_expr);
     return {col_def, Status::OK()};
 }
 
@@ -1935,7 +2060,11 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
 
     auto [embedding_data_ptr, dimension, status2] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
     knn_expr->embedding_data_ptr_ = embedding_data_ptr;
-    knn_expr->dimension_ = dimension;
+    if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemBit) {
+        knn_expr->dimension_ = dimension * 8;
+    } else {
+        knn_expr->dimension_ = dimension;
+    }
     if (!status2.ok()) {
         status = status2;
         return nullptr;
@@ -2142,9 +2271,9 @@ OrderByExpr *InfinityThriftService::GetOrderByExprFromProto(Status &status, cons
     if (!status.ok()) {
         return nullptr;
     }
-    if(expr.asc){
+    if (expr.asc) {
         order_by_expr->type_ = OrderType::kAsc;
-    }else{
+    } else {
         order_by_expr->type_ = OrderType::kDesc;
     }
     return order_by_expr.release();

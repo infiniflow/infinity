@@ -25,7 +25,7 @@ import internal_types;
 namespace infinity {
 
 // Refers to https://engineering.nyu.edu/~suel/papers/bmw.pdf
-export class BlockMaxWandIterator final : public MultiDocIterator {
+export class BlockMaxWandIterator : public MultiDocIterator {
 public:
     explicit BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iterators);
 
@@ -40,8 +40,6 @@ public:
     bool Next(RowID doc_id) override;
 
     float BM25Score() override;
-
-    u32 LeafCount() const override;
 
     u32 MatchCount() const override;
 

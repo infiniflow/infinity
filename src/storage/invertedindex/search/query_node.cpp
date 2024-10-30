@@ -1,4 +1,5 @@
 #include "query_node.h"
+#include <cassert>
 #include <chrono>
 
 import stl;
@@ -19,7 +20,7 @@ import or_iterator;
 import term_doc_iterator;
 import phrase_doc_iterator;
 import blockmax_wand_iterator;
-import blockmax_maxscore_iterator;
+import minimum_should_match_iterator;
 
 namespace infinity {
 
@@ -401,8 +402,10 @@ std::unique_ptr<QueryNode> AndNotQueryNode::InnerGetNewOptimizedQueryTree() {
 }
 
 // create search iterator
-std::unique_ptr<DocIterator>
-TermQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo /*early_term_algo*/) const {
+std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table_entry,
+                                                         const IndexReader &index_reader,
+                                                         EarlyTermAlgo /*early_term_algo*/,
+                                                         u32 /*minimum_should_match*/) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader) {
@@ -427,8 +430,10 @@ TermQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &in
     return search;
 }
 
-std::unique_ptr<DocIterator>
-PhraseQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo /*early_term_algo*/) const {
+std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const TableEntry *table_entry,
+                                                           const IndexReader &index_reader,
+                                                           EarlyTermAlgo /*early_term_algo*/,
+                                                           u32 /*minimum_should_match*/) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader) {
@@ -456,38 +461,47 @@ PhraseQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &
     return search;
 }
 
-std::unique_ptr<DocIterator>
-AndQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
+std::unique_ptr<DocIterator> AndQueryNode::CreateSearch(const TableEntry *table_entry,
+                                                        const IndexReader &index_reader,
+                                                        const EarlyTermAlgo early_term_algo,
+                                                        const u32 minimum_should_match) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     for (auto &child : children_) {
-        auto iter = child->CreateSearch(table_entry, index_reader, early_term_algo);
-        if (iter) {
-            sub_doc_iters.emplace_back(std::move(iter));
+        auto iter = child->CreateSearch(table_entry, index_reader, early_term_algo, 0);
+        if (!iter) {
+            // no need to continue if any child is invalid
+            return nullptr;
         }
+        sub_doc_iters.emplace_back(std::move(iter));
     }
     if (sub_doc_iters.empty()) {
         return nullptr;
     } else if (sub_doc_iters.size() == 1) {
         return std::move(sub_doc_iters[0]);
-    } else {
+    } else if (minimum_should_match <= sub_doc_iters.size()) {
         return MakeUnique<AndIterator>(std::move(sub_doc_iters));
+    } else {
+        assert(minimum_should_match > 2u);
+        return MakeUnique<MinimumShouldMatchWrapper<AndIterator>>(std::move(sub_doc_iters), minimum_should_match);
     }
 }
 
-std::unique_ptr<DocIterator>
-AndNotQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
+std::unique_ptr<DocIterator> AndNotQueryNode::CreateSearch(const TableEntry *table_entry,
+                                                           const IndexReader &index_reader,
+                                                           const EarlyTermAlgo early_term_algo,
+                                                           const u32 minimum_should_match) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     // check if the first child is a valid query
-    auto first_iter = children_.front()->CreateSearch(table_entry, index_reader, early_term_algo);
+    auto first_iter = children_.front()->CreateSearch(table_entry, index_reader, early_term_algo, minimum_should_match);
     if (!first_iter) {
         // no need to continue if the first child is invalid
         return nullptr;
     }
     sub_doc_iters.emplace_back(std::move(first_iter));
     for (u32 i = 1; i < children_.size(); ++i) {
-        auto iter = children_[i]->CreateSearch(table_entry, index_reader, early_term_algo);
+        auto iter = children_[i]->CreateSearch(table_entry, index_reader, early_term_algo, 0);
         if (iter) {
             sub_doc_iters.emplace_back(std::move(iter));
         }
@@ -499,38 +513,65 @@ AndNotQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &
     }
 }
 
-std::unique_ptr<DocIterator>
-OrQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
+std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const TableEntry *table_entry,
+                                                       const IndexReader &index_reader,
+                                                       const EarlyTermAlgo early_term_algo,
+                                                       const u32 minimum_should_match) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     bool all_are_term = true;
+    bool all_are_term_or_phrase = true;
+    const QueryNode *only_child_ = nullptr;
     for (auto &child : children_) {
-        if (child->GetType() != QueryNodeType::TERM) {
-            all_are_term = false;
-        }
-        auto iter = child->CreateSearch(table_entry, index_reader, early_term_algo);
-        if (iter) {
+        if (auto iter = child->CreateSearch(table_entry, index_reader, early_term_algo, 0); iter) {
+            only_child_ = child.get();
             sub_doc_iters.emplace_back(std::move(iter));
+            if (const auto child_type = child->GetType(); child_type != QueryNodeType::TERM) {
+                all_are_term = false;
+                if (child_type != QueryNodeType::PHRASE) {
+                    all_are_term_or_phrase = false;
+                }
+            }
         }
     }
     if (sub_doc_iters.empty()) {
         return nullptr;
     } else if (sub_doc_iters.size() == 1) {
-        return std::move(sub_doc_iters[0]);
-    } else {
-        if (all_are_term && early_term_algo == EarlyTermAlgo::kBMW)
+        return only_child_->CreateSearch(table_entry, index_reader, early_term_algo, minimum_should_match);
+    } else if (all_are_term && early_term_algo == EarlyTermAlgo::kBMW) {
+        if (minimum_should_match <= 1u) {
             return MakeUnique<BlockMaxWandIterator>(std::move(sub_doc_iters));
-        else if (all_are_term && early_term_algo == EarlyTermAlgo::kBMM)
-            return MakeUnique<BlockMaxMaxscoreIterator>(std::move(sub_doc_iters));
-        else
+        } else if (minimum_should_match < sub_doc_iters.size()) {
+            return MakeUnique<MinimumShouldMatchWrapper<BlockMaxWandIterator>>(std::move(sub_doc_iters), minimum_should_match);
+        } else if (minimum_should_match == sub_doc_iters.size()) {
+            return MakeUnique<AndIterator>(std::move(sub_doc_iters));
+        } else {
+            return nullptr;
+        }
+    } else if (all_are_term_or_phrase) {
+        if (minimum_should_match <= 1u) {
             return MakeUnique<OrIterator>(std::move(sub_doc_iters));
+        } else if (minimum_should_match < sub_doc_iters.size()) {
+            return MakeUnique<MinimumShouldMatchIterator>(std::move(sub_doc_iters), minimum_should_match);
+        } else if (minimum_should_match == sub_doc_iters.size()) {
+            return MakeUnique<AndIterator>(std::move(sub_doc_iters));
+        } else {
+            return nullptr;
+        }
+    } else {
+        if (minimum_should_match <= 1u) {
+            return MakeUnique<OrIterator>(std::move(sub_doc_iters));
+        } else {
+            return MakeUnique<MinimumShouldMatchWrapper<OrIterator>>(std::move(sub_doc_iters), minimum_should_match);
+        }
     }
 }
 
-std::unique_ptr<DocIterator>
-NotQueryNode::CreateSearch(const TableEntry *table_entry, const IndexReader &index_reader, EarlyTermAlgo early_term_algo) const {
-    String error_message = "NOT query node should be optimized into AND_NOT query node";
-    UnrecoverableError(error_message);
+std::unique_ptr<DocIterator> NotQueryNode::CreateSearch(const TableEntry *table_entry,
+                                                        const IndexReader &index_reader,
+                                                        EarlyTermAlgo early_term_algo,
+                                                        u32 minimum_should_match) const {
+    UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
     return nullptr;
 }
 
@@ -573,7 +614,10 @@ void TermQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool 
     os << '\n';
 }
 
-void TermQueryNode::GetQueryTerms(std::vector<std::string> &terms) const { terms.push_back(term_); }
+void TermQueryNode::GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const {
+    columns.push_back(column_);
+    terms.push_back(term_);
+}
 
 void PhraseQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
     os << prefix;
@@ -590,7 +634,8 @@ void PhraseQueryNode::PrintTree(std::ostream &os, const std::string &prefix, boo
     os << '\n';
 }
 
-void PhraseQueryNode::GetQueryTerms(std::vector<std::string> &terms) const {
+void PhraseQueryNode::GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const {
+    columns.push_back(column_);
     for (auto term : terms_) {
         terms.push_back(term);
     }
@@ -610,10 +655,20 @@ void MultiQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool
     children_.back()->PrintTree(os, next_prefix, true);
 }
 
-void MultiQueryNode::GetQueryTerms(std::vector<std::string> &terms) const {
+void MultiQueryNode::GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const {
     for (u32 i = 0; i < children_.size(); ++i) {
-        children_[i]->GetQueryTerms(terms);
+        children_[i]->GetQueryColumnsTerms(columns, terms);
     }
 }
+
+uint32_t MultiQueryNode::LeafCount() const {
+    if (GetType() != QueryNodeType::OR && GetType() != QueryNodeType::AND) {
+        UnrecoverableError("LeafCount: Unexpected case!");
+    }
+    return std::accumulate(children_.begin(), children_.end(), static_cast<u32>(0), [](const u32 cnt, const auto &it) {
+        return cnt + it->LeafCount();
+    });
+}
+
 
 } // namespace infinity

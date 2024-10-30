@@ -20,7 +20,7 @@ async function InfinityTable() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {tables.tables.map((table: string) => (
+        {tables.tables?.map((table: string) => (
           <TableRow key={table}>
             <TableCell className="font-medium">{table}</TableCell>
           </TableRow>
@@ -30,14 +30,7 @@ async function InfinityTable() {
   );
 }
 
-export default async function DatabasePage({
-  searchParams
-}: {
-  searchParams: { q: string; offset: string };
-}) {
-  const search = searchParams.q ?? '';
-  const offset = searchParams.offset ?? 0;
-
+export default async function DatabasePage() {
   const items: MenuItem[] = [
     {
       key: 'sub1',
@@ -56,14 +49,14 @@ export default async function DatabasePage({
   ];
 
   const ret = await listDatabase();
-  if (ret.databases.length > 1) {
-    const latestDatabase = ret.databases.at(-1);
+  if (ret.databases?.length > 1) {
+    const latestDatabase = ret.databases?.at(-1);
     const tables = await listTable(latestDatabase);
     console.log('🚀 ~ ret:', tables);
     items.push({
       key: latestDatabase,
       label: latestDatabase,
-      children: tables.tables
+      children: tables?.tables ?? []
     });
   }
 

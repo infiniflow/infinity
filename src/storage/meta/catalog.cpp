@@ -18,6 +18,7 @@ module;
 #include <fstream>
 #include <thread>
 #include <vector>
+#include <filesystem>
 
 module catalog;
 
@@ -60,7 +61,7 @@ import chunk_index_entry;
 import log_file;
 import persist_result_handler;
 import local_file_handle;
-import peer_task;
+import admin_statement;
 
 namespace infinity {
 
@@ -135,12 +136,16 @@ Catalog::~Catalog() {
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
 // use Txn::CreateDatabase instead
-Tuple<DBEntry *, Status>
-Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-    auto init_db_meta = [&]() { return DBMeta::NewDBMeta(MakeShared<String>(db_name)); };
-    LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
-    auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta));
-    return db_meta->CreateNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
+Tuple<DBEntry *, Status> Catalog::CreateDatabase(const SharedPtr<String> &db_name,
+                                                 const SharedPtr<String> &comment,
+                                                 TransactionID txn_id,
+                                                 TxnTimeStamp begin_ts,
+                                                 TxnManager *txn_mgr,
+                                                 ConflictType conflict_type) {
+    auto init_db_meta = [&]() { return DBMeta::NewDBMeta(db_name); };
+    LOG_TRACE(fmt::format("Adding new database entry: {}", *db_name));
+    auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(*db_name, std::move(init_db_meta));
+    return db_meta->CreateNewEntry(std::move(r_lock), comment, txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 // do not only use this method to drop database
@@ -173,14 +178,17 @@ Tuple<SharedPtr<DatabaseInfo>, Status> Catalog::GetDatabaseInfo(const String &db
     return db_meta->GetDatabaseInfo(std::move(r_lock), txn_id, begin_ts);
 }
 
-void Catalog::CreateDatabaseReplay(const SharedPtr<String> &db_name,
-                                   std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                                   TransactionID txn_id,
-                                   TxnTimeStamp begin_ts) {
+void Catalog::CreateDatabaseReplay(
+    const SharedPtr<String> &db_name,
+    const SharedPtr<String> &comment,
+    std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+    TransactionID txn_id,
+    TxnTimeStamp begin_ts) {
+
     auto init_db_meta = [&]() { return DBMeta::NewDBMeta(db_name); };
     LOG_TRACE(fmt::format("Adding new database entry: {}", *db_name));
     auto *db_meta = db_meta_map_.GetMetaNoLock(*db_name, std::move(init_db_meta));
-    db_meta->CreateEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(db_meta, db_meta->db_name(), txn_id, begin_ts); },
+    db_meta->CreateEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(db_meta, db_name, comment, txn_id, begin_ts); },
                                txn_id,
                                begin_ts);
 }
@@ -241,8 +249,14 @@ Tuple<TableEntry *, Status> Catalog::CreateTable(const String &db_name,
         return {nullptr, status};
     }
 
-    return db_entry
-        ->CreateTable(TableEntryType::kTableEntry, table_def->table_name(), table_def->columns(), txn_id, begin_ts, txn_mgr, conflict_type);
+    return db_entry->CreateTable(TableEntryType::kTableEntry,
+                                 table_def->table_name(),
+                                 table_def->table_comment(),
+                                 table_def->columns(),
+                                 txn_id,
+                                 begin_ts,
+                                 txn_mgr,
+                                 conflict_type);
 }
 
 Tuple<SharedPtr<TableEntry>, Status> Catalog::DropTableByName(const String &db_name,
@@ -533,32 +547,35 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
     // 1. load json
     // 2. load entries
     LOG_INFO(fmt::format("Load base FULL catalog json from: {}", full_ckp_info.path_));
-    auto catalog = Catalog::LoadFromFile(full_ckp_info, buffer_mgr);
+    auto catalog = Catalog::LoadFullCheckpoint(full_ckp_info.path_);
 
     // Load catalogs delta checkpoints and merge.
     for (const auto &delta_ckp_info : delta_ckp_infos) {
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", delta_ckp_info.path_));
-        UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_info);
-
-        catalog->LoadFromEntryDelta(std::move(catalog_delta_entry), buffer_mgr);
+        catalog->AttachDeltaCheckpoint(delta_ckp_info.path_);
     }
 
     LOG_TRACE(fmt::format("Catalog Delta Op is done"));
-
     return catalog;
+}
+void Catalog::AttachDeltaCheckpoint(const String &file_name) {
+    const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / file_name;
+    UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(catalog_path);
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    this->LoadFromEntryDelta(std::move(catalog_delta_entry), buffer_mgr);
 }
 
 // called by Replay
-UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info) {
-    const auto &catalog_path = delta_ckp_info.path_;
-
-    if(!VirtualStore::Exists(catalog_path)){
-        VirtualStore::DownloadObject(catalog_path, catalog_path);
+UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const String &catalog_path) {
+    if (!VirtualStore::Exists(catalog_path)) {
+        std::filesystem::path filePath = catalog_path;
+        String dst_file_name = filePath.filename();
+        VirtualStore::DownloadObject(catalog_path, dst_file_name);
     }
 
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
     if (!status.ok()) {
-        UnrecoverableError(status.message());
+        UnrecoverableError(fmt::format("{}:{}", catalog_path, status.message()));
     }
 
     i64 file_size = catalog_file_handle->FileSize();
@@ -584,7 +601,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
     auto *pm = InfinityContext::instance().persistence_manager();
     for (auto &op : delta_ops) {
         auto type = op->GetType();
-        LOG_INFO(fmt::format("Load delta op {}", op->ToString()));
+        // LOG_INFO(fmt::format("Load delta op {}", op->ToString()));
         auto commit_ts = op->commit_ts_;
         auto txn_id = op->txn_id_;
         auto begin_ts = op->begin_ts_;
@@ -609,7 +626,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                     this->DropDatabaseReplay(
                         *db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, true, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
+                            return DBEntry::ReplayDBEntry(db_meta, true, db_entry_dir, db_name, MakeShared<String>(), txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);
@@ -617,8 +634,13 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
                     this->CreateDatabaseReplay(
                         db_name,
-                        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, false, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
+                        add_db_entry_op->comment_,
+                        [&](DBMeta *db_meta,
+                            const SharedPtr<String> &db_name,
+                            const SharedPtr<String> &comment,
+                            TransactionID txn_id,
+                            TxnTimeStamp begin_ts) {
+                            return DBEntry::ReplayDBEntry(db_meta, false, db_entry_dir, db_name, comment, txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);
@@ -640,17 +662,23 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 SegmentID unsealed_id = add_table_entry_op->unsealed_id_;
                 SegmentID next_segment_id = add_table_entry_op->next_segment_id_;
                 ColumnID next_column_id = add_table_entry_op->next_column_id_;
+                const SharedPtr<String> &table_comment = add_table_entry_op->table_comment_;
 
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
                     // Actually the table entry replayed doesn't have full information cause index entry are lacked, but that is ok for now.
                     db_entry->DropTableReplay(
                         *table_name,
-                        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                        [&](TableMeta *table_meta,
+                            const SharedPtr<String> &table_name,
+                            const SharedPtr<String> &table_comment,
+                            TransactionID txn_id,
+                            TxnTimeStamp begin_ts) {
                             return TableEntry::ReplayTableEntry(true,
                                                                 table_meta,
                                                                 table_entry_dir,
                                                                 table_name,
+                                                                table_comment,
                                                                 column_defs,
                                                                 entry_type,
                                                                 txn_id,
@@ -664,11 +692,16 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                         txn_id,
                         begin_ts);
                 }
-                auto init_table_entry = [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                auto init_table_entry = [&](TableMeta *table_meta,
+                                            const SharedPtr<String> &table_name,
+                                            const SharedPtr<String> &table_comment,
+                                            TransactionID txn_id,
+                                            TxnTimeStamp begin_ts) {
                     return TableEntry::ReplayTableEntry(false,
                                                         table_meta,
                                                         table_entry_dir,
                                                         table_name,
+                                                        table_comment,
                                                         column_defs,
                                                         entry_type,
                                                         txn_id,
@@ -680,9 +713,9 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                                                         next_column_id);
                 };
                 if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
-                    db_entry->CreateTableReplay(table_name, init_table_entry, txn_id, begin_ts);
+                    db_entry->CreateTableReplay(table_name, table_comment, init_table_entry, txn_id, begin_ts);
                 } else if (merge_flag == MergeFlag::kUpdate) {
-                    db_entry->UpdateTableReplay(table_name, init_table_entry, txn_id, begin_ts);
+                    db_entry->UpdateTableReplay(table_name, table_comment, init_table_entry, txn_id, begin_ts);
                 }
                 break;
             }
@@ -799,7 +832,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
                 if (merge_flag == MergeFlag::kDelete) {
                     block_entry->DropColumnReplay(column_id);
-                } else if (merge_flag == MergeFlag::kNew) {
+                } else if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kUpdate) {
                     block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry,
                                                                                              column_id,
                                                                                              buffer_mgr,
@@ -807,8 +840,6 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                                                                                              last_chunk_offset,
                                                                                              commit_ts),
                                                  column_id);
-                } else if (merge_flag == MergeFlag::kUpdate) {
-                    // do nothing
                 } else {
                     UnrecoverableError(fmt::format("Unsupported merge flag {} for column entry {}", (i8)merge_flag, column_id));
                 }
@@ -948,11 +979,17 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
     }
 }
 
-UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
-    const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / full_ckp_info.path_;
+UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
+    const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / file_name;
+    String dst_dir = catalog_path.parent_path().string();
+    String dst_file_name = catalog_path.filename().string();
 
-    if(!VirtualStore::Exists(catalog_path)){
-        VirtualStore::DownloadObject(catalog_path, catalog_path);
+    if (!VirtualStore::Exists(dst_dir)){
+        VirtualStore::MakeDirectory(dst_dir);
+    }
+
+    if (!VirtualStore::Exists(catalog_path)) {
+        VirtualStore::DownloadObject(catalog_path, dst_file_name);
     }
 
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
@@ -972,6 +1009,8 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
+
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     return Deserialize(catalog_json, buffer_mgr);
 }
 
@@ -1011,7 +1050,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
     // FIXME: Temp implementation, will be replaced by async task.
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_tmp_path, FileAccessMode::kWrite);
     if (!status.ok()) {
-        UnrecoverableError(status.message());
+        UnrecoverableError(fmt::format("{}: {}", catalog_tmp_path, status.message()));
     }
 
     status = catalog_file_handle->Append(catalog_str.data(), catalog_str.size());
@@ -1022,8 +1061,8 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     // Rename temp file to regular catalog file
     VirtualStore::Rename(catalog_tmp_path, full_path);
-    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader){
-        VirtualStore::UploadObject(full_path, full_path);
+    if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader or InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
+        VirtualStore::UploadObject(full_path, full_catalog_name);
     }
 
     global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
@@ -1110,8 +1149,8 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 
     out_file_handle->Append((reinterpret_cast<const char *>(buf.data())), act_size);
     out_file_handle->Sync();
-    if(InfinityContext::instance().GetServerRole() == NodeRole::kLeader){
-        VirtualStore::UploadObject(full_path, full_path);
+    if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader or InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
+        VirtualStore::UploadObject(full_path, delta_catalog_name);
     }
     // {
     // log for delta op debug
@@ -1130,6 +1169,17 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry)); }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
+
+void Catalog::InitCompactionAlg(TxnTimeStamp system_start_ts) {
+    TransactionID txn_id = 0; // fake txn id
+    Vector<DBEntry *> db_entries = this->Databases(txn_id, system_start_ts);
+    for (auto *db_entry : db_entries) {
+        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, system_start_ts);
+        for (auto *table_entry : table_entries) {
+            table_entry->InitCompactionAlg(system_start_ts);
+        }
+    }
+}
 
 void Catalog::MemIndexCommit() {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();

@@ -26,6 +26,7 @@ import base_table_ref;
 import data_type;
 import physical_scan_base;
 import match_sparse_expr;
+import base_expression;
 
 namespace infinity {
 struct LoadMeta;
@@ -37,7 +38,9 @@ public:
                              u64 table_index,
                              SharedPtr<BaseTableRef> base_table_ref,
                              SharedPtr<MatchSparseExpression> match_sparse_expr,
-                             SharedPtr<Vector<LoadMeta>> load_metas);
+                             SharedPtr<BaseExpression> filter_expression,
+                             SharedPtr<Vector<LoadMeta>> load_metas,
+                             bool cache_result);
 
     void Init() override;
 
@@ -49,6 +52,12 @@ public:
 
     SizeT TaskletCount() override;
 
+    const SharedPtr<MatchSparseExpression> &match_sparse_expr() const { return match_sparse_expr_; }
+
+    const SharedPtr<BaseExpression> &filter_expression() const { return filter_expression_; }
+
+    i64 GetTopN() const { return match_sparse_expr_->topn_; }
+
 private:
     template <template <typename, typename> typename C>
     void ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state);
@@ -57,8 +66,8 @@ private:
     void ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state);
 
 private:
-    u64 table_index_ = 0;
     SharedPtr<MatchSparseExpression> match_sparse_expr_;
+    SharedPtr<BaseExpression> filter_expression_{};
 };
 
 } // namespace infinity

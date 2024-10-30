@@ -15,6 +15,7 @@ module;
 
 #include <cassert>
 #include <cstddef>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -24,6 +25,8 @@ module lemmatizer;
 
 import stl;
 import third_party;
+
+namespace fs = std::filesystem;
 
 namespace infinity {
 
@@ -38,8 +41,6 @@ Lemmatizer::Lemmatizer(const String &path) : path_(path) {}
 Lemmatizer::~Lemmatizer() {}
 
 Status Lemmatizer::Load() {
-    // wninit(path_.c_str());
-
     file_map_ = {{ADJ, "adj"}, {ADV, "adv"}, {NOUN, "noun"}, {VERB, "verb"}};
     pos_numbers_ = {{NOUN, 1}, {VERB, 2}, {ADJ, 3}, {ADV, 4}, {ADJ_SAT, 5}};
     MORPHOLOGICAL_SUBSTITUTIONS = {
@@ -66,10 +67,12 @@ Status Lemmatizer::Load() {
 }
 
 Status Lemmatizer::LoadLemmaPosOffsetMap() {
+    fs::path root(path_);
     for (const auto &pair : file_map_) {
         const String &pos = pair.second;
+        fs::path dict_path(root / ("index." + pos));
 
-        std::ifstream file(path_ + "/" + "index." + pos);
+        std::ifstream file(dict_path.string());
         if (!file.is_open()) {
             return Status::InvalidAnalyzerFile(fmt::format("Failed to load wordnet lemmatizer, index.{}", pos));
         }
@@ -131,12 +134,13 @@ Status Lemmatizer::LoadLemmaPosOffsetMap() {
 }
 
 void Lemmatizer::LoadExceptionMap() {
+    fs::path root(path_);
     for (const auto &pair : file_map_) {
         const auto &pos = pair.first;
         const auto &suffix = pair.second;
+        fs::path dict_path(root / (suffix + ".exc"));
 
-        std::ifstream file(path_ + "/" + suffix + ".exc");
-        std::cout << "exception file " << suffix + ".exc" << std::endl;
+        std::ifstream file(dict_path.string());
         exception_map_[pos] = {};
 
         String line;
@@ -181,7 +185,7 @@ Vector<String> Lemmatizer::FilterForms(const Vector<String> &forms, const String
     return result;
 }
 
-Vector<String> Lemmatizer::Morphy_(const String &form, const String &pos, bool check_exceptions) {
+Vector<String> Lemmatizer::Morphy(const String &form, const String &pos, bool check_exceptions) {
     const auto &exceptions = exception_map_.at(pos);
 
     Vector<String> forms;
@@ -206,7 +210,7 @@ String Lemmatizer::Lemmatize(const String &form, const String &pos) {
     }
 
     for (const auto &part : parts_of_speech) {
-        auto analyses = Morphy_(form, part);
+        auto analyses = Morphy(form, part);
         if (!analyses.empty()) {
             // Return the first successful analysis
             return analyses[0];

@@ -29,6 +29,7 @@ import parsed_expr;
 import constant_expr;
 import search_expr;
 import column_expr;
+import insert_row_expr;
 import column_def;
 import data_type;
 
@@ -45,8 +46,8 @@ TEST_F(InfinityTest, test1) {
 
     {
         QueryResult result = infinity->ListDatabases();
-        //    EXPECT_EQ(result.result_table_->row_count(), 1); // Bug
-        EXPECT_EQ(result.result_table_->ColumnCount(), 1u);
+        EXPECT_EQ(result.result_table_->row_count(), 1);
+        EXPECT_EQ(result.result_table_->ColumnCount(), 3u);
         EXPECT_EQ(result.result_table_->GetColumnNameById(0), "database");
         EXPECT_EQ(result.result_table_->DataBlockCount(), 1u);
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
@@ -58,7 +59,7 @@ TEST_F(InfinityTest, test1) {
 
     {
         CreateDatabaseOptions create_db_opts;
-        infinity->CreateDatabase("db1", create_db_opts);
+        infinity->CreateDatabase("db1", create_db_opts, "");
         QueryResult result = infinity->ListDatabases();
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 2);
@@ -169,21 +170,20 @@ TEST_F(InfinityTest, test1) {
 
         //        Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values
 
-        Vector<String> *columns = new Vector<String>();
-        columns->emplace_back(col1_name);
-        columns->emplace_back(col2_name);
-
-        Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
-        values->emplace_back(new Vector<ParsedExpr *>());
-
-        ConstantExpr *value1 = new ConstantExpr(LiteralType::kInteger);
+        Vector<String> columns = {col1_name, col2_name};
+        Vector<UniquePtr<ParsedExpr>> values{};
+        auto value1 = MakeUnique<ConstantExpr>(LiteralType::kInteger);
         value1->integer_value_ = 11;
-        values->at(0)->emplace_back(value1);
-
-        ConstantExpr *value2 = new ConstantExpr(LiteralType::kInteger);
+        values.emplace_back(std::move(value1));
+        auto value2 = MakeUnique<ConstantExpr>(LiteralType::kInteger);
         value2->integer_value_ = 22;
-        values->at(0)->emplace_back(value2);
-        infinity->Insert("default_db", "table1", columns, values);
+        values.emplace_back(std::move(value2));
+        auto insert_row = new InsertRowExpr();
+        insert_row->columns_ = std::move(columns);
+        insert_row->values_ = std::move(values);
+        Vector<InsertRowExpr *> *insert_rows = new Vector<InsertRowExpr *>();
+        insert_rows->emplace_back(insert_row);
+        infinity->Insert("default_db", "table1", insert_rows);
 
         //        QueryResult Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
         //                           Vector<Pair<ParsedExpr *, ParsedExpr *>> &fts_expr,
@@ -203,7 +203,7 @@ TEST_F(InfinityTest, test1) {
 
         SearchExpr * search_expr = nullptr;
 
-        result = infinity->Search("default_db", "table1", search_expr, nullptr, nullptr, nullptr, output_columns, nullptr);
+        result = infinity->Search("default_db", "table1", search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr);
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(0, 0);

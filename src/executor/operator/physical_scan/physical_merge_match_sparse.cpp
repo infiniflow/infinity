@@ -38,6 +38,7 @@ import logical_type;
 import knn_result_handler;
 import merge_knn;
 import match_sparse_scan_function_data;
+import result_cache_manager;
 
 namespace infinity {
 
@@ -46,9 +47,11 @@ PhysicalMergeMatchSparse::PhysicalMergeMatchSparse(u64 id,
                                                    u64 table_index,
                                                    SharedPtr<BaseTableRef> base_table_ref,
                                                    SharedPtr<MatchSparseExpression> match_sparse_expr,
-                                                   SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalScanBase(id, PhysicalOperatorType::kMergeMatchSparse, std::move(left), nullptr, base_table_ref, load_metas), table_index_(table_index),
-      match_sparse_expr_(std::move(match_sparse_expr)) {}
+                                                   SharedPtr<BaseExpression> filter_expression,
+                                                   SharedPtr<Vector<LoadMeta>> load_metas,
+                                                   bool cache_result)
+    : PhysicalScanBase(id, PhysicalOperatorType::kMergeMatchSparse, std::move(left), nullptr, table_index, base_table_ref, load_metas, cache_result),
+      match_sparse_expr_(std::move(match_sparse_expr)), filter_expression_(std::move(filter_expression)) {}
 
 void PhysicalMergeMatchSparse::Init() { left_->Init(); }
 
@@ -117,7 +120,7 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
 
     using MergeHeap = MergeKnn<ResultType, C, ResultType>;
     if (match_sparse_data.merge_knn_base_.get() == nullptr) {
-        auto merge_knn = MakeUnique<MergeHeap>(query_n, topn);
+        auto merge_knn = MakeUnique<MergeHeap>(query_n, topn, Optional<f32>());
         merge_knn->Begin();
         match_sparse_data.merge_knn_base_ = std::move(merge_knn);
     }
@@ -140,7 +143,7 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
 
     if (operator_state->input_complete_) {
         merge_knn->End(); // reorder the heap
-        i64 result_n = std::min(topn, (SizeT)merge_knn->total_count());
+        i64 result_n = merge_knn->GetSize();
 
         if (operator_state->data_block_array_.empty()) {
             operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());

@@ -15,11 +15,12 @@
 from infinity_embedded.errors import ErrorCode as PyErrorCode
 from infinity_embedded.common import LOCAL_INFINITY_PATH
 from infinity_embedded.embedded_infinity_ext import *
+from typing import List
 
 
 class LocalQueryResult:
     def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, index_names=None,
-                 column_defs=None, column_fields=None, database_name=None, store_dir=None, table_count=None):
+                 column_defs=None, column_fields=None, database_name=None, store_dir=None, table_count=None, comment=None):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_names = db_names
@@ -31,6 +32,7 @@ class LocalQueryResult:
         self.database_name = database_name
         self.store_dir = store_dir
         self.table_count = table_count
+        self.comment = comment
 
 
 class LocalInfinityClient:
@@ -63,15 +65,20 @@ class LocalInfinityClient:
                                     column_fields=res.column_fields)
         if has_db_name:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, database_name=res.database_name,
-                                    store_dir=res.store_dir, table_count=res.table_count)
+                                    store_dir=res.store_dir, table_count=res.table_count, comment=res.comment)
         if has_index_names:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, index_names=res.names)
         return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
 
-    def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError):
+    def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError, comment: str = None):
         create_database_options = CreateDatabaseOptions()
         create_database_options.conflict_type = conflict_type
-        return self.convert_res(self.client.CreateDatabase(db_name, create_database_options))
+        db_comment: str = None
+        if comment is None:
+            db_comment = ""
+        else:
+            db_comment = comment
+        return self.convert_res(self.client.CreateDatabase(db_name, create_database_options, db_comment))
 
     def drop_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError):
         drop_database_options = DropDatabaseOptions()
@@ -83,6 +90,12 @@ class LocalInfinityClient:
 
     def show_database(self, db_name: str):
         return self.convert_res(self.client.ShowDatabase(db_name), has_db_name=True)
+
+    def show_info(self, info_name: str):
+        if self.client is None:
+            raise Exception("Local infinity is not connected")
+
+        return self.convert_res(self.client.ShowInfo(info_name))
 
     def get_database(self, db_name: str):
         return self.convert_res(self.client.GetDatabase(db_name))
@@ -147,14 +160,14 @@ class LocalInfinityClient:
         drop_index_options.conflict_type = conflict_type
         return self.convert_res(self.client.DropIndex(db_name, table_name, index_name, drop_index_options))
 
-    def insert(self, db_name: str, table_name: str, column_names: list[str], fields):
+    def insert(self, db_name: str, table_name: str, fields):
         if self.client is None:
             raise Exception("Local infinity is not connected")
         retry = 0
         inner_ex = None
         while retry <= 2:
             try:
-                res = self.client.Insert(db_name, table_name, column_names, fields)
+                res = self.client.Insert(db_name, table_name, fields)
                 return self.convert_res(res)
             except Exception as ex:
                 inner_ex = ex
@@ -171,22 +184,56 @@ class LocalInfinityClient:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.Export(db_name, table_name, columns, file_name, export_options))
 
-    def select(self, db_name: str, table_name: str, select_list: list[WrapParsedExpr], search_expr,
-               where_expr, limit_expr, offset_expr, order_by_list: list[WrapOrderByExpr], group_by_list=None):
+    def search(self,
+               db_name: str,
+               table_name: str,
+               select_list: list[WrapParsedExpr],
+               highlight_list: list[WrapParsedExpr] = [],
+               order_by_list: list[WrapOrderByExpr] = [],
+               group_by_list: list[WrapParsedExpr] = [],
+               search_expr: WrapSearchExpr = None,
+               where_expr: WrapParsedExpr = None,
+               limit_expr: WrapParsedExpr = None,
+               offset_expr: WrapParsedExpr = None):
         if self.client is None:
             raise Exception("Local infinity is not connected")
-        return self.convert_res(self.client.Search(db_name, table_name, select_list,
-                                                   order_by_list=order_by_list,
-                                                   wrap_search_expr=search_expr, where_expr=where_expr,
-                                                   limit_expr=limit_expr, offset_expr=offset_expr, ),
+        return self.convert_res(self.client.Search(db_name,
+                                                   table_name,
+                                                   select_list,
+                                                   highlight_list,
+                                                   order_by_list,
+                                                   group_by_list,
+                                                   search_expr,
+                                                   where_expr,
+                                                   limit_expr,
+                                                   offset_expr),
                                 has_result_data=True)
 
-    def explain(self, db_name: str, table_name: str, explain_type, select_list, search_expr,
-                where_expr, group_by_list, limit_expr, offset_expr):
+    def explain(self,
+                db_name: str,
+                table_name: str,
+                explain_type,
+                select_list: list[WrapParsedExpr],
+                highlight_list: list[WrapParsedExpr] = [],
+                order_by_list: list[WrapOrderByExpr] = [],
+                group_by_list: list[WrapParsedExpr] = [],
+                search_expr: WrapSearchExpr = None,
+                where_expr: WrapParsedExpr = None,
+                limit_expr: WrapParsedExpr = None,
+                offset_expr: WrapParsedExpr = None):
         if self.client is None:
             raise Exception("Local infinity is not connected")
-        return self.convert_res(self.client.Explain(db_name, table_name, explain_type, select_list,
-                                                    search_expr, where_expr),
+        return self.convert_res(self.client.Explain(db_name,
+                                                    table_name,
+                                                    explain_type,
+                                                    select_list,
+                                                    highlight_list,
+                                                    order_by_list,
+                                                    group_by_list,
+                                                    search_expr,
+                                                    where_expr,
+                                                    limit_expr,
+                                                    offset_expr),
                                 has_result_data=True)
 
     def delete(self, db_name: str, table_name: str, where_expr):
@@ -236,7 +283,7 @@ class LocalInfinityClient:
 
     def optimize(self, db_name: str, table_name: str, optimize_opt: WrapOptimizeOptions):
         return self.convert_res(self.client.Optimize(db_name, table_name, optimize_opt))
-    
+
     def add_columns(self, db_name: str, table_name: str, column_defs: list[WrapColumnDef]):
         return self.convert_res(self.client.AddColumns(db_name, table_name, column_defs))
 

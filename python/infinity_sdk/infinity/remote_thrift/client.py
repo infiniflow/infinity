@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from thrift.protocol import TBinaryProtocol
-from thrift.protocol import TCompactProtocol
 from thrift.transport import TSocket
 from thrift.transport.TTransport import TTransportException
 
@@ -67,14 +66,23 @@ class ThriftInfinityClient:
         # version: 0.4.0.dev1, client_version: 18
         # version: 0.4.0.dev2, client_version: 19
         # version: 0.4.0.dev3, client_version: 20
-        res = self.client.Connect(ConnectRequest(client_version=20)) # 0.4.0.dev3
+        # version: 0.4.0.dev4, client_version: 21
+        # version: 0.4.0.dev5 and 0.4.0, client_version: 22
+        # version: 0.5.0.dev1, client_version: 23
+        res = self.client.Connect(ConnectRequest(client_version=23)) # 0.5.0.dev1
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
 
-    def create_database(self, db_name: str, conflict_type: CreateConflict = CreateConflict.Error):
+    def create_database(self, db_name: str, conflict_type: CreateConflict = CreateConflict.Error, comment: str = None):
+        db_comment: str
+        if comment is None:
+            db_comment = ""
+        else:
+            db_comment = comment
         return self.client.CreateDatabase(CreateDatabaseRequest(session_id=self.session_id,
                                                                 db_name=db_name,
+                                                                db_comment=db_comment,
                                                                 create_option=CreateOption(conflict_type=conflict_type)))
 
     def drop_database(self, db_name: str, conflict_type: DropConflict = DropConflict.Error):
@@ -155,7 +163,7 @@ class ThriftInfinityClient:
                                                       db_name=db_name,
                                                       table_name=table_name))
 
-    def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
+    def insert(self, db_name: str, table_name: str, fields: list[Field]):
         retry = 0
         inner_ex = None
         while retry <= 2:
@@ -163,7 +171,6 @@ class ThriftInfinityClient:
                 res = self.client.Insert(InsertRequest(session_id=self.session_id,
                                                        db_name=db_name,
                                                        table_name=table_name,
-                                                       column_names=column_names,
                                                        fields=fields))
                 return res
             except TTransportException as ex:
@@ -199,12 +206,13 @@ class ThriftInfinityClient:
                                                 file_name=file_name,
                                                 export_option=export_options))
 
-    def select(self, db_name: str, table_name: str, select_list, search_expr,
+    def select(self, db_name: str, table_name: str, select_list, highlight_list, search_expr,
                where_expr, group_by_list, limit_expr, offset_expr, order_by_list):
         return self.client.Select(SelectRequest(session_id=self.session_id,
                                                 db_name=db_name,
                                                 table_name=table_name,
                                                 select_list=select_list,
+                                                highlight_list=highlight_list,
                                                 search_expr=search_expr,
                                                 where_expr=where_expr,
                                                 group_by_list=group_by_list,
@@ -213,12 +221,13 @@ class ThriftInfinityClient:
                                                 order_by_list=order_by_list
                                                 ))
 
-    def explain(self, db_name: str, table_name: str, select_list, search_expr,
+    def explain(self, db_name: str, table_name: str, select_list, highlight_list, search_expr,
                 where_expr, group_by_list, limit_expr, offset_expr, explain_type):
         return self.client.Explain(ExplainRequest(session_id=self.session_id,
                                                   db_name=db_name,
                                                   table_name=table_name,
                                                   select_list=select_list,
+                                                  highlight_list=highlight_list,
                                                   search_expr=search_expr,
                                                   where_expr=where_expr,
                                                   group_by_list=group_by_list,

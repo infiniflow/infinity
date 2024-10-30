@@ -51,10 +51,20 @@ import cleanup_scanner;
 import persistence_manager;
 import extra_ddl_info;
 import virtual_store;
+import result_cache_manager;
 
 namespace infinity {
 
 Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {}
+
+Storage::~Storage() = default;
+
+ResultCacheManager *Storage::result_cache_manager() const noexcept {
+    if (config_ptr_->ResultCacheMode() != "on") {
+        return nullptr;
+    }
+    return result_cache_manager_.get();
+}
 
 StorageMode Storage::GetStorageMode() const {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -72,6 +82,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
         case StorageMode::kUnInitialized: {
             if (target_mode != StorageMode::kAdmin) {
                 UnrecoverableError("Attempt to set storage mode from UnInit to UnInit");
+            }
+
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                current_storage_mode_ = target_mode;
             }
 
             // Construct wal manager
@@ -98,6 +113,12 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
                 break;
             }
+
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                current_storage_mode_ = target_mode;
+            }
+
             switch (config_ptr_->StorageType()) {
                 case StorageType::kLocal: {
                     // Not init remote store
@@ -107,13 +128,12 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     if (VirtualStore::IsInit()) {
                         UnrecoverableError("remote storage system was initialized before.");
                     }
-                    Status status = VirtualStore::InitRemoteStore(
-                    StorageType::kMinio, 
-                    config_ptr_->ObjectStorageUrl(), 
-                    config_ptr_->ObjectStorageHttps(),
-                    config_ptr_->ObjectStorageAccessKey(), 
-                    config_ptr_->ObjectStorageSecretKey(),
-                    config_ptr_->ObjectStorageBucket());
+                    Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
+                                                                  config_ptr_->ObjectStorageUrl(),
+                                                                  config_ptr_->ObjectStorageHttps(),
+                                                                  config_ptr_->ObjectStorageAccessKey(),
+                                                                  config_ptr_->ObjectStorageSecretKey(),
+                                                                  config_ptr_->ObjectStorageBucket());
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -122,6 +142,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                         UnrecoverableError("Object storage processor was initialized before.");
                     }
                     object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
+                    object_storage_processor_->Start();
                     break;
                 }
                 default: {
@@ -138,6 +159,15 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
             }
 
+            if (result_cache_manager_ != nullptr) {
+                UnrecoverableError("Result cache manager was initialized before.");
+            }
+            // TODO: add result_cache_manager
+            if (config_ptr_->ResultCacheMode() == "on") {
+                SizeT cache_result_num = config_ptr_->CacheResultNum();
+                result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
+            }
+
             // Construct buffer manager
             if (buffer_mgr_ != nullptr) {
                 UnrecoverableError("Buffer manager was initialized before.");
@@ -149,6 +179,12 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                                                     config_ptr_->LRUNum());
             buffer_mgr_->Start();
 
+            if (current_storage_mode_ == StorageMode::kReadable) {
+                LOG_INFO("No checkpoint found in READER mode, waiting for log replication");
+                reader_init_phase_ = ReaderInitPhase::kPhase1;
+                return;
+            }
+
             // Must init catalog before txn manager.
             // Replay wal file wrap init catalog
             TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(target_mode);
@@ -156,6 +192,14 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 // Init database, need to create default_db
                 LOG_INFO(fmt::format("Init a new catalog"));
                 new_catalog_ = Catalog::NewCatalog();
+            }
+
+            i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
+            if (compact_interval > 0 and current_storage_mode_ == StorageMode::kWritable) {
+                LOG_INFO(fmt::format("Init compaction alg"));
+                new_catalog_->InitCompactionAlg(system_start_ts);
+            } else {
+                LOG_INFO(fmt::format("Skip init compaction alg"));
             }
 
             BuiltinFunctions builtin_functions(new_catalog_);
@@ -170,12 +214,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             if (txn_mgr_ != nullptr) {
                 UnrecoverableError("Transaction manager was initialized before.");
             }
-            txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
-                                              buffer_mgr_.get(),
-                                              bg_processor_.get(),
-                                              wal_mgr_.get(),
-                                              new_catalog_->next_txn_id(),
-                                              system_start_ts);
+            txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
             txn_mgr_->Start();
 
             // start WalManager after TxnManager since it depends on TxnManager.
@@ -190,12 +229,14 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             }
             memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
 
-            new_catalog_->StartMemoryIndexCommit();
-            new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
-
             bg_processor_->Start();
 
             if (target_mode == StorageMode::kWritable) {
+                // Compact processor will do in WRITABLE MODE:
+                // 1. Compact segments into a big one
+                // 2. Scan which segments should be merged into one
+                // 3. Save the dumped mem index in catalog
+
                 if (compact_processor_ != nullptr) {
                     UnrecoverableError("compact processor was initialized before.");
                 }
@@ -204,12 +245,15 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 compact_processor_->Start();
             }
 
+            // recover index after start compact process
+            new_catalog_->StartMemoryIndexCommit();
+            new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
+
             if (periodic_trigger_thread_ != nullptr) {
                 UnrecoverableError("periodic trigger was initialized before.");
             }
             periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
-            i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
             i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
             i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
             i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
@@ -237,6 +281,8 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 force_ckp_task->Wait();
                 txn->SetReaderAllowed(true);
                 txn_mgr_->CommitTxn(txn);
+            } else {
+                reader_init_phase_ = ReaderInitPhase::kPhase2;
             }
 
             periodic_trigger_thread_->Start();
@@ -247,20 +293,41 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from Readable to Readable");
             }
 
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                current_storage_mode_ = target_mode;
+            }
+
             if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
-                periodic_trigger_thread_->Stop();
-                periodic_trigger_thread_.reset();
+
+                if (periodic_trigger_thread_ != nullptr) {
+                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                        UnrecoverableError("Error reader init phase");
+                    }
+                    periodic_trigger_thread_->Stop();
+                    periodic_trigger_thread_.reset();
+                }
 
                 if (compact_processor_ != nullptr) {
                     UnrecoverableError("Compact processor shouldn't be set before");
                 }
 
-                bg_processor_->Stop();
-                bg_processor_.reset();
+                if (bg_processor_ != nullptr) {
+                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                        UnrecoverableError("Error reader init phase");
+                    }
+                    bg_processor_->Stop();
+                    bg_processor_.reset();
+                }
 
                 new_catalog_.reset();
 
                 memory_index_tracer_.reset();
+
+                if(wal_mgr_ != nullptr) {
+                    wal_mgr_->Stop();
+                    wal_mgr_.reset();
+                }
 
                 switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
@@ -268,9 +335,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                         break;
                     }
                     case StorageType::kMinio: {
-                        object_storage_processor_->Stop();
-                        object_storage_processor_.reset();
-                        VirtualStore::UnInitRemoteStore();
+                        if(object_storage_processor_ != nullptr) {
+                            object_storage_processor_->Stop();
+                            object_storage_processor_.reset();
+                            VirtualStore::UnInitRemoteStore();
+                        }
                         break;
                     }
                     default: {
@@ -278,8 +347,21 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     }
                 }
 
-                wal_mgr_->Stop();
-                wal_mgr_.reset();
+                if (txn_mgr_ != nullptr) {
+                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                        UnrecoverableError("Error reader init phase");
+                    }
+                    txn_mgr_->Stop();
+                    txn_mgr_.reset();
+                }
+
+                if(buffer_mgr_ != nullptr) {
+                    buffer_mgr_->Stop();
+                    buffer_mgr_.reset();
+                }
+
+                persistence_manager_.reset();
+
                 if (target_mode == StorageMode::kAdmin) {
                     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
                     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -289,14 +371,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                                                       config_ptr_->DeltaCheckpointThreshold(),
                                                       config_ptr_->FlushMethodAtCommit());
                 }
-
-                txn_mgr_->Stop();
-                txn_mgr_.reset();
-
-                buffer_mgr_->Stop();
-                buffer_mgr_.reset();
-
-                persistence_manager_.reset();
             }
 
             if (target_mode == StorageMode::kWritable) {
@@ -330,23 +404,36 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from Writable to Writable");
             }
 
-            if (target_mode == StorageMode::kUnInitialized) {
-                UnrecoverableError("Attempt to set storage mode from Writeable to UnInit");
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                current_storage_mode_ = target_mode;
             }
 
             if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
-                periodic_trigger_thread_->Stop();
-                periodic_trigger_thread_.reset();
 
-                compact_processor_->Stop(); // Different from Readable
-                compact_processor_.reset(); // Different from Readable
+                if(periodic_trigger_thread_ != nullptr) {
+                    periodic_trigger_thread_->Stop();
+                    periodic_trigger_thread_.reset();
+                }
 
-                bg_processor_->Stop();
-                bg_processor_.reset();
+                if(compact_processor_ != nullptr) {
+                    compact_processor_->Stop(); // Different from Readable
+                    compact_processor_.reset(); // Different from Readable
+                }
+
+                if(bg_processor_ != nullptr) {
+                    bg_processor_->Stop();
+                    bg_processor_.reset();
+                }
 
                 new_catalog_.reset();
 
                 memory_index_tracer_.reset();
+
+                if(wal_mgr_ != nullptr) {
+                    wal_mgr_->Stop();
+                    wal_mgr_.reset();
+                }
 
                 switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
@@ -354,9 +441,11 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                         break;
                     }
                     case StorageType::kMinio: {
-                        object_storage_processor_->Stop();
-                        object_storage_processor_.reset();
-                        VirtualStore::UnInitRemoteStore();
+                        if(object_storage_processor_ != nullptr) {
+                            object_storage_processor_->Stop();
+                            object_storage_processor_.reset();
+                            VirtualStore::UnInitRemoteStore();
+                        }
                         break;
                     }
                     default: {
@@ -364,8 +453,18 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     }
                 }
 
-                wal_mgr_->Stop();
-                wal_mgr_.reset();
+                if(txn_mgr_ != nullptr) {
+                    txn_mgr_->Stop();
+                    txn_mgr_.reset();
+                }
+
+                if(buffer_mgr_ != nullptr) {
+                    buffer_mgr_->Stop();
+                    buffer_mgr_.reset();
+                }
+
+                persistence_manager_.reset();
+
                 if (target_mode == StorageMode::kAdmin) {
                     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
                     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -375,22 +474,18 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                                                       config_ptr_->DeltaCheckpointThreshold(),
                                                       config_ptr_->FlushMethodAtCommit());
                 }
-
-                txn_mgr_->Stop();
-                txn_mgr_.reset();
-
-                buffer_mgr_->Stop();
-                buffer_mgr_.reset();
-
-                persistence_manager_.reset();
             }
 
             if (target_mode == StorageMode::kReadable) {
-                periodic_trigger_thread_->Stop();
-                periodic_trigger_thread_.reset();
+                if(periodic_trigger_thread_ != nullptr) {
+                    periodic_trigger_thread_->Stop();
+                    periodic_trigger_thread_.reset();
+                }
 
-                compact_processor_->Stop(); // Different from Readable
-                compact_processor_.reset(); // Different from Readable
+                if(compact_processor_ != nullptr) {
+                    compact_processor_->Stop(); // Different from Readable
+                    compact_processor_.reset(); // Different from Readable
+                }
 
                 i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
 
@@ -403,20 +498,75 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             break;
         }
     }
+}
 
-    std::unique_lock<std::mutex> lock(mutex_);
-    current_storage_mode_ = target_mode;
+Status Storage::SetReaderStorageContinue(TxnTimeStamp system_start_ts) {
+    StorageMode current_mode = GetStorageMode();
+    if (current_mode != StorageMode::kReadable) {
+        UnrecoverableError(fmt::format("Expect current storage mode is READER, but it is {}", ToString(current_mode)));
+    }
+
+    BuiltinFunctions builtin_functions(new_catalog_);
+    builtin_functions.Init();
+    // Catalog finish init here.
+    if (bg_processor_ != nullptr) {
+        UnrecoverableError("Background processor was initialized before.");
+    }
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
+
+    // Construct txn manager
+    if (txn_mgr_ != nullptr) {
+        UnrecoverableError("Transaction manager was initialized before.");
+    }
+    txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
+    txn_mgr_->Start();
+
+    // start WalManager after TxnManager since it depends on TxnManager.
+    wal_mgr_->Start();
+
+    if (memory_index_tracer_ != nullptr) {
+        UnrecoverableError("Memory index tracer was initialized before.");
+    }
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
+
+    new_catalog_->StartMemoryIndexCommit();
+    new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
+
+    bg_processor_->Start();
+
+    if (periodic_trigger_thread_ != nullptr) {
+        UnrecoverableError("periodic trigger was initialized before.");
+    }
+    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+
+    i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+    periodic_trigger_thread_->cleanup_trigger_ =
+        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
+    bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+
+    periodic_trigger_thread_->Start();
+    reader_init_phase_ = ReaderInitPhase::kPhase2;
+
+    return Status::OK();
 }
 
 void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
     new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
+void Storage::LoadFullCheckpoint(const String &checkpoint_path) {
+    if (new_catalog_.get() != nullptr) {
+        UnrecoverableError("Catalog was already initialized before.");
+    }
+    new_catalog_ = Catalog::LoadFullCheckpoint(checkpoint_path);
+}
+void Storage::AttachDeltaCheckpoint(const String &checkpoint_path) { new_catalog_->AttachDeltaCheckpoint(checkpoint_path); }
+
 void Storage::CreateDefaultDB() {
     Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"));
     new_txn->SetReaderAllowed(true);
     // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase("default_db", ConflictType::kError);
+    Status status = new_txn->CreateDatabase(MakeShared<String>("default_db"), ConflictType::kError, MakeShared<String>("Initial startup created"));
     if (!status.ok()) {
         UnrecoverableError("Can't initial 'default_db'");
     }

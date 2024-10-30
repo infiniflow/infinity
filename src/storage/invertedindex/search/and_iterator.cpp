@@ -27,14 +27,15 @@ import infinity_exception;
 namespace infinity {
 
 AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
-    std::sort(children_.begin(), children_.end(), [](const auto &lhs, const auto &rhs) { return lhs->GetDF() < rhs->GetDF(); });
-    // init df
-    doc_freq_ = std::numeric_limits<u32>::max();
+    std::sort(children_.begin(), children_.end(), [](const auto &lhs, const auto &rhs) {
+        return lhs->GetEstimateIterateCost() < rhs->GetEstimateIterateCost();
+    });
     bm25_score_upper_bound_ = 0.0f;
+    estimate_iterate_cost_ = {};
     for (SizeT i = 0; i < children_.size(); i++) {
         const auto &it = children_[i];
-        doc_freq_ = std::min(doc_freq_, it->GetDF());
         bm25_score_upper_bound_ += children_[i]->BM25ScoreUpperBound();
+        estimate_iterate_cost_ = std::min(estimate_iterate_cost_, it->GetEstimateIterateCost());
         // for minimum_should_match parameter
         switch (it->GetType()) {
             case DocIteratorType::kTermDocIterator:
@@ -42,15 +43,7 @@ AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIte
                 ++fixed_match_count_;
                 break;
             }
-            case DocIteratorType::kAndIterator:
-            case DocIteratorType::kAndNotIterator:
-            case DocIteratorType::kFilterIterator: {
-                UnrecoverableError("Wrong optimization result");
-                break;
-            }
-            case DocIteratorType::kOrIterator:
-            case DocIteratorType::kBMMIterator:
-            case DocIteratorType::kBMWIterator: {
+            default: {
                 dyn_match_ids_.push_back(i);
                 break;
             }
@@ -58,7 +51,7 @@ AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIte
     }
 }
 
-bool AndIterator::Next(RowID doc_id) {
+bool AndIterator::Next(const RowID doc_id) {
     assert(doc_id != INVALID_ROWID);
     if (doc_id_ != INVALID_ROWID && doc_id_ >= doc_id)
         return true;
@@ -122,12 +115,6 @@ void AndIterator::UpdateScoreThreshold(float threshold) {
         float new_threshold = std::max(0.0f, base_threshold + it->BM25ScoreUpperBound());
         it->UpdateScoreThreshold(new_threshold);
     }
-}
-
-u32 AndIterator::LeafCount() const {
-    return std::accumulate(children_.begin(), children_.end(), static_cast<u32>(0), [](const u32 cnt, const auto &it) {
-        return cnt + it->LeafCount();
-    });
 }
 
 u32 AndIterator::MatchCount() const {

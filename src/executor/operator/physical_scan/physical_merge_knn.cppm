@@ -43,11 +43,13 @@ public:
                               SharedPtr<Vector<String>> output_names,
                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                               SharedPtr<KnnExpression> knn_expr,
+                              SharedPtr<BaseExpression> filter_expression,
                               u64 knn_table_index,
-                              SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalScanBase(id, PhysicalOperatorType::kMergeKnn, std::move(left), nullptr, table_ref, load_metas),
-          output_names_(std::move(output_names)), output_types_(std::move(output_types)), knn_table_index_(knn_table_index),
-          knn_expression_(std::move(knn_expr)) {}
+                              SharedPtr<Vector<LoadMeta>> load_metas,
+                              bool cache_result)
+        : PhysicalScanBase(id, PhysicalOperatorType::kMergeKnn, std::move(left), nullptr, knn_table_index, table_ref, load_metas, cache_result),
+          output_names_(std::move(output_names)), output_types_(std::move(output_types)), knn_expression_(std::move(knn_expr)),
+          filter_expression_(std::move(filter_expression)) {}
 
     ~PhysicalMergeKnn() override = default;
 
@@ -65,8 +67,6 @@ public:
         return 0;
     }
 
-    inline u64 knn_table_index() const { return knn_table_index_; }
-
     inline bool IsKnnMinHeap() const { return knn_expression_->IsKnnMinHeap(); }
 
 private:
@@ -76,10 +76,10 @@ private:
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
-    u64 knn_table_index_{};
 
 public:
     SharedPtr<KnnExpression> knn_expression_{};
+    SharedPtr<BaseExpression> filter_expression_{};
 };
 
 } // namespace infinity

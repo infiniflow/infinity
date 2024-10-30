@@ -115,6 +115,11 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
 
 Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
     toml::table config_toml{};
+    if (config_path.get() != nullptr) {
+        LOG_INFO(fmt::format("Config file: {}", *config_path));
+    } else {
+        LOG_INFO("No config file is given, use default configs.");
+    }
     if (config_path.get() == nullptr || config_path->empty() || !VirtualStore::Exists(std::filesystem::absolute(*config_path))) {
         if (config_path.get() == nullptr || config_path->empty()) {
             fmt::print("No config file is given, use default configs.\n");
@@ -198,7 +203,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
 
         // Peer server port
-        i64 peer_server_port = 23850;
+        i64 peer_server_port = DEFAULT_PEER_PORT;
         UniquePtr<IntegerOption> peer_server_port_option = MakeUnique<IntegerOption>(PEER_SERVER_PORT_OPTION_NAME, peer_server_port, 65535, 1024);
         status = global_options_.AddOption(std::move(peer_server_port_option));
         if(!status.ok()) {
@@ -207,7 +212,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
 
         // Postgres port
-        i64 pg_port = 5432;
+        i64 pg_port = DEFAULT_POSTGRES_PORT;
         UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>(POSTGRES_PORT_OPTION_NAME, pg_port, 65535, 1024);
         status = global_options_.AddOption(std::move(pg_port_option));
         if(!status.ok()) {
@@ -216,7 +221,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
 
         // HTTP port
-        i64 http_port = 23820;
+        i64 http_port = DEFAULT_HTTP_PORT;
         UniquePtr<IntegerOption> http_port_option = MakeUnique<IntegerOption>(HTTP_PORT_OPTION_NAME, http_port, 65535, 1024);
         status = global_options_.AddOption(std::move(http_port_option));
         if(!status.ok()) {
@@ -225,7 +230,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
 
         // RPC Client port
-        i64 rpc_client_port = 23817;
+        i64 rpc_client_port = DEFAULT_CLIENT_PORT;
         UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>(CLIENT_PORT_OPTION_NAME, rpc_client_port, 65535, 1024);
         status = global_options_.AddOption(std::move(client_port_option));
         if(!status.ok()) {
@@ -411,6 +416,23 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         UniquePtr<IntegerOption> memindex_memory_quota_option = MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME,
                                                                                           memindex_memory_quota, std::numeric_limits<i64>::max(), 0);
         status = global_options_.AddOption(std::move(memindex_memory_quota_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Result Cache Mode
+        String result_cache_mode(DEFAULT_RESULT_CACHE_MODE);
+        auto result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode);
+        status = global_options_.AddOption(std::move(result_cache_mode_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        i64 cache_result_num = DEFAULT_CACHE_RESULT_NUM;
+        auto cache_result_num_option = MakeUnique<IntegerOption>(CACHE_RESULT_NUM_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
+        status = global_options_.AddOption(std::move(cache_result_num_option));
         if(!status.ok()) {
             fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
@@ -774,7 +796,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                         }
                         case GlobalOptionIndex::kPeerServerPort: {
                             // Peer server port
-                            i64 peer_server_port = 23850;
+                            i64 peer_server_port = DEFAULT_PEER_PORT;
                             if (elem.second.is_integer()) {
                                 peer_server_port = elem.second.value_or(peer_server_port);
                             } else {
@@ -793,7 +815,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                         }
                         case GlobalOptionIndex::kPostgresPort: {
                             // Postgres port
-                            i64 pg_port = 5432;
+                            i64 pg_port = DEFAULT_POSTGRES_PORT;
                             if (elem.second.is_integer()) {
                                 pg_port = elem.second.value_or(pg_port);
                             } else {
@@ -812,7 +834,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                         }
                         case GlobalOptionIndex::kHTTPPort: {
                             // HTTP port
-                            i64 http_port = 23820;
+                            i64 http_port = DEFAULT_HTTP_PORT;
                             if (elem.second.is_integer()) {
                                 http_port = elem.second.value_or(http_port);
                             } else {
@@ -831,7 +853,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                         }
                         case GlobalOptionIndex::kClientPort: {
                             // RPC Client port
-                            i64 rpc_client_port = 23817;
+                            i64 rpc_client_port = DEFAULT_CLIENT_PORT;
                             if (elem.second.is_integer()) {
                                 rpc_client_port = elem.second.value_or(rpc_client_port);
                             } else {
@@ -918,7 +940,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                 if(global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerServerPort) == nullptr) {
                     // Peer server port
-                    i64 pg_port = 23850;
+                    i64 pg_port = DEFAULT_PEER_PORT;
                     UniquePtr<IntegerOption> peer_server_port_option = MakeUnique<IntegerOption>(PEER_SERVER_PORT_OPTION_NAME, pg_port, 65535, 1024);
                     Status status = global_options_.AddOption(std::move(peer_server_port_option));
                     if(!status.ok()) {
@@ -928,7 +950,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                 if(global_options_.GetOptionByIndex(GlobalOptionIndex::kPostgresPort) == nullptr) {
                     // Postgres port
-                    i64 pg_port = 5432;
+                    i64 pg_port = DEFAULT_POSTGRES_PORT;
                     UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>(POSTGRES_PORT_OPTION_NAME, pg_port, 65535, 1024);
                     Status status = global_options_.AddOption(std::move(pg_port_option));
                     if(!status.ok()) {
@@ -938,7 +960,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                 if(global_options_.GetOptionByIndex(GlobalOptionIndex::kHTTPPort) == nullptr) {
                     // HTTP port
-                    i64 http_port = 23820;
+                    i64 http_port = DEFAULT_HTTP_PORT;
                     UniquePtr<IntegerOption> http_port_option = MakeUnique<IntegerOption>(HTTP_PORT_OPTION_NAME, http_port, 65535, 1024);
                     Status status = global_options_.AddOption(std::move(http_port_option));
                     if(!status.ok()) {
@@ -948,7 +970,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                 if(global_options_.GetOptionByIndex(GlobalOptionIndex::kClientPort) == nullptr) {
                     // RPC Client port
-                    i64 rpc_client_port = 23817;
+                    i64 rpc_client_port = DEFAULT_CLIENT_PORT;
                     UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>(CLIENT_PORT_OPTION_NAME, rpc_client_port, 65535, 1024);
                     Status status = global_options_.AddOption(std::move(client_port_option));
                     if(!status.ok()) {
@@ -1641,6 +1663,28 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             global_options_.AddOption(std::move(mem_index_memory_quota_option));
                             break;
                         }
+                        case GlobalOptionIndex::kResultCacheMode: {
+                            String result_cache_mode_str(DEFAULT_RESULT_CACHE_MODE);
+                            if (elem.second.is_string()) {
+                                result_cache_mode_str = elem.second.value_or(result_cache_mode_str);
+                            } else {
+                                return Status::InvalidConfig("'result_cache_mode' field isn't string.");
+                            }
+                            auto result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode_str);
+                            global_options_.AddOption(std::move(result_cache_mode_option));
+                            break;
+                        }
+                        case GlobalOptionIndex::kCacheResultNum: {
+                            i64 cache_result_num = DEFAULT_CACHE_RESULT_NUM;
+                            if (elem.second.is_integer()) {
+                                cache_result_num = elem.second.value_or(cache_result_num);
+                            } else {
+                                return Status::InvalidConfig("'cache_result_num' field isn't integer.");
+                            }
+                            auto cache_result_num_option = MakeUnique<IntegerOption>(CACHE_RESULT_NUM_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
+                            global_options_.AddOption(std::move(cache_result_num_option));
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'buffer' field", var_name));
                         }
@@ -1682,6 +1726,24 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     UniquePtr<IntegerOption> mem_index_memory_quota_option =
                         MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME, mem_index_memory_quota, std::numeric_limits<i64>::max(), 0);
                     Status status = global_options_.AddOption(std::move(mem_index_memory_quota_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCacheMode) == nullptr) {
+                    // Result Cache Mode
+                    String result_cache_mode_str(DEFAULT_RESULT_CACHE_MODE);
+                    UniquePtr<StringOption> result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode_str);
+                    Status status = global_options_.AddOption(std::move(result_cache_mode_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kCacheResultNum) == nullptr) {
+                    i64 cache_result_num = DEFAULT_CACHE_RESULT_NUM;
+                    UniquePtr<IntegerOption> cache_result_num_option = MakeUnique<IntegerOption>(CACHE_RESULT_NUM_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
+                    Status status = global_options_.AddOption(std::move(cache_result_num_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2262,6 +2324,27 @@ i64 Config::MemIndexMemoryQuota() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexMemoryQuota);
 }
 
+String Config::ResultCacheMode() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kResultCacheMode);
+}
+
+i64 Config::CacheResultNum() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kCacheResultNum);
+}
+
+void Config::SetCacheResult(const String &mode) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCacheMode);
+    if (base_option->data_type_ != BaseOptionDataType::kString) {
+        String error_message = "Attempt to set string value to result cache mode data type option";
+        UnrecoverableError(error_message);
+    }
+    StringOption *result_cache_mode_option = static_cast<StringOption *>(base_option);
+    result_cache_mode_option->value_ = mode;
+}
+
 // WAL
 String Config::WALDir() {
     std::lock_guard<std::mutex> guard(mutex_);
@@ -2377,7 +2460,7 @@ void Config::PrintAll() {
     fmt::print(" - cleanup_interval: {}\n", Utility::FormatTimeInfo(CleanupInterval()));
     fmt::print(" - compact_interval: {}\n", Utility::FormatTimeInfo(CompactInterval()));
     fmt::print(" - optimize_index_interval: {}\n", Utility::FormatTimeInfo(OptimizeIndexInterval()));
-    fmt::print(" - memindex_capacity: {}\n", Utility::FormatByteSize(MemIndexCapacity()));
+    fmt::print(" - memindex_capacity: {}\n", MemIndexCapacity()); // mem index capacity is line number
     fmt::print(" - storage_type: {}\n", ToString(StorageType()));
     switch(StorageType() ) {
         case StorageType::kLocal:  {

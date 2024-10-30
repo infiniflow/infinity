@@ -52,27 +52,25 @@ import chunk_index_entry;
 import memory_indexer;
 import persistence_manager;
 import infinity_context;
-import peer_task;
+import admin_statement;
 
 namespace infinity {
 
-Txn::Txn(TxnManager *txn_manager,
-         BufferManager *buffer_manager,
-         Catalog *catalog,
-         BGTaskProcessor *bg_task_processor,
-         TransactionID txn_id,
-         TxnTimeStamp begin_ts,
-         SharedPtr<String> txn_text)
-    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog), txn_store_(this, catalog),
-      txn_id_(txn_id), txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
-      txn_text_(std::move(txn_text)) {}
+Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<String> txn_text)
+    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(this, InfinityContext::instance().storage()->catalog()), txn_id_(txn_id),
+      txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
+      txn_text_(std::move(txn_text)) {
+    catalog_ = txn_store_.GetCatalog();
+}
 
-Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts)
-    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_store_(this, catalog), txn_id_(txn_id), txn_context_(begin_ts),
-      wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
+Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts)
+    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this, InfinityContext::instance().storage()->catalog()), txn_id_(txn_id),
+      txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {
+    catalog_ = txn_store_.GetCatalog();
+}
 
-UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id, begin_ts);
+UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, txn_id, begin_ts);
     txn->txn_context_.commit_ts_ = begin_ts;
     txn->txn_context_.state_ = TxnState::kCommitted;
     return txn;
@@ -168,17 +166,17 @@ void Txn::CheckTxn(const String &db_name) {
 }
 
 // Database OPs
-Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
+Status Txn::CreateDatabase(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment) {
     this->CheckTxnStatus();
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
-    auto [db_entry, status] = catalog_->CreateDatabase(db_name, this->txn_id_, begin_ts, txn_mgr_, conflict_type);
+    auto [db_entry, status] = catalog_->CreateDatabase(db_name, comment, this->txn_id_, begin_ts, txn_mgr_, conflict_type);
     if (db_entry == nullptr) { // nullptr means some exception happened
         return status;
     }
     txn_store_.AddDBStore(db_entry);
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateDatabase>(std::move(db_name), db_entry->GetPathNameTail()));
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateDatabase>(*db_name, db_entry->GetPathNameTail(), *comment));
     return Status::OK();
 }
 
@@ -217,7 +215,7 @@ Vector<DatabaseDetail> Txn::ListDatabases() {
     SizeT db_count = db_entries.size();
     for (SizeT idx = 0; idx < db_count; ++idx) {
         DBEntry *db_entry = db_entries[idx];
-        res.emplace_back(DatabaseDetail{db_entry->db_name_ptr()});
+        res.emplace_back(DatabaseDetail{db_entry->db_name_ptr(), db_entry->db_entry_dir(), db_entry->db_comment_ptr()});
     }
 
     return res;
@@ -265,7 +263,7 @@ Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
     TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
     new_table_entry->AddColumns(column_defs, txn_table_store);
-    auto add_status = db_entry->AddTable(std::move(new_table_entry), txn_id_, begin_ts, txn_mgr_, true/*add_if_found*/);
+    auto add_status = db_entry->AddTable(std::move(new_table_entry), txn_id_, begin_ts, txn_mgr_, true /*add_if_found*/);
     if (!add_status.ok()) {
         return add_status;
     }
@@ -284,7 +282,7 @@ Status Txn::DropColumns(TableEntry *table_entry, const Vector<String> &column_na
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
     TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
     new_table_entry->DropColumns(column_names, txn_table_store);
-    auto drop_status = db_entry->AddTable(std::move(new_table_entry), txn_id_, begin_ts, txn_mgr_, true/*add_if_found*/);
+    auto drop_status = db_entry->AddTable(std::move(new_table_entry), txn_id_, begin_ts, txn_mgr_, true /*add_if_found*/);
     if (!drop_status.ok()) {
         return drop_status;
     }
@@ -485,9 +483,10 @@ TxnTimeStamp Txn::Commit() {
     }
 
     NodeRole current_node_role = InfinityContext::instance().GetServerRole();
-    if(current_node_role != NodeRole::kStandalone and current_node_role != NodeRole::kLeader) {
-        if(!IsReaderAllowed()) {
-            RecoverableError(Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_node_role))));
+    if (current_node_role != NodeRole::kStandalone and current_node_role != NodeRole::kLeader) {
+        if (!IsReaderAllowed()) {
+            RecoverableError(
+                Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_node_role))));
         }
     }
 
@@ -518,15 +517,13 @@ TxnTimeStamp Txn::Commit() {
     txn_store_.MaintainCompactionAlg();
 
     if (!txn_delta_ops_entry_->operations().empty()) {
-        txn_mgr_->AddDeltaEntry(std::move(txn_delta_ops_entry_));
+        InfinityContext::instance().storage()->bg_processor()->Submit(MakeShared<AddDeltaEntryTask>(std::move(txn_delta_ops_entry_)));
     }
 
     return commit_ts;
 }
 
-bool Txn::CheckConflict(Catalog *catalog) {
-    return txn_store_.CheckConflict(catalog);
-}
+bool Txn::CheckConflict() { return txn_store_.CheckConflict(catalog_); }
 
 bool Txn::CheckConflict(Txn *other_txn) {
     LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, other_txn->txn_id_));
@@ -582,7 +579,7 @@ void Txn::Rollback() {
     LOG_TRACE(fmt::format("Txn: {} is dropped.", txn_id_));
 }
 
-void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { 
+void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) {
     std::lock_guard guard(txn_store_.mtx_);
     auto state = txn_context_.GetTxnState();
     if (state != TxnState::kStarted) {

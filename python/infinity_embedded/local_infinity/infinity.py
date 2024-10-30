@@ -39,7 +39,7 @@ class LocalInfinityConnection(InfinityConnection, ABC):
             raise Exception("Local infinity is not connected")
 
     @name_validity_check("db_name", "DB")
-    def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.Error):
+    def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.Error, comment: str = None):
         self.check_connect()
         create_database_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:
@@ -50,7 +50,7 @@ class LocalInfinityConnection(InfinityConnection, ABC):
             create_database_conflict = LocalConflictType.kReplace
         else:
             raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
-        res = self._client.create_database(db_name, create_database_conflict)
+        res = self._client.create_database(db_name, create_database_conflict, comment)
 
         if res.error_code == ErrorCode.OK:
             return LocalDatabase(self._client, db_name)
@@ -69,6 +69,22 @@ class LocalInfinityConnection(InfinityConnection, ABC):
     def show_database(self, db_name):
         self.check_connect()
         res = self._client.show_database(db_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
+    def show_info(self, info_name):
+        self.check_connect()
+        res = self._client.show_info(info_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
+    def search(self, db_name, table_name):
+        self.check_connect()
+        res = self._client.search(db_name, table_name, [])
         if res.error_code == ErrorCode.OK:
             return res
         else:

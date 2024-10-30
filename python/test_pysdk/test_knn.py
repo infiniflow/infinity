@@ -6,7 +6,6 @@ from common import common_values
 from common import common_index
 import infinity
 import infinity_embedded
-from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException, SparseVector
@@ -55,7 +54,6 @@ def setup_class(request, local_infinity, http):
     request.cls.uri = uri
     yield
     request.cls.infinity_obj.disconnect()
-
 
 @pytest.mark.usefixtures("setup_class")
 @pytest.mark.usefixtures("suffix")
@@ -196,7 +194,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     def test_insert_multi_column(self, suffix):
-        with pytest.raises(Exception, match=r".*value count mismatch*"):
+        with pytest.raises(Exception, match=r".*No default value found*"):
             db_obj = self.infinity_obj.get_database("default_db")
             db_obj.drop_table("test_insert_multi_column"+suffix,
                               conflict_type=ConflictType.Ignore)
@@ -761,6 +759,19 @@ class TestInfinity:
                .to_pl())
         print(res_filter_2)
         pl_assert_frame_equal(res_filter_1, res_filter_2)
+
+        # filter_fulltext = "num!=98 AND num != 12 AND filter_fulltext('body', 'harmful chemical')"
+        # filter_fulltext = """num!=98 AND num != 12 AND filter_fulltext('body', '(harmful OR chemical)')"""
+        # filter_fulltext = """num!=98 AND num != 12 AND filter_fulltext('body', '("harmful" OR "chemical")')"""
+        # filter_fulltext = """(num!=98 AND num != 12) AND filter_fulltext('body', '(("harmful" OR "chemical"))')"""
+        filter_fulltext = """(num!=98 AND num != 12) AND filter_fulltext('body^3,body,body^2', '(("harmful" OR "chemical"))')"""
+        _ = (table_obj
+               .output(["*"])
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1, {"filter": filter_fulltext})
+               .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12"})
+               .fusion(method='rrf', topn=10)
+               .to_pl())
+
         with pytest.raises(InfinityException) as e_info:
             res_filter_3 = (table_obj
                .output(["*"])
@@ -1737,3 +1748,31 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_with_index"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_bits.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("knn_distance_type", ["hamming"])
+    def test_binary_embedding_hamming_distance(self, check_data, knn_distance_type, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_binary_knn_hamming_distance" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_binary_knn_hamming_distance" + suffix, {
+            "c1" : {"type" : "int"},
+            "c2" : {"type" : "vector, 16, bit"}
+        }, ConflictType.Error)
+
+        table_obj.insert([{"c1" : 0, "c2" : [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}])
+        table_obj.insert([{"c1" : 1, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]}])
+        table_obj.insert([{"c1" : 2, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2]}])
+        table_obj.insert([{"c1" : 3, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3]}])
+        table_obj.insert([{"c1" : 4, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4]}])
+        table_obj.insert([{"c1" : 5, "c2" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5]}])
+
+        res = table_obj.output(["*", "_distance"]).match_dense("c2", [0] * 16, "bit", "hamming", 3).to_df()
+        if suffix == "_http":
+            pd.testing.assert_frame_equal(res, pd.DataFrame(
+                {'c1' : (0, 1, 2), 'c2' : ('[0100000000000000]', '[0000000000000001]', '[0000000000000011]'), 'DISTANCE' : (1.0, 1.0, 2.0)}).astype({'c1': dtype('int32'), 'DISTANCE' : dtype('float32')})) 
+        else:
+            pd.testing.assert_frame_equal(res, pd.DataFrame(
+                {'c1' : (0, 1, 2), 'c2' : (['0100000000000000'], ['0000000000000001'], ['0000000000000011']), 'DISTANCE' : (1.0, 1.0, 2.0)}
+            ).astype({'c1': dtype('int32'), 'DISTANCE' : dtype('float32')})) 

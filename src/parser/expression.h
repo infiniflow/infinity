@@ -22,6 +22,7 @@
 #include "expr/function_expr.h"
 #include "expr/fusion_expr.h"
 #include "expr/in_expr.h"
+#include "expr/insert_row_expr.h"
 #include "expr/knn_expr.h"
 #include "expr/match_expr.h"
 #include "expr/match_tensor_expr.h"

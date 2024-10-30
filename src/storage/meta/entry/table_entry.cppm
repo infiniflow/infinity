@@ -68,7 +68,8 @@ public:
 public:
     explicit TableEntry(bool is_delete,
                         const SharedPtr<String> &table_entry_dir,
-                        SharedPtr<String> table_collection_name,
+                        SharedPtr<String> table_name,
+                        SharedPtr<String> table_comment,
                         const Vector<SharedPtr<ColumnDef>> &columns,
                         TableEntryType table_entry_type,
                         TableMeta *table_meta,
@@ -86,7 +87,8 @@ public:
 
     static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
                                                const SharedPtr<String> &db_entry_dir,
-                                               SharedPtr<String> table_collection_name,
+                                               SharedPtr<String> table_name,
+                                               SharedPtr<String> table_comment,
                                                const Vector<SharedPtr<ColumnDef>> &columns,
                                                TableEntryType table_entry_type,
                                                TableMeta *table_meta,
@@ -97,6 +99,7 @@ public:
                                                   TableMeta *table_meta,
                                                   SharedPtr<String> table_entry_dir,
                                                   SharedPtr<String> table_name,
+                                                  SharedPtr<String> table_comment,
                                                   const Vector<SharedPtr<ColumnDef>> &column_defs,
                                                   TableEntryType table_entry_type,
                                                   TransactionID txn_id,
@@ -122,7 +125,7 @@ public:
 
     MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() const { return index_meta_map_.GetMetaMap(); }
 
-    void AddIndexMetaNoLock(const String& table_meta_name, UniquePtr<TableIndexMeta> table_index_meta);
+    void AddIndexMetaNoLock(const String &table_meta_name, UniquePtr<TableIndexMeta> table_index_meta);
 
     // replay
     void UpdateEntryReplay(const SharedPtr<TableEntry> &table_entry);
@@ -210,6 +213,10 @@ public:
 
     inline const SharedPtr<String> &GetTableName() const { return table_name_; }
 
+    inline const SharedPtr<String> &GetTableComment() const { return table_comment_; }
+
+    TxnTimeStamp max_commit_ts() const { return max_commit_ts_; }
+
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
 
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, Txn *txn) const;
@@ -247,9 +254,9 @@ public:
 
     void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
-    Tuple<Vector<String>, Vector<TableIndexMeta*>, std::shared_lock<std::shared_mutex>> GetAllIndexMapGuard() const;
+    Tuple<Vector<String>, Vector<TableIndexMeta *>, std::shared_lock<std::shared_mutex>> GetAllIndexMapGuard() const;
 
-    TableIndexMeta* GetIndexMetaPtrByName(const String& name) const;
+    TableIndexMeta *GetIndexMetaPtrByName(const String &name) const;
 
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
@@ -290,6 +297,7 @@ private:
     const SharedPtr<String> table_entry_dir_{};
 
     SharedPtr<String> table_name_{};
+    SharedPtr<String> table_comment_{};
 
     Vector<SharedPtr<ColumnDef>> columns_{};
     ColumnID next_column_id_{};
@@ -308,6 +316,8 @@ private:
     // for full text search cache
     SharedPtr<TableIndexReaderCache> fulltext_column_index_cache_;
 
+    TxnTimeStamp max_commit_ts_ = 0;
+
 public:
     // set nullptr to close auto compaction
     void SetCompactionAlg(UniquePtr<CompactionAlg> compaction_alg) { compaction_alg_ = std::move(compaction_alg); }
@@ -315,6 +325,8 @@ public:
     void AddSegmentToCompactionAlg(SegmentEntry *segment_entry);
 
     void AddDeleteToCompactionAlg(SegmentID segment_id);
+
+    void InitCompactionAlg(TxnTimeStamp system_start_ts);
 
     Vector<SegmentEntry *> CheckCompaction(TransactionID txn_id);
 

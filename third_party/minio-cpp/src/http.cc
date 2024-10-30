@@ -428,20 +428,47 @@ Response Request::execute() {
   while (!requests.perform(&left)) {
   }
   while (left) {
+    struct timeval timeout;
     fd_set fdread{};
     fd_set fdwrite{};
     fd_set fdexcep{};
     int maxfd = 0;
 
+    long curl_timeo = -1;
+
     FD_ZERO(&fdread);
     FD_ZERO(&fdwrite);
     FD_ZERO(&fdexcep);
 
+    /* set a suitable timeout to play around with */
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    
+    requests.timeout(&curl_timeo);
+    if(curl_timeo >= 0) {
+      timeout.tv_sec = curl_timeo / 1000;
+      if(timeout.tv_sec > 1)
+        timeout.tv_sec = 1;
+      else
+        timeout.tv_usec = (int)(curl_timeo % 1000) * 1000;
+    }
+    
+
     requests.fdset(&fdread, &fdwrite, &fdexcep, &maxfd);
 
-    if (select(maxfd + 1, &fdread, &fdwrite, &fdexcep, nullptr) < 0) {
-      std::cerr << "select() failed; this should not happen" << std::endl;
-      std::terminate();
+    if(maxfd == -1) {
+#ifdef _WIN32
+      Sleep(100);
+#else
+      /* Portable sleep for platforms other than Windows. */
+      struct timeval wait = { 0, 100 * 1000 }; /* 100ms */
+      select(0, NULL, NULL, NULL, &wait);
+#endif
+    } else {
+        if (select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout) < 0) {
+            std::cerr << "select() failed; this should not happen" << std::endl;
+            std::terminate();
+        }
     }
     while (!requests.perform(&left)) {
     }

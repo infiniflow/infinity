@@ -17,19 +17,9 @@ module;
 export module peer_task;
 
 import stl;
+import admin_statement;
 
 namespace infinity {
-
-export enum class NodeRole {
-    kUnInitialized,
-    kAdmin,
-    kStandalone,
-    kLeader,
-    kFollower,
-    kLearner,
-};
-
-export String ToString(NodeRole);
 
 export enum class PeerTaskType {
     kInvalid,
@@ -42,7 +32,7 @@ export enum class PeerTaskType {
     kNewLeader,
 };
 
-export enum class NodeStatus { kAlive, kTimeout, kInvalid };
+export enum class NodeStatus { kAlive, kTimeout, kLostConnection, kRemoved, kInvalid };
 
 export String ToString(NodeStatus);
 
@@ -63,14 +53,14 @@ export struct NodeInfo {
 
 export class PeerTask {
 public:
-    explicit PeerTask(PeerTaskType type, bool async = false) : type_(type), async_(async) {}
+    explicit PeerTask(PeerTaskType type, bool async = false) : type_(type), complete_(false), async_(async) //complete_ should not be assigned false in wait(), otherwise it might be stuck in wait() forever if complete() is called before wait().
+    {}
     virtual ~PeerTask() = default;
 
     void Wait() {
         if (async_) {
             return;
         }
-        complete_ = false;
         std::unique_lock<std::mutex> locker(mutex_);
         cv_.wait(locker, [this] { return complete_; });
     }
@@ -98,7 +88,7 @@ protected:
 
 export class TerminatePeerTask final : public PeerTask {
 public:
-    TerminatePeerTask() : PeerTask(PeerTaskType::kTerminate) {}
+    TerminatePeerTask(bool force_async) : PeerTask(PeerTaskType::kTerminate, force_async) {}
 
     String ToString() const final;
 };
@@ -157,16 +147,34 @@ public:
     String error_message_{};
     i64 leader_term_{};
     Vector<SharedPtr<NodeInfo>> other_nodes_{};
+    NodeStatus sender_status_{NodeStatus::kInvalid};
 };
 
 export class SyncLogTask final : public PeerTask {
 public:
-    SyncLogTask(const String& node_name, const Vector<SharedPtr<String>>& log_strings) : PeerTask(PeerTaskType::kLogSync), node_name_(node_name), log_strings_(log_strings) {}
+    SyncLogTask(const String &node_name, const Vector<SharedPtr<String>> &log_strings, bool on_register)
+        : PeerTask(PeerTaskType::kLogSync), node_name_(node_name), log_strings_(log_strings), on_register_(on_register) {}
 
     String ToString() const final;
 
-    String node_name_;
+    String node_name_{};
     Vector<SharedPtr<String>> log_strings_;
+    bool on_register_{false};
+
+    // response
+    i64 error_code_{};
+    String error_message_{};
+};
+
+export class ChangeRoleTask final : public PeerTask {
+public:
+    ChangeRoleTask(String node_name, String role_name)
+        : PeerTask(PeerTaskType::kChangeRole), node_name_(node_name), role_name_(std::move(role_name)) {}
+
+    String ToString() const final;
+
+    String node_name_{};
+    String role_name_{};
 
     // response
     i64 error_code_{};

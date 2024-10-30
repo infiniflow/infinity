@@ -31,8 +31,12 @@ import block_entry;
 import block_column_entry;
 import logical_type;
 import internal_types;
-
+import result_cache_manager;
 import logger;
+import data_block;
+import txn;
+import table_entry;
+import cached_match;
 
 namespace infinity {
 

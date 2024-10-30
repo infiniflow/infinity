@@ -57,6 +57,7 @@ import options;
 import cluster_manager;
 import utility;
 import peer_task;
+import infinity_exception;
 
 namespace infinity {
 
@@ -142,8 +143,29 @@ QueryResult AdminExecutor::Execute(QueryContext *query_context, const AdminState
         case AdminStmtType::kShowCurrentNode: {
             return ShowCurrentNode(query_context, admin_statement);
         }
+        case AdminStmtType::kRemoveNode: {
+            return RemoveNode(query_context, admin_statement);
+        }
         case AdminStmtType::kSetRole: {
             return SetRole(query_context, admin_statement);
+        }
+        case AdminStmtType::kCreateSnapshot: {
+            return CreateSnapshot(query_context, admin_statement);
+        }
+        case AdminStmtType::kListSnapshots: {
+            return ListSnapshots(query_context, admin_statement);
+        }
+        case AdminStmtType::kShowSnapshot: {
+            return ShowSnapshot(query_context, admin_statement);
+        }
+        case AdminStmtType::kDeleteSnapshot: {
+            return DeleteSnapshot(query_context, admin_statement);
+        }
+        case AdminStmtType::kExportSnapshot: {
+            return ExportSnapshot(query_context, admin_statement);
+        }
+        case AdminStmtType::kRecoverFromSnapshot: {
+            return RecoverFromSnapshot(query_context, admin_statement);
         }
         case AdminStmtType::kInvalid: {
             QueryResult query_result;
@@ -166,7 +188,7 @@ QueryResult AdminExecutor::ListLogFiles(QueryContext *query_context, const Admin
         MakeShared<ColumnDef>(2, varchar_type, "type", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_logs"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_logs"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -257,7 +279,7 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
         MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_log"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_log"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -396,7 +418,7 @@ QueryResult AdminExecutor::ListLogIndexes(QueryContext *query_context, const Adm
         MakeShared<ColumnDef>(5, varchar_type, "commands", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_logs"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_logs"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -484,7 +506,8 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext *query_context, const Admin
         MakeShared<ColumnDef>(2, varchar_type, "command", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_log_entry_command"), column_defs);
+    SharedPtr<TableDef> table_def =
+        TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_log_entry_command"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -607,7 +630,8 @@ QueryResult AdminExecutor::ListCatalogs(QueryContext *query_context, const Admin
         MakeShared<ColumnDef>(4, varchar_type, "file", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_log_entry_command"), column_defs);
+    SharedPtr<TableDef> table_def =
+        TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_log_entry_command"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
@@ -696,7 +720,7 @@ QueryResult AdminExecutor::ShowCatalog(QueryContext *query_context, const AdminS
         MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
@@ -863,7 +887,7 @@ QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const Admi
         MakeShared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -940,7 +964,7 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
         MakeShared<ColumnDef>(7, varchar_type, "encode", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{bigint_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bool_type, varchar_type};
@@ -1060,7 +1084,7 @@ QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminSt
         MakeShared<ColumnDef>(2, varchar_type, "db_entry_dir", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -1176,7 +1200,7 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
         MakeShared<ColumnDef>(12, bigint_type, "next_segment", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -1388,7 +1412,7 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
         MakeShared<ColumnDef>(17, varchar_type, "status", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -1660,7 +1684,7 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
         MakeShared<ColumnDef>(12, bigint_type, "checkpoint_ts", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -1898,7 +1922,7 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
         MakeShared<ColumnDef>(6, bigint_type, "outline_count", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -2087,7 +2111,7 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
         MakeShared<ColumnDef>(3, varchar_type, "constraints", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -2234,7 +2258,7 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
         MakeShared<ColumnDef>(2, bigint_type, "count", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -2377,7 +2401,7 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
         MakeShared<ColumnDef>(9, bigint_type, "segment_count", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -2589,7 +2613,7 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
         MakeShared<ColumnDef>(7, bigint_type, "chunk_count", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -2803,7 +2827,7 @@ QueryResult AdminExecutor::ListConfigs(QueryContext *query_context, const AdminS
 
     Config *global_config = query_context->global_config();
     QueryResult query_result;
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_configs"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_configs"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     // create data block for output state
@@ -3512,7 +3536,7 @@ QueryResult AdminExecutor::ListVariables(QueryContext *query_context, const Admi
     };
 
     QueryResult query_result;
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_configs"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_configs"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     // create data block for output state
@@ -3558,11 +3582,11 @@ QueryResult AdminExecutor::ShowVariable(QueryContext *query_context, const Admin
     //    SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
-    Vector<SharedPtr<ColumnDef>> output_column_defs = {
+    Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, column_defs);
 
     QueryResult query_result;
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kResult);
@@ -3611,17 +3635,10 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
         MakeShared<ColumnDef>(5, bigint_type, "heartbeat", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_nodes"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_nodes"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types{
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        bigint_type
-    };
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, bigint_type};
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
@@ -3681,7 +3698,6 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
             value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
         }
 
-
         ++row_count;
         if (row_count % output_block_ptr->capacity() == 0) {
             output_block_ptr->Finalize();
@@ -3712,7 +3728,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
         MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_node"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_node"), nullptr, column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<DataType>> column_types{
@@ -3727,7 +3743,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     Status status;
     SharedPtr<NodeInfo> server_node;
     std::tie(status, server_node) = InfinityContext::instance().cluster_manager()->GetNodeInfoPtrByName(node_name);
-    if(!status.ok()) {
+    if (!status.ok()) {
         query_result.result_table_ = nullptr;
         query_result.status_ = std::move(status);
         return query_result;
@@ -3820,6 +3836,24 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
     return query_result;
 }
 
+QueryResult AdminExecutor::RemoveNode(QueryContext *query_context, const AdminStatement *admin_statement) {
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
+
+    String node_name = admin_statement->node_name_.value();
+    QueryResult query_result;
+
+    Status status = InfinityContext::instance().cluster_manager()->RemoveNodeInfo(node_name);
+
+    if (status.ok()) {
+        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
+        query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+    } else {
+        query_result.status_ = status;
+    }
+
+    return query_result;
+}
 
 QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const AdminStatement *admin_statement) {
 
@@ -3831,7 +3865,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
         MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_current_node"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_current_node"), nullptr, column_defs);
 
     QueryResult query_result;
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
@@ -3950,26 +3984,34 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
     return query_result;
 }
 
-
 QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminStatement *admin_statement) {
+    // TODO: check if current role is same as the target role.
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
 
-    AdminNodeRole admin_server_role = admin_statement->admin_node_role_.value();
-    Status status;
+    NodeRole target_node_role = admin_statement->node_role_.value();
     QueryResult query_result;
-    switch (admin_server_role) {
-        case AdminNodeRole::kAdmin: {
+    NodeRole current_node_role = InfinityContext::instance().GetServerRole();
+    if (current_node_role == target_node_role) {
+        LOG_INFO(fmt::format("Infinity is already the role of {}", ToString(current_node_role)));
+        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
+        query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+        query_result.status_ = Status::OK();
+        return query_result;
+    }
+    Status status;
+    switch (target_node_role) {
+        case NodeRole::kAdmin: {
             status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
             LOG_INFO("Start in ADMIN mode");
             break;
         }
-        case AdminNodeRole::kStandalone: {
+        case NodeRole::kStandalone: {
             status = InfinityContext::instance().ChangeRole(NodeRole::kStandalone);
             LOG_INFO("Start in STANDALONE mode");
             break;
         }
-        case AdminNodeRole::kLeader: {
+        case NodeRole::kLeader: {
             String node_name = admin_statement->node_name_.value();
             switch (IdentifierValidation(node_name)) {
                 case IdentifierValidationStatus::kOk:
@@ -3987,15 +4029,23 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                     break;
                 }
             }
-            if(!status.ok()) {
+            if (!status.ok()) {
                 query_result.status_ = status;
                 return query_result;
             }
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, node_name);
-            LOG_INFO("Start in LEADER mode");
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, false, node_name);
+            if (!status.ok()) {
+                LOG_INFO("Fail to change to LEADER role");
+                Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+                if (!restore_status.ok()) {
+                    UnrecoverableError(fmt::format("Fail to change node role to LEADER, then fail to restore to ADMIN."));
+                }
+            } else {
+                LOG_INFO("Start in LEADER role");
+            }
             break;
         }
-        case AdminNodeRole::kFollower: {
+        case NodeRole::kFollower: {
             String node_name = admin_statement->node_name_.value();
             switch (IdentifierValidation(node_name)) {
                 case IdentifierValidationStatus::kOk:
@@ -4013,7 +4063,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                     break;
                 }
             }
-            if(!status.ok()) {
+            if (!status.ok()) {
                 query_result.status_ = status;
                 return query_result;
             }
@@ -4021,16 +4071,24 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             String leader_address = admin_statement->leader_address_.value();
             String leader_ip;
             i64 leader_port;
-            if(!ParseIPPort(leader_address, leader_ip, leader_port)) {
+            if (!ParseIPPort(leader_address, leader_ip, leader_port)) {
                 query_result.status_ = Status::InvalidServerAddress(leader_address);
                 return query_result;
             }
 
-            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, node_name, leader_ip, leader_port);
-            LOG_INFO("Start in FOLLOWER mode");
+            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, false, node_name, leader_ip, leader_port);
+            if (!status.ok()) {
+                LOG_INFO("Fail to change to FOLLOWER role");
+                Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+                if (!restore_status.ok()) {
+                    UnrecoverableError(fmt::format("Fail to change node role to FOLLOWER, then fail to restore to ADMIN."));
+                }
+            } else {
+                LOG_INFO("Start in FOLLOWER role");
+            }
             break;
         }
-        case AdminNodeRole::kLearner: {
+        case NodeRole::kLearner: {
             String node_name = admin_statement->node_name_.value();
             switch (IdentifierValidation(node_name)) {
                 case IdentifierValidationStatus::kOk:
@@ -4048,7 +4106,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                     break;
                 }
             }
-            if(!status.ok()) {
+            if (!status.ok()) {
                 query_result.status_ = status;
                 return query_result;
             }
@@ -4056,24 +4114,77 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             String leader_address = admin_statement->leader_address_.value();
             String leader_ip;
             i64 leader_port;
-            if(!ParseIPPort(leader_address, leader_ip, leader_port)) {
+            if (!ParseIPPort(leader_address, leader_ip, leader_port)) {
                 query_result.status_ = Status::InvalidServerAddress(leader_address);
                 return query_result;
             }
 
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, node_name, leader_ip, leader_port);
-            LOG_INFO("Start in LEARNER mode");
+            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, false, node_name, leader_ip, leader_port);
+            if (!status.ok()) {
+                LOG_INFO("Fail to change to LEARNER role");
+                Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+                if (!restore_status.ok()) {
+                    UnrecoverableError(fmt::format("Fail to change node role to FOLLOWER, then fail to restore to ADMIN."));
+                }
+            } else {
+                LOG_INFO("Start in LEARNER role");
+            }
             break;
+        }
+        default: {
+            UnrecoverableError("Unsupported role");
         }
     }
 
     if (status.ok()) {
-        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), column_defs);
+        auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), nullptr, column_defs);
         query_result.result_table_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     } else {
         query_result.status_ = status;
     }
 
+    return query_result;
+}
+
+QueryResult AdminExecutor::CreateSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: create snapshot"));
+    return query_result;
+}
+
+QueryResult AdminExecutor::ListSnapshots(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: list snapshots"));
+    return query_result;
+}
+
+QueryResult AdminExecutor::ShowSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: show snapshot"));
+    return query_result;
+}
+
+QueryResult AdminExecutor::DeleteSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: delete snapshot"));
+    return query_result;
+}
+
+QueryResult AdminExecutor::ExportSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: export snapshot"));
+    return query_result;
+}
+
+QueryResult AdminExecutor::RecoverFromSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+    QueryResult query_result;
+    query_result.result_table_ = nullptr;
+    query_result.status_ = Status::NotSupport(fmt::format("Not support: recover from snapshot"));
     return query_result;
 }
 

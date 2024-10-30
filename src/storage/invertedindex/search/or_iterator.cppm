@@ -60,8 +60,6 @@ public:
 
     void UpdateScoreThreshold(float threshold) override;
 
-    u32 LeafCount() const override;
-
     u32 MatchCount() const override;
 
 private:
@@ -74,4 +72,5 @@ private:
     RowID bm25_score_cache_docid_ = INVALID_ROWID;
     float bm25_score_cache_ = 0.0f;
 };
+
 } // namespace infinity

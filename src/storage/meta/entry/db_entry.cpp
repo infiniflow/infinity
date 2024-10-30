@@ -52,22 +52,28 @@ DBEntry::DBEntry(DBMeta *db_meta,
                  bool is_delete,
                  const SharedPtr<String> &db_entry_dir,
                  const SharedPtr<String> &db_name,
+                 const SharedPtr<String> &comment,
                  TransactionID txn_id,
                  TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kDatabase, is_delete, DBEntry::EncodeIndex(*db_name)), db_meta_(db_meta), db_entry_dir_(db_entry_dir), db_name_(db_name) {
+    : BaseEntry(EntryType::kDatabase, is_delete, DBEntry::EncodeIndex(*db_name)), db_meta_(db_meta), db_entry_dir_(db_entry_dir), db_name_(db_name),
+      db_comment_(comment) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 }
 
-SharedPtr<DBEntry>
-DBEntry::NewDBEntry(DBMeta *db_meta, bool is_delete, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
+                                       bool is_delete,
+                                       const SharedPtr<String> &db_name,
+                                       const SharedPtr<String> &comment,
+                                       TransactionID txn_id,
+                                       TxnTimeStamp begin_ts) {
     SharedPtr<String> db_entry_dir;
     if (is_delete) {
         db_entry_dir = MakeShared<String>("deleted");
     } else {
         db_entry_dir = DetermineDBDir(*db_name);
     }
-    return MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
+    return MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, comment, txn_id, begin_ts);
 }
 
 SharedPtr<String> DBEntry::DetermineDBDir(const String &db_name) {
@@ -78,10 +84,11 @@ SharedPtr<DBEntry> DBEntry::ReplayDBEntry(DBMeta *db_meta,
                                           bool is_delete,
                                           const SharedPtr<String> &db_entry_dir,
                                           const SharedPtr<String> &db_name,
+                                          const SharedPtr<String> &comment,
                                           TransactionID txn_id,
                                           TxnTimeStamp begin_ts,
                                           TxnTimeStamp commit_ts) noexcept {
-    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
+    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, comment, txn_id, begin_ts);
     db_entry->commit_ts_ = commit_ts;
     return db_entry;
 }
@@ -90,6 +97,7 @@ SharedPtr<String> DBEntry::AbsoluteDir() const { return MakeShared<String>(Path(
 
 Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type,
                                                  const SharedPtr<String> &table_name,
+                                                 const SharedPtr<String> &table_comment,
                                                  const Vector<SharedPtr<ColumnDef>> &columns,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
@@ -98,7 +106,7 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
     auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_name, this); };
     LOG_TRACE(fmt::format("Adding new table entry: {}", *table_name));
     auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(*table_name, std::move(init_table_meta));
-    return table_meta->CreateEntry(std::move(r_lock), table_entry_type, table_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
+    return table_meta->CreateEntry(std::move(r_lock), table_entry_type, table_name, table_comment, columns, txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<SharedPtr<TableEntry>, Status>
@@ -139,8 +147,7 @@ void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
     table_meta->DeleteEntry(txn_id);
 }
 
-Status
-DBEntry::AddTable(SharedPtr<TableEntry> table_entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, bool add_if_found) {
+Status DBEntry::AddTable(SharedPtr<TableEntry> table_entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, bool add_if_found) {
     auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_entry->GetTableName(), this); };
     const String &table_name = *table_entry->GetTableName();
     LOG_TRACE(fmt::format("Adding new table entry: {}", table_name));
@@ -148,44 +155,52 @@ DBEntry::AddTable(SharedPtr<TableEntry> table_entry, TransactionID txn_id, TxnTi
     return table_meta->AddEntry(std::move(r_lock), table_entry, txn_id, begin_ts, txn_mgr, add_if_found);
 }
 
-void DBEntry::CreateTableReplay(const SharedPtr<String> &table_name,
-                                std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                                TransactionID txn_id,
-                                TxnTimeStamp begin_ts) {
+void DBEntry::CreateTableReplay(
+    const SharedPtr<String> &table_name,
+    const SharedPtr<String> &table_comment,
+    std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+    TransactionID txn_id,
+    TxnTimeStamp begin_ts) {
     auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_name, this); };
     auto *table_meta = table_meta_map_.GetMetaNoLock(*table_name, std::move(init_table_meta));
-    table_meta->CreateEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(table_meta, table_name, txn_id, begin_ts); },
-                                  txn_id,
-                                  begin_ts);
+    table_meta->CreateEntryReplay(
+        [&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(table_meta, table_name, table_comment, txn_id, begin_ts); },
+        txn_id,
+        begin_ts);
 }
 
-void DBEntry::UpdateTableReplay(const SharedPtr<String> &table_name,
-                                std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                                TransactionID txn_id,
-                                TxnTimeStamp begin_ts) {
+void DBEntry::UpdateTableReplay(
+    const SharedPtr<String> &table_name,
+    const SharedPtr<String> &table_comment,
+    std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+    TransactionID txn_id,
+    TxnTimeStamp begin_ts) {
     auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(*table_name, ConflictType::kError);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     table_meta->UpdateEntryReplay(
         [&](SharedPtr<TableEntry> dst_table_entry, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            auto src_table_entry = init_entry(table_meta, table_name, txn_id, begin_ts);
+            auto src_table_entry = init_entry(table_meta, table_name, table_comment, txn_id, begin_ts);
             dst_table_entry->UpdateEntryReplay(src_table_entry);
         },
         txn_id,
         begin_ts);
 }
 
-void DBEntry::DropTableReplay(const String &table_name,
-                              std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                              TransactionID txn_id,
-                              TxnTimeStamp begin_ts) {
+void DBEntry::DropTableReplay(
+    const String &table_name,
+    std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+    TransactionID txn_id,
+    TxnTimeStamp begin_ts) {
     auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(table_name, ConflictType::kError);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     table_meta->DropEntryReplay(
-        [&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(table_meta, table_meta->table_name_ptr(), txn_id, begin_ts); },
+        [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return init_entry(table_meta, table_meta->table_name_ptr(), MakeShared<String>(), txn_id, begin_ts);
+        },
         txn_id,
         begin_ts);
 }
@@ -227,6 +242,7 @@ Status DBEntry::GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_arra
         TableDetail table_detail;
         table_detail.db_name_ = this->db_name_;
         table_detail.table_name_ = table_entry->GetTableName();
+        table_detail.table_comment_ = table_entry->GetTableComment();
         table_detail.table_entry_type_ = table_entry->EntryType();
         table_detail.column_count_ = table_entry->ColumnCount();
         table_detail.row_count_ = table_entry->row_count();
@@ -242,7 +258,7 @@ Status DBEntry::GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_arra
     return Status::OK();
 }
 
-Tuple<Vector<String>, Vector<TableMeta*>, std::shared_lock<std::shared_mutex>> DBEntry::GetAllTableMetas() const {
+Tuple<Vector<String>, Vector<TableMeta *>, std::shared_lock<std::shared_mutex>> DBEntry::GetAllTableMetas() const {
     return table_meta_map_.GetAllMetaGuard();
 }
 
@@ -256,6 +272,12 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
     json_res["db_name"] = *this->db_name_;
+
+    String& db_comment = *this->db_comment_;
+    if(!db_comment.empty()) {
+        json_res["db_comment"] = db_comment;
+    }
+
     json_res["txn_id"] = this->txn_id_;
     json_res["begin_ts"] = this->begin_ts_;
     json_res["commit_ts"] = this->commit_ts_.load();
@@ -280,6 +302,14 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
 
     bool deleted = db_entry_json["deleted"];
     SharedPtr<String> db_name = MakeShared<String>(db_entry_json["db_name"]);
+
+    SharedPtr<String> db_comment = nullptr;
+    if(db_entry_json.contains("db_comment")) {
+        db_comment = MakeShared<String>(db_entry_json["db_comment"]);
+    } else {
+        db_comment = MakeShared<String>();
+    }
+
     TransactionID txn_id = db_entry_json["txn_id"];
     u64 begin_ts = db_entry_json["begin_ts"];
 
@@ -287,7 +317,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
     if (!deleted) {
         db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
     }
-    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta, deleted, db_entry_dir, db_name, txn_id, begin_ts);
+    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta, deleted, db_entry_dir, db_name, db_comment, txn_id, begin_ts);
 
     u64 commit_ts = db_entry_json["commit_ts"];
     db_entry->commit_ts_.store(commit_ts);

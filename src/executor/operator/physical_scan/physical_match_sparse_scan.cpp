@@ -70,8 +70,15 @@ PhysicalMatchSparseScan::PhysicalMatchSparseScan(u64 id,
                                                  SharedPtr<MatchSparseExpression> match_sparse_expression,
                                                  const SharedPtr<CommonQueryFilter> &common_query_filter,
                                                  SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalFilterScanBase(id, PhysicalOperatorType::kMatchSparseScan, nullptr, nullptr, base_table_ref, common_query_filter, load_metas),
-      table_index_(table_index), match_sparse_expr_(std::move(match_sparse_expression)) {}
+    : PhysicalFilterScanBase(id,
+                             PhysicalOperatorType::kMatchSparseScan,
+                             nullptr,
+                             nullptr,
+                             table_index,
+                             base_table_ref,
+                             common_query_filter,
+                             load_metas),
+      match_sparse_expr_(std::move(match_sparse_expression)) {}
 
 void PhysicalMatchSparseScan::Init() { search_column_id_ = match_sparse_expr_->column_expr_->binding().column_idx; }
 
@@ -350,7 +357,8 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
     MatchSparseScanFunctionData &function_data = match_sparse_scan_state->match_sparse_scan_function_data_;
 
     if (merge_heap == nullptr) {
-        auto merge_knn_ptr = MakeUnique<MergeHeap>(query_n, topn);
+        const auto knn_threshold = GetKnnThreshold(match_sparse_expr_->opt_params_);
+        auto merge_knn_ptr = MakeUnique<MergeHeap>(query_n, topn, knn_threshold);
         merge_heap = merge_knn_ptr.get();
         merge_knn_ptr->Begin();
         function_data.merge_knn_base_ = std::move(merge_knn_ptr);
@@ -511,7 +519,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
     if (block_ids_idx == block_ids.size() && segment_ids_idx == segment_ids.size()) {
         LOG_DEBUG(fmt::format("MatchSparseScan: {} task finished", block_ids_idx));
         merge_heap->End();
-        i64 result_n = std::min(topn, (SizeT)merge_heap->total_count());
+        i64 result_n = merge_heap->GetSize();
 
         Vector<char *> result_dists_list;
         Vector<RowID *> row_ids_list;

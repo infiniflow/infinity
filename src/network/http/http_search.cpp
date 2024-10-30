@@ -64,6 +64,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         UniquePtr<ParsedExpr> offset{};
         UniquePtr<SearchExpr> search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
+        Vector<ParsedExpr *> *highlight_columns{nullptr};
         Vector<OrderByExpr *> *order_by_list{nullptr};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
@@ -72,6 +73,16 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 }
                 delete output_columns;
                 output_columns = nullptr;
+            }
+        });
+
+        DeferFn defer_fn_highlight([&]() {
+            if (highlight_columns != nullptr) {
+                for (auto &expr : *highlight_columns) {
+                    delete expr;
+                }
+                delete highlight_columns;
+                highlight_columns = nullptr;
             }
         });
 
@@ -103,6 +114,18 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
 
                 output_columns = ParseOutput(output_list, http_status, response);
                 if (output_columns == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "highlight")) {
+                auto &highlight_list = elem.value();
+                if (!highlight_list.is_array()) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "Output field should be array";
+                    return;
+                }
+
+                highlight_columns = ParseOutput(highlight_list, http_status, response);
+                if (highlight_columns == nullptr) {
                     return;
                 }
             } else if (IsEqual(key, "sort")) {
@@ -173,10 +196,19 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             }
         }
 
-        const QueryResult result =
-            infinity_ptr->Search(db_name, table_name, search_expr.release(), filter.release(), limit.release(), offset.release(), output_columns, order_by_list);
+        const QueryResult result = infinity_ptr->Search(db_name,
+                                                        table_name,
+                                                        search_expr.release(),
+                                                        filter.release(),
+                                                        limit.release(),
+                                                        offset.release(),
+                                                        output_columns,
+                                                        highlight_columns,
+                                                        order_by_list,
+                                                        nullptr);
 
         output_columns = nullptr;
+        highlight_columns = nullptr;
         order_by_list = nullptr;
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
@@ -229,6 +261,8 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
         UniquePtr<ParsedExpr> offset{};
         UniquePtr<SearchExpr> search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
+        Vector<ParsedExpr *> *highlight_columns{nullptr};
+        Vector<OrderByExpr *> *order_by_list{nullptr};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
@@ -238,6 +272,26 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                 output_columns = nullptr;
             }
         });
+        DeferFn defer_fn_highlight([&]() {
+            if (highlight_columns != nullptr) {
+                for (auto &expr : *highlight_columns) {
+                    delete expr;
+                }
+                delete highlight_columns;
+                highlight_columns = nullptr;
+            }
+        });
+
+        DeferFn defer_fn_order([&]() {
+            if (order_by_list != nullptr) {
+                for (auto &expr : *order_by_list) {
+                    delete expr;
+                }
+                delete order_by_list;
+                order_by_list = nullptr;
+            }
+        });
+
         ExplainType explain_type = ExplainType::kInvalid;
         for (const auto &elem : input_json.items()) {
             String key = elem.key();
@@ -257,6 +311,36 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
 
                 output_columns = ParseOutput(output_list, http_status, response);
                 if (output_columns == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "highlight")) {
+                auto &highlight_list = elem.value();
+                if (!highlight_list.is_array()) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "Output field should be array";
+                    return;
+                }
+
+                highlight_columns = ParseOutput(highlight_list, http_status, response);
+                if (highlight_columns == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "sort")) {
+                if (order_by_list != nullptr) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one sort field.";
+                    return;
+                }
+
+                auto &list = elem.value();
+                if (!list.is_array()) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "Sort field should be array";
+                    return;
+                }
+
+                order_by_list = ParseSort(list, http_status, response);
+                if (order_by_list == nullptr) {
                     return;
                 }
             } else if (IsEqual(key, "filter")) {
@@ -335,9 +419,14 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                                                          filter.release(),
                                                          limit.release(),
                                                          offset.release(),
-                                                         output_columns);
+                                                         output_columns,
+                                                         highlight_columns,
+                                                         order_by_list,
+                                                         nullptr);
 
         output_columns = nullptr;
+        highlight_columns = nullptr;
+        order_by_list = nullptr;
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
@@ -459,7 +548,7 @@ Vector<OrderByExpr *> *HTTPSearch::ParseSort(const nlohmann::json &json_object, 
         }
     });
 
-    for(const auto &order_expr : json_object) {
+    for (const auto &order_expr : json_object) {
         for (const auto &expression : order_expr.items()) {
             String key = expression.key();
             ToLower(key);
@@ -1199,6 +1288,45 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
     }
 
     switch (elem_type) {
+        case EmbeddingDataType::kElemBit: {
+            if (dimension % 8 != 0) {
+                response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                response["error_message"] = fmt::format("bit embeddings should have dimension of times of 8");
+                return {0, nullptr};
+            }
+            u8 *embedding_data_ptr = new u8[dimension / 8];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT i = 0; i < dimension / 8; ++i) {
+                u8 unit = 0;
+                for (SizeT bit_idx = 0; bit_idx < 8; bit_idx++) {
+                    const auto &value_ref = json_object[i * 8 + bit_idx];
+                    const auto &value_type = value_ref.type();
+                    switch (value_type) {
+                        case nlohmann::json::value_t::number_integer:
+                        case nlohmann::json::value_t::number_unsigned: {
+                            if (value_ref.template get<i64>() > 0) {
+                                unit |= (1 << bit_idx);
+                            }
+                            break;
+                        }
+                        default: {
+                            response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                            response["error_message"] = fmt::format("Embedding element type should be integer");
+                            return {0, nullptr};
+                        }
+                    }
+                }
+                embedding_data_ptr[i] = unit;
+            }
+            u8 *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
         case EmbeddingDataType::kElemInt32: {
             i32 *embedding_data_ptr = new i32[dimension];
             DeferFn defer_free_embedding([&]() {

@@ -1,10 +1,21 @@
-export interface IResponseBody<T> {
+export type IResponseBody<T = Record<string, unknown>> = {
   error_code: number;
-  [U: any]: T;
-}
+} & { [U: string | number]: T };
 
 export interface ITableColumns {
   name: string;
   type: string;
-  default: any;
+  default: unknown;
+}
+
+export interface ITableIndex {
+  columns: string;
+  index_name: string;
+  index_type: string;
+}
+
+export interface ITableSegment {
+  id: string;
+  size: string;
+  status: string;
 }

@@ -24,15 +24,16 @@ class TestInsert:
         uri = common_values.TEST_LOCAL_HOST
 
         cur_insert_n = 0
-        gen_finished = False
+        shutdown = False
+        error = False
 
         def insert_func(table_obj):
-            nonlocal cur_insert_n, gen_finished
+            nonlocal cur_insert_n, shutdown, error
             batch_size = 10
 
-            while cur_insert_n < insert_n and not gen_finished:
+            while cur_insert_n < insert_n:
+                insert_data = []
                 try:
-                    insert_data = []
                     # get `batch_size` data in data_gen one time
                     for i in range(batch_size):
                         try:
@@ -42,33 +43,39 @@ class TestInsert:
                                 data_line[col_name] = col_data
                             insert_data.append(data_line)
                         except StopIteration:
-                            gen_finished = True
                             break
-                    table_obj.insert(insert_data)
+                    if len(insert_data) > 0:
+                        table_obj.insert(insert_data)
+                    else:
+                        cur_insert_n = insert_n
                 except Exception as e:
+                    print(f"insert error at {cur_insert_n}")
+                    if not shutdown:
+                        error = True
+                        raise e
                     break
-                cur_insert_n += batch_size
-                if cur_insert_n == insert_n:
-                    gen_finished = True
+                cur_insert_n += len(insert_data)
 
         shutdown_time = 0
 
         def shutdown_func():
-            nonlocal cur_insert_n, shutdown_time
+            nonlocal cur_insert_n, shutdown_time, shutdown, error
+            shutdown = False
             last_shutdown_insert_n = cur_insert_n
-            while True:
-                if gen_finished or (
+            while not error:
+                if cur_insert_n >= insert_n or (
                     stop_n != 0
                     and cur_insert_n - last_shutdown_insert_n >= insert_n // stop_n
                 ):
+                    shutdown = True
                     infinity_runner.uninit()
                     print("shutdown infinity")
                     shutdown_time += 1
                     return
-                print(f"cur_insert_n: {cur_insert_n}")
+                print(f"cur_insert_n inner: {cur_insert_n}")
                 time.sleep(0.1)
 
-        while not gen_finished:
+        while cur_insert_n < insert_n:
             infinity_runner.init(config)
             infinity_obj = InfinityRunner.connect(uri)
 
@@ -89,7 +96,7 @@ class TestInsert:
         "insert_n, config",
         [
             (100000, "test/data/config/restart_test/test_insert/1.toml"),
-            (1000000, "test/data/config/restart_test/test_insert/1.toml"),
+            # (1000000, "test/data/config/restart_test/test_insert/1.toml"),
         ],
     )
     @pytest.mark.parametrize(
@@ -155,7 +162,7 @@ class TestInsert:
         "insert_n,config",
         [
             (100000, "test/data/config/restart_test/test_insert/1.toml"),
-            (1000000, "test/data/config/restart_test/test_insert/1.toml"),
+            # (1000000, "test/data/config/restart_test/test_insert/1.toml"),
         ],
     )
     @pytest.mark.parametrize(

@@ -124,7 +124,7 @@ Status Status::ClientVersionMismatch(const char *expected_version, const char *g
 }
 
 Status Status::AdminOnlySupportInMaintenanceMode() {
-    return Status(ErrorCode::kAdminOnlySupportInMaintenanceMode, MakeUnique<String>("Only maintanence mode supports ADMIN command"));
+    return Status(ErrorCode::kAdminOnlySupportInMaintenanceMode, MakeUnique<String>("Only maintenance mode supports ADMIN command"));
 }
 
 Status Status::NotSupportInMaintenanceMode() {

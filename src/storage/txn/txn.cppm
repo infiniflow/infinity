@@ -50,7 +50,6 @@ struct ScanParam {
 
 class TxnManager;
 struct Catalog;
-class BGTaskProcessor;
 struct TableEntry;
 struct DBEntry;
 struct BaseEntry;
@@ -67,18 +66,12 @@ struct SegmentIndexEntry;
 export class Txn : public EnableSharedFromThis<Txn> {
 public:
     // For new txn
-    explicit Txn(TxnManager *txn_manager,
-                 BufferManager *buffer_manager,
-                 Catalog *catalog,
-                 BGTaskProcessor *bg_task_processor,
-                 TransactionID txn_id,
-                 TxnTimeStamp begin_ts,
-                 SharedPtr<String> txn_text);
+    explicit Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<String> txn_text);
 
     // For replay txn
-    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
+    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
+    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // Txn steps:
     // 1. CreateTxn
@@ -95,7 +88,7 @@ public:
 
     TxnTimeStamp Commit();
 
-    bool CheckConflict(Catalog *catalog);
+    bool CheckConflict();
 
     bool CheckConflict(Txn *txn);
 
@@ -106,7 +99,7 @@ public:
     void Rollback();
 
     // Database OPs
-    Status CreateDatabase(const String &db_name, ConflictType conflict_type);
+    Status CreateDatabase(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
 
     Status DropDatabase(const String &db_name, ConflictType conflict_type);
 
@@ -209,7 +202,7 @@ public:
 
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
 
-    bool DeltaCheckpoint(TxnTimeStamp last_ckp_ts,TxnTimeStamp &max_commit_ts);
+    bool DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts);
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
@@ -229,14 +222,9 @@ public:
     void AddWriteTxnNum(TableEntry *table_entry);
 
     // Some transaction need to pass the txn access right check in txn commit phase;
-    void SetReaderAllowed(bool allowed) {
-        allowed_in_reader_ = allowed;
-    }
+    void SetReaderAllowed(bool allowed) { allowed_in_reader_ = allowed; }
 
-    bool IsReaderAllowed() const {
-        return allowed_in_reader_;
-    }
-
+    bool IsReaderAllowed() const { return allowed_in_reader_; }
 
     TxnStore *txn_store() { return &txn_store_; }
 
@@ -248,8 +236,7 @@ private:
 private:
     // Reference to external class
     TxnManager *txn_mgr_{};
-    BufferManager *buffer_mgr_{};  // This BufferManager ptr Only for replaying wal
-    BGTaskProcessor *bg_task_processor_{};
+    BufferManager *buffer_mgr_{}; // This BufferManager ptr Only for replaying wal
     Catalog *catalog_{};
 
     TxnStore txn_store_; // this has this ptr, so txn cannot be moved.

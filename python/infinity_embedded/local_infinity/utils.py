@@ -24,7 +24,7 @@ from infinity_embedded.errors import ErrorCode
 from infinity_embedded.common import InfinityException, SparseVector
 from infinity_embedded.local_infinity.types import build_result, logic_type_to_dtype
 from infinity_embedded.utils import binary_exp_to_paser_exp
-from infinity_embedded.embedded_infinity_ext import WrapInExpr, WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapConstantExpr, ParsedExprType, LiteralType
+from infinity_embedded.embedded_infinity_ext import WrapInExpr, WrapParsedExpr, WrapOrderByExpr, WrapFunctionExpr, WrapColumnExpr, WrapConstantExpr, ParsedExprType, LiteralType
 from infinity_embedded.embedded_infinity_ext import WrapEmbeddingType, WrapColumnDef, WrapDataType, LogicalType, EmbeddingDataType, WrapSparseType, ConstraintType
 from datetime import date, time, datetime, timedelta
 
@@ -293,16 +293,7 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
                     constant_expression.f64_array_value = [float(v) for v in value.values()]
                 case _:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                            f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
-        case datetime():
-            constant_expression.literal_type = LiteralType.kDateTime
-            constant_expression.str_value = value.strftime("%Y-%m-%d %H:%M:%S")
-        case date():
-            constant_expression.literal_type = LiteralType.kDate
-            constant_expression.str_value = value.strftime("%Y-%m-%d")
-        case time():
-            constant_expression.literal_type = LiteralType.kTime
-            constant_expression.str_value = value.strftime("%H:%M:%S")
+                                            f"Invalid sparse vector value type: {type(next(iter(value.values())))}") 
 
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
@@ -392,6 +383,39 @@ def get_constant_expr(column_info):
     else:
         return get_local_constant_expr_from_python_value(default)
 
+def get_constraints(column_info: dict) -> list[ConstraintType]:
+    if column_info.get("constraints") is None:
+        return []
+    res = []
+    constraints = column_info["constraints"]
+    for constraint in constraints:
+        constraint = constraint.lower()
+        match constraint:
+            case "null":
+                if ConstraintType.kNull not in res:
+                    res.append(ConstraintType.kNull)
+                else:
+                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+            case "not null":
+                if ConstraintType.kNotNull not in res:
+                    res.append(ConstraintType.kNotNull)
+                else:
+                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+            case "primary key":
+                if ConstraintType.kPrimaryKey not in res:
+                    res.append(ConstraintType.kPrimaryKey)
+                else:
+                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+            case "unique":
+                if ConstraintType.kUnique not in res:
+                    res.append(ConstraintType.kUnique)
+                else:
+                    raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+            case _:
+                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Unknown constraint: {constraint}")
+    return res
+
+
 def get_embedding_element_type(element_type):
     match element_type:
         case "bit":
@@ -417,17 +441,8 @@ def get_embedding_element_type(element_type):
         case _:
             raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
 
-def get_embedding_info(column_info, column_defs, column_name, index):
-    # "vector,1024,float32"
-    column_big_info = [item.strip() for item in column_info["type"].split(",")]
-    length = column_big_info[1]
-    element_type = column_big_info[2]
-
-    proto_column_def = WrapColumnDef()
-    proto_column_def.id = index
-    proto_column_def.column_name = column_name
+def get_embedding_type(column_big_info: list[str]) -> WrapDataType:
     column_type = WrapDataType()
-
     match column_big_info[0]:
         case "vector":
             column_type.logical_type = LogicalType.kEmbedding
@@ -440,37 +455,25 @@ def get_embedding_info(column_info, column_defs, column_name, index):
         case _:
             raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
 
+    length = column_big_info[1]
+    element_type = column_big_info[2]
+
     embedding_type = WrapEmbeddingType()
     embedding_type.element_type = get_embedding_element_type(element_type)
     embedding_type.dimension = int(length)
-    assert isinstance(embedding_type, WrapEmbeddingType)
-    assert embedding_type.element_type is not None
-    assert embedding_type.dimension is not None
     # physical_type = ttypes.PhysicalType()
     # physical_type.embedding_type = embedding_type
     column_type.embedding_type = embedding_type
-    proto_column_def.column_type = column_type
+    return column_type
 
-    proto_column_def.constant_expr = get_constant_expr(column_info)
+def get_sparse_type(column_big_info: list[str]) -> WrapDataType:
+    column_type = WrapDataType()
+    assert column_big_info[0] == "sparse"
+    column_type.logical_type = LogicalType.kSparse
 
-    column_defs.append(proto_column_def)
-
-def get_sparse_info(column_info, column_defs, column_name, index):
-    # "sparse,30000,float32,int16"
-    column_big_info = [item.strip() for item in column_info["type"].split(",")]
     length = column_big_info[1]
     element_type = column_big_info[2]
     index_type = column_big_info[3]
-
-    proto_column_def = WrapColumnDef()
-    proto_column_def.id = index
-    proto_column_def.column_name = column_name
-    column_type = WrapDataType()
-
-    if column_big_info[0] == "sparse":
-        column_type.logical_type = LogicalType.kSparse
-    else:
-        raise InfinityException(ErrorCode.FTS_INDEX_NOT_EXIST, f"Unknown column type: {column_big_info[0]}")
 
     sparse_type = WrapSparseType()
     sparse_type.element_type = get_embedding_element_type(element_type)
@@ -487,106 +490,75 @@ def get_sparse_info(column_info, column_defs, column_name, index):
     sparse_type.dimension = int(length)
 
     column_type.sparse_type = sparse_type
-    proto_column_def.column_type = column_type
+    return column_type
 
-    proto_column_def.constant_expr = get_constant_expr(column_info)
+def get_data_type(column_info: dict) -> WrapDataType:
+    if "type" not in column_info:
+        raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, f"Column definition without data type")
+    datatype = column_info["type"].lower()
+    column_big_info = [item.strip() for item in datatype.split(",")]
+    column_big_info_first_str = column_big_info[0]
+    match column_big_info_first_str:
+        case "vector" | "multivector" | "tensor" | "tensorarray":
+            embedding_type = get_embedding_type(column_big_info)
+            return embedding_type
+            # return get_embedding_info(column_info, column_defs, column_name, index)
+        case "sparse":
+            sparse_type = get_sparse_type(column_big_info)
+            return sparse_type
+            # return get_sparse_info(column_info, column_defs, column_name, index)
+        case _:
+            proto_column_type = WrapDataType()
+            match datatype:
+                case "int8":
+                    proto_column_type.logical_type = LogicalType.kTinyInt
+                case "int16":
+                    proto_column_type.logical_type = LogicalType.kSmallInt
+                case "integer" | "int32" | "int":
+                    proto_column_type.logical_type = LogicalType.kInteger
+                case "int64":
+                    proto_column_type.logical_type = LogicalType.kBigInt
+                case "int128":
+                    proto_column_type.logical_type = LogicalType.kHugeInt
+                case "float" | "float32":
+                    proto_column_type.logical_type = LogicalType.kFloat
+                case "double" | "float64":
+                    proto_column_type.logical_type = LogicalType.kDouble
+                case "float16":
+                    proto_column_type.logical_type = LogicalType.kFloat16
+                case "bfloat16":
+                    proto_column_type.logical_type = LogicalType.kBFloat16
+                case "varchar":
+                    proto_column_type.logical_type = LogicalType.kVarchar
+                case "bool":
+                    proto_column_type.logical_type = LogicalType.kBoolean
+                case "date":
+                    proto_column_type.logical_type = LogicalType.kDate
+                case "time":
+                    proto_column_type.logical_type = LogicalType.kTime
+                case "datetime":
+                    proto_column_type.logical_type = LogicalType.kDateTime
+                case "timestamp":
+                    proto_column_type.logical_type = LogicalType.kTimestamp
+                case _:
+                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
+            return proto_column_type
 
-    column_defs.append(proto_column_def)
-
-def get_ordinary_info(column_info, column_defs, column_name, index):
+def get_ordinary_info(column_info_, column_defs, column_name, index):
     # "c1": {"type": "int", "constraints":["primary key", ...], "default": 1/"asdf"/[1,2]/...}
     # process column definition
 
     proto_column_def = WrapColumnDef()
     proto_column_def.id = index
     proto_column_def.column_name = column_name
-    proto_column_def.column_type.logical_type = LogicalType.kInvalid
 
-    for key, value in column_info.items():
-        lower_key = key.lower()
-        match lower_key:
-            case "type":
-                datatype = value.lower()
-                column_big_info = [item.strip() for item in datatype.split(",")]
-                column_big_info_first_str = column_big_info[0].lower()
-                match column_big_info_first_str:
-                    case "vector" | "multivector" | "tensor" | "tensorarray":
-                        return get_embedding_info(column_info, column_defs, column_name, index)
-                    case "sparse":
-                        return get_sparse_info(column_info, column_defs, column_name, index)
-                proto_column_type = WrapDataType()
-                match datatype:
-                    case "int8":
-                        proto_column_type.logical_type = LogicalType.kTinyInt
-                    case "int16":
-                        proto_column_type.logical_type = LogicalType.kSmallInt
-                    case "int32":
-                        proto_column_type.logical_type = LogicalType.kInteger
-                    case "int":
-                        proto_column_type.logical_type = LogicalType.kInteger
-                    case "integer":
-                        proto_column_type.logical_type = LogicalType.kInteger
-                    case "int64":
-                        proto_column_type.logical_type = LogicalType.kBigInt
-                    case "int128":
-                        proto_column_type.logical_type = LogicalType.kHugeInt
-                    case "float":
-                        proto_column_type.logical_type = LogicalType.kFloat
-                    case "float32":
-                        proto_column_type.logical_type = LogicalType.kFloat
-                    case "double":
-                        proto_column_type.logical_type = LogicalType.kDouble
-                    case "float64":
-                        proto_column_type.logical_type = LogicalType.kDouble
-                    case "float16":
-                        proto_column_type.logical_type = LogicalType.kFloat16
-                    case "bfloat16":
-                        proto_column_type.logical_type = LogicalType.kBFloat16
-                    case "varchar":
-                        proto_column_type.logical_type = LogicalType.kVarchar
-                    case "bool":
-                        proto_column_type.logical_type = LogicalType.kBoolean
-                    case "date":
-                        proto_column_type.logical_type = LogicalType.kDate
-                    case "time":
-                        proto_column_type.logical_type = LogicalType.kTime
-                    case "datetime":
-                        proto_column_type.logical_type = LogicalType.kDateTime
-                    case _:
-                        raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
-                proto_column_def.column_type = proto_column_type
-            case "constraints":
-                # process constraints
-                constraints = value
-                for constraint in constraints:
-                    constraint = constraint.lower()
-                    match constraint:
-                        case "null":
-                            if ConstraintType.kNull not in proto_column_def.constraints:
-                                proto_column_def.constraints.add(ConstraintType.kNull)
-                            else:
-                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
-                        case "not null":
-                            if ConstraintType.kNotNull not in proto_column_def.constraints:
-                                proto_column_def.constraints.add(ConstraintType.kNotNull)
-                            else:
-                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
-                        case "primary key":
-                            if ConstraintType.kPrimaryKey not in proto_column_def.constraints:
-                                proto_column_def.constraints.add(ConstraintType.kPrimaryKey)
-                            else:
-                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
-                        case "unique":
-                            if ConstraintType.kUnique not in proto_column_def.constraints:
-                                proto_column_def.constraints.add(ConstraintType.kUnique)
-                            else:
-                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
-                        case _:
-                            raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Unknown constraint: {constraint}")
+    column_info = {}
+    for key, value in column_info_.items():
+        column_info[key.lower()] = value
 
-    if proto_column_def.column_type.logical_type is None:
-        raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, f"Column definition without data type")
-
+    proto_column_def.column_type = get_data_type(column_info)
     proto_column_def.constant_expr = get_constant_expr(column_info)
-
+    proto_column_def.constraints = get_constraints(column_info)
+    if "comment" in column_info:
+        proto_column_def.comment = column_info["comment"]
     column_defs.append(proto_column_def)

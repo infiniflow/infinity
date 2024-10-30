@@ -506,7 +506,7 @@ public:
             hops++;
         } // beam search end
 
-        // LOG_DEBUG(fmt::format("Beam search hops {}: {} nodes expanded, {} cmps,  {} ios", hops, full_retset.size(), cmps, num_ios));
+        LOG_DEBUG(fmt::format("Beam search hops {}: {} nodes expanded, {} cmps,  {} ios", hops, full_retset.size(), cmps, num_ios));
         // copy the top k results to the output buffer
         std::sort(full_retset.begin(), full_retset.end());
         for (u64 i = 0; i < k_search; i++) {

@@ -105,7 +105,6 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
                                                   buffer_mgr->persistence_manager());
 
     block_column_entry->buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-
     return block_column_entry;
 }
 

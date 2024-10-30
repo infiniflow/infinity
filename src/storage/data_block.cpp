@@ -33,6 +33,34 @@ import logger;
 
 namespace infinity {
 
+bool DataBlock::AppendColumns(const DataBlock &other, const Vector<SizeT> &column_idxes) {
+    if (!initialized || !other.initialized) {
+        return false;
+    }
+    if (row_count_ != other.row_count_) {
+        return false;
+    }
+    if (capacity_ != other.capacity_) {
+        return false;
+    }
+    if (!finalized || !other.finalized) {
+        return false;
+    }
+    for (SizeT idx : column_idxes) {
+        column_vectors.push_back(other.column_vectors[idx]);
+    }
+    return true;
+}
+
+UniquePtr<DataBlock> DataBlock::Clone() const {
+    if (!finalized) {
+        return nullptr;
+    }
+    auto data_block = MakeUnique<DataBlock>();
+    data_block->Init(column_vectors);
+    return data_block;
+}
+
 void DataBlock::Init(const DataBlock *input, const SharedPtr<Selection> &input_select) {
     if (initialized) {
         String error_message = "Data block was initialized before.";

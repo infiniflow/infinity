@@ -30,17 +30,15 @@ import third_party;
 namespace infinity {
 export class TermDocIterator final : public DocIterator {
 public:
-    TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight)
-        : column_id_(column_id), iter_(std::move(iter)), weight_(weight) {
-        doc_freq_ = iter_->GetDocFreq();
-        term_freq_ = 0;
-    }
+    TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight);
 
     ~TermDocIterator() override;
 
     float GetWeight() const { return weight_; }
 
     void MultiplyWeight(float factor) { weight_ *= factor; }
+
+    inline u32 GetDocFreq() const { return doc_freq_; }
 
     u64 GetTermFreq() const { return term_freq_; }
 
@@ -70,7 +68,6 @@ public:
             threshold_ = threshold;
     }
 
-    u32 LeafCount() const override { return 1; }
     u32 MatchCount() const override { return DocID() != INVALID_ROWID; }
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
@@ -81,6 +78,8 @@ public:
 
 private:
     Pair<tf_t, u32> GetScoreData();
+
+    u32 doc_freq_ = 0;
 
     u64 column_id_;
     UniquePtr<PostingIterator> iter_;

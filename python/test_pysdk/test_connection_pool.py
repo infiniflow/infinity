@@ -2,7 +2,6 @@ import sys
 import os
 import pytest
 from common import common_values
-import time
 from infinity.connection_pool import ConnectionPool
 from infinity.common import ConflictType
 
@@ -37,14 +36,17 @@ class TestInfinity:
         res = self.infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    #@pytest.mark.skip(reason = "cluster fail")
     @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_connection_pool(self, suffix):
-        connection_pool = ConnectionPool(uri=self.uri, min_size=4, max_size=8)
-        assert len(connection_pool.free_pool_) == 4
+        connection_pool = ConnectionPool(uri=self.uri, max_size=8)
+        assert len(connection_pool.free_pool_) == 8
 
         infinity_obj = connection_pool.get_conn()
+        _ = connection_pool.get_conn() # It's safe for user to not releasing (due to exception or some other reasons) a connection created by ConnectionPool
+        _ = connection_pool.get_conn() # It's safe for user to not releasing (due to exception or some other reasons) a connection created by ConnectionPool
         assert infinity_obj
-        assert len(connection_pool.free_pool_) == 3
+        assert len(connection_pool.free_pool_) == 5
 
         infinity_obj.drop_database("my_database"+suffix, conflict_type=ConflictType.Ignore)
         db = infinity_obj.create_database("my_database"+suffix)
@@ -62,7 +64,11 @@ class TestInfinity:
         infinity_obj.drop_database("my_database"+suffix, conflict_type=ConflictType.Error)
 
         connection_pool.release_conn(infinity_obj)
-        assert len(connection_pool.free_pool_) == 4
+        assert len(connection_pool.free_pool_) == 6
+
+        external_infinity_obj = infinity.connect(self.uri)
+        connection_pool.release_conn(external_infinity_obj)
+        assert len(connection_pool.free_pool_) == 7 # It's safe for user to release a connection not created by ConnectionPool
 
         try:
             connection_pool.release_conn(infinity_obj)
@@ -71,15 +77,3 @@ class TestInfinity:
         else:
             assert "no exception when double release" == 0
         connection_pool.destroy()
-
-    @pytest.mark.usefixtures("skip_if_local_infinity")
-    def test_time_out(self):
-        #test timeout is ok
-        connection_pool = ConnectionPool(uri=self.uri, min_size=4, max_size=8, timeout=5.0)
-        begin_time = time.time()
-        try:
-            while True:
-                connection_pool.get_conn()
-        except Exception as e:
-            print(e)
-        assert time.time() - begin_time < 10

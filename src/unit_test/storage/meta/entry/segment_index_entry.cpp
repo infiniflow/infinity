@@ -108,7 +108,7 @@ TEST_P(SegmentIndexEntryTest, create_ivf_index_test) {
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -172,7 +172,7 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -254,7 +254,7 @@ TEST_P(SegmentIndexEntryTest, opt_bmp_index_test){
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kSparse, sparseInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -347,7 +347,7 @@ TEST_P(SegmentIndexEntryTest, flush_bmp_test) {
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kSparse, sparseInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
         auto status = txn1->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28.1)
 
-project(infinity VERSION 0.4.0)
+project(infinity VERSION 0.5.0)
 
 if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
     message(FATAL_ERROR "This project requires the Ninja generator. Refers to https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html#generator-support")
@@ -173,10 +173,22 @@ endif ()
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm64.*")
+    set(ARM64 TRUE)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64.*")
+    set(ARM64 TRUE)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
+    set(X86_64 TRUE)
+endif()          
+
 #add_definitions(-march=native)
 add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
 if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
-    add_definitions(-mevex512)
+    if(X86_64)
+        add_definitions(-mevex512)
+    else()
+        add_definitions(-march=native)
+    endif()
 endif ()
 
 execute_process(
@@ -238,7 +250,7 @@ if(DEFINED CPACK_PACKAGE_VERSION)
     string(REPLACE "-" "." CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
 endif()
 if(NOT DEFINED CPACK_PACKAGE_VERSION OR CPACK_PACKAGE_VERSION STREQUAL "")
-    set(CPACK_PACKAGE_VERSION "0.4.0")
+    set(CPACK_PACKAGE_VERSION "0.5.0")
 endif()
 set(CPACK_PACKAGE_RELEASE 1)
 set(CPACK_PACKAGE_CONTACT "Zhichang Yu <yuzhichang@gmail.com>")
