@@ -215,6 +215,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                 case NodeRole::kFollower: {
                     cluster_manager_->UnInit(from_leader);
 
+                    storage_->SetStorageMode(StorageMode::kAdmin);
                     storage_->SetStorageMode(StorageMode::kReadable);
 
                     Status init_status = cluster_manager_->InitAsFollower(node_name, node_ip, node_port);
@@ -228,6 +229,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                 case NodeRole::kLearner: {
                     cluster_manager_->UnInit(from_leader);
 
+                    storage_->SetStorageMode(StorageMode::kAdmin);
                     storage_->SetStorageMode(StorageMode::kReadable);
 
                     Status init_status = cluster_manager_->InitAsLearner(node_name, node_ip, node_port);
@@ -285,6 +287,8 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     }
                     // TODO: disconnect from leader;
                     cluster_manager_->UnInit(from_leader);
+                    storage_->SetStorageMode(StorageMode::kAdmin);
+
                     Status init_status = cluster_manager_->InitAsLeader(node_name);
                     if (!init_status.ok()) {
                         cluster_manager_->UnInit(from_leader);

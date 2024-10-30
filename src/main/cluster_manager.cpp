@@ -482,6 +482,7 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
     {
         std::unique_lock<std::mutex> lock(mutex_);
         other_node_map_.erase(node_name);
+        clients_for_cleanup_.emplace_back(reader_client_map_[node_name]);
         reader_client_map_.erase(node_name);
     }
 
@@ -522,11 +523,13 @@ Status ClusterManager::UpdateNodeByLeader(const String &node_name, UpdateNodeOp 
         switch (update_node_op) {
             case UpdateNodeOp::kRemove: {
                 client_iter->second->UnInit(true);
+                clients_for_cleanup_.emplace_back(reader_client_map_[node_name]);
                 reader_client_map_.erase(node_name);
                 break;
             }
             case UpdateNodeOp::kLostConnection: {
                 client_iter->second->UnInit(false);
+                clients_for_cleanup_.emplace_back(reader_client_map_[node_name]);
                 reader_client_map_.erase(node_name);
                 break;
             }
