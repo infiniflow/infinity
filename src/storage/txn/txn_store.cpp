@@ -194,11 +194,15 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Append(const SharedPtr<DataBlock
 }
 
 void TxnTableStore::AddIndexStore(TableIndexEntry *table_index_entry) {
+    std::lock_guard lock(mtx_);
+
     txn_indexes_.emplace(table_index_entry, ptr_seq_n_++);
     has_update_ = true;
 }
 
 void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, const Vector<SegmentIndexEntry *> &segment_index_entries) {
+    std::lock_guard lock(mtx_);
+
     auto *txn_index_store = this->GetIndexStore(table_index_entry);
     for (auto *segment_index_entry : segment_index_entries) {
         auto [iter, insert_ok] = txn_index_store->index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
@@ -212,6 +216,8 @@ void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, c
 }
 
 void TxnTableStore::AddChunkIndexStore(TableIndexEntry *table_index_entry, ChunkIndexEntry *chunk_index_entry) {
+    std::lock_guard lock(mtx_);
+
     auto *txn_index_store = this->GetIndexStore(table_index_entry);
     SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
     txn_index_store->index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
@@ -221,6 +227,8 @@ void TxnTableStore::AddChunkIndexStore(TableIndexEntry *table_index_entry, Chunk
 }
 
 void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {
+    std::lock_guard lock(mtx_);
+
     if (txn_indexes_.contains(table_index_entry)) {
         table_index_entry->Cleanup();
         txn_indexes_.erase(table_index_entry);

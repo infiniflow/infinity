@@ -164,6 +164,8 @@ public: // Setter, Getter
     void AddWriteTxnNum() { added_txn_num_ = true; }
 
 private:
+    std::mutex mtx_{};
+
     HashMap<SegmentID, TxnSegmentStore> txn_segments_store_{};
     Vector<SegmentEntry *> flushed_segments_{};
     HashSet<SegmentEntry *> set_sealed_segments_{};
