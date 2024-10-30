@@ -3,7 +3,7 @@ import logging
 import platform
 import subprocess
 import sys
-from infinity_cluster import InfinityRunner, InfinityCluster
+from infinity_cluster import InfinityRunner, InfinityCluster, MinioParams, convert_request_to_curl
 import os
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -11,13 +11,6 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import http_network_util, infinity_http
-
-def convert_request_to_curl(method: str, header: dict, data: dict, url: str):
-    cmd = "curl -X {method} -H {headers} -d '{data}' '{uri}'"
-    method = method.upper()
-    headers = " ".join([f"-H '{key}:{value}'" for key, value in header.items()])
-    data = json.dumps(data)
-    return cmd.format(method=method, headers=headers, data=data, uri=url)
 
 class mocked_http_network(http_network_util):
     def __init__(self, ns_name: str, *args, **kwargs):
@@ -39,6 +32,7 @@ class mocked_http_network(http_network_util):
     def raise_exception(self, resp, expect={}):
         # todo: handle curl exception
         pass
+
 
 class MockedInfinityRunner(InfinityRunner):
     def __init__(
@@ -73,8 +67,8 @@ class MockedInfinityRunner(InfinityRunner):
 
 
 class MockInfinityCluster(InfinityCluster):
-    def __init__(self, executable_path: str):
-        super().__init__(executable_path)
+    def __init__(self, executable_path: str, *, minio_params: MinioParams = None):
+        super().__init__(executable_path, minio_params=minio_params)
         self.ns_prefix = "ns"
         self.bridge_name = "br0"
         self.mock_ip_prefix = "17.0.0."

@@ -3,12 +3,11 @@ import time
 import pytest
 from infinity_cluster import InfinityCluster
 from mocked_infinity_cluster import MockInfinityCluster
-from docker_infinity_cluster import DockerInfinityCluster
+from docker_infinity_cluster import DockerInfinityCluster, MinioParams
 
 
 @pytest.mark.usefixtures("skip_if_docker")
-def test_standalone(infinity_path: str):
-    cluster = InfinityCluster(infinity_path)
+def test_standalone(cluster: InfinityCluster):
     cluster.add_node("test", "conf/pytest_parallel_infinity_conf.toml")
     cluster.init_standalone("test")
     test_client = cluster.client("test")
@@ -21,9 +20,7 @@ def test_standalone(infinity_path: str):
 
 
 @pytest.mark.usefixtures("skip_if_docker")
-@pytest.mark.skip(reason="bug")
-def test_0(infinity_path: str):
-    cluster = InfinityCluster(infinity_path)
+def test_0(cluster: InfinityCluster):
     cluster.add_node("node1", "conf/leader.toml")
     cluster.add_node("node2", "conf/follower.toml")
 
@@ -39,9 +36,10 @@ def test_0(infinity_path: str):
 
 
 @pytest.mark.usefixtures("skip_if_docker")
-@pytest.mark.skip(reason="bug")
-def test_mock(infinity_path: str):
-    cluster = MockInfinityCluster(infinity_path)
+@pytest.mark.skip(reason="deprecated")
+def test_mock(mock_cluster: MockInfinityCluster):
+    cluster = mock_cluster
+
     cluster.add_node("node1", "conf/leader.toml")
     cluster.add_node("node2", "conf/follower.toml")
 
@@ -63,8 +61,8 @@ def test_mock(infinity_path: str):
 
 
 @pytest.mark.usefixtures("skip_if_not_docker")
-def test_docker(infinity_path: str):
-    cluster = DockerInfinityCluster(infinity_path)
+def test_docker(docker_cluster: DockerInfinityCluster):
+    cluster = docker_cluster
 
     cluster.add_node("node1", "conf/leader.toml")
     cluster.add_node("node2", "conf/follower.toml")
@@ -80,11 +78,11 @@ def test_docker(infinity_path: str):
     time.sleep(0.1)
     cluster.reconnect("node2")
 
+    res = cluster.client("node1").list_databases()
+    print(res.db_names)
+
     time.sleep(1)
 
     print("remove nodes")
-
-    cluster.remove_node("node2")
-    cluster.remove_node("node1")
 
     cluster.clear()
