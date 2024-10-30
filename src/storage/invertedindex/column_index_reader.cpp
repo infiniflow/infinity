@@ -246,6 +246,9 @@ void TableIndexReaderCache::InvalidateColumn(u64 column_id, const String &column
 
 void TableIndexReaderCache::InvalidateSegmentColumn(u64 column_id, SegmentID segment_id) {
     std::scoped_lock lock(mutex_);
+    if (!cache_column_readers_.get()) {
+        return;
+    }
     auto iter = cache_column_readers_->find(column_id);
     if (iter != cache_column_readers_->end()) {
         iter->second->InvalidateSegment(segment_id);
@@ -254,6 +257,9 @@ void TableIndexReaderCache::InvalidateSegmentColumn(u64 column_id, SegmentID seg
 
 void TableIndexReaderCache::InvalidateChunkColumn(u64 column_id, SegmentID segment_id, ChunkID chunk_id) {
     std::scoped_lock lock(mutex_);
+    if (!cache_column_readers_.get()) {
+        return;
+    }
     auto iter = cache_column_readers_->find(column_id);
     if (iter != cache_column_readers_->end()) {
         iter->second->InvalidateChunk(segment_id, chunk_id);

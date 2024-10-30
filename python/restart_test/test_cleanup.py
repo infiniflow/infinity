@@ -7,6 +7,7 @@ from infinity.common import ConflictType
 from restart_util import *
 import infinity
 import pathlib
+from infinity.errors import ErrorCode
 
 
 # Test with cleanuped data but meta data not cleanuped
@@ -180,6 +181,7 @@ class TestCleanup:
         infinity_runner.clear()
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+
         @decorator
         def part1(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
@@ -194,8 +196,12 @@ class TestCleanup:
             table_obj.insert([{"c1": "text1", "c2": "text2"}])
 
             drop_index_name = "idx1_todrop"
-            table_obj.create_index(drop_index_name, index.IndexInfo("c1", index.IndexType.FullText))
-            table_obj.create_index("idx2", index.IndexInfo("c2", index.IndexType.FullText))
+            table_obj.create_index(
+                drop_index_name, index.IndexInfo("c1", index.IndexType.FullText)
+            )
+            table_obj.create_index(
+                "idx2", index.IndexInfo("c2", index.IndexType.FullText)
+            )
 
             res = (
                 table_obj.output(["c1"])
@@ -206,8 +212,64 @@ class TestCleanup:
             table_obj.drop_index(drop_index_name)
 
             infinity_obj.cleanup()
-            dropped_index_dirs = pathlib.Path("/var/infinity/data").rglob(f"*{drop_index_name}*")
+            dropped_index_dirs = pathlib.Path("/var/infinity/data").rglob(
+                f"*{drop_index_name}*"
+            )
             assert len(list(dropped_index_dirs)) == 0
+
+            db_obj.drop_table(table_name)
+
+        part1()
+
+    def test_invalidate_fulltext_cache2(self, infinity_runner: InfinityRunner):
+        table_name = "test_invalid_fulltext_cache2"
+        index_name = "body_index"
+
+        data_dir = "/var/infinity/data"
+        config = "test/data/config/restart_test/test_cleanup/2.toml"
+        uri = common_values.TEST_LOCAL_HOST
+        import_file = "test/data/csv/enwiki_9.csv"
+        abs_import_file = os.path.abspath(import_file)
+
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, ConflictType.Ignore)
+            table_obj = db_obj.create_table(
+                table_name,
+                {
+                    "doctitle": {"type": "varchar"},
+                    "docdate": {"type": "varchar"},
+                    "body": {"type": "varchar"},
+                },
+                ConflictType.Error,
+            )
+            res = table_obj.create_index(
+                index_name, index.IndexInfo("body", index.IndexType.FullText)
+            )
+            assert res.error_code == ErrorCode.OK
+
+            # compaction need 4 segment in default config
+            for i in range(4):
+                table_obj.import_data(abs_import_file, {"delimiter": "\t"})
+
+            res = table_obj.output(["*"]).match_text("body^5", "America", 3).to_pl()
+
+            # wait for compaction
+            time.sleep(3)
+
+            infinity_obj.cleanup()
+            time.sleep(1)
+
+            cnt = 0
+            for path in pathlib.Path(data_dir).rglob("*"):
+                depth = len(path.relative_to(data_dir).parts)
+                # print("    " * depth + path.name)
+                if path.is_dir() and index_name in str(path):
+                    cnt += 1
+            assert cnt == 1
 
             db_obj.drop_table(table_name)
 
