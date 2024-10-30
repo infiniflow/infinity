@@ -460,6 +460,7 @@ private:
                 UniquePtr<QueryNode> query_tree;
                 MinimumShouldMatchOption minimum_should_match_option;
                 f32 score_threshold = {};
+                FulltextSimilarity ft_similarity = FulltextSimilarity::kBM25;
                 {
                     const Map<String, String> &column2analyzer = index_reader.GetColumn2Analyzer();
                     SearchOptions search_ops(filter_fulltext_expr->options_text_);
@@ -513,12 +514,27 @@ private:
                         score_threshold = DataType::StringToValue<FloatT>(iter->second);
                     }
 
+                    // option: similarity
+                    if (iter = search_ops.options_.find("similarity"); iter != search_ops.options_.end()) {
+                        String ft_sim = iter->second;
+                        ToLower(ft_sim);
+                        if (ft_sim == "bm25") {
+                            ft_similarity = FulltextSimilarity::kBM25;
+                        } else if (ft_sim == "boolean") {
+                            ft_similarity = FulltextSimilarity::kBoolean;
+                        } else {
+                            RecoverableError(Status::SyntaxError(R"(similarity option must be "BM25" or "boolean".)"));
+                        }
+                    }
+
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
                     if (!query_tree) {
                         RecoverableError(Status::ParseMatchExprFailed(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_));
                     }
                 }
+                //TODO: ft_similarity
+                (void)(ft_similarity);
                 return MakeUnique<IndexFilterEvaluatorFulltext>(filter_fulltext_expr,
                                                                 table_entry_ptr_,
                                                                 early_term_algo,
