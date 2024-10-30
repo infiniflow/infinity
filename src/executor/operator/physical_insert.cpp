@@ -36,6 +36,9 @@ import status;
 import infinity_exception;
 import logger;
 
+import wal_manager;
+import infinity_context;
+
 import column_def;
 
 namespace infinity {
@@ -43,6 +46,17 @@ namespace infinity {
 void PhysicalInsert::Init() {}
 
 bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to flush on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     SizeT row_count = value_list_.size();
     SizeT column_count = value_list_[0].size();
     SizeT table_collection_column_count = table_entry_->ColumnCount();

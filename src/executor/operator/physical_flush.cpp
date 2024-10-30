@@ -19,21 +19,33 @@ module physical_flush;
 import stl;
 import txn;
 import query_context;
-import table_def;\
+import table_def;
 import data_table;
-
+import wal_manager;
 import physical_operator_type;
 import operator_state;
 import logger;
 import bg_task;
 import third_party;
 import status;
+import infinity_context;
 
 namespace infinity {
 
 void PhysicalFlush::Init() {}
 
 bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to flush on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     switch (flush_type_) {
         case FlushType::kData: {
             FlushData(query_context, operator_state);
@@ -58,7 +70,7 @@ void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operat
     auto *wal_mgr = query_context->storage()->wal_manager();
     if (!wal_mgr->TrySubmitCheckpointTask(force_ckp_task)) {
         LOG_TRACE(fmt::format("Skip {} checkpoint(manual) because there is already a full checkpoint task running.", "FULL"));
-        return ;
+        return;
     }
     force_ckp_task->Wait();
     LOG_TRACE("Flushed data");

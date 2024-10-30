@@ -29,11 +29,25 @@ import logical_type;
 import infinity_exception;
 import column_def;
 
+import wal_manager;
+import infinity_context;
+
 namespace infinity {
 
 void PhysicalDropSchema::Init() {}
 
 bool PhysicalDropSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to flush on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     auto txn = query_context->GetTxn();
     Status status = txn->DropDatabase(*schema_name_, conflict_type_);
     if (!status.ok()) {

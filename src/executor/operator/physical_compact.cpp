@@ -35,6 +35,8 @@ import infinity_exception;
 import third_party;
 import status;
 import wal_entry;
+import wal_manager;
+import infinity_context;
 
 namespace infinity {
 
@@ -112,6 +114,17 @@ void PhysicalCompact::Init() {
 }
 
 bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to flush on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     auto *compact_operator_state = static_cast<CompactOperatorState *>(operator_state);
     SizeT group_idx = compact_operator_state->compact_idx_;
     CompactStateData *compact_state_data = compact_operator_state->compact_state_data_.get();

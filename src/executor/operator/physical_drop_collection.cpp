@@ -14,6 +14,8 @@
 
 module;
 
+module physical_drop_collection;
+
 import stl;
 import txn;
 import query_context;
@@ -22,14 +24,26 @@ import data_table;
 
 import physical_operator_type;
 import operator_state;
-
-module physical_drop_collection;
+import wal_manager;
+import infinity_context;
+import status;
 
 namespace infinity {
 
 void PhysicalDropCollection::Init() {}
 
 bool PhysicalDropCollection::Execute(QueryContext *, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to flush on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     operator_state->SetComplete();
     return true;
 }

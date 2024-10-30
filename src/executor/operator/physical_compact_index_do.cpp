@@ -24,10 +24,24 @@ import table_index_entry;
 import block_index;
 import status;
 import base_table_ref;
+import wal_manager;
+import infinity_context;
+import infinity_exception;
 
 namespace infinity {
 
 bool PhysicalCompactIndexDo::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to flush on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     auto *compact_index_do_operator_state = static_cast<CompactIndexDoOperatorState *>(operator_state);
     auto *compact_state_data = compact_index_do_operator_state->compact_state_data_.get();
     BaseTableRef *new_table_ref = compact_state_data->GetNewTableRef();
@@ -44,7 +58,6 @@ bool PhysicalCompactIndexDo::Execute(QueryContext *query_context, OperatorState 
     }
     auto *table_index_entry = index_index->index_snapshots_vec_[create_index_idx]->table_index_entry_;
     const String &index_name = *table_index_entry->GetIndexName();
-
 
     Txn *txn = query_context->GetTxn();
     auto &create_index_idxes = (*compact_index_do_operator_state->create_index_shared_data_)[create_index_idx]->create_index_idxes_;

@@ -26,6 +26,8 @@ import status;
 import infinity_exception;
 import value;
 import defer_op;
+import wal_manager;
+import infinity_context;
 
 namespace infinity {
 
@@ -40,6 +42,17 @@ bool PhysicalRenameTable::Execute(QueryContext *query_context, OperatorState *op
 void PhysicalAddColumns::Init() {}
 
 bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to flush on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     LOG_INFO(fmt::format("Locking table {} for add columns", *table_entry_->GetTableName()));
     table_entry_->SetLocked();
     LOG_INFO(fmt::format("Table {} is locked", *table_entry_->GetTableName()));
@@ -62,6 +75,17 @@ bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *ope
 void PhysicalDropColumns::Init() {}
 
 bool PhysicalDropColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to flush on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     LOG_INFO(fmt::format("Locking table {} for add columns", *table_entry_->GetTableName()));
     table_entry_->SetLocked();
     LOG_INFO(fmt::format("Table {} is locked", *table_entry_->GetTableName()));
