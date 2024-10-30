@@ -1471,6 +1471,39 @@ void TableEntry::InvalidateFullTextIndexCache(TableIndexEntry *table_index_entry
     fulltext_column_index_cache_->InvalidateColumn(column_id, column_name);
 }
 
+void TableEntry::InvalidateFullTextSegmentIndexCache(SegmentIndexEntry *segment_index_entry) {
+    SegmentID segment_id = segment_index_entry->segment_id();
+    TableIndexEntry *table_index_entry = segment_index_entry->table_index_entry();
+    const IndexBase *index_base = table_index_entry->index_base();
+    String index_name = *table_index_entry->GetIndexName();
+    String column_name = index_base->column_name();
+    LOG_DEBUG(fmt::format("Invalidate fulltext segment index cache: {}, column_name: {}, table_name: {}, segment_id: {}",
+                          index_name,
+                          column_name,
+                          *table_name_,
+                          segment_id));
+    ColumnID column_id = GetColumnIdByName(column_name);
+    fulltext_column_index_cache_->InvalidateSegmentColumn(column_id, segment_id);
+}
+
+void TableEntry::InvalidateFullTextChunkIndexCache(ChunkIndexEntry *chunk_index_entry) {
+    ChunkID chunk_id = chunk_index_entry->chunk_id_;
+    SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
+    SegmentID segment_id = segment_index_entry->segment_id();
+    TableIndexEntry *table_index_entry = segment_index_entry->table_index_entry();
+    const IndexBase *index_base = table_index_entry->index_base();
+    String index_name = *table_index_entry->GetIndexName();
+    String column_name = index_base->column_name();
+    LOG_DEBUG(fmt::format("Invalidate fulltext chunk index cache: {}, column_name: {}, table_name: {}, segment_id: {}, chunk_id: {}",
+                          index_name,
+                          column_name,
+                          *table_name_,
+                          segment_id,
+                          chunk_id));
+    ColumnID column_id = GetColumnIdByName(column_name);
+    fulltext_column_index_cache_->InvalidateChunkColumn(column_id, segment_id, chunk_id);
+}
+
 Tuple<Vector<String>, Vector<TableIndexMeta *>, std::shared_lock<std::shared_mutex>> TableEntry::GetAllIndexMapGuard() const {
     return index_meta_map_.GetAllMetaGuard();
 }
