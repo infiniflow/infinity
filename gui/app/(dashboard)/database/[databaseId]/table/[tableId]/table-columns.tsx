@@ -4,7 +4,7 @@ import { ITableColumns } from '@/lib/databse-interface';
 import { ColumnDef } from '@tanstack/react-table';
 import { useFetchTableColumns } from 'app/(dashboard)/database/hooks';
 import { DataTable } from 'app/(dashboard)/database/infinity-table';
-import { DatabaseRouteParams } from 'app/(dashboard)/database/interface';
+import { PureDatabaseRouteParams } from 'app/(dashboard)/database/interface';
 import { DataTableColumnHeader } from 'app/(dashboard)/database/table-column-header';
 
 export const columns: ColumnDef<ITableColumns>[] = [
@@ -31,10 +31,7 @@ export const columns: ColumnDef<ITableColumns>[] = [
   }
 ];
 
-export function TableColumns({
-  tableId,
-  databaseId
-}: DatabaseRouteParams['params']) {
+export function TableColumns({ tableId, databaseId }: PureDatabaseRouteParams) {
   const { tableColumns } = useFetchTableColumns({ tableId, databaseId });
 
   return (

@@ -395,7 +395,7 @@ struct SQL_LTYPE {
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
-%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE
+%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
 
 %token NUMBER
@@ -2507,6 +2507,40 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->admin_type_ = infinity::AdminStmtType::kShowVariable;
      $$->variable_name_ = $4;
      free($4);
+}
+| ADMIN CREATE SNAPSHOT {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kCreateSnapshot;
+}
+| ADMIN SHOW SNAPSHOTS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListSnapshots;
+}
+| ADMIN SHOW SNAPSHOT STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowSnapshot;
+     $$->snapshot_name_ = $4;
+     free($4);
+}
+| ADMIN DELETE SNAPSHOT STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kDeleteSnapshot;
+     $$->snapshot_name_ = $4;
+     free($4);
+}
+| ADMIN EXPORT SNAPSHOT STRING TO STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kExportSnapshot;
+     $$->snapshot_name_ = $4;
+     $$->export_path_ = $6;
+     free($4);
+     free($6);
+}
+| ADMIN RECOVER FROM SNAPSHOT STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kRecoverFromSnapshot;
+     $$->snapshot_name_ = $5;
+     free($5);
 }
 | ADMIN SHOW NODES {
      $$ = new infinity::AdminStatement();

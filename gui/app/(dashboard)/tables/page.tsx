@@ -20,7 +20,7 @@ async function InfinityTable() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {tables.tables.map((table: string) => (
+        {tables.tables?.map((table: string) => (
           <TableRow key={table}>
             <TableCell className="font-medium">{table}</TableCell>
           </TableRow>
@@ -30,9 +30,7 @@ async function InfinityTable() {
   );
 }
 
-export default async function DatabasePage({}: {
-  searchParams: { q: string; offset: string };
-}) {
+export default async function DatabasePage() {
   const items: MenuItem[] = [
     {
       key: 'sub1',

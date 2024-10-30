@@ -778,7 +778,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         // all task Complete
 
         merge_heap->End();
-        i64 result_n = std::min(knn_scan_shared_data->topk_, merge_heap->total_count());
+        i64 result_n = merge_heap->GetSize();
 
         SizeT query_n = knn_scan_shared_data->query_count_;
         Vector<char *> result_dists_list;
