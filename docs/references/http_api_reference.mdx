@@ -948,8 +948,8 @@ curl --request POST \
     - `"type"`: `"fulltext"`
     - `"ANALYZER"`: *Optional*
       - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs. Use `-` to specify stemmer for languages, `English` is the default stemmer: `"standard-english"` and `"standard"` have the same stemmer setting. Supported language stemmer includes: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`,`Russian`,`Spanish`,`Swedish`,`Turkish`.
-      - `"rag"`: RAG analyzer imported from [RAGFlow](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py). Multilingual support including `Chinese` and `English`. Use `-fine` to specify the fine-grained analyzer results.
-      - `"chinese"`: Simplified Chinese. Use `-fine` to specify the fine-grained analyzer results.
+      - `"rag"`: Multilingual RAG analyzer imported from [RAGFlow](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py), supporting Chinese and English. Use `-fine` to output the fine-grained analyzer results.
+      - `"chinese"`: Simplified Chinese. Use `-fine` to output the fine-grained analyzer results.
       - `"traditional"`: Traditional Chinese
       - `"japanese"`: Japanese
       - `"korean"`: Korean
