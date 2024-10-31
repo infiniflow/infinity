@@ -132,6 +132,30 @@ std::string AdminStatement::ToString() const {
             ss << "Admin set role";
             break;
         }
+        case AdminStmtType::kCreateSnapshot: {
+            ss << "Admin create snapshot";
+            break;
+        }
+        case AdminStmtType::kListSnapshots: {
+            ss << "Admin list snapshots";
+            break;
+        }
+        case AdminStmtType::kShowSnapshot: {
+            ss << "Admin show snapshot";
+            break;
+        }
+        case AdminStmtType::kDeleteSnapshot: {
+            ss << "Admin delete snapshot";
+            break;
+        }
+        case AdminStmtType::kExportSnapshot: {
+            ss << "Admin export snapshot";
+            break;
+        }
+        case AdminStmtType::kRecoverFromSnapshot: {
+            ss << "Admin recover from snapshot";
+            break;
+        }
         case AdminStmtType::kInvalid: {
             ss << "Invalid admin statement";
             break;

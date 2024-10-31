@@ -29,7 +29,12 @@ import term_meta;
 namespace infinity {
 export class DiskIndexSegmentReader : public IndexSegmentReader {
 public:
-    DiskIndexSegmentReader(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag);
+    DiskIndexSegmentReader(SegmentID segment_id,
+                           ChunkID chunk_id,
+                           const String &index_dir,
+                           const String &base_name,
+                           RowID base_row_id,
+                           optionflag_t flag);
 
     virtual ~DiskIndexSegmentReader();
 

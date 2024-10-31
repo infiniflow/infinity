@@ -35,6 +35,17 @@ SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_l2 SEARCH MATCH VECTOR (c2, [0.3, 
 6 2 0.060000
 4 1 0.100000
 
+query II
+SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (threshold = 0.08);
+----
+8 3 0.020000
+6 2 0.060000
+
+query II
+SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (threshold = 0.04);
+----
+8 3 0.020000
+
 statement error
 SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 

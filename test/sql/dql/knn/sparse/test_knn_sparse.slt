@@ -84,6 +84,12 @@ SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_sparse SEARCH MATCH SPARSE (c2, 
 3 2 3.000000
 5 4 0.000000
 
+query II
+SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 5) WITH (threshold = 10);
+----
+4 3 16.000000
+2 1 12.000000
+
 statement error
 SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
 

@@ -86,6 +86,8 @@ import status;
 import default_values;
 import parse_fulltext_options;
 import highlighter;
+import data_type;
+import internal_types;
 
 namespace infinity {
 
@@ -203,8 +205,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     const Map<String, String> &column2analyzer = match_node->index_reader_.GetColumn2Analyzer();
                     SearchOptions search_ops(match_node->match_expr_->options_text_);
 
-                    // option: threshold
-                    const String &threshold = search_ops.options_["threshold"];
+                    // option: begin_threshold
+                    const String &threshold = search_ops.options_["begin_threshold"];
                     match_node->begin_threshold_ = strtof(threshold.c_str(), nullptr);
 
                     // option: default field
@@ -258,6 +260,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     // option: minimum_should_match
                     if (iter = search_ops.options_.find("minimum_should_match"); iter != search_ops.options_.end()) {
                         match_node->minimum_should_match_option_ = ParseMinimumShouldMatchOption(iter->second);
+                    }
+
+                    // option: threshold
+                    if (iter = search_ops.options_.find("threshold"); iter != search_ops.options_.end()) {
+                        match_node->score_threshold_ = DataType::StringToValue<FloatT>(iter->second);
                     }
 
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);

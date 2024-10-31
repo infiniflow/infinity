@@ -14,10 +14,10 @@
 
 module;
 
+#include <string>
 module knn_scan_data;
 
 import stl;
-
 import infinity_exception;
 import third_party;
 import logical_type;
@@ -179,6 +179,7 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 cur
 
 template <typename QueryDataType, typename DistDataType>
 void KnnScanFunctionData::Init() {
+    static_assert(std::is_same_v<DistDataType, f32>);
     switch (knn_scan_shared_data_->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
             String error_message = "Invalid Knn distance type";
@@ -186,16 +187,20 @@ void KnnScanFunctionData::Init() {
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {
-            auto merge_knn_max =
-                MakeUnique<MergeKnn<QueryDataType, CompareMax, DistDataType>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
+            const auto knn_threshold = GetKnnThreshold(knn_scan_shared_data_->opt_params_);
+            auto merge_knn_max = MakeUnique<MergeKnn<QueryDataType, CompareMax, DistDataType>>(knn_scan_shared_data_->query_count_,
+                                                                                               knn_scan_shared_data_->topk_,
+                                                                                               knn_threshold);
             merge_knn_max->Begin();
             merge_knn_base_ = std::move(merge_knn_max);
             break;
         }
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
-            auto merge_knn_min =
-                MakeUnique<MergeKnn<QueryDataType, CompareMin, DistDataType>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
+            const auto knn_threshold = GetKnnThreshold(knn_scan_shared_data_->opt_params_);
+            auto merge_knn_min = MakeUnique<MergeKnn<QueryDataType, CompareMin, DistDataType>>(knn_scan_shared_data_->query_count_,
+                                                                                               knn_scan_shared_data_->topk_,
+                                                                                               knn_threshold);
             merge_knn_min->Begin();
             merge_knn_base_ = std::move(merge_knn_min);
             break;

@@ -41,8 +41,13 @@ import virtual_store;
 
 namespace infinity {
 
-DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag)
-    : base_row_id_(base_row_id) {
+DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
+                                               ChunkID chunk_id,
+                                               const String &index_dir,
+                                               const String &base_name,
+                                               RowID base_row_id,
+                                               optionflag_t flag)
+    : IndexSegmentReader(segment_id, chunk_id), base_row_id_(base_row_id) {
     Path path = Path(InfinityContext::instance().config()->DataDir()) / index_dir / base_name;
     String path_str = path.string();
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();

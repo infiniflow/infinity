@@ -55,8 +55,12 @@ void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentI
         segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, txn);
         // segment_readers
         for (u32 i = 0; i < chunk_index_entries.size(); ++i) {
-            SharedPtr<DiskIndexSegmentReader> segment_reader =
-                MakeShared<DiskIndexSegmentReader>(index_dir_, chunk_index_entries[i]->base_name_, chunk_index_entries[i]->base_rowid_, flag);
+            SharedPtr<DiskIndexSegmentReader> segment_reader = MakeShared<DiskIndexSegmentReader>(segment_id,
+                                                                                                  chunk_index_entries[i]->chunk_id_,
+                                                                                                  index_dir_,
+                                                                                                  chunk_index_entries[i]->base_name_,
+                                                                                                  chunk_index_entries[i]->base_rowid_,
+                                                                                                  flag);
             segment_readers_.push_back(std::move(segment_reader));
         }
         chunk_index_entries_.insert(chunk_index_entries_.end(),
@@ -64,7 +68,7 @@ void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentI
                                     std::move_iterator(chunk_index_entries.end()));
         if (memory_indexer.get() != nullptr && memory_indexer->GetDocCount() != 0) {
             // segment_reader
-            SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(memory_indexer.get());
+            SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
             segment_readers_.push_back(std::move(segment_reader));
             // for loading column length file
             assert(memory_indexer_.get() == nullptr);
@@ -106,6 +110,40 @@ Pair<u64, float> ColumnIndexReader::GetTotalDfAndAvgColumnLength() {
         }
     }
     return Pair<u64, float>(total_df_, avg_column_length_);
+}
+
+void ColumnIndexReader::InvalidateSegment(SegmentID segment_id) {
+    for (auto iter = segment_readers_.begin(); iter != segment_readers_.end();) {
+        if ((*iter)->segment_id() == segment_id) {
+            iter = segment_readers_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    for (auto iter = chunk_index_entries_.begin(); iter != chunk_index_entries_.end();) {
+        if ((*iter)->segment_index_entry_->segment_id() == segment_id) {
+            iter = chunk_index_entries_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
+
+void ColumnIndexReader::InvalidateChunk(SegmentID segment_id, ChunkID chunk_id) {
+    for (auto iter = segment_readers_.begin(); iter != segment_readers_.end();) {
+        if ((*iter)->segment_id() == segment_id && (*iter)->chunk_id() == chunk_id) {
+            iter = segment_readers_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    for (auto iter = chunk_index_entries_.begin(); iter != chunk_index_entries_.end();) {
+        if ((*iter)->segment_index_entry_->segment_id() == segment_id && (*iter)->chunk_id_ == chunk_id) {
+            iter = chunk_index_entries_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
 }
 
 void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
@@ -203,6 +241,28 @@ void TableIndexReaderCache::InvalidateColumn(u64 column_id, const String &column
     }
     if (column2analyzer_.get() != nullptr) {
         column2analyzer_->erase(column_name);
+    }
+}
+
+void TableIndexReaderCache::InvalidateSegmentColumn(u64 column_id, SegmentID segment_id) {
+    std::scoped_lock lock(mutex_);
+    if (!cache_column_readers_.get()) {
+        return;
+    }
+    auto iter = cache_column_readers_->find(column_id);
+    if (iter != cache_column_readers_->end()) {
+        iter->second->InvalidateSegment(segment_id);
+    }
+}
+
+void TableIndexReaderCache::InvalidateChunkColumn(u64 column_id, SegmentID segment_id, ChunkID chunk_id) {
+    std::scoped_lock lock(mutex_);
+    if (!cache_column_readers_.get()) {
+        return;
+    }
+    auto iter = cache_column_readers_->find(column_id);
+    if (iter != cache_column_readers_->end()) {
+        iter->second->InvalidateChunk(segment_id, chunk_id);
     }
 }
 
