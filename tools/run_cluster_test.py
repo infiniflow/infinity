@@ -29,6 +29,7 @@ if __name__ == "__main__":
         python_executable,
         "-m",
         "pytest",
+        #"-v",
         f"{python_test_dir}/test_cluster",
         f"--infinity_path={infinity_path}",
         "-x",
