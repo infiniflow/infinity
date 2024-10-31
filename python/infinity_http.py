@@ -350,6 +350,7 @@ class table_http(infinity_http_network):
             index_name,
             index_info,
             conflict_type=ConflictType.Error,
+            index_comment: str = ""
     ):
         copt = conflict_type
         if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
@@ -374,7 +375,7 @@ class table_http(infinity_http_network):
             ["accept", "content-type"],
         )
         d = self.set_up_data(
-            ["create_option"], {"fields": fields, "index": create_index_info, "create_option": copt}
+            ["create_option"], {"comment" : index_comment, "fields": fields, "index": create_index_info, "create_option": copt}
         )
         r = self.request(url, "post", h, d)
         self.raise_exception(r)
@@ -404,7 +405,9 @@ class table_http(infinity_http_network):
         h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.raise_exception(r)
-        return database_result()
+        r_json = r.json()
+        index_comment = r_json.get("index_comment", "")
+        return database_result(index_comment=index_comment)
 
     def list_indexes(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes"
@@ -801,12 +804,13 @@ class table_http_result(table_http):
 
 
 class database_result():
-    def __init__(self, list=[], database_name: str="", error_code=ErrorCode.OK, columns=[], index_list=[]):
+    def __init__(self, list=[], database_name: str="", error_code=ErrorCode.OK, columns=[], index_list=[], index_comment=None):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
         self.columns = columns
         self.index_list = index_list
+        self.index_comment = index_comment
 
 
 identifier_limit = 65536

@@ -792,7 +792,8 @@ WrapQueryResult WrapCreateIndex(Infinity &instance,
                                 const String &table_name,
                                 const String &index_name,
                                 WrapIndexInfo &wrap_index_info,
-                                const CreateIndexOptions &create_index_options) {
+                                const CreateIndexOptions &create_index_options,
+                                const String &index_comment = "") {
     auto index_info = new IndexInfo();
     index_info->index_type_ = wrap_index_info.index_type;
     index_info->column_name_ = wrap_index_info.column_name;
@@ -804,7 +805,7 @@ WrapQueryResult WrapCreateIndex(Infinity &instance,
         }
         index_info->index_param_list_ = index_param_list;
     }
-    auto query_result = instance.CreateIndex(db_name, table_name, index_name, index_info, create_index_options);
+    auto query_result = instance.CreateIndex(db_name, table_name, index_name, index_comment, index_info, create_index_options);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
@@ -819,7 +820,36 @@ WrapQueryResult WrapDropIndex(Infinity &instance,
 
 WrapQueryResult WrapShowIndex(Infinity &instance, const String &db_name, const String &table_name, const String &index_name) {
     auto query_result = instance.ShowIndex(db_name, table_name, index_name);
-    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+    WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
+    if (query_result.IsOk()) {
+        SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+        auto row_count = data_block->row_count();
+        if (row_count != 11) {
+            String error_message = "ShowDatabase: query result is invalid.";
+            UnrecoverableError(error_message);
+        }
+        {
+            Value value = data_block->GetValue(1, 0);
+            result.database_name = value.GetVarchar();
+        }
+        {
+            Value value = data_block->GetValue(1, 1);
+            result.table_name = value.GetVarchar();
+        }
+        {
+            Value value = data_block->GetValue(1, 2);
+            result.index_name = value.GetVarchar();
+        }
+        {
+            Value value = data_block->GetValue(1, 3);
+            result.comment = value.GetVarchar();
+        }
+        {
+            Value value = data_block->GetValue(1, 4);
+            result.index_type = value.GetVarchar();
+        }
+    }
+    return result;
 }
 
 WrapQueryResult WrapShowSegment(Infinity &instance, const String &db_name, const String &table_name, const SegmentID &segment_id) {
