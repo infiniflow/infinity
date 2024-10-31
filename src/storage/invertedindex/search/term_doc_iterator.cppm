@@ -28,6 +28,7 @@ import column_length_io;
 import third_party;
 
 namespace infinity {
+
 export class TermDocIterator final : public DocIterator {
 public:
     TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight);
@@ -61,7 +62,9 @@ public:
 
     bool Next(RowID doc_id) override;
 
-    float BM25Score() override;
+    float BM25Score();
+
+    float Score() override { return BM25Score(); }
 
     void UpdateScoreThreshold(float threshold) override {
         if (threshold > threshold_)
@@ -77,7 +80,6 @@ public:
     const String *column_name_ptr_ = nullptr;
 
 private:
-    Pair<tf_t, u32> GetScoreData();
 
     u32 doc_freq_ = 0;
 
@@ -109,4 +111,5 @@ private:
     u32 block_skip_cnt_ = 0;
     u32 block_skip_cnt_inner_ = 0;
 };
+
 } // namespace infinity

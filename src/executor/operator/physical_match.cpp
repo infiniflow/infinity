@@ -97,7 +97,7 @@ void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &r
             break;
         }
         RowID id = et_iter->DocID();
-        float et_score = et_iter->BM25Score();
+        float et_score = et_iter->Score();
         if (SHOULD_LOG_DEBUG()) {
             OStringStream oss;
             et_iter->PrintTree(oss, "", true);

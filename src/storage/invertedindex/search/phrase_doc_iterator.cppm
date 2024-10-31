@@ -11,6 +11,7 @@ import index_defines;
 import column_length_io;
 
 namespace infinity {
+
 export class PhraseDocIterator final : public DocIterator {
 public:
     PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight, u32 slop = 0);
@@ -30,7 +31,9 @@ public:
 
     bool Next(RowID doc_id) override;
 
-    float BM25Score() override;
+    float BM25Score();
+
+    float Score() override { return BM25Score(); }
 
     void UpdateScoreThreshold(float threshold) override {
         if (threshold > threshold_)

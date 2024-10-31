@@ -52,7 +52,7 @@ public:
         }
     }
 
-    float BM25Score() override { return query_iterator_->BM25Score(); }
+    float Score() override { return query_iterator_->Score(); }
 
     void UpdateScoreThreshold(const float threshold) override { query_iterator_->UpdateScoreThreshold(threshold); }
 
