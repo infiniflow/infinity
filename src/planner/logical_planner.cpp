@@ -103,6 +103,8 @@ import insert_row_expr;
 import catalog;
 import special_function;
 import utility;
+import wal_manager;
+import infinity_context;
 
 namespace infinity {
 
@@ -115,27 +117,83 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             return BuildSelect(static_cast<const SelectStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kInsert: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             return BuildInsert(const_cast<InsertStatement *>(static_cast<const InsertStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kUpdate: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             return BuildUpdate(static_cast<const UpdateStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kDelete: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             return BuildDelete(static_cast<const DeleteStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kCreate: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             return BuildCreate(const_cast<CreateStatement *>(static_cast<const CreateStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kDrop: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             return BuildDrop(const_cast<DropStatement *>(static_cast<const DropStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kShow: {
             return BuildShow(const_cast<ShowStatement *>(static_cast<const ShowStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kFlush: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             return BuildFlush(static_cast<const FlushStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kOptimize: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             return BuildOptimize(const_cast<OptimizeStatement *>(static_cast<const OptimizeStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kCopy: {
@@ -151,12 +209,28 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             return BuildExecute(static_cast<const ExecuteStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kAlter: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             return BuildAlter(const_cast<AlterStatement *>(static_cast<const AlterStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kCommand: {
             return BuildCommand(static_cast<const CommandStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kCompact: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             return BuildCompact(static_cast<const CompactStatement *>(statement), bind_context_ptr);
         }
         default: {
@@ -871,6 +945,14 @@ Status LogicalPlanner::BuildExecute(const ExecuteStatement *, SharedPtr<BindCont
 Status LogicalPlanner::BuildCopy(CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     BindSchemaName(statement->schema_name_);
     if (statement->copy_from_) {
+        StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+            UnrecoverableError("Uninitialized storage mode");
+        }
+
+        if (storage_mode != StorageMode::kWritable) {
+            return Status::InvalidNodeRole("Attempt to write on non-writable node");
+        }
         // Import
         return BuildImport(statement, bind_context_ptr);
     } else {
@@ -1176,6 +1258,14 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             break;
         }
         case CommandType::kLockTable: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             auto *lock_table = static_cast<LockCmd *>(command_statement->command_info_.get());
             if (lock_table->db_name().empty()) {
                 lock_table->SetDBName(query_context_ptr_->schema_name());
@@ -1189,6 +1279,14 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             break;
         }
         case CommandType::kUnlockTable: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             auto *unlock_table = static_cast<UnlockCmd *>(command_statement->command_info_.get());
             if (unlock_table->db_name().empty()) {
                 unlock_table->SetDBName(query_context_ptr_->schema_name());
@@ -1202,6 +1300,14 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             break;
         }
         case CommandType::kCleanup: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
             auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
             this->logical_plan_ = logical_command;
             break;
