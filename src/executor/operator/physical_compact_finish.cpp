@@ -30,10 +30,24 @@ import wal_entry;
 import logger;
 import txn;
 import internal_types;
+import infinity_context;
+import infinity_exception;
+import status;
 
 namespace infinity {
 
 bool PhysicalCompactFinish::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     auto *compact_finish_operator_state = static_cast<CompactFinishOperatorState *>(operator_state);
     const CompactStateData *compact_state_data = compact_finish_operator_state->compact_state_data_.get();
     if (!ApplyDeletes(query_context, compact_state_data)) {

@@ -16,6 +16,8 @@ module;
 
 #include <string>
 
+module physical_delete;
+
 import stl;
 
 import query_context;
@@ -30,14 +32,26 @@ import data_block;
 import column_vector;
 import internal_types;
 import third_party;
-
-module physical_delete;
+import wal_manager;
+import infinity_context;
+import status;
 
 namespace infinity {
 
 void PhysicalDelete::Init() {}
 
 bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     OperatorState* prev_op_state = operator_state->prev_op_state_;
 
     SizeT data_block_count = prev_op_state->data_block_array_.size();
