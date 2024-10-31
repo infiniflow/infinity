@@ -35,7 +35,7 @@ RUN --mount=type=bind,source=gcc-13.2.0.tar.xz,target=/root/gcc-13.2.0.tar.xz \
     && cd /root && mkdir build-gcc && cd build-gcc \
     && ../gcc-13.2.0/configure --enable-languages=c,c++ \
         --disable-multilib --with-pic \
-    && make -j12 && make install-strip \
+    && make -j16 && make install-strip \
     && cd /root && rm -rf build-gcc && rm -rf gcc-13.2.0 \
     && ln -s gcc /usr/local/bin/cc && ldconfig
 
@@ -239,5 +239,10 @@ RUN git clone --single-branch --depth=1 https://github.com/VectorCamp/vectorscan
     && cmake -DCMAKE_BUILD_TYPE=Release -DFAT_RUNTIME=On ..  \
     && make -j 12 install \
     && rm -rf ../../vectorscan
+
+# Install Docker
+# https://docs.docker.com/engine/install/centos/#install-using-the-convenience-script
+RUN cd /root && curl -fsSL https://get.docker.com -o get-docker.sh \
+    && sh get-docker.sh
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

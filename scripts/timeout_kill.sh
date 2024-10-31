@@ -7,7 +7,11 @@ if [ $# -lt 1 ]; then
 fi
 
 DURATION=$1
-
+# Check if no PIDs are provided
+if [ $# -eq 1 ]; then
+    echo "No PIDs provided. Exiting."
+    exit 0
+fi
 # kill all infinity process
 for pid in "${@:2}"; do
     # Send SIGTERM
