@@ -128,6 +128,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     if (VirtualStore::IsInit()) {
                         UnrecoverableError("remote storage system was initialized before.");
                     }
+                    LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
                     Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
                                                                   config_ptr_->ObjectStorageUrl(),
                                                                   config_ptr_->ObjectStorageHttps(),

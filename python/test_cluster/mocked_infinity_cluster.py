@@ -3,17 +3,16 @@ import logging
 import platform
 import subprocess
 import sys
-from infinity_cluster import InfinityRunner, InfinityCluster
+from infinity_cluster import InfinityRunner, InfinityCluster, MinioParams, convert_request_to_curl
 import os
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity_http import http_network_util, infinity_http
 
-
-class mocked_infinity_http(infinity_http):
+class mocked_http_network(http_network_util):
     def __init__(self, ns_name: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ns_name = ns_name
@@ -24,7 +23,7 @@ class mocked_infinity_http(infinity_http):
         url = self.base_url + url
         logging.debug("url: " + url)
 
-        cmd = mocked_infinity_http.__convert_request_to_curl(method, header, data, url)
+        cmd = convert_request_to_curl(method, header, data, url)
         cmd = f"sudo ip netns exec {self.ns_name} {cmd}"
         print(f"cmd: {cmd}")
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
@@ -33,14 +32,6 @@ class mocked_infinity_http(infinity_http):
     def raise_exception(self, resp, expect={}):
         # todo: handle curl exception
         pass
-
-    @staticmethod
-    def __convert_request_to_curl(method: str, header: dict, data: dict, url: str):
-        cmd = "curl -X {method} -H {headers} -d '{data}' '{uri}'"
-        method = method.upper()
-        headers = " ".join([f"-H '{key}:{value}'" for key, value in header.items()])
-        data = json.dumps(data)
-        return cmd.format(method=method, headers=headers, data=data, uri=url)
 
 
 class MockedInfinityRunner(InfinityRunner):
@@ -61,14 +52,14 @@ class MockedInfinityRunner(InfinityRunner):
             raise ValueError("Process is already initialized.")
         if config_path:
             self.config_path = config_path
-            self.__load_config()
+            self.load_config()
 
         run_cmd = f"{self.executable_path} --config={self.config_path} 2>&1"
         run_cmd = f"sudo ip netns exec {self.ns_name} {run_cmd}"
         self.process = subprocess.Popen(run_cmd, shell=True)
 
     def add_client(self, http_addr: str):
-        self.client = mocked_infinity_http(self.ns_name, http_addr)
+        self.client = infinity_http(net=mocked_http_network(self.ns_name, http_addr))
 
     def peer_uri(self):
         peer_port = self.network_config["peer_port"]
@@ -76,19 +67,18 @@ class MockedInfinityRunner(InfinityRunner):
 
 
 class MockInfinityCluster(InfinityCluster):
-    def __init__(self, executable_path: str):
-        super().__init__(executable_path)
+    def __init__(self, executable_path: str, *, minio_params: MinioParams = None):
+        super().__init__(executable_path, minio_params=minio_params)
         self.ns_prefix = "ns"
         self.bridge_name = "br0"
         self.mock_ip_prefix = "17.0.0."
         self.mock_ip_mask = 24
-        self.mock_port = 1
         self.cur_ip_suffix = 1
         self.first_mock_ip = None  # for ping test
         self.__check_prerequisites()
         self.__prepare_bridge()
 
-    def __del__(self):
+    def clear(self):
         subprocess.run(f"sudo ip link set {self.bridge_name} down".split())
         subprocess.run(f"sudo brctl delbr {self.bridge_name}".split())
         for ns_name in self.runners:
@@ -97,13 +87,13 @@ class MockInfinityCluster(InfinityCluster):
             subprocess.run(f"sudo ip link delete {veht_name}".split())
 
     def add_node(self, node_name: str, config_path: str):
+        if node_name in self.runners:
+            raise ValueError(f"Node {node_name} already exists in the cluster.")
         ns_name = f"{self.ns_prefix}_{node_name}"
         mock_ip = self.__connect_to_bridge(ns_name, ping=False)
         runner = MockedInfinityRunner(
             mock_ip, ns_name, node_name, self.executable_path, config_path
         )
-        if node_name in self.runners:
-            raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner
 
     def remove_node(self, node_name: str):

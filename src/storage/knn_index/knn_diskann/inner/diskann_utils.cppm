@@ -23,11 +23,86 @@ import third_party;
 import default_values;
 import infinity_exception;
 import logger;
+import status;
 import third_party;
+import local_file_handle;
+import virtual_store;
+import diskann_dist_func;
 
 export module diskann_utils;
 
 namespace infinity {
+export struct QueryStats {
+    f32 total_us_ = 0;
+    f32 io_us_ = 0;
+    f32 cpu_us_ = 0;
+
+    u32 n_4k_ = 0; // number of 4k reads
+    u32 n_8k_ = 0;
+    u32 n_12k_ = 0;
+    u32 n_ios_ = 0;
+    u32 read_size_ = 0;
+    u32 n_cmps_saved_ = 0; // saved cmp operations
+    u32 n_cmps_ = 0;       // cmp operations
+    u32 n_cache_hits_ = 0;
+    u32 n_hops_ = 0;
+};
+
+// Read request info, used in pq_flash_index
+export struct AlignedRead {
+    // all 3 fields must be 512-aligned
+    u64 offset; // read offset
+    u64 len;    // read length
+    void *buf;  // read into buffer
+
+    AlignedRead() : offset(0), len(0), buf(nullptr) {}
+
+    AlignedRead(u64 offset, u64 len, void *buf) : offset(offset), len(len), buf(buf) {
+        assert(offset % 512 == 0);
+        assert(len % 512 == 0);
+        assert(reinterpret_cast<u64>(buf) % 512 == 0);
+    }
+};
+
+// reader of disk index, async = false for now
+export class AlignedFileReader {
+    using This = AlignedFileReader;
+
+private:
+    u64 file_sz_;
+    UniquePtr<LocalFileHandle> file_desc_;
+
+public:
+    AlignedFileReader() : file_sz_(0), file_desc_(nullptr) {}
+
+    AlignedFileReader(This &&other) : file_sz_(other.file_sz_), file_desc_(std::move(other.file_desc_)) {}
+
+    ~AlignedFileReader() = default;
+
+    static UniquePtr<This> Make() { return MakeUnique<This>(); }
+
+    void Read(std::vector<AlignedRead> &read_reqs, bool async = false) {
+        if (async) {
+            Status status = Status::NotSupport("DiskAnn(): Async read not supported yet");
+            RecoverableError(status);
+        }
+
+        for (SizeT reqs = 0; reqs < read_reqs.size(); reqs++) {
+            file_desc_->Seek(read_reqs[reqs].offset);
+            file_desc_->Read(read_reqs[reqs].buf, read_reqs[reqs].len);
+        }
+    }
+
+    void Open(const std::string &file_path) {
+        auto [data_file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        file_desc_ = std::move(data_file_handle);
+    }
+
+    void Close() { file_desc_.reset(); }
+};
 
 export inline void AllocAligned(void **ptr, SizeT size, SizeT align) {
     *ptr = nullptr;
@@ -49,14 +124,14 @@ export inline void AlignedFree(void *ptr) {
 }
 
 export struct Neighbor {
-    u32 id;
+    SizeT id;
     f32 distance;
     bool expanded;
 
     Neighbor() : id(-1), distance(std::numeric_limits<f32>::max()), expanded(false) {};
     // Neighbor() = default;
 
-    Neighbor(u32 id, f32 distance) : id(id), distance(distance), expanded(false) {}
+    Neighbor(SizeT id, f32 distance) : id(id), distance(distance), expanded(false) {}
 
     inline bool operator<(const Neighbor &other) const { return distance < other.distance || (distance == other.distance && id < other.id); }
 
@@ -141,6 +216,7 @@ public:
         AllocAligned((void **)&aligned_pq_coord_scratch_, graph_degree * DISKANN_MAX_PQ_CHUNKS * sizeof(u8), 256);
         AllocAligned((void **)&aligned_pqtable_dist_scratch_, 256 * DISKANN_MAX_PQ_CHUNKS * sizeof(float), 256);
         AllocAligned((void **)&aligned_dist_scratch_, graph_degree * sizeof(f32), 256);
+        AllocAligned((void **)&aligned_query_float_, aligned_dim * sizeof(f32), 8 * sizeof(f32));
         AllocAligned((void **)&rotated_query_, aligned_dim * sizeof(f32), 8 * sizeof(f32));
 
         memset(aligned_query_float_, 0, aligned_dim * sizeof(f32));
@@ -215,7 +291,7 @@ public:
     }
     ~InMemQueryScratch() {
         if (this->aligned_query_T_ != nullptr) {
-            AlignedFree(this->aligned_query_T_);
+            AlignedFree((void *)this->aligned_query_T_);
             this->aligned_query_T_ = nullptr;
         }
 
@@ -282,6 +358,53 @@ private:
     std::unordered_set<u32> expanded_nodes_set_;
     Vector<Neighbor> expanded_nghrs_vec_;
     Vector<u32> occlude_list_output_;
+};
+
+export template <typename DataType>
+class SsdQueryScratch : public AbstractScratch<DataType> {
+public:
+    DataType *coord_scratch_ = nullptr; // at least [sizeof(DataType) * data_dim]
+
+    char *sector_scratch_ = nullptr; // at least [MAX_N_SECTOR_READS * SECTOR_LEN]
+    SizeT sector_idx_ = 0;           // index of the next [SECTOR_LEN] scratch to use
+
+    std::unordered_set<SizeT> visited_;
+    NeighborPriorityQueue retset_;
+    Vector<Neighbor> full_retset_;
+
+public:
+    SsdQueryScratch(SizeT aligned_dim, SizeT visited_reserve) {
+        SizeT coord_alloc_size = RoundUp(sizeof(DataType) * aligned_dim, 256);
+
+        AllocAligned((void **)&coord_scratch_, coord_alloc_size, 256);
+        AllocAligned((void **)&sector_scratch_, DISKANN_MAX_N_SECTOR_READS * DISKANN_SECTOR_LEN, 256);
+        AllocAligned((void **)&this->aligned_query_T_, sizeof(DataType) * aligned_dim, 8 * sizeof(DataType));
+
+        this->pq_scratch_ = new PQScratch<DataType>(DISKANN_MAX_GRAPH_DEGREE, aligned_dim);
+
+        memset(coord_scratch_, 0, coord_alloc_size);
+        memset(this->aligned_query_T_, 0, sizeof(DataType) * aligned_dim);
+
+        visited_.reserve(visited_reserve);
+        full_retset_.reserve(visited_reserve);
+    }
+
+    ~SsdQueryScratch() {
+        AlignedFree((void *)coord_scratch_);
+        AlignedFree((void *)sector_scratch_);
+        AlignedFree((void *)this->aligned_query_T_);
+
+        delete this->pq_scratch_;
+    }
+
+    void Clear() { this->Reset(); }
+
+    void Reset() {
+        sector_idx_ = 0;
+        visited_.clear();
+        retset_.Clear();
+        full_retset_.clear();
+    }
 };
 
 export template <typename T>
@@ -388,7 +511,7 @@ public:
     }
 
     void Destroy() {
-        if (scratch_!= nullptr) {
+        if (scratch_ != nullptr) {
             delete scratch_;
             scratch_ = nullptr;
         }
