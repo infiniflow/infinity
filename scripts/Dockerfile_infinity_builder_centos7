@@ -240,9 +240,4 @@ RUN git clone --single-branch --depth=1 https://github.com/VectorCamp/vectorscan
     && make -j 12 install \
     && rm -rf ../../vectorscan
 
-# Install Docker
-# https://docs.docker.com/engine/install/centos/#install-using-the-convenience-script
-RUN cd /root && curl -fsSL https://get.docker.com -o get-docker.sh \
-    && sh get-docker.sh
-
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

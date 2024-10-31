@@ -1,0 +1,24 @@
+FROM infiniflow/infinity_builder:centos7_clang18
+
+# Install Docker
+# https://docs.docker.com/engine/install/centos/#install-using-the-convenience-script
+RUN cd /root && curl -fsSL https://get.docker.com -o get-docker.sh \
+    && sh get-docker.sh
+
+# Install iproute2 manually
+RUN --mount=type=bind,source=iproute2-6.9.0.tar.gz,target=/root/iproute2-6.9.0.tar.gz \
+    cd /root \
+    && tar -zxf iproute2-6.9.0.tar.gz && cd iproute2-6.9.0 \
+    && ./configure --prefix=/usr/local/iproute2 \
+    && make && make install \
+    && ip -V
+
+# test requirements
+RUN --mount=type=bind,source=python/test_cluster/requirements.txt,target=/root/requirements1.txt \
+    cd /root \
+    && /usr/local/bin/python3.10 -m venv /usr/local/venv310 && source /usr/local/venv310/bin/activate \
+    && pip3 install -r requirements1.txt
+
+RUN yum install -y sudo bridge-utils
+
+ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
