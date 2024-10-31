@@ -200,7 +200,8 @@ void BenchmarkCreateIndex(SharedPtr<Infinity> infinity, const String &db_name, c
     index_info->column_name_ = "text";
     index_info->index_param_list_ = new Vector<InitParameter *>();
 
-    auto r = infinity->CreateIndex(db_name, table_name, index_name, index_info, CreateIndexOptions());
+    String index_comment = "";
+    auto r = infinity->CreateIndex(db_name, table_name, index_name, index_comment, index_info, CreateIndexOptions());
     if (r.IsOk()) {
         r = infinity->Flush();
     } else {
