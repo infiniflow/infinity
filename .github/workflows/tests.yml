@@ -68,6 +68,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
             wget https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/iproute2-6.9.0.tar.gz
+            curl -fsSL https://get.docker.com -o get-docker.sh
             sudo docker build -f scripts/Dockerfile_infinity_tester_centos7 -t infiniflow/infinity_tester:centos7_clang18 .
             echo docker image ls
 

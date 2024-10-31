@@ -2,8 +2,8 @@ FROM infiniflow/infinity_builder:centos7_clang18
 
 # Install Docker
 # https://docs.docker.com/engine/install/centos/#install-using-the-convenience-script
-RUN cd /root && curl -fsSL https://get.docker.com -o get-docker.sh \
-    && sh get-docker.sh
+RUN --mount=type=bind,source=get-docker.sh,target=/root/get-docker.sh \
+    cd /root && sh get-docker.sh
 
 # Install iproute2 manually
 RUN --mount=type=bind,source=iproute2-6.9.0.tar.gz,target=/root/iproute2-6.9.0.tar.gz \
