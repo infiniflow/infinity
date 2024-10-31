@@ -139,3 +139,6 @@ tmp*/
 dist/
 python/infinity_sdk/infinity_sdk.egg-info/
 minio/
+
+# not ignore Dockerfile
+!Dockerfile*
