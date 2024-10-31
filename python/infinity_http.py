@@ -376,7 +376,7 @@ class table_http:
         h = self.net.set_up_header(
             ["accept", "content-type"],
         )
-        d = self.set_up_data(
+        d = self.net.set_up_data(
             ["create_option"], {"comment" : index_comment, "fields": fields, "index": create_index_info, "create_option": copt}
         )
         r = self.net.request(url, "post", h, d)
@@ -404,9 +404,9 @@ class table_http:
 
     def show_index(self, index_name):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
         r_json = r.json()
         index_comment = r_json.get("index_comment", "")
         return database_result(index_comment=index_comment)
