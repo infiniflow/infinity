@@ -161,7 +161,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 
     // 2 build query iterator
     // result
-    FullTextQueryContext full_text_query_context;
+    FullTextQueryContext full_text_query_context(ft_similarity_, minimum_should_match_option_);
     u32 result_count = 0;
     const float *score_result = nullptr;
     const RowID *row_id_result = nullptr;
@@ -182,7 +182,8 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree_));
 
     if (use_block_max_iter) {
-        et_iter = query_builder.CreateSearch(full_text_query_context, early_term_algo_, minimum_should_match_option_);
+        full_text_query_context.early_term_algo_ = early_term_algo_;
+        et_iter = query_builder.CreateSearch(full_text_query_context);
         // et_iter is nullptr if fulltext index is present but there's no data
         if (et_iter != nullptr) {
             et_iter->UpdateScoreThreshold(std::max(begin_threshold_, score_threshold_));
@@ -193,7 +194,8 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         }
     }
     if (use_ordinary_iter) {
-        doc_iterator = query_builder.CreateSearch(full_text_query_context, EarlyTermAlgo::kNaive, minimum_should_match_option_);
+        full_text_query_context.early_term_algo_ = EarlyTermAlgo::kNaive;
+        doc_iterator = query_builder.CreateSearch(full_text_query_context);
         if (doc_iterator && score_threshold_ > 0.0f) {
             auto new_doc_iter = MakeUnique<ScoreThresholdIterator>(std::move(doc_iterator), score_threshold_);
             doc_iterator = std::move(new_doc_iter);
@@ -351,6 +353,7 @@ PhysicalMatch::PhysicalMatch(const u64 id,
                              const SharedPtr<CommonQueryFilter> &common_query_filter,
                              MinimumShouldMatchOption &&minimum_should_match_option,
                              const f32 score_threshold,
+                             const FulltextSimilarity ft_similarity,
                              const u64 match_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas,
                              const bool cache_result)
@@ -358,7 +361,7 @@ PhysicalMatch::PhysicalMatch(const u64 id,
       base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), index_reader_(std::move(index_reader)),
       query_tree_(std::move(query_tree)), begin_threshold_(begin_threshold), early_term_algo_(early_term_algo), top_n_(top_n),
       common_query_filter_(common_query_filter), minimum_should_match_option_(std::move(minimum_should_match_option)),
-      score_threshold_(score_threshold) {}
+      score_threshold_(score_threshold), ft_similarity_(ft_similarity) {}
 
 PhysicalMatch::~PhysicalMatch() = default;
 

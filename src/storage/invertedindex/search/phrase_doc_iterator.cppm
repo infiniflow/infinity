@@ -9,12 +9,13 @@ import third_party;
 import posting_iterator;
 import index_defines;
 import column_length_io;
+import parse_fulltext_options;
 
 namespace infinity {
 
 export class PhraseDocIterator final : public DocIterator {
 public:
-    PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight, u32 slop = 0);
+    PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight, u32 slop, FulltextSimilarity ft_similarity);
 
     inline u32 GetDocFreq() const { return doc_freq_; }
 
@@ -33,7 +34,16 @@ public:
 
     float BM25Score();
 
-    float Score() override { return BM25Score(); }
+    float Score() override {
+        switch (ft_similarity_) {
+            case FulltextSimilarity::kBM25: {
+                return BM25Score();
+            }
+            case FulltextSimilarity::kBoolean: {
+                return GetWeight();
+            }
+        }
+    }
 
     void UpdateScoreThreshold(float threshold) override {
         if (threshold > threshold_)
@@ -64,6 +74,7 @@ private:
     Vector<UniquePtr<PostingIterator>> pos_iters_;
     float weight_;
     u32 slop_{};
+    const FulltextSimilarity ft_similarity_ = FulltextSimilarity::kBM25;
 
     // for BM25 Score
     float bm25_score_cache_ = 0.0f;

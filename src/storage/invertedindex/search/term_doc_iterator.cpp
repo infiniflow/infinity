@@ -24,8 +24,8 @@ import logger;
 
 namespace infinity {
 
-TermDocIterator::TermDocIterator(UniquePtr<PostingIterator> &&iter, const u64 column_id, const float weight)
-    : column_id_(column_id), iter_(std::move(iter)), weight_(weight) {
+TermDocIterator::TermDocIterator(UniquePtr<PostingIterator> &&iter, const u64 column_id, const float weight, const FulltextSimilarity ft_similarity)
+    : column_id_(column_id), iter_(std::move(iter)), weight_(weight), ft_similarity_(ft_similarity) {
     doc_freq_ = iter_->GetDocFreq();
     term_freq_ = 0;
     estimate_iterate_cost_ = {0, doc_freq_};

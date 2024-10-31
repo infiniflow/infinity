@@ -533,15 +533,14 @@ private:
                         RecoverableError(Status::ParseMatchExprFailed(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_));
                     }
                 }
-                //TODO: ft_similarity
-                (void)(ft_similarity);
                 return MakeUnique<IndexFilterEvaluatorFulltext>(filter_fulltext_expr,
                                                                 table_entry_ptr_,
                                                                 early_term_algo,
                                                                 std::move(index_reader),
                                                                 std::move(query_tree),
                                                                 std::move(minimum_should_match_option),
-                                                                score_threshold);
+                                                                score_threshold,
+                                                                ft_similarity);
             }
             case Enum::kAndExpr: {
                 Vector<UniquePtr<IndexFilterEvaluator>> candidates;
