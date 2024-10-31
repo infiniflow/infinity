@@ -136,11 +136,12 @@ class ThriftInfinityClient:
                                                     table_name=table_name))
 
     def create_index(self, db_name: str, table_name: str, index_name: str, index_info: IndexInfo,
-                     conflict_type: CreateConflict = CreateConflict.Error):
+                     conflict_type: CreateConflict = CreateConflict.Error, index_comment : str = ""):
         return self.client.CreateIndex(CreateIndexRequest(session_id=self.session_id,
                                                           db_name=db_name,
                                                           table_name=table_name,
                                                           index_name=index_name,
+                                                          index_comment=index_comment,
                                                           index_info=index_info,
                                                           create_option=CreateOption(conflict_type=conflict_type)))
 

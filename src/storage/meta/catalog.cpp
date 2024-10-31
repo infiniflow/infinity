@@ -15,10 +15,10 @@
 module;
 
 #include <cassert>
+#include <filesystem>
 #include <fstream>
 #include <thread>
 #include <vector>
-#include <filesystem>
 
 module catalog;
 
@@ -984,7 +984,7 @@ UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
     String dst_dir = catalog_path.parent_path().string();
     String dst_file_name = catalog_path.filename().string();
 
-    if (!VirtualStore::Exists(dst_dir)){
+    if (!VirtualStore::Exists(dst_dir)) {
         VirtualStore::MakeDirectory(dst_dir);
     }
 

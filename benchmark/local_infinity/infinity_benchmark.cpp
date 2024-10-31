@@ -216,8 +216,16 @@ int main() {
                         col2->names_.emplace_back("col2");
                         output_columns->emplace_back(col2);
 
-                        [[maybe_unused]] auto ignored =
-                            infinity->Search("default_db", "benchmark_test", nullptr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr);
+                        [[maybe_unused]] auto ignored = infinity->Search("default_db",
+                                                                         "benchmark_test",
+                                                                         nullptr,
+                                                                         nullptr,
+                                                                         nullptr,
+                                                                         nullptr,
+                                                                         output_columns,
+                                                                         nullptr,
+                                                                         nullptr,
+                                                                         nullptr);
                     });
                 results.push_back(fmt::format("-> Select QPS: {}", total_times / tims_costing_second));
             }
@@ -395,7 +403,8 @@ int main() {
             index_info->index_param_list_ = index_param_list;
         }
 
-        infinity->CreateIndex(db_name, table_name, index_name, index_info, CreateIndexOptions());
+        String index_comment = "";
+        infinity->CreateIndex(db_name, table_name, index_name, index_comment, index_info, CreateIndexOptions());
     } while (false);
 
     //    {

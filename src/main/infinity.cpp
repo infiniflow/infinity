@@ -461,6 +461,7 @@ QueryResult Infinity::ListTableIndexes(const String &db_name, const String &tabl
 QueryResult Infinity::CreateIndex(const String &db_name,
                                   const String &table_name,
                                   const String &index_name,
+                                  const String &index_comment,
                                   IndexInfo *index_info_ptr,
                                   const CreateIndexOptions &create_index_options) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
@@ -476,6 +477,9 @@ QueryResult Infinity::CreateIndex(const String &db_name,
 
     create_index_info->index_name_ = index_name;
     ToLower(create_index_info->index_name_);
+
+    create_index_info->comment_ = index_comment;
+    ToLower(create_index_info->comment_);
 
     ToLower(index_info_ptr->column_name_);
     for (InitParameter *init_param_ptr : *index_info_ptr->index_param_list_) {

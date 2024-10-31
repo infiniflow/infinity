@@ -406,8 +406,8 @@ Vector<String> TableIndexEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp b
     std::shared_lock lock(rw_locker_);
     Vector<String> res;
     res.reserve(index_by_segment_.size());
-    for(const auto& index_pair: index_by_segment_) {
-        const SegmentIndexEntry* segment_index_entry = index_pair.second.get();
+    for (const auto &index_pair : index_by_segment_) {
+        const SegmentIndexEntry *segment_index_entry = index_pair.second.get();
         Vector<String> segment_files = segment_index_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), segment_files.begin(), segment_files.end());
     }

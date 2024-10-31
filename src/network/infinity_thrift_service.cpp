@@ -1327,7 +1327,8 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
     }
     index_info_to_use->index_param_list_ = index_param_list;
 
-    QueryResult result = infinity->CreateIndex(request.db_name, request.table_name, request.index_name, index_info_to_use, create_index_opts);
+    QueryResult result =
+        infinity->CreateIndex(request.db_name, request.table_name, request.index_name, request.index_comment, index_info_to_use, create_index_opts);
     ProcessQueryResult(response, result);
 }
 
@@ -1392,7 +1393,7 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 10) {
+        if (row_count != 11) {
             String error_message = "ShowIndex: query result is invalid.";
             UnrecoverableError(error_message);
         }
@@ -1414,36 +1415,41 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
 
         {
             Value value = data_block->GetValue(1, 3);
-            response.index_type = value.GetVarchar();
+            response.index_comment = value.GetVarchar();
         }
 
         {
             Value value = data_block->GetValue(1, 4);
-            response.index_column_names = value.GetVarchar();
+            response.index_type = value.GetVarchar();
         }
 
         {
             Value value = data_block->GetValue(1, 5);
-            response.index_column_ids = value.GetVarchar();
+            response.index_column_names = value.GetVarchar();
         }
 
         {
             Value value = data_block->GetValue(1, 6);
-            response.other_parameters = value.GetVarchar();
+            response.index_column_ids = value.GetVarchar();
         }
 
         {
             Value value = data_block->GetValue(1, 7);
-            response.store_dir = value.GetVarchar();
+            response.other_parameters = value.GetVarchar();
         }
 
         {
             Value value = data_block->GetValue(1, 8);
-            response.store_size = value.GetVarchar();
+            response.store_dir = value.GetVarchar();
         }
 
         {
             Value value = data_block->GetValue(1, 9);
+            response.store_size = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(1, 10);
             response.segment_index_count = value.GetVarchar();
         }
 

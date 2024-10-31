@@ -34,7 +34,7 @@ import logger;
 
 namespace infinity {
 
-String DiskAnnEncodeTypeToString(DiskAnnEncodeType encode_type){
+String DiskAnnEncodeTypeToString(DiskAnnEncodeType encode_type) {
     switch (encode_type) {
         case DiskAnnEncodeType::kPlain:
             return "plain";
@@ -43,7 +43,7 @@ String DiskAnnEncodeTypeToString(DiskAnnEncodeType encode_type){
     }
 }
 
-DiskAnnEncodeType StringToDiskAnnEncodeType(const String &str){
+DiskAnnEncodeType StringToDiskAnnEncodeType(const String &str) {
     if (str == "plain") {
         return DiskAnnEncodeType::kPlain;
     } else {
@@ -51,8 +51,11 @@ DiskAnnEncodeType StringToDiskAnnEncodeType(const String &str){
     }
 }
 
-SharedPtr<IndexBase>
-IndexDiskAnn::Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
+SharedPtr<IndexBase> IndexDiskAnn::Make(SharedPtr<String> index_name,
+                                        SharedPtr<String> index_comment,
+                                        const String &file_name,
+                                        Vector<String> column_names,
+                                        const Vector<InitParameter *> &index_param_list) {
     SizeT R = DISKANN_R;
     SizeT L = DISKANN_L;
     SizeT num_pq_chunks = DISKANN_NUM_PQ_CHUNKS;
@@ -90,20 +93,19 @@ IndexDiskAnn::Make(SharedPtr<String> index_name, const String &file_name, Vector
         RecoverableError(status);
     }
 
-    return std::make_shared<IndexDiskAnn>(index_name, file_name, std::move(column_names), metric_type, encode_type, R, L, num_pq_chunks, num_parts);
+    return std::make_shared<
+        IndexDiskAnn>(index_name, index_comment, file_name, std::move(column_names), metric_type, encode_type, R, L, num_pq_chunks, num_parts);
 }
 
 bool IndexDiskAnn::operator==(const IndexDiskAnn &other) const {
     if (this->index_type_ != other.index_type_ || this->file_name_ != other.file_name_ || this->column_names_ != other.column_names_) {
         return false;
     }
-    return metric_type_ == other.metric_type_ && encode_type_ == other.encode_type_ &&  R_ == other.R_ && L_ == other.L_ && 
-    num_pq_chunks_ == other.num_pq_chunks_ && num_parts_ == other.num_parts_;
+    return metric_type_ == other.metric_type_ && encode_type_ == other.encode_type_ && R_ == other.R_ && L_ == other.L_ &&
+           num_pq_chunks_ == other.num_pq_chunks_ && num_parts_ == other.num_parts_;
 }
 
-bool IndexDiskAnn::operator!=(const IndexDiskAnn &other) const {
-    return !(*this == other);
-}
+bool IndexDiskAnn::operator!=(const IndexDiskAnn &other) const { return !(*this == other); }
 
 i32 IndexDiskAnn::GetSizeInBytes() const {
     SizeT size = IndexBase::GetSizeInBytes();
@@ -126,15 +128,17 @@ void IndexDiskAnn::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, num_parts_);
 }
 
-String IndexDiskAnn::ToString() const{
+String IndexDiskAnn::ToString() const {
     std::stringstream ss;
-    ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << R_ << ", " << L_ << ", " << num_pq_chunks_ << ", " << num_parts_;
+    ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << R_ << ", " << L_ << ", " << num_pq_chunks_ << ", "
+       << num_parts_;
     return ss.str();
 }
 
 String IndexDiskAnn::BuildOtherParamsString() const {
     std::stringstream ss;
-    ss << "metric_type=" << MetricTypeToString(metric_type_) << ", encode_type=" << DiskAnnEncodeTypeToString(encode_type_) << ", R=" << R_ << ", L=" << L_ << ", num_pq_chunks=" << num_pq_chunks_ << ", num_parts=" << num_parts_;
+    ss << "metric_type=" << MetricTypeToString(metric_type_) << ", encode_type=" << DiskAnnEncodeTypeToString(encode_type_) << ", R=" << R_
+       << ", L=" << L_ << ", num_pq_chunks=" << num_pq_chunks_ << ", num_parts=" << num_parts_;
     return ss.str();
 }
 
@@ -161,7 +165,6 @@ void IndexDiskAnn::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_ta
             fmt::format("Attempt to create DsikAnn index on column: {}, data type: {}.", column_name, data_type->ToString()));
         RecoverableError(status);
     }
-
 }
 
 } // namespace infinity

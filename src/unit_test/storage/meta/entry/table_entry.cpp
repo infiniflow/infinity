@@ -44,16 +44,12 @@ using namespace infinity;
 
 class TableEntryTest : public BaseTestParamStr {};
 
-void InsertData(const String& db_name, const String& table_name) {
+void InsertData(const String &db_name, const String &table_name) {
     Vector<Vector<String>> datas_ = {
-        {
-         R"#(Animalia is an illustrated children's book by anarchism Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold. A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket.)#"},
-        {
-         R"#(The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch.)#"},
-        {
-         R"#(The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.)#"},
-        {
-         R"#(周末我和朋友一起去“电子城”，想挑选一些新的“电脑配件”。那里有各种各样的“hardware”，如“motherboard”、“graphics card”等。我们还看到了一些很“awesome”的“peripheral devices”，像“keyboard”和“mouse”。我朋友说他需要一个新的“power supply”，而我则对那些“high-tech”的“storage devices”比较感兴趣。逛了一会儿后，我们都买到了自己心仪的东西，然后就“happily”回家了。)#"},
+        {R"#(Animalia is an illustrated children's book by anarchism Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold. A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket.)#"},
+        {R"#(The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch.)#"},
+        {R"#(The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.)#"},
+        {R"#(周末我和朋友一起去“电子城”，想挑选一些新的“电脑配件”。那里有各种各样的“hardware”，如“motherboard”、“graphics card”等。我们还看到了一些很“awesome”的“peripheral devices”，像“keyboard”和“mouse”。我朋友说他需要一个新的“power supply”，而我则对那些“high-tech”的“storage devices”比较感兴趣。逛了一会儿后，我们都买到了自己心仪的东西，然后就“happily”回家了。)#"},
     };
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
@@ -73,7 +69,7 @@ void InsertData(const String& db_name, const String& table_name) {
                     auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
                     column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
                 }
-                auto& row = datas_[block_id];
+                auto &row = datas_[block_id];
                 for (SizeT i = 0; i < column_vectors.size(); ++i) {
                     auto &column = row[i];
                     column_vectors[i].AppendByStringView(column);
@@ -82,7 +78,6 @@ void InsertData(const String& db_name, const String& table_name) {
             }
             segment_entry->AppendBlockEntry(std::move(block_entry));
         }
-
     }
     segment_entry->FlushNewData();
     txn->Import(table_entry, segment_entry);
@@ -94,13 +89,12 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TableEntryTest,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
-TEST_P(TableEntryTest, decode_index_test){
+TEST_P(TableEntryTest, decode_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog(); 
+    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
 
-
-    //create table, drop table
+    // create table, drop table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -108,15 +102,15 @@ TEST_P(TableEntryTest, decode_index_test){
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
 
-        String encode_index = TableEntry::EncodeIndex("tbl1",  table_entry->GetTableMeta());
+        String encode_index = TableEntry::EncodeIndex("tbl1", table_entry->GetTableMeta());
         EXPECT_TRUE(TableEntry::DecodeIndex(encode_index)[0] == "default_db");
         EXPECT_TRUE(TableEntry::DecodeIndex(encode_index)[1] == "tbl1");
         EXPECT_THROW(TableEntry::DecodeIndex("/default_db/tbl1"), UnrecoverableException);
@@ -128,14 +122,14 @@ TEST_P(TableEntryTest, decode_index_test){
     txn_mgr->CommitTxn(txn1);
 }
 
-TEST_P(TableEntryTest,  create_no_name_index_test){
+TEST_P(TableEntryTest, create_no_name_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
 
-    //create table
+    // create table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -143,12 +137,12 @@ TEST_P(TableEntryTest,  create_no_name_index_test){
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -162,7 +156,7 @@ TEST_P(TableEntryTest,  create_no_name_index_test){
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
         SharedPtr<String> index_name = MakeShared<String>("");
-        auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
+        auto index_base_hnsw = IndexHnsw::Make(index_name, MakeShared<String>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {
             delete init_parameter;
         }
@@ -172,11 +166,10 @@ TEST_P(TableEntryTest,  create_no_name_index_test){
         ConflictType conflict_type = ConflictType::kError;
         auto [table_entry, table_status] = catalog->GetTableByName(db_name, table_name, txn1->TxnID(), txn1->BeginTS());
         EXPECT_EQ(table_status.ok(), true);
-        EXPECT_THROW(table_entry->CreateIndex(index_base_hnsw, conflict_type, txn1->TxnID(), txn1->BeginTS(), txn_mgr), 
-                    UnrecoverableException);
+        EXPECT_THROW(table_entry->CreateIndex(index_base_hnsw, conflict_type, txn1->TxnID(), txn1->BeginTS(), txn_mgr), UnrecoverableException);
     }
 
-    //drop table
+    // drop table
     {
         auto [table_entry, status] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
@@ -185,14 +178,14 @@ TEST_P(TableEntryTest,  create_no_name_index_test){
     txn_mgr->CommitTxn(txn1);
 }
 
-TEST_P(TableEntryTest,  remove_index_test){
+TEST_P(TableEntryTest, remove_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
 
-    //create table
+    // create table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -200,12 +193,12 @@ TEST_P(TableEntryTest,  remove_index_test){
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -219,7 +212,7 @@ TEST_P(TableEntryTest,  remove_index_test){
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
         SharedPtr<String> index_name = MakeShared<String>("hnsw_index");
-        auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
+        auto index_base_hnsw = IndexHnsw::Make(index_name, MakeShared<String>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {
             delete init_parameter;
         }
@@ -232,17 +225,18 @@ TEST_P(TableEntryTest,  remove_index_test){
         auto [index_entry, index_status] = catalog->CreateIndex(table_entry, index_base_hnsw, conflict_type, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_EQ(index_status.ok(), true);
 
-        table_entry->RemoveIndexEntry("hnsw_index",txn1->TxnID());
+        table_entry->RemoveIndexEntry("hnsw_index", txn1->TxnID());
     }
 
-    //drop index
+    // drop index
     {
-        auto [index_entry, status] = catalog->DropIndex("default_db", "tbl1", "hnsw_index", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
+        auto [index_entry, status] =
+            catalog->DropIndex("default_db", "tbl1", "hnsw_index", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_FALSE(status.ok());
-        EXPECT_STREQ(status.message() ,"Not existed entry.");
+        EXPECT_STREQ(status.message(), "Not existed entry.");
     }
 
-    //drop table
+    // drop table
     {
         auto [table_entry, status] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
@@ -251,14 +245,14 @@ TEST_P(TableEntryTest,  remove_index_test){
     txn_mgr->CommitTxn(txn1);
 }
 
-TEST_P(TableEntryTest,  table_indexes_test){
+TEST_P(TableEntryTest, table_indexes_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
 
-    //create table
+    // create table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -266,12 +260,12 @@ TEST_P(TableEntryTest,  table_indexes_test){
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -285,7 +279,7 @@ TEST_P(TableEntryTest,  table_indexes_test){
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
         SharedPtr<String> index_name = MakeShared<String>("hnsw_index");
-        auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
+        auto index_base_hnsw = IndexHnsw::Make(index_name, MakeShared<String>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {
             delete init_parameter;
         }
@@ -304,13 +298,14 @@ TEST_P(TableEntryTest,  table_indexes_test){
         EXPECT_EQ(table_entry->TableIndexes(txn1->TxnID(), txn1->BeginTS()).size(), 1);
     }
 
-    //drop index
+    // drop index
     {
-        auto [index_entry, status] = catalog->DropIndex("default_db", "tbl1", "hnsw_index", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
+        auto [index_entry, status] =
+            catalog->DropIndex("default_db", "tbl1", "hnsw_index", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
-    //drop table
+    // drop table
     {
         auto [table_entry, status] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
@@ -321,10 +316,10 @@ TEST_P(TableEntryTest,  table_indexes_test){
     txn_mgr->CommitTxn(txn1);
 }
 
-TEST_P(TableEntryTest,  get_fulltext_analyzers_test){
+TEST_P(TableEntryTest, get_fulltext_analyzers_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-    //create table
+    // create table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Vector<SharedPtr<ColumnDef>> columns;
@@ -332,8 +327,7 @@ TEST_P(TableEntryTest,  get_fulltext_analyzers_test){
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -342,10 +336,8 @@ TEST_P(TableEntryTest,  get_fulltext_analyzers_test){
         txn_mgr->CommitTxn(txn1);
     }
 
-    //insert data
-    {
-        InsertData("default_db", "tbl1");
-    }
+    // insert data
+    { InsertData("default_db", "tbl1"); }
 
     // CreateIndex
     {
@@ -353,7 +345,8 @@ TEST_P(TableEntryTest,  get_fulltext_analyzers_test){
         Vector<String> columns1{"col1"};
         Vector<InitParameter *> parameters1;
         SharedPtr<String> index_name = MakeShared<String>("fulltext_index");
-        auto index_base_fulltext = IndexFullText::Make(index_name, "fulltext_index_test_fulltext", columns1, parameters1);
+        auto index_base_fulltext =
+            IndexFullText::Make(index_name, MakeShared<String>("test comment"), "fulltext_index_test_fulltext", columns1, parameters1);
 
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
@@ -364,15 +357,15 @@ TEST_P(TableEntryTest,  get_fulltext_analyzers_test){
         EXPECT_EQ(index_status.ok(), true);
 
         Map<String, String> column2analyzer;
-        table_entry->GetFulltextAnalyzers(txn1->TxnID(), txn1->BeginTS(),column2analyzer);
-        for(auto pair : column2analyzer){
+        table_entry->GetFulltextAnalyzers(txn1->TxnID(), txn1->BeginTS(), column2analyzer);
+        for (auto pair : column2analyzer) {
             EXPECT_STREQ(pair.first.c_str(), "col1");
             EXPECT_STREQ(pair.second.c_str(), "standard");
         }
         txn_mgr->CommitTxn(txn1);
     }
 
-    //drop index
+    // drop index
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop index"));
         auto status = txn1->DropIndexByName("default_db", "tbl1", "fulltext_index", ConflictType::kError);
@@ -380,7 +373,7 @@ TEST_P(TableEntryTest,  get_fulltext_analyzers_test){
         txn_mgr->CommitTxn(txn1);
     }
 
-    //drop table
+    // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
@@ -389,10 +382,10 @@ TEST_P(TableEntryTest,  get_fulltext_analyzers_test){
     }
 }
 
-TEST_P(TableEntryTest,  optimize_fulltext_index_test){
+TEST_P(TableEntryTest, optimize_fulltext_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-    //create table
+    // create table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Vector<SharedPtr<ColumnDef>> columns;
@@ -400,8 +393,7 @@ TEST_P(TableEntryTest,  optimize_fulltext_index_test){
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -410,10 +402,8 @@ TEST_P(TableEntryTest,  optimize_fulltext_index_test){
         txn_mgr->CommitTxn(txn1);
     }
 
-    //insert data
-    {
-        InsertData("default_db", "tbl1");
-    }
+    // insert data
+    { InsertData("default_db", "tbl1"); }
 
     // CreateIndex
     {
@@ -421,7 +411,8 @@ TEST_P(TableEntryTest,  optimize_fulltext_index_test){
         Vector<String> columns1{"col1"};
         Vector<InitParameter *> parameters1;
         SharedPtr<String> index_name = MakeShared<String>("fulltext_index");
-        auto index_base_fulltext = IndexFullText::Make(index_name, "fulltext_index_test_fulltext", columns1, parameters1);
+        auto index_base_fulltext =
+            IndexFullText::Make(index_name, MakeShared<String>("test comment"), "fulltext_index_test_fulltext", columns1, parameters1);
 
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
@@ -434,10 +425,8 @@ TEST_P(TableEntryTest,  optimize_fulltext_index_test){
         txn_mgr->CommitTxn(txn1);
     }
 
-    //insert data
-    {
-        InsertData("default_db", "tbl1");
-    }
+    // insert data
+    { InsertData("default_db", "tbl1"); }
 
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"));
@@ -449,7 +438,7 @@ TEST_P(TableEntryTest,  optimize_fulltext_index_test){
         txn_mgr->CommitTxn(txn1);
     }
 
-    //drop index
+    // drop index
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop index"));
         auto status = txn1->DropIndexByName("default_db", "tbl1", "fulltext_index", ConflictType::kError);
@@ -457,7 +446,7 @@ TEST_P(TableEntryTest,  optimize_fulltext_index_test){
         txn_mgr->CommitTxn(txn1);
     }
 
-    //drop table
+    // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
@@ -466,10 +455,10 @@ TEST_P(TableEntryTest,  optimize_fulltext_index_test){
     }
 }
 
-TEST_P(TableEntryTest,  roll_back_committed_write_test){
+TEST_P(TableEntryTest, roll_back_committed_write_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-    //create table
+    // create table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Vector<SharedPtr<ColumnDef>> columns;
@@ -477,8 +466,7 @@ TEST_P(TableEntryTest,  roll_back_committed_write_test){
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -492,14 +480,10 @@ TEST_P(TableEntryTest,  roll_back_committed_write_test){
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         Vector<Vector<String>> datas_ = {
-            {
-            R"#(Animalia is an illustrated children's book by anarchism Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold. A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket.)#"},
-            {
-            R"#(The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch.)#"},
-            {
-            R"#(The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.)#"},
-            {
-            R"#(周末我和朋友一起去“电子城”，想挑选一些新的“电脑配件”。那里有各种各样的“hardware”，如“motherboard”、“graphics card”等。我们还看到了一些很“awesome”的“peripheral devices”，像“keyboard”和“mouse”。我朋友说他需要一个新的“power supply”，而我则对那些“high-tech”的“storage devices”比较感兴趣。逛了一会儿后，我们都买到了自己心仪的东西，然后就“happily”回家了。)#"},
+            {R"#(Animalia is an illustrated children's book by anarchism Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold. A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket.)#"},
+            {R"#(The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch.)#"},
+            {R"#(The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.)#"},
+            {R"#(周末我和朋友一起去“电子城”，想挑选一些新的“电脑配件”。那里有各种各样的“hardware”，如“motherboard”、“graphics card”等。我们还看到了一些很“awesome”的“peripheral devices”，像“keyboard”和“mouse”。我朋友说他需要一个新的“power supply”，而我则对那些“high-tech”的“storage devices”比较感兴趣。逛了一会儿后，我们都买到了自己心仪的东西，然后就“happily”回家了。)#"},
         };
         TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
@@ -519,7 +503,7 @@ TEST_P(TableEntryTest,  roll_back_committed_write_test){
                         auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
                         column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
                     }
-                    auto& row = datas_[block_id];
+                    auto &row = datas_[block_id];
                     for (SizeT i = 0; i < column_vectors.size(); ++i) {
                         auto &column = row[i];
                         column_vectors[i].AppendByStringView(column);
@@ -528,23 +512,22 @@ TEST_P(TableEntryTest,  roll_back_committed_write_test){
                 }
                 segment_entry->AppendBlockEntry(std::move(block_entry));
             }
-
         }
         segment_entry->FlushNewData();
         txn->Import(table_entry, segment_entry);
         auto txn_store = txn->GetTxnTableStore(table_entry);
         txn_store->SetAppendState(MakeUnique<AppendState>(txn_store->GetBlocks()));
         Vector<TxnSegmentStore> segment_stores;
-        for(auto pair : txn_store->txn_segments()){
+        for (auto pair : txn_store->txn_segments()) {
             segment_stores.emplace_back(pair.second);
         }
         table_entry->CommitWrite(txn->TxnID(), txn->CommitTS(), txn_store->txn_segments(), nullptr);
-        std::cout<<segment_stores.size()<<std::endl;
+        std::cout << segment_stores.size() << std::endl;
         auto status1 = table_entry->RollbackWrite(txn->CommitTS(), segment_stores);
         EXPECT_TRUE(status1.ok());
     }
 
-    //drop table
+    // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
@@ -553,10 +536,10 @@ TEST_P(TableEntryTest,  roll_back_committed_write_test){
     }
 }
 
-TEST_P(TableEntryTest,  roll_back_uncommitted_write_test){
+TEST_P(TableEntryTest, roll_back_uncommitted_write_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-    //create table
+    // create table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Vector<SharedPtr<ColumnDef>> columns;
@@ -564,8 +547,7 @@ TEST_P(TableEntryTest,  roll_back_uncommitted_write_test){
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -579,14 +561,10 @@ TEST_P(TableEntryTest,  roll_back_uncommitted_write_test){
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         Vector<Vector<String>> datas_ = {
-            {
-            R"#(Animalia is an illustrated children's book by anarchism Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold. A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket.)#"},
-            {
-            R"#(The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch.)#"},
-            {
-            R"#(The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.)#"},
-            {
-            R"#(周末我和朋友一起去“电子城”，想挑选一些新的“电脑配件”。那里有各种各样的“hardware”，如“motherboard”、“graphics card”等。我们还看到了一些很“awesome”的“peripheral devices”，像“keyboard”和“mouse”。我朋友说他需要一个新的“power supply”，而我则对那些“high-tech”的“storage devices”比较感兴趣。逛了一会儿后，我们都买到了自己心仪的东西，然后就“happily”回家了。)#"},
+            {R"#(Animalia is an illustrated children's book by anarchism Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold. A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket.)#"},
+            {R"#(The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch.)#"},
+            {R"#(The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.)#"},
+            {R"#(周末我和朋友一起去“电子城”，想挑选一些新的“电脑配件”。那里有各种各样的“hardware”，如“motherboard”、“graphics card”等。我们还看到了一些很“awesome”的“peripheral devices”，像“keyboard”和“mouse”。我朋友说他需要一个新的“power supply”，而我则对那些“high-tech”的“storage devices”比较感兴趣。逛了一会儿后，我们都买到了自己心仪的东西，然后就“happily”回家了。)#"},
         };
         TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
@@ -606,7 +584,7 @@ TEST_P(TableEntryTest,  roll_back_uncommitted_write_test){
                         auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
                         column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
                     }
-                    auto& row = datas_[block_id];
+                    auto &row = datas_[block_id];
                     for (SizeT i = 0; i < column_vectors.size(); ++i) {
                         auto &column = row[i];
                         column_vectors[i].AppendByStringView(column);
@@ -615,21 +593,20 @@ TEST_P(TableEntryTest,  roll_back_uncommitted_write_test){
                 }
                 segment_entry->AppendBlockEntry(std::move(block_entry));
             }
-
         }
         segment_entry->FlushNewData();
         txn->Import(table_entry, segment_entry);
         auto txn_store = txn->GetTxnTableStore(table_entry);
         txn_store->SetAppendState(MakeUnique<AppendState>(txn_store->GetBlocks()));
         Vector<TxnSegmentStore> segment_stores;
-        for(auto pair : txn_store->txn_segments()){
+        for (auto pair : txn_store->txn_segments()) {
             segment_stores.emplace_back(pair.second);
         }
         auto status1 = table_entry->RollbackWrite(txn->CommitTS(), segment_stores);
         EXPECT_TRUE(status1.ok());
     }
 
-    //drop table
+    // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
@@ -638,10 +615,10 @@ TEST_P(TableEntryTest,  roll_back_uncommitted_write_test){
     }
 }
 
-TEST_P(TableEntryTest,  compact_test){
+TEST_P(TableEntryTest, compact_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-    //create table
+    // create table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Vector<SharedPtr<ColumnDef>> columns;
@@ -649,8 +626,7 @@ TEST_P(TableEntryTest,  compact_test){
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -659,10 +635,8 @@ TEST_P(TableEntryTest,  compact_test){
         txn_mgr->CommitTxn(txn1);
     }
 
-    //insert data
-    {
-        InsertData("default_db", "tbl1");
-    }
+    // insert data
+    { InsertData("default_db", "tbl1"); }
 
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("compact"));
@@ -677,7 +651,7 @@ TEST_P(TableEntryTest,  compact_test){
         table_entry->CheckCompaction(txn1->TxnID());
     }
 
-    //drop table
+    // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
@@ -686,10 +660,10 @@ TEST_P(TableEntryTest,  compact_test){
     }
 }
 
-TEST_P(TableEntryTest,  check_any_delete_test){
+TEST_P(TableEntryTest, check_any_delete_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-    //create table
+    // create table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Vector<SharedPtr<ColumnDef>> columns;
@@ -697,8 +671,7 @@ TEST_P(TableEntryTest,  check_any_delete_test){
             std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -707,10 +680,8 @@ TEST_P(TableEntryTest,  check_any_delete_test){
         txn_mgr->CommitTxn(txn1);
     }
 
-    //insert data
-    {
-        InsertData("default_db", "tbl1");
-    }
+    // insert data
+    { InsertData("default_db", "tbl1"); }
 
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("check"));
@@ -727,7 +698,7 @@ TEST_P(TableEntryTest,  check_any_delete_test){
         EXPECT_TRUE(table_entry->CheckAnyDelete(txn2->BeginTS()));
     }
 
-    //drop table
+    // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
@@ -736,16 +707,16 @@ TEST_P(TableEntryTest,  check_any_delete_test){
     }
 }
 
-TEST_P(TableEntryTest, table_entry_type_test){
+TEST_P(TableEntryTest, table_entry_type_test) {
     EXPECT_STREQ(ToString(TableEntryType::kTableEntry).c_str(), "Table");
     EXPECT_STREQ(ToString(TableEntryType::kCollectionEntry).c_str(), "Collection");
     EXPECT_THROW(ToString(static_cast<TableEntryType>(2)), UnrecoverableException);
 }
 
-TEST_P(TableEntryTest, serialize_test){
+TEST_P(TableEntryTest, serialize_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-    //create table
+    // create table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Vector<SharedPtr<ColumnDef>> columns;
@@ -755,8 +726,11 @@ TEST_P(TableEntryTest, serialize_test){
             i64 column_id = 0;
             auto const_expr = new ConstantExpr(LiteralType::kString);
             const_expr->str_value_ = strdup("DEFAULT");
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints, std::shared_ptr<ParsedExpr>(const_expr));
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id,
+                                                        MakeShared<DataType>(LogicalType::kVarchar),
+                                                        "col1",
+                                                        constraints,
+                                                        std::shared_ptr<ParsedExpr>(const_expr));
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -771,7 +745,8 @@ TEST_P(TableEntryTest, serialize_test){
         Vector<String> columns1{"col1"};
         Vector<InitParameter *> parameters1;
         SharedPtr<String> index_name = MakeShared<String>("fulltext_index");
-        auto index_base_fulltext = IndexFullText::Make(index_name, "fulltext_index_test_fulltext", columns1, parameters1);
+        auto index_base_fulltext =
+            IndexFullText::Make(index_name, MakeShared<String>("test comment"), "fulltext_index_test_fulltext", columns1, parameters1);
 
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
@@ -784,10 +759,8 @@ TEST_P(TableEntryTest, serialize_test){
         txn_mgr->CommitTxn(txn1);
     }
 
-    //insert data
-    {
-        InsertData("default_db", "tbl1");
-    }
+    // insert data
+    { InsertData("default_db", "tbl1"); }
 
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"));
@@ -800,7 +773,7 @@ TEST_P(TableEntryTest, serialize_test){
         EXPECT_TRUE(json_res["column_definition"][0]["default"]["value"] == "DEFAULT");
     }
 
-    //drop table
+    // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
@@ -809,11 +782,11 @@ TEST_P(TableEntryTest, serialize_test){
     }
 }
 
-TEST_P(TableEntryTest, deserialize_test){
+TEST_P(TableEntryTest, deserialize_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
-    //create table
+    // create table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Vector<SharedPtr<ColumnDef>> columns;
@@ -823,8 +796,11 @@ TEST_P(TableEntryTest, deserialize_test){
             i64 column_id = 0;
             auto const_expr = new ConstantExpr(LiteralType::kString);
             const_expr->str_value_ = strdup("DEFAULT");
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints, std::shared_ptr<ParsedExpr>(const_expr));
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id,
+                                                        MakeShared<DataType>(LogicalType::kVarchar),
+                                                        "col1",
+                                                        constraints,
+                                                        std::shared_ptr<ParsedExpr>(const_expr));
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -839,7 +815,8 @@ TEST_P(TableEntryTest, deserialize_test){
         Vector<String> columns1{"col1"};
         Vector<InitParameter *> parameters1;
         SharedPtr<String> index_name = MakeShared<String>("fulltext_index");
-        auto index_base_fulltext = IndexFullText::Make(index_name, "fulltext_index_test_fulltext", columns1, parameters1);
+        auto index_base_fulltext =
+            IndexFullText::Make(index_name, MakeShared<String>("test comment"), "fulltext_index_test_fulltext", columns1, parameters1);
 
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
@@ -852,10 +829,8 @@ TEST_P(TableEntryTest, deserialize_test){
         txn_mgr->CommitTxn(txn1);
     }
 
-    //insert data
-    {
-        InsertData("default_db", "tbl1");
-    }
+    // insert data
+    { InsertData("default_db", "tbl1"); }
 
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"));
@@ -869,7 +844,7 @@ TEST_P(TableEntryTest, deserialize_test){
         EXPECT_TRUE(json_res == json_res1);
     }
 
-    //drop table
+    // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
@@ -878,10 +853,10 @@ TEST_P(TableEntryTest, deserialize_test){
     }
 }
 
-TEST_P(TableEntryTest, get_colunm_id_by_name_test){
+TEST_P(TableEntryTest, get_colunm_id_by_name_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-    //create table
+    // create table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Vector<SharedPtr<ColumnDef>> columns;
@@ -891,8 +866,11 @@ TEST_P(TableEntryTest, get_colunm_id_by_name_test){
             i64 column_id = 0;
             auto const_expr = new ConstantExpr(LiteralType::kString);
             const_expr->str_value_ = strdup("DEFAULT");
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints, std::shared_ptr<ParsedExpr>(const_expr));
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id,
+                                                        MakeShared<DataType>(LogicalType::kVarchar),
+                                                        "col1",
+                                                        constraints,
+                                                        std::shared_ptr<ParsedExpr>(const_expr));
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -910,7 +888,7 @@ TEST_P(TableEntryTest, get_colunm_id_by_name_test){
         EXPECT_THROW(table_entry->GetColumnIdByName("col2"), RecoverableException);
     }
 
-    //drop table
+    // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);

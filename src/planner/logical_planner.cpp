@@ -720,6 +720,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
 
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
+    auto index_comment = MakeShared<String>(create_index_info->comment_);
     if (table_name->empty()) {
         Status status = Status::InvalidIndexName("No index name.");
         RecoverableError(status);
@@ -743,44 +744,46 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         case IndexType::kFullText: {
             assert(index_info->index_param_list_ != nullptr);
             IndexFullText::ValidateColumnDataType(base_table_ref, index_info->column_name_);
-            base_index_ptr = IndexFullText::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            base_index_ptr =
+                IndexFullText::Make(index_name, index_comment, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kHnsw: {
             assert(index_info->index_param_list_ != nullptr);
             // The following check might affect performance
             IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_, *(index_info->index_param_list_)); // may throw exception
-            base_index_ptr = IndexHnsw::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            base_index_ptr = IndexHnsw::Make(index_name, index_comment, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kIVF: {
             assert(index_info->index_param_list_ != nullptr);
-            auto ivf_ptr = IndexIVF::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            auto ivf_ptr = IndexIVF::Make(index_name, index_comment, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             ivf_ptr->ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr = std::move(ivf_ptr);
             break;
         }
         case IndexType::kSecondary: {
             IndexSecondary::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexSecondary::Make(index_name, index_filename, {index_info->column_name_});
+            base_index_ptr = IndexSecondary::Make(index_name, index_comment, index_filename, {index_info->column_name_});
             break;
         }
         case IndexType::kEMVB: {
             assert(index_info->index_param_list_ != nullptr);
             IndexEMVB::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexEMVB::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            base_index_ptr = IndexEMVB::Make(index_name, index_comment, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kBMP: {
             assert(index_info->index_param_list_ != nullptr);
             IndexBMP::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexBMP::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            base_index_ptr = IndexBMP::Make(index_name, index_comment, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kDiskAnn: {
             assert(index_info->index_param_list_ != nullptr);
             IndexDiskAnn::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexDiskAnn::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            base_index_ptr =
+                IndexDiskAnn::Make(index_name, index_comment, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kInvalid: {

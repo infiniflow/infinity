@@ -30,8 +30,11 @@ import internal_types;
 
 namespace infinity {
 
-SharedPtr<IndexBMP>
-IndexBMP::Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
+SharedPtr<IndexBMP> IndexBMP::Make(SharedPtr<String> index_name,
+                                   SharedPtr<String> index_comment,
+                                   const String &file_name,
+                                   Vector<String> column_names,
+                                   const Vector<InitParameter *> &index_param_list) {
     SizeT block_size = BMP_BLOCK_SIZE;
     BMPCompressType compress_type = BMPCompressType::kCompressed;
     for (const auto *para : index_param_list) {
@@ -52,7 +55,7 @@ IndexBMP::Make(SharedPtr<String> index_name, const String &file_name, Vector<Str
         Status status = Status::InvalidIndexParam("Compress type");
         RecoverableError(status);
     }
-    return MakeShared<IndexBMP>(index_name, file_name, column_names, block_size, compress_type);
+    return MakeShared<IndexBMP>(index_name, index_comment, file_name, column_names, block_size, compress_type);
 }
 
 void IndexBMP::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {

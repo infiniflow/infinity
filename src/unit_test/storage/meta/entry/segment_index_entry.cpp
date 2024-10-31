@@ -54,12 +54,11 @@ class SegmentIndexEntryTest : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          SegmentIndexEntryTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
-                                           BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
 void CreateTable();
 void CreateIndex();
-void InsertData(const String& db_name, const String& table_name);
+void InsertData(const String &db_name, const String &table_name);
 void DropIndex();
 void DropTable();
 
@@ -77,11 +76,11 @@ TEST_P(SegmentIndexEntryTest, decode_index_test) {
         auto [index_entry, index_status] = txn1->GetIndexByName(db_name, table_name, index_name);
         EXPECT_TRUE(index_status.ok());
         SharedPtr<SegmentIndexEntry> segment_index_entry;
-        EXPECT_FALSE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry));//get
-        String encoded_index =  SegmentIndexEntry::EncodeIndex(0, index_entry);
-        std::cout<<encoded_index<<std::endl;
+        EXPECT_FALSE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry)); // get
+        String encoded_index = SegmentIndexEntry::EncodeIndex(0, index_entry);
+        std::cout << encoded_index << std::endl;
         EXPECT_TRUE(encoded_index == "#default_db#tbl1#fulltext_index#0");
-        Vector<std::string_view> decoded_index  = SegmentIndexEntry::DecodeIndex(encoded_index);
+        Vector<std::string_view> decoded_index = SegmentIndexEntry::DecodeIndex(encoded_index);
         EXPECT_TRUE(decoded_index[0] == "default_db");
         EXPECT_TRUE(decoded_index[1] == "tbl1");
         EXPECT_TRUE(decoded_index[2] == "fulltext_index");
@@ -104,8 +103,7 @@ TEST_P(SegmentIndexEntryTest, create_ivf_index_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -121,8 +119,8 @@ TEST_P(SegmentIndexEntryTest, create_ivf_index_test) {
         parameters.emplace_back(new InitParameter("metric", "l2"));
         parameters.emplace_back(new InitParameter("plain_storage_data_type", "f32"));
 
-        auto index_base = IndexIVF::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
-    //    std::cout << "index_base: " << index_base->ToString() << std::endl;
+        auto index_base = IndexIVF::Make(MakeShared<String>("idx1"), MakeShared<String>("test comment"), "tbl1_idx1", columns, parameters);
+        //    std::cout << "index_base: " << index_base->ToString() << std::endl;
         for (auto parameter : parameters) {
             delete parameter;
         }
@@ -139,7 +137,7 @@ TEST_P(SegmentIndexEntryTest, create_ivf_index_test) {
         txn1->CreateIndexFinish(table_entry, index_entry);
         EXPECT_TRUE(status3.ok());
 
-        txn_mgr->CommitTxn(txn1); 
+        txn_mgr->CommitTxn(txn1);
     }
 
     {
@@ -150,7 +148,7 @@ TEST_P(SegmentIndexEntryTest, create_ivf_index_test) {
         auto [index_entry, index_status] = txn1->GetIndexByName(db_name, table_name, index_name);
         EXPECT_TRUE(index_status.ok());
         SharedPtr<SegmentIndexEntry> segment_index_entry;
-        EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry));//create
+        EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry)); // create
         txn_mgr->CommitTxn(txn1);
     }
 
@@ -168,8 +166,7 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -187,8 +184,8 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
         parameters.emplace_back(new InitParameter("ef_construction", "200"));
         parameters.emplace_back(new InitParameter("encode", "plain"));
 
-        auto index_base = IndexHnsw::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
-    //    std::cout << "index_base: " << index_base->ToString() << std::endl;
+        auto index_base = IndexHnsw::Make(MakeShared<String>("idx1"), MakeShared<String>("test comment"), "tbl1_idx1", columns, parameters);
+        //    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
         for (auto parameter : parameters) {
             delete parameter;
@@ -206,7 +203,7 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
         txn1->CreateIndexFinish(table_entry, index_entry);
         EXPECT_TRUE(status3.ok());
 
-        txn_mgr->CommitTxn(txn1); 
+        txn_mgr->CommitTxn(txn1);
     }
 
     {
@@ -232,14 +229,15 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
         opt_params.clear();
         opt_params.emplace_back(MakeUnique<InitParameter>("compress_to_lvq", ""));
         opt_params.emplace_back(MakeUnique<InitParameter>("lvq_avg", ""));
-        EXPECT_THROW(segment_index_entry->OptIndex(const_cast<IndexBase *>(index_entry->index_base()), txn_table_store, opt_params, false), RecoverableException);
+        EXPECT_THROW(segment_index_entry->OptIndex(const_cast<IndexBase *>(index_entry->index_base()), txn_table_store, opt_params, false),
+                     RecoverableException);
         txn_mgr->CommitTxn(txn1);
     }
 
     DropTable();
 }
 
-TEST_P(SegmentIndexEntryTest, opt_bmp_index_test){
+TEST_P(SegmentIndexEntryTest, opt_bmp_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     {
@@ -250,8 +248,7 @@ TEST_P(SegmentIndexEntryTest, opt_bmp_index_test){
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto sparseInfo = MakeShared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kSparse, sparseInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kSparse, sparseInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -267,8 +264,8 @@ TEST_P(SegmentIndexEntryTest, opt_bmp_index_test){
         parameters.emplace_back(new InitParameter("block_size", "16"));
         parameters.emplace_back(new InitParameter("compress_type", "compress"));
 
-        auto index_base = IndexBMP::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
-    //    std::cout << "index_base: " << index_base->ToString() << std::endl;
+        auto index_base = IndexBMP::Make(MakeShared<String>("idx1"), MakeShared<String>("test comment"), "tbl1_idx1", columns, parameters);
+        //    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
         for (auto parameter : parameters) {
             delete parameter;
@@ -286,7 +283,7 @@ TEST_P(SegmentIndexEntryTest, opt_bmp_index_test){
         txn1->CreateIndexFinish(table_entry, index_entry);
         EXPECT_TRUE(status3.ok());
 
-        txn_mgr->CommitTxn(txn1); 
+        txn_mgr->CommitTxn(txn1);
     }
 
     {
@@ -324,7 +321,7 @@ TEST_P(SegmentIndexEntryTest, flush_fulltext_test) {
         auto [index_entry, index_status] = txn1->GetIndexByName(db_name, table_name, index_name);
         EXPECT_TRUE(index_status.ok());
         SharedPtr<SegmentIndexEntry> segment_index_entry;
-        EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry));//create
+        EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry)); // create
         EXPECT_FALSE(segment_index_entry->Flush(txn1->BeginTS()));
     }
 
@@ -343,8 +340,7 @@ TEST_P(SegmentIndexEntryTest, flush_bmp_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto sparseInfo = MakeShared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kSparse, sparseInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kSparse, sparseInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -360,8 +356,8 @@ TEST_P(SegmentIndexEntryTest, flush_bmp_test) {
         parameters.emplace_back(new InitParameter("block_size", "16"));
         parameters.emplace_back(new InitParameter("compress_type", "compress"));
 
-        auto index_base = IndexBMP::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
-    //    std::cout << "index_base: " << index_base->ToString() << std::endl;
+        auto index_base = IndexBMP::Make(MakeShared<String>("idx1"), MakeShared<String>("test comment"), "tbl1_idx1", columns, parameters);
+        //    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
         for (auto parameter : parameters) {
             delete parameter;
@@ -379,7 +375,7 @@ TEST_P(SegmentIndexEntryTest, flush_bmp_test) {
         txn1->CreateIndexFinish(table_entry, index_entry);
         EXPECT_TRUE(status3.ok());
 
-        txn_mgr->CommitTxn(txn1); 
+        txn_mgr->CommitTxn(txn1);
     }
 
     {
@@ -390,7 +386,7 @@ TEST_P(SegmentIndexEntryTest, flush_bmp_test) {
         auto [index_entry, index_status] = txn1->GetIndexByName(db_name, table_name, index_name);
         EXPECT_TRUE(index_status.ok());
         SharedPtr<SegmentIndexEntry> segment_index_entry;
-        EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry));//create
+        EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry)); // create
         EXPECT_TRUE(segment_index_entry->Flush(txn1->BeginTS()));
     }
 
@@ -410,7 +406,7 @@ TEST_P(SegmentIndexEntryTest, cleanup_test) {
         auto [index_entry, index_status] = txn1->GetIndexByName(db_name, table_name, index_name);
         EXPECT_TRUE(index_status.ok());
         SharedPtr<SegmentIndexEntry> segment_index_entry;
-        EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry));//create
+        EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry)); // create
         segment_index_entry->Cleanup();
     }
 

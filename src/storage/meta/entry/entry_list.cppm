@@ -62,7 +62,7 @@ public:
         return *this;
     }
 
-    template<typename T>
+    template <typename T>
     EntryList Clone(T *parent) const {
         EntryList new_entry_list;
         std::shared_lock r_lock(rw_locker_);
@@ -123,19 +123,19 @@ public:
         return entry_list_.size();
     }
 
-    inline void PushFrontEntry(const SharedPtr<Entry>& entry) {
+    inline void PushFrontEntry(const SharedPtr<Entry> &entry) {
         std::unique_lock lock(rw_locker_);
         entry_list_.push_front(entry);
     }
 
-    inline void PushBackEntry(const SharedPtr<Entry>& entry) {
+    inline void PushBackEntry(const SharedPtr<Entry> &entry) {
         std::unique_lock lock(rw_locker_);
         entry_list_.push_back(entry);
     }
 
     Vector<BaseEntry *> GetCandidateEntry(TxnTimeStamp max_commit_ts, EntryType entry_type) {
         std::shared_lock lock(rw_locker_);
-        Vector<BaseEntry*> result;
+        Vector<BaseEntry *> result;
         result.reserve(entry_list_.size());
         for (const auto &base_entry : entry_list_) {
             if (base_entry->entry_type_ != entry_type) {
@@ -157,9 +157,8 @@ public:
         });
     }
 
-    List<SharedPtr<Entry>> GetAllEntries() const {
-        return entry_list_;
-    }
+    List<SharedPtr<Entry>> GetAllEntries() const { return entry_list_; }
+
 private:
     // helper
     FindResult FindEntryNoLock(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);

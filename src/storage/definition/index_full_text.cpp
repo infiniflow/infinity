@@ -39,6 +39,7 @@ namespace infinity {
 void ToLowerString(String &lower) { std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower); }
 
 SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
+                                         SharedPtr<String> index_comment,
                                          const String &file_name,
                                          Vector<String> column_names,
                                          const Vector<InitParameter *> &index_param_list) {
@@ -62,7 +63,7 @@ SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
     if (!status.ok()) {
         RecoverableError(status);
     }
-    return MakeShared<IndexFullText>(index_name, file_name, std::move(column_names), analyzer_name, (optionflag_t)flag);
+    return MakeShared<IndexFullText>(index_name, index_comment, file_name, std::move(column_names), analyzer_name, (optionflag_t)flag);
 }
 
 bool IndexFullText::operator==(const IndexFullText &other) const {
@@ -96,13 +97,11 @@ String IndexFullText::ToString() const {
     return output_str;
 }
 
-
 String IndexFullText::BuildOtherParamsString() const {
     std::stringstream ss;
     ss << "analyzer = " << analyzer_;
     return ss.str();
 }
-
 
 nlohmann::json IndexFullText::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();
