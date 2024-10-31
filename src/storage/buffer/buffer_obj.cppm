@@ -86,7 +86,7 @@ public:
     BufferObj(const BufferObj &) = delete;
     BufferObj &operator=(const BufferObj &) = delete;
 
-    void SetFileWorker(UniquePtr<FileWorker> file_worker);
+    void UpdateFileWorkerInfo(UniquePtr<FileWorker> file_worker);
 
 public:
     // called by ObjectHandle when load first time for that ObjectHandle
