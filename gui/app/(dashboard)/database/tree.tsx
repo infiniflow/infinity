@@ -1,7 +1,7 @@
 'use client';
 
 import cx from 'classnames';
-import TreeView, { INode } from 'react-accessible-treeview';
+import TreeView, { EventCallback, INode } from 'react-accessible-treeview';
 import { AiOutlineLoading } from 'react-icons/ai';
 import { IoMdArrowDropright } from 'react-icons/io';
 import { Leaf, LeafIconMap } from './constants';
@@ -40,22 +40,31 @@ function AsyncTree() {
       ></div>
       <TreeView
         data={data}
-        aria-label="Checkbox tree"
+        aria-label="directory tree"
         onLoadData={wrappedOnLoadData}
-        propagateSelect
-        togglableSelect
-        propagateSelectUpwards
         nodeRenderer={({
           element,
           isBranch,
           isExpanded,
-          // isSelected,
-          // isHalfSelected,
-          // handleSelect,
           getNodeProps,
           level,
-          handleExpand
+          handleExpand,
+          handleSelect
         }) => {
+          const handleNodeClick: EventCallback = (e) => {
+            handleSelect(e);
+            if (isBranch) {
+              handleExpand(e);
+            } else {
+              handleClickTreeName({
+                level,
+                name: element.name,
+                parent: element.parent,
+                data
+              });
+            }
+          };
+
           const branchNode = (isExpanded: boolean, element: INode) => {
             return isExpanded &&
               !element.metadata?.isEmpty &&
@@ -77,14 +86,7 @@ function AsyncTree() {
           return (
             <div
               {...getNodeProps({
-                onClick: isBranch
-                  ? handleExpand
-                  : handleClickTreeName({
-                      level,
-                      name: element.name,
-                      parent: element.parent,
-                      data
-                    })
+                onClick: handleNodeClick
               })}
               style={{ marginLeft: 40 * (level - 1) }}
             >

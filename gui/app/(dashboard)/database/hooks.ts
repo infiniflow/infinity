@@ -30,15 +30,14 @@ export const useHandleClickTreeName = () => {
       name: string;
       parent: TreeParentId;
       data: INode[];
-    }) =>
-      () => {
-        if (level === 3) {
-          const databaseId = getParentIdById(data, parent);
-          if (databaseId) {
-            router.push(`/database/${databaseId}/table/${parent}?tab=${name}`);
-          }
+    }) => {
+      if (level === 3) {
+        const databaseId = getParentIdById(data, parent);
+        if (databaseId) {
+          router.push(`/database/${databaseId}/table/${parent}?tab=${name}`);
         }
-      },
+      }
+    },
     [router]
   );
 
@@ -132,28 +131,6 @@ export const useBuildTreeData = () => {
     await fetchTables(element.id as string);
 
     return undefined;
-    // return new Promise((resolve) => {
-    //   setTimeout(() => {
-    //     setData((value) =>
-    //       updateTreeData(value, element.id, [
-    //         {
-    //           name: `Child Node ${value.length}`,
-    //           children: [],
-    //           id: value.length,
-    //           parent: element.id,
-    //           isBranch: true
-    //         },
-    //         {
-    //           name: 'Another child Node',
-    //           children: [],
-    //           id: value.length + 1,
-    //           parent: element.id
-    //         }
-    //       ])
-    //     );
-    //     resolve(undefined);
-    //   }, 1000);
-    // });
   };
 
   const wrappedOnLoadData = async (props: ITreeViewOnLoadDataProps) => {
