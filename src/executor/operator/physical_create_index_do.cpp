@@ -34,6 +34,8 @@ import buffer_manager;
 import txn_store;
 import third_party;
 import logger;
+import wal_manager;
+import infinity_context;
 
 module physical_create_index_do;
 
@@ -52,6 +54,17 @@ void PhysicalCreateIndexDo::Init() {}
 
 // FIXME: fetch and add a block one time
 bool PhysicalCreateIndexDo::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     auto *txn = query_context->GetTxn();
     auto *create_index_do_state = static_cast<CreateIndexDoOperatorState *>(operator_state);
     auto &create_index_idxes = create_index_do_state->create_index_shared_data_->create_index_idxes_;

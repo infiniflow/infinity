@@ -86,3 +86,30 @@ def test_docker(docker_cluster: DockerInfinityCluster):
     print("remove nodes")
 
     cluster.clear()
+'''
+tc1:
+n1: admin
+n2: admin
+n1->leader
+show node->n1 leader;
+n2->follower
+show node on n1 & n2->n1 leader, n2 follower;
+create table t1 on n1;
+insert data into t1 on n1;
+select data t1 on n2;
+try to insert data into t1 on n2; # fail
+n1->admin
+show node on n2->n1 timeout, n2 follower;
+create table t2 on n2; # fail
+n1->leader
+show node on n1 & n2->n1 leader, n2 follower;
+insert data into t1 on n1;
+select data t1 on n1 and n2;
+n2->admin
+show node on n1;
+insert data into t1 on n2;
+n2->follower
+show node on n1 & n2;
+select data t1 on n1 and n2;
+
+'''

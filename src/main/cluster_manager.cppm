@@ -23,6 +23,7 @@ import peer_thrift_client;
 import peer_server_thrift_types;
 import peer_task;
 import storage;
+import admin_statement;
 
 namespace infinity {
 
@@ -34,6 +35,8 @@ public:
     ~ClusterManager();
 
 public:
+    void InitAsAdmin();
+    void InitAsStandalone();
     Status InitAsLeader(const String &node_name);
     Status InitAsFollower(const String &node_name, const String &leader_ip, i64 leader_port);
     Status InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port);
@@ -41,11 +44,13 @@ public:
 
 public:
     Status RegisterToLeader();
-    void HeartBeatToLeader();
+
     void CheckHeartBeat();
 
 private:
-    void CheckHeartBeatInner();
+    void CheckHeartBeatThread();
+    void HeartBeatToLeaderThread();
+
     Status RegisterToLeaderNoLock();
     Status UnregisterToLeaderNoLock();
     Tuple<SharedPtr<PeerClient>, Status> ConnectToServerNoLock(const String &from_node_name, const String &server_ip, i64 server_port);
@@ -99,6 +104,9 @@ public:
     // Used by all nodes / all mode ADMIN SHOW NODE;
     SharedPtr<NodeInfo> ThisNode() const;
 
+    // Used by all nodes
+    NodeRole GetNodeRole() const { return current_node_role_; }
+
 private:
     Storage *storage_{};
     mutable std::mutex mutex_;
@@ -121,6 +129,10 @@ private:
     Atomic<bool> hb_running_{false};
 
     Atomic<SizeT> follower_count_{1};
+
+    Atomic<NodeRole> current_node_role_{NodeRole::kUnInitialized};
+
+    Vector<SharedPtr<PeerClient>> clients_for_cleanup_;
 };
 
 } // namespace infinity

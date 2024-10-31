@@ -37,11 +37,26 @@ import logical_type;
 import internal_types;
 import value;
 
+import wal_manager;
+import infinity_context;
+import status;
+
 namespace infinity {
 
 void PhysicalUpdate::Init() {}
 
 bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (storage_mode == StorageMode::kUnInitialized) {
+        UnrecoverableError("Uninitialized storage mode");
+    }
+
+    if (storage_mode != StorageMode::kWritable) {
+        operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
     OperatorState* prev_op_state = operator_state->prev_op_state_;
     SizeT input_data_block_count = prev_op_state->data_block_array_.size();
     for(SizeT block_idx = 0; block_idx < input_data_block_count; ++ block_idx) {
