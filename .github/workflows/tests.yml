@@ -64,27 +64,27 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
     
-      - name: Prepare cluster test
-        if: ${{ !cancelled() && !failure() }}
-        run : |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/test_cluster/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-        #   sudo docker exec ${BUILDER_CONTAINER} bash -c "yum install sudo iproute2 bridge-utils -y"
-        #   sudo apt install virtualenv -y
-        #   virtualenv -p python3 .venv
-        #   source .venv/bin/activate && pip3 install pytest && pip3 install -r python/test_cluster/requirements.txt
+    #   - name: Prepare cluster test
+    #     if: ${{ !cancelled() && !failure() }}
+    #     run : |
+    #       sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/test_cluster/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+    #     #   sudo docker exec ${BUILDER_CONTAINER} bash -c "yum install sudo iproute2 bridge-utils -y"
+    #     #   sudo apt install virtualenv -y
+    #     #   virtualenv -p python3 .venv
+    #     #   source .venv/bin/activate && pip3 install pytest && pip3 install -r python/test_cluster/requirements.txt
     
-      - name: Run cluster test
-        if: ${{ !cancelled() && !failure() }}
-        id: run_cluster_test
-        run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity"
-        #   source .venv/bin/activate && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --docker
+    #   - name: Run cluster test
+    #     if: ${{ !cancelled() && !failure() }}
+    #     id: run_cluster_test
+    #     run: |
+    #       sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity"
+    #     #   source .venv/bin/activate && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --docker
 
-      - name: Collect cluster test output
-        if: ${{ !cancelled() }}
-        run: |
-          failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
-          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+    #   - name: Collect cluster test output
+    #     if: ${{ !cancelled() }}
+    #     run: |
+    #       failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
+    #       sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
     
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}
@@ -242,27 +242,27 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
 
-      - name: Prepare cluster test
-        if: ${{ !cancelled() && !failure() }}
-        run : |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/test_cluster/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-        #   sudo docker exec ${BUILDER_CONTAINER} bash -c "yum install sudo iproute2 bridge-utils -y"
-        #   sudo apt install virtualenv -y
-        #   virtualenv -p python3 .venv
-        #   source .venv/bin/activate && pip3 install pytest && pip3 install -r python/test_cluster/requirements.txt
+    #   - name: Prepare cluster test
+    #     if: ${{ !cancelled() && !failure() }}
+    #     run : |
+    #       sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/test_cluster/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+    #     #   sudo docker exec ${BUILDER_CONTAINER} bash -c "yum install sudo iproute2 bridge-utils -y"
+    #     #   sudo apt install virtualenv -y
+    #     #   virtualenv -p python3 .venv
+    #     #   source .venv/bin/activate && pip3 install pytest && pip3 install -r python/test_cluster/requirements.txt
 
-      - name: Run cluster test
-        if: ${{ !cancelled() && !failure() }}
-        id: run_cluster_test
-        run:
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-release/src/infinity"
-        #   source .venv/bin/activate && python3 tools/run_cluster_test.py --infinity_path=cmake-build-release/src/infinity --docker
+    #   - name: Run cluster test
+    #     if: ${{ !cancelled() && !failure() }}
+    #     id: run_cluster_test
+    #     run:
+    #       sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-release/src/infinity"
+    #     #   source .venv/bin/activate && python3 tools/run_cluster_test.py --infinity_path=cmake-build-release/src/infinity --docker
 
-      - name: Collect cluster test output
-        if: ${{ !cancelled() }}
-        run: |
-          failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
-          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-release/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+    #   - name: Collect cluster test output
+    #     if: ${{ !cancelled() }}
+    #     run: |
+    #       failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
+    #       sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-release/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
     
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}

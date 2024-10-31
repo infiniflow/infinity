@@ -1,7 +1,7 @@
 from numpy import dtype
 import pandas as pd
 from infinity_cluster import InfinityCluster
-from docker_infinity_cluster import DockerInfinityCluster, MinioParams
+from docker_infinity_cluster import DockerInfinityCluster
 import pytest
 import time
 from infinity.errors import ErrorCode
