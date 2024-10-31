@@ -1,5 +1,10 @@
+from abc import abstractmethod
+import json
+import random
+import string
 import subprocess
 import time
+import docker
 import tomli
 import sys
 import os
@@ -11,46 +16,38 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
-from infinity_http import infinity_http
+from infinity_http import infinity_http, http_network_util
 
 
-class InfinityRunner:
+def convert_request_to_curl(method: str, header: dict, data: dict, url: str):
+    cmd = "curl -sS --request {method} --url {url} {headers} --data '{data}'"
+    method = method.upper()
+    headers = " ".join([f"--header '{key}:{value}'" for key, value in header.items()])
+    data = json.dumps(data)
+    return cmd.format(method=method, headers=headers, data=data, url=url)
+
+
+class MinioParams:
+    def __init__(self, minio_dir: str, minio_port: int):
+        self.minio_dir = minio_dir
+        self.minio_port = minio_port
+
+
+class BaseInfinityRunner:
     def __init__(self, node_name: str, executable_path: str, config_path: str):
         self.node_name = node_name
         self.executable_path = executable_path
         self.config_path = config_path
-        self.__load_config()
-        self.process = None
+        self.load_config()
         self.client = None
 
-    def __del__(self):
-        self.uninit()
-
+    @abstractmethod
     def init(self, config_path: str | None):
-        if self.process is not None:
-            raise ValueError("Process is already initialized.")
-        if config_path:
-            self.config_path = config_path
-            self.__load_config()
+        pass
 
-        cmd = [self.executable_path, f"--config={self.config_path}"]
-        my_env = os.environ.copy()
-        my_env["LD_PRELOAD"] = ""
-        my_env["ASAN_OPTIONS"] = ""
-        self.process = subprocess.Popen(cmd, shell=False, env=my_env)
-        time.sleep(1)  # Give the process a moment to start
-        if self.process.poll() is not None:
-            raise RuntimeError(
-                f"Failed to start process for node {self.node_name}, return code: {self.process.returncode}"
-            )
-        print(f"Launch {self.node_name} successfully. pid: {self.process.pid}")
-
+    @abstractmethod
     def uninit(self):
-        print(f"Uniting node {self.node_name}")
-        if self.process is None:
-            return
-        timeout = 60
-        timeout_kill.timeout_kill(timeout, self.process)
+        pass
 
     def init_as_standalone(self, config_path: str | None = None):
         self.init(config_path)
@@ -73,8 +70,9 @@ class InfinityRunner:
             lambda: self.client.set_role_follower(self.node_name, leader_addr)
         )
 
+    @abstractmethod
     def add_client(self, http_addr: str):
-        self.client = infinity_http(http_addr)
+        pass
 
     def http_uri(self):
         http_ip = self.network_config["server_address"]
@@ -86,12 +84,11 @@ class InfinityRunner:
         peer_port = self.network_config["peer_port"]
         return peer_ip, peer_port
 
-    def __load_config(self):
-        with open(self.config_path, "rb") as f:
-            config = tomli.load(f)
-            self.network_config = config["network"]
+    @abstractmethod
+    def load_config(self):
+        pass
 
-    def __init_cmd(self, send_f, timeout=30):
+    def __init_cmd(self, send_f, timeout=10):
         t1 = time.time()
         while True:
             try:
@@ -105,17 +102,96 @@ class InfinityRunner:
             break
 
 
+class InfinityRunner(BaseInfinityRunner):
+    def __init__(self, node_name: str, executable_path: str, config_path: str):
+        super().__init__(node_name, executable_path, config_path)
+        self.process = None
+
+    def init(self, config_path: str | None):
+        if self.process is not None:
+            raise ValueError("Process is already initialized.")
+        if config_path:
+            self.config_path = config_path
+            self.load_config()
+
+        cmd = [self.executable_path, f"--config={self.config_path}"]
+        my_env = os.environ.copy()
+        my_env["LD_PRELOAD"] = ""
+        my_env["ASAN_OPTIONS"] = ""
+        self.process = subprocess.Popen(cmd, shell=False, env=my_env)
+        time.sleep(1)  # Give the process a moment to start
+        if self.process.poll() is not None:
+            raise RuntimeError(
+                f"Failed to start process for node {self.node_name}, return code: {self.process.returncode}"
+            )
+        print(f"Launch {self.node_name} successfully. pid: {self.process.pid}")
+
+    def uninit(self):
+        print(f"Uniting node {self.node_name}")
+        if self.process is None:
+            return
+        timeout = 60
+        timeout_kill.timeout_kill(timeout, self.process)
+
+    def add_client(self, http_addr: str):
+        self.client = infinity_http(net=http_network_util(http_addr))
+
+    def load_config(self):
+        with open(self.config_path, "rb") as f:
+            config = tomli.load(f)
+            self.network_config = config["network"]
+
+
 class InfinityCluster:
-    def __init__(self, executable_path: str):
+    def __init__(self, executable_path: str, *, minio_params: MinioParams = None):
         self.executable_path = executable_path
         self.runners: dict[str, InfinityRunner] = {}
         self.leader_runner: InfinityRunner | None = None
+
+        if minio_params is not None:
+            self.add_minio(minio_params, True)
+
+    def clear(self):
+        for runner in self.runners.values():
+            runner.uninit()
+        # if self.minio_container is not None:
+        #     self.minio_container.remove(force=True, v=True)
 
     def add_node(self, node_name: str, config_path: str):
         runner = InfinityRunner(node_name, self.executable_path, config_path)
         if node_name in self.runners:
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner
+
+    def add_minio(self, minio_params: MinioParams, host_net: bool) -> bool:
+        minio_image_name = "quay.io/minio/minio"
+
+        minio_cmd = f'server /data --console-address ":{minio_params.minio_port}"'
+        docker_client = docker.from_env()
+        kargs = {}
+        if host_net:
+            kargs = {"network": "host"}
+            container_name = "minio_host"
+        else:
+            container_name = "minio_docker"
+
+        try:
+            self.minio_container = docker_client.containers.get(container_name)
+            return False
+        except docker.errors.NotFound:
+            self.minio_container = docker_client.containers.run(
+                image=minio_image_name,
+                name=container_name,
+                detach=True,
+                environment=[
+                    "MINIO_ROOT_PASSWORD=minioadmin",
+                    "MINIO_ROOT_USER=minioadmin",
+                ],
+                volumes=[f"{minio_params.minio_dir}:/data"],
+                command=minio_cmd,
+                **kargs,
+            )
+            return True
 
     def init_standalone(self, node_name: str):
         if node_name not in self.runners:
