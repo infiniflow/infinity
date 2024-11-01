@@ -62,6 +62,7 @@ def test_mock(mock_cluster: MockInfinityCluster):
     cluster.clear()
 
 
+@pytest.mark.docker
 def test_docker(docker_cluster: DockerInfinityCluster):
     cluster = docker_cluster
 
