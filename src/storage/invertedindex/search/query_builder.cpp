@@ -37,23 +37,22 @@ import parse_fulltext_options;
 
 namespace infinity {
 
-void QueryBuilder::Init(IndexReader index_reader) { index_reader_ = index_reader; }
+void QueryBuilder::Init(IndexReader index_reader) { index_reader_ = std::move(index_reader); }
 
 QueryBuilder::~QueryBuilder() {}
 
-UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context,
-                                                  EarlyTermAlgo early_term_algo,
-                                                  const MinimumShouldMatchOption &minimum_should_match_option) {
+UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context) {
     // Optimize the query tree.
     if (!context.optimized_query_tree_) {
         context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
-        if (!minimum_should_match_option.empty()) {
+        if (!context.minimum_should_match_option_.empty()) {
             const auto leaf_count = context.optimized_query_tree_->LeafCount();
-            context.minimum_should_match_ = GetMinimumShouldMatchParameter(minimum_should_match_option, leaf_count);
+            context.minimum_should_match_ = GetMinimumShouldMatchParameter(context.minimum_should_match_option_, leaf_count);
         }
     }
     // Create the iterator from the query tree.
-    auto result = context.optimized_query_tree_->CreateSearch(table_entry_, index_reader_, early_term_algo, context.minimum_should_match_);
+    const CreateSearchParams params{table_entry_, &index_reader_, context.early_term_algo_, context.ft_similarity_, context.minimum_should_match_};
+    auto result = context.optimized_query_tree_->CreateSearch(params);
 #ifdef INFINITY_DEBUG
     {
         OStringStream oss;

@@ -37,4 +37,9 @@ export MinimumShouldMatchOption ParseMinimumShouldMatchOption(std::string_view i
 
 export u32 GetMinimumShouldMatchParameter(const MinimumShouldMatchOption &option_vec, u32 leaf_count);
 
+export enum class FulltextSimilarity {
+    kBM25,
+    kBoolean,
+};
+
 } // namespace infinity

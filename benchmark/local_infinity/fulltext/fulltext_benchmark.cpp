@@ -45,6 +45,7 @@ import function_expr;
 import search_expr;
 import column_expr;
 import virtual_store;
+import insert_row_expr;
 
 using namespace infinity;
 
@@ -163,27 +164,27 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
 
     profiler.Begin();
     Vector<String> orig_columns{"id", "title", "text"};
-    ConstantExpr *const_expr = nullptr;
+    UniquePtr<ConstantExpr> const_expr;
     SizeT num_inserted = 0;
     while (num_inserted < num_rows) {
-        Vector<String> *columns = new Vector<String>(orig_columns);
-        Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
-        values->reserve(insert_batch);
+        auto insert_rows = new Vector<InsertRowExpr *>();
+        insert_rows->reserve(insert_batch);
         for (SizeT i = 0; i < insert_batch && (num_inserted + i) < num_rows; i++) {
             auto &t = batch_cache[num_inserted + i];
-            auto value_list = new Vector<ParsedExpr *>(columns->size());
-            const_expr = new ConstantExpr(LiteralType::kString);
+            auto insert_row = MakeUnique<InsertRowExpr>();
+            insert_row->columns_ = orig_columns;
+            const_expr = MakeUnique<ConstantExpr>(LiteralType::kString);
             const_expr->str_value_ = std::get<0>(t);
-            value_list->at(0) = const_expr;
-            const_expr = new ConstantExpr(LiteralType::kString);
+            insert_row->values_.emplace_back(std::move(const_expr));
+            const_expr = MakeUnique<ConstantExpr>(LiteralType::kString);
             const_expr->str_value_ = std::get<1>(t);
-            value_list->at(1) = const_expr;
-            const_expr = new ConstantExpr(LiteralType::kString);
+            insert_row->values_.emplace_back(std::move(const_expr));
+            const_expr = MakeUnique<ConstantExpr>(LiteralType::kString);
             const_expr->str_value_ = std::get<2>(t);
-            value_list->at(2) = const_expr;
-            values->push_back(value_list);
+            insert_row->values_.emplace_back(std::move(const_expr));
+            insert_rows->push_back(insert_row.release());
         }
-        infinity->Insert(db_name, table_name, columns, values);
+        infinity->Insert(db_name, table_name, insert_rows);
         // NOTE: ~InsertStatement() has deleted or freed columns, values, value_list, const_expr, const_expr->str_value_
         num_inserted += insert_batch;
     }

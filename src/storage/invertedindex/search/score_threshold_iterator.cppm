@@ -32,7 +32,7 @@ public:
     DocIteratorType GetType() const override { return DocIteratorType::kScoreThresholdIterator; }
     String Name() const override { return "ScoreThresholdIterator"; };
     bool Next(RowID doc_id) override;
-    float BM25Score() override { return query_iterator_->BM25Score(); }
+    float Score() override { return query_iterator_->Score(); }
     void UpdateScoreThreshold(const float threshold) override { query_iterator_->UpdateScoreThreshold(threshold); }
     u32 MatchCount() const override { return query_iterator_->MatchCount(); }
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;

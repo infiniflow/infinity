@@ -78,12 +78,12 @@ bool AndIterator::Next(const RowID doc_id) {
             float sum_score = 0.0f;
             for (SizeT i = 0; i < children_.size(); i++) {
                 const auto &it = children_[i];
-                sum_score += it->BM25Score();
+                sum_score += it->Score();
             }
             if (sum_score > threshold_) {
                 doc_id_ = target_doc_id;
-                bm25_score_cache_ = sum_score;
-                bm25_score_cache_docid_ = doc_id_;
+                score_cache_ = sum_score;
+                score_cache_docid_ = doc_id_;
                 return true;
             }
             ++target_doc_id;
@@ -91,17 +91,17 @@ bool AndIterator::Next(const RowID doc_id) {
     }
 }
 
-float AndIterator::BM25Score() {
-    if (bm25_score_cache_docid_ == doc_id_) {
-        return bm25_score_cache_;
+float AndIterator::Score() {
+    if (score_cache_docid_ == doc_id_) {
+        return score_cache_;
     }
     float sum_score = 0.0f;
     for (SizeT i = 0; i < children_.size(); i++) {
         const auto &it = children_[i];
-        sum_score += it->BM25Score();
+        sum_score += it->Score();
     }
-    bm25_score_cache_docid_ = doc_id_;
-    bm25_score_cache_ = sum_score;
+    score_cache_docid_ = doc_id_;
+    score_cache_ = sum_score;
     return sum_score;
 }
 
