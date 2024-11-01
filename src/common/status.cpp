@@ -576,7 +576,9 @@ Status Status::CantConnectLeader(const String &leader_info) {
     return Status(ErrorCode::kCantConnectLeader, MakeUnique<String>(fmt::format("Can't connect leader: {}", leader_info)));
 }
 
-Status Status::MinioInvalidAccessKey(const String &detailed) { return Status(ErrorCode::kMinioInvalidAccessKey, MakeUnique<String>(detailed)); }
+Status Status::MinioInvalidAccessKey(const String &detailed) {
+    return Status(ErrorCode::kMinioInvalidAccessKey, MakeUnique<String>(fmt::format("Minio error: {}", detailed)));
+}
 
 Status Status::MinioBucketNotExists(const String &bucket_name) {
     return Status(ErrorCode::kMinioInvalidAccessKey, MakeUnique<String>(fmt::format("Bucket {} not found", bucket_name)));
