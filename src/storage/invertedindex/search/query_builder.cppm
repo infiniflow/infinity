@@ -34,7 +34,7 @@ export struct FullTextQueryContext {
     UniquePtr<QueryNode> query_tree_{};
     UniquePtr<QueryNode> optimized_query_tree_{};
     const FulltextSimilarity ft_similarity_{};
-    const MinimumShouldMatchOption &minimum_should_match_option_;
+    const MinimumShouldMatchOption minimum_should_match_option_{};
     u32 minimum_should_match_ = 0;
     EarlyTermAlgo early_term_algo_ = EarlyTermAlgo::kNaive;
     FullTextQueryContext(const FulltextSimilarity ft_similarity, const MinimumShouldMatchOption &minimum_should_match_option)

@@ -338,16 +338,17 @@ void QueryMatchTest::QueryMatch(const String &db_name,
         Status status = Status::ParseMatchExprFailed(match_expr->fields_, match_expr->matching_text_);
         RecoverableError(status);
     }
-    FullTextQueryContext full_text_query_context;
+    FullTextQueryContext full_text_query_context(FulltextSimilarity::kBM25, MinimumShouldMatchOption{});
+    full_text_query_context.early_term_algo_ = EarlyTermAlgo::kNaive;
     full_text_query_context.query_tree_ = std::move(query_tree);
-    UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context, EarlyTermAlgo::kNaive, MinimumShouldMatchOption{});
+    UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);
 
     RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : (doc_iterator->Next(), doc_iterator->DocID());
     if (iter_row_id == INVALID_ROWID) {
         fmt::print("iter_row_id is INVALID_ROWID\n");
     } else {
         do {
-            auto score = doc_iterator->BM25Score();
+            auto score = doc_iterator->Score();
             fmt::print("iter_row_id = {}, score = {}\n", iter_row_id.ToUint64(), score);
             doc_iterator->Next();
             iter_row_id = doc_iterator->DocID();
