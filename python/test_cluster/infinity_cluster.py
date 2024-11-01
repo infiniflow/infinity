@@ -56,6 +56,12 @@ class BaseInfinityRunner:
         self.add_client(f"http://{http_ip}:{http_port}/")
         self.__init_cmd(lambda: self.client.set_role_standalone(self.node_name))
 
+    def init_as_admin(self, config_path: str | None = None):
+        #self.init(config_path)
+        http_ip, http_port = self.http_uri()
+        self.add_client(f"http://{http_ip}:{http_port}/")
+        self.__init_cmd(lambda: self.client.set_role_admin())
+
     def init_as_leader(self, config_path: str | None = None):
         self.init(config_path)
         http_ip, http_port = self.http_uri()
@@ -191,6 +197,12 @@ class InfinityCluster:
             raise ValueError(f"Node {node_name} not found in the runners.")
         runner = self.runners[node_name]
         runner.init_as_standalone()
+
+    def init_admin(self, node_name: str):
+        if node_name not in self.runners:
+            raise ValueError(f"Node {node_name} not found in the runners.")
+        runner = self.runners[node_name]
+        runner.init_as_admin()
 
     def init_leader(self, leader_name: str):
         if self.leader_runner is not None:

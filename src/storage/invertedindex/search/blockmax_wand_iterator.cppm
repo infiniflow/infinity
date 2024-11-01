@@ -39,7 +39,9 @@ public:
 
     bool Next(RowID doc_id) override;
 
-    float BM25Score() override;
+    float BM25Score();
+
+    float Score() override { return BM25Score(); }
 
     u32 MatchCount() const override;
 

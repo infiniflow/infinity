@@ -48,7 +48,7 @@ MinimumShouldMatchIterator::MinimumShouldMatchIterator(Vector<UniquePtr<DocItera
         UnrecoverableError("MinimumShouldMatchIterator should have minimum_should_match > 1");
     }
     tail_heap_.resize(minimum_should_match_ - 1u);
-    bm25_score_cache_docid_ = INVALID_ROWID;
+    score_cache_docid_ = INVALID_ROWID;
     bm25_score_upper_bound_ = 0.0f;
     estimate_iterate_cost_ = {};
     for (const auto &child : children_) {
@@ -123,9 +123,9 @@ bool MinimumShouldMatchIterator::Next(RowID doc_id) {
     }
 }
 
-float MinimumShouldMatchIterator::BM25Score() {
-    if (bm25_score_cache_docid_ == doc_id_) {
-        return bm25_score_cache_;
+float MinimumShouldMatchIterator::Score() {
+    if (score_cache_docid_ == doc_id_) {
+        return score_cache_;
     }
     while (tail_size_) {
         // advance tail
@@ -139,10 +139,10 @@ float MinimumShouldMatchIterator::BM25Score() {
     }
     float sum_score = 0;
     for (const auto idx : lead_) {
-        sum_score += children_[idx]->BM25Score();
+        sum_score += children_[idx]->Score();
     }
-    bm25_score_cache_docid_ = doc_id_;
-    bm25_score_cache_ = sum_score;
+    score_cache_docid_ = doc_id_;
+    score_cache_ = sum_score;
     return sum_score;
 }
 

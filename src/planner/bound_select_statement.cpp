@@ -267,6 +267,19 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         match_node->score_threshold_ = DataType::StringToValue<FloatT>(iter->second);
                     }
 
+                    // option: similarity
+                    if (iter = search_ops.options_.find("similarity"); iter != search_ops.options_.end()) {
+                        String ft_sim = iter->second;
+                        ToLower(ft_sim);
+                        if (ft_sim == "bm25") {
+                            match_node->ft_similarity_ = FulltextSimilarity::kBM25;
+                        } else if (ft_sim == "boolean") {
+                            match_node->ft_similarity_ = FulltextSimilarity::kBoolean;
+                        } else {
+                            RecoverableError(Status::SyntaxError(R"(similarity option must be "BM25" or "boolean".)"));
+                        }
+                    }
+
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     UniquePtr<QueryNode> query_tree =
                         search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
