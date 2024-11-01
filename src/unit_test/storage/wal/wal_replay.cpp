@@ -78,7 +78,7 @@ protected:
 
     void TearDown() override {
         // system(tree_cmd.c_str());
-//        RemoveDbDirs();
+        //        RemoveDbDirs();
     }
 
     String tree_cmd;
@@ -616,7 +616,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
 #endif
     }
     // Restart the db instance
-//    system(tree_cmd.c_str());
+    //    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -755,7 +755,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 #endif
     }
     // Restart db instance
-//    system(tree_cmd.c_str());
+    //    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -816,7 +816,8 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
                     MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
                 columns.emplace_back(column_def_ptr);
             }
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_annivfflat"), MakeShared<String>(), columns);
+            auto tbl1_def =
+                MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_annivfflat"), MakeShared<String>(), columns);
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
             EXPECT_TRUE(status.ok());
@@ -832,7 +833,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
             parameters1.emplace_back(new InitParameter("plain_storage_data_type", "f32"));
 
             SharedPtr<String> index_name = MakeShared<String>("idx1");
-            auto index_base_ivf = IndexIVF::Make(index_name, "idx1_tbl1", columns1, parameters1);
+            auto index_base_ivf = IndexIVF::Make(index_name, MakeShared<String>("test comment"), "idx1_tbl1", columns1, parameters1);
             for (auto *init_parameter : parameters1) {
                 delete init_parameter;
             }
@@ -865,7 +866,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-//    system(tree_cmd.c_str());
+    //    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -938,7 +939,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
             SharedPtr<String> index_name = MakeShared<String>("hnsw_index");
-            auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
+            auto index_base_hnsw = IndexHnsw::Make(index_name, MakeShared<String>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
             for (auto *init_parameter : parameters1) {
                 delete init_parameter;
             }
@@ -971,7 +972,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-//    system(tree_cmd.c_str());
+    //    system(tree_cmd.c_str());
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();

@@ -22,7 +22,7 @@ namespace infinity {
 
 export using infinity::QueryNodeType;
 export using infinity::QueryNodeTypeToString;
-
+export using infinity::CreateSearchParams;
 export using infinity::QueryNode;
 export using infinity::TermQueryNode;
 export using infinity::MultiQueryNode;

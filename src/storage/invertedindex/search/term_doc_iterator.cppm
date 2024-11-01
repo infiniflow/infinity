@@ -26,11 +26,13 @@ import internal_types;
 import doc_iterator;
 import column_length_io;
 import third_party;
+import parse_fulltext_options;
 
 namespace infinity {
+
 export class TermDocIterator final : public DocIterator {
 public:
-    TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight);
+    TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight, FulltextSimilarity ft_similarity);
 
     ~TermDocIterator() override;
 
@@ -61,7 +63,18 @@ public:
 
     bool Next(RowID doc_id) override;
 
-    float BM25Score() override;
+    float BM25Score();
+
+    float Score() override {
+        switch (ft_similarity_) {
+            case FulltextSimilarity::kBM25: {
+                return BM25Score();
+            }
+            case FulltextSimilarity::kBoolean: {
+                return GetWeight();
+            }
+        }
+    }
 
     void UpdateScoreThreshold(float threshold) override {
         if (threshold > threshold_)
@@ -77,7 +90,6 @@ public:
     const String *column_name_ptr_ = nullptr;
 
 private:
-    Pair<tf_t, u32> GetScoreData();
 
     u32 doc_freq_ = 0;
 
@@ -85,6 +97,7 @@ private:
     UniquePtr<PostingIterator> iter_;
     float weight_ = 1.0f; // changed in MultiplyWeight()
     u64 term_freq_;
+    const FulltextSimilarity ft_similarity_ = FulltextSimilarity::kBM25;
 
     // for BM25 Score
     float bm25_score_cache_ = 0.0f;
@@ -109,4 +122,5 @@ private:
     u32 block_skip_cnt_ = 0;
     u32 block_skip_cnt_inner_ = 0;
 };
+
 } // namespace infinity

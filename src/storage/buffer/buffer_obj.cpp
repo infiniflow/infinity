@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-
+#include <cassert>
 import stl;
 import file_worker;
 import buffer_handle;
@@ -23,6 +23,7 @@ import logger;
 import third_party;
 import logger;
 import file_worker_type;
+import var_file_worker;
 
 module buffer_obj;
 
@@ -41,7 +42,20 @@ BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<Fil
 
 BufferObj::~BufferObj() = default;
 
-void BufferObj::SetFileWorker(UniquePtr<FileWorker> file_worker) { file_worker_ = std::move(file_worker); }
+void BufferObj::UpdateFileWorkerInfo(UniquePtr<FileWorker> file_worker) { 
+    switch (file_worker_->Type()) {
+        case FileWorkerType::kVarFile:{
+            assert(file_worker->Type() == FileWorkerType::kVarFile);
+            auto *var_file_worker = static_cast<VarFileWorker *>(file_worker_.get());
+            auto *new_var_file_worker = static_cast<VarFileWorker *>(var_file_worker);
+            var_file_worker->SetBufferSize(new_var_file_worker->GetBufferSize());
+            break;
+        }
+        default:{
+            break;
+        }
+    }
+}
 
 BufferHandle BufferObj::Load() {
     std::unique_lock<std::mutex> locker(w_locker_);

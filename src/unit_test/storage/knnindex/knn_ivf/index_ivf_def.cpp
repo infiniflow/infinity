@@ -65,26 +65,26 @@ TEST_F(IndexIVFTest, testplain) {
     Map<String, String> args_map{{"meTric", "cos"}, {"plain_storage_data_type", "f32"}};
     InitParameterHelper h;
     {
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
+        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), MakeShared<String>("test comment"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
         ivf_index->ValidateColumnDataType(base_table_ref, "col_ivf");
         std::cout << "IndexIVF::BuildOtherParamsString(): " << ivf_index->BuildOtherParamsString() << std::endl;
         std::cout << "IndexIVF::ToString(): " << ivf_index->ToString() << std::endl;
     }
     {
         args_map["plain_storage_data_type"] = "bf16";
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
+        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), MakeShared<String>("test comment"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
         ivf_index->ValidateColumnDataType(base_table_ref, "col_ivf");
         std::cout << "IndexIVF::BuildOtherParamsString(): " << ivf_index->BuildOtherParamsString() << std::endl;
         std::cout << "IndexIVF::ToString(): " << ivf_index->ToString() << std::endl;
     }
     {
         args_map["plain_storage_data_type"] = "i8";
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
+        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), MakeShared<String>("test comment"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
         EXPECT_THROW(ivf_index->ValidateColumnDataType(base_table_ref, "col_ivf"), RecoverableException);
     }
     {
         args_map["unused_param"] = "xxx";
-        EXPECT_THROW(IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map)),
+        EXPECT_THROW(IndexIVF::Make(MakeShared<String>("tmp_index_name"), MakeShared<String>("test comment"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map)),
                      RecoverableException);
     }
 }
@@ -97,20 +97,20 @@ TEST_F(IndexIVFTest, testsq) {
                                  {"scalar_quantization_bits", "4"}};
     InitParameterHelper h;
     {
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
+        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), MakeShared<String>("test comment"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
         ivf_index->ValidateColumnDataType(base_table_ref, "col_ivf");
         std::cout << "IndexIVF::BuildOtherParamsString(): " << ivf_index->BuildOtherParamsString() << std::endl;
         std::cout << "IndexIVF::ToString(): " << ivf_index->ToString() << std::endl;
     }
     {
         args_map["centroids_num_ratio"] = "-0.33";
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
+        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), MakeShared<String>("test comment"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
         EXPECT_THROW(ivf_index->ValidateColumnDataType(base_table_ref, "col_ivf"), RecoverableException);
     }
     {
         args_map["centroids_num_ratio"] = "0.33";
         args_map["Centroids_num_ratio"] = "0.33";
-        EXPECT_THROW(IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map)),
+        EXPECT_THROW(IndexIVF::Make(MakeShared<String>("tmp_index_name"), MakeShared<String>("test comment"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map)),
                      RecoverableException);
     }
 }
@@ -123,14 +123,14 @@ TEST_F(IndexIVFTest, testpq) {
                                  {"product_quanTization_subspace_bits", "12"}};
     InitParameterHelper h;
     {
-        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
+        auto ivf_index = IndexIVF::Make(MakeShared<String>("tmp_index_name"), MakeShared<String>("test comment"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map));
         ivf_index->ValidateColumnDataType(base_table_ref, "col_ivf");
         std::cout << "IndexIVF::BuildOtherParamsString(): " << ivf_index->BuildOtherParamsString() << std::endl;
         std::cout << "IndexIVF::ToString(): " << ivf_index->ToString() << std::endl;
     }
     {
         args_map.erase("Metric");
-        EXPECT_THROW(IndexIVF::Make(MakeShared<String>("tmp_index_name"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map)),
+        EXPECT_THROW(IndexIVF::Make(MakeShared<String>("tmp_index_name"), MakeShared<String>("test comment"), "tmp_file_name", Vector<String>{"col_ivf"}, h.build_ipl(args_map)),
                      RecoverableException);
     }
 }

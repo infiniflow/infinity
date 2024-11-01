@@ -44,6 +44,10 @@ public:
 
     SizeT GetMemoryCost() const override;
 
+    SizeT GetBufferSize() const { return buffer_size_; }
+
+    void SetBufferSize(SizeT buffer_size) { buffer_size_ = buffer_size; }
+
     FileWorkerType Type() const override { return FileWorkerType::kVarFile; }
 
 protected:

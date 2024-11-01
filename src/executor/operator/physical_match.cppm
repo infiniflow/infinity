@@ -55,6 +55,7 @@ public:
                            const SharedPtr<CommonQueryFilter> &common_query_filter,
                            MinimumShouldMatchOption &&minimum_should_match_option,
                            f32 score_threshold,
+                           FulltextSimilarity ft_similarity,
                            u64 match_table_index,
                            SharedPtr<Vector<LoadMeta>> load_metas,
                            bool cache_result);
@@ -113,6 +114,7 @@ private:
     // for minimum_should_match
     MinimumShouldMatchOption minimum_should_match_option_{};
     f32 score_threshold_{};
+    FulltextSimilarity ft_similarity_{FulltextSimilarity::kBM25};
 
     bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
     bool ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state);

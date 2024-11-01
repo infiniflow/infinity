@@ -55,7 +55,7 @@ bool AndNotIterator::Next(RowID doc_id) {
     return doc_id != INVALID_ROWID;
 }
 
-float AndNotIterator::BM25Score() { return children_[0]->BM25Score(); }
+float AndNotIterator::Score() { return children_[0]->Score(); }
 
 void AndNotIterator::UpdateScoreThreshold(float threshold) { children_[0]->UpdateScoreThreshold(threshold); }
 

@@ -34,7 +34,7 @@ public:
     /* pure virtual methods implementation */
     bool Next(RowID doc_id) override;
 
-    float BM25Score() override;
+    float Score() override;
 
     void UpdateScoreThreshold(float threshold) override;
 

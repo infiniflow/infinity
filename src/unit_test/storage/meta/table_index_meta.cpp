@@ -48,7 +48,7 @@ TEST_P(TableIndexMetaTest, get_all_entries_test) {
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
 
-    //create table
+    // create table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -56,12 +56,12 @@ TEST_P(TableIndexMetaTest, get_all_entries_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -75,7 +75,7 @@ TEST_P(TableIndexMetaTest, get_all_entries_test) {
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
         SharedPtr<String> index_name = MakeShared<String>("hnsw_index");
-        auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
+        auto index_base_hnsw = IndexHnsw::Make(index_name, MakeShared<String>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {
             delete init_parameter;
         }
@@ -93,16 +93,17 @@ TEST_P(TableIndexMetaTest, get_all_entries_test) {
         EXPECT_FALSE(index_entry->table_index_meta()->Empty());
     }
 
-    //drop index
+    // drop index
     {
-        auto [index_entry, status] = catalog->DropIndex("default_db", "tbl1", "hnsw_index", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
+        auto [index_entry, status] =
+            catalog->DropIndex("default_db", "tbl1", "hnsw_index", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_entry->table_index_meta()->GetAllEntries().size(), 0);
         EXPECT_EQ(index_entry->table_index_meta()->EntryCount(), 0);
         EXPECT_TRUE(index_entry->table_index_meta()->Empty());
     }
 
-    //drop table
+    // drop table
     {
         auto [table_entry, status] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
@@ -120,7 +121,7 @@ TEST_P(TableIndexMetaTest, table_entry_test) {
     // start txn1
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
 
-    //create table
+    // create table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -128,12 +129,12 @@ TEST_P(TableIndexMetaTest, table_entry_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -147,7 +148,7 @@ TEST_P(TableIndexMetaTest, table_entry_test) {
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
         SharedPtr<String> index_name = MakeShared<String>("hnsw_index");
-        auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
+        auto index_base_hnsw = IndexHnsw::Make(index_name, MakeShared<String>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {
             delete init_parameter;
         }
@@ -161,16 +162,17 @@ TEST_P(TableIndexMetaTest, table_entry_test) {
         EXPECT_EQ(index_status.ok(), true);
 
         auto table_entry_ptr = index_entry->table_index_meta()->table_entry();
-        EXPECT_EQ(table_entry_ptr,  table_entry);
+        EXPECT_EQ(table_entry_ptr, table_entry);
     }
 
-    //drop index
+    // drop index
     {
-        auto [index_entry, status] = catalog->DropIndex("default_db", "tbl1", "hnsw_index", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
+        auto [index_entry, status] =
+            catalog->DropIndex("default_db", "tbl1", "hnsw_index", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
-    //drop table
+    // drop table
     {
         auto [table_entry, status] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());

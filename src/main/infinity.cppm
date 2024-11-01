@@ -62,7 +62,7 @@ public:
 
     void LocalDisconnect();
 
-    QueryResult CreateDatabase(const String &db_name, const CreateDatabaseOptions &options, const String& db_comment);
+    QueryResult CreateDatabase(const String &db_name, const CreateDatabaseOptions &options, const String &db_comment);
 
     QueryResult DropDatabase(const String &db_name, const DropDatabaseOptions &options);
 
@@ -118,6 +118,7 @@ public:
     QueryResult CreateIndex(const String &db_name,
                             const String &table_name,
                             const String &index_name,
+                            const String &index_comment,
                             IndexInfo *index_info_ptr,
                             const CreateIndexOptions &create_index_options);
 

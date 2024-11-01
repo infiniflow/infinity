@@ -14,8 +14,8 @@
 
 module;
 
-#include <string>
 #include <sstream>
+#include <string>
 #include <vector>
 
 module index_base;
@@ -84,6 +84,8 @@ int32_t IndexBase::GetSizeInBytes() const {
     size += sizeof(int32_t);
     size += index_name_->length();
     size += sizeof(int32_t);
+    size += index_comment_->length();
+    size += sizeof(int32_t);
     size += file_name_.length();
     size += sizeof(int32_t);
     for (const String &column_name : column_names_) {
@@ -95,6 +97,7 @@ int32_t IndexBase::GetSizeInBytes() const {
 void IndexBase::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, index_type_);
     WriteBufAdv(ptr, *index_name_);
+    WriteBufAdv(ptr, *index_comment_);
     WriteBufAdv(ptr, file_name_);
     WriteBufAdv(ptr, static_cast<int32_t>(column_names_.size()));
     for (const String &column_name : column_names_) {
@@ -111,6 +114,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
     IndexType index_type = ReadBufAdv<IndexType>(ptr);
     Vector<String> column_names;
     SharedPtr<String> index_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+    SharedPtr<String> index_comment = MakeShared<String>(ReadBufAdv<String>(ptr));
     String file_name = ReadBufAdv<String>(ptr);
     int32_t column_names_size = ReadBufAdv<int32_t>(ptr);
     for (int32_t i = 0; i < column_names_size; ++i) {
@@ -120,7 +124,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
     switch (index_type) {
         case IndexType::kIVF: {
             const auto ivf_option = ReadBufAdv<IndexIVFOption>(ptr);
-            res = MakeShared<IndexIVF>(index_name, file_name, column_names, ivf_option);
+            res = MakeShared<IndexIVF>(index_name, index_comment, file_name, column_names, ivf_option);
             break;
         }
         case IndexType::kHnsw: {
@@ -129,7 +133,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
             SizeT M = ReadBufAdv<SizeT>(ptr);
             SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
             SizeT block_size = ReadBufAdv<SizeT>(ptr);
-            res = MakeShared<IndexHnsw>(index_name, file_name, column_names, metric_type, encode_type, M, ef_construction, block_size);
+            res = MakeShared<IndexHnsw>(index_name, index_comment, file_name, column_names, metric_type, encode_type, M, ef_construction, block_size);
             break;
         }
         case IndexType::kDiskAnn: {
@@ -139,29 +143,35 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
             SizeT L = ReadBufAdv<SizeT>(ptr);
             SizeT num_pq_chunks = ReadBufAdv<SizeT>(ptr);
             SizeT num_parts = ReadBufAdv<SizeT>(ptr);
-            res = MakeShared<IndexDiskAnn>(index_name, file_name, column_names, metric_type, encode_type, R, L, num_pq_chunks, num_parts);
+            res = MakeShared<
+                IndexDiskAnn>(index_name, index_comment, file_name, column_names, metric_type, encode_type, R, L, num_pq_chunks, num_parts);
             break;
         }
         case IndexType::kFullText: {
             String analyzer = ReadBufAdv<String>(ptr);
             u8 flag = ReadBufAdv<u8>(ptr);
-            res = MakeShared<IndexFullText>(index_name, file_name, column_names, analyzer, optionflag_t(flag));
+            res = MakeShared<IndexFullText>(index_name, index_comment, file_name, column_names, analyzer, optionflag_t(flag));
             break;
         }
         case IndexType::kSecondary: {
-            res = MakeShared<IndexSecondary>(index_name, file_name, std::move(column_names));
+            res = MakeShared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
             break;
         }
         case IndexType::kEMVB: {
             u32 residual_pq_subspace_num = ReadBufAdv<u32>(ptr);
             u32 residual_pq_subspace_bits = ReadBufAdv<u32>(ptr);
-            res = MakeShared<IndexEMVB>(index_name, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);
+            res = MakeShared<IndexEMVB>(index_name,
+                                        index_comment,
+                                        file_name,
+                                        std::move(column_names),
+                                        residual_pq_subspace_num,
+                                        residual_pq_subspace_bits);
             break;
         }
         case IndexType::kBMP: {
             SizeT block_size = ReadBufAdv<SizeT>(ptr);
             BMPCompressType compress_type = ReadBufAdv<BMPCompressType>(ptr);
-            res = MakeShared<IndexBMP>(index_name, file_name, std::move(column_names), block_size, compress_type);
+            res = MakeShared<IndexBMP>(index_name, index_comment, file_name, std::move(column_names), block_size, compress_type);
             break;
         }
         case IndexType::kInvalid: {
@@ -197,6 +207,7 @@ nlohmann::json IndexBase::Serialize() const {
     nlohmann::json res;
     res["index_type"] = IndexInfo::IndexTypeToString(index_type_);
     res["index_name"] = *index_name_;
+    res["index_comment"] = *index_comment_;
     res["file_name"] = file_name_;
     res["column_names"] = column_names_;
     return res;
@@ -207,12 +218,13 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
     String index_type_name = index_def_json["index_type"];
     IndexType index_type = IndexInfo::StringToIndexType(index_type_name);
     SharedPtr<String> index_name = MakeShared<String>(index_def_json["index_name"]);
+    SharedPtr<String> index_comment = MakeShared<String>(index_def_json["index_comment"]);
     String file_name = index_def_json["file_name"];
     Vector<String> column_names = index_def_json["column_names"];
     switch (index_type) {
         case IndexType::kIVF: {
             const auto ivf_option = IndexIVF::DeserializeIndexIVFOption(index_def_json["ivf_option"]);
-            res = MakeShared<IndexIVF>(index_name, file_name, std::move(column_names), ivf_option);
+            res = MakeShared<IndexIVF>(index_name, index_comment, file_name, std::move(column_names), ivf_option);
             break;
         }
         case IndexType::kHnsw: {
@@ -221,7 +233,15 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             SizeT block_size = index_def_json["block_size"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             HnswEncodeType encode_type = StringToHnswEncodeType(index_def_json["encode_type"]);
-            res = MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, block_size);
+            res = MakeShared<IndexHnsw>(index_name,
+                                        index_comment,
+                                        file_name,
+                                        std::move(column_names),
+                                        metric_type,
+                                        encode_type,
+                                        M,
+                                        ef_construction,
+                                        block_size);
             break;
         }
         case IndexType::kDiskAnn: {
@@ -231,28 +251,42 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             SizeT num_parts = index_def_json["num_parts"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             DiskAnnEncodeType encode_type = StringToDiskAnnEncodeType(index_def_json["encode_type"]);
-            res = MakeShared<IndexDiskAnn>(index_name, file_name, std::move(column_names), metric_type, encode_type, R, L, num_pq_chunks, num_parts);
+            res = MakeShared<IndexDiskAnn>(index_name,
+                                           index_comment,
+                                           file_name,
+                                           std::move(column_names),
+                                           metric_type,
+                                           encode_type,
+                                           R,
+                                           L,
+                                           num_pq_chunks,
+                                           num_parts);
             break;
         }
         case IndexType::kFullText: {
             String analyzer = index_def_json["analyzer"];
-            res = MakeShared<IndexFullText>(index_name, file_name, std::move(column_names), analyzer);
+            res = MakeShared<IndexFullText>(index_name, index_comment, file_name, std::move(column_names), analyzer);
             break;
         }
         case IndexType::kSecondary: {
-            res = MakeShared<IndexSecondary>(index_name, file_name, std::move(column_names));
+            res = MakeShared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
             break;
         }
         case IndexType::kEMVB: {
             u32 residual_pq_subspace_num = index_def_json["pq_subspace_num"];
             u32 residual_pq_subspace_bits = index_def_json["pq_subspace_bits"];
-            res = MakeShared<IndexEMVB>(index_name, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);
+            res = MakeShared<IndexEMVB>(index_name,
+                                        index_comment,
+                                        file_name,
+                                        std::move(column_names),
+                                        residual_pq_subspace_num,
+                                        residual_pq_subspace_bits);
             break;
         }
         case IndexType::kBMP: {
             SizeT block_size = index_def_json["block_size"];
             auto compress_type = static_cast<BMPCompressType>(index_def_json["compress_type"]);
-            res = MakeShared<IndexBMP>(index_name, file_name, std::move(column_names), block_size, compress_type);
+            res = MakeShared<IndexBMP>(index_name, index_comment, file_name, std::move(column_names), block_size, compress_type);
             break;
         }
         case IndexType::kInvalid: {
