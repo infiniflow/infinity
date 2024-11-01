@@ -87,7 +87,6 @@ jobs:
         id: run_cluster_test
         run: |
           sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=$INFINITY_DIR"
-          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=$INFINITY_DIR --docker"
 
       - name: Collect cluster test output
         if: ${{ !cancelled() }}

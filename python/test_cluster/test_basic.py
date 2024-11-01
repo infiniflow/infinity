@@ -11,7 +11,6 @@ from infinity.errors import ErrorCode
 from infinity.common import InfinityException
 from infinity.common import ConflictType
 
-@pytest.mark.usefixtures("skip_if_docker")
 def test_standalone(cluster: InfinityCluster):
     cluster.add_node("test", "conf/pytest_parallel_infinity_conf.toml")
     cluster.init_standalone("test")
@@ -24,7 +23,6 @@ def test_standalone(cluster: InfinityCluster):
     cluster.clear()
 
 
-@pytest.mark.usefixtures("skip_if_docker")
 def test_0(cluster: InfinityCluster):
     cluster.add_node("node1", "conf/leader.toml")
     cluster.add_node("node2", "conf/follower.toml")
@@ -40,7 +38,6 @@ def test_0(cluster: InfinityCluster):
     cluster.clear()
 
 
-@pytest.mark.usefixtures("skip_if_docker")
 @pytest.mark.skip(reason="deprecated")
 def test_mock(mock_cluster: MockInfinityCluster):
     cluster = mock_cluster
@@ -65,7 +62,6 @@ def test_mock(mock_cluster: MockInfinityCluster):
     cluster.clear()
 
 
-@pytest.mark.usefixtures("skip_if_not_docker")
 def test_docker(docker_cluster: DockerInfinityCluster):
     cluster = docker_cluster
 
@@ -92,7 +88,6 @@ def test_docker(docker_cluster: DockerInfinityCluster):
 
     cluster.clear()
 
-@pytest.mark.usefixtures("skip_if_docker")
 def test_tc1(cluster: InfinityCluster):
     '''
     tc1:
