@@ -5,6 +5,7 @@ from docker_infinity_cluster import DockerInfinityCluster
 import pytest
 import time
 from infinity.errors import ErrorCode
+from infinity.common import ConflictType
 
 
 class TestInsert:
@@ -26,6 +27,7 @@ class TestInsert:
 
             table_name = "table1"
             db1 = infinity1.get_database("default_db")
+            res = db1.drop_table(table_name, ConflictType.Ignore)
             table1 = db1.create_table(
                 table_name, {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}}
             )
