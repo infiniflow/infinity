@@ -152,11 +152,13 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     Txn *txn = query_context->GetTxn();
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
+        DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
         LOG_DEBUG(fmt::format("Export segment_id: {}", segment_id));
         SizeT block_count = segment_snapshot.block_map_.size();
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
             BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
+            SegmentOffset seg_off = block_entry->segment_offset();
             SizeT block_row_count = block_entry->row_count();
 
             Vector<ColumnVector> column_vectors;
@@ -194,9 +196,8 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 }
             }
 
-            DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
             for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
-                if (!visible(row_idx)) {
+                if (!visible(seg_off + row_idx)) {
                     continue;
                 }
                 if (offset > 0) {
@@ -287,11 +288,13 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
     Txn *txn = query_context->GetTxn();
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
+        DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
         SizeT block_count = segment_snapshot.block_map_.size();
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
             BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
+            SegmentOffset seg_off = block_entry->segment_offset();
             SizeT block_row_count = block_entry->row_count();
 
             Vector<ColumnVector> column_vectors;
@@ -329,9 +332,8 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 }
             }
 
-            DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
             for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
-                if (!visible(row_idx)) {
+                if (!visible(seg_off + row_idx)) {
                     continue;
                 }
                 if (offset > 0) {
@@ -438,14 +440,17 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     SizeT file_no_{0};
     Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+    Txn *txn = query_context->GetTxn();
     // Write header
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
+        DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
         SizeT block_count = segment_snapshot.block_map_.size();
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
             BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
+            SegmentOffset seg_off = block_entry->segment_offset();
             SizeT block_row_count = block_entry->row_count();
 
             ColumnVector exported_column_vector = block_entry->GetColumnBlockEntry(exported_column_idx)->GetConstColumnVector(buffer_manager);
@@ -455,6 +460,9 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
             }
 
             for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
+                if (!visible(seg_off + row_idx)) {
+                    continue;
+                }
                 if (offset > 0) {
                     --offset;
                     continue;
@@ -529,12 +537,15 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     SizeT row_count{0};
     Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+    Txn *txn = query_context->GetTxn();
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
         SizeT block_count = segment_snapshot.block_map_.size();
+        DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
             BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
+            SegmentOffset seg_off = block_entry->segment_offset();
             SizeT block_row_count = block_entry->row_count();
 
             Vector<ColumnVector> column_vectors;
@@ -577,7 +588,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                 ColumnID select_column_idx = select_columns[block_column_idx];
                 ColumnDef *column_def = column_defs[select_column_idx].get();
                 ColumnVector &column_vector = column_vectors[block_column_idx];
-                block_arrays.emplace_back(BuildArrowArray(column_def, column_vector));
+                block_arrays.emplace_back(BuildArrowArray(column_def, column_vector, visible, seg_off));
             }
 
             SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_row_count, block_arrays);
@@ -798,7 +809,8 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
     return nullptr;
 }
 
-SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, const ColumnVector &column_vector) {
+SharedPtr<arrow::Array>
+PhysicalExport::BuildArrowArray(ColumnDef *column_def, const ColumnVector &column_vector, const DeleteFilter &visible, const SegmentOffset seg_off) {
     SharedPtr<arrow::ArrayBuilder> array_builder = nullptr;
     auto &column_type = column_def->type();
 
@@ -1041,7 +1053,15 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
         }
     }
 
+    SizeT offset = offset_;
     for (SizeT i = 0; i < column_vector.Size(); ++i) {
+        if (!visible(seg_off + i)) {
+            continue;
+        }
+        if (offset > 0) {
+            --offset;
+            continue;
+        }
         auto value = column_vector.GetValue(i);
         value.AppendToArrowArray(column_type, array_builder);
     }
