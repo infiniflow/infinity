@@ -171,10 +171,10 @@ delta_checkpoint_interval     = "60s"
 # Range: ["1KB", "1024GB"]
 wal_compact_threshold         = "1GB"
 
-# Controls how the WAL manager flushes its logs to the disk
-# - "only_write": (Default) The WAL manager writes logs but leaves it to the OS to determine when to flush them.
-# - "flush_at_once": The WAL manager writes and flushes logs upon each commit.
-# - "flush_per_second": The WAL manager writes logs after each commit and flushes them to disk once per second.
+# Controls how the WAL manager flushes its logs to disk
+# - "only_write": (Default) Writes logs but leaves it to the OS to determine when to flush them.
+# - "flush_at_once": Writes and flushes logs upon each commit.
+# - "flush_per_second": Writes logs after each commit and flushes them to disk once per second.
 wal_flush                     = "only_write"
 
 [resource]
