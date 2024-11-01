@@ -1,5 +1,7 @@
 import os
 import subprocess
+import argparse
+import subprocess
 
 
 def image_exists(image_name):
@@ -11,31 +13,35 @@ def image_exists(image_name):
     return result.returncode == 0
 
 
-def main():
-    image_name = "infiniflow/infinity_tester:centos7_clang18"
-
+def main(image_name: str, bin_path: str):
     if image_exists(image_name):
         print(f"Image {image_name} already exists.")
         return
 
-    if not os.path.exists("docker-27.3.1.tgz"):
-        os.system(
-            "wget https://download.docker.com/linux/static/stable/x86_64/docker-27.3.1.tgz"
-        )
-    else:
-        print("docker-27.3.1.tgz already exists, skipping download.")
+    # download_command = "wget -O docker-27.3.1.tgz https://download.docker.com/linux/static/stable/x86_64/docker-27.3.1.tgz"
+    # if os.system(download_command) != 0:
+    #     print("Failed to download docker-27.3.1.tgz")
+    # download_command = "wget -O iproute2-6.9.0.tar.gz https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/iproute2-6.9.0.tar.gz"
+    # if os.system(download_command) != 0:
+    #     print("Failed to download iproute2-6.9.0.tar.gz")
+    subprocess.check_call(f"cp {bin_path}/docker-27.3.1.tgz .", shell=True)
+    subprocess.check_call(f"cp {bin_path}/iproute2-6.9.0.tar.gz .", shell=True)
 
-    if not os.path.exists("iproute2-6.9.0.tar.gz"):
-        os.system(
-            "wget https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/iproute2-6.9.0.tar.gz"
-        )
-    else:
-        print("iproute2-6.9.0.tar.gz already exists, skipping download.")
-    os.system(
-        "sudo docker build -f scripts/Dockerfile_infinity_tester_centos7 -t infiniflow/infinity_tester:centos7_clang18 ."
+    print("Listing current directory contents:")
+    for item in os.listdir("."):
+        print(item)
+
+    subprocess.check_call(
+        f"sudo docker build -f scripts/Dockerfile_infinity_tester_centos7 -t {image_name} .",
+        shell=True,
     )
-    os.system("docker image ls")
+    subprocess.check_call("docker image ls", shell=True)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--image_name", type=str, required=True)
+    parser.add_argument("--bin_path", type=str, required=True)
+    args = parser.parse_args()
+
+    main(args.image_name, args.bin_path)
