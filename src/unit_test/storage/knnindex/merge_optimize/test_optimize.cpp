@@ -111,7 +111,7 @@ TEST_P(OptimizeKnnTest, test1) {
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
 
-        auto index_hnsw = IndexHnsw::Make(index_name, file_name, column_names, index_param_list_ptr);
+        auto index_hnsw = IndexHnsw::Make(index_name, MakeShared<String>("test comment"), file_name, column_names, index_param_list_ptr);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_hnsw, ConflictType::kError);
         ASSERT_TRUE(status2.ok());
 
@@ -221,7 +221,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
-        auto index_secondary = IndexSecondary::Make(index_name, file_name, column_names);
+        auto index_secondary = IndexSecondary::Make(index_name, MakeShared<String>("test comment"), file_name, column_names);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_secondary, ConflictType::kError);
         ASSERT_TRUE(status2.ok());
         txn_mgr->CommitTxn(txn);

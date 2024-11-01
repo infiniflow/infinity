@@ -3,7 +3,12 @@ import logging
 import platform
 import subprocess
 import sys
-from infinity_cluster import InfinityRunner, InfinityCluster, MinioParams, convert_request_to_curl
+from infinity_cluster import (
+    InfinityRunner,
+    InfinityCluster,
+    MinioParams,
+    convert_request_to_curl,
+)
 import os
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -11,6 +16,7 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import http_network_util, infinity_http
+
 
 class mocked_http_network(http_network_util):
     def __init__(self, ns_name: str, *args, **kwargs):
@@ -67,8 +73,14 @@ class MockedInfinityRunner(InfinityRunner):
 
 
 class MockInfinityCluster(InfinityCluster):
-    def __init__(self, executable_path: str, *, minio_params: MinioParams = None):
-        super().__init__(executable_path, minio_params=minio_params)
+    def __init__(
+        self,
+        executable_path: str,
+        *,
+        minio_params: MinioParams = None,
+        infinity_dir: str,
+    ):
+        super().__init__(executable_path, minio_params=minio_params, infinity_dir=infinity_dir)
         self.ns_prefix = "ns"
         self.bridge_name = "br0"
         self.mock_ip_prefix = "17.0.0."

@@ -67,6 +67,7 @@ public:
     SharedPtr<CommonQueryFilter> common_query_filter_{};
     MinimumShouldMatchOption minimum_should_match_option_{};
     f32 score_threshold_{};
+    FulltextSimilarity ft_similarity_{FulltextSimilarity::kBM25};
 };
 
 } // namespace infinity

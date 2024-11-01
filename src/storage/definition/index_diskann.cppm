@@ -25,7 +25,6 @@ import base_table_ref;
 import create_index_info;
 import statement_common;
 
-
 namespace infinity {
 
 export enum class DiskAnnEncodeType {
@@ -39,19 +38,24 @@ export DiskAnnEncodeType StringToDiskAnnEncodeType(const String &str);
 
 export class IndexDiskAnn final : public IndexBase {
 public:
-    static SharedPtr<IndexBase>
-    Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
+    static SharedPtr<IndexBase> Make(SharedPtr<String> index_name,
+                                     SharedPtr<String> index_comment,
+                                     const String &file_name,
+                                     Vector<String> column_names,
+                                     const Vector<InitParameter *> &index_param_list);
 
     IndexDiskAnn(SharedPtr<String> index_name,
-              const String &file_name,
-              Vector<String> column_names,
-              MetricType metric_type,
-              DiskAnnEncodeType encode_type,
-              SizeT R,
-              SizeT L,
-              SizeT num_pq_chunks,
-              SizeT num_parts)
-        : IndexBase(IndexType::kDiskAnn, index_name, file_name, std::move(column_names)), metric_type_(metric_type), encode_type_(encode_type), R_(R), L_(L), num_pq_chunks_(num_pq_chunks), num_parts_(num_parts) {}
+                 SharedPtr<String> index_comment,
+                 const String &file_name,
+                 Vector<String> column_names,
+                 MetricType metric_type,
+                 DiskAnnEncodeType encode_type,
+                 SizeT R,
+                 SizeT L,
+                 SizeT num_pq_chunks,
+                 SizeT num_parts)
+        : IndexBase(IndexType::kDiskAnn, index_name, index_comment, file_name, std::move(column_names)), metric_type_(metric_type),
+          encode_type_(encode_type), R_(R), L_(L), num_pq_chunks_(num_pq_chunks), num_parts_(num_parts) {}
 
     ~IndexDiskAnn() final = default;
 
@@ -76,10 +80,10 @@ public:
 public:
     const MetricType metric_type_{MetricType::kInvalid};
     DiskAnnEncodeType encode_type_{DiskAnnEncodeType::kInvalid};
-    const SizeT R_{};// degree of the graph
-    const SizeT L_{};// length of the candidates list
-    const SizeT num_pq_chunks_{};// dimension cut blocks by pq
-    const SizeT num_parts_{};// Number of dataset slices when building the Vamana index
+    const SizeT R_{};             // degree of the graph
+    const SizeT L_{};             // length of the candidates list
+    const SizeT num_pq_chunks_{}; // dimension cut blocks by pq
+    const SizeT num_parts_{};     // Number of dataset slices when building the Vamana index
 };
 
 } // namespace infinity

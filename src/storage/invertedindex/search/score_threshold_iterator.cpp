@@ -32,7 +32,7 @@ bool ScoreThresholdIterator::Next(RowID doc_id) {
         }
         doc_id = query_iterator_->DocID();
         // check score
-        if (BM25Score() >= score_threshold_) {
+        if (Score() >= score_threshold_) {
             doc_id_ = doc_id;
             return true;
         }

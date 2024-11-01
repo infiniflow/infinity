@@ -126,7 +126,7 @@ BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker, boo
     if (auto iter1 = buffer_map_.find(file_path); iter1 != buffer_map_.end()) {
         BufferObj *buffer_obj = iter1->second.get();
         if (restart) {
-            buffer_obj->SetFileWorker(std::move(file_worker));
+            buffer_obj->UpdateFileWorkerInfo(std::move(file_worker));
         }
         return buffer_obj;
     }

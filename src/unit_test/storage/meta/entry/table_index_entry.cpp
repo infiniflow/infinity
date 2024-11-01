@@ -51,9 +51,9 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TableIndexEntryTest,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
-void InsertData(const String& db_name, const String& table_name);
+void InsertData(const String &db_name, const String &table_name);
 
-void CreateTable(){
+void CreateTable() {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
     Vector<SharedPtr<ColumnDef>> columns;
@@ -63,8 +63,11 @@ void CreateTable(){
         i64 column_id = 0;
         auto const_expr = new ConstantExpr(LiteralType::kString);
         const_expr->str_value_ = strdup("DEFAULT");
-        auto column_def_ptr =
-            MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kVarchar), "col1", constraints, std::shared_ptr<ParsedExpr>(const_expr));
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id,
+                                                    MakeShared<DataType>(LogicalType::kVarchar),
+                                                    "col1",
+                                                    constraints,
+                                                    std::shared_ptr<ParsedExpr>(const_expr));
         columns.emplace_back(column_def_ptr);
     }
     auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -73,13 +76,14 @@ void CreateTable(){
     txn_mgr->CommitTxn(txn1);
 }
 
-void CreateIndex(){
+void CreateIndex() {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
     Vector<String> columns1{"col1"};
     Vector<InitParameter *> parameters1;
     SharedPtr<String> index_name = MakeShared<String>("fulltext_index");
-    auto index_base_fulltext = IndexFullText::Make(index_name, "fulltext_index_test_fulltext", columns1, parameters1);
+    auto index_base_fulltext =
+        IndexFullText::Make(index_name, MakeShared<String>("test comment"), "fulltext_index_test_fulltext", columns1, parameters1);
 
     const String &db_name = "default_db";
     const String &table_name = "tbl1";
@@ -93,10 +97,10 @@ void CreateIndex(){
     txn1->CreateIndexFinish(table_entry, index_entry);
     EXPECT_TRUE(status3.ok());
 
-    txn_mgr->CommitTxn(txn1);    
+    txn_mgr->CommitTxn(txn1);
 }
 
-void DropIndex(){
+void DropIndex() {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop index"));
     auto status = txn1->DropIndexByName("default_db", "tbl1", "fulltext_index", ConflictType::kError);
@@ -104,15 +108,15 @@ void DropIndex(){
     txn_mgr->CommitTxn(txn1);
 }
 
-void DropTable(){
+void DropTable() {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
     auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
     EXPECT_TRUE(status.ok());
-    txn_mgr->CommitTxn(txn1);    
+    txn_mgr->CommitTxn(txn1);
 }
 
-TEST_P(TableIndexEntryTest, decode_index_test){
+TEST_P(TableIndexEntryTest, decode_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     CreateTable();
@@ -140,7 +144,7 @@ TEST_P(TableIndexEntryTest, decode_index_test){
     DropTable();
 }
 
-TEST_P(TableIndexEntryTest, deserialize_test){
+TEST_P(TableIndexEntryTest, deserialize_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
@@ -167,8 +171,8 @@ TEST_P(TableIndexEntryTest, deserialize_test){
     DropTable();
 }
 
-///TODO: non nullptr case
-TEST_P(TableIndexEntryTest, get_mem_index_test){
+/// TODO: non nullptr case
+TEST_P(TableIndexEntryTest, get_mem_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     CreateTable();
     CreateIndex();
@@ -188,7 +192,7 @@ TEST_P(TableIndexEntryTest, get_mem_index_test){
     DropTable();
 }
 
-TEST_P(TableIndexEntryTest, opt_hnsw_index_test){
+TEST_P(TableIndexEntryTest, opt_hnsw_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     {
@@ -199,8 +203,7 @@ TEST_P(TableIndexEntryTest, opt_hnsw_index_test){
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -218,8 +221,8 @@ TEST_P(TableIndexEntryTest, opt_hnsw_index_test){
         parameters.emplace_back(new InitParameter("ef_construction", "200"));
         parameters.emplace_back(new InitParameter("encode", "plain"));
 
-        auto index_base = IndexHnsw::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
-    //    std::cout << "index_base: " << index_base->ToString() << std::endl;
+        auto index_base = IndexHnsw::Make(MakeShared<String>("idx1"), MakeShared<String>("test comment"), "tbl1_idx1", columns, parameters);
+        //    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
         for (auto parameter : parameters) {
             delete parameter;
@@ -237,7 +240,7 @@ TEST_P(TableIndexEntryTest, opt_hnsw_index_test){
         txn1->CreateIndexFinish(table_entry, index_entry);
         EXPECT_TRUE(status3.ok());
 
-        txn_mgr->CommitTxn(txn1); 
+        txn_mgr->CommitTxn(txn1);
     }
 
     {
@@ -268,7 +271,7 @@ TEST_P(TableIndexEntryTest, opt_hnsw_index_test){
     DropTable();
 }
 
-TEST_P(TableIndexEntryTest, opt_bmp_index_test){
+TEST_P(TableIndexEntryTest, opt_bmp_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     {
@@ -279,8 +282,7 @@ TEST_P(TableIndexEntryTest, opt_bmp_index_test){
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto sparseInfo = MakeShared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kSparse, sparseInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kSparse, sparseInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -296,8 +298,8 @@ TEST_P(TableIndexEntryTest, opt_bmp_index_test){
         parameters.emplace_back(new InitParameter("block_size", "16"));
         parameters.emplace_back(new InitParameter("compress_type", "compress"));
 
-        auto index_base = IndexBMP::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
-    //    std::cout << "index_base: " << index_base->ToString() << std::endl;
+        auto index_base = IndexBMP::Make(MakeShared<String>("idx1"), MakeShared<String>("test comment"), "tbl1_idx1", columns, parameters);
+        //    std::cout << "index_base: " << index_base->ToString() << std::endl;
 
         for (auto parameter : parameters) {
             delete parameter;
@@ -315,7 +317,7 @@ TEST_P(TableIndexEntryTest, opt_bmp_index_test){
         txn1->CreateIndexFinish(table_entry, index_entry);
         EXPECT_TRUE(status3.ok());
 
-        txn_mgr->CommitTxn(txn1); 
+        txn_mgr->CommitTxn(txn1);
     }
 
     {

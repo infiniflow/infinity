@@ -123,6 +123,13 @@ class infinity_http:
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
 
+    def set_role_admin(self):
+        url = f"admin/node/current"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"role": "admin"})
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+
     def set_role_leader(self, node_name):
         url = f"admin/node/current"
         h = self.net.set_up_header(["accept", "content-type"])
@@ -206,6 +213,13 @@ class infinity_http:
         self.net.raise_exception(r)
         return database_result(database_name=r.json()["database_name"])
 
+    def show_node(self, node_name):
+        url = f"admin/node/{node_name}"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        print(r.json())
+        return database_result(node_name=r.json()["node"]["name"], node_role=r.json()["node"]["role"], node_status=r.json()["node"]["status"])
 
 ####################3####################3####################3####################3####################3####################3####################3####################3
 
@@ -352,6 +366,7 @@ class table_http:
             index_name,
             index_info,
             conflict_type=ConflictType.Error,
+            index_comment: str = ""
     ):
         copt = conflict_type
         if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
@@ -376,7 +391,7 @@ class table_http:
             ["accept", "content-type"],
         )
         d = self.net.set_up_data(
-            ["create_option"], {"fields": fields, "index": create_index_info, "create_option": copt}
+            ["create_option"], {"comment" : index_comment, "fields": fields, "index": create_index_info, "create_option": copt}
         )
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
@@ -406,7 +421,9 @@ class table_http:
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h)
         self.net.raise_exception(r)
-        return database_result()
+        r_json = r.json()
+        index_comment = r_json.get("index_comment", "")
+        return database_result(index_comment=index_comment)
 
     def list_indexes(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes"
@@ -804,12 +821,16 @@ class table_http_result:
 
 
 class database_result():
-    def __init__(self, list=[], database_name: str="", error_code=ErrorCode.OK, columns=[], index_list=[]):
+    def __init__(self, list=[], database_name: str="", error_code=ErrorCode.OK, columns=[], index_list=[], node_name="", node_role="", node_status="", index_comment=None):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
         self.columns = columns
         self.index_list = index_list
+        self.node_name = node_name
+        self.node_role = node_role
+        self.node_status = node_status
+        self.index_comment = index_comment
 
 
 identifier_limit = 65536

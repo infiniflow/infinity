@@ -56,7 +56,7 @@ public:
     /* pure virtual methods implementation */
     bool Next(RowID doc_id) override;
 
-    float BM25Score() override;
+    float Score() override;
 
     void UpdateScoreThreshold(float threshold) override;
 
@@ -68,9 +68,9 @@ private:
     const DocIterator *GetDocIterator(u32 i) const { return children_[i].get(); }
 
     DocIteratorHeap heap_;
-    // bm25 score cache
-    RowID bm25_score_cache_docid_ = INVALID_ROWID;
-    float bm25_score_cache_ = 0.0f;
+    // score cache
+    RowID score_cache_docid_ = INVALID_ROWID;
+    float score_cache_ = 0.0f;
 };
 
 } // namespace infinity

@@ -97,9 +97,8 @@ public:
 
     bool CheckIfIndexColumn(ColumnID column_id, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    List<SharedPtr<TableIndexEntry>> GetAllEntries() const {
-        return index_entry_list_.GetAllEntries();
-    }
+    List<SharedPtr<TableIndexEntry>> GetAllEntries() const { return index_entry_list_.GetAllEntries(); }
+
 private:
     SharedPtr<String> ToString();
 
@@ -107,7 +106,7 @@ private:
 
     static UniquePtr<TableIndexMeta> Deserialize(const nlohmann::json &index_def_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
-    void PushFrontEntry(const SharedPtr<TableIndexEntry>& new_table_index_entry);
+    void PushFrontEntry(const SharedPtr<TableIndexEntry> &new_table_index_entry);
 
 public:
     const SharedPtr<String> &index_name() const { return index_name_; }
