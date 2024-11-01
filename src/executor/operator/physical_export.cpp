@@ -43,6 +43,8 @@ import default_values;
 import internal_types;
 import virtual_store;
 import local_file_handle;
+import knn_filter;
+import txn;
 
 namespace infinity {
 
@@ -99,9 +101,9 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
     SizeT select_column_count = select_columns.size();
 
     String parent_path = VirtualStore::GetParentPath(file_path_);
-    if(!parent_path.empty()) {
+    if (!parent_path.empty()) {
         Status create_status = VirtualStore::MakeDirectory(parent_path);
-        if(!create_status.ok()) {
+        if (!create_status.ok()) {
             RecoverableError(create_status);
         }
     }
@@ -148,6 +150,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
     SizeT file_no_{0};
     Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+    Txn *txn = query_context->GetTxn();
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
         LOG_DEBUG(fmt::format("Export segment_id: {}", segment_id));
         SizeT block_count = segment_snapshot.block_map_.size();
@@ -191,8 +194,11 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 }
             }
 
+            DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
             for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
-                // TODO: Check the visibility
+                if (!visible(row_idx)) {
+                    continue;
+                }
                 if (offset > 0) {
                     --offset;
                     continue;
@@ -261,9 +267,9 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
     SizeT select_column_count = select_columns.size();
 
     String parent_path = VirtualStore::GetParentPath(file_path_);
-    if(!parent_path.empty()) {
+    if (!parent_path.empty()) {
         Status create_status = VirtualStore::MakeDirectory(parent_path);
-        if(!create_status.ok()) {
+        if (!create_status.ok()) {
             RecoverableError(create_status);
         }
     }
@@ -278,6 +284,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
     SizeT file_no_{0};
     Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+    Txn *txn = query_context->GetTxn();
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
         SizeT block_count = segment_snapshot.block_map_.size();
@@ -322,8 +329,11 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 }
             }
 
+            DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
             for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
-                // TODO: Need to check visibility
+                if (!visible(row_idx)) {
+                    continue;
+                }
                 if (offset > 0) {
                     --offset;
                     continue;
@@ -396,13 +406,14 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     }
 
     EmbeddingInfo *embedding_type_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
-    switch(embedding_type_info->Type()) {
+    switch (embedding_type_info->Type()) {
         case EmbeddingDataType::kElemFloat: {
             // Supported
             break;
         }
         default: {
-            Status status = Status::NotSupport(fmt::format("Type: {}, only float element type embedding is supported now", EmbeddingType::EmbeddingDataType2String(embedding_type_info->Type())));
+            Status status = Status::NotSupport(fmt::format("Type: {}, only float element type embedding is supported now",
+                                                           EmbeddingType::EmbeddingDataType2String(embedding_type_info->Type())));
             RecoverableError(status);
         }
     }
@@ -410,9 +421,9 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     i32 dimension = embedding_type_info->Dimension();
 
     String parent_path = VirtualStore::GetParentPath(file_path_);
-    if(!parent_path.empty()) {
+    if (!parent_path.empty()) {
         Status create_status = VirtualStore::MakeDirectory(parent_path);
-        if(!create_status.ok()) {
+        if (!create_status.ok()) {
             RecoverableError(create_status);
         }
     }
@@ -505,9 +516,9 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     SharedPtr<::parquet::arrow::FileWriter> file_writer;
 
     String parent_path = VirtualStore::GetParentPath(file_path_);
-    if(!parent_path.empty()) {
+    if (!parent_path.empty()) {
         Status create_status = VirtualStore::MakeDirectory(parent_path);
-        if(!create_status.ok()) {
+        if (!create_status.ok()) {
             RecoverableError(create_status);
         }
     }
