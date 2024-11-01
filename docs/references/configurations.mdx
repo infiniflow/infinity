@@ -52,12 +52,12 @@ Infinity embedded does not have an *explicit* configuration file. Its configurat
 
 ```toml
 [general]
-# Version of the Infinity Server
+# Infinity server version
 version                  = "0.5.0"
 # Timezone
 time_zone                = "utc-8"
-# Number of worker threads. Defaults to the number of the CPU cores
-# Range : [1, 16384]
+# The number of worker threads. Defaults to the number of CPU cores.
+# Range: [1, 16384]
 cpu_limit                = 8
 
 # Network configuration
@@ -71,108 +71,110 @@ postgres_port            = 5432
 http_port                = 23820
 # Port of the Python SDK server
 client_port              = 23817
-# The maximum number of connections. Defaults to 256
-# Range : [1, 65536]
+# The maximum number of connections. Defaults to 256.
+# Range: [1, 65536]
 connection_pool_size     = 128
 
 # Log configuration
 [log]
-# Filename of log files
+# Filename of the log files.
 log_filename             = "infinity.log"
-# Directory for the log files
+# Directory for the log files.
 log_dir                  = "/var/infinity/log"
-# Controls if the log should be printed to standard output
-# Range : {true|false} 
+# Controls whether to print the log to the standard output.
+# Range: {true|false} 
 log_to_stdout            = false
-# The maximum size of each log file. Defaults to 1GB
-# Range : at least 1GB
+# The maximum size of each log file. Defaults to "1GB".
+# Range: at least 1GB
 log_file_max_size        = "10GB"
 # The number of rotating log files. Defaults to 8
-# Range : [1, 655636]
+# Range: [1, 655636]
 log_file_rotate_count    = 10
-# The output log level. Defaults to "info"
-# Range : {"trace"/"debug"/"info"/"warning"/"error"/"critical"}
+# The log output level. Defaults to "info".
+# Range: {"trace"/"debug"/"info"/"warning"/"error"/"critical"}
 log_level               = "info"
 
 # Storage configuration
 [storage]
-# The working directory of the persistence manager
-# - It holds the data that Infintiy saves when using the local disk for storage
-# - It caches the accessed object files when using minio/s3 for object storage
+# The working directory of the persistence manager:
+# - Holds the data that Infintiy saves when using the local disk for storage.
+# - Caches the accessed object files when using MinIO/S3 for object storage.
 persistence_dir          = "/var/infinity/persistence"
 
-# Periodically activates garbage collection:
-# Use "number + unit of time" to specify intervals
-# - s for seconds. "60s": 60 seconds
-# - m for minutes. "60m": 60 minutes
-# - h for hours. "1h": one hour
+# Garbage collection period
+# Defined as "number + unit of time":
+# - s for seconds (e.g., "60s" for 60 seconds),
+# - m for minutes (e.g., "60m" for 60 minutes),
+# - h for hours (e.g., "1h" for one hour).
 # To disable a specific periodic task, set the corresponding variable to "0s"
 
 # Interval between index optimization tasks
-# Range : ["10s", "720h"]
+# Range: ["10s", "720h"]
 optimize_interval        = "10s"
 # Interval between cleanup tasks
-# Range : ["10s", "720h"]
+# Range: ["10s", "720h"]
 cleanup_interval         = "60s"
 # Interval between compaction tasks
-# Range : ["10s", "720h"]
+# Range: ["10s", "720h"]
 compact_interval         = "120s"
-# The threshold for flushing a single in-memory index to disk,
-# when the number of rows the index includes exceeds this threshold,
-# The system performs a flush operation for that in-memory index
-# Range : [8192, 8388608]
+# The threshold for flushing an in-memory index to disk.
+# When the number of rows in the index exceeds this threshold,
+# the system performs a flush operation on that index.
+# Range: [8192, 8388608]
 mem_index_capacity       = 1048576
-# Storage type. Including local, minio. Default to local  
+# Storage type. Defaults to "local". 
+# Range: {"local"|"minio"}  
 storage_type             = "local"
 
 # Object storage configuration
 [storage.object_storage]
 # URL of the object storage server
 url                      = "127.0.0.1:9000"
-# The bucket where store the data
+# The name of bucket where the data is stored
 bucket_name              = "infinity"
 # Access key of object storage server
 access_key               = "minioadmin"
 # Secret key of object storage server
 secret_key               = "minioadmin"
-# Using http or https protocol
+# Whether to enable HTTP or HTTPS protocol
 enable_https             = false
 
 # Buffer manager configuration
 [buffer]
-# The size of memory that buffer manager holds. Defaults to 8GB
+# The amount of memory occupied by the buffer manager. Defaults to "8GB".
 buffer_manager_size      = "4GB"
-# The number of LRU caches in buffer manager
-# Range : [1, 100]
+# The number of LRU caches in the buffer manager.
+# Range: [1, 100]
 lru_num                  = 7
-# When the required memory exceeds the size of the free memory in the buffer manager,
-# the buffer manager dumps some of the its in-use memory to a temporary storage path specified by temp_dir
+# When the required memory size exceeds the free memory in the buffer manager,
+# the buffer manager dumps some of the its in-use memory to a temporary storage.
+* `temp_dir` specifies the path to this temporary storage. 
 temp_dir                 = "/var/infinity/tmp"
 # The global memory index threshold for triggering a flush to disk
 # When the memory used by all existing in-memory indices in the system exceeds this threshold,
-# The system performs a flush operation for all in-memory indices
+# the system will perform a flush operation on all in-memory indices.
 memindex_memory_quota   = "1GB"
 
 # WAL configuration
 [wal]
-# Directory for the WAL files
+# The directory containing the WAL files
 wal_dir                       = "/var/infinity/wal"
-# Interval between periodically full checkpoints
-# Range : ["0s", "720h"]
+# Interval between full checkpoints
+# Range: ["0s", "720h"]
 full_checkpoint_interval      = "86400s"
-# Interval between periodically delta (incremental) checkpoints
-# Range : ["0s", "720h"]
+# The interval between delta (incremental) checkpoints
+# Range: ["0s", "720h"]
 delta_checkpoint_interval     = "60s"
 
 # Size threshold for triggering a compaction on a WAL file
-# When a WAL file exceeds this threshold, the system will perform a compaction on it
-# Range : ["1KB", "1024GB"]
+# When the size of a WAL file exceeds this threshold, the system will perform compaction.
+# Range: ["1KB", "1024GB"]
 wal_compact_threshold         = "1GB"
 
 # Controls how the WAL manager flushes its logs to the disk
-# - "only_write": (Default) write log, OS control when to flush the log
-# - "flush_at_once": write and flush log each commit
-# - "flush_per_second": logs are written after each commit and flushed to disk per second
+# - "only_write": (Default) The WAL manager writes logs but leaves it to the OS to determine when to flush them.
+# - "flush_at_once": The WAL manager writes and flushes logs upon each commit.
+# - "flush_per_second": The WAL manager writes logs after each commit and flushes them to disk once per second.
 wal_flush                     = "only_write"
 
 [resource]
