@@ -1,0 +1,111 @@
+statement ok
+CREATE TABLE sqllogic_test_export_deleted_jsonl (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_jsonl VALUES(3, '4433252', [1.1, 2.03, 3.04, 4.0]);
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_jsonl VALUES(4, '4433253', [1.9, 2.0, 3.045, 4.5]);
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_jsonl VALUES(5, '4433254', [0.1, 4.03, 1.2, 2.5]);
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_jsonl VALUES(6, '4433255', [2.1, 2.3, 2.68, 3.7]);
+
+query I
+select * from sqllogic_test_export_deleted_jsonl;
+----
+3 4433252 [1.1,2.03,3.04,4]
+4 4433253 [1.9,2,3.045,4.5]
+5 4433254 [0.1,4.03,1.2,2.5]
+6 4433255 [2.1,2.3,2.68,3.7]
+
+statement ok
+DELETE FROM sqllogic_test_export_deleted_jsonl WHERE name='3';
+
+statement ok
+DELETE FROM sqllogic_test_export_deleted_jsonl WHERE name='5';
+
+query I
+select * from sqllogic_test_export_deleted_jsonl;
+----
+4 4433253 [1.9,2,3.045,4.5]
+6 4433255 [2.1,2.3,2.68,3.7]
+
+statement ok
+COPY sqllogic_test_export_deleted_jsonl TO '/var/infinity/test_data/tmp/test_export_deleted_embedding.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+
+statement ok
+DROP TABLE sqllogic_test_export_deleted_jsonl;
+
+statement ok
+CREATE TABLE test_import_deleted_jsonl (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
+
+statement ok
+COPY test_import_deleted_jsonl FROM '/var/infinity/test_data/tmp/test_export_deleted_embedding.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+
+query I
+select * from test_import_deleted_jsonl;
+----
+4 4433253 [1.9,2,3.045,4.5]
+6 4433255 [2.1,2.3,2.68,3.7]
+
+statement ok
+DROP TABLE test_import_deleted_jsonl;
+
+statement ok
+CREATE TABLE sqllogic_test_export_deleted_csv (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_csv  VALUES(3, '4433252', [1.1, 2.03, 3.04, 4.0]);
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_csv VALUES(4, '4433253', [1.9, 2.0, 3.045, 4.5]);
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_csv VALUES(5, '4433254', [0.1, 4.03, 1.2, 2.5]);
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_csv VALUES(6, '4433255', [2.1, 2.3, 2.68, 3.7]);
+
+query I
+select * from sqllogic_test_export_deleted_csv;
+----
+3 4433252 [1.1,2.03,3.04,4]
+4 4433253 [1.9,2,3.045,4.5]
+5 4433254 [0.1,4.03,1.2,2.5]
+6 4433255 [2.1,2.3,2.68,3.7]
+
+statement ok
+DELETE FROM sqllogic_test_export_deleted_csv WHERE name='3';
+
+statement ok
+DELETE FROM sqllogic_test_export_deleted_csv WHERE name='5';
+
+query I
+select * from sqllogic_test_export_deleted_csv;
+----
+4 4433253 [1.9,2,3.045,4.5]
+6 4433255 [2.1,2.3,2.68,3.7]
+
+statement ok
+COPY sqllogic_test_export_deleted_csv TO '/var/infinity/test_data/tmp/test_export_deleted_embedding.csv' WITH (FORMAT CSV, DELIMITER ',');
+
+statement ok
+DROP TABLE sqllogic_test_export_deleted_csv;
+
+statement ok
+CREATE TABLE test_import_deleted_csv (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
+
+statement ok
+COPY test_import_deleted_csv FROM '/var/infinity/test_data/tmp/test_export_deleted_embedding.csv' WITH (FORMAT CSV, DELIMITER ',');
+
+query I
+select * from test_import_deleted_csv;
+----
+4 4433253 [1.9,2,3.045,4.5]
+6 4433255 [2.1,2.3,2.68,3.7]
+
+statement ok
+DROP TABLE test_impo;
