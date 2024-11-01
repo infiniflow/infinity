@@ -84,7 +84,7 @@ class DockerInfinityRunner(BaseInfinityRunner):
         run_cmds = " && ".join(
             [
                 "cd /infinity",
-                f"{self.executable_path} --config={self.config_path}",
+                f"{self.executable_path} --config={self.config_path} 2>&1",
             ]
         )
         print(run_cmds)
@@ -155,12 +155,9 @@ class DockerInfinityCluster(InfinityCluster):
         executable_path: str,
         *,
         minio_params: MinioParams = None,
+        infinity_dir: str,
     ):
-        super().__init__(executable_path)
-
-        image_name = "infiniflow/infinity_builder:centos7_clang18"
         docker_client = docker.from_env()
-        self.image_name = image_name
 
         network_name = "infinity_network"
         try:
@@ -170,9 +167,15 @@ class DockerInfinityCluster(InfinityCluster):
                 network_name,
                 driver="bridge",
             )
+        super().__init__(
+            executable_path, minio_params=minio_params, infinity_dir=infinity_dir
+        )
+
+        image_name = "infiniflow/infinity_builder:centos7_clang18"
+        self.image_name = image_name
 
         if minio_params is not None:
-            add = self.add_minio(minio_params, False)
+            add = self.add_minio(minio_params)
             if add:
                 self.network.connect(self.minio_container)
             info = docker_client.api.inspect_network(self.network.id)
@@ -180,6 +183,36 @@ class DockerInfinityCluster(InfinityCluster):
             minio_ip = minio_ip.split("/")[0]
             self.minio_ip = minio_ip
             self.minio_params = minio_params
+
+    def add_minio(self, minio_params: MinioParams):
+        minio_image_name = "quay.io/minio/minio"
+
+        minio_cmd = f'server /data --console-address ":{minio_params.minio_port}"'
+        docker_client = docker.from_env()
+        kargs = {}
+        container_name = "minio_docker"
+
+        try:
+            self.minio_container = docker_client.containers.get(container_name)
+        except docker.errors.NotFound:
+            self.minio_container = docker_client.containers.run(
+                image=minio_image_name,
+                name=container_name,
+                detach=True,
+                environment=[
+                    "MINIO_ROOT_PASSWORD=minioadmin",
+                    "MINIO_ROOT_USER=minioadmin",
+                ],
+                volumes=[f"{minio_params.minio_dir}:/data"],
+                command=minio_cmd,
+                **kargs,
+            )
+            self.network.connect(self.minio_container)
+        info = docker_client.api.inspect_network(self.network.id)
+        minio_ip = info["Containers"][self.minio_container.id]["IPv4Address"]
+        minio_ip = minio_ip.split("/")[0]
+        self.minio_ip = minio_ip
+        self.minio_params = minio_params
 
     def clear(self):
         super().clear()
@@ -191,7 +224,8 @@ class DockerInfinityCluster(InfinityCluster):
         if node_name in self.runners:
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         container_name, cpus, tz = self.__init_docker_params()
-        pwd = os.getcwd()
+        pwd = self.infinity_dir
+        print(f"pwd: {pwd}")
         docker_client = docker.from_env()
 
         try:
@@ -203,7 +237,10 @@ class DockerInfinityCluster(InfinityCluster):
                 name=container_name,
                 detach=True,
                 cpuset_cpus=f"0-{cpus - 1}",
-                volumes=[f"{pwd}:/infinity", "/boot:/boot"],
+                volumes=["/boot:/boot"],
+                mounts=[
+                    docker.types.Mount(target="/infinity", source=pwd, type="bind")
+                ],
                 environment=[f"TZ={tz}"],
             )
             added = True

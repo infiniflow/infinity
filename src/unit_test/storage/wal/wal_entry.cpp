@@ -211,7 +211,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     {
         Vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
         SharedPtr<String> index_name = MakeShared<String>("idx1");
-        auto index_base = IndexIVF::Make(index_name, "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
+        auto index_base = IndexIVF::Make(index_name, MakeShared<String>("test comment"), "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
         for (auto parameter : parameters) {
             delete parameter;
         }
@@ -253,9 +253,7 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<ChunkID> deprecate_ids{0, 1};
         entry->cmds_.push_back(MakeShared<WalCmdDumpIndex>("db1", "tbl1", "idx1", 0 /*segment_id*/, chunk_infos, deprecate_ids));
     }
-    {
-        entry->cmds_.push_back(MakeShared<WalCmdRenameTable>("db1", "tbl1", "tbl2"));
-    }
+    { entry->cmds_.push_back(MakeShared<WalCmdRenameTable>("db1", "tbl1", "tbl2")); }
     {
         Vector<SharedPtr<ColumnDef>> column_defs;
         std::set<ConstraintType> constraints;
@@ -340,10 +338,10 @@ TEST_F(WalEntryTest, WalEntryIterator) {
             if (wal_entry == nullptr) {
                 break;
             }
-//            Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
-//            for (const auto &cmd : wal_entry->cmds_) {
-//                Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-//            }
+            //            Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
+            //            for (const auto &cmd : wal_entry->cmds_) {
+            //                Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+            //            }
         }
     }
 
@@ -366,8 +364,8 @@ TEST_F(WalEntryTest, WalEntryIterator) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 catalog_path = checkpoint_cmd->catalog_path_;
 
-//                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
-//                Println("Catalog Path: {}", catalog_path);
+                //                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
+                //                Println("Catalog Path: {}", catalog_path);
                 break;
             }
         }
@@ -385,13 +383,13 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     }
 
     // phase 3: replay the entries
-//    Println("Start to replay the entries", "");
-//    for (const auto &entry : replay_entries) {
-//        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
-//        for (const auto &cmd : entry->cmds_) {
-//            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-//        }
-//    }
+    //    Println("Start to replay the entries", "");
+    //    for (const auto &entry : replay_entries) {
+    //        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
+    //        for (const auto &cmd : entry->cmds_) {
+    //            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+    //        }
+    //    }
     EXPECT_EQ(max_commit_ts, 123ul);
     EXPECT_EQ(catalog_path, String("catalog"));
     EXPECT_EQ(replay_entries.size(), 1u);
@@ -415,10 +413,10 @@ TEST_F(WalEntryTest, WalListIterator) {
         if (wal_entry.get() == nullptr) {
             break;
         }
-//        Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
-//        for (const auto &cmd : wal_entry->cmds_) {
-//            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-//        }
+        //        Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
+        //        for (const auto &cmd : wal_entry->cmds_) {
+        //            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+        //        }
     }
 
     Vector<SharedPtr<WalEntry>> replay_entries;
@@ -440,8 +438,8 @@ TEST_F(WalEntryTest, WalListIterator) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 catalog_path = checkpoint_cmd->catalog_path_;
 
-//                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
-//                Println("Catalog Path: {}", catalog_path);
+                //                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
+                //                Println("Catalog Path: {}", catalog_path);
                 break;
             }
         }
@@ -459,13 +457,13 @@ TEST_F(WalEntryTest, WalListIterator) {
     }
 
     // phase 3: replay the entries
-//    Println("Start to replay the entries", "");
-//    for (const auto &entry : replay_entries) {
-//        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
-//        for (const auto &cmd : entry->cmds_) {
-//            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-//        }
-//    }
+    //    Println("Start to replay the entries", "");
+    //    for (const auto &entry : replay_entries) {
+    //        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
+    //        for (const auto &cmd : entry->cmds_) {
+    //            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+    //        }
+    //    }
     EXPECT_EQ(max_commit_ts, 123ul);
     EXPECT_EQ(catalog_path, ckp_file_path);
     EXPECT_EQ(replay_entries.size(), 1u);

@@ -62,7 +62,7 @@ class RemoteTable():
 
     @name_validity_check("index_name", "Index")
     def create_index(self, index_name: str, index_info: IndexInfo,
-                     conflict_type: ConflictType = ConflictType.Error):
+                     conflict_type: ConflictType = ConflictType.Error, index_comment = ""):
         index_name = index_name.strip()
 
         index_info_to_use = index_info.to_ttype()
@@ -81,7 +81,8 @@ class RemoteTable():
                                       table_name=self._table_name,
                                       index_name=index_name,
                                       index_info=index_info_to_use,
-                                      conflict_type=create_index_conflict)
+                                      conflict_type=create_index_conflict,
+                                      index_comment=index_comment)
 
         if res.error_code == ErrorCode.OK:
             return res

@@ -27,12 +27,13 @@ namespace infinity {
 // Does not need any extra member.
 export class IndexSecondary final : public IndexBase {
 public:
-    static SharedPtr<IndexBase> Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names) {
-        return MakeShared<IndexSecondary>(index_name, file_name, std::move(column_names));
+    static SharedPtr<IndexBase>
+    Make(SharedPtr<String> index_name, SharedPtr<String> index_comment, const String &file_name, Vector<String> column_names) {
+        return MakeShared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
     }
 
-    IndexSecondary(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names)
-        : IndexBase(IndexType::kSecondary, index_name, file_name, std::move(column_names)) {}
+    IndexSecondary(SharedPtr<String> index_name, SharedPtr<String> index_comment, const String &file_name, Vector<String> column_names)
+        : IndexBase(IndexType::kSecondary, index_name, index_comment, file_name, std::move(column_names)) {}
 
     ~IndexSecondary() final = default;
 

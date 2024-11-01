@@ -30,15 +30,19 @@ namespace infinity {
 
 export class IndexFullText final : public IndexBase {
 public:
-    static SharedPtr<IndexBase>
-    Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
+    static SharedPtr<IndexBase> Make(SharedPtr<String> index_name,
+                                     SharedPtr<String> index_comment,
+                                     const String &file_name,
+                                     Vector<String> column_names,
+                                     const Vector<InitParameter *> &index_param_list);
 
     IndexFullText(SharedPtr<String> index_name,
+                  SharedPtr<String> index_comment,
                   const String &file_name,
                   Vector<String> column_names,
                   const String &analyzer,
                   optionflag_t flag = OPTION_FLAG_ALL)
-        : IndexBase(IndexType::kFullText, index_name, file_name, std::move(column_names)), analyzer_(analyzer), flag_(flag){};
+        : IndexBase(IndexType::kFullText, index_name, index_comment, file_name, std::move(column_names)), analyzer_(analyzer), flag_(flag){};
 
     ~IndexFullText() final = default;
 

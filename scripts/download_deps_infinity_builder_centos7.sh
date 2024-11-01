@@ -34,7 +34,8 @@ https://www.python.org/ftp/python/3.10.15/Python-3.10.15.tar.xz
 https://www.python.org/ftp/python/3.11.10/Python-3.11.10.tar.xz
 https://www.python.org/ftp/python/3.12.7/Python-3.12.7.tar.xz
 https://www.python.org/ftp/python/3.13.0/Python-3.13.0.tar.xz
-https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.20.2/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz"
+https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.20.2/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz
+https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/iproute2-6.9.0.tar.gz"
 
 SAVEIFS=$IFS   # Save current IFS (Internal Field Separator)
 IFS=$'\n'      # Change IFS to newline char

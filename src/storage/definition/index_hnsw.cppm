@@ -39,10 +39,14 @@ export HnswEncodeType StringToHnswEncodeType(const String &str);
 
 export class IndexHnsw final : public IndexBase {
 public:
-    static SharedPtr<IndexBase>
-    Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
+    static SharedPtr<IndexBase> Make(SharedPtr<String> index_name,
+                                     SharedPtr<String> index_comment,
+                                     const String &file_name,
+                                     Vector<String> column_names,
+                                     const Vector<InitParameter *> &index_param_list);
 
     IndexHnsw(SharedPtr<String> index_name,
+              SharedPtr<String> index_comment,
               const String &file_name,
               Vector<String> column_names,
               MetricType metric_type,
@@ -50,8 +54,8 @@ public:
               SizeT M,
               SizeT ef_construction,
               SizeT block_size)
-        : IndexBase(IndexType::kHnsw, index_name, file_name, std::move(column_names)), metric_type_(metric_type), encode_type_(encode_type), M_(M),
-          ef_construction_(ef_construction), block_size_(block_size) {}
+        : IndexBase(IndexType::kHnsw, index_name, index_comment, file_name, std::move(column_names)), metric_type_(metric_type),
+          encode_type_(encode_type), M_(M), ef_construction_(ef_construction), block_size_(block_size) {}
 
     ~IndexHnsw() final = default;
 

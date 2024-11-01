@@ -61,10 +61,17 @@ export struct IndexIVFOption {
 
 export class IndexIVF final : public IndexBase {
 public:
-    static SharedPtr<IndexIVF>
-    Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
+    static SharedPtr<IndexIVF> Make(SharedPtr<String> index_name,
+                                    SharedPtr<String> index_comment,
+                                    const String &file_name,
+                                    Vector<String> column_names,
+                                    const Vector<InitParameter *> &index_param_list);
 
-    IndexIVF(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const IndexIVFOption &ivf_option);
+    IndexIVF(SharedPtr<String> index_name,
+             SharedPtr<String> index_comment,
+             const String &file_name,
+             Vector<String> column_names,
+             const IndexIVFOption &ivf_option);
 
     ~IndexIVF() override = default;
 

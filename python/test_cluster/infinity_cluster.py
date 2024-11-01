@@ -149,13 +149,13 @@ class InfinityRunner(BaseInfinityRunner):
 
 
 class InfinityCluster:
-    def __init__(self, executable_path: str, *, minio_params: MinioParams = None):
+    def __init__(self, executable_path: str, *, minio_params: MinioParams, infinity_dir: str):
         self.executable_path = executable_path
         self.runners: dict[str, InfinityRunner] = {}
         self.leader_runner: InfinityRunner | None = None
+        self.infinity_dir = infinity_dir
 
-        if minio_params is not None:
-            self.add_minio(minio_params, True)
+        self.add_minio(minio_params)
 
     def clear(self):
         for runner in self.runners.values():
@@ -169,21 +169,15 @@ class InfinityCluster:
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner
 
-    def add_minio(self, minio_params: MinioParams, host_net: bool) -> bool:
+    def add_minio(self, minio_params: MinioParams):
         minio_image_name = "quay.io/minio/minio"
 
         minio_cmd = f'server /data --console-address ":{minio_params.minio_port}"'
         docker_client = docker.from_env()
-        kargs = {}
-        if host_net:
-            kargs = {"network": "host"}
-            container_name = "minio_host"
-        else:
-            container_name = "minio_docker"
+        container_name = "minio_host"
 
         try:
             self.minio_container = docker_client.containers.get(container_name)
-            return False
         except docker.errors.NotFound:
             self.minio_container = docker_client.containers.run(
                 image=minio_image_name,
@@ -195,9 +189,8 @@ class InfinityCluster:
                 ],
                 volumes=[f"{minio_params.minio_dir}:/data"],
                 command=minio_cmd,
-                **kargs,
+                network="host",
             )
-            return True
 
     def init_standalone(self, node_name: str):
         if node_name not in self.runners:
