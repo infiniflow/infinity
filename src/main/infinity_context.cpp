@@ -115,7 +115,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     cluster_manager_->InitAsStandalone();
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kWritable);
                     if (!set_storage_status.ok()) {
-                        UnrecoverableError("Failed to init storage to standalone.");
+                        UnrecoverableError(fmt::format("Failed to init storage to standalone, messgae: {}", set_storage_status.message()));
                     }
                     break;
                 }
