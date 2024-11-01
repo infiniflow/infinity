@@ -294,25 +294,25 @@ print(res.db_names) # ['my_database', 'database_1']
 ## show_database
 
 ```python
-db_object.show_database(database_name)
+infinity_object.show_database(database_name)
 ```
 
-Show detail information of a database.
+Shows detailed information about a database.
 
 ### Returns
 
 A structure containing the following attributes:
 
 - `error_code`: `int`
-    - `0`: The operation succeeds.
-    - A non-zero value indicates a specific error condition.
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
 ```python
-res = db_object.show_database('my_database')
+res = infinity_object.show_database('my_database')
 ```
 
 ---
@@ -800,7 +800,7 @@ res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 db_object.show_table(table_name)
 ```
 
-Show detail information of a table.
+Shows detailed information about a table.
 
 ### Returns
 
@@ -1196,18 +1196,18 @@ res.index_names # ['my_index', 'tensor_index', 'sparse_index']
 ## show_index
 
 ```python
-db_object.show_index(index_name)
+table_object.show_index(index_name)
 ```
 
-Show detail information of a index.
+Shows detailed information about an index.
 
 ### Returns
 
 A structure containing the following attributes:
 
 - `error_code`: `int`
-    - `0`: The operation succeeds.
-    - A non-zero value indicates a specific error condition.
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
