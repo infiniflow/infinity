@@ -581,7 +581,7 @@ Status Status::MinioInvalidAccessKey(const String &detailed) {
 }
 
 Status Status::MinioBucketNotExists(const String &bucket_name) {
-    return Status(ErrorCode::kMinioInvalidAccessKey, MakeUnique<String>(fmt::format("Bucket {} not found", bucket_name)));
+    return Status(ErrorCode::kMinioBucketNotExists, MakeUnique<String>(fmt::format("Bucket {} not found", bucket_name)));
 }
 
 Status Status::InvalidStorageType(const String &expected, const String &actual) {
