@@ -149,11 +149,10 @@ class InfinityRunner(BaseInfinityRunner):
 
 
 class InfinityCluster:
-    def __init__(self, executable_path: str, *, minio_params: MinioParams, infinity_dir: str):
+    def __init__(self, executable_path: str, *, minio_params: MinioParams):
         self.executable_path = executable_path
         self.runners: dict[str, InfinityRunner] = {}
         self.leader_runner: InfinityRunner | None = None
-        self.infinity_dir = infinity_dir
 
         self.add_minio(minio_params)
 

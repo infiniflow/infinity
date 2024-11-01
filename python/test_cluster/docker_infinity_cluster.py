@@ -158,7 +158,6 @@ class DockerInfinityCluster(InfinityCluster):
         infinity_dir: str,
     ):
         docker_client = docker.from_env()
-
         network_name = "infinity_network"
         try:
             self.network = docker_client.networks.get(network_name)
@@ -167,9 +166,8 @@ class DockerInfinityCluster(InfinityCluster):
                 network_name,
                 driver="bridge",
             )
-        super().__init__(
-            executable_path, minio_params=minio_params, infinity_dir=infinity_dir
-        )
+        super().__init__(executable_path, minio_params=minio_params)
+        self.infinity_dir = infinity_dir
 
         image_name = "infiniflow/infinity_builder:centos7_clang18"
         self.image_name = image_name

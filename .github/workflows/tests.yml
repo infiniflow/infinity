@@ -56,11 +56,20 @@ jobs:
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot --cpus ${CPUS} infiniflow/infinity_builder:centos7_clang18
     
-      - name: Create Test image
+      - name: Create Test image & Start tester container
         if: ${{ !cancelled() && !failure() }}
         run: |
             TESTER_IMAGE_NAME=infiniflow/infinity_tester:centos7_clang18
             sudo python3 scripts/build_tester_image.py --image_name=${TESTER_IMAGE_NAME} --bin_path=${RUNNER_WORKSPACE_PREFIX}/build_tester_image
+            TESTER_CONTAINER=infinity_tester_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+            CPUS=${CPUS:-$(nproc)}
+            echo "TESTER_CONTAINER=${TESTER_CONTAINER}" >> $GITHUB_ENV
+            echo "CPUS=${CPUS}" >> $GITHUB_ENV
+            TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+            INF_DIRECTORY=$PWD
+            echo "${INF_DIRECTORY}" | sudo tee .tester_env
+            sudo docker rm -f -v ${TESTER_CONTAINER} && sudo docker run --net=host --cap-add=NET_ADMIN -d --name ${TESTER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot -v /var/run/docker.sock:/var/run/docker.sock --cpus ${CPUS} ${TESTER_IMAGE_NAME}
+            sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && export INF_DIRECTORY=`cat .tester_env` && echo INF_DIRECTORY=${INF_DIRECTORY}"
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
@@ -70,25 +79,12 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
 
-      - name: Start tester container
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-            TESTER_IMAGE_NAME=infiniflow/infinity_tester:centos7_clang18
-            TESTER_CONTAINER=infinity_tester_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-            CPUS=${CPUS:-$(nproc)}
-            echo "TESTER_CONTAINER=${TESTER_CONTAINER}" >> $GITHUB_ENV
-            echo "CPUS=${CPUS}" >> $GITHUB_ENV
-            TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-            INF_DIRECTORY=$PWD
-            echo "${INF_DIRECTORY}" | sudo tee .tester_env
-            sudo docker rm -f -v ${TESTER_CONTAINER} && sudo docker run --net=host --cap-add=NET_ADMIN -d --name ${TESTER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot -v /var/run/docker.sock:/var/run/docker.sock --cpus ${CPUS} ${TESTER_IMAGE_NAME}
-            sudo docker exec ${TESTER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
-    
       - name: Run cluster test
         if: ${{ !cancelled() && !failure() }}
         id: run_cluster_test
         run: |
-          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && INF_DIRECTORY=`cat .tester_env`  && echo INF_DIRECTORY=${INF_DIRECTORY} && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=${INF_DIRECTORY}"
+          sudo docker exec ${TESTER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
+          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && export INF_DIRECTORY=`cat .tester_env` && echo INF_DIRECTORY=${INF_DIRECTORY} && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=${INF_DIRECTORY}"
 
       - name: Collect cluster test output
         if: ${{ !cancelled() }}

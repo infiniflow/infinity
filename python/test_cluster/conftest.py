@@ -22,7 +22,15 @@ def pytest_addoption(parser):
         default=9001,
     )
     parser.addoption("--infinity_dir", action="store", required=True)
+    parser.addoption("--docker", action="store_true", default=False)
 
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--docker"):
+        return # do not skip docker test
+    skip_docker = pytest.mark.skip(reason="need --docker option to run")
+    for item in items:
+        if "docker_cluster" in item.fixturenames:
+            item.add_marker(skip_docker)
 
 def pytest_generate_tests(metafunc):
     infinity_path = metafunc.config.getoption("infinity_path")
@@ -31,8 +39,9 @@ def pytest_generate_tests(metafunc):
     minio_params = MinioParams(minio_dir, minio_port)
 
     infinity_dir = metafunc.config.getoption("infinity_dir")
-    if (len(infinity_dir) == 0):
-        raise ValueError("Please provide a valid infinity_dir")
+    if len(infinity_dir) == 0:
+        # raise ValueError("Please provide a valid infinity_dir")
+        pass
     print("infinity_dir: ", infinity_dir)
     # print(metafunc.fixturenames)
 
@@ -42,12 +51,10 @@ def pytest_generate_tests(metafunc):
         )
         metafunc.parametrize("docker_cluster", [docker_infinity_cluster])
     elif "cluster" in metafunc.fixturenames:
-        infinity_cluster = InfinityCluster(
-            infinity_path, minio_params=minio_params, infinity_dir=infinity_dir
-        )
+        infinity_cluster = InfinityCluster(infinity_path, minio_params=minio_params)
         metafunc.parametrize("cluster", [infinity_cluster])
     elif "mock_cluster" in metafunc.fixturenames:
         mock_infinity_cluster = MockInfinityCluster(
-            infinity_path, minio_params=minio_params, infinity_dir=infinity_dir
+            infinity_path, minio_params=minio_params
         )
         metafunc.parametrize("mock_cluster", [mock_infinity_cluster])
