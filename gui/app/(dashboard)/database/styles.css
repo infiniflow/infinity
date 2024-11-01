@@ -31,11 +31,15 @@
 }
 
 .tree-node:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgb(234, 240, 255);
 }
 
-.tree-node--focused {
-  background-color: #d7d7d7;
+.tree .tree-node--focused {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.tree .tree-node--selected {
+  background: rgb(213, 222, 249);
 }
 
 .arrow--open {
