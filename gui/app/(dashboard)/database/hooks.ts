@@ -44,6 +44,10 @@ export const useHandleClickTreeName = () => {
   return { handleClickTreeName };
 };
 
+export interface TreeDataProps {
+  fetchDatabases?: () => Promise<void>;
+}
+
 export const useBuildTreeData = () => {
   const loadedAlertElement = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<INode[]>([]);
@@ -157,7 +161,13 @@ export const useBuildTreeData = () => {
     }
   };
 
-  return { wrappedOnLoadData, data, loadedAlertElement, loading };
+  return {
+    wrappedOnLoadData,
+    data,
+    loadedAlertElement,
+    loading,
+    fetchDatabases
+  };
 };
 
 export const useFetchTableColumns = ({

@@ -31,7 +31,7 @@
 }
 
 .tree-node:hover {
-  background: rgb(240, 244, 254);
+  background: rgb(234, 240, 255);
 }
 
 .tree .tree-node--focused {
