@@ -640,4 +640,15 @@ const SharedPtr<DataType> BlockEntry::GetColumnType(u64 column_id) const {
 
 u32 BlockEntry::segment_id() const { return segment_entry_->segment_id(); }
 
+SizeT BlockEntry::GetStorageSize() const {
+    SizeT result = 0;
+    {
+        std::shared_lock lock(rw_locker_);
+        for (ColumnID column_id = 0; column_id < columns_.size(); ++column_id) {
+            result += columns_[column_id]->GetStorageSize();
+        }
+    }
+    return result;
+}
+
 } // namespace infinity
