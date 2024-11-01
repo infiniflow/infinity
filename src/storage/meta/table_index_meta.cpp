@@ -41,8 +41,7 @@ struct SegmentEntry;
 TableIndexMeta::TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name)
     : index_name_(std::move(index_name)), table_entry_(table_entry) {}
 
-TableIndexMeta::TableIndexMeta(const TableIndexMeta &meta)
-    : index_name_(meta.index_name_), table_entry_(meta.table_entry_) {}
+TableIndexMeta::TableIndexMeta(const TableIndexMeta &meta) : index_name_(meta.index_name_), table_entry_(meta.table_entry_) {}
 
 UniquePtr<TableIndexMeta> TableIndexMeta::Clone(TableEntry *table_entry) const {
     auto ret = UniquePtr<TableIndexMeta>(new TableIndexMeta(*this));
@@ -147,6 +146,7 @@ TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, 
     table_index_info->segment_index_count_ = table_index_entry->index_by_segment().size();
 
     auto index_base = table_index_entry->index_base();
+    table_index_info->index_comment_ = MakeShared<String>(*index_base->index_comment_);
     table_index_info->index_type_ = MakeShared<String>(IndexInfo::IndexTypeToString(index_base->index_type_));
     table_index_info->index_other_params_ = MakeShared<String>(index_base->BuildOtherParamsString());
 
@@ -183,7 +183,7 @@ nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
     Vector<BaseEntry *> entry_candidates = index_entry_list_.GetCandidateEntry(max_commit_ts, EntryType::kTableIndex);
 
     for (const auto &entry : entry_candidates) {
-        TableIndexEntry* table_index_entry = static_cast<TableIndexEntry*>(entry);
+        TableIndexEntry *table_index_entry = static_cast<TableIndexEntry *>(entry);
         json_res["index_entries"].emplace_back(table_index_entry->Serialize(max_commit_ts));
     }
     return json_res;
@@ -206,7 +206,7 @@ TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEn
     return res;
 }
 
-void TableIndexMeta::PushFrontEntry(const SharedPtr<TableIndexEntry>& new_table_index_entry) {
+void TableIndexMeta::PushFrontEntry(const SharedPtr<TableIndexEntry> &new_table_index_entry) {
     index_entry_list_.PushFrontEntry(new_table_index_entry);
 }
 

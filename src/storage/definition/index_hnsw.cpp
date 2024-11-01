@@ -58,8 +58,11 @@ String HnswEncodeTypeToString(HnswEncodeType encode_type) {
     }
 }
 
-SharedPtr<IndexBase>
-IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
+SharedPtr<IndexBase> IndexHnsw::Make(SharedPtr<String> index_name,
+                                     SharedPtr<String> index_comment,
+                                     const String &file_name,
+                                     Vector<String> column_names,
+                                     const Vector<InitParameter *> &index_param_list) {
     SizeT M = HNSW_M;
     SizeT ef_construction = HNSW_EF_CONSTRUCTION;
     SizeT block_size = HNSW_BLOCK_SIZE;
@@ -92,7 +95,15 @@ IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
         RecoverableError(status);
     }
 
-    return MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, block_size);
+    return MakeShared<IndexHnsw>(index_name,
+                                 index_comment,
+                                 file_name,
+                                 std::move(column_names),
+                                 metric_type,
+                                 encode_type,
+                                 M,
+                                 ef_construction,
+                                 block_size);
 }
 
 bool IndexHnsw::operator==(const IndexHnsw &other) const {

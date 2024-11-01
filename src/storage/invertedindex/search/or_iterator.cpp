@@ -84,18 +84,18 @@ bool OrIterator::Next(const RowID doc_id) {
     return doc_id_ != INVALID_ROWID;
 }
 
-float OrIterator::BM25Score() {
-    if (bm25_score_cache_docid_ == doc_id_) {
-        return bm25_score_cache_;
+float OrIterator::Score() {
+    if (score_cache_docid_ == doc_id_) {
+        return score_cache_;
     }
     float sum_score = 0;
     for (const auto &child : children_) {
         if (child->DocID() == doc_id_) {
-            sum_score += child->BM25Score();
+            sum_score += child->Score();
         }
     }
-    bm25_score_cache_docid_ = doc_id_;
-    bm25_score_cache_ = sum_score;
+    score_cache_docid_ = doc_id_;
+    score_cache_ = sum_score;
     return sum_score;
 }
 

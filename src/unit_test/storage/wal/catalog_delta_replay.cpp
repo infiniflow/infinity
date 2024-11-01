@@ -819,7 +819,11 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
 
-                IndexFullText fullIdxBase(std::make_shared<String>(idx_name), idx_file_name, col_name_list, analyzer);
+                IndexFullText fullIdxBase(std::make_shared<String>(idx_name),
+                                          MakeShared<String>("test comment"),
+                                          idx_file_name,
+                                          col_name_list,
+                                          analyzer);
                 std::shared_ptr<IndexBase> fullIdxBasePtr = std::make_shared<IndexFullText>(fullIdxBase);
 
                 auto [table_idx_entry, status2] = txn_idx->CreateIndexDef(table_entry, fullIdxBasePtr, ConflictType::kInvalid);
@@ -982,7 +986,11 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
 
-                IndexFullText fullIdxBase(std::make_shared<String>(idx_name), idx_file_name, col_name_list, analyzer);
+                IndexFullText fullIdxBase(std::make_shared<String>(idx_name),
+                                          MakeShared<String>("test comment"),
+                                          idx_file_name,
+                                          col_name_list,
+                                          analyzer);
                 std::shared_ptr<IndexBase> fullIdxBasePtr = std::make_shared<IndexFullText>(fullIdxBase);
 
                 auto [table_idx_entry, status2] = txn_idx->CreateIndexDef(table_entry, fullIdxBasePtr, ConflictType::kInvalid);
@@ -1131,7 +1139,11 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
 
-                IndexFullText fullIdxBase(std::make_shared<String>(idx_name), idx_file_name, col_name_list, analyzer);
+                IndexFullText fullIdxBase(std::make_shared<String>(idx_name),
+                                          MakeShared<String>("test comment"),
+                                          idx_file_name,
+                                          col_name_list,
+                                          analyzer);
                 std::shared_ptr<IndexBase> fullIdxBasePtr = std::make_shared<IndexFullText>(fullIdxBase);
 
                 auto [table_idx_entry, status2] = txn_idx->CreateIndexDef(table_entry, fullIdxBasePtr, ConflictType::kInvalid);

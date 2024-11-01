@@ -51,11 +51,11 @@ protected:
         InitData();
     }
 
-    void CreateDBAndTable(const String& db_name, const String& table_name);
+    void CreateDBAndTable(const String &db_name, const String &table_name);
 
     void CreateIndex(const String &db_name, const String &table_name, const String &index_name, const String &analyzer);
 
-    void InsertData(const String& db_name, const String& table_name);
+    void InsertData(const String &db_name, const String &table_name);
 
     void QueryMatch(const String &db_name,
                     const String &table_name,
@@ -67,7 +67,6 @@ protected:
                     const DocIteratorType &query_type);
 
     void InitData();
-
 
 public:
     const String data_path_ = "/var/infinity";
@@ -155,7 +154,7 @@ TEST_P(QueryMatchTest, phrase) {
     }
 }
 
-void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table_name) {
+void QueryMatchTest::CreateDBAndTable(const String &db_name, const String &table_name) {
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
         String col1_name = "id";
@@ -209,7 +208,7 @@ void QueryMatchTest::CreateIndex(const String &db_name, const String &table_name
         auto [table_entry, status1] = txn_idx->GetTableByName(db_name, table_name);
         EXPECT_TRUE(status1.ok());
 
-        IndexFullText full_idx_base(MakeShared<String>(index_name), index_file_name, col_name_list, analyzer);
+        IndexFullText full_idx_base(MakeShared<String>(index_name), MakeShared<String>("test comment"), index_file_name, col_name_list, analyzer);
         SharedPtr<IndexBase> full_idx_base_ptr = MakeShared<IndexFullText>(full_idx_base);
 
         auto [table_idx_entry, status2] = txn_idx->CreateIndexDef(table_entry, full_idx_base_ptr, ConflictType::kInvalid);
@@ -263,7 +262,7 @@ void QueryMatchTest::CreateIndex(const String &db_name, const String &table_name
     }
 }
 
-void QueryMatchTest::InsertData(const String& db_name, const String& table_name) {
+void QueryMatchTest::InsertData(const String &db_name, const String &table_name) {
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
 
@@ -283,7 +282,7 @@ void QueryMatchTest::InsertData(const String& db_name, const String& table_name)
                     auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
                     column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
                 }
-                auto& row = datas_[block_id];
+                auto &row = datas_[block_id];
                 for (SizeT i = 0; i < column_vectors.size(); ++i) {
                     auto &column = row[i];
                     column_vectors[i].AppendByStringView(column);
@@ -292,7 +291,6 @@ void QueryMatchTest::InsertData(const String& db_name, const String& table_name)
             }
             segment_entry->AppendBlockEntry(std::move(block_entry));
         }
-
     }
     segment_entry->FlushNewData();
     txn->Import(table_entry, segment_entry);
@@ -340,16 +338,17 @@ void QueryMatchTest::QueryMatch(const String &db_name,
         Status status = Status::ParseMatchExprFailed(match_expr->fields_, match_expr->matching_text_);
         RecoverableError(status);
     }
-    FullTextQueryContext full_text_query_context;
+    FullTextQueryContext full_text_query_context(FulltextSimilarity::kBM25, MinimumShouldMatchOption{});
+    full_text_query_context.early_term_algo_ = EarlyTermAlgo::kNaive;
     full_text_query_context.query_tree_ = std::move(query_tree);
-    UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context, EarlyTermAlgo::kNaive, MinimumShouldMatchOption{});
+    UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);
 
     RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : (doc_iterator->Next(), doc_iterator->DocID());
     if (iter_row_id == INVALID_ROWID) {
         fmt::print("iter_row_id is INVALID_ROWID\n");
     } else {
         do {
-            auto score = doc_iterator->BM25Score();
+            auto score = doc_iterator->Score();
             fmt::print("iter_row_id = {}, score = {}\n", iter_row_id.ToUint64(), score);
             doc_iterator->Next();
             iter_row_id = doc_iterator->DocID();

@@ -49,7 +49,7 @@ public:
 
     MetaMap() = default;
 
-    template<typename T>
+    template <typename T>
     MetaMap Clone(T *parent) const {
         MetaMap new_meta_map;
         std::shared_lock r_lock(rw_locker_);
@@ -60,7 +60,7 @@ public:
     }
 
 public:
-    void AddNewMetaNoLock(const String& meta_name, UniquePtr<Meta> meta);
+    void AddNewMetaNoLock(const String &meta_name, UniquePtr<Meta> meta);
 
     Tuple<Meta *, std::shared_lock<std::shared_mutex>> GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func);
 
@@ -81,35 +81,32 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true);
 
-    Tuple<Vector<String>, Vector<Meta*>, std::shared_lock<std::shared_mutex>> GetAllMetaGuard() const;
+    Tuple<Vector<String>, Vector<Meta *>, std::shared_lock<std::shared_mutex>> GetAllMetaGuard() const;
 
-    Meta* GetMetaPtrByName(const String& name) const;
+    Meta *GetMetaPtrByName(const String &name) const;
 
     SizeT Size() const {
         std::shared_lock r_lock(rw_locker_);
         return meta_map_.size();
     }
 
-    std::shared_mutex& GetMetaLock() {
-        return rw_locker_;
-    }
+    std::shared_mutex &GetMetaLock() { return rw_locker_; }
 
 private:
-
     mutable std::shared_mutex rw_locker_{};
     mutable Map meta_map_;
 };
 
 template <MetaConcept Meta>
-Tuple<Vector<String>, Vector<Meta*>, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetAllMetaGuard() const {
+Tuple<Vector<String>, Vector<Meta *>, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetAllMetaGuard() const {
     Vector<String> meta_name_array;
-    Vector<Meta*> meta_ptr_array;
+    Vector<Meta *> meta_ptr_array;
     std::shared_lock r_lock(rw_locker_);
     SizeT size = meta_map_.size();
     meta_name_array.reserve(size);
     meta_ptr_array.reserve(size);
 
-    for(const auto& meta_pair: meta_map_) {
+    for (const auto &meta_pair : meta_map_) {
         meta_name_array.push_back(meta_pair.first);
         meta_ptr_array.push_back(meta_pair.second.get());
     }
@@ -117,10 +114,10 @@ Tuple<Vector<String>, Vector<Meta*>, std::shared_lock<std::shared_mutex>> MetaMa
 }
 
 template <MetaConcept Meta>
-Meta* MetaMap<Meta>::GetMetaPtrByName(const String& name) const {
+Meta *MetaMap<Meta>::GetMetaPtrByName(const String &name) const {
     std::shared_lock r_lock(rw_locker_);
     auto iter = meta_map_.find(name);
-    if(iter == meta_map_.end()) {
+    if (iter == meta_map_.end()) {
         return nullptr;
     } else {
         return iter->second.get();
@@ -128,13 +125,13 @@ Meta* MetaMap<Meta>::GetMetaPtrByName(const String& name) const {
 }
 
 template <MetaConcept Meta>
-void MetaMap<Meta>::AddNewMetaNoLock(const String& meta_name, UniquePtr<Meta> meta) {
+void MetaMap<Meta>::AddNewMetaNoLock(const String &meta_name, UniquePtr<Meta> meta) {
     meta_map_.emplace(std::move(meta_name), std::move(meta));
 }
 
 template <MetaConcept Meta>
 Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func) {
-    Meta* return_meta_ptr{nullptr};
+    Meta *return_meta_ptr{nullptr};
     std::shared_lock r_lock(rw_locker_);
     auto iter = meta_map_.find(name);
     if (iter == meta_map_.end()) {
@@ -148,7 +145,6 @@ Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const 
             } else {
                 LOG_TRACE("Add new entry in existed meta_map");
                 iter = meta_map_.emplace(name, std::move(new_meta)).first;
-
             }
             return_meta_ptr = iter->second.get();
         }

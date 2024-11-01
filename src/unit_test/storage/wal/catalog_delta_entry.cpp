@@ -67,7 +67,7 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     ColumnID column_id = 0;
     auto index_name = MakeShared<String>("index_test");
     auto index_dir = MakeShared<String>("data/db_test/table_test/0/0/index_test");
-    auto index_base = IndexSecondary::Make(index_name, "file_name", Vector<String>{"col1", "col2"});
+    auto index_base = IndexSecondary::Make(index_name, MakeShared<String>("test comment"), "file_name", Vector<String>{"col1", "col2"});
     String segment_filter_binary_data = "abcde";
     String block_filter_binary_data = "abcde";
     String base_name = "chunk1";
@@ -168,7 +168,7 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             EXPECT_EQ(op1, op2);
         }
     }
-//    infinity::InfinityContext::instance().UnInit();
+    //    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_P(CatalogDeltaEntryTest, MergeEntries) {
@@ -202,7 +202,7 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         op2->merge_flag_ = MergeFlag::kDelete;
 
         op1_same_name->db_entry_dir_ = op2->db_entry_dir_ = op1->db_entry_dir_ = db_dir;
-        op1_same_name->comment_  = op2->comment_ = op1->comment_ = MakeShared<String>();
+        op1_same_name->comment_ = op2->comment_ = op1->comment_ = MakeShared<String>();
 
         auto op1_copy = MakeUnique<AddDBEntryOp>(*op1);
         op1_copy->merge_flag_ = MergeFlag::kUpdate;

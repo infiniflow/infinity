@@ -17,10 +17,16 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "--infinity_dir",
+        type=str,
+        required=True,
+    )
 
     args = parser.parse_args()
     infinity_path = args.infinity_path
     docker = args.docker
+    infinity_dir = args.infinity_dir
 
     current_path = os.getcwd()
     python_test_dir = current_path + "/python"
@@ -29,12 +35,14 @@ if __name__ == "__main__":
         python_executable,
         "-m",
         "pytest",
+        #"-v",
         f"{python_test_dir}/test_cluster",
         f"--infinity_path={infinity_path}",
         "-x",
         "-s",
         "-m",
         "not slow",
+        f"--infinity_dir={infinity_dir}",
     ]
     if docker:
         cmd.append("--docker")

@@ -1828,6 +1828,11 @@ public:
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
 
+        String index_comment;
+        if (body_info_json.contains("comment")) {
+            index_comment = body_info_json["comment"];
+        }
+
         CreateIndexOptions options;
         if (body_info_json.contains("create_option")) {
             auto create_option = body_info_json["create_option"];
@@ -1903,7 +1908,7 @@ public:
         }
 
         if (json_response["error_code"] == 0) {
-            auto result = infinity->CreateIndex(database_name, table_name, index_name, index_info, options);
+            auto result = infinity->CreateIndex(database_name, table_name, index_name, index_comment, index_info, options);
             index_info = nullptr;
             if (result.IsOk()) {
                 json_response["error_code"] = 0;

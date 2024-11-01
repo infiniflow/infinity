@@ -246,7 +246,8 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
-        SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name, fmt::format("{}_{}", *table_name, *index_name), {*column_name});
+        SharedPtr<IndexBase> index_base =
+            IndexSecondary::Make(index_name, MakeShared<String>("test comment"), fmt::format("{}_{}", *table_name, *index_name), {*column_name});
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
@@ -287,7 +288,8 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
-        SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name, fmt::format("{}_{}", *table_name, *index_name), {*column_name});
+        SharedPtr<IndexBase> index_base =
+            IndexSecondary::Make(index_name, MakeShared<String>("test comment"), fmt::format("{}_{}", *table_name, *index_name), {*column_name});
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
@@ -352,8 +354,11 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         }
 
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
-        SharedPtr<IndexBase> index_base =
-            IndexFullText::Make(index_name, fmt::format("{}_{}", *table_name, *index_name), {*column_name}, index_param_list);
+        SharedPtr<IndexBase> index_base = IndexFullText::Make(index_name,
+                                                              MakeShared<String>("test comment"),
+                                                              fmt::format("{}_{}", *table_name, *index_name),
+                                                              {*column_name},
+                                                              index_param_list);
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
@@ -407,7 +412,8 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
-        SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name, fmt::format("{}_{}", *table_name, *index_name), {*column_name});
+        SharedPtr<IndexBase> index_base =
+            IndexSecondary::Make(index_name, MakeShared<String>("test comment"), fmt::format("{}_{}", *table_name, *index_name), {*column_name});
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 

@@ -130,6 +130,10 @@ export struct WrapQueryResult {
     String store_dir;
     BigIntT table_count;
     String comment;
+    // show index
+    String table_name;
+    String index_name;
+    String index_type;
 
     WrapQueryResult() = default;
     WrapQueryResult(ErrorCode error_code, const char *error_msg) : error_code(error_code) {
@@ -260,7 +264,7 @@ export struct WrapSearchExpr {
 
 export struct WrapParsedExpr {
     WrapParsedExpr() = default;
-    WrapParsedExpr(ParsedExprType expr_type) : type(expr_type) {};
+    WrapParsedExpr(ParsedExprType expr_type) : type(expr_type){};
     ParsedExprType type;
     WrapConstantExpr constant_expr;
     WrapColumnExpr column_expr;
@@ -358,7 +362,8 @@ export WrapQueryResult WrapCreateIndex(Infinity &instance,
                                        const String &table_name,
                                        const String &index_name,
                                        WrapIndexInfo &wrap_index_info,
-                                       const CreateIndexOptions &create_index_options);
+                                       const CreateIndexOptions &create_index_options,
+                                       const String &index_comment);
 
 export WrapQueryResult WrapDropIndex(Infinity &instance,
                                      const String &db_name,
