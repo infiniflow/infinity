@@ -74,7 +74,7 @@ public:
     [[nodiscard]] ResultCacheManager *result_cache_manager() const noexcept;
 
     StorageMode GetStorageMode() const;
-    void SetStorageMode(StorageMode mode);
+    Status SetStorageMode(StorageMode mode);
     Status SetReaderStorageContinue(TxnTimeStamp system_start_ts);
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);

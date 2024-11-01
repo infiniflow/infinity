@@ -176,6 +176,9 @@ export enum class ErrorCode : long {
     kNotExistNode = 7019,
     kDuplicateNode = 7020,
     kCantConnectLeader = 7021,
+    kMinioInvalidAccessKey = 7022,
+    kMinioBucketNotExists = 7023,
+    kInvalidStorageType = 7024,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -338,10 +341,13 @@ public:
     static Status InvalidFileFlag(u8 flag);
     static Status InvalidServerAddress(const String &error_address);
     static Status FailToRunPython(const String &reason);
-    static Status CantConnectServer(const String& ip, i64 port, const String& reason);
-    static Status NotExistNode(const String& node_info);
-    static Status DuplicateNode(const String& node_info);
-    static Status CantConnectLeader(const String& leader_info);
+    static Status CantConnectServer(const String &ip, i64 port, const String &reason);
+    static Status NotExistNode(const String &node_info);
+    static Status DuplicateNode(const String &node_info);
+    static Status CantConnectLeader(const String &leader_info);
+    static Status MinioInvalidAccessKey(const String &detailed);
+    static Status MinioBucketNotExists(const String &bucket_name);
+    static Status InvalidStorageType(const String &expected, const String &actual);
 
     // meta
     static Status InvalidEntry();
