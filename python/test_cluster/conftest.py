@@ -31,6 +31,8 @@ def pytest_generate_tests(metafunc):
     minio_params = MinioParams(minio_dir, minio_port)
 
     infinity_dir = metafunc.config.getoption("infinity_dir")
+    if (len(infinity_dir) == 0):
+        raise ValueError("Please provide a valid infinity_dir")
     print("infinity_dir: ", infinity_dir)
     # print(metafunc.fixturenames)
 
