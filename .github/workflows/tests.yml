@@ -80,6 +80,7 @@ jobs:
             echo "CPUS=${CPUS}" >> $GITHUB_ENV
             TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
             sudo docker rm -f -v ${TESTER_CONTAINER} && sudo docker run --net=host --cap-add=NET_ADMIN -d --name ${TESTER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -e INFINITY_DIR=$PWD -v $PWD:/infinity -v /boot:/boot -v /var/run/docker.sock:/var/run/docker.sock --cpus ${CPUS} ${TESTER_IMAGE_NAME}
+            sudo docker exec ${TESTER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
     
       - name: Run cluster test
         if: ${{ !cancelled() && !failure() }}
