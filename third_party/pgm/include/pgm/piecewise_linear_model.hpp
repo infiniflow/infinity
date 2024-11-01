@@ -303,7 +303,7 @@ size_t make_segmentation(size_t n, size_t start, size_t end, size_t epsilon, Fin
             add_point(in(i), i);
         }
     }
-    if (in(end - 1) != in(end - 2))
+    if (end >= start + 2 && in(end - 1) != in(end - 2))
         add_point(in(end - 1), end - 1);
 
     if (end == n) {
