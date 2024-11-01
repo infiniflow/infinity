@@ -19,11 +19,9 @@ def main(image_name: str, bin_path: str):
         return
 
     # download_command = "wget -O docker-27.3.1.tgz https://download.docker.com/linux/static/stable/x86_64/docker-27.3.1.tgz"
-    # if os.system(download_command) != 0:
-    #     print("Failed to download docker-27.3.1.tgz")
+    # subprocess.check_call(download_command, shell=True)
     # download_command = "wget -O iproute2-6.9.0.tar.gz https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/iproute2-6.9.0.tar.gz"
-    # if os.system(download_command) != 0:
-    #     print("Failed to download iproute2-6.9.0.tar.gz")
+    # subprocess.check_call(download_command, shell=True)
     subprocess.check_call(f"cp {bin_path}/docker-27.3.1.tgz .", shell=True)
     subprocess.check_call(f"cp {bin_path}/iproute2-6.9.0.tar.gz .", shell=True)
 
