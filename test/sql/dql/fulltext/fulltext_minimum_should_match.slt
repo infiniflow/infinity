@@ -48,6 +48,12 @@ SELECT *, SCORE() FROM ft_minimum_should_match SEARCH MATCH TEXT ('doc', 'second
 1 first text 0.366141
 
 query I
+SELECT *, SCORE() FROM ft_minimum_should_match SEARCH MATCH TEXT ('doc', 'second text multiple', 'topn=10;similarity=boolean;threshold=1.5');
+----
+2 second text multiple 3.000000
+4 another second text xxx 2.000000
+
+query I
 SELECT * FROM ft_minimum_should_match WHERE filter_fulltext('doc', 'second text', 'threshold=0.3');
 ----
 1 first text

@@ -58,7 +58,7 @@ public:
         return false;
     }
 
-    float BM25Score() override { return 0.1f; }
+    float Score() override { return 0.1f; }
 
     void UpdateScoreThreshold(float threshold) override {}
 
@@ -94,7 +94,7 @@ struct MockQueryNode : public TermQueryNode {
     }
 
     void PushDownWeight(float factor) final { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, const IndexReader &, EarlyTermAlgo, u32) const override {
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams) const override {
         return MakeUnique<MockVectorDocIterator>(std::move(doc_ids_), term_, column_);
     }
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final {
@@ -200,11 +200,12 @@ TEST_F(QueryBuilderTest, test_and) {
     static_cast<QueryNode *>(and_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
     // apply query builder
-    FullTextQueryContext context;
+    FullTextQueryContext context(FulltextSimilarity::kBM25, MinimumShouldMatchOption{});
+    context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(and_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive, MinimumShouldMatchOption{});
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
 
     oss.str("");
     oss << "DocIterator tree after optimization:" << std::endl;
@@ -270,11 +271,12 @@ TEST_F(QueryBuilderTest, test_or) {
     static_cast<QueryNode *>(or_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
     // apply query builder
-    FullTextQueryContext context;
+    FullTextQueryContext context(FulltextSimilarity::kBM25, MinimumShouldMatchOption{});
+    context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(or_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive, MinimumShouldMatchOption{});
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
 
     oss.str("");
     oss << "DocIterator tree after optimization:" << std::endl;
@@ -346,11 +348,12 @@ TEST_F(QueryBuilderTest, test_and_not) {
     static_cast<QueryNode *>(and_not_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
     // apply query builder
-    FullTextQueryContext context;
+    FullTextQueryContext context(FulltextSimilarity::kBM25, MinimumShouldMatchOption{});
+    context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive, MinimumShouldMatchOption{});
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
 
     oss.str("");
     oss << "DocIterator tree after optimization:" << std::endl;
@@ -428,11 +431,12 @@ TEST_F(QueryBuilderTest, test_and_not2) {
     static_cast<QueryNode *>(and_not_root.get())->PrintTree(oss);
     LOG_INFO(oss.str());
     // apply query builder
-    FullTextQueryContext context;
+    FullTextQueryContext context(FulltextSimilarity::kBM25, MinimumShouldMatchOption{});
+    context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive, MinimumShouldMatchOption{});
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
 
     oss.str("");
     oss << "DocIterator tree after optimization:" << std::endl;

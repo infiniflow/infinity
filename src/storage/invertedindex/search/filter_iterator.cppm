@@ -52,7 +52,7 @@ public:
         }
     }
 
-    float BM25Score() override { return query_iterator_->BM25Score(); }
+    float Score() override { return query_iterator_->Score(); }
 
     void UpdateScoreThreshold(const float threshold) override { query_iterator_->UpdateScoreThreshold(threshold); }
 
@@ -88,10 +88,7 @@ export struct FilterQueryNode final : public QueryNode {
 
     void PushDownWeight(const float factor) override { MultiplyWeight(factor); }
 
-    UniquePtr<DocIterator> CreateSearch(const TableEntry *table_entry,
-                                        const IndexReader &index_reader,
-                                        EarlyTermAlgo early_term_algo,
-                                        u32 minimum_should_match) const override;
+    UniquePtr<DocIterator> CreateSearch(CreateSearchParams params) const override;
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
 

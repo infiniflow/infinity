@@ -24,15 +24,21 @@ import internal_types;
 import default_values;
 import base_table_ref;
 import parse_fulltext_options;
+import query_node;
 
 namespace infinity {
 
 class Txn;
-struct QueryNode;
+
 export struct FullTextQueryContext {
-    UniquePtr<QueryNode> query_tree_;
-    UniquePtr<QueryNode> optimized_query_tree_;
+    UniquePtr<QueryNode> query_tree_{};
+    UniquePtr<QueryNode> optimized_query_tree_{};
+    const FulltextSimilarity ft_similarity_{};
+    const MinimumShouldMatchOption minimum_should_match_option_{};
     u32 minimum_should_match_ = 0;
+    EarlyTermAlgo early_term_algo_ = EarlyTermAlgo::kNaive;
+    FullTextQueryContext(const FulltextSimilarity ft_similarity, const MinimumShouldMatchOption &minimum_should_match_option)
+        : ft_similarity_(ft_similarity), minimum_should_match_option_(minimum_should_match_option) {}
 };
 
 export class QueryBuilder {
@@ -46,8 +52,7 @@ public:
 
     const Map<String, String> &GetColumn2Analyzer() { return index_reader_.GetColumn2Analyzer(); }
 
-    UniquePtr<DocIterator>
-    CreateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo, const MinimumShouldMatchOption &minimum_should_match_option);
+    UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
 private:
     BaseTableRef* base_table_ref_{nullptr};

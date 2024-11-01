@@ -15,8 +15,11 @@ import logger;
 
 namespace infinity {
 
-PhraseDocIterator::PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, const float weight, const u32 slop)
-    : pos_iters_(std::move(iters)), weight_(weight), slop_(slop) {
+PhraseDocIterator::PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters,
+                                     const float weight,
+                                     const u32 slop,
+                                     const FulltextSimilarity ft_similarity)
+    : pos_iters_(std::move(iters)), weight_(weight), slop_(slop), ft_similarity_(ft_similarity) {
     doc_freq_ = 0;
     phrase_freq_ = 0;
     if (pos_iters_.size()) {
