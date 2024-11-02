@@ -78,9 +78,8 @@ class MockInfinityCluster(InfinityCluster):
         executable_path: str,
         *,
         minio_params: MinioParams = None,
-        infinity_dir: str,
     ):
-        super().__init__(executable_path, minio_params=minio_params, infinity_dir=infinity_dir)
+        super().__init__(executable_path, minio_params=minio_params)
         self.ns_prefix = "ns"
         self.bridge_name = "br0"
         self.mock_ip_prefix = "17.0.0."

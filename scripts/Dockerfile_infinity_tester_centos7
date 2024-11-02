@@ -1,10 +1,5 @@
 FROM infiniflow/infinity_builder:centos7_clang18
 
-# Install Docker
-# https://docs.docker.com/engine/install/centos/#install-using-the-convenience-script
-RUN --mount=type=bind,source=get-docker.sh,target=/root/get-docker.sh \
-    cd /root && sh get-docker.sh
-
 # Install iproute2 manually
 RUN --mount=type=bind,source=iproute2-6.9.0.tar.gz,target=/root/iproute2-6.9.0.tar.gz \
     cd /root \
@@ -19,6 +14,15 @@ RUN --mount=type=bind,source=python/test_cluster/requirements.txt,target=/root/r
     && /usr/local/bin/python3.10 -m venv /usr/local/venv310 && source /usr/local/venv310/bin/activate \
     && pip3 install -r requirements1.txt
 
-RUN yum install -y sudo bridge-utils
+RUN yum install -y sudo bridge-utils iptables
+
+# Install Docker
+# https://docs.docker.com/engine/install/centos/#install-using-the-convenience-script
+# RUN --mount=type=bind,source=get-docker.sh,target=/root/get-docker.sh \
+#     cd /root && sh get-docker.sh
+RUN --mount=type=bind,source=docker-27.3.1.tgz,target=/root/docker-27.3.1.tgz \
+    cd /root \
+    && tar zxf docker-27.3.1.tgz \
+    && sudo cp docker/* /usr/bin
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

@@ -61,10 +61,9 @@ class TestInsert:
         else:
             cluster.clear()
 
-    @pytest.mark.usefixtures("skip_if_docker")
     def test_insert_11(self, cluster: InfinityCluster):
         self.__test_inner_1(cluster)
 
-    @pytest.mark.usefixtures("skip_if_not_docker")
+    @pytest.mark.docker
     def test_insert_12(self, docker_cluster: DockerInfinityCluster):
         self.__test_inner_1(docker_cluster)
