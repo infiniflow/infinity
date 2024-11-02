@@ -405,11 +405,6 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from Writable to Writable");
             }
 
-            {
-                std::unique_lock<std::mutex> lock(mutex_);
-                current_storage_mode_ = target_mode;
-            }
-
             if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
 
                 if(periodic_trigger_thread_ != nullptr) {
@@ -496,6 +491,13 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                 bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
                 periodic_trigger_thread_->Start();
             }
+
+
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                current_storage_mode_ = target_mode;
+            }
+
             break;
         }
     }

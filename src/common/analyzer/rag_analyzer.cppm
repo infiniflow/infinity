@@ -74,7 +74,13 @@ private:
 
     Pair<Vector<String>, double> MaxBackward(const String &line);
 
-    int DFS(const String &chars, int s, Vector<Pair<String, int>> &pre_tokens, Vector<Vector<Pair<String, int>>> &token_list);
+    int DFS(const String &chars,
+            int s,
+            Vector<Pair<String, int>> &pre_tokens,
+            Vector<Vector<Pair<String, int>>> &token_list,
+            Vector<String> &best_tokens,
+            double &max_score,
+            bool memo_all);
 
     String Merge(const String &tokens);
 
