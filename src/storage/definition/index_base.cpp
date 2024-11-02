@@ -218,7 +218,14 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
     String index_type_name = index_def_json["index_type"];
     IndexType index_type = IndexInfo::StringToIndexType(index_type_name);
     SharedPtr<String> index_name = MakeShared<String>(index_def_json["index_name"]);
-    SharedPtr<String> index_comment = MakeShared<String>(index_def_json["index_comment"]);
+
+    SharedPtr<String> index_comment;
+    if (index_def_json.contains("index_comment")) {
+        index_comment = MakeShared<String>(index_def_json["index_comment"]);
+    } else {
+        index_comment = MakeShared<String>();
+    }
+
     String file_name = index_def_json["file_name"];
     Vector<String> column_names = index_def_json["column_names"];
     switch (index_type) {
