@@ -503,7 +503,7 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
         block_entry->CommitBlock(txn_id, commit_ts);
     }
     for (auto *block_column_entry : segment_store.block_column_entries_) {
-        block_column_entry->CommitColumn(txn_id, commit_ts);   
+        block_column_entry->CommitColumn(txn_id, commit_ts);
     }
 }
 
@@ -648,7 +648,7 @@ Vector<String> SegmentEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begi
     std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
     Vector<String> res;
     res.reserve(block_entries_.size());
-    for(const auto& block_entry: block_entries_) {
+    for (const auto &block_entry : block_entries_) {
         Vector<String> files = block_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), files.begin(), files.end());
     }
@@ -687,7 +687,12 @@ String SegmentEntry::SegmentStatusToString(const SegmentStatus &type) {
 }
 
 String SegmentEntry::ToString() const {
-    return fmt::format("Segment path: {}, id: {}, row_count: {}, block_count: {}, status: {}", *segment_dir_, segment_id_, row_count_, block_entries_.size(), SegmentStatusToString(status_));
+    return fmt::format("Segment path: {}, id: {}, row_count: {}, block_count: {}, status: {}",
+                       *segment_dir_,
+                       segment_id_,
+                       row_count_,
+                       block_entries_.size(),
+                       SegmentStatusToString(status_));
 }
 
 void SegmentEntry::AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store) {
@@ -700,6 +705,15 @@ void SegmentEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore
     for (auto &block : block_entries_) {
         block->DropColumns(column_ids, table_store);
     }
+}
+
+SizeT SegmentEntry::GetStorageSize() const {
+    SizeT result = 0;
+    std::shared_lock lock(rw_locker_);
+    for (auto &block : block_entries_) {
+        result += block->GetStorageSize();
+    }
+    return result;
 }
 
 } // namespace infinity
