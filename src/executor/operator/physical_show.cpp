@@ -2494,6 +2494,24 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     {
         SizeT column_id = 0;
         {
+            Value value = Value::MakeVarchar("storage_size");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            SizeT storage_size = column_block_entry->GetStorageSize();
+            String storage_size_str = Utility::FormatByteSize(storage_size);
+            Value value = Value::MakeVarchar(storage_size_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
             Value value = Value::MakeVarchar("extra_file_name");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

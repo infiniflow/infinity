@@ -353,4 +353,18 @@ void BlockColumnEntry::FillWithDefaultValue(SizeT row_count, const Value *defaul
     }
 }
 
+SizeT BlockColumnEntry::GetStorageSize() const {
+    SizeT result = 0;
+
+    {
+        std::shared_lock lock(mutex_);
+        result += buffer_->GetBufferSize();
+        for (BufferObj *outline_buffer : outline_buffers_) {
+            result += outline_buffer->GetBufferSize();
+        }
+    }
+
+    return result;
+}
+
 } // namespace infinity
