@@ -157,7 +157,7 @@ Status ClusterManager::UnInit(bool not_unregister) {
     }
     client_to_leader_.reset();
 
-    for(const auto& reader_client_pair: reader_client_map_) {
+    for (const auto &reader_client_pair : reader_client_map_) {
         clients_for_cleanup_.emplace_back(reader_client_pair.second);
     }
     reader_client_map_.clear();
@@ -214,13 +214,21 @@ void ClusterManager::HeartBeatToLeaderThread() {
         hb_task->Wait();
 
         if (hb_task->error_code_ != 0) {
-            LOG_ERROR(fmt::format("Can't connect to leader: {}, {}:{}, error: {}",
-                                  leader_node_->node_name_,
-                                  leader_node_->ip_address_,
-                                  leader_node_->port_,
-                                  hb_task->error_message_));
-            leader_node_->node_status_ = NodeStatus::kTimeout;
-
+            if (hb_task->error_code_ == (i64)(ErrorCode::kNotRegistered)) {
+                LOG_ERROR(fmt::format("Error to connect to leader: {}, {}:{}, error: {}",
+                                      leader_node_->node_name_,
+                                      leader_node_->ip_address_,
+                                      leader_node_->port_,
+                                      hb_task->error_message_));
+                leader_node_->node_status_ = hb_task->sender_status_;
+            } else {
+                LOG_ERROR(fmt::format("Can't connect to leader: {}, {}:{}, error: {}",
+                                      leader_node_->node_name_,
+                                      leader_node_->ip_address_,
+                                      leader_node_->port_,
+                                      hb_task->error_message_));
+                leader_node_->node_status_ = NodeStatus::kTimeout;
+            }
             continue;
         }
 
@@ -640,14 +648,10 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
     }
 
     if (!non_leader_node_found) {
-        non_leader_node->txn_timestamp_ = non_leader_node->txn_timestamp_;
-        auto now = std::chrono::system_clock::now();
-        auto time_since_epoch = now.time_since_epoch();
-        non_leader_node->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
-        ++non_leader_node->heartbeat_count_;
-        sender_status = infinity_peer_server::NodeStatus::type::kAlive;
-        other_node_map_.emplace(non_leader_node->node_name_, non_leader_node);
+        sender_status = infinity_peer_server::NodeStatus::type::kLostConnection;
+        return Status::NotRegistered(non_leader_node->node_name_);
     }
+
     return Status::OK();
 }
 
