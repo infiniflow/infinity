@@ -108,36 +108,31 @@ select c2 from test_math where isfinite(1.0);
 -2.500000
 
 query XII
-SELECT *, truncate(c2, 1), truncate(c1, 0) FROM test_math;
+SELECT c1, c2, truncate(c2, 0) AS truncate_0, truncate(c2, 1) AS truncate_1, truncate(c2, 2) AS truncate_2 FROM test_math WHERE c1 < 10;
 ----
-1 4.000000 1.000000 2.400000
-4 9.000000 2.000000 3.700000
-9 16.000000 3.000000 10.100000
-1 2.456000 1.000000 2.400000
-4 3.789000 2.000000 3.700000
-9 10.111000 3.000000 10.100000
-16 15.555000 4.000000 15.500000
+1 4.000000 4.000000 4.000000 4.000000
+4 9.000000 9.000000 9.000000 9.000000
+9 16.000000 16.000000 16.000000 16.000000
 
-query X III
-SELECT c2 FROM test_math WHERE truncate(c2, 1) = 3.7;
+query XIII
+SELECT c1, c2, truncate(c2, -1) AS truncate_neg1, truncate(c2, -2) AS truncate_neg2 FROM test_math WHERE c1 >= 10;
 ----
-4.000000
+10 2.400000 0.000000 0.000000
+10 -2.400000 0.000000 0.000000
+10 2.500000 0.000000 0.000000
+10 -2.500000 0.000000 0.000000
 
-query X IV
-SELECT c2 FROM test_math WHERE truncate(c2, 0) = 10;
+query XIV
+SELECT c1, truncate(c1, 0) AS truncate_0, truncate(c1, 1) AS truncate_1, truncate(c1, -1) AS truncate_neg1 FROM test_math;
 ----
-10.000000
+1 1 1 0
+4 4 4 0
+9 9 9 0
+10 10 10 10
+10 10 10 10
+10 10 10 10
+10 10 10 10
 
-query X V
-SELECT *, truncate(c1, -1) FROM test_math;
-----
-1 4.000000 0.000000
-4 9.000000 0.000000
-9 16.000000 0.000000
-1 2.456000 0.000000
-4 3.789000 0.000000
-9 10.111000 0.000000
-16 15.555000 10.000000
 
 statement ok
 DROP TABLE test_math;

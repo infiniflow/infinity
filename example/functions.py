@@ -109,6 +109,10 @@ print(res)
 res = table_obj.output(["*", "ln(c1)", "ln(c2)"]).to_df()
 print(res)
 
+#function truncate
+res = table_obj.output(["*", "truncate(c1, 0)", "truncate(c2, 1)", "truncate(c2, 2)"]).to_df()
+print(res)
+
 res = db_obj.drop_table("function_example")
 
 infinity_obj.disconnect()
