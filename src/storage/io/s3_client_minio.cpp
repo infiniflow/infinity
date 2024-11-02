@@ -106,7 +106,7 @@ Status S3ClientMinio::CopyObject(const String &src_bucket_name,
     return Status::OK();
 }
 
-bool S3ClientMinio::BucketExists(const String &bucket_name) {
+Status S3ClientMinio::BucketExists(const String &bucket_name) {
     // Create bucket exists arguments.
     minio::s3::BucketExistsArgs args;
     args.bucket = bucket_name;
@@ -114,11 +114,22 @@ bool S3ClientMinio::BucketExists(const String &bucket_name) {
     // Call bucket exists.
     minio::s3::BucketExistsResponse resp = client_->BucketExists(args);
     // Handle response.
-    if (resp) {
-        return resp.exist;
+    if(resp) {
+        if(resp.exist) {
+            return Status::OK();
+        } else {
+            return Status::MinioBucketNotExists(bucket_name);
+        }
     } else {
-        UnrecoverableError(fmt::format("Unable to do bucket existence check: {}", resp.Error().String()));
-        return false;
+        switch(resp.status_code) {
+            case 403: {
+                return Status::MinioInvalidAccessKey(resp.Error().String());
+            }
+            default: {
+                UnrecoverableError(fmt::format("Unable to do bucket existence check: {}", resp.Error().String()));
+                return Status::OK();
+            }
+        }
     }
 }
 

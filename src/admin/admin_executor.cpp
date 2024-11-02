@@ -3954,7 +3954,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 
             ++column_id;
             {
-                //            const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node->last_update_ts_);
+                // const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node->last_update_ts_);
                 const std::time_t t_c = server_node->last_update_ts_;
                 Value value = Value::MakeVarchar(std::ctime(&t_c));
                 ValueExpression value_expr(value);

@@ -119,6 +119,9 @@ def test_tc1(cluster: InfinityCluster):
     n2->follower
     show node on n1 & n2;
     select data t1 on n1 and n2;
+    drop t1 on n1;
+    show table on n1 & n2;
+    shutdown all nodes;
     '''
     cluster.add_node("node1", "conf/leader.toml")
     cluster.add_node("node2", "conf/follower.toml")
@@ -208,6 +211,10 @@ def test_tc1(cluster: InfinityCluster):
     table1 = db1.get_table(table_name)
     res = table1.output(["*"]).to_df()
     print(res)
+
+    res = db1.drop_table(table_name, ConflictType.Ignore)
+
+    assert(res.error_code == ErrorCode.OK)
     #table1.insert([{"c1": 2, "c2": [1.0, 2.0, 3.0, 4.0]}])
     #res_gt = pd.DataFrame(
     #    {
@@ -225,3 +232,19 @@ def test_tc1(cluster: InfinityCluster):
     cluster.remove_node("node2")
     cluster.remove_node("node1")
     cluster.clear()
+
+
+'''
+tc2:
+n1: admin
+n2: admin
+n3: admin
+n4: admin
+n1->leader
+create table t1 on n1;
+insert several rows data;
+n2->follower
+n3->learner
+n4->learner
+show nodes on n1 & n2 & n3 & n4
+'''

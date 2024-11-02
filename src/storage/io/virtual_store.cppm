@@ -86,7 +86,7 @@ public:
     static Status RemoveObject(const String &object_name);
     static Status CopyObject(const String &src_object_name, const String &dst_object_name);
     //
-    static bool BucketExists();
+    static Status BucketExists();
 
 private:
     static std::mutex mtx_;

@@ -71,11 +71,11 @@ StorageMode Storage::GetStorageMode() const {
     return current_storage_mode_;
 }
 
-void Storage::SetStorageMode(StorageMode target_mode) {
+Status Storage::SetStorageMode(StorageMode target_mode) {
     StorageMode current_mode = GetStorageMode();
     if (current_mode == target_mode) {
         LOG_WARN(fmt::format("Set unchanged mode"));
-        return;
+        return Status::OK();
     }
     cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
     switch (current_mode) {
@@ -136,7 +136,12 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                                                                   config_ptr_->ObjectStorageSecretKey(),
                                                                   config_ptr_->ObjectStorageBucket());
                     if (!status.ok()) {
-                        UnrecoverableError(status.message());
+                        {
+                            std::unique_lock<std::mutex> lock(mutex_);
+                            current_storage_mode_ = current_mode;
+                        }
+                        VirtualStore::UnInitRemoteStore();
+                        return status;
                     }
 
                     if (object_storage_processor_ != nullptr) {
@@ -183,7 +188,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             if (current_storage_mode_ == StorageMode::kReadable) {
                 LOG_INFO("No checkpoint found in READER mode, waiting for log replication");
                 reader_init_phase_ = ReaderInitPhase::kPhase1;
-                return;
+                return Status::OK();
             }
 
             // Must init catalog before txn manager.
@@ -325,7 +330,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
-                if(wal_mgr_ != nullptr) {
+                if (wal_mgr_ != nullptr) {
                     wal_mgr_->Stop();
                     wal_mgr_.reset();
                 }
@@ -336,7 +341,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                         break;
                     }
                     case StorageType::kMinio: {
-                        if(object_storage_processor_ != nullptr) {
+                        if (object_storage_processor_ != nullptr) {
                             object_storage_processor_->Stop();
                             object_storage_processor_.reset();
                             VirtualStore::UnInitRemoteStore();
@@ -356,7 +361,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     txn_mgr_.reset();
                 }
 
-                if(buffer_mgr_ != nullptr) {
+                if (buffer_mgr_ != nullptr) {
                     buffer_mgr_->Stop();
                     buffer_mgr_.reset();
                 }
@@ -407,17 +412,17 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
             if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
 
-                if(periodic_trigger_thread_ != nullptr) {
+                if (periodic_trigger_thread_ != nullptr) {
                     periodic_trigger_thread_->Stop();
                     periodic_trigger_thread_.reset();
                 }
 
-                if(compact_processor_ != nullptr) {
+                if (compact_processor_ != nullptr) {
                     compact_processor_->Stop(); // Different from Readable
                     compact_processor_.reset(); // Different from Readable
                 }
 
-                if(bg_processor_ != nullptr) {
+                if (bg_processor_ != nullptr) {
                     bg_processor_->Stop();
                     bg_processor_.reset();
                 }
@@ -426,7 +431,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
 
                 memory_index_tracer_.reset();
 
-                if(wal_mgr_ != nullptr) {
+                if (wal_mgr_ != nullptr) {
                     wal_mgr_->Stop();
                     wal_mgr_.reset();
                 }
@@ -437,7 +442,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                         break;
                     }
                     case StorageType::kMinio: {
-                        if(object_storage_processor_ != nullptr) {
+                        if (object_storage_processor_ != nullptr) {
                             object_storage_processor_->Stop();
                             object_storage_processor_.reset();
                             VirtualStore::UnInitRemoteStore();
@@ -449,12 +454,12 @@ void Storage::SetStorageMode(StorageMode target_mode) {
                     }
                 }
 
-                if(txn_mgr_ != nullptr) {
+                if (txn_mgr_ != nullptr) {
                     txn_mgr_->Stop();
                     txn_mgr_.reset();
                 }
 
-                if(buffer_mgr_ != nullptr) {
+                if (buffer_mgr_ != nullptr) {
                     buffer_mgr_->Stop();
                     buffer_mgr_.reset();
                 }
@@ -473,12 +478,12 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             }
 
             if (target_mode == StorageMode::kReadable) {
-                if(periodic_trigger_thread_ != nullptr) {
+                if (periodic_trigger_thread_ != nullptr) {
                     periodic_trigger_thread_->Stop();
                     periodic_trigger_thread_.reset();
                 }
 
-                if(compact_processor_ != nullptr) {
+                if (compact_processor_ != nullptr) {
                     compact_processor_->Stop(); // Different from Readable
                     compact_processor_.reset(); // Different from Readable
                 }
@@ -501,6 +506,7 @@ void Storage::SetStorageMode(StorageMode target_mode) {
             break;
         }
     }
+    return Status::OK();
 }
 
 Status Storage::SetReaderStorageContinue(TxnTimeStamp system_start_ts) {
