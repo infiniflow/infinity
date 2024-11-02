@@ -192,6 +192,7 @@ class TestInfinity:
                                                      index.IndexType.Secondary),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+        table_obj.insert([{"c1": 1, "body": "hello"}])
         res = table_obj.create_index("my_index_2",
                                      index.IndexInfo("body",
                                                      index.IndexType.Secondary),
