@@ -197,10 +197,18 @@ def test_tc1(cluster: InfinityCluster):
     assert(res.node_name == "node1")
     assert(res.node_role == "leader")
     assert(res.node_status == "alive")
-    res = infinity1.show_node("node2")
-    assert(res.node_name == "node2")
-    assert(res.node_role == "follower")
-    assert(res.node_status == "alive")
+
+    try:
+        infinity1.show_node("node2")
+    except InfinityException as e:
+        print(e)
+        assert(e.error_code == 7019) # Not found node2
+
+    res = infinity2.show_node("node1")
+    assert(res.node_name == "node1")
+    assert(res.node_role == "leader")
+    assert(res.node_status == "lost connection")
+    # TODO: reconnect leader and check the status
 
     table_name  = "table1"
     db1 = infinity1.get_database("default_db")

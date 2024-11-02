@@ -589,6 +589,10 @@ Status Status::InvalidStorageType(const String &expected, const String &actual) 
                   MakeUnique<String>(fmt::format("Expect storage type: {}, actual storage type: {}", expected, actual)));
 }
 
+Status Status::NotRegistered(const String &node_info) {
+    return Status(ErrorCode::kNotRegistered, MakeUnique<String>(fmt::format("Not registered node: {}", node_info)));
+}
+
 // meta
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 
