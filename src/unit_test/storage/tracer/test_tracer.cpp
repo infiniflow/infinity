@@ -172,7 +172,7 @@ private:
     TestCatalog &catalog_;
     bool may_fail_;
 
-    BlockingQueue<UniquePtr<DumpIndexTask>> task_queue_;
+    BlockingQueue<UniquePtr<DumpIndexTask>> task_queue_{"TestMemIndexTracer"};
     Thread dump_thread_;
 };
 

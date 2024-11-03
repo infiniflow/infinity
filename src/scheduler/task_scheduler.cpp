@@ -38,12 +38,24 @@ import base_statement;
 import extra_ddl_info;
 import create_statement;
 import command_statement;
+import global_resource_usage;
 
 namespace infinity {
 
 // Non-static memory methods
 
-TaskScheduler::TaskScheduler(Config *config_ptr) { Init(config_ptr); }
+TaskScheduler::TaskScheduler(Config *config_ptr) {
+    Init(config_ptr);
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("TaskScheduler");
+#endif
+}
+
+TaskScheduler::~TaskScheduler() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("TaskScheduler");
+#endif
+}
 
 void TaskScheduler::Init(Config *config_ptr) {
     const u64 cpu_count = Thread::hardware_concurrency();
@@ -65,7 +77,7 @@ void TaskScheduler::Init(Config *config_ptr) {
 
     for (u64 worker_id = 0; worker_id < worker_count_; ++worker_id) {
         const u64 cpu_id = cpu_id_vec[worker_id];
-        UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();
+        UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>("TaskScheduler");
         UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), worker_id);
         // Pin the thread to specific cpu
         ThreadUtil::pin(*worker_thread, cpu_id);
@@ -112,12 +124,12 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
     }
     // DumpPlanFragment(plan_fragment);
     bool use_scheduler = false;
-    switch(base_statement->Type()) {
+    switch (base_statement->Type()) {
         case StatementType::kSelect:
         case StatementType::kExplain:
         case StatementType::kDelete:
-        case StatementType::kUpdate: 
-        case StatementType::kCompact:{
+        case StatementType::kUpdate:
+        case StatementType::kCompact: {
             use_scheduler = true; // continue;
             break;
         }
@@ -134,12 +146,12 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
         }
     }
 
-    if(!use_scheduler) {
+    if (!use_scheduler) {
         if (!plan_fragment->HasChild()) {
             if (plan_fragment->GetContext()->Tasks().size() == 1) {
                 FragmentTask *task = plan_fragment->GetContext()->Tasks()[0].get();
                 RunTask(task);
-                return ;
+                return;
             } else {
                 String error_message = "Oops! None select and create idnex statement has multiple fragments.";
                 UnrecoverableError(error_message);

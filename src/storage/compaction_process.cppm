@@ -59,7 +59,7 @@ private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<BGTask>> task_queue_;
+    BlockingQueue<SharedPtr<BGTask>> task_queue_{"CompactionProcessor"};
 
     Thread processor_thread_{};
 

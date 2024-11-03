@@ -41,6 +41,9 @@ export struct DefaultConfig {
 
 export struct Config {
 public:
+    Config();
+    ~Config();
+
     Status Init(const SharedPtr<String> &config_path, DefaultConfig *default_config);
 
     void PrintAll();

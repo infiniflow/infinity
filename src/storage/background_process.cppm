@@ -50,7 +50,7 @@ private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<BGTask>> task_queue_;
+    BlockingQueue<SharedPtr<BGTask>> task_queue_{"BGTaskProcessor"};
 
     Thread processor_thread_{};
 

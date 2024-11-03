@@ -27,7 +27,7 @@ namespace infinity {
 class QueryContext;
 class PlanFragment;
 
-using FragmentTaskBlockQueue = BlockingQueue<FragmentTask*>;
+using FragmentTaskBlockQueue = BlockingQueue<FragmentTask *>;
 
 struct Worker {
     Worker(u64 cpu_id, UniquePtr<FragmentTaskBlockQueue> queue, UniquePtr<Thread> thread)
@@ -41,14 +41,14 @@ export class TaskScheduler {
 public:
     explicit TaskScheduler(Config *config_ptr);
 
-    ~TaskScheduler() = default;
+    ~TaskScheduler();
 
     void Init(Config *config_ptr);
 
     void UnInit();
 
     // Schedule start fragments
-    void Schedule(PlanFragment * plan_fragment_root, const BaseStatement* base_statement);
+    void Schedule(PlanFragment *plan_fragment_root, const BaseStatement *base_statement);
 
     // `plan_fragment` can be scheduled because all of its dependencies are met.
     void ScheduleFragment(PlanFragment *plan_fragment);

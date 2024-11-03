@@ -37,7 +37,7 @@ private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<BaseObjectStorageTask>> task_queue_;
+    BlockingQueue<SharedPtr<BaseObjectStorageTask>> task_queue_{"ObjectStorageProcess"};
 
     Thread processor_thread_{};
 

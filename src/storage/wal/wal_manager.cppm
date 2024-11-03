@@ -160,7 +160,7 @@ private:
     Thread flush_thread_{};
 
     // TxnManager and Flush thread access following members
-    BlockingQueue<WalEntry *> wait_flush_{};
+    BlockingQueue<WalEntry *> wait_flush_{"WalManager"};
 
     // Only Flush thread access following members
     std::ofstream ofs_{};
