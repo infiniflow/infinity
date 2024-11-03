@@ -20,6 +20,9 @@ namespace infinity {
 struct TruncateFunction {
     template <typename XType, typename DType, typename ResultType>
     static inline bool Run(XType x_value, DType d_value, ResultType &result) {
+        if (std::isnan(static_cast<double>(x_value)) || std::isinf(static_cast<double>(x_value))) {
+            return false; // 或者根据需求返回特定的值
+        }
         // 将 D 转换为整数
         int64_t d_int = static_cast<int64_t>(d_value);
 
@@ -31,6 +34,9 @@ struct TruncateFunction {
         } else {
             factor = std::pow(10.0, -d_int);
             temp_result = std::trunc(static_cast<double>(x_value) / factor) * factor;
+        }
+        if (std::isnan(temp_result) || std::isinf(temp_result)) {
+            return false; // 或者根据需求返回特定的值
         }
 
         result = ResultType(static_cast<float>(temp_result));
