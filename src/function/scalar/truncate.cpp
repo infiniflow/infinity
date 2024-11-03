@@ -19,22 +19,21 @@ namespace infinity {
 
 struct TruncateFunction {
     template <typename XType, typename DType, typename ResultType>
-    static inline bool Run(XType x, DType d, ResultType &result) {
-        int64_t D = static_cast<int64_t>(d);
+    static inline bool Run(XType x_value, DType d_value, ResultType &result) {
+        // 将 D 转换为整数
+        int64_t d_int = static_cast<int64_t>(d_value);
 
-        if (static_cast<DType>(D) != d) {
-            return false;
-        }
-
-        if (D > 0) {
-            double factor = std::pow(10.0, D);
-            result = static_cast<ResultType>(std::trunc(static_cast<double>(x) * factor) / factor);
-        } else if (D == 0) {
-            result = static_cast<ResultType>(std::trunc(static_cast<double>(x)));
+        double factor;
+        double temp_result;
+        if (d_int >= 0) {
+            factor = std::pow(10.0, d_int);
+            temp_result = std::trunc(static_cast<double>(x_value) * factor) / factor;
         } else {
-            double factor = std::pow(10.0, -D);
-            result = static_cast<ResultType>(std::trunc(static_cast<double>(x) / factor) * factor);
+            factor = std::pow(10.0, -d_int);
+            temp_result = std::trunc(static_cast<double>(x_value) / factor) * factor;
         }
+
+        result = ResultType(static_cast<float>(temp_result));
         return true;
     }
 };
