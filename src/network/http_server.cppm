@@ -25,11 +25,11 @@ export class HTTPServer {
 public:
     void Start(const String& server_address, u16 port);
     void Shutdown();
+
 private:
     SharedPtr<HttpRouter> router_{};
     SharedPtr<WebServer> server_{};
     atomic_bool started_{false};
 };
 
-}
-
+} // namespace infinity

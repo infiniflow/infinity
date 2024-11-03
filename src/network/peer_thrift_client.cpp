@@ -35,6 +35,9 @@ PeerClient::~PeerClient() {
         UnInit(false);
     }
     server_connected_ = false;
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("PeerClient");
+#endif
 }
 
 Status PeerClient::Init() {

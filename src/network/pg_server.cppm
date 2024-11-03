@@ -40,4 +40,4 @@ private:
     UniquePtr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
 };
 
-}
+} // namespace infinity

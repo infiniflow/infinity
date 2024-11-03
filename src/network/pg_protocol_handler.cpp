@@ -18,10 +18,21 @@ import boost;
 import stl;
 import pg_message;
 module pg_protocol_handler;
+import global_resource_usage;
 
 namespace infinity {
 
-PGProtocolHandler::PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : buffer_reader_(socket), buffer_writer_(socket) {}
+PGProtocolHandler::PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : buffer_reader_(socket), buffer_writer_(socket) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("PGProtocolHandler");
+#endif
+}
+
+PGProtocolHandler::~PGProtocolHandler() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("PGProtocolHandler");
+#endif
+}
 
 u32 PGProtocolHandler::read_startup_header() {
     constexpr u32 SSL_MESSAGE_VERSION = 80877103u;

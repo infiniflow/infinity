@@ -16,6 +16,7 @@ module;
 
 import stl;
 import default_values;
+import global_resource_usage;
 
 export module ring_buffer_iterator;
 
@@ -23,9 +24,23 @@ namespace infinity {
 
 export class RingBufferIterator {
 public:
-    explicit RingBufferIterator(Array<char, PG_MSG_BUFFER_SIZE> &data, SizeT position = 0) : data_(data), position_(position) {}
+    explicit RingBufferIterator(Array<char, PG_MSG_BUFFER_SIZE> &data, SizeT position = 0) : data_(data), position_(position) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("RingBufferIterator");
+#endif
+    }
 
-    RingBufferIterator(const RingBufferIterator &other) : data_(other.data_), position_(other.position_) {}
+    RingBufferIterator(const RingBufferIterator &other) : data_(other.data_), position_(other.position_) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("RingBufferIterator");
+#endif
+    }
+
+    ~RingBufferIterator() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("RingBufferIterator");
+#endif
+    }
 
     RingBufferIterator &operator=(const RingBufferIterator &other) {
         //        Assert<NetworkException>(&data_ == &other.data_, "The two iterators are from different arrays");

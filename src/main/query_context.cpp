@@ -61,9 +61,18 @@ import infinity_context;
 
 namespace infinity {
 
-QueryContext::QueryContext(BaseSession *session) : session_ptr_(session) {};
+QueryContext::QueryContext(BaseSession *session) : session_ptr_(session) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("QueryContext");
+#endif
+}
 
-QueryContext::~QueryContext() { UnInit(); }
+QueryContext::~QueryContext() {
+    UnInit();
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("QueryContext");
+#endif
+}
 
 void QueryContext::Init(Config *global_config_ptr,
                         TaskScheduler *scheduler_ptr,

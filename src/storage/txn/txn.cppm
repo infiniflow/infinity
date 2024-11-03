@@ -33,6 +33,7 @@ import extra_ddl_info;
 import internal_types;
 import column_def;
 import value;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -70,6 +71,8 @@ public:
 
     // For replay txn
     explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    virtual ~Txn();
 
     static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts);
 

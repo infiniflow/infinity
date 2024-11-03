@@ -19,6 +19,7 @@ import pg_message;
 import ring_buffer_iterator;
 import default_values;
 import stl;
+import global_resource_usage;
 
 export module buffer_writer;
 
@@ -26,8 +27,16 @@ namespace infinity {
 
 export class BufferWriter {
 public:
-    explicit BufferWriter(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {}
-
+    explicit BufferWriter(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("BufferWriter");
+#endif
+    }
+    ~BufferWriter() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("BufferWriter");
+#endif
+    }
     [[nodiscard]] SizeT size() const;
 
     inline static SizeT max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }
