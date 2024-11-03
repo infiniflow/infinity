@@ -22,6 +22,7 @@ import compaction_process;
 import catalog;
 import txn_manager;
 import wal_manager;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -29,15 +30,21 @@ class CleanupTask;
 
 export class PeriodicTrigger {
 public:
-    explicit PeriodicTrigger(i64 interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {}
+    explicit PeriodicTrigger(i64 interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("PeriodicTrigger");
+#endif
+    }
 
-    virtual ~PeriodicTrigger() = default;
+    virtual ~PeriodicTrigger() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("PeriodicTrigger");
+#endif
+    }
 
     bool Check();
 
-    void UpdateInternal(i64 new_interval) {
-        interval_ = new_interval;
-    }
+    void UpdateInternal(i64 new_interval) { interval_ = new_interval; }
 
     virtual void Trigger() = 0;
 

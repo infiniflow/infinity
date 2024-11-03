@@ -26,8 +26,15 @@ import peer_server_thrift_types;
 import wal_manager;
 import wal_entry;
 import admin_statement;
+import global_resource_usage;
 
 namespace infinity {
+
+ClusterManager::ClusterManager(Storage *storage) : storage_(storage) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("SessionManager");
+#endif
+}
 
 ClusterManager::~ClusterManager() {
     other_node_map_.clear();
@@ -36,6 +43,9 @@ ClusterManager::~ClusterManager() {
         client_to_leader_->UnInit(true);
     }
     client_to_leader_.reset();
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("SessionManager");
+#endif
 }
 
 void ClusterManager::InitAsAdmin() { current_node_role_ = NodeRole::kAdmin; }

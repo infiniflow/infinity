@@ -31,6 +31,7 @@ class SessionManager;
 export class CompactionProcessor {
 public:
     CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr);
+    ~CompactionProcessor();
 
     void Start();
 

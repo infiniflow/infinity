@@ -24,6 +24,7 @@ import third_party;
 import infinity_exception;
 import virtual_store;
 import logger;
+import global_resource_usage;
 
 namespace fs = std::filesystem;
 
@@ -81,9 +82,17 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
     }
     String read_path_empty = GetObjPath(ObjAddr::KeyEmpty);
     VirtualStore::Truncate(read_path_empty, 0);
+
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("PersistenceManager");
+#endif
 }
 
-PersistenceManager::~PersistenceManager() = default;
+PersistenceManager::~PersistenceManager() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("PersistenceManager");
+#endif
+}
 
 PersistWriteResult PersistenceManager::Persist(const String &file_path, const String &tmp_file_path, bool try_compose) {
     PersistWriteResult result;

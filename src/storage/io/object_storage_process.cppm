@@ -17,6 +17,7 @@ module;
 import blocking_queue;
 import stl;
 import object_storage_task;
+import global_resource_usage;
 
 export module object_storage_process;
 
@@ -24,7 +25,17 @@ namespace infinity {
 
 export class ObjectStorageProcess {
 public:
-    explicit ObjectStorageProcess() = default;
+    explicit ObjectStorageProcess() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("ObjectStorageProcess");
+#endif
+    }
+
+    ~ObjectStorageProcess() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("ObjectStorageProcess");
+#endif
+    }
 
     void Start();
     void Stop();

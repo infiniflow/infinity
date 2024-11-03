@@ -31,7 +31,7 @@ export enum class UpdateNodeOp { kRemove, kLostConnection };
 
 export class ClusterManager {
 public:
-    explicit ClusterManager(Storage *storage) : storage_(storage) {}
+    explicit ClusterManager(Storage *storage);
     ~ClusterManager();
 
 public:

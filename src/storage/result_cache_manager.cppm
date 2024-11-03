@@ -22,6 +22,7 @@ import stl;
 import cached_node_base;
 import data_block;
 import logical_read_cache;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -87,7 +88,16 @@ private:
 
 export class ResultCacheManager {
 public:
-    ResultCacheManager(SizeT cache_num_capacity) : cache_map_(cache_num_capacity) {}
+    ResultCacheManager(SizeT cache_num_capacity) : cache_map_(cache_num_capacity) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("ResultCacheManager");
+#endif
+    }
+    ~ResultCacheManager() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("ResultCacheManager");
+#endif
+    }
 
     bool AddCache(UniquePtr<CachedNodeBase> cached_node, Vector<UniquePtr<DataBlock>> data_blocks);
 

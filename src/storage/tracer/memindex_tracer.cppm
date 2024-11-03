@@ -20,6 +20,7 @@ import stl;
 import bg_task;
 import third_party;
 import logger;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -102,7 +103,17 @@ inline void MemIndexTracer::AddMemUsed(SizeT add) {
 export class BGMemIndexTracer : public MemIndexTracer {
 public:
     BGMemIndexTracer(SizeT index_memory_limit, Catalog *catalog, TxnManager *txn_mgr)
-        : MemIndexTracer(index_memory_limit), catalog_(catalog), txn_mgr_(txn_mgr) {}
+        : MemIndexTracer(index_memory_limit), catalog_(catalog), txn_mgr_(txn_mgr) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("BGMemIndexTracer");
+#endif
+    }
+
+    ~BGMemIndexTracer() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("BGMemIndexTracer");
+#endif
+    }
 
     void TriggerDump(UniquePtr<DumpIndexTask> task) override;
 
