@@ -11,13 +11,18 @@ import {
 } from '@/components/ui/dialog';
 import React, { useCallback } from 'react';
 import { DatabaseCreatingForm } from './database-creating-form';
+import { TreeDataProps } from './database/hooks';
 
-export function DatabaseCreatingDialog({ children }: React.PropsWithChildren) {
+export function DatabaseCreatingDialog({
+  children,
+  fetchDatabases
+}: React.PropsWithChildren & TreeDataProps) {
   const [open, setOpen] = React.useState(false);
 
   const hide = useCallback(() => {
     setOpen(false);
-  }, []);
+    fetchDatabases?.();
+  }, [fetchDatabases]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

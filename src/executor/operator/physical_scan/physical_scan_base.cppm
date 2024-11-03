@@ -39,10 +39,10 @@ public:
                      const PhysicalOperatorType type,
                      UniquePtr<PhysicalOperator> left,
                      UniquePtr<PhysicalOperator> right,
-                     u64 table_index,
+                     const u64 table_index,
                      SharedPtr<BaseTableRef> base_table_ref,
                      SharedPtr<Vector<LoadMeta>> load_metas,
-                     bool cache_result = false)
+                     const bool cache_result = false)
         : PhysicalOperator(type, std::move(left), std::move(right), id, std::move(load_metas), cache_result), table_index_(table_index),
           base_table_ref_(std::move(base_table_ref)) {}
 

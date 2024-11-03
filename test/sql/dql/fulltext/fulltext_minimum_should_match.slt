@@ -25,12 +25,50 @@ SELECT * FROM ft_minimum_should_match;
 5 another multiple
 
 query I
-SELECT * FROM ft_minimum_should_match SEARCH MATCH TEXT ('doc', 'second text;topn=10');
+SELECT * FROM ft_minimum_should_match SEARCH MATCH TEXT ('doc', 'second text', 'topn=10');
 ----
 2 second text multiple
 4 another second text xxx
 1 first text
 3 third text many words
+
+query I
+SELECT *, SCORE() FROM ft_minimum_should_match SEARCH MATCH TEXT ('doc', 'second text', 'topn=10;threshold=-9999');
+----
+2 second text multiple 1.186260
+4 another second text xxx 1.079068
+1 first text 0.366141
+3 third text many words 0.244768
+
+query I
+SELECT *, SCORE() FROM ft_minimum_should_match SEARCH MATCH TEXT ('doc', 'second text', 'topn=10;threshold=0.3');
+----
+2 second text multiple 1.186260
+4 another second text xxx 1.079068
+1 first text 0.366141
+
+query I
+SELECT *, SCORE() FROM ft_minimum_should_match SEARCH MATCH TEXT ('doc', 'second text multiple', 'topn=10;similarity=boolean;threshold=1.5');
+----
+2 second text multiple 3.000000
+4 another second text xxx 2.000000
+
+query I
+SELECT * FROM ft_minimum_should_match WHERE filter_fulltext('doc', 'second text', 'threshold=0.3');
+----
+1 first text
+2 second text multiple
+4 another second text xxx
+
+query I
+SELECT *, SCORE() FROM ft_minimum_should_match SEARCH MATCH TEXT ('doc', 'second text', 'topn=10;threshold=1.1');
+----
+2 second text multiple 1.186260
+
+query I
+SELECT * FROM ft_minimum_should_match WHERE filter_text('doc', 'second text', 'threshold=1.1');
+----
+2 second text multiple
 
 query I
 SELECT * FROM ft_minimum_should_match SEARCH MATCH TEXT ('doc', 'second text', 'minimum_should_match=50%;topn=10');

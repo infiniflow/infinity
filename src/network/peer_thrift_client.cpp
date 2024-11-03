@@ -294,6 +294,10 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
         // Error
         peer_task->error_code_ = response.error_code;
         peer_task->error_message_ = response.error_message;
+        if (response.sender_status == infinity_peer_server::NodeStatus::type::kLostConnection) {
+            peer_task->leader_term_ = response.leader_term;
+            peer_task->sender_status_ = NodeStatus::kLostConnection;
+        }
     } else {
         switch (response.sender_status) {
             case infinity_peer_server::NodeStatus::type::kAlive: {
@@ -430,7 +434,8 @@ void PeerClient::ChangeRole(ChangeRoleTask *change_role_task) {
         change_role_task->error_message_ = thrift_exception.what();
         change_role_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
         LOG_ERROR(fmt::format("Sync log to node, transport error: {}, error: {}", change_role_task->node_name_, change_role_task->error_message_));
-        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(change_role_task->node_name_, UpdateNodeOp::kLostConnection);
+        Status status =
+            InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(change_role_task->node_name_, UpdateNodeOp::kLostConnection);
         if (!status.ok()) {
             LOG_ERROR(status.message());
         }
@@ -438,7 +443,8 @@ void PeerClient::ChangeRole(ChangeRoleTask *change_role_task) {
         change_role_task->error_message_ = application_exception.what();
         change_role_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
         LOG_ERROR(fmt::format("Sync log to node, application: {}, error: {}", change_role_task->node_name_, change_role_task->error_message_));
-        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(change_role_task->node_name_, UpdateNodeOp::kLostConnection);
+        Status status =
+            InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(change_role_task->node_name_, UpdateNodeOp::kLostConnection);
         if (!status.ok()) {
             LOG_ERROR(status.message());
         }

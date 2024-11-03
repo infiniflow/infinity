@@ -319,7 +319,8 @@ TEST_P(CatalogTest, get_table_info_test) {
         }
 
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
 
         auto [table_info, status1] = catalog->GetTableInfo("default_db", "tbl1", txn1);
@@ -355,7 +356,8 @@ TEST_P(CatalogTest, get_table_index_info_test) {
         }
 
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -369,7 +371,7 @@ TEST_P(CatalogTest, get_table_index_info_test) {
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
         SharedPtr<String> index_name = MakeShared<String>("hnsw_index");
-        auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
+        auto index_base_hnsw = IndexHnsw::Make(index_name, MakeShared<String>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {
             delete init_parameter;
         }
@@ -428,7 +430,8 @@ TEST_P(CatalogTest, remove_index_test) {
         }
 
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
 
         EXPECT_TRUE(status.ok());
     }
@@ -443,7 +446,7 @@ TEST_P(CatalogTest, remove_index_test) {
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
 
         SharedPtr<String> index_name = MakeShared<String>("hnsw_index");
-        auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
+        auto index_base_hnsw = IndexHnsw::Make(index_name, MakeShared<String>("test comment"), "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {
             delete init_parameter;
         }
@@ -497,7 +500,8 @@ TEST_P(CatalogTest, roll_back_append_test) {
         }
 
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
 
         EXPECT_TRUE(status.ok());
     }
@@ -536,7 +540,8 @@ TEST_P(CatalogTest, roll_back_delete_test) {
         }
 
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
 
         EXPECT_TRUE(status.ok());
     }
@@ -574,7 +579,8 @@ TEST_P(CatalogTest, roll_back_write_test) {
         }
 
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
 
         EXPECT_TRUE(status.ok());
     }

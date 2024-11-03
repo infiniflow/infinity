@@ -35,3 +35,21 @@ SELECT * FROM date_index_scan_insert WHERE d1 >= DATE '1970-1-1';
 
 statement ok
 DROP TABLE date_index_scan_insert;
+
+statement ok
+create table one_line_secondary_index(c1 int, c2 varchar);
+
+statement ok
+insert into one_line_secondary_index values(1, 'aa');
+
+statement ok
+create index one_line_secondary_index_idx on one_line_secondary_index(c1);
+
+query I
+select * from one_line_secondary_index where c1 = 1;
+----
+1 aa
+
+statement ok
+drop table one_line_secondary_index;
+

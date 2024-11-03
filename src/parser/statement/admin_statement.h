@@ -47,6 +47,12 @@ enum class AdminStmtType {
     kShowCurrentNode,
     kRemoveNode,
     kSetRole,
+    kCreateSnapshot,
+    kListSnapshots,
+    kShowSnapshot,
+    kDeleteSnapshot,
+    kExportSnapshot,
+    kRecoverFromSnapshot,
     kInvalid,
 };
 
@@ -86,6 +92,8 @@ public:
     std::optional<std::string> leader_address_{};
     std::optional<std::string> variable_name_{};
     std::optional<std::string> node_name_{};
+    std::optional<std::string> snapshot_name_{};
+    std::optional<std::string> export_path_{};
 };
 
 } // namespace infinity

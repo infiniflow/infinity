@@ -191,10 +191,11 @@ void PhysicalShow::Init() {
         }
         case ShowStmtType::kIndexes: {
 
-            output_names_->reserve(7);
-            output_types_->reserve(7);
+            output_names_->reserve(8);
+            output_types_->reserve(8);
 
             output_names_->emplace_back("index_name");
+            output_names_->emplace_back("index_comment");
             output_names_->emplace_back("index_type");
             output_names_->emplace_back("column_id");
             output_names_->emplace_back("column_name");
@@ -202,6 +203,7 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("index segments");
             output_names_->emplace_back("other_parameters");
 
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
@@ -269,30 +271,14 @@ void PhysicalShow::Init() {
             break;
         }
         case ShowStmtType::kSegment: {
-            output_names_->reserve(10);
-            output_types_->reserve(10);
+            output_names_->reserve(2);
+            output_types_->reserve(2);
 
-            output_names_->emplace_back("id");
-            output_names_->emplace_back("status");
-            output_names_->emplace_back("dir");
-            output_names_->emplace_back("size");
-            output_names_->emplace_back("block_count");
-            output_names_->emplace_back("row_capacity");
-            output_names_->emplace_back("row_count");
-            output_names_->emplace_back("actual_row_count");
-            output_names_->emplace_back("room");
-            output_names_->emplace_back("column_count");
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("value");
 
-            output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
             break;
         }
 
@@ -311,26 +297,14 @@ void PhysicalShow::Init() {
         }
 
         case ShowStmtType::kBlock: {
-            output_names_->reserve(8);
-            output_types_->reserve(8);
+            output_names_->reserve(2);
+            output_types_->reserve(2);
 
-            output_names_->emplace_back("id");
-            output_names_->emplace_back("path");
-            output_names_->emplace_back("size");
-            output_names_->emplace_back("row_capacity");
-            output_names_->emplace_back("row_count");
-            output_names_->emplace_back("checkpoint_row_count");
-            output_names_->emplace_back("column_count");
-            output_names_->emplace_back("checkpoint_ts");
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("value");
 
-            output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
             break;
         }
 
@@ -1049,7 +1023,21 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("index_comment");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
 
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(*(table_index_info->index_comment_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
     {
         SizeT column_id = 0;
         {
@@ -2032,25 +2020,37 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     }
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    Vector<SharedPtr<DataType>> column_types{bigint_type,
-                                             varchar_type,
-                                             varchar_type,
-                                             varchar_type,
-                                             bigint_type,
-                                             bigint_type,
-                                             bigint_type,
-                                             bigint_type,
-                                             bigint_type,
-                                             bigint_type};
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
 
-    if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
+    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
+    if (segment_entry == nullptr) {
+        Status status = Status::SegmentNotExist(*segment_id_);
+        RecoverableError(status);
+        return;
+    }
 
+    {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeBigInt(segment_entry->segment_id());
+            Value value = Value::MakeVarchar("id");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(segment_entry->segment_id()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("status");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2061,6 +2061,15 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("path");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
 
         ++column_id;
         {
@@ -2068,76 +2077,120 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("storage_size");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
 
         ++column_id;
         {
-            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
             String segment_size_str;
-            if (query_context->persistence_manager() == nullptr) {
-                segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
-            } else {
-                Vector<String> paths = segment_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
-                SizeT segment_size = 0;
-                for (const String &path : paths) {
-                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
-                    if (!status.ok()) {
-                        RecoverableError(status);
-                    }
-                    segment_size += file_size;
-                }
-                segment_size_str = Utility::FormatByteSize(segment_size);
-            }
+            segment_size_str = Utility::FormatByteSize(segment_entry->GetStorageSize());
             Value value = Value::MakeVarchar(segment_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
+    }
 
-        ++column_id;
+    {
+        SizeT column_id = 0;
         {
-            Value value = Value::MakeBigInt(segment_entry->block_entries().size());
+            Value value = Value::MakeVarchar("block_count");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            Value value = Value::MakeBigInt(segment_entry->row_capacity());
+            Value value = Value::MakeVarchar(std::to_string(segment_entry->block_entries().size()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("row_capacity");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            Value value = Value::MakeBigInt(segment_entry->row_count());
+            Value value = Value::MakeVarchar(std::to_string(segment_entry->row_capacity()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("row_count");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            Value value = Value::MakeBigInt(segment_entry->actual_row_count());
+            Value value = Value::MakeVarchar(std::to_string(segment_entry->row_count()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("actual_row_count");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            Value value = Value::MakeBigInt(segment_entry->Room());
+            Value value = Value::MakeVarchar(std::to_string(segment_entry->actual_row_count()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("room");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            Value value = Value::MakeBigInt(segment_entry->column_count());
+            Value value = Value::MakeVarchar(std::to_string(segment_entry->Room()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("column_count");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-    } else {
-        Status status = Status::SegmentNotExist(*segment_id_);
-        RecoverableError(status);
-        return;
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(segment_entry->column_count()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
     }
 
     output_block_ptr->Finalize();
@@ -2242,10 +2295,8 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     }
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>>
-        column_types{bigint_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
 
     auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
@@ -2262,77 +2313,140 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         return;
     }
 
-    SizeT column_id = 0;
     {
-        Value value = Value::MakeBigInt(block_entry->block_id());
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    }
-
-    String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
-    ++column_id;
-    {
-        Value value = Value::MakeVarchar(full_block_dir);
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    }
-
-    ++column_id;
-    {
-        String block_size_str;
-        if (query_context->persistence_manager() == nullptr) {
-            block_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
-        } else {
-            Vector<String> paths = block_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
-            SizeT block_size = 0;
-            for (const String &path : paths) {
-                auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                block_size += file_size;
-            }
-            block_size_str = Utility::FormatByteSize(block_size);
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("id");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        Value value = Value::MakeVarchar(block_size_str);
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(block_entry->block_id()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
     }
 
-    ++column_id;
     {
-        Value value = Value::MakeBigInt(block_entry->row_capacity());
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("path");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
+            Value value = Value::MakeVarchar(full_block_dir);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
     }
 
-    ++column_id;
     {
-        Value value = Value::MakeBigInt(block_entry->row_count());
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("storage_size");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            SizeT block_storage_size = block_entry->GetStorageSize();
+            String block_storage_size_str = Utility::FormatByteSize(block_storage_size);
+            Value value = Value::MakeVarchar(block_storage_size_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
     }
 
-    ++column_id;
     {
-        Value value = Value::MakeBigInt(block_entry->checkpoint_row_count());
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("row_capacity");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            SizeT row_capacity = block_entry->row_capacity();
+            Value value = Value::MakeVarchar(std::to_string(row_capacity));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
     }
 
-    ++column_id;
     {
-        Value value = Value::MakeBigInt(block_entry->columns().size());
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("row_count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            SizeT row_count = block_entry->row_count();
+            Value value = Value::MakeVarchar(std::to_string(row_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
     }
 
-    ++column_id;
     {
-        Value value = Value::MakeBigInt(block_entry->checkpoint_ts());
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("checkpoint_row_count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            SizeT checkpoint_row_count = block_entry->checkpoint_row_count();
+            Value value = Value::MakeVarchar(std::to_string(checkpoint_row_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("column_count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            SizeT column_count = block_entry->columns().size();
+            Value value = Value::MakeVarchar(std::to_string(column_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("checkpoint_ts");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            SizeT checkpoint_ts = block_entry->checkpoint_ts();
+            Value value = Value::MakeVarchar(std::to_string(checkpoint_ts));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
     }
 
     output_block_ptr->Finalize();
@@ -2470,6 +2584,24 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         ++column_id;
         {
             Value value = Value::MakeVarchar(std::to_string(outline_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("storage_size");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            SizeT storage_size = column_block_entry->GetStorageSize();
+            String storage_size_str = Utility::FormatByteSize(storage_size);
+            Value value = Value::MakeVarchar(storage_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -3257,7 +3389,8 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
+    Vector<SharedPtr<DataType>>
+        column_types{varchar_type, varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
@@ -3282,6 +3415,14 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             {
                 // Append index name to the first column
                 Value value = Value::MakeVarchar(index_name);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+            ++column_id;
+            {
+                // Append index_comment to output
+                String comment = *index_base->index_comment_;
+                Value value = Value::MakeVarchar(comment);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }

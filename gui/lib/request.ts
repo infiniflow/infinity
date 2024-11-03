@@ -10,7 +10,6 @@ export const request = async (
     headers: {
       accept: 'application/json'
     },
-    cache: 'no-store',
     method
   };
 

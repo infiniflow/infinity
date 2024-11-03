@@ -40,6 +40,12 @@ SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MAT
 Anarchism 30-APR-2012 03:25:17.000 0 22.299635
 Anarchism 30-APR-2012 03:25:17.000 6 46.196758
 
+# phrase and term
+query TTIR rowsort
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', '"social customs" harmful', 'topn=3;threshold=40');
+----
+Anarchism 30-APR-2012 03:25:17.000 6 46.196758
+
 # copy data from csv file
 query I
 COPY sqllogic_test_enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t', FORMAT CSV );

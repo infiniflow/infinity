@@ -192,6 +192,7 @@ class TestInfinity:
                                                      index.IndexType.Secondary),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+        table_obj.insert([{"c1": 1, "body": "hello"}])
         res = table_obj.create_index("my_index_2",
                                      index.IndexInfo("body",
                                                      index.IndexType.Secondary),
@@ -1462,3 +1463,101 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         res = db_obj.drop_table("test_index" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("index_type", [
+        common_index.IndexType.IVF,
+        common_index.IndexType.Hnsw,
+        common_index.IndexType.BMP,
+        common_index.IndexType.FullText,
+        common_index.IndexType.EMVB,
+        common_index.IndexType.Secondary,
+    ])
+    def test_create_index_with_comment(self, index_type, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_index_comment" + suffix, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        if index_type == common_index.IndexType.IVF:
+            table_obj = db_obj.create_table("test_index_comment" + suffix, {
+                "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
+            assert table_obj is not None
+
+            res = table_obj.create_index("my_index",
+                                         index.IndexInfo("c1",
+                                                         index.IndexType.IVF,
+                                                         {"metric": "l2"}),
+                                         ConflictType.Error, "test comment")
+            assert res.error_code == ErrorCode.OK
+        elif index_type == common_index.IndexType.Hnsw:
+            table_obj = db_obj.create_table(
+                "test_index_comment" + suffix, {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
+            assert table_obj is not None
+
+            res = table_obj.create_index("my_index",
+                                         index.IndexInfo("c1",
+                                                         index.IndexType.Hnsw,
+                                                         {
+                                                             "M": "16",
+                                                             "ef_construction": "50",
+                                                             "metric": "L2"
+                                                         }), ConflictType.Error, "test comment")
+
+            assert res.error_code == ErrorCode.OK
+        elif index_type == common_index.IndexType.BMP:
+            table_obj = db_obj.create_table(
+                "test_index_comment" + suffix, {"col1": {"type": "int"}, "col2": {"type": "sparse,30000,float,int16"}},
+                ConflictType.Error)
+            assert table_obj is not None
+
+            # CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = compress);
+            res = table_obj.create_index("my_index",
+                                         index.IndexInfo("col2",
+                                                         index.IndexType.BMP,
+                                                         {"block_size": "8", "compress_type": "COMPRESS"}),
+                                         ConflictType.Error, "test comment")
+            assert res.error_code == ErrorCode.OK
+        elif index_type == common_index.IndexType.FullText:
+            table_obj = db_obj.create_table(
+                "test_index_comment" + suffix, {
+                    "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}
+                }, ConflictType.Error)
+            assert table_obj is not None
+
+            res = table_obj.create_index("my_index",
+                                         index.IndexInfo("body",
+                                                         index.IndexType.FullText,
+                                                         {"ANALYZER": "STANDARD"}),
+                                         ConflictType.Error, "test comment")
+
+            assert res.error_code == ErrorCode.OK
+        elif index_type == common_index.IndexType.EMVB:
+            table_obj = db_obj.create_table(
+                "test_index_comment" + suffix, {
+                    "c1": {"type": "int"}, "c2": {"type": "tensor, 128, float"}
+                }, ConflictType.Error)
+            assert table_obj is not None
+            res = table_obj.create_index("my_index",
+                                         index.IndexInfo("c2",
+                                                         index.IndexType.EMVB,
+                                                         {"pq_subspace_num": "32", "pq_subspace_bits": "8"}),
+                                         ConflictType.Error, "test comment")
+            assert res.error_code == ErrorCode.OK
+        elif index_type == common_index.IndexType.Secondary:
+            table_obj = db_obj.create_table(
+                "test_index_comment" + suffix, {
+                    "c1": {"type": "int"}, "body": {"type": "varchar"}
+                }, ConflictType.Error)
+            assert table_obj is not None
+            res = table_obj.create_index("my_index",
+                                         index.IndexInfo("c1",
+                                                         index.IndexType.Secondary),
+                                         ConflictType.Error, "test comment")
+            assert res.error_code == ErrorCode.OK
+
+        res = table_obj.show_index("my_index")
+        assert res.error_code == ErrorCode.OK and res.index_comment == 'test comment'
+
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_index_comment" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+

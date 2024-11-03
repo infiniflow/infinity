@@ -1,2 +1,4 @@
 tomli~=2.0.2
 psutil~=6.0.0
+docker~=7.1.0
+tomli-w~=1.1.0

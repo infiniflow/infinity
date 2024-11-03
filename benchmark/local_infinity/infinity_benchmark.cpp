@@ -43,6 +43,7 @@ import column_def;
 import statement_common;
 import data_type;
 import virtual_store;
+import insert_row_expr;
 
 using namespace infinity;
 
@@ -216,30 +217,32 @@ int main() {
                         col2->names_.emplace_back("col2");
                         output_columns->emplace_back(col2);
 
-                        [[maybe_unused]] auto ignored =
-                            infinity->Search("default_db", "benchmark_test", nullptr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr);
+                        [[maybe_unused]] auto ignored = infinity->Search("default_db",
+                                                                         "benchmark_test",
+                                                                         nullptr,
+                                                                         nullptr,
+                                                                         nullptr,
+                                                                         nullptr,
+                                                                         output_columns,
+                                                                         nullptr,
+                                                                         nullptr,
+                                                                         nullptr);
                     });
                 results.push_back(fmt::format("-> Select QPS: {}", total_times / tims_costing_second));
             }
             {
                 auto tims_costing_second =
                     Measurement("Insert", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-                        Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
-                        values->emplace_back(new Vector<ParsedExpr *>());
-
-                        Vector<String> *columns = new Vector<String>();
-                        columns->emplace_back(col_name_1);
-                        columns->emplace_back(col_name_2);
-
-                        ConstantExpr *value1 = new ConstantExpr(LiteralType::kInteger);
+                        auto insert_row = MakeUnique<InsertRowExpr>();
+                        insert_row->columns_ = {col_name_1, col_name_2};
+                        auto value1 = MakeUnique<ConstantExpr>(LiteralType::kInteger);
                         value1->integer_value_ = i;
-                        values->at(0)->emplace_back(value1);
-
-                        ConstantExpr *value2 = new ConstantExpr(LiteralType::kInteger);
+                        insert_row->values_.emplace_back(std::move(value1));
+                        auto value2 = MakeUnique<ConstantExpr>(LiteralType::kInteger);
                         value2->integer_value_ = i;
-                        values->at(0)->emplace_back(value2);
-
-                        __attribute__((unused)) auto ignored = infinity->Insert("default_db", "benchmark_test", columns, values);
+                        insert_row->values_.emplace_back(std::move(value2));
+                        auto insert_rows = new Vector<InsertRowExpr *>({insert_row.release()});
+                        [[maybe_unused]] auto ignored = infinity->Insert("default_db", "benchmark_test", insert_rows);
                     });
                 results.push_back(fmt::format("-> Insert QPS: {}", total_times / tims_costing_second));
             }
@@ -311,22 +314,16 @@ int main() {
         {
             auto tims_costing_second =
                 Measurement("Insert for Select Sort", thread_num, sort_row, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-                    Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
-                    values->emplace_back(new Vector<ParsedExpr *>());
-
-                    Vector<String> *columns = new Vector<String>();
-                    columns->emplace_back(col_name_1);
-                    columns->emplace_back(col_name_2);
-
-                    ConstantExpr *value1 = new ConstantExpr(LiteralType::kInteger);
+                    auto insert_row = MakeUnique<InsertRowExpr>();
+                    insert_row->columns_ = {col_name_1, col_name_2};
+                    auto value1 = MakeUnique<ConstantExpr>(LiteralType::kInteger);
                     value1->integer_value_ = std::rand();
-                    values->at(0)->emplace_back(value1);
-
-                    ConstantExpr *value2 = new ConstantExpr(LiteralType::kInteger);
+                    insert_row->values_.emplace_back(std::move(value1));
+                    auto value2 = MakeUnique<ConstantExpr>(LiteralType::kInteger);
                     value2->integer_value_ = std::rand();
-                    values->at(0)->emplace_back(value2);
-
-                    __attribute__((unused)) auto ignored = infinity->Insert("default_db", "benchmark_test", columns, values);
+                    insert_row->values_.emplace_back(std::move(value2));
+                    auto insert_rows = new Vector<InsertRowExpr *>({insert_row.release()});
+                    [[maybe_unused]] auto ignored = infinity->Insert("default_db", "benchmark_test", insert_rows);
                 });
             results.push_back(fmt::format("-> Insert for Sort Time: {}s", tims_costing_second));
         }
@@ -395,7 +392,8 @@ int main() {
             index_info->index_param_list_ = index_param_list;
         }
 
-        infinity->CreateIndex(db_name, table_name, index_name, index_info, CreateIndexOptions());
+        String index_comment = "";
+        infinity->CreateIndex(db_name, table_name, index_name, index_comment, index_info, CreateIndexOptions());
     } while (false);
 
     //    {

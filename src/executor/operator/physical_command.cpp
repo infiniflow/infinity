@@ -326,6 +326,17 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case CommandType::kLockTable: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+                operator_state->SetComplete();
+                return true;
+            }
+
             [[maybe_unused]] auto *lock_table_command = static_cast<LockCmd *>(command_info_.get());
             auto *txn = query_context->GetTxn();
             auto [table_entry, status] = txn->GetTableByName(lock_table_command->db_name(), lock_table_command->table_name());
@@ -336,6 +347,17 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case CommandType::kUnlockTable: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+                operator_state->SetComplete();
+                return true;
+            }
+
             [[maybe_unused]] auto *unlock_table_command = static_cast<UnlockCmd *>(command_info_.get());
             auto *txn = query_context->GetTxn();
             auto [table_entry, status] = txn->GetTableByName(unlock_table_command->db_name(), unlock_table_command->table_name());
@@ -346,6 +368,17 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case CommandType::kCleanup: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+                operator_state->SetComplete();
+                return true;
+            }
+
             auto *bg_process = query_context->storage()->bg_processor();
             {
                 Txn *txn = query_context->GetTxn();

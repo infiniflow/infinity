@@ -44,6 +44,7 @@ public:
                                      SharedPtr<MatchTensorExpression> match_tensor_expression,
                                      const SharedPtr<CommonQueryFilter> &common_query_filter,
                                      u32 topn,
+                                     Optional<f32> knn_threshold,
                                      const SharedPtr<MatchTensorScanIndexOptions> &index_options,
                                      SharedPtr<Vector<LoadMeta>> load_metas);
 
@@ -75,6 +76,8 @@ public:
 
     [[nodiscard]] inline u32 GetTopN() const { return topn_; }
 
+    [[nodiscard]] inline Optional<f32> GetKnnThreshold() const { return knn_threshold_; }
+
     const SharedPtr<MatchTensorScanIndexOptions> &index_options() const { return index_options_; }
 
 private:
@@ -87,6 +90,7 @@ private:
 
     // extra options from match_tensor_expr_
     u32 topn_ = 0;
+    Optional<f32> knn_threshold_;
     SharedPtr<MatchTensorScanIndexOptions> index_options_;
 
     // column to search

@@ -214,7 +214,8 @@ TEST_P(MemoryIndexerTest, SpillLoadTest) {
     UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
 
     loaded_indexer->Load();
-    SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(loaded_indexer.get());
+    SegmentID segment_id = fake_segment_index_entry_1->segment_id();
+    SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, loaded_indexer.get());
     for (SizeT i = 0; i < expected_postings_.size(); ++i) {
         const ExpectedPosting &expected = expected_postings_[i];
         const String &term = expected.term;
@@ -257,7 +258,8 @@ TEST_P(MemoryIndexerTest, SeekPosition) {
         indexer1.CommitSync();
     }
 
-    SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(&indexer1);
+    SegmentID segment_id = fake_segment_index_entry_1->segment_id();
+    SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, &indexer1);
     const String term("a");
     SegmentPosting seg_posting;
     SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();

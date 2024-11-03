@@ -477,11 +477,29 @@ Pair<Vector<String>, double> RAGAnalyzer::MaxBackward(const String &line) {
     return Score(res);
 }
 
-int RAGAnalyzer::DFS(const String &chars, int s, Vector<Pair<String, int>> &pre_tokens, Vector<Vector<Pair<String, int>>> &token_list) {
+int RAGAnalyzer::DFS(const String &chars,
+                     int s,
+                     Vector<Pair<String, int>> &pre_tokens,
+                     Vector<Vector<Pair<String, int>>> &token_list,
+                     Vector<String> &best_tokens,
+                     double &max_score,
+                     bool memo_all) {
     int res = s;
     int len = UTF8Length(chars);
     if (s >= len) {
-        token_list.push_back(pre_tokens);
+        if (memo_all) {
+            token_list.push_back(pre_tokens);
+        } else {
+            double current_score = Score(pre_tokens).second;
+            if (current_score > max_score) {
+                best_tokens.clear();
+                best_tokens.reserve(pre_tokens.size());
+                for (auto &t : pre_tokens) {
+                    best_tokens.push_back(t.first);
+                }
+                max_score = current_score;
+            }
+        }
         return res;
     }
     // pruning
@@ -517,7 +535,7 @@ int RAGAnalyzer::DFS(const String &chars, int s, Vector<Pair<String, int>> &pre_
                 pretks.emplace_back(t, v);
             else
                 pretks.emplace_back(t, Encode(-12, 0));
-            res = std::max(res, DFS(chars, e, pretks, token_list));
+            res = std::max(res, DFS(chars, e, pretks, token_list, best_tokens, max_score, memo_all));
         }
     }
 
@@ -533,7 +551,7 @@ int RAGAnalyzer::DFS(const String &chars, int s, Vector<Pair<String, int>> &pre_
     else
         pre_tokens.emplace_back(t, Encode(-12, 0));
 
-    return DFS(chars, s + 1, pre_tokens, token_list);
+    return DFS(chars, s + 1, pre_tokens, token_list, best_tokens, max_score, memo_all);
 }
 
 String RAGAnalyzer::Merge(const String &tks_str) {
@@ -651,10 +669,13 @@ String RAGAnalyzer::Tokenize(const String &line) {
 
             Vector<Pair<String, int>> pre_tokens;
             Vector<Vector<Pair<String, int>>> token_list;
-            DFS(Join(tks, s, e < tks.size() ? e + 1 : e, ""), 0, pre_tokens, token_list);
-            Vector<Pair<Vector<String>, double>> sorted_tokens;
-            SortTokens(token_list, sorted_tokens);
-            res.push_back(Join(sorted_tokens[0].first, 0));
+            Vector<String> best_tokens;
+            double max_score = 0.0F;
+            DFS(Join(tks, s, e < tks.size() ? e + 1 : e, ""), 0, pre_tokens, token_list, best_tokens, max_score, false);
+            // Vector<Pair<Vector<String>, double>> sorted_tokens;
+            // SortTokens(token_list, sorted_tokens);
+            // res.push_back(Join(sorted_tokens[0].first, 0));
+            res.push_back(Join(best_tokens, 0));
             i = e + 1;
         }
     }
@@ -704,7 +725,9 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
             token_list.push_back(tk);
         } else {
             Vector<Pair<String, int>> pre_tokens;
-            DFS(token, 0, pre_tokens, token_list);
+            Vector<String> best_tokens;
+            double max_score = 0.0F;
+            DFS(token, 0, pre_tokens, token_list, best_tokens, max_score, true);
         }
         if (token_list.size() < 2) {
             res.push_back(token);
@@ -713,20 +736,20 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
         Vector<Pair<Vector<String>, double>> sorted_tokens;
         SortTokens(token_list, sorted_tokens);
         auto stk = sorted_tokens[1].first;
-        String s_token;
         if (stk.size() == token.length()) {
-            s_token = token;
+            res.push_back(token);
         } else if (RE2::PartialMatch(token, pattern5_)) { // [a-z\\.-]+
             for (auto &t : stk) {
                 if (UTF8Length(t) < 3) {
-                    s_token = token;
+                    res.push_back(token);
                     break;
                 }
             }
         } else {
-            s_token = Join(stk, 0);
+            for (auto &t : stk) {
+                res.push_back(t);
+            }
         }
-        res.push_back(s_token);
     }
     EnglishNormalize(res, result);
     // String ret = Join(normalize_res, 0);

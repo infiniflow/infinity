@@ -95,12 +95,12 @@ private:
         SizeT medoid, vamana_frozen_num, vamana_frozen_loc = 0;
         mem_index_file_handle.Read(&actual_file_size, sizeof(SizeT));
         mem_index_file_handle.Read(&width, sizeof(u32));
-        mem_index_file_handle.Read(&medoid, sizeof(SizeT));
+        mem_index_file_handle.Read(&medoid, sizeof(SizeT)); // medoid node id i.e. enter point
         mem_index_file_handle.Read(&vamana_frozen_num, sizeof(SizeT));
 
         if (vamana_frozen_num == 1)
             vamana_frozen_loc = medoid;
-        // node structure: [neighbor_size(u32), neighbor_id(SizeT)*]
+        // node structure: [vector(VectorDataType)*, neighbor_size(u32), neighbor_id(SizeT)*]
         u64 max_node_len = (width) * sizeof(SizeT) + sizeof(u32) + ndims * sizeof(VectorDataType); // graph node + vector
         u32 nnodes_per_sector = DISKANN_SECTOR_LEN / max_node_len; // 0 if max_node_len > SECTOR_LEN(multi-sector for a node)
 
@@ -125,7 +125,7 @@ private:
         output_file_meta[5] = n_sectors;
         output_file_meta[6] = vamana_frozen_num;
         output_file_meta[7] = vamana_frozen_loc;
-        u64 append_reorder_data = 0; // not used for now
+        u64 append_reorder_data = 0; // whether use reorder data, not used for now
         output_file_meta[8] = append_reorder_data;
         output_file_meta[9] = disk_index_file_size;
         index_file_handle.Append(output_file_meta.data(), DISKANN_SECTOR_LEN);
@@ -278,7 +278,7 @@ public:
             LOG_TRACE(fmt::format("Sample training size :{}", train_size));
         }
 
-        // step 2. generate pq pivots and pq data
+        // step 2. generate pq pivots from training data and compress pq data
         {
             data_file_handle->Seek(0);
             auto [pqCompressed_data_file_handle, pq_data_file_status] = VirtualStore::Open(pqCompressed_data_file_path_, FileAccessMode::kWrite);

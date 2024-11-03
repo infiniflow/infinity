@@ -273,11 +273,15 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     return table_index_entry;
 }
 
-BaseMemIndex *TableIndexEntry::GetMemIndex() const {
-    if (last_segment_.get() == nullptr) {
-        return nullptr;
+Vector<BaseMemIndex *> TableIndexEntry::GetMemIndex() const {
+    Vector<BaseMemIndex *> res;
+    for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+        auto *mem_idx = segment_index_entry->GetMemIndex();
+        if (mem_idx) {
+            res.push_back(mem_idx);
+        }
     }
-    return last_segment_->GetMemIndex();
+    return res;
 }
 
 void TableIndexEntry::MemIndexCommit() {
@@ -402,8 +406,8 @@ Vector<String> TableIndexEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp b
     std::shared_lock lock(rw_locker_);
     Vector<String> res;
     res.reserve(index_by_segment_.size());
-    for(const auto& index_pair: index_by_segment_) {
-        const SegmentIndexEntry* segment_index_entry = index_pair.second.get();
+    for (const auto &index_pair : index_by_segment_) {
+        const SegmentIndexEntry *segment_index_entry = index_pair.second.get();
         Vector<String> segment_files = segment_index_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), segment_files.begin(), segment_files.end());
     }

@@ -576,6 +576,23 @@ Status Status::CantConnectLeader(const String &leader_info) {
     return Status(ErrorCode::kCantConnectLeader, MakeUnique<String>(fmt::format("Can't connect leader: {}", leader_info)));
 }
 
+Status Status::MinioInvalidAccessKey(const String &detailed) {
+    return Status(ErrorCode::kMinioInvalidAccessKey, MakeUnique<String>(fmt::format("Minio error: {}", detailed)));
+}
+
+Status Status::MinioBucketNotExists(const String &bucket_name) {
+    return Status(ErrorCode::kMinioBucketNotExists, MakeUnique<String>(fmt::format("Bucket {} not found", bucket_name)));
+}
+
+Status Status::InvalidStorageType(const String &expected, const String &actual) {
+    return Status(ErrorCode::kInvalidStorageType,
+                  MakeUnique<String>(fmt::format("Expect storage type: {}, actual storage type: {}", expected, actual)));
+}
+
+Status Status::NotRegistered(const String &node_info) {
+    return Status(ErrorCode::kNotRegistered, MakeUnique<String>(fmt::format("Not registered node: {}", node_info)));
+}
+
 // meta
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 

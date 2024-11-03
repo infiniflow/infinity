@@ -12,10 +12,9 @@ import pandas as pd
 import polars as pl
 import pyarrow as pa
 from infinity.table import ExplainType
-from datetime import date, time, datetime
 from typing import List
 
-class infinity_http_network:
+class http_network_util:
     header_dict = baseHeader
     response_dict = baseResponse
     data_dict = baseData
@@ -106,9 +105,12 @@ class infinity_http_network:
             print(e)
             return database_result(error_code=e.error_code)
 
-class infinity_http(infinity_http_network):
-    def __init__(self, url: str = default_url):
-        super().__init__(url)
+class infinity_http:
+    def __init__(self, *, net: http_network_util = None):
+        if net is not None:
+            self.net = net
+        else:
+            self.net = http_network_util(default_url)
 
     def disconnect(self):
         print("disconnect")
@@ -116,49 +118,54 @@ class infinity_http(infinity_http_network):
 
     def set_role_standalone(self, node_name):
         url = f"admin/node/current"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data([], {"role": "standalone", "name": node_name})
-        r = self.request(url, "post", h, d)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"role": "standalone", "name": node_name})
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+
+    def set_role_admin(self):
+        url = f"admin/node/current"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"role": "admin"})
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
 
     def set_role_leader(self, node_name):
         url = f"admin/node/current"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data([], {"role": "leader", "name": node_name})
-        r = self.request(url, "post", h, d)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"role": "leader", "name": node_name})
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
         return database_result()
 
     def set_role_follower(self, node_name, leader_addr):
         url = f"admin/node/current"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data([], {"role": "follower", "name": node_name, "address": leader_addr})
-        r = self.request(url, "post", h, d)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"role": "follower", "name": node_name, "address": leader_addr})
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
         return database_result()
 
 
     # database
     def create_database(self, db_name, opt=ConflictType.Error):
         url = f"databases/{db_name}"
-        h = self.set_up_header(["accept", "content-type"])
+        h = self.net.set_up_header(["accept", "content-type"])
         if opt in [ConflictType.Error, ConflictType.Ignore, ConflictType.Replace]:
-            d = self.set_up_data(
+            d = self.net.set_up_data(
                 ["create_option"], {"create_option": baseCreateOptions[opt]}
             )
-            r = self.request(url, "post", h, d)
-            self.raise_exception(r)
+            r = self.net.request(url, "post", h, d)
+            self.net.raise_exception(r)
             return True
         else:
             try:
-                d = self.set_up_data(
-                    ["create_option"], {"create_option": opt}
-                )
-                r = self.request(url, "post", h, d)
-                self.raise_exception(r)
+                d = self.net.set_up_data(["create_option"], {"create_option": opt})
+                r = self.net.request(url, "post", h, d)
+                self.net.raise_exception(r)
             except:
                 raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE)
-            # d = self.set_up_data(
+            # d = self.net.set_up_data(
             #    ["create_option"], {"create_option": str(opt)}
             # )
             # different exception type
@@ -166,50 +173,59 @@ class infinity_http(infinity_http_network):
 
     def drop_database(self, db_name, opt=ConflictType.Error):
         url = f"databases/{db_name}"
-        h = self.set_up_header(["accept", "content-type"])
+        h = self.net.set_up_header(["accept", "content-type"])
         if opt in [ConflictType.Error, ConflictType.Ignore]:
-            d = self.set_up_data(["drop_option"], {"drop_option": baseDropOptions[opt]})
-            r = self.request(url, "delete", h, d)
-            self.raise_exception(r)
+            d = self.net.set_up_data(
+                ["drop_option"], {"drop_option": baseDropOptions[opt]}
+            )
+            r = self.net.request(url, "delete", h, d)
+            self.net.raise_exception(r)
             return database_result()
         else:
             try:
-                d = self.set_up_data(["drop_option"], {"drop_option": opt})
-                r = self.request(url, "delete", h, d)
-                self.raise_exception(r)
+                d = self.net.set_up_data(["drop_option"], {"drop_option": opt})
+                r = self.net.request(url, "delete", h, d)
+                self.net.raise_exception(r)
             except:
                 raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE)
 
     def get_database(self, db_name, opt=ConflictType.Error):
         url = f"databases/{db_name}"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h, {})
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
         try:
-            self.raise_exception(r)
-            return database_http(self, database_name=r.json()["database_name"])
+            self.net.raise_exception(r)
+            return database_http(self.net, database_name=r.json()["database_name"])
         except:
             raise InfinityException(ErrorCode.DB_NOT_EXIST)
 
     def list_databases(self):
         url = "databases"
-        self.set_up_header(["accept"])
-        r = self.request(url, "get")
-        self.raise_exception(r)
+        self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get")
+        self.net.raise_exception(r)
         return database_result(list=r.json()["databases"])
 
     def show_database(self, db_name):
         url = f"databases/{db_name}"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h, {})
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
         return database_result(database_name=r.json()["database_name"])
 
+    def show_node(self, node_name):
+        url = f"admin/node/{node_name}"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        print(r.json())
+        return database_result(node_name=r.json()["node"]["name"], node_role=r.json()["node"]["role"], node_status=r.json()["node"]["status"])
 
 ####################3####################3####################3####################3####################3####################3####################3####################3
 
-class database_http(infinity_http_network):
-    def __init__(self, network_util: infinity_http_network, database_name: str):
-        super().__init__(network_util.base_url)
+class database_http:
+    def __init__(self, net: http_network_util, database_name: str):
+        self.net = net
         self.database_name = database_name
         self._db_name = database_name
 
@@ -239,18 +255,18 @@ class database_http(infinity_http_network):
         print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data(
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data(
             ["create_option"],
             {
                 "fields": fields,
                 "create_option": copt,
             },
         )
-        r = self.request(url, "post", h, d)
-        self.raise_exception(r)
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
         self.table_name = table_name
-        return table_http(self, self.database_name, table_name)
+        return table_http(self.net, self.database_name, table_name)
 
     def drop_table(
             self,
@@ -264,31 +280,31 @@ class database_http(infinity_http_network):
                 copt = baseDropOptions[conflict_type]
 
         url = f"databases/{self.database_name}/tables/{table_name}"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data(["drop_option"], {"drop_option": copt})
-        r = self.request(url, "delete", h, d)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data(["drop_option"], {"drop_option": copt})
+        r = self.net.request(url, "delete", h, d)
+        self.net.raise_exception(r)
         return database_result()
 
     def list_tables(self):
         url = f"databases/{self.database_name}/tables"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
         return database_result()
 
     def show_table(self, table_name):
         check_valid_name(table_name)
         url = f"databases/{self.database_name}/tables/{table_name}"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
         # self.table_name = table_name
 
     def get_all_tables(self):
         url = f"databases/{self.database_name}/tables"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h)
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
         # return all db names
         ret = []
         r_json = r.json()
@@ -302,10 +318,10 @@ class database_http(infinity_http_network):
     def get_table(self, table_name):
         check_valid_name(table_name)
         url = f"databases/{self.database_name}/tables/{table_name}"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h)
-        self.raise_exception(r)
-        return table_http(self, self.database_name, table_name)
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
+        return table_http(self.net, self.database_name, table_name)
     
     # not implemented, just to pass test
     def show_tables(self):
@@ -313,17 +329,17 @@ class database_http(infinity_http_network):
         return database_result(columns=["database", "table", "type", "column_count", "block_count", "block_capacity",
                                         "segment_count", "segment_capacity", "comment"])
     
-class table_http(infinity_http_network):
-    def __init__(self, network_util: infinity_http_network, database_name: str, table_name: str):
-        super().__init__(network_util.base_url)
+class table_http:
+    def __init__(self, net: http_network_util, database_name: str, table_name: str):
+        self.net = net
         self.database_name = database_name
         self.table_name = table_name
 
     def show_columns(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
         res = {"name": [], "type": [], "default": [], "comment": []}
         print(r.json())
         for col in r.json()["columns"]:
@@ -336,9 +352,9 @@ class table_http(infinity_http_network):
 
     def show_columns_type(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
         res = {}
         for col in r.json()["columns"]:
             res[col["name"]] = col["type"]
@@ -350,6 +366,7 @@ class table_http(infinity_http_network):
             index_name,
             index_info,
             conflict_type=ConflictType.Error,
+            index_comment: str = ""
     ):
         copt = conflict_type
         if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
@@ -370,14 +387,14 @@ class table_http(infinity_http_network):
         # print(create_index_info)
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
-        h = self.set_up_header(
+        h = self.net.set_up_header(
             ["accept", "content-type"],
         )
-        d = self.set_up_data(
-            ["create_option"], {"fields": fields, "index": create_index_info, "create_option": copt}
+        d = self.net.set_up_data(
+            ["create_option"], {"comment" : index_comment, "fields": fields, "index": create_index_info, "create_option": copt}
         )
-        r = self.request(url, "post", h, d)
-        self.raise_exception(r)
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
         return database_result()
 
     def drop_index(
@@ -393,24 +410,26 @@ class table_http(infinity_http_network):
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
 
-        h = self.set_up_header(["accept"])
-        d = self.set_up_data([], {"drop_option": copt})
-        r = self.request(url, "delete", h, d)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept"])
+        d = self.net.set_up_data([], {"drop_option": copt})
+        r = self.net.request(url, "delete", h, d)
+        self.net.raise_exception(r)
         return database_result()
 
     def show_index(self, index_name):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h)
-        self.raise_exception(r)
-        return database_result()
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
+        r_json = r.json()
+        index_comment = r_json.get("index_comment", "")
+        return database_result(index_comment=index_comment)
 
     def list_indexes(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes"
-        h = self.set_up_header(["accept"])
-        r = self.request(url, "get", h)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
         r_json = r.json()
         index_list = []
         exists = r_json.get("tables", None)
@@ -421,12 +440,12 @@ class table_http(infinity_http_network):
 
     def optimize(self, index_name="", optimize_options={}):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
-        h = self.set_up_header(
+        h = self.net.set_up_header(
             ["accept", "content-type"],
         )
         opt_opt = {"optimize_options": optimize_options}
-        r = self.request(url, "put", h, opt_opt)
-        self.raise_exception(r)
+        r = self.net.request(url, "put", h, opt_opt)
+        self.net.raise_exception(r)
         return database_result()
 
     def insert(self, values=[]):
@@ -449,9 +468,9 @@ class table_http(infinity_http_network):
                         value[key] = value[key].to_dict()
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
-        h = self.set_up_header(["accept", "content-type"])
-        r = self.request(url, "post", h, values)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept", "content-type"])
+        r = self.net.request(url, "post", h, values)
+        self.net.raise_exception(r)
         return database_result()
 
     def import_data(self, data_path="/home/infiniflow/Documents/development/infinity/test/data/csv/pysdk_test.csv",
@@ -470,10 +489,10 @@ class table_http(infinity_http_network):
                 data["delimiter"] = import_options["delimiter"]
 
         url = f"databases/{self.database_name}/tables/{self.table_name}"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data([], data)
-        r = self.request(url, "put", h, d)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], data)
+        r = self.net.request(url, "put", h, d)
+        self.net.raise_exception(r)
         return database_result()
 
     def export_data(self, data_path="", export_options={}, columns=[]):
@@ -498,59 +517,60 @@ class table_http(infinity_http_network):
         data["columns"] = columns
 
         url = f"databases/{self.database_name}/table/{self.table_name}"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data([], data)
-        r = self.request(url, "get", h, d)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], data)
+        r = self.net.request(url, "get", h, d)
+        self.net.raise_exception(r)
         return database_result()
 
     def add_columns(self, columns_definition={}):
         url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
-        h = self.set_up_header(["accept", "content-type"])
+        h = self.net.set_up_header(["accept", "content-type"])
         fields = []
         for col in columns_definition:
             tmp = {"name": col}
             for param_name in columns_definition[col]:
                 tmp[param_name.lower()] = columns_definition[col][param_name]
             fields.append(tmp)
-        d = self.set_up_data([], {"fields": fields})
-        r = self.request(url, "post", h, d)
-        return self.get_database_result(r)
+        d = self.net.set_up_data([], {"fields": fields})
+        r = self.net.request(url, "post", h, d)
+        return self.net.get_database_result(r)
 
     def drop_columns(self, column_name: list[str] | str):
         if isinstance(column_name, str):
             column_name = [column_name]
         url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data([], {"column_names": column_name})
-        r = self.request(url, "delete", h, d)
-        return self.get_database_result(r)
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"column_names": column_name})
+        r = self.net.request(url, "delete", h, d)
+        return self.net.get_database_result(r)
 
     def output(
-            self,
-            output=[],
+        self,
+        output=[],
     ):
         return table_http_result(output, self)
     
     def delete(self, filter=""):
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data([], {"filter": filter})
-        r = self.request(url, "delete", h, d)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"filter": filter})
+        r = self.net.request(url, "delete", h, d)
+        self.net.raise_exception(r)
         return database_result()
 
     def update(self, filter_str: str, update: dict[str, Any]):
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
-        h = self.set_up_header(["accept", "content-type"])
-        d = self.set_up_data([], {"update": update, "filter": filter_str})
-        r = self.request(url, "put", h, d)
-        self.raise_exception(r)
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"update": update, "filter": filter_str})
+        r = self.net.request(url, "put", h, d)
+        self.net.raise_exception(r)
         return database_result()
 
-class table_http_result(table_http):
+
+class table_http_result:
     def __init__(self, output: list, table_http: table_http):
-        super().__init__(table_http, table_http.database_name, table_http.table_name)
+        self.table_http = table_http
 
         self.output_res = []
         self._output = output
@@ -565,8 +585,8 @@ class table_http_result(table_http):
         self._sort = []
 
     def select(self):
-        url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
-        h = self.set_up_header(["accept", "content-type"])
+        url = f"databases/{self.table_http.database_name}/tables/{self.table_http.table_name}/docs"
+        h = self.table_http.net.set_up_header(["accept", "content-type"])
         tmp = {}
         if len(self._filter):
             tmp["filter"] = self._filter
@@ -579,9 +599,9 @@ class table_http_result(table_http):
         if len(self._sort):
             tmp["sort"] = self._sort
         # print(tmp)
-        d = self.set_up_data([], tmp)
-        r = self.request(url, "get", h, d)
-        self.raise_exception(r)
+        d = self.table_http.net.set_up_data([], tmp)
+        r = self.table_http.net.request(url, "get", h, d)
+        self.table_http.net.raise_exception(r)
         # print(r.json())
         if "output" in r.json():
             self.output_res = r.json()["output"]
@@ -590,8 +610,8 @@ class table_http_result(table_http):
         return self
 
     def explain(self, ExplainType=ExplainType.Physical):
-        url = f"databases/{self.database_name}/tables/{self.table_name}/meta"
-        h = self.set_up_header(["accept", "content-type"])
+        url = f"databases/{self.table_http.database_name}/tables/{self.table_http.table_name}/meta"
+        h = self.table_http.net.set_up_header(["accept", "content-type"])
         tmp = {}
         if len(self._filter):
             tmp["filter"] = self._filter
@@ -611,9 +631,9 @@ class table_http_result(table_http):
             tmp["highlight"] = self._highlight
         tmp["explain_type"] = ExplainType_transfrom(ExplainType)
         # print(tmp)
-        d = self.set_up_data([], tmp)
-        r = self.request(url, "get", h, d)
-        self.raise_exception(r)
+        d = self.table_http.net.set_up_data([], tmp)
+        r = self.table_http.net.request(url, "get", h, d)
+        self.table_http.net.raise_exception(r)
         message = ""
         sign = 0
         for res in r.json()["output"]:
@@ -722,7 +742,7 @@ class table_http_result(table_http):
             self.select()
 
         df_dict = {}
-        col_types = self.show_columns_type()
+        col_types = self.table_http.show_columns_type()
         for output_col in self._output:
             if output_col in col_types:
                 df_dict[output_col] = ()
@@ -801,12 +821,16 @@ class table_http_result(table_http):
 
 
 class database_result():
-    def __init__(self, list=[], database_name: str="", error_code=ErrorCode.OK, columns=[], index_list=[]):
+    def __init__(self, list=[], database_name: str="", error_code=ErrorCode.OK, columns=[], index_list=[], node_name="", node_role="", node_status="", index_comment=None):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
         self.columns = columns
         self.index_list = index_list
+        self.node_name = node_name
+        self.node_role = node_role
+        self.node_status = node_status
+        self.index_comment = index_comment
 
 
 identifier_limit = 65536

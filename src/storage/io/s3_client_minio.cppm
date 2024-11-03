@@ -26,7 +26,7 @@ public:
     Status RemoveObject(const String &bucket_name, const String &object_name) final;
     Status
     CopyObject(const String &src_bucket_name, const String &src_object_name, const String &dst_bucket_name, const String &dst_object_name) final;
-    bool BucketExists(const String &bucket_name) final;
+    Status BucketExists(const String &bucket_name) final;
     Status MakeBucket(const String &bucket_name) final;
 
 private:

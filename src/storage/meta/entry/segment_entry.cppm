@@ -57,12 +57,17 @@ export enum class SegmentStatus : u8 {
 };
 
 export String ToString(SegmentStatus segment_status) {
-    switch(segment_status) {
-        case SegmentStatus::kUnsealed: return "Unsealed";
-        case SegmentStatus::kSealed: return "Sealed";
-        case SegmentStatus::kCompacting: return "Compacting";
-        case SegmentStatus::kNoDelete: return "NoDelete";
-        case SegmentStatus::kDeprecated: return "Deprecated";
+    switch (segment_status) {
+        case SegmentStatus::kUnsealed:
+            return "Unsealed";
+        case SegmentStatus::kSealed:
+            return "Sealed";
+        case SegmentStatus::kCompacting:
+            return "Compacting";
+        case SegmentStatus::kNoDelete:
+            return "NoDelete";
+        case SegmentStatus::kDeprecated:
+            return "Deprecated";
     }
 }
 
@@ -159,6 +164,7 @@ public:
     static String SegmentStatusToString(const SegmentStatus &type);
 
     String ToString() const;
+
 public:
     // Const getter
     const TableEntry *GetTableEntry() const { return table_entry_; }
@@ -209,6 +215,8 @@ public:
     SharedPtr<BlockEntry> GetBlockEntryByID(BlockID block_id) const;
 
     BlocksGuard GetBlocksGuard() const { return BlocksGuard{block_entries_, std::shared_lock(rw_locker_)}; }
+
+    SizeT GetStorageSize() const;
 
 public:
     SizeT row_count(TxnTimeStamp check_ts) const;

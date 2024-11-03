@@ -37,8 +37,13 @@ export MetricType StringToMetricType(const String &str);
 
 export class IndexBase {
 protected:
-    explicit IndexBase(IndexType index_type, SharedPtr<String> index_name, const String &file_name, Vector<String> column_names)
-        : index_type_(index_type), index_name_(std::move(index_name)), file_name_(file_name), column_names_(std::move(column_names)) {}
+    explicit IndexBase(IndexType index_type,
+                       SharedPtr<String> index_name,
+                       SharedPtr<String> index_comment,
+                       const String &file_name,
+                       Vector<String> column_names)
+        : index_type_(index_type), index_name_(std::move(index_name)), index_comment_(std::move(index_comment)), file_name_(file_name),
+          column_names_(std::move(column_names)) {}
 
 public:
     explicit IndexBase(SharedPtr<String> index_name) : index_name_(std::move(index_name)) {}
@@ -70,6 +75,7 @@ public:
 public:
     IndexType index_type_{IndexType::kInvalid};
     SharedPtr<String> index_name_{};
+    SharedPtr<String> index_comment_{};
     const String file_name_{};
     const Vector<String> column_names_{};
 };

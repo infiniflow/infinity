@@ -6,14 +6,10 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { showConfigs, showVariables } from '../actions';
-// import { getProducts } from '@/lib/db';
 
-export default async function ProductsPage({}: {
-  searchParams: { q: string; offset: string };
-}) {
+export default async function ProductsPage() {
   const configs = await showConfigs();
   const variables = await showVariables();
-  console.log(variables);
 
   return (
     <div>

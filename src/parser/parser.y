@@ -395,7 +395,7 @@ struct SQL_LTYPE {
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
-%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE
+%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
 
 %token NUMBER
@@ -732,6 +732,36 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER COMMENT STRING {
     delete $3;
 
     create_index_info->index_info_ = $6;
+
+    if(create_index_info->index_name_.empty()) {
+        yyerror(&yyloc, scanner, result, "No index name");
+        YYERROR;
+    }
+
+    $$ = new infinity::CreateStatement();
+    $$->create_info_ = create_index_info;
+}
+| CREATE INDEX if_not_exists_info ON table_name index_info COMMENT STRING {
+    std::shared_ptr<infinity::CreateIndexInfo> create_index_info = std::make_shared<infinity::CreateIndexInfo>();
+    if($5->schema_name_ptr_ != nullptr) {
+        create_index_info->schema_name_ = $5->schema_name_ptr_;
+        free($5->schema_name_ptr_);
+    }
+    create_index_info->table_name_ = $5->table_name_ptr_;
+    free($5->table_name_ptr_);
+    delete $5;
+
+    create_index_info->index_name_ = $3->info_;
+    if ($3->exists_) {
+        create_index_info->conflict_type_ = $3->if_not_exists_ ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
+    } else {
+        create_index_info->conflict_type_ = infinity::ConflictType::kIgnore;
+    }
+    delete $3;
+
+    create_index_info->index_info_ = $6;
+    create_index_info->comment_ = $8;
+    free($8);
 
     if(create_index_info->index_name_.empty()) {
         yyerror(&yyloc, scanner, result, "No index name");
@@ -2507,6 +2537,40 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->admin_type_ = infinity::AdminStmtType::kShowVariable;
      $$->variable_name_ = $4;
      free($4);
+}
+| ADMIN CREATE SNAPSHOT {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kCreateSnapshot;
+}
+| ADMIN SHOW SNAPSHOTS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListSnapshots;
+}
+| ADMIN SHOW SNAPSHOT STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowSnapshot;
+     $$->snapshot_name_ = $4;
+     free($4);
+}
+| ADMIN DELETE SNAPSHOT STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kDeleteSnapshot;
+     $$->snapshot_name_ = $4;
+     free($4);
+}
+| ADMIN EXPORT SNAPSHOT STRING TO STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kExportSnapshot;
+     $$->snapshot_name_ = $4;
+     $$->export_path_ = $6;
+     free($4);
+     free($6);
+}
+| ADMIN RECOVER FROM SNAPSHOT STRING {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kRecoverFromSnapshot;
+     $$->snapshot_name_ = $5;
+     free($5);
 }
 | ADMIN SHOW NODES {
      $$ = new infinity::AdminStatement();

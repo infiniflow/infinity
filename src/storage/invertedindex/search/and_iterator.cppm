@@ -35,18 +35,19 @@ public:
     /* pure virtual methods implementation */
     bool Next(RowID doc_id) override;
 
-    float BM25Score() override;
+    float Score() override;
 
     void UpdateScoreThreshold(float threshold) override;
 
     u32 MatchCount() const override;
 
 private:
-    // bm25 score cache
-    RowID bm25_score_cache_docid_ = INVALID_ROWID;
-    float bm25_score_cache_ = 0.0f;
+    // score cache
+    RowID score_cache_docid_ = INVALID_ROWID;
+    float score_cache_ = 0.0f;
     // for minimum_should_match
     u32 fixed_match_count_ = 0;
     Vector<u32> dyn_match_ids_{};
 };
+
 } // namespace infinity

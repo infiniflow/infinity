@@ -1,0 +1,22 @@
+[general]
+version = "0.5.0"
+time_zone = "utc-8"
+
+[network]
+[log]
+log_to_stdout = true
+log_level = "trace"
+
+[storage]
+persistence_dir = ""
+optimize_interval = "0s"
+cleanup_interval = "0s"
+compact_interval = "0s"
+
+[buffer]
+memindex_memory_quota   = "10MB" # big enough to hold test data
+[wal]
+delta_checkpoint_interval = "0s"
+full_checkpoint_interval = "0s"
+
+[resource]

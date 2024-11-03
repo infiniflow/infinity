@@ -35,6 +35,7 @@ export enum class DocIteratorType : u8 {
     kBMMIterator,
     kBMWIterator,
     kFilterIterator,
+    kScoreThresholdIterator,
 };
 
 export struct DocIteratorEstimateIterateCost {
@@ -82,7 +83,7 @@ public:
     // If has_blockmax is true, it ensures its BM25 score be larger than current threshold.
     virtual bool Next(RowID doc_id) = 0;
 
-    virtual float BM25Score() = 0;
+    virtual float Score() = 0;
 
     virtual void UpdateScoreThreshold(float threshold) = 0;
 

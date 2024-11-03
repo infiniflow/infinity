@@ -459,14 +459,11 @@ private:
                 EarlyTermAlgo early_term_algo = EarlyTermAlgo::kNaive;
                 UniquePtr<QueryNode> query_tree;
                 MinimumShouldMatchOption minimum_should_match_option;
+                f32 score_threshold = {};
+                FulltextSimilarity ft_similarity = FulltextSimilarity::kBM25;
                 {
                     const Map<String, String> &column2analyzer = index_reader.GetColumn2Analyzer();
                     SearchOptions search_ops(filter_fulltext_expr->options_text_);
-
-                    // option: threshold
-                    if (search_ops.options_.contains("threshold")) {
-                        RecoverableError(Status::SyntaxError("threshold option should not in filter_fulltext"));
-                    }
 
                     // option: default field
                     auto iter = search_ops.options_.find("default_field");
@@ -512,6 +509,24 @@ private:
                         minimum_should_match_option = ParseMinimumShouldMatchOption(iter->second);
                     }
 
+                    // option: threshold
+                    if (iter = search_ops.options_.find("threshold"); iter != search_ops.options_.end()) {
+                        score_threshold = DataType::StringToValue<FloatT>(iter->second);
+                    }
+
+                    // option: similarity
+                    if (iter = search_ops.options_.find("similarity"); iter != search_ops.options_.end()) {
+                        String ft_sim = iter->second;
+                        ToLower(ft_sim);
+                        if (ft_sim == "bm25") {
+                            ft_similarity = FulltextSimilarity::kBM25;
+                        } else if (ft_sim == "boolean") {
+                            ft_similarity = FulltextSimilarity::kBoolean;
+                        } else {
+                            RecoverableError(Status::SyntaxError(R"(similarity option must be "BM25" or "boolean".)"));
+                        }
+                    }
+
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
                     if (!query_tree) {
@@ -523,7 +538,9 @@ private:
                                                                 early_term_algo,
                                                                 std::move(index_reader),
                                                                 std::move(query_tree),
-                                                                std::move(minimum_should_match_option));
+                                                                std::move(minimum_should_match_option),
+                                                                score_threshold,
+                                                                ft_similarity);
             }
             case Enum::kAndExpr: {
                 Vector<UniquePtr<IndexFilterEvaluator>> candidates;

@@ -1,0 +1,22 @@
+[general]
+version = "0.5.0"
+time_zone = "utc-8"
+
+[network]
+[log]
+log_to_stdout = true
+log_level = "trace"
+
+[storage]
+persistence_dir = ""
+data_dir = "/var/infinity/data"
+optimize_interval = "0s"
+cleanup_interval = "1s"
+compact_interval = "1s"
+
+[buffer]
+[wal]
+delta_checkpoint_interval = "1s"
+full_checkpoint_interval = "0s"
+
+[resource]

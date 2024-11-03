@@ -4,7 +4,7 @@ import { ITableSegment } from '@/lib/databse-interface';
 import { ColumnDef } from '@tanstack/react-table';
 import { useFetchTableSegments } from 'app/(dashboard)/database/hooks';
 import { DataTable } from 'app/(dashboard)/database/infinity-table';
-import { DatabaseRouteParams } from 'app/(dashboard)/database/interface';
+import { PureDatabaseRouteParams } from 'app/(dashboard)/database/interface';
 
 export const columns: ColumnDef<ITableSegment>[] = [
   {
@@ -24,7 +24,7 @@ export const columns: ColumnDef<ITableSegment>[] = [
 export function TableSegments({
   tableId,
   databaseId
-}: DatabaseRouteParams['params']) {
+}: PureDatabaseRouteParams) {
   const { tableSegments } = useFetchTableSegments({ tableId, databaseId });
 
   return (

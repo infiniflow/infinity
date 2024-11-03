@@ -36,7 +36,7 @@ public:
 
     bool Next(RowID doc_id) override;
 
-    float BM25Score() override;
+    float Score() override;
 
     u32 MatchCount() const override;
 
@@ -53,9 +53,9 @@ private:
     Vector<u32> tail_heap_{};
     u32 tail_size_ = 0;
 
-    // bm25 score cache
-    RowID bm25_score_cache_docid_ = {};
-    float bm25_score_cache_ = {};
+    // score cache
+    RowID score_cache_docid_ = {};
+    float score_cache_ = {};
 };
 
 export template <std::derived_from<MultiDocIterator> T>

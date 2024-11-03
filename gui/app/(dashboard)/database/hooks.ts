@@ -13,7 +13,7 @@ import {
   showTableIndexes,
   showTableSegments
 } from '../actions';
-import { DatabaseRouteParams, TreeParentId } from './interface';
+import { PureDatabaseRouteParams, TreeParentId } from './interface';
 import { buildLeafData, getParentIdById, updateTreeData } from './utils';
 
 export const useHandleClickTreeName = () => {
@@ -30,20 +30,23 @@ export const useHandleClickTreeName = () => {
       name: string;
       parent: TreeParentId;
       data: INode[];
-    }) =>
-      () => {
-        if (level === 3) {
-          const databaseId = getParentIdById(data, parent);
-          if (databaseId) {
-            router.push(`/database/${databaseId}/table/${parent}?tab=${name}`);
-          }
+    }) => {
+      if (level === 3) {
+        const databaseId = getParentIdById(data, parent);
+        if (databaseId) {
+          router.push(`/database/${databaseId}/table/${parent}?tab=${name}`);
         }
-      },
+      }
+    },
     [router]
   );
 
   return { handleClickTreeName };
 };
+
+export interface TreeDataProps {
+  fetchDatabases?: () => Promise<void>;
+}
 
 export const useBuildTreeData = () => {
   const loadedAlertElement = useRef<HTMLDivElement>(null);
@@ -132,28 +135,6 @@ export const useBuildTreeData = () => {
     await fetchTables(element.id as string);
 
     return undefined;
-    // return new Promise((resolve) => {
-    //   setTimeout(() => {
-    //     setData((value) =>
-    //       updateTreeData(value, element.id, [
-    //         {
-    //           name: `Child Node ${value.length}`,
-    //           children: [],
-    //           id: value.length,
-    //           parent: element.id,
-    //           isBranch: true
-    //         },
-    //         {
-    //           name: 'Another child Node',
-    //           children: [],
-    //           id: value.length + 1,
-    //           parent: element.id
-    //         }
-    //       ])
-    //     );
-    //     resolve(undefined);
-    //   }, 1000);
-    // });
   };
 
   const wrappedOnLoadData = async (props: ITreeViewOnLoadDataProps) => {
@@ -180,13 +161,19 @@ export const useBuildTreeData = () => {
     }
   };
 
-  return { wrappedOnLoadData, data, loadedAlertElement, loading };
+  return {
+    wrappedOnLoadData,
+    data,
+    loadedAlertElement,
+    loading,
+    fetchDatabases
+  };
 };
 
 export const useFetchTableColumns = ({
   databaseId,
   tableId
-}: DatabaseRouteParams['params']) => {
+}: PureDatabaseRouteParams) => {
   const [tableColumns, setTableColumns] = useState<ITableColumns[]>([]);
 
   const fetchTableColumns = useCallback(async () => {
@@ -208,7 +195,7 @@ export const useFetchTableColumns = ({
 export const useFetchTableIndexes = ({
   databaseId,
   tableId
-}: DatabaseRouteParams['params']) => {
+}: PureDatabaseRouteParams) => {
   const [tableIndexes, setTableIndexes] = useState<ITableIndex[]>([]);
 
   const fetchTableIndexes = useCallback(async () => {
@@ -230,7 +217,7 @@ export const useFetchTableIndexes = ({
 export const useFetchTableSegments = ({
   databaseId,
   tableId
-}: DatabaseRouteParams['params']) => {
+}: PureDatabaseRouteParams) => {
   const [tableSegments, setTableSegments] = useState<ITableSegment[]>([]);
 
   const fetchTableSegments = useCallback(async () => {

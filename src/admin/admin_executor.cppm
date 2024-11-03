@@ -57,6 +57,12 @@ private:
     static QueryResult RemoveNode(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult ShowCurrentNode(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult SetRole(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult CreateSnapshot(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ListSnapshots(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ShowSnapshot(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult DeleteSnapshot(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult ExportSnapshot(QueryContext* query_context, const AdminStatement* admin_statement);
+    static QueryResult RecoverFromSnapshot(QueryContext* query_context, const AdminStatement* admin_statement);
 
     static Vector<SharedPtr<WalEntry>> GetAllCheckpointEntries(QueryContext* query_context, const AdminStatement* admin_statement);
     static Tuple<UniquePtr<Catalog>, Status> LoadCatalogFiles(QueryContext* query_context, const AdminStatement* admin_statement, Vector<SharedPtr<WalEntry>>& ckp_entries);

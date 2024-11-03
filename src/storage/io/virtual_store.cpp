@@ -34,6 +34,7 @@ import stream_reader;
 import s3_client_minio;
 import infinity_context;
 import object_storage_task;
+import admin_statement;
 
 namespace infinity {
 
@@ -448,11 +449,17 @@ Status VirtualStore::InitRemoteStore(StorageType storage_type,
     }
 
     bucket_ = bucket;
-    if (s3_client_->BucketExists(bucket)) {
-        return Status::OK();
-    } else {
-        return s3_client_->MakeBucket(bucket);
+    if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader or InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
+        Status bucket_check = s3_client_->BucketExists(bucket);
+        if (!bucket_check.ok()) {
+            if (bucket_check.code() == ErrorCode::kMinioBucketNotExists) {
+                return s3_client_->MakeBucket(bucket);
+            } else {
+                return bucket_check;
+            }
+        }
     }
+    return Status::OK();
 }
 
 Status VirtualStore::UnInitRemoteStore() {
@@ -542,20 +549,18 @@ Status VirtualStore::CopyObject(const String &src_object_name, const String &dst
     return Status::OK();
 }
 
-bool VirtualStore::BucketExists() {
+Status VirtualStore::BucketExists() {
     if (VirtualStore::storage_type_ == StorageType::kLocal) {
-        return false;
+        return Status::InvalidStorageType("object_storage", "local");
     }
     switch (VirtualStore::storage_type_) {
         case StorageType::kMinio: {
             return s3_client_->BucketExists(VirtualStore::bucket_);
         }
         default: {
-            return false;
+            return Status::InvalidStorageType("Unknown", "Unknown");
         }
     }
-
-    return false;
 }
 
 } // namespace infinity

@@ -99,7 +99,10 @@ public:
         // SaveLabels(file_handler);
     }
 
-    void SaveGraph(LocalFileHandle &file_handle) { graph_store_.Save(file_handle, nd_ + num_frozen_pts_, num_frozen_pts_, start_); }
+    void SaveGraph(LocalFileHandle &file_handle) { 
+        graph_store_.Save(file_handle, nd_ + num_frozen_pts_, num_frozen_pts_, start_); 
+
+    }
 
     static UniquePtr<This> Load(LocalFileHandle &file_handle) {}
 
@@ -152,6 +155,7 @@ private:
             start_ = max_points_; // start from the first frozen point
         } else {
             start_ = CalculateEntryPoint(); // calculate medoid as enterpoint
+            LOG_DEBUG(fmt::format("CalculateEntryPoint medoid node start_ = {}", start_));
         }
 
         for (SizeT node_ctr = 0; node_ctr < visit_order.size(); node_ctr++) {

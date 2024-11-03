@@ -105,7 +105,6 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
                                                   buffer_mgr->persistence_manager());
 
     block_column_entry->buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-
     return block_column_entry;
 }
 
@@ -352,6 +351,20 @@ void BlockColumnEntry::FillWithDefaultValue(SizeT row_count, const Value *defaul
     for (SizeT i = 0; i < row_count; ++i) {
         column_vector.SetValue(i, *default_value);
     }
+}
+
+SizeT BlockColumnEntry::GetStorageSize() const {
+    SizeT result = 0;
+
+    {
+        std::shared_lock lock(mutex_);
+        result += buffer_->GetBufferSize();
+        for (BufferObj *outline_buffer : outline_buffers_) {
+            result += outline_buffer->GetBufferSize();
+        }
+    }
+
+    return result;
 }
 
 } // namespace infinity

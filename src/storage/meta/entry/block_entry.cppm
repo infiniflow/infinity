@@ -191,6 +191,7 @@ public:
     // Setter, Used in import, segment append block, and block append block in compact
     inline void IncreaseRowCount(SizeT increased_row_count) { block_row_count_ += increased_row_count; }
 
+    SizeT GetStorageSize() const;
 private:
     void FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count);
 

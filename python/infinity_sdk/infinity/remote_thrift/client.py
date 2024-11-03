@@ -68,7 +68,8 @@ class ThriftInfinityClient:
         # version: 0.4.0.dev3, client_version: 20
         # version: 0.4.0.dev4, client_version: 21
         # version: 0.4.0.dev5 and 0.4.0, client_version: 22
-        res = self.client.Connect(ConnectRequest(client_version=22)) # 0.4.0.dev5 and 0.4.0
+        # version: 0.5.0.dev1, client_version: 23
+        res = self.client.Connect(ConnectRequest(client_version=23)) # 0.5.0.dev1
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
@@ -135,11 +136,12 @@ class ThriftInfinityClient:
                                                     table_name=table_name))
 
     def create_index(self, db_name: str, table_name: str, index_name: str, index_info: IndexInfo,
-                     conflict_type: CreateConflict = CreateConflict.Error):
+                     conflict_type: CreateConflict = CreateConflict.Error, index_comment : str = ""):
         return self.client.CreateIndex(CreateIndexRequest(session_id=self.session_id,
                                                           db_name=db_name,
                                                           table_name=table_name,
                                                           index_name=index_name,
+                                                          index_comment=index_comment,
                                                           index_info=index_info,
                                                           create_option=CreateOption(conflict_type=conflict_type)))
 

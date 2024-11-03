@@ -294,25 +294,25 @@ print(res.db_names) # ['my_database', 'database_1']
 ## show_database
 
 ```python
-db_object.show_database(database_name)
+infinity_object.show_database(database_name)
 ```
 
-Show detail information of a database.
+Shows detailed information about a database.
 
 ### Returns
 
 A structure containing the following attributes:
 
 - `error_code`: `int`
-    - `0`: The operation succeeds.
-    - A non-zero value indicates a specific error condition.
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
 ```python
-res = db_object.show_database('my_database')
+res = infinity_object.show_database('my_database')
 ```
 
 ---
@@ -800,7 +800,7 @@ res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 db_object.show_table(table_name)
 ```
 
-Show detail information of a table.
+Shows detailed information about a table.
 
 ### Returns
 
@@ -855,6 +855,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
 - **index_type**: `IndexType`, *Required*  
   Index type. You may want to import `infinity.index` to set `IndexType`: `from infinity.index import IndexType`  
   - `Hnsw`: An HNSW index. Works with dense vectors, and multivectors only.
+  - `IVF`: An IVF index. Works with dense vectors and multivectors only.
   - `FullText`: A full-text index.  
   - `Secondary`: A secondary index. Works with structured data only.
   - `BMP`: A Block-Max Pruning index. Works with sparse vectors only.
@@ -870,10 +871,29 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"encode"`: *Optional*
       - `"plain"`: (Default) Plain encoding.
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
+  - Parameter settings for an IVF index:
+    - `"metric"` *Required* - The distance metric to use in a similarity search.
+      - `"ip"`: Inner product.
+      - `"l2"`: Euclidean distance.
+      - `"cosine"`: Cosine similarity.
+    - `"storage_type"`: *Optional*
+      - `"plain"`: (Default) Plain storage.
+      - `"scalar_quantization"`: Scalar quantization.
+      - `"product_quantization"`: Product quantization.
+    - `"plain_storage_data_type"`: *Optional* for plain storage.
+      - `"int8"`: default value for `int8` embeddings.
+      - `"uint8"`: default value for `uint8` embeddings.
+      - `"float32"`: default value for floating-point embeddings.
+      - `"float16"`: for floating-point embeddings.
+      - `"bfloat16"`: for floating-point embeddings.
+    - `"scalar_quantization_bits"`: *Required* for scalar quantization. Must be either `4` or `8`.
+    - `"product_quantization_subspace_num"`: *Required* for product quantization. Must be divisor of the embedding dimension.
+    - `"product_quantization_subspace_bits"`: *Required* for product quantization. Must be in the range `[4, 16]`.
   - Parameter settings for a full-text index:
     - `"ANALYZER"`: *Optional*
       - `"standard"`: (Default) The standard analyzer, segmented by token, lowercase processing, and provides stemming output. Use `-` to specify the languages stemmer. `English` is the default stemmer: `"standard-english"` and `"standard"` are the same stemmer setting. Supported language stemmers include: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`, `Russian`, `Spanish`, `Swedish`, and `Turkish`.
-      - `"chinese"`: Simplified Chinese
+      - `"rag"`: Multilingual RAG analyzer imported from [RAGFlow](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py), supporting `Chinese` and `English`. Use `-fine` to output the fine-grained analyzer results.
+      - `"chinese"`: Simplified Chinese. Use `-fine` to output the fine-grained analyzer results.
       - `"traditional"`: Traditional Chinese
       - `"japanese"`: Japanese
       - `"korean"`: Korean
@@ -1176,18 +1196,18 @@ res.index_names # ['my_index', 'tensor_index', 'sparse_index']
 ## show_index
 
 ```python
-db_object.show_index(index_name)
+table_object.show_index(index_name)
 ```
 
-Show detail information of a index.
+Shows detailed information about an index.
 
 ### Returns
 
 A structure containing the following attributes:
 
 - `error_code`: `int`
-    - `0`: The operation succeeds.
-    - A non-zero value indicates a specific error condition.
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
@@ -1759,12 +1779,15 @@ An integer indicating the number of nearest neighbours to return.
 
 #### knn_params: `dict[str, str]`, *Optional*
 
-A dictionary representing additional KNN or ANN search parameters. Currently only `"ef"` is supported.
+A dictionary representing additional KNN or ANN search parameters.
 
 - `"ef"`: `str`, Recommended value: one to ten times the value of `topn`.  
   - For example, if you set `topn` to `10`, you can set `"ef"` to `"50"`.
   - If you set `"ef"` too high, search performance may worsen.  
   - If you do not set `"ef"` or set it to a value lower than `topn`, the search uses the `topn` value as the value for `"ef"`.
+- `"threshold"`: `str`, *Optional* A threshold value for the search.
+  - For example, if you use the `"cosine"` distance metric and set `"threshold"` to `"0.5"`, the search will return only those rows with a cosine similarity greater than `0.5`.
+- `"nprobe"`: `str`, *Optional* The number of cells to search for the IVF index. The default value is `"1"`.
 
 ### Returns
 

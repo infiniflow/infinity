@@ -1,7 +1,7 @@
 # testing invalid items in config
 # result should be same as default
 [ygenera1]
-versi0n                 = "0.4.0"
+versi0n                 = "0.5.0"
 time_z0ne                = "utc-123"
 cpu_1imit               = 123
 
