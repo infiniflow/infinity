@@ -432,9 +432,9 @@ class table_http:
         self.net.raise_exception(r)
         r_json = r.json()
         index_list = []
-        exists = r_json.get("tables", None)
+        exists = r_json.get("indexes", None)
         if exists is not None:
-            for t in r_json["tables"]:
+            for t in r_json["indexes"]:
                 index_list.append(t)
         return database_result(index_list=index_list)
 

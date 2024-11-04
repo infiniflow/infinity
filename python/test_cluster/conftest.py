@@ -21,20 +21,30 @@ def pytest_addoption(parser):
         action="store",
         default=9001,
     )
-    parser.addoption("--infinity_dir", action="store", required=True)
+    parser.addoption(
+        "--infinity_dir",
+        action="store",
+        required=True,
+        help="Path to infinity directory. For local test, $pwd is ok",
+    )
     parser.addoption("--docker", action="store_true", default=False)
 
+
 def pytest_configure(config):
-    config.addinivalue_line("markers", "docker: mark test to run only when --docker option is provided")
+    config.addinivalue_line(
+        "markers", "docker: mark test to run only when --docker option is provided"
+    )
+
 
 def pytest_collection_modifyitems(config, items):
     if config.getoption("--docker"):
-        return # do not skip docker test
+        return  # do not skip docker test
     skip_docker = pytest.mark.skip(reason="need --docker option to run")
     for item in items:
         if "docker" in item.keywords:
             print(f"skip {item.name}")
             item.add_marker(skip_docker)
+
 
 def pytest_generate_tests(metafunc):
     infinity_path = metafunc.config.getoption("infinity_path")
@@ -51,7 +61,10 @@ def pytest_generate_tests(metafunc):
 
     if "docker_cluster" in metafunc.fixturenames:
         # skip if docker is in option and the testcase is marked with docker
-        if not metafunc.config.getoption("--docker") and "docker" in metafunc.definition.keywords:
+        if (
+            not metafunc.config.getoption("--docker")
+            and "docker" in metafunc.definition.keywords
+        ):
             return
 
         print("Init DockerInfinityCluster")

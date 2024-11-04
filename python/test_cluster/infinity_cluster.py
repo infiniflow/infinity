@@ -39,7 +39,8 @@ class BaseInfinityRunner:
         self.executable_path = executable_path
         self.config_path = config_path
         self.load_config()
-        self.client = None
+        http_ip, http_port = self.http_uri()
+        self.add_client(f"http://{http_ip}:{http_port}/")
 
     @abstractmethod
     def init(self, config_path: str | None):
@@ -48,33 +49,6 @@ class BaseInfinityRunner:
     @abstractmethod
     def uninit(self):
         pass
-
-    def init_as_standalone(self, config_path: str | None = None):
-        self.init(config_path)
-        http_ip, http_port = self.http_uri()
-        print(f"add client: http://{http_ip}:{http_port}/")
-        self.add_client(f"http://{http_ip}:{http_port}/")
-        self.__init_cmd(lambda: self.client.set_role_standalone(self.node_name))
-
-    def init_as_admin(self, config_path: str | None = None):
-        #self.init(config_path)
-        http_ip, http_port = self.http_uri()
-        self.add_client(f"http://{http_ip}:{http_port}/")
-        self.__init_cmd(lambda: self.client.set_role_admin())
-
-    def init_as_leader(self, config_path: str | None = None):
-        self.init(config_path)
-        http_ip, http_port = self.http_uri()
-        self.add_client(f"http://{http_ip}:{http_port}/")
-        self.__init_cmd(lambda: self.client.set_role_leader(self.node_name))
-
-    def init_as_follower(self, leader_addr: str, config_path: str | None = None):
-        self.init(config_path)
-        http_ip, http_port = self.http_uri()
-        self.add_client(f"http://{http_ip}:{http_port}/")
-        self.__init_cmd(
-            lambda: self.client.set_role_follower(self.node_name, leader_addr)
-        )
 
     @abstractmethod
     def add_client(self, http_addr: str):
@@ -109,9 +83,11 @@ class BaseInfinityRunner:
 
 
 class InfinityRunner(BaseInfinityRunner):
-    def __init__(self, node_name: str, executable_path: str, config_path: str):
+    def __init__(self, node_name: str, executable_path: str, config_path: str, init=True):
         super().__init__(node_name, executable_path, config_path)
         self.process = None
+        if init:
+            self.init(config_path)
 
     def init(self, config_path: str | None):
         if self.process is not None:
@@ -191,19 +167,19 @@ class InfinityCluster:
                 network="host",
             )
 
-    def init_standalone(self, node_name: str):
+    def set_standalone(self, node_name: str):
         if node_name not in self.runners:
             raise ValueError(f"Node {node_name} not found in the runners.")
         runner = self.runners[node_name]
-        runner.init_as_standalone()
+        runner.client.set_role_standalone(node_name)
 
-    def init_admin(self, node_name: str):
+    def set_admin(self, node_name: str):
         if node_name not in self.runners:
             raise ValueError(f"Node {node_name} not found in the runners.")
         runner = self.runners[node_name]
-        runner.init_as_admin()
+        runner.client.set_role_admin()
 
-    def init_leader(self, leader_name: str):
+    def set_leader(self, leader_name: str):
         if self.leader_runner is not None:
             raise ValueError(
                 f"Leader {self.leader_runner.node_name} has already been initialized."
@@ -212,16 +188,18 @@ class InfinityCluster:
             raise ValueError(f"Leader {leader_name} not found in the runners.")
         leader_runner = self.runners[leader_name]
         self.leader_runner = leader_runner
-        leader_runner.init_as_leader()
+        leader_runner.client.set_role_leader(leader_name)
 
-    def init_follower(self, follower_name: str):
+    def set_follower(self, follower_name: str):
         if follower_name not in self.runners:
             raise ValueError(f"Follower {follower_name} not found in the runners")
         if self.leader_runner is None:
             raise ValueError("Leader has not been initialized.")
         follower_runner = self.runners[follower_name]
         leader_ip, leader_port = self.leader_addr()
-        follower_runner.init_as_follower(f"{leader_ip}:{leader_port}")
+        follower_runner.client.set_role_follower(
+            follower_name, f"{leader_ip}:{leader_port}"
+        )
 
     def client(self, node_name: str) -> infinity_http | None:
         if node_name not in self.runners:

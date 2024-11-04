@@ -16,8 +16,8 @@ class TestInsert:
 
             print("init nodes")
 
-            cluster.init_leader("node1")
-            cluster.init_follower("node2")
+            cluster.set_leader("node1")
+            cluster.set_follower("node2")
 
             time.sleep(1)
             print("insert in node1")

@@ -13,7 +13,7 @@ from infinity.common import ConflictType
 
 def test_standalone(cluster: InfinityCluster):
     cluster.add_node("test", "conf/pytest_parallel_infinity_conf.toml")
-    cluster.init_standalone("test")
+    cluster.set_standalone("test")
     test_client = cluster.client("test")
     assert test_client is not None
 
@@ -27,8 +27,8 @@ def test_0(cluster: InfinityCluster):
     cluster.add_node("node1", "conf/leader.toml")
     cluster.add_node("node2", "conf/follower.toml")
 
-    cluster.init_leader("node1")
-    cluster.init_follower("node2")
+    cluster.set_leader("node1")
+    cluster.set_follower("node2")
 
     time.sleep(1)
 
@@ -45,8 +45,8 @@ def test_mock(mock_cluster: MockInfinityCluster):
     cluster.add_node("node1", "conf/leader.toml")
     cluster.add_node("node2", "conf/follower.toml")
 
-    cluster.init_leader("node1")
-    cluster.init_follower("node2")
+    cluster.set_leader("node1")
+    cluster.set_follower("node2")
 
     time.sleep(1)
 
@@ -71,8 +71,8 @@ def test_docker(docker_cluster: DockerInfinityCluster):
 
     print("init nodes")
 
-    cluster.init_leader("node1")
-    cluster.init_follower("node2")
+    cluster.set_leader("node1")
+    cluster.set_follower("node2")
 
     time.sleep(1)
 
@@ -122,14 +122,14 @@ def test_tc1(cluster: InfinityCluster):
     cluster.add_node("node1", "conf/leader.toml")
     cluster.add_node("node2", "conf/follower.toml")
 
-    cluster.init_leader("node1")
+    cluster.set_leader("node1")
     infinity1 = cluster.client("node1")
     res = infinity1.show_node("node1")
     assert(res.node_name == "node1")
     assert(res.node_role == "leader")
     assert(res.node_status == "alive")
 
-    cluster.init_follower("node2")
+    cluster.set_follower("node2")
     infinity2 = cluster.client("node2")
     res = infinity1.show_node("node1")
     assert(res.node_name == "node1")
