@@ -54,7 +54,7 @@ static const String REGEX_SPLIT_CHAR = R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=
 static const String NLTK_TOKENIZE_PATTERN =
     R"((?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|(?=[^\(\"\`{\[:;&\#\*@\)}\]\-,])\S+?(?=\s|$|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)|,(?=$|\s|(?:[)\";}\]\*:@\'\({\[\?!])|(?:\-{2,}|\.{2,}|(?:\.\s){2,}\.)))|\S)";
 
-static constexpr std::size_t MAX_SENTENCE_LEN = 128;
+static constexpr std::size_t MAX_SENTENCE_LEN = 100;
 
 static inline i32 Encode(i32 freq, i32 idx) {
     u32 encoded_value = 0;
@@ -651,13 +651,12 @@ void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) {
 void RAGAnalyzer::SplitLongText(const String &L, u32 length, Vector<String> &sublines) {
     u32 slice_count = length / MAX_SENTENCE_LEN + 1;
     sublines.reserve(slice_count);
-    u32 max_sentence_len = length / slice_count + slice_count;
     std::size_t last_sentence_start = 0;
     std::size_t next_sentence_start = 0;
     for (unsigned i = 0; i < slice_count; ++i) {
-        next_sentence_start = max_sentence_len * (i + 1) - 5;
-        if (next_sentence_start < length) {
-            std::size_t sentence_length = max_sentence_len * (i + 1) + 5 > length ? length - next_sentence_start : 10;
+        next_sentence_start = MAX_SENTENCE_LEN * (i + 1) - 5;
+        if (next_sentence_start + 5 < length) {
+            std::size_t sentence_length = MAX_SENTENCE_LEN * (i + 1) + 5 > length ? length - next_sentence_start : 10;
             String substr = UTF8Substr(L, next_sentence_start, sentence_length);
             auto [tks, s] = MaxForward(substr);
             auto [tks1, s1] = MaxBackward(substr);
@@ -673,11 +672,14 @@ void RAGAnalyzer::SplitLongText(const String &L, u32 length, Vector<String> &sub
             }
 
             std::size_t start = 0;
-            while (start < tks.size() && diff[start] == 1) {
+            while (start < tks.size() && diff[start] == 0) {
                 next_sentence_start += UTF8Length(tks[start]);
                 start++;
             }
-        }
+        } else
+            next_sentence_start = length;
+        if (next_sentence_start == last_sentence_start)
+            continue;
         String str = UTF8Substr(L, last_sentence_start, next_sentence_start - last_sentence_start);
         sublines.push_back(str);
         last_sentence_start = next_sentence_start;
