@@ -5,10 +5,11 @@ import pandas as pd
 import pytest
 from infinity_cluster import InfinityCluster
 from infinity.common import ConflictType
+from infinity.common import InfinityException
 
 
 class TestDatabase:
-    def test1(self, cluster: InfinityCluster):
+    def test_create_100_db(self, cluster: InfinityCluster):
         try:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
@@ -66,6 +67,31 @@ class TestDatabase:
                 if db_name.startswith("test_cluster_db_name") or db_name == "default_db":
                     res_dbs.append(db_name)
             assert len(res_dbs) == (1)
+        except Exception as e:
+            print(e)
+            cluster.clear()
+            raise
+        else:
+            cluster.clear()
+
+    def test_create_database_on_follower(self, cluster: InfinityCluster):
+        try:
+            cluster.add_node("node1", "conf/leader.toml")
+            cluster.add_node("node2", "conf/follower.toml")
+
+            print("init nodes")
+            cluster.set_leader("node1")
+            cluster.set_follower("node2")
+            time.sleep(1)
+
+            infinity1 = cluster.client("node1")
+            infinity2 = cluster.client("node2")
+
+            try:
+                infinity2.create_database("test_cluster_follower_db")
+            except InfinityException as e:
+                print(e)
+                assert(e.error_code == 8007)
         except Exception as e:
             print(e)
             cluster.clear()
