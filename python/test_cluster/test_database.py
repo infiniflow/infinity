@@ -45,6 +45,27 @@ class TestDatabase:
                 if db_name.startswith("test_cluster_db_name") or db_name == "default_db":
                     res_dbs.append(db_name)
             assert len(res_dbs) == (db_count + 1)
+
+            for i in range(db_count):
+                print('drop test_cluster_db_name' + str(i))
+                infinity1.drop_database('test_cluster_db_name' + str(i), ConflictType.Ignore)
+
+            time.sleep(1)
+            dbs = infinity1.list_databases()
+            res_dbs = []
+            for db_name in dbs.db_names:
+                print('db name: ' + db_name)
+                if db_name.startswith("test_cluster_db_name") or db_name == "default_db":
+                    res_dbs.append(db_name)
+            assert len(res_dbs) == (1)
+
+            dbs = infinity2.list_databases()
+            res_dbs = []
+            for db_name in dbs.db_names:
+                print('db name: ' + db_name)
+                if db_name.startswith("test_cluster_db_name") or db_name == "default_db":
+                    res_dbs.append(db_name)
+            assert len(res_dbs) == (1)
         except Exception as e:
             print(e)
             cluster.clear()
