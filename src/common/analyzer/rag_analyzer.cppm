@@ -54,7 +54,6 @@ public:
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;
 
-protected:
 private:
     static constexpr float DENOMINATOR = 1000000;
 
@@ -81,6 +80,10 @@ private:
             Vector<String> &best_tokens,
             double &max_score,
             bool memo_all);
+
+    void TokenizeInner(Vector<String> &res, const String &L);
+
+    void SplitLongText(const String &L, u32 length, Vector<String> &sublines);
 
     String Merge(const String &tokens);
 
