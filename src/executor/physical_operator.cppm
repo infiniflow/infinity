@@ -27,6 +27,7 @@ import load_meta;
 import internal_types;
 import data_type;
 import column_binding;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -40,9 +41,17 @@ public:
                                      SharedPtr<Vector<LoadMeta>> load_metas,
                                      bool cache_result = false)
         : operator_id_(id), operator_type_(type), left_(std::move(left)), right_(std::move(right)), load_metas_(std::move(load_metas)),
-          cache_result_(cache_result) {}
+          cache_result_(cache_result) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("PhysicalOperator");
+#endif
+    }
 
-    virtual ~PhysicalOperator() = default;
+    virtual ~PhysicalOperator() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("PhysicalOperator");
+#endif
+    }
 
     virtual void Init() = 0;
 

@@ -26,6 +26,7 @@ import physical_sink;
 import query_context;
 import internal_types;
 import data_type;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -33,9 +34,17 @@ export class PlanFragment {
 public:
     PlanFragment() = default;
 
-    explicit inline PlanFragment(u64 fragment_id) : fragment_id_(fragment_id) {}
+    explicit inline PlanFragment(u64 fragment_id) : fragment_id_(fragment_id) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("PlanFragment");
+#endif
+    }
 
-    virtual ~PlanFragment() = default;
+    virtual ~PlanFragment() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("PlanFragment");
+#endif
+    }
 
     void SetFragmentType(FragmentType fragment_type) { fragment_type_ = fragment_type; }
 

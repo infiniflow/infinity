@@ -23,6 +23,7 @@ import local_file_handle;
 import third_party;
 import file_worker_type;
 import persistence_manager;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -34,6 +35,9 @@ public:
     explicit FileWorker(SharedPtr<String> data_dir, SharedPtr<String> temp_dir, SharedPtr<String> file_dir, SharedPtr<String> file_name, PersistenceManager* persistence_manager)
         : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)), persistence_manager_(persistence_manager) {
         assert(!std::filesystem::path(*file_dir_).is_absolute());
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("FileWorker");
+#endif
     }
 
     // No destruct here

@@ -71,6 +71,7 @@ import column_def;
 import explain_statement;
 import table_entry;
 import segment_entry;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -638,7 +639,17 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
 
 FragmentContext::FragmentContext(PlanFragment *plan_fragment_ptr, QueryContext *query_context, Notifier *notifier)
     : notifier_(notifier), plan_fragment_ptr_(plan_fragment_ptr), query_context_(query_context), fragment_type_(plan_fragment_ptr->GetFragmentType()),
-      unfinished_child_n_(plan_fragment_ptr->Children().size()) {}
+      unfinished_child_n_(plan_fragment_ptr->Children().size()) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("FragmentContext");
+#endif
+}
+
+FragmentContext::~FragmentContext() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("FragmentContext");
+#endif
+}
 
 bool FragmentContext::TryFinishFragment() {
     auto fragment_id = plan_fragment_ptr_->FragmentID();
