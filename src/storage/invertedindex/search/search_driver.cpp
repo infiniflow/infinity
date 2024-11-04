@@ -23,9 +23,9 @@
 #define SearchScannerSuffix InfinitySyntax
 #include "search_scanner_derived_helper.h"
 #undef SearchScannerSuffix
-#define SearchScannerSuffix Plain
-#include "search_scanner_derived_helper.h"
-#undef SearchScannerSuffix
+// #define SearchScannerSuffix Plain
+// #include "search_scanner_derived_helper.h"
+// #undef SearchScannerSuffix
 
 import stl;
 import term;
@@ -113,65 +113,14 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string
     return parsed_query_tree;
 }
 
-std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, const std::string *default_field_ptr) const {
-    std::istringstream iss(query);
-    if (!iss.good()) {
-        return nullptr;
-    }
-    if (!default_field_ptr) {
-        default_field_ptr = &default_field_;
-    }
-    std::unique_ptr<SearchScanner> scanner;
-    std::unique_ptr<SearchParser> parser;
-    std::unique_ptr<QueryNode> result;
-    try {
-        switch (operator_option_) {
-            case FulltextQueryOperatorOption::kInfinitySyntax:
-                scanner = std::make_unique<SearchScannerInfinitySyntax>(&iss);
-                break;
-            case FulltextQueryOperatorOption::kAnd:
-            case FulltextQueryOperatorOption::kOr:
-                scanner = std::make_unique<SearchScannerPlain>(&iss);
-                break;
-        }
-        parser = std::make_unique<SearchParser>(*scanner, *this, *default_field_ptr, result);
-    } catch (std::bad_alloc &ba) {
-        std::cerr << "Failed to allocate: (" << ba.what() << "), exiting!!\n";
-        return nullptr;
-    }
-    constexpr int accept = 0;
-    if (parser->parse() != accept) {
-        return nullptr;
-    }
-    return result;
-}
-
-std::unique_ptr<QueryNode>
-SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text, bool from_quoted, unsigned long slop) const {
-    if (text.empty()) {
-        Status status = Status::SyntaxError("Empty query text");
-        RecoverableError(status);
-        return nullptr;
-    }
+inline TermList GetTermListFromAnalyzer(const std::string &analyzer_name, Analyzer *analyzer, const std::string &query_str) {
+    TermList result;
     Term input_term;
-    input_term.text_ = std::move(text);
-    TermList terms;
-
-    // 1. analyze
-    std::string analyzer_name = "standard";
-    if (!field.empty()) {
-        if (auto it = field2analyzer_.find(field); it != field2analyzer_.end()) {
-            analyzer_name = it->second;
-        }
-    }
-    auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
+    input_term.text_ = query_str;
     TermList temp_output_terms;
     analyzer->Analyze(input_term, temp_output_terms);
     // remove duplicates and only keep the root words for query
-    const u32 INVALID_TERM_OFFSET = -1;
+    constexpr u32 INVALID_TERM_OFFSET = -1;
     Term last_term;
     last_term.word_offset_ = INVALID_TERM_OFFSET;
     for (const Term &term : temp_output_terms) {
@@ -180,7 +129,7 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&t
         }
         if (last_term.word_offset_ != term.word_offset_) {
             if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-                terms.emplace_back(last_term);
+                result.emplace_back(last_term);
             }
             last_term.text_ = term.text_;
             last_term.word_offset_ = term.word_offset_;
@@ -193,60 +142,114 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&t
         }
     }
     if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-        terms.emplace_back(last_term);
+        result.emplace_back(last_term);
     }
-    if (terms.empty()) {
-        std::cerr << "Analyzer " << analyzer_name << " analyzes following text as empty terms: " << input_term.text_ << std::endl;
+    if (result.empty()) {
+        std::cerr << std::format("Analyzer {} analyzes following text as empty terms: {}\n", analyzer_name, query_str);
     }
+    return result;
+}
+
+inline std::string GetAnalyzerName(const std::string &field, const std::map<std::string, std::string> &field2analyzer) {
+    std::string analyzer_name = "standard";
+    if (!field.empty()) {
+        if (const auto it = field2analyzer.find(field); it != field2analyzer.end()) {
+            analyzer_name = it->second;
+        }
+    }
+    return analyzer_name;
+}
+
+std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, const std::string *default_field_ptr) const {
+    std::istringstream iss(query);
+    if (!iss.good()) {
+        return nullptr;
+    }
+    if (!default_field_ptr) {
+        default_field_ptr = &default_field_;
+    }
+    const auto &default_field = *default_field_ptr;
+    const auto default_analyzer_name = GetAnalyzerName(default_field, field2analyzer_);
+    if (default_analyzer_name != "keyword" && operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax) {
+        // use parser
+        std::unique_ptr<QueryNode> result;
+        const auto scanner = std::make_unique<SearchScannerInfinitySyntax>(&iss);
+        const auto parser = std::make_unique<SearchParser>(*scanner, *this, *default_field_ptr, result);
+        if (constexpr int accept = 0; parser->parse() != accept) {
+            return nullptr;
+        }
+        return result;
+    } else {
+        // use analyzer for the whole query string
+        auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(default_analyzer_name);
+        if (!status.ok()) {
+            RecoverableError(std::move(status));
+        }
+        TermList terms = GetTermListFromAnalyzer(default_analyzer_name, analyzer.get(), query);
+        std::unique_ptr<MultiQueryNode> multi_query;
+        if (default_analyzer_name == "keyword") {
+            multi_query = std::make_unique<KeywordQueryNode>();
+        } else if (operator_option_ == FulltextQueryOperatorOption::kOr) {
+            multi_query = std::make_unique<OrQueryNode>();
+        } else if (operator_option_ == FulltextQueryOperatorOption::kAnd) {
+            multi_query = std::make_unique<AndQueryNode>();
+        }
+        for (const auto &term : terms) {
+            auto subquery = std::make_unique<TermQueryNode>();
+            subquery->term_ = term.text_;
+            subquery->column_ = default_field;
+            multi_query->Add(std::move(subquery));
+        }
+        return multi_query;
+    }
+}
+
+std::unique_ptr<QueryNode>
+SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::string &text, const bool from_quoted, const unsigned long slop) const {
+    assert(operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax);
+    if (text.empty()) {
+        RecoverableError(Status::SyntaxError("Empty query text"));
+        return nullptr;
+    }
+    // 1. analyze
+    const auto analyzer_name = GetAnalyzerName(field, field2analyzer_);
+    auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
+    if (!status.ok()) {
+        RecoverableError(std::move(status));
+    }
+    TermList terms = GetTermListFromAnalyzer(analyzer_name, analyzer.get(), text);
 
     // 2. build query node
     if (terms.empty()) {
         auto result = std::make_unique<TermQueryNode>();
-        result->term_ = std::move(input_term.text_);
+        result->term_ = text;
         result->column_ = field;
         return result;
     } else if (terms.size() == 1) {
         auto result = std::make_unique<TermQueryNode>();
-        result->term_ = std::move(terms.front().text_);
+        result->term_ = terms.front().text_;
         result->column_ = field;
         return result;
     } else {
         if (from_quoted) {
             auto result = std::make_unique<PhraseQueryNode>();
-            for (auto term : terms) {
-                result->AddTerm(term.Text());
+            for (const auto &term : terms) {
+                result->AddTerm(term.text_);
             }
             result->column_ = field;
             result->slop_ = slop;
             return result;
         } else {
-            auto result = GetMultiQueryNodeByOperatorOption();
-            auto *multi_query_ptr = dynamic_cast<MultiQueryNode *>(result.get());
-            for (auto &term : terms) {
+            auto result = std::make_unique<OrQueryNode>();
+            for (const auto &term : terms) {
                 auto subquery = std::make_unique<TermQueryNode>();
-                subquery->term_ = std::move(term.text_);
+                subquery->term_ = term.text_;
                 subquery->column_ = field;
-                multi_query_ptr->Add(std::move(subquery));
+                result->Add(std::move(subquery));
             }
             return result;
         }
     }
-}
-
-std::unique_ptr<QueryNode> SearchDriver::GetMultiQueryNodeByOperatorOption() const {
-    switch (operator_option_) {
-        case FulltextQueryOperatorOption::kInfinitySyntax: // treat it as OR
-        case FulltextQueryOperatorOption::kOr: {
-            return std::make_unique<OrQueryNode>();
-            break;
-        }
-        case FulltextQueryOperatorOption::kAnd: {
-            return std::make_unique<AndQueryNode>();
-            break;
-        }
-    }
-    UnrecoverableError("Invalid switch case!");
-    return {};
 }
 
 // Unescape reserved characters per https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
