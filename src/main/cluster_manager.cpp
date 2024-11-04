@@ -418,6 +418,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
         auto iter = other_node_map_.find(node_info->node_name_);
         if (iter != other_node_map_.end()) {
             // Duplicated node
+            // TODO: Update node info and not throw error.
             return Status::DuplicateNode(node_info->node_name_);
         }
     }

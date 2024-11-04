@@ -100,6 +100,7 @@ class DockerInfinityRunner(BaseInfinityRunner):
             [
                 "cd /infinity",
                 f"pid=$(pgrep -f infinity || true)",
+                f"echo $pid",
                 f"bash scripts/timeout_kill.sh {timeout} $pid",
             ]
         )
