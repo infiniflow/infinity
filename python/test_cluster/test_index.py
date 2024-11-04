@@ -9,11 +9,10 @@ import infinity.index as index
 
 
 class TestIndex:
-    @pytest.mark.skip(reason="bug.")
     def test1(self, cluster: InfinityCluster):
         try:
             cluster.add_node("node1", "conf/leader.toml")
-            cluster.add_node("node2", "conf/follower.toml", init=True)
+            cluster.add_node("node2", "conf/follower.toml")
 
             print("init nodes")
             cluster.set_leader("node1")
