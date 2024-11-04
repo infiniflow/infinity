@@ -37,6 +37,7 @@ export enum class DocIteratorType : u8 {
     kFilterIterator,
     kScoreThresholdIterator,
     kKeywordIterator,
+    kMustFirstIterator,
 };
 
 export struct DocIteratorEstimateIterateCost {
