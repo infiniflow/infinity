@@ -733,7 +733,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
         LOG_DEBUG(replay_entries[replay_count]->ToString());
-        ReplayWalEntry(*replay_entries[replay_count], false);
+        ReplayWalEntry(*replay_entries[replay_count], false, true);
     }
 
     LOG_INFO(fmt::format("Latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
@@ -889,7 +889,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
     return wal_entries;
 }
 
-void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup) {
+void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup, bool is_replay) {
     for (const auto &cmd : entry.cmds_) {
         LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
         switch (cmd->GetType()) {
@@ -927,7 +927,7 @@ void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup) {
                 break;
             }
             case WalCommandType::APPEND: {
-                WalCmdAppendReplay(*dynamic_cast<const WalCmdAppend *>(cmd.get()), entry.txn_id_, entry.commit_ts_, on_startup);
+                WalCmdAppendReplay(*dynamic_cast<const WalCmdAppend *>(cmd.get()), entry.txn_id_, entry.commit_ts_, is_replay);
                 break;
             }
             case WalCommandType::DELETE: {
@@ -1349,7 +1349,7 @@ void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID t
         commit_ts);
 }
 
-void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts, bool on_startup) {
+void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts, bool is_replay) {
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
@@ -1363,7 +1363,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     auto append_state = MakeUnique<AppendState>(table_store->GetBlocks());
     table_store->SetAppendState(std::move(append_state));
 
-    Catalog::Append(table_store->GetTableEntry(), fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager(), on_startup);
+    Catalog::Append(table_store->GetTableEntry(), fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager(), is_replay);
     Catalog::CommitWrite(table_store->GetTableEntry(), fake_txn->TxnID(), commit_ts, table_store->txn_segments(), nullptr);
 }
 
