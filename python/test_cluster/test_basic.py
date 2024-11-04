@@ -324,6 +324,13 @@ def test_tc2(cluster: InfinityCluster):
     for i in range(10):
         table1.insert([{"c1": i, "c2": [1.0, 2.0, 3.0, 4.0]}])
 
+    res_gt = pd.DataFrame(
+        {
+            "c1": (0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+            "c2": ([1.0, 2.0, 3.0, 4.0] for _ in range(10)),
+        }
+    ).astype({"c1": dtype("int32"), "c2": dtype("object")})
+
     infinity2 = cluster.client("node2")
     cluster.set_follower("node2")
 
@@ -333,8 +340,8 @@ def test_tc2(cluster: InfinityCluster):
     infinity4 = cluster.client("node4")
     cluster.set_learner("node4")
 
+    time.sleep(1)
     for server in [infinity1, infinity2, infinity3, infinity4]:
-        time.sleep(1)
         res = server.show_node("node1")
         assert(res.node_name == "node1")
         assert(res.node_role == "leader")
@@ -352,7 +359,13 @@ def test_tc2(cluster: InfinityCluster):
         assert(res.node_role == "learner")
         assert(res.node_status == "alive")        
 
-    res = db1.drop_table(table_name, ConflictType.Ignore)
+    for server in [infinity1, infinity2, infinity3, infinity4]:
+        db = server.get_database("default_db")
+        table = db.get_table(table_name)
+        res = table.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, res_gt)
+
+    res = db1.drop_table(table_name)
     assert(res.error_code == ErrorCode.OK)
 
     time.sleep(1)
