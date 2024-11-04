@@ -83,7 +83,9 @@ class BaseInfinityRunner:
 
 
 class InfinityRunner(BaseInfinityRunner):
-    def __init__(self, node_name: str, executable_path: str, config_path: str, init=True):
+    def __init__(
+        self, node_name: str, executable_path: str, config_path: str, init=True
+    ):
         super().__init__(node_name, executable_path, config_path)
         self.process = None
         if init:
@@ -199,6 +201,17 @@ class InfinityCluster:
         leader_ip, leader_port = self.leader_addr()
         follower_runner.client.set_role_follower(
             follower_name, f"{leader_ip}:{leader_port}"
+        )
+
+    def set_learner(self, learner_name: str):
+        if learner_name not in self.runners:
+            raise ValueError(f"Learner {learner_name} not found in the runners")
+        if self.leader_runner is None:
+            raise ValueError("Learner has not been initialized.")
+        learner_runner = self.runners[learner_name]
+        leader_ip, leader_port = self.leader_addr()
+        learner_runner.client.set_role_follower(
+            learner_name, f"{leader_ip}:{leader_port}"
         )
 
     def client(self, node_name: str) -> infinity_http | None:
