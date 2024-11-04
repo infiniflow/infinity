@@ -89,17 +89,17 @@ topLevelQuery
 query
 : clause { $$ = std::move($1); }
 | query clause {
-    auto query = driver.GetMultiQueryNodeByOperatorOption();
-    auto *multi_query_ptr = dynamic_cast<MultiQueryNode *>(query.get());
-    multi_query_ptr->Add(std::move($1));
-    multi_query_ptr->Add(std::move($2));
-    $$ = std::move(query);
+    assert(driver.operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax);
+    auto q = std::make_unique<OrQueryNode>();
+    q->Add(std::move($1));
+    q->Add(std::move($2));
+    $$ = std::move(q);
 }
 | query OR clause {
-    auto query = std::make_unique<OrQueryNode>();
-    query->Add(std::move($1));
-    query->Add(std::move($3));
-    $$ = std::move(query);
+    auto q = std::make_unique<OrQueryNode>();
+    q->Add(std::move($1));
+    q->Add(std::move($3));
+    $$ = std::move(q);
 };
 
 clause
@@ -141,12 +141,12 @@ basic_filter
         YYERROR;
     }
     std::string text = SearchDriver::Unescape($1.text_);
-    $$ = driver.AnalyzeAndBuildQueryNode(field, std::move(text), $1.from_quoted_);
+    $$ = driver.AnalyzeAndBuildQueryNode(field, text, $1.from_quoted_);
 }
 | STRING OP_COLON STRING {
     std::string field = SearchDriver::Unescape($1.text_);
     std::string text = SearchDriver::Unescape($3.text_);
-    $$ = driver.AnalyzeAndBuildQueryNode(std::move(field), std::move(text), $3.from_quoted_);
+    $$ = driver.AnalyzeAndBuildQueryNode(field, text, $3.from_quoted_);
 };
 | STRING TILDE {
     const std::string &field = default_field;
@@ -155,12 +155,12 @@ basic_filter
         YYERROR;
     }
     std::string text = SearchDriver::Unescape($1.text_);
-    $$ = driver.AnalyzeAndBuildQueryNode(field, std::move(text), $1.from_quoted_, $2);
+    $$ = driver.AnalyzeAndBuildQueryNode(field, text, $1.from_quoted_, $2);
 }
 | STRING OP_COLON STRING TILDE {
     std::string field = SearchDriver::Unescape($1.text_);
     std::string text = SearchDriver::Unescape($3.text_);
-    $$ = driver.AnalyzeAndBuildQueryNode(std::move(field), std::move(text), $3.from_quoted_, $4);
+    $$ = driver.AnalyzeAndBuildQueryNode(field, text, $3.from_quoted_, $4);
 };
 
 %%
