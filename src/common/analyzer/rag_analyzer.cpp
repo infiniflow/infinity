@@ -670,12 +670,22 @@ void RAGAnalyzer::SplitLongText(const String &L, u32 length, Vector<String> &sub
             if (s1 > s) {
                 tks = tks1;
             }
-
             std::size_t start = 0;
+            std::size_t forward_same_len = 0;
             while (start < tks.size() && diff[start] == 0) {
-                next_sentence_start += UTF8Length(tks[start]);
+                forward_same_len += UTF8Length(tks[start]);
                 start++;
             }
+            if (forward_same_len == 0) {
+                std::size_t end = tks.size() - 1;
+                std::size_t backward_same_len = 0;
+                while (end >= 0 && diff[end] == 0) {
+                    backward_same_len += UTF8Length(tks[end]);
+                    end--;
+                }
+                next_sentence_start += sentence_length - backward_same_len;
+            } else
+                next_sentence_start += forward_same_len;
         } else
             next_sentence_start = length;
         if (next_sentence_start == last_sentence_start)
