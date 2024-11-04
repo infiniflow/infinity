@@ -52,12 +52,21 @@ import persistence_manager;
 import extra_ddl_info;
 import virtual_store;
 import result_cache_manager;
+import global_resource_usage;
 
 namespace infinity {
 
-Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {}
+Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("Storage");
+#endif
+}
 
-Storage::~Storage() = default;
+Storage::~Storage() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("Storage");
+#endif
+}
 
 ResultCacheManager *Storage::result_cache_manager() const noexcept {
     if (config_ptr_->ResultCacheMode() != "on") {
@@ -496,7 +505,6 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                 bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
                 periodic_trigger_thread_->Start();
             }
-
 
             {
                 std::unique_lock<std::mutex> lock(mutex_);

@@ -33,11 +33,22 @@ import default_values;
 import wal_manager;
 import defer_op;
 import infinity_context;
+import global_resource_usage;
 
 namespace infinity {
 
 TxnManager::TxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts)
-    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false) {}
+    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("TxnManager");
+#endif
+}
+
+TxnManager::~TxnManager() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("TxnManager");
+#endif
+}
 
 Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     // Check if the is_running_ is true

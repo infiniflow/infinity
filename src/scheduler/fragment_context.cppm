@@ -105,7 +105,7 @@ public:
 public:
     explicit FragmentContext(PlanFragment *plan_fragment_ptr, QueryContext *query_context, Notifier *notifier);
 
-    virtual ~FragmentContext() = default;
+    virtual ~FragmentContext();
 
     inline void IncreaseTask() { unfinished_task_n_.fetch_add(1); }
 

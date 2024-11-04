@@ -6,6 +6,7 @@ import stl;
 import s3_client;
 import status;
 import third_party;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -14,9 +15,17 @@ public:
     S3ClientMinio(String _url = "http://localhost:9000", bool _https = false, String _access_key = "minioadmin", String _secret_key = "minioadmin")
         : S3Client(_url, _https, _access_key, _secret_key), base_url(_url, _https), provider(_access_key, _secret_key) {
         client_ = MakeUnique<minio::s3::Client>(base_url, &provider);
+
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("S3ClientMinio");
+#endif
     }
 
-    ~S3ClientMinio() = default;
+    ~S3ClientMinio() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("S3ClientMinio");
+#endif
+    }
 
     Status Init() final;
     Status UnInit() final;

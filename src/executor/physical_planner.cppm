@@ -18,13 +18,24 @@ import stl;
 import physical_operator;
 import logical_node;
 import query_context;
+import global_resource_usage;
 
 export module physical_planner;
 namespace infinity {
 
 export class PhysicalPlanner {
 public:
-    explicit PhysicalPlanner(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {}
+    explicit PhysicalPlanner(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("PhysicalPlanner");
+#endif
+    }
+
+    ~PhysicalPlanner() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("PhysicalPlanner");
+#endif
+    }
 
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildPhysicalOperator(const SharedPtr<LogicalNode> &logical_operator) const;
 

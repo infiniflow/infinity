@@ -22,6 +22,7 @@ import catalog;
 import catalog_delta_entry;
 import buffer_manager;
 import third_party;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -43,9 +44,17 @@ class BaseMemIndex;
 struct ChunkIndexEntry;
 
 export struct BGTask {
-    BGTask(BGTaskType type, bool async) : type_(type), async_(async) {}
+    BGTask(BGTaskType type, bool async) : type_(type), async_(async) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("BGTask");
+#endif
+    }
 
-    virtual ~BGTask() = default;
+    virtual ~BGTask() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("BGTask");
+#endif
+    }
 
     BGTaskType type_{BGTaskType::kInvalid};
     bool async_{false};

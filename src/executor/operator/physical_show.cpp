@@ -5878,20 +5878,23 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
         }
-        {
-            // object_name
-            Value value = Value::MakeVarchar(object_pair.first);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // object_count
-            Value value = Value::MakeBigInt(object_pair.second);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
+        if (object_pair.second > 0) {
 
-        ++row_count;
+            {
+                // object_name
+                Value value = Value::MakeVarchar(object_pair.first);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+            {
+                // object_count
+                Value value = Value::MakeBigInt(object_pair.second);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+
+            ++row_count;
+        }
         if (row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
             operator_state->output_.emplace_back(std::move(output_block_ptr));

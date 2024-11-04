@@ -19,6 +19,7 @@ import stl;
 
 import index_base;
 import column_def;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -38,6 +39,16 @@ public:
         for (SizeT idx = 0; idx < column_count; ++idx) {
             column_name2id_[columns_[idx]->name()] = idx;
         }
+
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("BaseResult");
+#endif
+    }
+
+    virtual ~TableDef() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("BaseResult");
+#endif
     }
 
     bool operator==(const TableDef &other) const;

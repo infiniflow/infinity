@@ -58,6 +58,7 @@ import base_table_ref;
 import cluster_manager;
 import admin_statement;
 import cleanup_scanner;
+import global_resource_usage;
 
 module wal_manager;
 
@@ -70,7 +71,11 @@ WalManager::WalManager(Storage *storage,
                        FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
       wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option), last_ckp_wal_size_(0),
-      checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {}
+      checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("WalManager");
+#endif
+}
 
 WalManager::WalManager(Storage *storage,
                        String wal_dir,
@@ -80,12 +85,19 @@ WalManager::WalManager(Storage *storage,
                        FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
       wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), data_path_(data_dir), storage_(storage), running_(false), flush_option_(flush_option),
-      last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {}
+      last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("WalManager");
+#endif
+}
 
 WalManager::~WalManager() {
     if (running_.load()) {
         Stop();
     }
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("WalManager");
+#endif
 }
 
 void WalManager::Start() {

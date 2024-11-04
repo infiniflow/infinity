@@ -45,6 +45,7 @@ import internal_types;
 import column_vector;
 import query_result;
 import select_statement;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -67,7 +68,17 @@ private:
     static ClientVersions client_version_;
 
 public:
-    InfinityThriftService() = default;
+    InfinityThriftService() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("InfinityThriftService");
+#endif
+    }
+
+    virtual ~InfinityThriftService() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("InfinityThriftService");
+#endif
+    }
 
     void Connect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ConnectRequest &request) final;
 

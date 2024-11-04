@@ -478,7 +478,7 @@ export struct QueueSourceState : public SourceState {
 
     bool GetData();
 
-    BlockingQueue<SharedPtr<FragmentDataBase>> source_queue_{};
+    BlockingQueue<SharedPtr<FragmentDataBase>> source_queue_{"QueueSourceState"};
 
     Map<u64, u64> num_tasks_; // fragment_id -> number of pending tasks
 

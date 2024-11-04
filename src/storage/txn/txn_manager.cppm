@@ -38,7 +38,7 @@ export class TxnManager {
 public:
     explicit TxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts);
 
-    ~TxnManager() = default;
+    ~TxnManager();
 
     Txn *BeginTxn(UniquePtr<String> txn_text, bool ckp_txn = false);
 

@@ -58,3 +58,6 @@ query II
 SELECT * FROM sqllogic_test_insert_embedding;
 ----
 0 [01111110]
+
+statement ok
+DROP TABLE sqllogic_test_insert_embedding;

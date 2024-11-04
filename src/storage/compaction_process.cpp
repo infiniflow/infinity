@@ -44,10 +44,21 @@ import segment_index_entry;
 import status;
 import default_values;
 import wal_manager;
+import global_resource_usage;
 
 namespace infinity {
 
-CompactionProcessor::CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr) : catalog_(catalog), txn_mgr_(txn_mgr) {}
+CompactionProcessor::CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr) : catalog_(catalog), txn_mgr_(txn_mgr) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("CompactionProcessor");
+#endif
+}
+
+CompactionProcessor::~CompactionProcessor() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("CompactionProcessor");
+#endif
+}
 
 void CompactionProcessor::Start() {
     LOG_INFO("Compaction processor is started.");

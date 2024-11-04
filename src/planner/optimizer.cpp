@@ -31,6 +31,7 @@ import explain_statement;
 import logical_node_type;
 import base_statement;
 import result_cache_getter;
+import global_resource_usage;
 
 module optimizer;
 
@@ -46,6 +47,10 @@ Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query
     if (query_context_ptr->storage()->result_cache_manager()) {
         AddRule(MakeUnique<ResultCacheGetter>()); // put after column pruner, column remapper
     }
+
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("Optimizer");
+#endif
 }
 
 void Optimizer::AddRule(UniquePtr<OptimizerRule> rule) { rules_.emplace_back(std::move(rule)); }

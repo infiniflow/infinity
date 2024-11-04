@@ -30,10 +30,15 @@ import persistence_manager;
 import infinity_context;
 import logger;
 import persist_result_handler;
+import global_resource_usage;
 
 namespace infinity {
 
-FileWorker::~FileWorker() = default;
+FileWorker::~FileWorker() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("FileWorker");
+#endif
+}
 
 bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {

@@ -53,6 +53,7 @@ import memory_indexer;
 import persistence_manager;
 import infinity_context;
 import admin_statement;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -61,12 +62,18 @@ Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID t
       txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
       txn_text_(std::move(txn_text)) {
     catalog_ = txn_store_.GetCatalog();
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("Txn");
+#endif
 }
 
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts)
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this, InfinityContext::instance().storage()->catalog()), txn_id_(txn_id),
       txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {
     catalog_ = txn_store_.GetCatalog();
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("Txn");
+#endif
 }
 
 UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -74,6 +81,12 @@ UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr,
     txn->txn_context_.commit_ts_ = begin_ts;
     txn->txn_context_.state_ = TxnState::kCommitted;
     return txn;
+}
+
+Txn::~Txn() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("Txn");
+#endif
 }
 
 // DML

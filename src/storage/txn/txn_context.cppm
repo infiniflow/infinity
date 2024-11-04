@@ -21,6 +21,7 @@ import txn_state;
 import third_party;
 import infinity_exception;
 import logger;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -30,7 +31,17 @@ export class TxnContext {
 public:
     friend class Txn;
 
-    TxnContext(TxnTimeStamp begin_ts) : begin_ts_(begin_ts) {}
+    TxnContext(TxnTimeStamp begin_ts) : begin_ts_(begin_ts) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("TxnContext");
+#endif
+    }
+
+    ~TxnContext() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("TxnContext");
+#endif
+    }
 
     inline TxnTimeStamp GetBeginTS() const { return begin_ts_; }
 

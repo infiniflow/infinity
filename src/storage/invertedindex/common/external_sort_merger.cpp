@@ -14,14 +14,14 @@
 
 module;
 #include <cassert>
+#include <cstdio>
+#include <cstring>
+#include <fcntl.h>
 #include <filesystem>
 #include <functional>
 #include <queue>
-#include <cstring>
 #include <sys/mman.h>
-#include <cstdio>
 #include <unistd.h>
-#include <fcntl.h>
 
 module external_sort_merger;
 
@@ -45,7 +45,7 @@ template <typename KeyType, typename LenType>
 SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32 bs, u32 output_num)
     : filenm_(filenm), MAX_GROUP_SIZE_(group_size), BS_SIZE_(bs), PRE_BUF_SIZE_((u32)(1. * bs * 0.8 / (group_size + 1))),
       RUN_BUF_SIZE_(PRE_BUF_SIZE_ * group_size), OUT_BUF_SIZE_(bs - RUN_BUF_SIZE_ - PRE_BUF_SIZE_), OUT_BUF_NUM_(output_num),
-      term_tuple_list_queue_() {
+      term_tuple_list_queue_("SortMerger") {
     run_buf_ = out_buf_ = nullptr;
     count_ = 0;
 
@@ -64,7 +64,6 @@ SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32
 
     out_buf_size_ = new u32[OUT_BUF_NUM_];
     out_buf_full_ = new bool[OUT_BUF_NUM_];
-
 
     CYCLE_BUF_SIZE_ = MAX_GROUP_SIZE_ + MAX_GROUP_SIZE_ / 2;
     CYCLE_BUF_THRESHOLD_ = MAX_GROUP_SIZE_;
@@ -314,9 +313,7 @@ void SortMerger<KeyType, LenType>::Merge() {
             IASSERT(micro_run_pos_[idx] <= size_micro_run_[idx]);
             std::unique_lock lock(cycle_buf_mtx_);
 
-            cycle_buf_con_.wait(lock, [this]() {
-                return !this->cycle_buffer_->IsEmpty() || read_finish_;
-            });
+            cycle_buf_con_.wait(lock, [this]() { return !this->cycle_buffer_->IsEmpty() || read_finish_; });
 
             if (read_finish_ && cycle_buffer_->IsEmpty()) {
                 merge_loser_tree_->DeleteTopInsert(nullptr, true);
@@ -363,7 +360,7 @@ void SortMerger<KeyType, LenType>::Unpin(Vector<UniquePtr<Thread>> &threads) {
     for (int i = 0; i < num_cores; ++i) {
         CPU_SET(i, &cpuset);
     }
-    for (auto& thread : threads) {
+    for (auto &thread : threads) {
         pthread_setaffinity_np(thread->native_handle(), sizeof(cpu_set_t), &cpuset);
     }
 #endif
@@ -436,7 +433,7 @@ void SortMerger<KeyType, LenType>::Run() {
 
     this->Unpin(threads);
 
-    for (auto& thread : threads) {
+    for (auto &thread : threads) {
         thread->join();
     }
     fclose(f);
@@ -451,7 +448,7 @@ void SortMerger<KeyType, LenType>::Run() {
 }
 
 template <typename KeyType, typename LenType>
-requires std::same_as<KeyType, TermTuple>
+    requires std::same_as<KeyType, TermTuple>
 SortMergerTermTuple<KeyType, LenType>::SortMergerTermTuple(const char *filenm, u32 group_size, u32 bs, u32 output_num)
     : Super(filenm, group_size, bs, output_num) {
     InitRunFile();
@@ -462,7 +459,7 @@ SortMergerTermTuple<KeyType, LenType>::SortMergerTermTuple(const char *filenm, u
 }
 
 template <typename KeyType, typename LenType>
-requires std::same_as<KeyType, TermTuple>
+    requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
     SharedPtr<TermTupleList> tuple_list = nullptr;
     u32 last_idx = -1;
@@ -490,9 +487,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
             IASSERT(this->micro_run_pos_[idx] <= this->size_micro_run_[idx]);
             std::unique_lock lock(this->cycle_buf_mtx_);
 
-            this->cycle_buf_con_.wait(lock, [this]() {
-                return !this->cycle_buffer_->IsEmpty() || this->read_finish_;
-            });
+            this->cycle_buf_con_.wait(lock, [this]() { return !this->cycle_buffer_->IsEmpty() || this->read_finish_; });
 
             if (this->read_finish_ && this->cycle_buffer_->IsEmpty()) {
                 this->merge_loser_tree_->DeleteTopInsert(nullptr, true);
@@ -529,19 +524,19 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
 }
 
 template <typename KeyType, typename LenType>
-requires std::same_as<KeyType, TermTuple>
+    requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::PredictImpl(DirectIO &io_stream) {
     this->Predict(io_stream);
 }
 
 template <typename KeyType, typename LenType>
-requires std::same_as<KeyType, TermTuple>
+    requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::InitRunFile() {
     run_file_ = fopen(this->filenm_.c_str(), "r");
 }
 
 template <typename KeyType, typename LenType>
-requires std::same_as<KeyType, TermTuple>
+    requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::UnInitRunFile() {
     fclose(run_file_);
     if (std::filesystem::exists(this->filenm_)) {
@@ -550,17 +545,17 @@ void SortMergerTermTuple<KeyType, LenType>::UnInitRunFile() {
 }
 
 template <typename KeyType, typename LenType>
-requires std::same_as<KeyType, TermTuple>
+    requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::JoinThreads(Vector<UniquePtr<Thread>> &threads) {
     this->Unpin(threads);
-    for (auto& thread : threads) {
+    for (auto &thread : threads) {
         thread->join();
     }
 }
 
 template <typename KeyType, typename LenType>
-requires std::same_as<KeyType, TermTuple>
-void SortMergerTermTuple<KeyType, LenType>::Run(Vector<UniquePtr<Thread>>& threads) {
+    requires std::same_as<KeyType, TermTuple>
+void SortMergerTermTuple<KeyType, LenType>::Run(Vector<UniquePtr<Thread>> &threads) {
     UniquePtr<Thread> predict_thread = MakeUnique<Thread>(std::bind(&self_t::PredictImpl, this, *io_stream_));
     UniquePtr<Thread> merge_thread = MakeUnique<Thread>(std::bind(&self_t::MergeImpl, this));
 
