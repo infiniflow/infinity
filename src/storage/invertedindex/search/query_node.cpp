@@ -22,6 +22,7 @@ import phrase_doc_iterator;
 import blockmax_wand_iterator;
 import minimum_should_match_iterator;
 import parse_fulltext_options;
+import keyword_iterator;
 
 namespace infinity {
 
@@ -550,8 +551,21 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
     }
 }
 
-std::unique_ptr<DocIterator> KeywordQueryNode::CreateSearch(CreateSearchParams params) const {
-    // TODO
+std::unique_ptr<DocIterator> KeywordQueryNode::CreateSearch(const CreateSearchParams params) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    sub_doc_iters.reserve(children_.size());
+    for (const auto &child : children_) {
+        if (child->GetType() != QueryNodeType::TERM) {
+            UnrecoverableError("KeywordQueryNode should only contain term children");
+        }
+        if (auto iter = child->CreateSearch(params); iter) {
+            sub_doc_iters.emplace_back(std::move(iter));
+        }
+    }
+    if (sub_doc_iters.empty()) {
+        return nullptr;
+    }
+    return std::make_unique<KeywordIterator>(std::move(sub_doc_iters), GetWeight());
 }
 
 std::unique_ptr<DocIterator> NotQueryNode::CreateSearch(CreateSearchParams) const {
@@ -659,7 +673,7 @@ uint32_t MultiQueryNode::LeafCount() const {
             return children_.front()->LeafCount();
         }
         case QueryNodeType::KEYWORD: {
-            return children_.size();
+            return 0;
         }
         default: {
             UnrecoverableError("LeafCount: Unexpected case!");
