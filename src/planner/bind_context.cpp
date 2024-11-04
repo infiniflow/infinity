@@ -31,10 +31,16 @@ import column_expr;
 import logger;
 import knn_expr;
 import match_sparse_expr;
+import global_resource_usage;
 
 namespace infinity {
 
-BindContext::~BindContext() { Destroy(); }
+BindContext::~BindContext() {
+    Destroy();
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("BindContext");
+#endif
+}
 
 void BindContext::Destroy() {
     // TODO: Bind context need to release the resource carefully.

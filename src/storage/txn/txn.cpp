@@ -53,6 +53,7 @@ import memory_indexer;
 import persistence_manager;
 import infinity_context;
 import admin_statement;
+import global_resource_usage;
 
 namespace infinity {
 

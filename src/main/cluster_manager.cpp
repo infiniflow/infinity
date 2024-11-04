@@ -32,7 +32,7 @@ namespace infinity {
 
 ClusterManager::ClusterManager(Storage *storage) : storage_(storage) {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("SessionManager");
+    GlobalResourceUsage::IncrObjectCount("ClusterManager");
 #endif
 }
 
@@ -44,7 +44,7 @@ ClusterManager::~ClusterManager() {
     }
     client_to_leader_.reset();
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("SessionManager");
+    GlobalResourceUsage::DecrObjectCount("ClusterManager");
 #endif
 }
 

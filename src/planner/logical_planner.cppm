@@ -43,6 +43,7 @@ import command_statement;
 import compact_statement;
 import data_type;
 import extra_ddl_info;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -51,6 +52,15 @@ public:
     explicit LogicalPlanner(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
         names_ptr_ = MakeShared<Vector<String>>();
         types_ptr_ = MakeShared<Vector<DataType>>();
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("LogicalPlanner");
+#endif
+    }
+
+    ~LogicalPlanner() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("LogicalPlanner");
+#endif
     }
 
     Status Build(const BaseStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

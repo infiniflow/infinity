@@ -33,7 +33,6 @@ import extra_ddl_info;
 import internal_types;
 import column_def;
 import value;
-import global_resource_usage;
 
 namespace infinity {
 
