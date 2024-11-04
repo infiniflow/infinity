@@ -37,6 +37,7 @@ enum class QueryNodeType : char {
     AND,
     AND_NOT,
     OR,
+    KEYWORD,
     // unimplemented:
     PREFIX_TERM,
     SUFFIX_TERM,
@@ -137,7 +138,7 @@ struct MultiQueryNode : public QueryNode {
 
     void Add(std::unique_ptr<QueryNode> &&node) { children_.emplace_back(std::move(node)); }
     uint32_t LeafCount() const override;
-    void PushDownWeight(float factor) final {
+    void PushDownWeight(float factor) override {
         // no need to update weight for MultiQueryNode, because it will be reset to 1.0
         factor *= GetWeight();
         for (auto &child : children_) {
@@ -180,9 +181,14 @@ struct OrQueryNode final : public MultiQueryNode {
     std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params) const override;
 };
 
+struct KeywordQueryNode final : public MultiQueryNode {
+    KeywordQueryNode() : MultiQueryNode(QueryNodeType::KEYWORD) {}
+    void PushDownWeight(float factor) override { MultiplyWeight(factor); }
+    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params) const override;
+};
+
 // unimplemented
-struct WandQueryNode;
-// struct PhraseQueryNode;
 struct PrefixTermQueryNode;
 struct SuffixTermQueryNode;
 struct SubstringTermQueryNode;

@@ -1,0 +1,44 @@
+
+statement ok
+DROP TABLE IF EXISTS ft_keyword;
+
+statement ok
+CREATE TABLE ft_keyword(num int, doc varchar);
+
+# copy data from csv file
+statement ok
+COPY ft_keyword FROM '/var/infinity/test_data/fulltext_delete.csv' WITH ( DELIMITER '\t', FORMAT CSV );
+
+statement ok
+INSERT INTO ft_keyword VALUES (4, 'another second text xxx'), (5, 'another multiple');
+
+statement ok
+CREATE INDEX ft_index ON ft_keyword(doc) USING FULLTEXT WITH (analyzer = keyword);
+
+query I
+SELECT * FROM ft_keyword;
+----
+1 first text
+2 second text multiple
+3 third text many words
+4 another second text xxx
+5 another multiple
+
+query I
+SELECT *, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc', 'second text', 'topn=10');
+----
+1 first text 1.000000
+2 second text multiple 1.000000
+3 third text many words 1.000000
+4 another second text xxx 1.000000
+
+query I
+SELECT *, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5', 'multiple another', 'topn=10');
+----
+2 second text multiple 4.500000
+4 another second text xxx 4.500000
+5 another multiple 4.500000
+
+# Clean up
+statement ok
+DROP TABLE ft_keyword;
