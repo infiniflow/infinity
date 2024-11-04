@@ -14,9 +14,9 @@ def image_exists(image_name):
 
 
 def main(image_name: str, bin_path: str):
-    if image_exists(image_name):
-        print(f"Image {image_name} already exists.")
-        return
+    # if image_exists(image_name):
+    #     print(f"Image {image_name} already exists.")
+    #     return
 
     # download_command = "wget -O docker-27.3.1.tgz https://download.docker.com/linux/static/stable/x86_64/docker-27.3.1.tgz"
     # subprocess.check_call(download_command, shell=True)

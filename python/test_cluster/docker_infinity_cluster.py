@@ -228,7 +228,6 @@ class DockerInfinityCluster(InfinityCluster):
 
         try:
             container = docker_client.containers.get(container_name)
-            added = False
         except docker.errors.NotFound:
             container = docker_client.containers.run(
                 image=self.image_name,
@@ -241,10 +240,11 @@ class DockerInfinityCluster(InfinityCluster):
                 ],
                 environment=[f"TZ={tz}"],
             )
-            added = True
 
-        if added:
+        try:
             self.network.connect(container)
+        except docker.errors.APIError as e:
+            pass
         info = docker_client.api.inspect_network(self.network.id)
         # print(info)
         mock_ip = info["Containers"][container.id]["IPv4Address"]

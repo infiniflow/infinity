@@ -34,13 +34,16 @@ class MinioParams:
 
 
 class BaseInfinityRunner:
-    def __init__(self, node_name: str, executable_path: str, config_path: str):
+    def __init__(self, node_name: str, executable_path: str, config_path: str, init: bool = True):
         self.node_name = node_name
         self.executable_path = executable_path
         self.config_path = config_path
         self.load_config()
         http_ip, http_port = self.http_uri()
         self.add_client(f"http://{http_ip}:{http_port}/")
+        if init:
+            print(f"Initializing node {self.node_name}")
+            self.init(config_path)
 
     @abstractmethod
     def init(self, config_path: str | None):
@@ -86,11 +89,8 @@ class InfinityRunner(BaseInfinityRunner):
     def __init__(
         self, node_name: str, executable_path: str, config_path: str, init=True
     ):
-        super().__init__(node_name, executable_path, config_path)
         self.process = None
-        if init:
-            print(f"Initializing node {self.node_name}")
-            self.init(config_path)
+        super().__init__(node_name, executable_path, config_path, init)
 
     def init(self, config_path: str | None):
         if self.process is not None:
