@@ -50,6 +50,10 @@ LocalFileHandle::~LocalFileHandle() {
     fd_ = -1;
     path_.clear();
     access_mode_ = FileAccessMode::kInvalid;
+
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("LocalFileHandle");
+#endif
 }
 
 Status LocalFileHandle::Close() {

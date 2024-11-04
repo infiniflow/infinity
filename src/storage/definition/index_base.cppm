@@ -17,9 +17,9 @@ module;
 export module index_base;
 
 import stl;
-
 import third_party;
 import create_index_info;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -43,12 +43,24 @@ protected:
                        const String &file_name,
                        Vector<String> column_names)
         : index_type_(index_type), index_name_(std::move(index_name)), index_comment_(std::move(index_comment)), file_name_(file_name),
-          column_names_(std::move(column_names)) {}
+          column_names_(std::move(column_names)) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("IndexBase");
+#endif
+    }
 
 public:
-    explicit IndexBase(SharedPtr<String> index_name) : index_name_(std::move(index_name)) {}
+    explicit IndexBase(SharedPtr<String> index_name) : index_name_(std::move(index_name)) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("IndexBase");
+#endif
+    }
 
-    virtual ~IndexBase() = default;
+    virtual ~IndexBase() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("BaseResult");
+#endif
+    }
 
     bool operator==(const IndexBase &other) const;
 
