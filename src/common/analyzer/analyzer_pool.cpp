@@ -31,6 +31,7 @@ import korean_analyzer;
 import standard_analyzer;
 import ngram_analyzer;
 import rag_analyzer;
+import keyword_analyzer;
 import logger;
 
 namespace infinity {
@@ -266,6 +267,9 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 return {nullptr, Status::InvalidAnalyzerName(fmt::format("NGRAM-number, number > 0, but it is {}.", name))};
             }
             return {MakeUnique<NGramAnalyzer>(ngram), Status::OK()};
+        }
+        case Str2Int(KEYWORD.data()): {
+            return {MakeUnique<KeywordAnalyzer>(), Status::OK()};
         }
         default: {
             if(std::filesystem::is_regular_file(name)) {
