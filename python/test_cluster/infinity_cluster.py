@@ -131,7 +131,7 @@ class InfinityCluster:
         self.executable_path = executable_path
         self.runners: dict[str, InfinityRunner] = {}
         self.leader_runner: InfinityRunner | None = None
-
+        self.leader_name = None
         self.add_minio(minio_params)
 
     def clear(self):
@@ -170,12 +170,18 @@ class InfinityCluster:
             )
 
     def set_standalone(self, node_name: str):
+        if self.leader_runner is not None and self.leader_name == node_name:
+            self.leader_name = None
+            self.leader_runner = None
         if node_name not in self.runners:
             raise ValueError(f"Node {node_name} not found in the runners.")
         runner = self.runners[node_name]
         runner.client.set_role_standalone(node_name)
 
     def set_admin(self, node_name: str):
+        if self.leader_runner is not None and self.leader_name == node_name:
+            self.leader_name = None
+            self.leader_runner = None
         if node_name not in self.runners:
             raise ValueError(f"Node {node_name} not found in the runners.")
         runner = self.runners[node_name]
@@ -189,6 +195,7 @@ class InfinityCluster:
         if leader_name not in self.runners:
             raise ValueError(f"Leader {leader_name} not found in the runners.")
         leader_runner = self.runners[leader_name]
+        self.leader_name = leader_name
         self.leader_runner = leader_runner
         leader_runner.client.set_role_leader(leader_name)
 
@@ -210,7 +217,7 @@ class InfinityCluster:
             raise ValueError("Learner has not been initialized.")
         learner_runner = self.runners[learner_name]
         leader_ip, leader_port = self.leader_addr()
-        learner_runner.client.set_role_follower(
+        learner_runner.client.set_role_learner(
             learner_name, f"{leader_ip}:{leader_port}"
         )
 

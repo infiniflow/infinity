@@ -175,7 +175,7 @@ def test_tc1(cluster: InfinityCluster):
         print(e)
 
 
-    infinity1.set_role_admin()
+    cluster.set_admin("node1")
     time.sleep(1)
     res = infinity2.show_node("node1")
     assert(res.node_status == "timeout")
@@ -193,7 +193,7 @@ def test_tc1(cluster: InfinityCluster):
     except InfinityException as e:
         print(e)
 
-    infinity1.set_role_leader("node1")
+    cluster.set_leader("node1")
     time.sleep(1)
     res = infinity1.show_node("node1")
     assert(res.node_name == "node1")
@@ -211,9 +211,8 @@ def test_tc1(cluster: InfinityCluster):
     assert(res.node_role == "leader")
     assert(res.node_status == "lost connection")
     # reconnect leader and check the status
-    infinity2.set_role_admin()
-    leader_ip, leader_port = cluster.leader_addr()
-    infinity2.set_role_follower("node2", f"{leader_ip}:{leader_port}")
+    cluster.set_admin("node2")
+    cluster.set_follower("node2")
     time.sleep(1)
     res = infinity1.show_node("node2")
     assert(res.node_name == "node2")
@@ -244,7 +243,7 @@ def test_tc1(cluster: InfinityCluster):
     res = table2.output(["*"]).to_df()
     pd.testing.assert_frame_equal(res, res_gt)
 
-    infinity2.set_role_admin()
+    cluster.set_admin("node2")
     time.sleep(1)
     try:
         infinity1.show_node("node2")
@@ -256,7 +255,7 @@ def test_tc1(cluster: InfinityCluster):
     except InfinityException as e:
         print(e)
 
-    infinity2.set_role_follower("node2", f"{leader_ip}:{leader_port}")
+    cluster.set_follower("node2")
     time.sleep(1)
     res = infinity1.show_node("node2")
     assert(res.node_name == "node2")
@@ -309,14 +308,13 @@ def test_tc2(cluster: InfinityCluster):
     cluster.add_node("node2", "conf/follower.toml")
     cluster.add_node("node3", "conf/learner.toml")
     cluster.add_node("node4", "conf/learner2.toml")
-    cluster.init_admin("node1")
-    cluster.init_admin("node2")
-    cluster.init_admin("node3")
-    cluster.init_admin("node4")
+    cluster.set_admin("node1")
+    cluster.set_admin("node2")
+    cluster.set_admin("node3")
+    cluster.set_admin("node4")
 
+    cluster.set_leader("node1")
     infinity1 = cluster.client("node1")
-    cluster.leader_runner = cluster.runners["node1"]
-    infinity1.set_role_leader("node1")
     db1 = infinity1.get_database("default_db")
     table_name = "table1_tc2"
     db1.drop_table(table_name, ConflictType.Ignore)
@@ -326,15 +324,14 @@ def test_tc2(cluster: InfinityCluster):
     for i in range(10):
         table1.insert([{"c1": i, "c2": [1.0, 2.0, 3.0, 4.0]}])
 
-    leader_ip, leader_port = cluster.leader_addr()
     infinity2 = cluster.client("node2")
-    infinity2.set_role_follower("node2", f"{leader_ip}:{leader_port}")
+    cluster.set_follower("node2")
 
     infinity3 = cluster.client("node3")
-    infinity3.set_role_learner("node3", f"{leader_ip}:{leader_port}")
+    cluster.set_learner("node3")
 
     infinity4 = cluster.client("node4")
-    infinity4.set_role_learner("node4", f"{leader_ip}:{leader_port}")
+    cluster.set_learner("node4")
 
     for server in [infinity1, infinity2, infinity3, infinity4]:
         time.sleep(1)
