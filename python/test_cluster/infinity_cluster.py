@@ -89,6 +89,7 @@ class InfinityRunner(BaseInfinityRunner):
         super().__init__(node_name, executable_path, config_path)
         self.process = None
         if init:
+            print(f"Initializing node {self.node_name}")
             self.init(config_path)
 
     def init(self, config_path: str | None):
@@ -140,8 +141,8 @@ class InfinityCluster:
         # if self.minio_container is not None:
         #     self.minio_container.remove(force=True, v=True)
 
-    def add_node(self, node_name: str, config_path: str):
-        runner = InfinityRunner(node_name, self.executable_path, config_path)
+    def add_node(self, node_name: str, config_path: str, init=True):
+        runner = InfinityRunner(node_name, self.executable_path, config_path, init)
         if node_name in self.runners:
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner

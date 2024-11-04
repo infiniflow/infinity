@@ -10,7 +10,6 @@ import common_values
 
 
 class TestImport:
-    pytest.mark.skip(reason="skip")
     def test1(self, cluster: InfinityCluster):
         try:
             cluster.add_node("node1", "conf/leader.toml")
