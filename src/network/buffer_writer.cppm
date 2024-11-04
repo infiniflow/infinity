@@ -27,16 +27,8 @@ namespace infinity {
 
 export class BufferWriter {
 public:
-    explicit BufferWriter(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("BufferWriter");
-#endif
-    }
-    ~BufferWriter() {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount("BufferWriter");
-#endif
-    }
+    explicit BufferWriter(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {}
+    ~BufferWriter() = default;
     [[nodiscard]] SizeT size() const;
 
     inline static SizeT max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }

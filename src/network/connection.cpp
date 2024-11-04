@@ -44,11 +44,7 @@ import global_resource_usage;
 namespace infinity {
 
 Connection::Connection(boost::asio::io_service &io_service)
-    : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("PGConnection");
-#endif
-}
+    : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
 
 Connection::~Connection() {
     if (session_ == nullptr) {
@@ -57,9 +53,6 @@ Connection::~Connection() {
     }
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
     session_mgr->RemoveSessionByID(session_->session_id());
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("PGConnection");
-#endif
 }
 
 void Connection::HandleError(const char *error_message) {

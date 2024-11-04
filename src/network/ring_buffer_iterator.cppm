@@ -30,17 +30,9 @@ public:
 #endif
     }
 
-    RingBufferIterator(const RingBufferIterator &other) : data_(other.data_), position_(other.position_) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("RingBufferIterator");
-#endif
-    }
+    RingBufferIterator(const RingBufferIterator &other) : data_(other.data_), position_(other.position_) {}
 
-    ~RingBufferIterator() {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount("RingBufferIterator");
-#endif
-    }
+    ~RingBufferIterator() = default;
 
     RingBufferIterator &operator=(const RingBufferIterator &other) {
         //        Assert<NetworkException>(&data_ == &other.data_, "The two iterators are from different arrays");

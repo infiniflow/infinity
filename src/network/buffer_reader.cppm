@@ -27,17 +27,9 @@ namespace infinity {
 
 export class BufferReader {
 public:
-    explicit BufferReader(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("BufferReader");
-#endif
-    }
+    explicit BufferReader(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {}
 
-    ~BufferReader() {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount("BufferReader");
-#endif
-    }
+    ~BufferReader() = default;
 
     [[nodiscard]] SizeT size() const;
 

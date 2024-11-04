@@ -22,17 +22,9 @@ import global_resource_usage;
 
 namespace infinity {
 
-PGProtocolHandler::PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : buffer_reader_(socket), buffer_writer_(socket) {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("PGProtocolHandler");
-#endif
-}
+PGProtocolHandler::PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : buffer_reader_(socket), buffer_writer_(socket) {}
 
-PGProtocolHandler::~PGProtocolHandler() {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("PGProtocolHandler");
-#endif
-}
+PGProtocolHandler::~PGProtocolHandler() = default;
 
 u32 PGProtocolHandler::read_startup_header() {
     constexpr u32 SSL_MESSAGE_VERSION = 80877103u;
