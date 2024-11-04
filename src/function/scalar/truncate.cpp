@@ -20,33 +20,31 @@ namespace infinity {
 struct TruncateFunction {
     template <typename XType, typename DType, typename ResultType>
     static inline bool Run(XType x_value, DType d_value, ResultType &result) {
-        // 检查 x_value 是否为 NaN 或 Inf
-        if (std::isnan(x_value) || std::isinf(x_value)) {
+        double x_val = static_cast<double>(x_value);
+
+        if (std::isnan(x_val) || std::isinf(x_val)) {
             return false;
         }
 
         int64_t d_int = static_cast<int64_t>(d_value);
 
-        // 优化：处理特殊情况，避免使用 std::pow
         double factor = 1.0;
+        double temp_result = 0.0;
+
         if (d_int > 0) {
-            // 当 d_int > 0 时，计算 10 的 d_int 次方
             for (int64_t i = 0; i < d_int; ++i) {
                 factor *= 10.0;
             }
-            temp_result = std::trunc(x_value * factor) / factor;
+            temp_result = std::trunc(x_val * factor) / factor;
         } else if (d_int < 0) {
-            // 当 d_int < 0 时，计算 10 的 -d_int 次方
             for (int64_t i = 0; i < -d_int; ++i) {
                 factor *= 10.0;
             }
-            temp_result = std::trunc(x_value / factor) * factor;
+            temp_result = std::trunc(x_val / factor) * factor;
         } else {
-            // 当 d_int == 0 时，不需要计算
-            temp_result = std::trunc(x_value);
+            temp_result = std::trunc(x_val);
         }
 
-        // 检查结果是否有效
         if (std::isnan(temp_result) || std::isinf(temp_result)) {
             return false;
         }
@@ -60,8 +58,6 @@ void RegisterTruncateFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "truncate";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
-
-    // 注册不同数据类型的 truncate 函数
     function_set_ptr->AddFunction(ScalarFunction(func_name,
                                                  {DataType(LogicalType::kTinyInt), DataType(LogicalType::kInteger)},
                                                  DataType(LogicalType::kDouble),
