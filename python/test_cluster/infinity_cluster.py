@@ -136,8 +136,17 @@ class InfinityCluster:
         self.add_minio(minio_params)
 
     def clear(self):
-        for runner in self.runners.values():
-            runner.uninit()
+        # shutdown follower and learner first
+        if self.leader_runner is not None:
+            for runner_name in self.runners.keys():
+                if runner_name != self.leader_name:
+                    self.runners[runner_name].uninit()
+            self.runners[self.leader_name].uninit()
+        else:
+            for runner in self.runners.values():
+                runner.uninit()
+        self.runners.clear()
+
         # if self.minio_container is not None:
         #     self.minio_container.remove(force=True, v=True)
 
@@ -238,6 +247,9 @@ class InfinityCluster:
         runner = self.runners[node_name]
         runner.uninit()
         del self.runners[node_name]
+        if self.leader_name is not None and self.leader_name == node_name:
+            self.leader_name = None
+            self.leader_runner = None
 
 
 if __name__ == "__main__":
