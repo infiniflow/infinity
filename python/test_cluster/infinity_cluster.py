@@ -57,7 +57,7 @@ class BaseInfinityRunner:
         self.__init_cmd(lambda: self.client.set_role_standalone(self.node_name))
 
     def init_as_admin(self, config_path: str | None = None):
-        #self.init(config_path)
+        self.init(config_path)
         http_ip, http_port = self.http_uri()
         self.add_client(f"http://{http_ip}:{http_port}/")
         self.__init_cmd(lambda: self.client.set_role_admin())
@@ -74,6 +74,14 @@ class BaseInfinityRunner:
         self.add_client(f"http://{http_ip}:{http_port}/")
         self.__init_cmd(
             lambda: self.client.set_role_follower(self.node_name, leader_addr)
+        )
+
+    def init_as_learner(self, leader_addr: str, config_path: str | None = None):
+        self.init(config_path)
+        http_ip, http_port = self.http_uri()
+        self.add_client(f"http://{http_ip}:{http_port}/")
+        self.__init_cmd(
+            lambda: self.client.set_role_learner(self.node_name, leader_addr)
         )
 
     @abstractmethod
@@ -222,6 +230,15 @@ class InfinityCluster:
         follower_runner = self.runners[follower_name]
         leader_ip, leader_port = self.leader_addr()
         follower_runner.init_as_follower(f"{leader_ip}:{leader_port}")
+
+    def init_learner(self, learner_name: str):
+        if learner_name not in self.runners:
+            raise ValueError(f"Learner {learner_name} not found in the runners")
+        if self.leader_runner is None:
+            raise ValueError("Learner has not been initialized.")
+        learner_runner = self.runners[learner_name]
+        leader_ip, leader_port = self.leader_addr()
+        learner_runner.init_as_learner(f"{leader_ip}:{leader_port}")
 
     def client(self, node_name: str) -> infinity_http | None:
         if node_name not in self.runners:
