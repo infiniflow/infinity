@@ -70,6 +70,7 @@ class TestInsert:
         self.__test_inner_1(docker_cluster)
 
     # read/write when leader/follower is disconnected
+    @pytest.mark.docker
     def test_insert_2(self, docker_cluster: DockerInfinityCluster):
         try:
             docker_cluster.add_node("node1", "conf/leader.toml")
@@ -135,6 +136,7 @@ class TestInsert:
             docker_cluster.clear()
 
     @pytest.mark.skip("Bug")
+    @pytest.mark.docker
     def test_insert_3(self, docker_cluster: DockerInfinityCluster):
         try:
             docker_cluster.add_node("node1", "conf/leader.toml")
