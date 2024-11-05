@@ -19,7 +19,6 @@ module;
 #include <cmath>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 
 #include <openccxx.h>
 #include <pcre2.h>
