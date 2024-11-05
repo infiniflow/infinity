@@ -88,7 +88,7 @@ export struct FilterQueryNode final : public QueryNode {
 
     void PushDownWeight(const float factor) override { MultiplyWeight(factor); }
 
-    UniquePtr<DocIterator> CreateSearch(CreateSearchParams params) const override;
+    UniquePtr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
 

@@ -186,6 +186,16 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
             RecoverableError(std::move(status));
         }
         TermList terms = GetTermListFromAnalyzer(default_analyzer_name, analyzer.get(), query);
+        if (terms.empty()) {
+            RecoverableError(Status::SyntaxError("Empty query text"));
+            return nullptr;
+        }
+        if (terms.size() == 1 && default_analyzer_name != "keyword") {
+            auto q = std::make_unique<TermQueryNode>();
+            q->term_ = terms.front().text_;
+            q->column_ = default_field;
+            return q;
+        }
         std::unique_ptr<MultiQueryNode> multi_query;
         if (default_analyzer_name == "keyword") {
             multi_query = std::make_unique<KeywordQueryNode>();
@@ -218,6 +228,20 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::stri
         RecoverableError(std::move(status));
     }
     TermList terms = GetTermListFromAnalyzer(analyzer_name, analyzer.get(), text);
+    if (terms.empty()) {
+        RecoverableError(Status::SyntaxError("Empty query text"));
+        return nullptr;
+    }
+    if (analyzer_name == "keyword") {
+        auto result = std::make_unique<KeywordQueryNode>();
+        for (const auto &term : terms) {
+            auto subquery = std::make_unique<TermQueryNode>();
+            subquery->term_ = term.text_;
+            subquery->column_ = field;
+            result->Add(std::move(subquery));
+        }
+        return result;
+    }
 
     // 2. build query node
     if (terms.empty()) {
