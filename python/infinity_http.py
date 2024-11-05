@@ -146,6 +146,13 @@ class infinity_http:
         self.net.raise_exception(r)
         return database_result()
 
+    def set_role_learner(self, node_name, leader_addr):
+        url = f"admin/node/current"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], {"role": "learner", "name": node_name, "address": leader_addr})
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
 
     # database
     def create_database(self, db_name, opt=ConflictType.Error):
@@ -432,9 +439,9 @@ class table_http:
         self.net.raise_exception(r)
         r_json = r.json()
         index_list = []
-        exists = r_json.get("tables", None)
+        exists = r_json.get("indexes", None)
         if exists is not None:
-            for t in r_json["tables"]:
+            for t in r_json["indexes"]:
                 index_list.append(t)
         return database_result(index_list=index_list)
 
