@@ -20,6 +20,7 @@ import stl;
 import table_entry_type;
 import logger;
 import infinity_exception;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -49,7 +50,20 @@ inline String ToString(BaseTableType type) {
 export class BaseTable {
 public:
     explicit BaseTable(TableEntryType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
-            : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
+        : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("BaseTable");
+#endif
+    }
+
+    BaseTable(const BaseTable &other_table) = delete;
+    BaseTable(BaseTable &&other) = delete;
+
+    virtual ~BaseTable() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("BaseTable");
+#endif
+    }
 
     [[nodiscard]] inline TableEntryType kind() const { return kind_; }
 

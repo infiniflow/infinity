@@ -14,22 +14,24 @@
 
 module;
 
-export module http_server;
+#include <sstream>
+#include <string>
+module keyword_analyzer;
 
 import stl;
-import third_party;
+import term;
+import analyzer;
 
 namespace infinity {
 
-export class HTTPServer {
-public:
-    void Start(const String& server_address, u16 port);
-    void Shutdown();
-
-private:
-    SharedPtr<HttpRouter> router_{};
-    SharedPtr<WebServer> server_{};
-    atomic_bool started_{false};
-};
+int KeywordAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
+    std::istringstream is(input.text_);
+    std::string t;
+    u32 offset = 0;
+    while (is >> t) {
+        func(data, t.data(), t.size(), offset++, 0, Term::AND, 0, false);
+    }
+    return 0;
+}
 
 } // namespace infinity

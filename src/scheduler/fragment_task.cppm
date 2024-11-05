@@ -19,6 +19,7 @@ export module fragment_task;
 import stl;
 import profiler;
 import operator_state;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -46,11 +47,24 @@ export String FragmentTaskStatus2String(FragmentTaskStatus status) {
 
 export class FragmentTask {
 public:
-    explicit FragmentTask(bool terminator = true) : is_terminator_(terminator) {}
+    explicit FragmentTask(bool terminator = true) : is_terminator_(terminator) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("FragmentTask");
+#endif
+    }
 
     explicit FragmentTask(void *fragment_context, i64 task_id, i64 operator_count)
         : fragment_context_(fragment_context), task_id_(task_id), operator_count_(operator_count) {
         Init();
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("FragmentTask");
+#endif
+    }
+
+    ~FragmentTask() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("FragmentTask");
+#endif
     }
 
     [[nodiscard]] inline bool IsTerminator() const { return is_terminator_; }

@@ -18,6 +18,7 @@ export module peer_task;
 
 import stl;
 import admin_statement;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -53,9 +54,19 @@ export struct NodeInfo {
 
 export class PeerTask {
 public:
-    explicit PeerTask(PeerTaskType type, bool async = false) : type_(type), complete_(false), async_(async) //complete_ should not be assigned false in wait(), otherwise it might be stuck in wait() forever if complete() is called before wait().
-    {}
-    virtual ~PeerTask() = default;
+    explicit PeerTask(PeerTaskType type, bool async = false)
+        : type_(type), complete_(false), async_(async) // complete_ should not be assigned false in wait(), otherwise it might be stuck in wait()
+                                                       // forever if complete() is called before wait().
+    {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("PeerTask");
+#endif
+    }
+    virtual ~PeerTask() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("PeerTask");
+#endif
+    }
 
     void Wait() {
         if (async_) {

@@ -35,8 +35,7 @@ export class BaseSession {
 
 public:
     BaseSession(u64 session_id, SessionType session_type)
-        : connected_time_(std::time(nullptr)), current_database_("default_db"), session_type_(session_type),
-        session_id_(session_id) {}
+        : connected_time_(std::time(nullptr)), current_database_("default_db"), session_type_(session_type), session_id_(session_id) {}
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
@@ -89,13 +88,33 @@ protected:
 export class LocalSession : public BaseSession {
 
 public:
-    explicit LocalSession(u64 session_id) : BaseSession(session_id, SessionType::kLocal) {}
+    explicit LocalSession(u64 session_id) : BaseSession(session_id, SessionType::kLocal) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("LocalSession");
+#endif
+    }
+
+    ~LocalSession() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("LocalSession");
+#endif
+    }
 };
 
 export class RemoteSession : public BaseSession {
 
 public:
-    explicit RemoteSession(u64 session_id) : BaseSession(session_id, SessionType::kRemote) {}
+    explicit RemoteSession(u64 session_id) : BaseSession(session_id, SessionType::kRemote) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("RemoteSession");
+#endif
+    }
+
+    ~RemoteSession() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("RemoteSession");
+#endif
+    }
 
     [[nodiscard]] inline const String &user_name() const { return user_name_; }
 

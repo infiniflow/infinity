@@ -39,6 +39,7 @@ import logical_type;
 import embedding_info;
 import sparse_info;
 import data_type;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -54,7 +55,7 @@ Connection::~Connection() {
     session_mgr->RemoveSessionByID(session_->session_id());
 }
 
-void Connection::HandleError(const char* error_message) {
+void Connection::HandleError(const char *error_message) {
     HashMap<PGMessageType, String> error_message_map;
     error_message_map[PGMessageType::kHumanReadableError] = error_message;
     LOG_ERROR(error_message);
@@ -68,9 +69,9 @@ void Connection::Run() {
 
     SessionManager *session_manager = InfinityContext::instance().session_manager();
     SharedPtr<RemoteSession> remote_session = session_manager->CreateRemoteSession();
-    if(remote_session == nullptr) {
+    if (remote_session == nullptr) {
         HandleError("Infinity is running under maintenance mode, only one connection is allowed.");
-        return ;
+        return;
     }
 
     session_ = std::move(remote_session);
@@ -84,8 +85,8 @@ void Connection::Run() {
             HandleRequest();
         } catch (const infinity::RecoverableException &e) {
             LOG_TRACE(fmt::format("Recoverable exception: {}", e.what()));
-            return ;
-        } catch (const infinity::UnrecoverableException& e) {
+            return;
+        } catch (const infinity::UnrecoverableException &e) {
             HandleError(e.what());
         } catch (const std::exception &e) {
             HandleError(e.what());

@@ -33,6 +33,7 @@ import select_statement;
 import parsed_expr;
 import search_expr;
 import data_type;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -54,9 +55,19 @@ public:
     static inline SharedPtr<BindContext> Make(BindContext *parent) { return MakeShared<BindContext>(parent); }
 
 public:
-    explicit BindContext(const SharedPtr<BindContext> &parent) : parent_(parent.get()) { binding_context_id_ = GenerateBindingContextIndex(); }
+    explicit BindContext(const SharedPtr<BindContext> &parent) : parent_(parent.get()) {
+        binding_context_id_ = GenerateBindingContextIndex();
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("BindContext");
+#endif
+    }
 
-    explicit BindContext(BindContext *parent) : parent_(parent) { binding_context_id_ = GenerateBindingContextIndex(); }
+    explicit BindContext(BindContext *parent) : parent_(parent) {
+        binding_context_id_ = GenerateBindingContextIndex();
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("BindContext");
+#endif
+    }
 
     virtual ~BindContext();
 

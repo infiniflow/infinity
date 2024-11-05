@@ -1,4 +1,4 @@
-// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,22 +14,19 @@
 
 module;
 
-export module http_server;
-
+export module keyword_analyzer;
 import stl;
-import third_party;
+import term;
+import analyzer;
 
 namespace infinity {
-
-export class HTTPServer {
+export class KeywordAnalyzer : public Analyzer {
 public:
-    void Start(const String& server_address, u16 port);
-    void Shutdown();
+    KeywordAnalyzer() = default;
+    ~KeywordAnalyzer() override = default;
 
-private:
-    SharedPtr<HttpRouter> router_{};
-    SharedPtr<WebServer> server_{};
-    atomic_bool started_{false};
+protected:
+    int AnalyzeImpl(const Term &input, void *data, HookType func) override;
 };
 
 } // namespace infinity

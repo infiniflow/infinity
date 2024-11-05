@@ -807,11 +807,11 @@ namespace infinity {
   case 4: // query: query clause
 #line 91 "search_parser.y"
                {
-    auto query = driver.GetMultiQueryNodeByOperatorOption();
-    auto *multi_query_ptr = dynamic_cast<MultiQueryNode *>(query.get());
-    multi_query_ptr->Add(std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ()));
-    multi_query_ptr->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
-    yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
+    assert(driver.operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax);
+    auto q = std::make_unique<OrQueryNode>();
+    q->Add(std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ()));
+    q->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
+    yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(q);
 }
 #line 817 "search_parser.cpp"
     break;
@@ -819,10 +819,10 @@ namespace infinity {
   case 5: // query: query OR clause
 #line 98 "search_parser.y"
                   {
-    auto query = std::make_unique<OrQueryNode>();
-    query->Add(std::move(yystack_[2].value.as < std::unique_ptr<QueryNode> > ()));
-    query->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
-    yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
+    auto q = std::make_unique<OrQueryNode>();
+    q->Add(std::move(yystack_[2].value.as < std::unique_ptr<QueryNode> > ()));
+    q->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
+    yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(q);
 }
 #line 828 "search_parser.cpp"
     break;
@@ -901,7 +901,7 @@ namespace infinity {
         YYERROR;
     }
     std::string text = SearchDriver::Unescape(yystack_[0].value.as < InfString > ().text_);
-    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, std::move(text), yystack_[0].value.as < InfString > ().from_quoted_);
+    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, text, yystack_[0].value.as < InfString > ().from_quoted_);
 }
 #line 907 "search_parser.cpp"
     break;
@@ -911,7 +911,7 @@ namespace infinity {
                          {
     std::string field = SearchDriver::Unescape(yystack_[2].value.as < InfString > ().text_);
     std::string text = SearchDriver::Unescape(yystack_[0].value.as < InfString > ().text_);
-    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(std::move(field), std::move(text), yystack_[0].value.as < InfString > ().from_quoted_);
+    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, text, yystack_[0].value.as < InfString > ().from_quoted_);
 }
 #line 917 "search_parser.cpp"
     break;
@@ -925,7 +925,7 @@ namespace infinity {
         YYERROR;
     }
     std::string text = SearchDriver::Unescape(yystack_[1].value.as < InfString > ().text_);
-    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, std::move(text), yystack_[1].value.as < InfString > ().from_quoted_, yystack_[0].value.as < unsigned long > ());
+    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, text, yystack_[1].value.as < InfString > ().from_quoted_, yystack_[0].value.as < unsigned long > ());
 }
 #line 931 "search_parser.cpp"
     break;
@@ -935,7 +935,7 @@ namespace infinity {
                                {
     std::string field = SearchDriver::Unescape(yystack_[3].value.as < InfString > ().text_);
     std::string text = SearchDriver::Unescape(yystack_[1].value.as < InfString > ().text_);
-    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(std::move(field), std::move(text), yystack_[1].value.as < InfString > ().from_quoted_, yystack_[0].value.as < unsigned long > ());
+    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, text, yystack_[1].value.as < InfString > ().from_quoted_, yystack_[0].value.as < unsigned long > ());
 }
 #line 941 "search_parser.cpp"
     break;

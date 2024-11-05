@@ -18,39 +18,23 @@ export module peer_server_thrift_service;
 
 import peer_server_thrift_types;
 import stl;
-// import infinity;
-// import query_options;
-// import column_def;
-// import statement_common;
-// import data_type;
-// import status;
-// import embedding_info;
-// import constant_expr;
-// import column_expr;
-// import function_expr;
-// import knn_expr;
-// import match_sparse_expr;
-// import match_tensor_expr;
-// import match_expr;
-// import fusion_expr;
-// import parsed_expr;
-// import update_statement;
-// import search_expr;
-// import explain_statement;
-// import create_index_info;
-// import data_block;
-// import table_def;
-// import internal_types;
-// import column_vector;
-// import query_result;
+import global_resource_usage;
 
 namespace infinity {
 
 export class PeerServerThriftService final : public infinity_peer_server::PeerServiceIf {
 
 public:
-    PeerServerThriftService() = default;
-    virtual ~PeerServerThriftService() = default;
+    PeerServerThriftService() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("PeerServerThriftService");
+#endif
+    }
+    virtual ~PeerServerThriftService() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("PeerServerThriftService");
+#endif
+    }
 
     void Register(infinity_peer_server::RegisterResponse &response, const infinity_peer_server::RegisterRequest &request) final;
     void Unregister(infinity_peer_server::UnregisterResponse &response, const infinity_peer_server::UnregisterRequest &request) final;

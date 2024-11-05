@@ -18,6 +18,7 @@ export module local_file_handle;
 
 import stl;
 import status;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -25,7 +26,11 @@ export enum class FileAccessMode { kWrite, kRead, kMmapRead, kInvalid };
 
 export class LocalFileHandle {
 public:
-    LocalFileHandle(i32 fd, const String &path, FileAccessMode file_access_mode) : fd_(fd), path_(path), access_mode_(file_access_mode) {}
+    LocalFileHandle(i32 fd, const String &path, FileAccessMode file_access_mode) : fd_(fd), path_(path), access_mode_(file_access_mode) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("LocalFileHandle");
+#endif
+    }
     ~LocalFileHandle();
 
 

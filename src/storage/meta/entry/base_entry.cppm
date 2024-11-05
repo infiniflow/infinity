@@ -28,6 +28,7 @@ import third_party;
 import txn_state;
 import logger;
 import cleanup_scanner;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -47,7 +48,7 @@ export enum class EntryType : i8 {
 };
 
 export String ToString(EntryType entry_type) {
-    switch(entry_type) {
+    switch (entry_type) {
         case EntryType::kDatabase: {
             return "database";
         }
@@ -83,11 +84,19 @@ export String ToString(EntryType entry_type) {
 
 export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type, bool is_delete, String encode)
-        : deleted_(is_delete), entry_type_(entry_type), encode_(MakeUnique<String>(std::move(encode))) {}
+        : deleted_(is_delete), entry_type_(entry_type), encode_(MakeUnique<String>(std::move(encode))) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("BaseEntry");
+#endif
+    }
 
     BaseEntry(const BaseEntry &other);
 
-    virtual ~BaseEntry() = default;
+    virtual ~BaseEntry() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("BaseEntry");
+#endif
+    }
 
     static inline void Commit(BaseEntry *base_entry, TxnTimeStamp commit_ts) { base_entry->commit_ts_.store(commit_ts); }
 
@@ -98,6 +107,7 @@ export struct BaseEntry {
     virtual void PickCleanup(CleanupScanner *scanner) {};
 
     virtual Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const = 0;
+
 public:
     // Reserved
     inline void Commit(TxnTimeStamp commit_ts) {
@@ -131,7 +141,16 @@ private:
 
 export class BaseMeta {
 public:
-    virtual ~BaseMeta() = default;
+    BaseMeta() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("BaseMeta");
+#endif
+    }
+    virtual ~BaseMeta() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("BaseMeta");
+#endif
+    }
 
     virtual bool PickCleanup(CleanupScanner *scanner) = 0;
 

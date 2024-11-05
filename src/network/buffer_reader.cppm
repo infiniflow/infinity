@@ -19,6 +19,7 @@ import pg_message;
 import ring_buffer_iterator;
 import default_values;
 import stl;
+import global_resource_usage;
 
 export module buffer_reader;
 
@@ -26,7 +27,9 @@ namespace infinity {
 
 export class BufferReader {
 public:
-    explicit BufferReader(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket){};
+    explicit BufferReader(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket) {}
+
+    ~BufferReader() = default;
 
     [[nodiscard]] SizeT size() const;
 

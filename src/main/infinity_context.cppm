@@ -72,7 +72,8 @@ public:
 private:
     friend class Singleton;
 
-    InfinityContext() = default;
+    InfinityContext();
+    ~InfinityContext();
 
     UniquePtr<Config> config_{};
     UniquePtr<ResourceManager> resource_manager_{};

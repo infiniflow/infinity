@@ -18,6 +18,7 @@ export module cleanup_scanner;
 
 import stl;
 import buffer_manager;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -28,14 +29,24 @@ class BaseEntry;
 
 export class CleanupInfoTracer {
 public:
+    CleanupInfoTracer() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("CleanupInfoTracer");
+#endif
+    }
+
+    ~CleanupInfoTracer() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("CleanupInfoTracer");
+#endif
+    }
+
     void ResetInfo(TxnTimeStamp cleanup_ts) {
         cleanup_ts_ = cleanup_ts;
         cleanup_info_.clear();
     }
 
-    void AddCleanupInfo(String path) {
-        cleanup_info_.emplace_back(std::move(path));
-    }
+    void AddCleanupInfo(String path) { cleanup_info_.emplace_back(std::move(path)); }
 
     String GetCleanupInfo() const;
 
@@ -65,7 +76,7 @@ private:
     const TxnTimeStamp visible_ts_;
 
     BufferManager *buffer_mgr_;
-    
+
     Vector<Pair<SharedPtr<BaseEntry>, bool>> entries_;
 };
 

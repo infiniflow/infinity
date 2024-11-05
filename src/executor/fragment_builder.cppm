@@ -18,6 +18,7 @@ import stl;
 import query_context;
 import plan_fragment;
 import physical_operator;
+import global_resource_usage;
 
 export module fragment_builder;
 
@@ -25,7 +26,17 @@ namespace infinity {
 
 export class FragmentBuilder {
 public:
-    explicit FragmentBuilder(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {}
+    explicit FragmentBuilder(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("FragmentBuilder");
+#endif
+    }
+
+    ~FragmentBuilder() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("FragmentBuilder");
+#endif
+    }
 
     SharedPtr<PlanFragment> BuildFragment(const Vector<PhysicalOperator *> &physical_plans);
 

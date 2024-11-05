@@ -20,6 +20,7 @@ import stl;
 import optimizer_rule;
 import logical_node;
 import base_statement;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -28,6 +29,12 @@ class QueryContext;
 export class Optimizer {
 public:
     explicit Optimizer(QueryContext *query_context_ptr);
+
+    ~Optimizer() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("Optimizer");
+#endif
+    }
 
     void AddRule(UniquePtr<OptimizerRule> rule);
 

@@ -40,6 +40,7 @@ public:
     static constexpr std::string_view STANDARD = "standard";
     static constexpr std::string_view NGRAM = "ngram";
     static constexpr std::string_view RAG = "rag";
+    static constexpr std::string_view KEYWORD = "keyword";
 
 private:
     CacheType cache_{};
