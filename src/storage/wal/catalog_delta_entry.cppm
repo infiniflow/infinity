@@ -69,7 +69,7 @@ export enum class CatalogDeltaOpType : i8 {
     SET_BLOCK_STATUS_SEALED = 22,
 };
 
-export String ToString(CatalogDeltaOpType op_type);
+export String CatalogDeltaOpTypeToString(CatalogDeltaOpType op_type);
 
 export enum class MergeFlag : u8 {
     kInvalid = 0,
@@ -103,6 +103,7 @@ public:
     void ReadAdvBase(const char *&ptr);
 
     virtual const String ToString() const;
+    String ToStringSimple() const;
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
     virtual void Merge(CatalogDeltaOperation &other) = 0;
     virtual Vector<String> GetFilePaths() const { return Vector<String>(); }
@@ -359,6 +360,8 @@ public:
     static UniquePtr<CatalogDeltaEntry> ReadAdv(const char *&ptr, i32 max_bytes);
 
     [[nodiscard]] String ToString() const;
+
+    [[nodiscard]] String ToStringSimple() const;
 
     void SaveState(TransactionID txn_id, TxnTimeStamp commit_ts, u64 sequence);
 

@@ -530,6 +530,7 @@ TxnTimeStamp Txn::Commit() {
     txn_store_.MaintainCompactionAlg();
 
     if (!txn_delta_ops_entry_->operations().empty()) {
+        LOG_TRACE(txn_delta_ops_entry_->ToStringSimple());
         InfinityContext::instance().storage()->bg_processor()->Submit(MakeShared<AddDeltaEntryTask>(std::move(txn_delta_ops_entry_)));
     }
 

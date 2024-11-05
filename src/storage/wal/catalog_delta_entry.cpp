@@ -40,7 +40,7 @@ import logger;
 
 namespace infinity {
 
-String ToString(CatalogDeltaOpType op_type) {
+String CatalogDeltaOpTypeToString(CatalogDeltaOpType op_type) {
     switch (op_type) {
         case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
             return "AddDatabase";
@@ -142,6 +142,10 @@ const String CatalogDeltaOperation::ToString() const {
                        commit_ts_,
                        (u8)merge_flag_,
                        *encode_);
+}
+
+String CatalogDeltaOperation::ToStringSimple() const {
+    return fmt::format("type: {}, encode: {}", CatalogDeltaOpTypeToString(type_), *encode_);
 }
 
 CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts)
@@ -1119,6 +1123,17 @@ String CatalogDeltaEntry::ToString() const {
     std::stringstream sstream;
     for (const auto &operation : operations_) {
         sstream << operation->ToString() << '\n';
+    }
+    return sstream.str();
+}
+
+String CatalogDeltaEntry::ToStringSimple() const {
+    std::stringstream sstream;
+    sstream << "\n";
+
+    sstream << fmt::format("CatalogDeltaEntry: txn id: {}, commit_ts: {}\n", txn_ids_.empty() ? 0 : txn_ids_[0], max_commit_ts_);
+    for (const auto &operation : operations_) {
+        sstream << operation->ToStringSimple() << '\n';
     }
     return sstream.str();
 }
