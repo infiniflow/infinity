@@ -25,7 +25,6 @@ import meta_state;
 import data_access_state;
 import buffer_manager;
 import txn_state;
-import txn_context;
 import txn_store;
 import database_detail;
 import status;
@@ -193,6 +192,8 @@ public:
 
     void SetTxnCommitting(TxnTimeStamp commit_ts);
 
+    void SetTxnRollbacking(TxnTimeStamp rollback_ts);
+
     void SetTxnRollbacked();
 
     void SetTxnRead();
@@ -244,7 +245,12 @@ private:
     TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
     TransactionID txn_id_{};
 
-    TxnContext txn_context_;
+    // Use as txn context;
+    mutable std::shared_mutex rw_locker_{};
+    const TxnTimeStamp begin_ts_{};
+    TxnTimeStamp commit_ts_{};
+    TxnState state_{TxnState::kStarted};
+    TxnType type_{TxnType::kInvalid};
 
     // Handled database
     String db_name_{};
