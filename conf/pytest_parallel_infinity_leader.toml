@@ -50,7 +50,7 @@ enable_https             = false
 buffer_manager_size      = "8GB"
 lru_num                  = 7
 temp_dir                 = "/var/infinity/leader/tmp"
-result_cache_mode       = "on"
+result_cache       = "on"
 
 memindex_memory_quota   = "1GB"
 

@@ -437,10 +437,10 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
-        // Result Cache Mode
-        String result_cache_mode(DEFAULT_RESULT_CACHE_MODE);
-        auto result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode);
-        status = global_options_.AddOption(std::move(result_cache_mode_option));
+        // Result Cache
+        String result_cache(DEFAULT_RESULT_CACHE);
+        auto result_cache_option = MakeUnique<StringOption>(RESULT_CACHE_OPTION_NAME, result_cache);
+        status = global_options_.AddOption(std::move(result_cache_option));
         if (!status.ok()) {
             fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
@@ -1712,15 +1712,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             global_options_.AddOption(std::move(mem_index_memory_quota_option));
                             break;
                         }
-                        case GlobalOptionIndex::kResultCacheMode: {
-                            String result_cache_mode_str(DEFAULT_RESULT_CACHE_MODE);
+                        case GlobalOptionIndex::kResultCache: {
+                            String result_cache_str(DEFAULT_RESULT_CACHE);
                             if (elem.second.is_string()) {
-                                result_cache_mode_str = elem.second.value_or(result_cache_mode_str);
+                                result_cache_str = elem.second.value_or(result_cache_str);
                             } else {
-                                return Status::InvalidConfig("'result_cache_mode' field isn't string.");
+                                return Status::InvalidConfig("'result_cache' field isn't string.");
                             }
-                            auto result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode_str);
-                            global_options_.AddOption(std::move(result_cache_mode_option));
+                            auto result_cache_option = MakeUnique<StringOption>(RESULT_CACHE_OPTION_NAME, result_cache_str);
+                            global_options_.AddOption(std::move(result_cache_option));
                             break;
                         }
                         case GlobalOptionIndex::kCacheResultNum: {
@@ -1780,11 +1780,11 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                         UnrecoverableError(status.message());
                     }
                 }
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCacheMode) == nullptr) {
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCache) == nullptr) {
                     // Result Cache Mode
-                    String result_cache_mode_str(DEFAULT_RESULT_CACHE_MODE);
-                    UniquePtr<StringOption> result_cache_mode_option = MakeUnique<StringOption>(RESULT_CACHE_MODE_OPTION_NAME, result_cache_mode_str);
-                    Status status = global_options_.AddOption(std::move(result_cache_mode_option));
+                    String result_cache_str(DEFAULT_RESULT_CACHE);
+                    UniquePtr<StringOption> result_cache_option = MakeUnique<StringOption>(RESULT_CACHE_OPTION_NAME, result_cache_str);
+                    Status status = global_options_.AddOption(std::move(result_cache_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2381,9 +2381,9 @@ i64 Config::MemIndexMemoryQuota() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexMemoryQuota);
 }
 
-String Config::ResultCacheMode() {
+String Config::ResultCache() {
     std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetStringValue(GlobalOptionIndex::kResultCacheMode);
+    return global_options_.GetStringValue(GlobalOptionIndex::kResultCache);
 }
 
 i64 Config::CacheResultNum() {
@@ -2393,13 +2393,13 @@ i64 Config::CacheResultNum() {
 
 void Config::SetCacheResult(const String &mode) {
     std::lock_guard<std::mutex> guard(mutex_);
-    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCacheMode);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kResultCache);
     if (base_option->data_type_ != BaseOptionDataType::kString) {
         String error_message = "Attempt to set string value to result cache mode data type option";
         UnrecoverableError(error_message);
     }
-    StringOption *result_cache_mode_option = static_cast<StringOption *>(base_option);
-    result_cache_mode_option->value_ = mode;
+    StringOption *result_cache_option = static_cast<StringOption *>(base_option);
+    result_cache_option->value_ = mode;
 }
 
 // WAL

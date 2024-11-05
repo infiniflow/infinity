@@ -1832,4 +1832,5 @@ class TestInfinity:
         else:
             pd.testing.assert_frame_equal(res, pd.DataFrame(
                 {'c1' : (0, 1, 2), 'c2' : (['0100000000000000'], ['0000000000000001'], ['0000000000000011']), 'DISTANCE' : (1.0, 1.0, 2.0)}
-            ).astype({'c1': dtype('int32'), 'DISTANCE' : dtype('float32')})) 
+            ).astype({'c1': dtype('int32'), 'DISTANCE' : dtype('float32')}))
+        db_obj.drop_table("test_binary_knn_hamming_distance" + suffix, ConflictType.Error)

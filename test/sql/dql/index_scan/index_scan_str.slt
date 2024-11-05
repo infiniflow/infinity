@@ -1,5 +1,5 @@
 statement ok
-SET CONFIG result_cache_mode "off";
+SET CONFIG result_cache "off";
 
 statement ok
 DROP TABLE IF EXISTS str_index_scan_insert;
@@ -59,4 +59,4 @@ statement ok
 DROP TABLE str_index_scan_insert;
 
 statement ok
-SET CONFIG result_cache_mode "on";
+SET CONFIG result_cache "on";
