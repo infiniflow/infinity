@@ -3,41 +3,74 @@ statement ok
 DROP TABLE IF EXISTS ft_keyword;
 
 statement ok
-CREATE TABLE ft_keyword(num int, doc varchar);
+CREATE TABLE ft_keyword(num int, doc varchar, doc2 varchar DEFAULT 'default text');
 
 # copy data from csv file
 statement ok
 COPY ft_keyword FROM '/var/infinity/test_data/fulltext_delete.csv' WITH ( DELIMITER '\t', FORMAT CSV );
 
 statement ok
-INSERT INTO ft_keyword VALUES (4, 'another second text xxx'), (5, 'another multiple');
+INSERT INTO ft_keyword VALUES (4, 'another second text xxx', 'not default'), (5, 'another multiple', 'another not');
 
 statement ok
 CREATE INDEX ft_index ON ft_keyword(doc) USING FULLTEXT WITH (analyzer = keyword);
 
+statement ok
+CREATE INDEX ft_index2 ON ft_keyword(doc2) USING FULLTEXT;
+
 query I
 SELECT * FROM ft_keyword;
 ----
-1 first text
-2 second text multiple
-3 third text many words
-4 another second text xxx
-5 another multiple
+1 first text default text
+2 second text multiple default text
+3 third text many words default text
+4 another second text xxx not default
+5 another multiple another not
 
-query I
-SELECT *, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc', 'second text', 'topn=10');
+query I rowsort
+SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5', 'multiple another', 'topn=10');
 ----
-1 first text 1.000000
-2 second text multiple 1.000000
-3 third text many words 1.000000
-4 another second text xxx 1.000000
+2 4.500000
+4 4.500000
+5 4.500000
 
-query I
-SELECT *, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5', 'multiple another', 'topn=10');
+query I rowsort
+SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc', 'second default text', 'topn=10');
 ----
-2 second text multiple 4.500000
-4 another second text xxx 4.500000
-5 another multiple 4.500000
+1 1.000000
+2 1.000000
+3 1.000000
+4 1.000000
+
+query I rowsort
+SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc2', 'second default text', 'topn=10;similarity=boolean');
+----
+1 2.000000
+2 2.000000
+3 2.000000
+4 1.000000
+
+query I rowsort
+SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5,doc2^3', 'second default text', 'topn=10;similarity=boolean');
+----
+1 10.500000
+2 10.500000
+3 10.500000
+4 7.500000
+
+query I rowsort
+SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('', '(doc:"second default text")^4.5 (doc2:second doc2:default doc2:text)^3', 'topn=10;similarity=boolean');
+----
+1 10.500000
+2 10.500000
+3 10.500000
+4 7.500000
+
+query I rowsort
+SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('', '(doc:"second default text")^4.5 (doc2:another doc2:not)^3', 'topn=10;similarity=boolean;minimum_should_match=1');
+----
+4 7.500000
+5 6.000000
 
 # Clean up
 statement ok

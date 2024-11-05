@@ -42,11 +42,12 @@ void FilterIterator::PrintTree(std::ostream &os, const String &prefix, const boo
     query_iterator_->PrintTree(os, next_prefix, true);
 }
 
-UniquePtr<DocIterator> FilterQueryNode::CreateSearch(const CreateSearchParams params) const {
+UniquePtr<DocIterator> FilterQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
+    assert(is_top_level);
     assert(common_query_filter_ != nullptr);
     if (!common_query_filter_->AlwaysTrue() && common_query_filter_->filter_result_count_ == 0)
         return nullptr;
-    auto search_iter = query_tree_->CreateSearch(params);
+    auto search_iter = query_tree_->CreateSearch(params, is_top_level);
     if (!search_iter) {
         return nullptr;
     }

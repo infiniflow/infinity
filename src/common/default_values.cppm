@@ -197,7 +197,7 @@ export {
 
     constexpr SizeT INSERT_BATCH_ROW_LIMIT = 8192;
 
-    constexpr std::string_view DEFAULT_RESULT_CACHE_MODE = "off";
+    constexpr std::string_view DEFAULT_RESULT_CACHE = "off";
     constexpr SizeT DEFAULT_CACHE_RESULT_NUM = 10000;
 
     // default persistence parameter
@@ -264,7 +264,7 @@ export {
     constexpr std::string_view LRU_NUM_OPTION_NAME = "lru_num";
     constexpr std::string_view TEMP_DIR_OPTION_NAME = "temp_dir";
     constexpr std::string_view MEMINDEX_MEMORY_QUOTA_OPTION_NAME = "memindex_memory_quota";
-    constexpr std::string_view RESULT_CACHE_MODE_OPTION_NAME = "result_cache_mode";
+    constexpr std::string_view RESULT_CACHE_OPTION_NAME = "result_cache";
     constexpr std::string_view CACHE_RESULT_NUM_OPTION_NAME = "cache_result_num";
 
     constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";

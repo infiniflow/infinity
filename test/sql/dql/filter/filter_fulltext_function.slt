@@ -1,5 +1,5 @@
 statement ok
-SET CONFIG result_cache_mode "off";
+SET CONFIG result_cache "off";
 
 statement ok
 DROP TABLE IF EXISTS ft_in_filter;
@@ -192,4 +192,4 @@ statement ok
 DROP TABLE ft_in_filter;
 
 statement ok
-SET CONFIG result_cache_mode "on";
+SET CONFIG result_cache "on";
