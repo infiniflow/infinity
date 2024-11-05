@@ -181,23 +181,23 @@ public:
 
     inline TransactionID TxnID() const { return txn_id_; }
 
-    inline TxnTimeStamp CommitTS() { return txn_context_.GetCommitTS(); }
+    TxnTimeStamp CommitTS();
 
-    inline TxnTimeStamp BeginTS() { return txn_context_.GetBeginTS(); }
+    TxnTimeStamp BeginTS();
 
-    inline TxnState GetTxnState() { return txn_context_.GetTxnState(); }
+    TxnState GetTxnState();
 
-    inline TxnType GetTxnType() const { return txn_context_.GetTxnType(); }
+    TxnType GetTxnType() const;
 
     void SetTxnCommitted();
 
     void SetTxnCommitting(TxnTimeStamp commit_ts);
 
-    void SetTxnRollbacked() { txn_context_.SetTxnRollbacked(); }
+    void SetTxnRollbacked();
 
-    void SetTxnRead() { txn_context_.SetTxnType(TxnType::kRead); }
+    void SetTxnRead();
 
-    void SetTxnWrite() { txn_context_.SetTxnType(TxnType::kWrite); }
+    void SetTxnWrite();
 
     // WAL and replay OPS
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
