@@ -13,7 +13,11 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
+
+module buffer_obj;
+
 import stl;
 import file_worker;
 import buffer_handle;
@@ -24,8 +28,7 @@ import third_party;
 import logger;
 import file_worker_type;
 import var_file_worker;
-
-module buffer_obj;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -38,20 +41,27 @@ BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<Fil
         type_ = BufferType::kPersistent;
         status_ = BufferStatus::kFreed;
     }
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("BufferObj");
+#endif
 }
 
-BufferObj::~BufferObj() = default;
+BufferObj::~BufferObj() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("BufferObj");
+#endif
+}
 
-void BufferObj::UpdateFileWorkerInfo(UniquePtr<FileWorker> file_worker) { 
+void BufferObj::UpdateFileWorkerInfo(UniquePtr<FileWorker> file_worker) {
     switch (file_worker_->Type()) {
-        case FileWorkerType::kVarFile:{
+        case FileWorkerType::kVarFile: {
             assert(file_worker->Type() == FileWorkerType::kVarFile);
             auto *var_file_worker = static_cast<VarFileWorker *>(file_worker_.get());
             auto *new_var_file_worker = static_cast<VarFileWorker *>(var_file_worker);
             var_file_worker->SetBufferSize(new_var_file_worker->GetBufferSize());
             break;
         }
-        default:{
+        default: {
             break;
         }
     }
@@ -276,7 +286,7 @@ bool BufferObj::AddBufferSize(SizeT add_size) {
     return free_success;
 }
 
-void BufferObj::AddObjRc() { 
+void BufferObj::AddObjRc() {
     std::unique_lock<std::mutex> locker(w_locker_);
     obj_rc_++;
 }
@@ -289,7 +299,7 @@ void BufferObj::SubObjRc() {
     --obj_rc_;
     if (obj_rc_ == 0) {
         status_ = BufferStatus::kClean;
-        buffer_mgr_->AddToCleanList(this, false/*do_free*/);
+        buffer_mgr_->AddToCleanList(this, false /*do_free*/);
     }
 }
 

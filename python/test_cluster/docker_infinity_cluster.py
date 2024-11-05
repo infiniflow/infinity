@@ -100,6 +100,7 @@ class DockerInfinityRunner(BaseInfinityRunner):
             [
                 "cd /infinity",
                 f"pid=$(pgrep -f infinity || true)",
+                f"echo $pid",
                 f"bash scripts/timeout_kill.sh {timeout} $pid",
             ]
         )
@@ -228,7 +229,6 @@ class DockerInfinityCluster(InfinityCluster):
 
         try:
             container = docker_client.containers.get(container_name)
-            added = False
         except docker.errors.NotFound:
             container = docker_client.containers.run(
                 image=self.image_name,
@@ -241,10 +241,11 @@ class DockerInfinityCluster(InfinityCluster):
                 ],
                 environment=[f"TZ={tz}"],
             )
-            added = True
 
-        if added:
+        try:
             self.network.connect(container)
+        except docker.errors.APIError as e:
+            pass
         info = docker_client.api.inspect_network(self.network.id)
         # print(info)
         mock_ip = info["Containers"][container.id]["IPv4Address"]
@@ -293,54 +294,4 @@ class DockerInfinityCluster(InfinityCluster):
 
 
 if __name__ == "__main__":
-    infinity_path = "cmake-build-debug/src/infinity"
-    minio_dir = "minio"
-    minio_port = 9001
-    cluster = DockerInfinityCluster(
-        infinity_path, minio_params=MinioParams(minio_dir, minio_port)
-    )
-    try:
-        cluster.add_node("node1", "conf/leader.toml")
-        cluster.add_node("node2", "conf/follower.toml")
-
-        print("init nodes")
-
-        cluster.init_leader("node1")
-        cluster.init_follower("node2")
-
-        time.sleep(1)
-        print("insert in node1")
-
-        infinity1 = cluster.client("node1")
-        r = infinity1.list_databases()
-
-        db1 = infinity1.get_database("default_db")
-        table1 = db1.create_table(
-            "table1", {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}}
-        )
-        table1.insert([{"c1": 1, "c2": [1.0, 2.0, 3.0, 4.0]}])
-
-        res_gt = pd.DataFrame(
-            {
-                "c1": (1),
-                "c2": ([[1.0, 2.0, 3.0, 4.0]]),
-            }
-        ).astype({"c1": dtype("int32"), "c2": dtype("object")})
-
-        res = table1.output(["*"]).to_df()
-        pd.testing.assert_frame_equal(res, res_gt)
-
-        time.sleep(1)
-        print("select in node2")
-
-        infinity2 = cluster.client("node2")
-        db2 = infinity2.get_database("default_db")
-        table2 = db2.get_table("table1")
-        res = table2.output(["*"]).to_df()
-        pd.testing.assert_frame_equal(res, res_gt)
-    except Exception as e:
-        print(e)
-        cluster.clear()
-        raise
-    else:
-        cluster.clear()
+    pass

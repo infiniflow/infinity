@@ -28,6 +28,7 @@ import infinity_exception;
 import internal_types;
 import persistence_manager;
 import column_def;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -156,7 +157,17 @@ export struct WalChunkIndexInfo {
 
 // WalCommandType -> String
 export struct WalCmd {
-    virtual ~WalCmd() = default;
+    WalCmd() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("WalCmd");
+#endif
+    }
+
+    virtual ~WalCmd() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("WalCmd");
+#endif
+    }
 
     virtual auto GetType() const -> WalCommandType = 0;
 
@@ -520,6 +531,18 @@ export struct WalEntryHeader {
 };
 
 export struct WalEntry : WalEntryHeader {
+    WalEntry() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("WalEntry");
+#endif
+    }
+
+    ~WalEntry() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("WalEntry");
+#endif
+    }
+
     bool operator==(const WalEntry &other) const;
 
     bool operator!=(const WalEntry &other) const;

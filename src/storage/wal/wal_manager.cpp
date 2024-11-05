@@ -58,6 +58,7 @@ import base_table_ref;
 import cluster_manager;
 import admin_statement;
 import cleanup_scanner;
+import global_resource_usage;
 
 module wal_manager;
 
@@ -70,7 +71,11 @@ WalManager::WalManager(Storage *storage,
                        FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
       wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option), last_ckp_wal_size_(0),
-      checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {}
+      checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("WalManager");
+#endif
+}
 
 WalManager::WalManager(Storage *storage,
                        String wal_dir,
@@ -80,12 +85,19 @@ WalManager::WalManager(Storage *storage,
                        FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
       wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), data_path_(data_dir), storage_(storage), running_(false), flush_option_(flush_option),
-      last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {}
+      last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("WalManager");
+#endif
+}
 
 WalManager::~WalManager() {
     if (running_.load()) {
         Stop();
     }
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("WalManager");
+#endif
 }
 
 void WalManager::Start() {
@@ -733,7 +745,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
         LOG_DEBUG(replay_entries[replay_count]->ToString());
-        ReplayWalEntry(*replay_entries[replay_count], false);
+        ReplayWalEntry(*replay_entries[replay_count], false, true);
     }
 
     LOG_INFO(fmt::format("Latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
@@ -889,7 +901,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
     return wal_entries;
 }
 
-void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup) {
+void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup, bool is_replay) {
     for (const auto &cmd : entry.cmds_) {
         LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
         switch (cmd->GetType()) {
@@ -927,7 +939,7 @@ void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup) {
                 break;
             }
             case WalCommandType::APPEND: {
-                WalCmdAppendReplay(*dynamic_cast<const WalCmdAppend *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                WalCmdAppendReplay(*dynamic_cast<const WalCmdAppend *>(cmd.get()), entry.txn_id_, entry.commit_ts_, is_replay);
                 break;
             }
             case WalCommandType::DELETE: {
@@ -1349,7 +1361,7 @@ void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID t
         commit_ts);
 }
 
-void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts, bool is_replay) {
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
@@ -1363,7 +1375,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     auto append_state = MakeUnique<AppendState>(table_store->GetBlocks());
     table_store->SetAppendState(std::move(append_state));
 
-    Catalog::Append(table_store->GetTableEntry(), fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager(), true);
+    Catalog::Append(table_store->GetTableEntry(), fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager(), is_replay);
     Catalog::CommitWrite(table_store->GetTableEntry(), fake_txn->TxnID(), commit_ts, table_store->txn_segments(), nullptr);
 }
 

@@ -22,6 +22,10 @@ BaseEntry::BaseEntry(const BaseEntry &other) : deleted_(other.deleted_), entry_t
     txn_id_ = other.txn_id_;
     begin_ts_ = other.begin_ts_;
     commit_ts_ = other.commit_ts_.load();
+
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("BaseEntry");
+#endif
 }
 
 bool BaseEntry::CheckVisible(Txn *txn) const {

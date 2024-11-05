@@ -26,17 +26,12 @@ import query_options;
 import thrift;
 
 using namespace std;
-// using namespace apache::thrift;
-// using namespace apache::thrift::concurrency;
-// using namespace apache::thrift::protocol;
-// using namespace apache::thrift::transport;
-// using namespace apache::thrift::server;
 
 namespace infinity {
 
 export class ThreadedThriftServer {
 public:
-    void Init(const String& server_address, i32 port_no);
+    void Init(const String &server_address, i32 port_no);
     void Start();
     void Shutdown();
 
@@ -60,7 +55,7 @@ private:
 
 export class NonBlockPoolThriftServer {
 public:
-    void Init(const String& server_address, i32 port_no, i32 pool_size);
+    void Init(const String &server_address, i32 port_no, i32 pool_size);
     void Start();
     void Shutdown();
 

@@ -32,8 +32,21 @@ import variables;
 import status;
 import infinity_exception;
 import wal_manager;
+import global_resource_usage;
 
 namespace infinity {
+
+InfinityContext::InfinityContext() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("InfinityContext");
+#endif
+}
+
+InfinityContext::~InfinityContext() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("InfinityContext");
+#endif
+}
 
 NodeRole InfinityContext::GetServerRole() const {
     if (cluster_manager_ == nullptr) {

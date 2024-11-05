@@ -26,8 +26,15 @@ import peer_server_thrift_types;
 import wal_manager;
 import wal_entry;
 import admin_statement;
+import global_resource_usage;
 
 namespace infinity {
+
+ClusterManager::ClusterManager(Storage *storage) : storage_(storage) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("ClusterManager");
+#endif
+}
 
 ClusterManager::~ClusterManager() {
     other_node_map_.clear();
@@ -36,6 +43,9 @@ ClusterManager::~ClusterManager() {
         client_to_leader_->UnInit(true);
     }
     client_to_leader_.reset();
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("ClusterManager");
+#endif
 }
 
 void ClusterManager::InitAsAdmin() { current_node_role_ = NodeRole::kAdmin; }
@@ -418,6 +428,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
         auto iter = other_node_map_.find(node_info->node_name_);
         if (iter != other_node_map_.end()) {
             // Duplicated node
+            // TODO: Update node info and not throw error.
             return Status::DuplicateNode(node_info->node_name_);
         }
     }
@@ -782,7 +793,7 @@ Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
         LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
         last_txn_id = entry->txn_id_;
         last_commit_ts = entry->commit_ts_;
-        wal_manager->ReplayWalEntry(*entry, false);
+        wal_manager->ReplayWalEntry(*entry, false, false);
     }
 
     LOG_INFO(fmt::format("Replicated from leader: latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
@@ -812,7 +823,7 @@ Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
             }
         }
         LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
-        wal_manager->ReplayWalEntry(*entry, true);
+        wal_manager->ReplayWalEntry(*entry, true, true);
         last_commit_ts = entry->commit_ts_;
     }
 

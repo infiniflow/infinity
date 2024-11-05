@@ -71,6 +71,8 @@ public:
     // For replay txn
     explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    virtual ~Txn();
+
     static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // Txn steps:

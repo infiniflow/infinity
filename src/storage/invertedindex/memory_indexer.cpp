@@ -436,6 +436,12 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
             if (term_length >= MAX_TUPLE_LENGTH) {
                 continue;
             }
+
+            if (count < temp_term_tuple->Size()) {
+                UnrecoverableError("Unexpected error in TupleListToIndexFile");
+            }
+
+            count -= temp_term_tuple->Size();
             std::string_view term = std::string_view(temp_term_tuple->term_);
 
             if (term != last_term) {

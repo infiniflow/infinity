@@ -27,6 +27,7 @@ import knn_expr;
 import third_party;
 import logger;
 import status;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -42,8 +43,16 @@ enum class ExtraValueInfoType : u8 {
 // Extra Value Info
 //===--------------------------------------------------------------------===//
 struct ExtraValueInfo {
-    explicit ExtraValueInfo(ExtraValueInfoType type) : type_(type) {}
-    virtual ~ExtraValueInfo() {}
+    explicit ExtraValueInfo(ExtraValueInfoType type) : type_(type) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("ExtraValueInfo");
+#endif
+    }
+    virtual ~ExtraValueInfo() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("ExtraValueInfo");
+#endif
+    }
 
     ExtraValueInfoType type_;
 

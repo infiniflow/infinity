@@ -62,6 +62,7 @@ import log_file;
 import persist_result_handler;
 import local_file_handle;
 import admin_statement;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -116,6 +117,10 @@ Catalog::Catalog() : catalog_dir_(MakeShared<String>(CATALOG_FILE_DIR)), running
     }
 
     ResizeProfileHistory(DEFAULT_PROFILER_HISTORY_SIZE);
+
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("Catalog");
+#endif
 }
 
 Catalog::~Catalog() {
@@ -130,6 +135,10 @@ Catalog::~Catalog() {
         mem_index_commit_thread_->join();
         mem_index_commit_thread_.reset();
     }
+
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("Catalog");
+#endif
 }
 
 // do not only use this method to create database

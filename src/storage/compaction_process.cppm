@@ -31,6 +31,7 @@ class SessionManager;
 export class CompactionProcessor {
 public:
     CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr);
+    ~CompactionProcessor();
 
     void Start();
 
@@ -59,7 +60,7 @@ private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<BGTask>> task_queue_;
+    BlockingQueue<SharedPtr<BGTask>> task_queue_{"CompactionProcessor"};
 
     Thread processor_thread_{};
 
