@@ -463,11 +463,11 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetViews"};
 }
 
-TxnTimeStamp Txn::CommitTS() { return txn_context_.GetCommitTS(); }
+TxnTimeStamp Txn::CommitTS() const { return txn_context_.GetCommitTS(); }
 
-TxnTimeStamp Txn::BeginTS() { return txn_context_.GetBeginTS(); }
+TxnTimeStamp Txn::BeginTS() const { return txn_context_.GetBeginTS(); }
 
-TxnState Txn::GetTxnState() { return txn_context_.GetTxnState(); }
+TxnState Txn::GetTxnState() const { return txn_context_.GetTxnState(); }
 
 TxnType Txn::GetTxnType() const { return txn_context_.GetTxnType(); }
 

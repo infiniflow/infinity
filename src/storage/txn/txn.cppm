@@ -181,11 +181,11 @@ public:
 
     inline TransactionID TxnID() const { return txn_id_; }
 
-    TxnTimeStamp CommitTS();
+    TxnTimeStamp CommitTS() const;
 
-    TxnTimeStamp BeginTS();
+    TxnTimeStamp BeginTS() const;
 
-    TxnState GetTxnState();
+    TxnState GetTxnState() const;
 
     TxnType GetTxnType() const;
 

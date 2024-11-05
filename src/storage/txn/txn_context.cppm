@@ -45,12 +45,12 @@ public:
 
     inline TxnTimeStamp GetBeginTS() const { return begin_ts_; }
 
-    inline TxnTimeStamp GetCommitTS() {
+    inline TxnTimeStamp GetCommitTS() const {
         std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
         return commit_ts_;
     }
 
-    inline TxnState GetTxnState() {
+    inline TxnState GetTxnState() const {
         std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
         return state_;
     }
@@ -97,7 +97,7 @@ public:
     TxnType GetTxnType() const { return type_; }
 
 private:
-    std::shared_mutex rw_locker_{};
+    mutable std::shared_mutex rw_locker_{};
     const TxnTimeStamp begin_ts_{};
     TxnTimeStamp commit_ts_{};
     TxnState state_{TxnState::kStarted};
