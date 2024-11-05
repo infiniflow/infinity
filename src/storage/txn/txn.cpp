@@ -532,7 +532,7 @@ WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 TxnTimeStamp Txn::Commit() {
     if (wal_entry_->cmds_.empty() && txn_store_.ReadOnly()) {
         // Don't need to write empty WalEntry (read-only transactions).
-        TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampR(this);
+        TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
         return commit_ts;
@@ -547,7 +547,7 @@ TxnTimeStamp Txn::Commit() {
     }
 
     // register commit ts in wal manager here, define the commit sequence
-    TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampW(this);
+    TxnTimeStamp commit_ts = txn_mgr_->GetWriteCommitTS(this);
     LOG_TRACE(fmt::format("Txn: {} is committing, begin_ts:{} committing ts: {}", txn_id_, BeginTS(), commit_ts));
 
     this->SetTxnCommitting(commit_ts);
@@ -621,7 +621,7 @@ void Txn::Rollback() {
     auto state = this->GetTxnState();
     TxnTimeStamp abort_ts = 0;
     if (state == TxnState::kStarted) {
-        abort_ts = txn_mgr_->GetCommitTimeStampR(this);
+        abort_ts = txn_mgr_->GetReadCommitTS(this);
     } else if (state == TxnState::kCommitting) {
         abort_ts = this->CommitTS();
     } else {
