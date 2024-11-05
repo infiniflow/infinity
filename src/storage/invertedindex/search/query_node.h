@@ -94,7 +94,8 @@ struct QueryNode {
     // recursively multiply and push down the weight to the leaf term nodes
     virtual void PushDownWeight(float factor = 1.0f) = 0;
     // create the iterator from the query tree, need to be called after optimization
-    virtual std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params) const = 0;
+    // is_top_level: used to determine whether to use early termination
+    virtual std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level = true) const = 0;
     // print the query tree, for debugging
     virtual void PrintTree(std::ostream &os, const std::string &prefix = "", bool is_final = true) const = 0;
 
@@ -110,7 +111,7 @@ struct TermQueryNode : public QueryNode {
 
     uint32_t LeafCount() const override { return 1; }
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params) const override;
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
     void GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const override;
 };
@@ -124,7 +125,7 @@ struct PhraseQueryNode final : public QueryNode {
 
     uint32_t LeafCount() const override { return 1; }
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params) const override;
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
     void GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const override;
 
@@ -159,33 +160,33 @@ struct NotQueryNode final : public MultiQueryNode {
     NotQueryNode() : MultiQueryNode(QueryNodeType::NOT) {}
     uint32_t LeafCount() const override { return 0; }
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
-    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params) const override;
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
 };
 
 struct AndQueryNode final : public MultiQueryNode {
     AndQueryNode() : MultiQueryNode(QueryNodeType::AND) {}
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
-    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params) const override;
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
 };
 
 struct AndNotQueryNode final : public MultiQueryNode {
     AndNotQueryNode() : MultiQueryNode(QueryNodeType::AND_NOT) {}
     uint32_t LeafCount() const override { return children_[0]->LeafCount(); }
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
-    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params) const override;
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
 };
 
 struct OrQueryNode final : public MultiQueryNode {
     OrQueryNode() : MultiQueryNode(QueryNodeType::OR) {}
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
-    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params) const override;
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
 };
 
 struct KeywordQueryNode final : public MultiQueryNode {
     KeywordQueryNode() : MultiQueryNode(QueryNodeType::KEYWORD) {}
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
-    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params) const override;
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
 };
 
 // unimplemented

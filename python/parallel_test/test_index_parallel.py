@@ -15,7 +15,8 @@ from test_sdkbase import TestSdk
 TEST_DATA_DIR = "/test/data/"
 kInsertThreadNum = 4
 kRuningTime = 10
-kThreadNum = 4 
+kThreadNum = 4
+
 
 class TestIndexParallel(TestSdk):
 
@@ -347,7 +348,7 @@ class TestIndexParallel(TestSdk):
 
         for i in range(kThreadNum):
             threads.append(Thread(target=query_worker, args=[
-                connection_pool, table_name, end_time, i + 2*kThreadNum]))
+                connection_pool, table_name, end_time, i + 2 * kThreadNum]))
 
         for t in threads:
             t.start()

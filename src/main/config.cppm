@@ -115,7 +115,7 @@ public:
 
     i64 MemIndexMemoryQuota();
 
-    String ResultCacheMode();
+    String ResultCache();
     i64 CacheResultNum();
     void SetCacheResult(const String &mode);
 
