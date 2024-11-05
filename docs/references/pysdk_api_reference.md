@@ -2078,8 +2078,9 @@ This method specifies the projection columns for the current table but does not 
 
 ```python
 table_obj.output(["doctitle", "docdate", "body"]).highlight(["body"]).match_text("body^5", "harmful chemical", 3).to_pl()
+# The matched words will be enclosed in <em> and </em>
+```
 
-# The matched words will be embraced by <em> and </em>
 ---
 
 ## fusion
@@ -2243,16 +2244,16 @@ Returns the query result in pandas DataFrame format.
 Call `to_df()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
 :::
 
+### Returns
+
+A `pandas.DataFrame` object.
+
 ### Examples
 
 ```python
 # Format columns "c1" and C2" of the current table into a pandas DataFrame
 res = table_object.output(["c1", "c2"]).to_df()
 ```
-
-### Returns
-
-A `pandas.DataFrame` object.
 
 ## to_pl
 
