@@ -22,6 +22,7 @@ from infinity.connection_pool import ConnectionPool
 
 
 from common import common_values
+import logging
 
 
 @pytest.fixture(scope="function")
@@ -80,3 +81,12 @@ def pytest_addoption(parser):
         default=False,
         help="Run integration tests (requires S3 buckets to be setup with access)",
     )
+
+log_output_file = "run_parallel_test.log"
+
+def pytest_configure(config):
+    logger = logging.getLogger("run_parallel_test")
+    logger.setLevel(logging.INFO)
+    handler = logging.FileHandler(log_output_file)
+    logger.addHandler(handler)
+    logger.addHandler(logging.StreamHandler())

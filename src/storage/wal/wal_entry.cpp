@@ -930,6 +930,7 @@ void WalCmdDropColumns::WriteAdv(char *&buf) const {
 
 String WalCmdCreateDatabase::ToString() const {
     std::stringstream ss;
+    ss << "Create Database: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "db dir: " << db_dir_tail_ << std::endl;
     ss << "db comment: " << db_comment_ << std::endl;
@@ -938,12 +939,14 @@ String WalCmdCreateDatabase::ToString() const {
 
 String WalCmdDropDatabase::ToString() const {
     std::stringstream ss;
+    ss << "Drop Database: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     return ss.str();
 }
 
 String WalCmdCreateTable::ToString() const {
     std::stringstream ss;
+    ss << "Create Table: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_def_->ToString() << std::endl;
     ss << "table dir: " << table_dir_tail_ << std::endl;
@@ -952,6 +955,7 @@ String WalCmdCreateTable::ToString() const {
 
 String WalCmdDropTable::ToString() const {
     std::stringstream ss;
+    ss << "Drop Table: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     return ss.str();
@@ -959,6 +963,7 @@ String WalCmdDropTable::ToString() const {
 
 String WalCmdCreateIndex::ToString() const {
     std::stringstream ss;
+    ss << "Create Index: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "index def: " << index_base_->ToString() << std::endl;
@@ -967,6 +972,7 @@ String WalCmdCreateIndex::ToString() const {
 
 String WalCmdDropIndex::ToString() const {
     std::stringstream ss;
+    ss << "Drop Index: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "index name: " << index_name_ << std::endl;
@@ -975,6 +981,7 @@ String WalCmdDropIndex::ToString() const {
 
 String WalCmdImport::ToString() const {
     std::stringstream ss;
+    ss << "Import: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     auto &segment_info = segment_info_;
@@ -984,6 +991,7 @@ String WalCmdImport::ToString() const {
 
 String WalCmdAppend::ToString() const {
     std::stringstream ss;
+    ss << "Append: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << block_->ToBriefString();
@@ -992,6 +1000,7 @@ String WalCmdAppend::ToString() const {
 
 String WalCmdDelete::ToString() const {
     std::stringstream ss;
+    ss << "Delete: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "delete row cout: " << row_ids_.size() << std::endl;
@@ -1000,6 +1009,7 @@ String WalCmdDelete::ToString() const {
 
 String WalCmdSetSegmentStatusSealed::ToString() const {
     std::stringstream ss;
+    ss << "Set Segment Status Sealed: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "segment id: " << segment_id_ << std::endl;
@@ -1008,6 +1018,7 @@ String WalCmdSetSegmentStatusSealed::ToString() const {
 
 String WalCmdUpdateSegmentBloomFilterData::ToString() const {
     std::stringstream ss;
+    ss << "Update Segment Bloom Filter Data: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "segment id: " << segment_id_ << std::endl;
@@ -1016,6 +1027,7 @@ String WalCmdUpdateSegmentBloomFilterData::ToString() const {
 
 String WalCmdCheckpoint::ToString() const {
     std::stringstream ss;
+    ss << "Checkpoint: " << std::endl;
     ss << "catalog path: " << fmt::format("{}/{}", catalog_path_, catalog_name_) << std::endl;
     ss << "max commit ts: " << max_commit_ts_ << std::endl;
     ss << "is full checkpoint: " << is_full_checkpoint_ << std::endl;
@@ -1024,6 +1036,7 @@ String WalCmdCheckpoint::ToString() const {
 
 String WalCmdCompact::ToString() const {
     std::stringstream ss;
+    ss << "Compact: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "deprecated segment: ";
@@ -1041,6 +1054,7 @@ String WalCmdCompact::ToString() const {
 
 String WalCmdOptimize::ToString() const {
     std::stringstream ss;
+    ss << "Optimize: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "index name: " << index_name_ << std::endl;
@@ -1054,6 +1068,7 @@ String WalCmdOptimize::ToString() const {
 
 String WalCmdDumpIndex::ToString() const {
     std::stringstream ss;
+    ss << "Dump Index: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "index name: " << index_name_ << std::endl;
@@ -1072,6 +1087,7 @@ String WalCmdDumpIndex::ToString() const {
 
 String WalCmdRenameTable::ToString() const {
     std::stringstream ss;
+    ss << "Rename Table: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "new table name: " << new_table_name_ << std::endl;
@@ -1080,6 +1096,7 @@ String WalCmdRenameTable::ToString() const {
 
 String WalCmdAddColumns::ToString() const {
     std::stringstream ss;
+    ss << "Add Columns: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "columns: ";
@@ -1091,6 +1108,7 @@ String WalCmdAddColumns::ToString() const {
 
 String WalCmdDropColumns::ToString() const {
     std::stringstream ss;
+    ss << "Drop Columns: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "columns: ";

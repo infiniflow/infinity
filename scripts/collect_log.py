@@ -86,3 +86,11 @@ if not os.path.isfile(executable_path):
 else:
     if failure:
         shutil.copy(executable_path, f"{output_dir}/{random_name}.exe")
+
+run_parallel_test_log = "run_parallel_test.log"
+
+if not os.path.isfile(run_parallel_test_log):
+    print("Error: run_parallel_test log file not found")
+else:
+    if failure:
+        shutil.copy(run_parallel_test_log, f"{output_dir}/{random_name}_{run_parallel_test_log}")
