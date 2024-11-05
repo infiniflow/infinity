@@ -99,7 +99,7 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
     }
 }
 
-Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const String &node_name, String node_ip, i16 node_port) {
+Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const String &node_name, String node_ip, u16 node_port) {
     NodeRole current_role = GetServerRole();
     if (current_role == target_role) {
         return Status::OK();
@@ -155,8 +155,11 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     // No need to un-init cluster manager
                     Status init_status = cluster_manager_->InitAsFollower(node_name, node_ip, node_port);
                     if (!init_status.ok()) {
+                        storage_->SetStorageMode(StorageMode::kAdmin);
                         cluster_manager_->UnInit(from_leader);
                         cluster_manager_.reset();
+                        cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
+                        cluster_manager_->InitAsAdmin();
                         return init_status;
                     }
                     break;
@@ -170,8 +173,11 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     // No need to un-init cluster manager, since current is admin
                     Status init_status = cluster_manager_->InitAsLearner(node_name, node_ip, node_port);
                     if (!init_status.ok()) {
+                        storage_->SetStorageMode(StorageMode::kAdmin);
                         cluster_manager_->UnInit(from_leader);
                         cluster_manager_.reset();
+                        cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
+                        cluster_manager_->InitAsAdmin();
                         return init_status;
                     }
                     break;

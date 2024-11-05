@@ -47,8 +47,8 @@ mem_index_capacity       = 1048576
 buffer_manager_size      = "4GB"
 lru_num                  = 7
 temp_dir                 = "/var/infinity/tmp"
-
-memindex_memory_quota   = "1GB"
+result_cache             = "off"
+memindex_memory_quota    = "1GB"
 
 [wal]
 wal_dir                       = "/var/infinity/wal"

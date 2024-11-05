@@ -155,6 +155,13 @@ temp_dir                 = "/var/infinity/tmp"
 # the system will perform a flush operation on all in-memory indices.
 memindex_memory_quota   = "1GB"
 
+# If cache the query result.
+# If same query is sent to Infinity, Infinity will check and return the cached result.
+result_cache            = "on"
+
+# Cache query capacity
+cache_result_num        = 100
+
 # WAL configuration
 [wal]
 # The directory containing the WAL files

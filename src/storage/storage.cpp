@@ -69,7 +69,7 @@ Storage::~Storage() {
 }
 
 ResultCacheManager *Storage::result_cache_manager() const noexcept {
-    if (config_ptr_->ResultCacheMode() != "on") {
+    if (config_ptr_->ResultCache() != "on") {
         return nullptr;
     }
     return result_cache_manager_.get();
@@ -178,7 +178,7 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Result cache manager was initialized before.");
             }
             // TODO: add result_cache_manager
-            if (config_ptr_->ResultCacheMode() == "on") {
+            if (config_ptr_->ResultCache() == "on") {
                 SizeT cache_result_num = config_ptr_->CacheResultNum();
                 result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
             }
