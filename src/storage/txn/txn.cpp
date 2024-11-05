@@ -59,7 +59,7 @@ namespace infinity {
 
 Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<String> txn_text)
     : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(this, InfinityContext::instance().storage()->catalog()), txn_id_(txn_id),
-      txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
+      begin_ts_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
       txn_text_(std::move(txn_text)) {
     catalog_ = txn_store_.GetCatalog();
 #ifdef INFINITY_DEBUG
@@ -69,7 +69,7 @@ Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID t
 
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts)
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this, InfinityContext::instance().storage()->catalog()), txn_id_(txn_id),
-      txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {
+      begin_ts_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {
     catalog_ = txn_store_.GetCatalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Txn");
@@ -78,8 +78,8 @@ Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, T
 
 UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, txn_id, begin_ts);
-    txn->txn_context_.commit_ts_ = begin_ts;
-    txn->txn_context_.state_ = TxnState::kCommitted;
+    txn->commit_ts_ = begin_ts;
+    txn->state_ = TxnState::kCommitted;
     return txn;
 }
 
@@ -161,7 +161,7 @@ TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) { return txn_store
 TxnTableStore *Txn::GetExistTxnTableStore(TableEntry *table_entry) const { return txn_store_.GetExistTxnTableStore(table_entry); }
 
 void Txn::CheckTxnStatus() {
-    TxnState txn_state = txn_context_.GetTxnState();
+    TxnState txn_state = this->GetTxnState();
     if (txn_state != TxnState::kStarted) {
         String error_message = "Transaction isn't started.";
         UnrecoverableError(error_message);
@@ -181,7 +181,7 @@ void Txn::CheckTxn(const String &db_name) {
 // Database OPs
 Status Txn::CreateDatabase(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment) {
     this->CheckTxnStatus();
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     auto [db_entry, status] = catalog_->CreateDatabase(db_name, comment, this->txn_id_, begin_ts, txn_mgr_, conflict_type);
     if (db_entry == nullptr) { // nullptr means some exception happened
@@ -195,7 +195,7 @@ Status Txn::CreateDatabase(const SharedPtr<String> &db_name, ConflictType confli
 
 Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     this->CheckTxnStatus();
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_, conflict_type);
     if (dropped_db_entry.get() == nullptr) {
@@ -209,14 +209,14 @@ Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
 
 Tuple<DBEntry *, Status> Txn::GetDatabase(const String &db_name) {
     this->CheckTxnStatus();
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     return catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
 }
 
 Tuple<SharedPtr<DatabaseInfo>, Status> Txn::GetDatabaseInfo(const String &db_name) {
     this->CheckTxnStatus();
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     return catalog_->GetDatabaseInfo(db_name, this->txn_id_, begin_ts);
 }
@@ -224,7 +224,7 @@ Tuple<SharedPtr<DatabaseInfo>, Status> Txn::GetDatabaseInfo(const String &db_nam
 Vector<DatabaseDetail> Txn::ListDatabases() {
     Vector<DatabaseDetail> res;
 
-    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id_, txn_context_.GetBeginTS());
+    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id_, this->BeginTS());
     SizeT db_count = db_entries.size();
     for (SizeT idx = 0; idx < db_count; ++idx) {
         DBEntry *db_entry = db_entries[idx];
@@ -244,7 +244,7 @@ Status Txn::GetTables(const String &db_name, Vector<TableDetail> &output_table_a
 Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
     this->CheckTxn(db_name);
 
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     LOG_TRACE("Txn::CreateTable try to insert a created table placeholder on catalog");
 
@@ -267,7 +267,7 @@ Status Txn::RenameTable(TableEntry *old_table_entry, const String &new_table_nam
 }
 
 Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs) {
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_id_, begin_ts);
     if (!db_status.ok()) {
@@ -286,7 +286,7 @@ Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef
 }
 
 Status Txn::DropColumns(TableEntry *table_entry, const Vector<String> &column_names) {
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_id_, begin_ts);
     if (!db_status.ok()) {
@@ -307,7 +307,7 @@ Status Txn::DropColumns(TableEntry *table_entry, const Vector<String> &column_na
 Status Txn::DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type) {
     this->CheckTxn(db_name);
 
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     LOG_TRACE("Txn::DropTableCollectionByName try to insert a dropped table placeholder on catalog");
     auto [table_entry, table_status] = catalog_->DropTableByName(db_name, table_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
@@ -325,7 +325,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
 
 // Index OPs
 Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_base, conflict_type, txn_id_, begin_ts, txn_mgr_);
     if (table_index_entry == nullptr) { // nullptr means some exception happened
@@ -343,12 +343,12 @@ Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, co
 Tuple<TableIndexEntry *, Status> Txn::GetIndexByName(const String &db_name, const String &table_name, const String &index_name) {
     this->CheckTxn(db_name);
 
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
     return catalog_->GetIndexByName(db_name, table_name, index_name, txn_id_, begin_ts);
 }
 
 Tuple<SharedPtr<TableIndexInfo>, Status> Txn::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name) {
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
     return catalog_->GetTableIndexInfo(db_name, table_name, index_name, txn_id_, begin_ts);
 }
 
@@ -413,7 +413,7 @@ Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, c
 Status Txn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
     this->CheckTxn(db_name);
 
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     auto [table_index_entry, index_status] = catalog_->DropIndex(db_name, table_name, index_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
     if (table_index_entry.get() == nullptr) {
@@ -430,7 +430,7 @@ Status Txn::DropIndexByName(const String &db_name, const String &table_name, con
 Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const String &table_name) {
     this->CheckTxn(db_name);
 
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TxnTimeStamp begin_ts = this->BeginTS();
 
     return catalog_->GetTableByName(db_name, table_name, txn_id_, begin_ts);
 }
@@ -463,13 +463,56 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetViews"};
 }
 
+TxnTimeStamp Txn::CommitTS() const {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    return commit_ts_;
+}
+
+TxnTimeStamp Txn::BeginTS() const { return begin_ts_; }
+
+TxnState Txn::GetTxnState() const {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    return state_;
+}
+
+TxnType Txn::GetTxnType() const { return type_; }
+
+void Txn::SetTxnRollbacking(TxnTimeStamp rollback_ts) {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    if (state_ != TxnState::kCommitting && state_ != TxnState::kStarted) {
+        String error_message = fmt::format("Transaction is in {} status, which can't rollback.", ToString(state_));
+        UnrecoverableError(error_message);
+    }
+    state_ = TxnState::kRollbacking;
+    commit_ts_ = rollback_ts; // update commit_ts ?
+}
+
+void Txn::SetTxnRollbacked() {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    state_ = TxnState::kRollbacked;
+}
+
+void Txn::SetTxnRead() { type_ = TxnType::kRead; }
+
+void Txn::SetTxnWrite() { type_ = TxnType::kWrite; }
+
 void Txn::SetTxnCommitted() {
-    // LOG_INFO(fmt::format("Txn {} is committed, committed_ts: {}", txn_id_, committed_ts));
-    txn_context_.SetTxnCommitted();
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    if (state_ != TxnState::kCommitting) {
+        String error_message = "Transaction isn't in COMMITTING status.";
+        UnrecoverableError(error_message);
+    }
+    state_ = TxnState::kCommitted;
 }
 
 void Txn::SetTxnCommitting(TxnTimeStamp commit_ts) {
-    txn_context_.SetTxnCommitting(commit_ts);
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    if (state_ != TxnState::kStarted) {
+        String error_message = "Transaction isn't in STARTED status.";
+        UnrecoverableError(error_message);
+    }
+    state_ = TxnState::kCommitting;
+    commit_ts_ = commit_ts;
     wal_entry_->commit_ts_ = commit_ts;
 }
 
@@ -478,18 +521,18 @@ WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 // void Txn::Begin() {
 //     TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
 //     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
-//     txn_context_.SetTxnBegin(ts);
+//     this->SetTxnBegin(ts);
 // }
 
 // void Txn::SetBeginTS(TxnTimeStamp begin_ts) {
 //     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, begin_ts));
-//     txn_context_.SetTxnBegin(begin_ts);
+//     this->SetTxnBegin(begin_ts);
 // }
 
 TxnTimeStamp Txn::Commit() {
     if (wal_entry_->cmds_.empty() && txn_store_.ReadOnly()) {
         // Don't need to write empty WalEntry (read-only transactions).
-        TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampR(this);
+        TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
         return commit_ts;
@@ -504,7 +547,7 @@ TxnTimeStamp Txn::Commit() {
     }
 
     // register commit ts in wal manager here, define the commit sequence
-    TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampW(this);
+    TxnTimeStamp commit_ts = txn_mgr_->GetWriteCommitTS(this);
     LOG_TRACE(fmt::format("Txn: {} is committing, begin_ts:{} committing ts: {}", txn_id_, BeginTS(), commit_ts));
 
     this->SetTxnCommitting(commit_ts);
@@ -547,7 +590,7 @@ bool Txn::CheckConflict(Txn *other_txn) {
 void Txn::CommitBottom() {
     LOG_TRACE(fmt::format("Txn bottom: {} is started.", txn_id_));
     // prepare to commit txn local data into table
-    TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
 
     txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
 
@@ -557,7 +600,7 @@ void Txn::CommitBottom() {
 
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!txn_delta_ops_entry_->operations().empty()) {
-        txn_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
+        txn_delta_ops_entry_->SaveState(txn_id_, this->CommitTS(), txn_mgr_->NextSequence());
     }
 
     // Notify the top half
@@ -568,24 +611,24 @@ void Txn::CommitBottom() {
 }
 
 void Txn::CancelCommitBottom() {
-    txn_context_.SetTxnRollbacked();
+    this->SetTxnRollbacked();
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_bottom_done_ = true;
     commit_cv_.notify_one();
 }
 
 void Txn::Rollback() {
-    auto state = txn_context_.GetTxnState();
+    auto state = this->GetTxnState();
     TxnTimeStamp abort_ts = 0;
     if (state == TxnState::kStarted) {
-        abort_ts = txn_mgr_->GetCommitTimeStampR(this);
+        abort_ts = txn_mgr_->GetReadCommitTS(this);
     } else if (state == TxnState::kCommitting) {
-        abort_ts = txn_context_.GetCommitTS();
+        abort_ts = this->CommitTS();
     } else {
         String error_message = fmt::format("Transaction {} state is {}.", txn_id_, ToString(state));
         UnrecoverableError(error_message);
     }
-    txn_context_.SetTxnRollbacking(abort_ts);
+    this->SetTxnRollbacking(abort_ts);
 
     txn_store_.Rollback(txn_id_, abort_ts);
 
@@ -594,7 +637,7 @@ void Txn::Rollback() {
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) {
     std::lock_guard guard(txn_store_.mtx_);
-    auto state = txn_context_.GetTxnState();
+    auto state = this->GetTxnState();
     if (state != TxnState::kStarted) {
         auto begin_ts = BeginTS();
         UnrecoverableError(fmt::format("Should add wal cmd in started state, begin_ts: {}", begin_ts));

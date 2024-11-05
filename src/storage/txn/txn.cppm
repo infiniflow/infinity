@@ -25,7 +25,6 @@ import meta_state;
 import data_access_state;
 import buffer_manager;
 import txn_state;
-import txn_context;
 import txn_store;
 import database_detail;
 import status;
@@ -181,23 +180,25 @@ public:
 
     inline TransactionID TxnID() const { return txn_id_; }
 
-    inline TxnTimeStamp CommitTS() { return txn_context_.GetCommitTS(); }
+    TxnTimeStamp CommitTS() const;
 
-    inline TxnTimeStamp BeginTS() { return txn_context_.GetBeginTS(); }
+    TxnTimeStamp BeginTS() const;
 
-    inline TxnState GetTxnState() { return txn_context_.GetTxnState(); }
+    TxnState GetTxnState() const;
 
-    inline TxnType GetTxnType() const { return txn_context_.GetTxnType(); }
+    TxnType GetTxnType() const;
 
     void SetTxnCommitted();
 
     void SetTxnCommitting(TxnTimeStamp commit_ts);
 
-    void SetTxnRollbacked() { txn_context_.SetTxnRollbacked(); }
+    void SetTxnRollbacking(TxnTimeStamp rollback_ts);
 
-    void SetTxnRead() { txn_context_.SetTxnType(TxnType::kRead); }
+    void SetTxnRollbacked();
 
-    void SetTxnWrite() { txn_context_.SetTxnType(TxnType::kWrite); }
+    void SetTxnRead();
+
+    void SetTxnWrite();
 
     // WAL and replay OPS
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
@@ -244,7 +245,12 @@ private:
     TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
     TransactionID txn_id_{};
 
-    TxnContext txn_context_;
+    // Use as txn context;
+    mutable std::shared_mutex rw_locker_{};
+    const TxnTimeStamp begin_ts_{};
+    TxnTimeStamp commit_ts_{};
+    TxnState state_{TxnState::kStarted};
+    TxnType type_{TxnType::kInvalid};
 
     // Handled database
     String db_name_{};
