@@ -2078,7 +2078,7 @@ This method specifies the projection columns for the current table but does not 
 
 ```python
 table_obj.output(["doctitle", "docdate", "body"]).highlight(["body"]).match_text("body^5", "harmful chemical", 3).to_pl()
-# The matched words will be embraced in <em> and </em>
+# The matched words will be enclosed in <em> and </em>
 ```
 
 ---
