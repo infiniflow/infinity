@@ -102,7 +102,7 @@ public:
 
     void ReplayWalEntry(const WalEntry &entry, bool on_startup, bool is_replay);
 
-    TxnTimeStamp GetCheckpointedTS();
+    TxnTimeStamp LastCheckpointTS();
 
     Vector<SharedPtr<String>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);

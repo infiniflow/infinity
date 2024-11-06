@@ -555,7 +555,7 @@ TxnTimeStamp Txn::Commit() {
     txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     // LOG_INFO(fmt::format("Txn {} commit ts: {}", txn_id_, commit_ts));
 
-    if (txn_mgr_->CheckConflict(this)) {
+    if (txn_mgr_->CheckTxnConflict(this)) {
         LOG_ERROR(fmt::format("Txn: {} is rolled back. rollback ts: {}", txn_id_, commit_ts));
         wal_entry_ = nullptr;
         txn_mgr_->SendToWAL(this);
