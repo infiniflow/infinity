@@ -104,6 +104,13 @@ std::mutex InfinityThriftService::infinity_session_map_mutex_;
 HashMap<u64, SharedPtr<Infinity>> InfinityThriftService::infinity_session_map_;
 ClientVersions InfinityThriftService::client_version_;
 
+u32 InfinityThriftService::ClearSessionMap() {
+    std::lock_guard lock(infinity_session_map_mutex_);
+    const auto session_count = infinity_session_map_.size();
+    infinity_session_map_.clear();
+    return session_count;
+}
+
 void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ConnectRequest &request) {
     i64 request_client_version = request.client_version;
     if (request_client_version != current_version_index_) {

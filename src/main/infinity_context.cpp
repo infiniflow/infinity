@@ -33,6 +33,7 @@ import status;
 import infinity_exception;
 import wal_manager;
 import global_resource_usage;
+import infinity_thrift_service;
 
 namespace infinity {
 
@@ -471,6 +472,9 @@ void InfinityContext::StopThriftServers() {
         // start_servers_func_ = nullptr;
         // stop_servers_func_ = nullptr;
     }
+    // close all thrift sessions
+    const auto removed_session_count = InfinityThriftService::ClearSessionMap();
+    LOG_INFO(fmt::format("Removed {} thrift sessions", removed_session_count));
 }
 
 } // namespace infinity
