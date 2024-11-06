@@ -68,6 +68,8 @@ private:
     static ClientVersions client_version_;
 
 public:
+    static u32 ClearSessionMap();
+
     InfinityThriftService() {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("InfinityThriftService");

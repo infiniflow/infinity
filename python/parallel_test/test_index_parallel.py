@@ -384,13 +384,9 @@ class TestIndexParallel(TestSdk):
             while time.time() < end_time:
                 table_name = f"{table_name_prefix}_{thread_id}_{table_counter}"
                 table_counter += 1
-                res = db_obj.create_table(table_name, {
-                    "id": {"type": "int"},
-                    "value": {"type": "varchar"}}, ConflictType.Ignore)
-                if res.error_code == ErrorCode.OK:
-                    print(f"thread {thread_id}: table {table_name} created")
-                else:
-                    print(f"thread {thread_id}: create table {table_name} failed: {res.error_msg}")
+                db_obj.create_table(table_name, {"id": {"type": "int"}, "value": {"type": "varchar"}},
+                                    ConflictType.Ignore)
+                print(f"thread {thread_id}: table {table_name} created")
                 time.sleep(0.5)
                 res = db_obj.drop_table(table_name, ConflictType.Ignore)
                 if res.error_code == ErrorCode.OK:
@@ -402,7 +398,6 @@ class TestIndexParallel(TestSdk):
 
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default_db")
         table_name_prefix = "test_table_creation_deletion"
 
         threads = []
