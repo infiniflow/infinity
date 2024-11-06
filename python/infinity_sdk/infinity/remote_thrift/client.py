@@ -256,8 +256,8 @@ class ThriftInfinityClient:
             return CommonResponse(ErrorCode.OK, "Already disconnected")
         try:
             res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
-        except Exception:
-            pass
+        except Exception as e:
+            res = CommonResponse(ErrorCode.CLIENT_CLOSE, str(e))
         self.transport.close()
         self._is_connected = False
         return res
