@@ -48,7 +48,7 @@ print(f"Found log files: {log_files}")
 for log_file in log_files:
     filename = log_file.replace("/", "_")
     if failure:
-        shutil.copy(log_file, f"{output_dir}/{random_name}_{filename}")
+        shutil.copy(log_file, f"{output_dir}/{random_name}{filename}")
     print(f"Last {show_lines} lines from {log_file}:")
     with open(log_file, "r") as f:
         lines = f.readlines()

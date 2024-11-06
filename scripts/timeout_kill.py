@@ -1,4 +1,4 @@
-from subprocess import Popen
+from subprocess import Popen, TimeoutExpired
 import sys
 import time
 import os
@@ -48,9 +48,10 @@ def timeout_kill(duration: int, pids: list[int]):
 
 def timeout_kill(timeout: int, process: Popen[bytes]):
     process.terminate()
-    if process.wait(timeout) is None:
-        process.kill()
-        process.wait()
+    try:
+        ret = process.wait(timeout)
+    except TimeoutExpired as e:
+        ret = process.kill()
         print(f"process {process.pid} timeout, killed.")
         exit(1)
 
