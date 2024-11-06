@@ -335,6 +335,8 @@ TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prep
 
     auto &block_index = table_ref->block_index_;
     if (table_ref->index_index_.get() == nullptr) {
+        // Note1:
+        // If same table_ref is called in multiple threads, table_ref->index_index_ should be initialized in advance
         table_ref->index_index_ = MakeShared<IndexIndex>();
     }
     Vector<SegmentIndexEntry *> segment_index_entries;
