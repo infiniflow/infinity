@@ -162,6 +162,7 @@ bool TableIndexEntry::GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedP
         segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn);
         index_by_segment_.emplace(segment_id, segment_index_entry);
         created = true;
+        LOG_TRACE(fmt::format("{} Create segment index entry for segment {}", this->encode(), segment_id));
     } else {
         segment_index_entry = iter->second;
     }

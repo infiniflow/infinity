@@ -719,6 +719,7 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
             case IndexType::kSecondary:
             case IndexType::kBMP: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
+                    LOG_TRACE(fmt::format("Table {}.{} index {} segment {} MemIndexInsert.", *GetDBName(), *table_name_, *index_base->index_name_, seg_id));
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
                 }
                 break;

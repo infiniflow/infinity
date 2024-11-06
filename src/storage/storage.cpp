@@ -308,11 +308,6 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from Readable to Readable");
             }
 
-            {
-                std::unique_lock<std::mutex> lock(mutex_);
-                current_storage_mode_ = target_mode;
-            }
-
             if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
 
                 if (periodic_trigger_thread_ != nullptr) {
@@ -411,6 +406,11 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                 periodic_trigger_thread_->optimize_index_trigger_ =
                     MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
                 periodic_trigger_thread_->Start();
+            }
+
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                current_storage_mode_ = target_mode;
             }
             break;
         }

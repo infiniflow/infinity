@@ -5504,7 +5504,7 @@ void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperato
         }
         {
             // delta op type
-            Value value = Value::MakeVarchar(ToString(delta_op_brief.type_));
+            Value value = Value::MakeVarchar(CatalogDeltaOpTypeToString(delta_op_brief.type_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
         }

@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import time
@@ -257,6 +258,7 @@ class TestIndexParallel(TestSdk):
         connection_pool.release_conn(infinity_obj)
 
     def test_index_creation_deletion_parallel(self, get_infinity_connection_pool):
+        self.logger = logging.getLogger("run_parallel_test")
 
         def index_worker(connection_pool: ConnectionPool, table_name, column_name, index_name, end_time, thread_id):
             infinity_obj = connection_pool.get_conn()
@@ -269,15 +271,19 @@ class TestIndexParallel(TestSdk):
                                                              index.IndexType.FullText),
                                              ConflictType.Ignore)
                 if res.error_code == ErrorCode.OK:
-                    print(f"thread {thread_id}: index {index_name} created")
+                    # print(f"thread {thread_id}: index {index_name} created")
+                    logging.info(f"thread {thread_id}: index {index_name} created")
                 else:
-                    print(f"thread {thread_id}: create_index {index_name} failed: {res.error_msg}")
+                    # print(f"thread {thread_id}: create_index {index_name} failed: {res.error_msg}")
+                    logging.info(f"thread {thread_id}: create_index {index_name} failed: {res.error_msg}")
                 time.sleep(0.5)
                 res = table_obj.drop_index(index_name, ConflictType.Ignore)
                 if res.error_code == ErrorCode.OK:
-                    print(f"thread {thread_id}: index {index_name} deleted")
+                    # print(f"thread {thread_id}: index {index_name} deleted")
+                    logging.info(f"thread {thread_id}: index {index_name} deleted")
                 else:
-                    print(f"thread {thread_id}: delete_index {index_name} failed: {res.error_msg}")
+                    # print(f"thread {thread_id}: delete_index {index_name} failed: {res.error_msg}")
+                    logging.info(f"thread {thread_id}: delete_index {index_name} failed: {res.error_msg}")
                 time.sleep(0.5)
 
             connection_pool.release_conn(infinity_obj)
@@ -293,7 +299,8 @@ class TestIndexParallel(TestSdk):
                     value.append({"doctitle": data["doctitle"][i],
                                   "docdate": data["docdate"][i], "body": data["body"][i]})
                 table_obj.insert(value)
-                print(f"thread {thread_id}: put data")
+                # print(f"thread {thread_id}: put data")
+                logging.info(f"thread {thread_id}: put data")
                 time.sleep(1)
 
             connection_pool.release_conn(infinity_obj)
@@ -307,9 +314,11 @@ class TestIndexParallel(TestSdk):
                 try:
                     res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
                         "body^5", "harmful chemical", 3).to_pl()
-                    print(f"thread {thread_id}: check result:\n{res}")
+                    # print(f"thread {thread_id}: check result:\n{res}")
+                    logging.info(f"thread {thread_id}: check result:\n{res}")
                 except Exception as e:
-                    print(f"thread {thread_id}: check failed: {e}")
+                    # print(f"thread {thread_id}: check failed: {e}")
+                    logging.info(f"thread {thread_id}: check failed: {e}")
                 time.sleep(0.5)
 
             connection_pool.release_conn(infinity_obj)
@@ -350,11 +359,17 @@ class TestIndexParallel(TestSdk):
             threads.append(Thread(target=query_worker, args=[
                 connection_pool, table_name, end_time, i + 2 * kThreadNum]))
 
-        for t in threads:
-            t.start()
+        try:
+            self.logger.info("test_index_creation_deletion_parallel start")
+            for t in threads:
+                t.start()
 
-        for t in threads:
-            t.join()
+            for t in threads:
+                t.join()
+        except Exception as e:
+            self.logger.error(f"test_index_creation_deletion_parallel failed: {e}")
+        else:
+            self.logger.info("test_index_creation_deletion_parallel end")
 
         res = db_obj.drop_table(table_name, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK

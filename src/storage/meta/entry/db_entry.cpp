@@ -112,6 +112,7 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
 Tuple<SharedPtr<TableEntry>, Status>
 DBEntry::DropTable(const String &table_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_name, conflict_type);
+    LOG_TRACE(fmt::format("Dropping table entry: {}", table_name));
     if (!status.ok()) {
         return {nullptr, status};
     }
