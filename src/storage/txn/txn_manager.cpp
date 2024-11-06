@@ -118,7 +118,7 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
 }
 
 // Prepare to commit ReadTxn
-TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
+TxnTimeStamp TxnManager::GetReadCommitTS(Txn *txn) {
     std::lock_guard guard(locker_);
     TxnTimeStamp commit_ts = start_ts_ + 1;
     txn->SetTxnRead();
@@ -126,7 +126,7 @@ TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
 }
 
 // Prepare to commit WriteTxn
-TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
+TxnTimeStamp TxnManager::GetWriteCommitTS(Txn *txn) {
     std::lock_guard guard(locker_);
     start_ts_ += 2;
     TxnTimeStamp commit_ts = start_ts_;

@@ -54,9 +54,9 @@ public:
 
     BufferManager *GetBufferMgr() const { return buffer_mgr_; }
 
-    TxnTimeStamp GetCommitTimeStampR(Txn *txn);
+    TxnTimeStamp GetReadCommitTS(Txn *txn);
 
-    TxnTimeStamp GetCommitTimeStampW(Txn *txn);
+    TxnTimeStamp GetWriteCommitTS(Txn *txn);
 
     bool CheckConflict(Txn *txn);
 
