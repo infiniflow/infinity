@@ -61,7 +61,10 @@ public:
 
 export class CompactStateData {
 public:
-    CompactStateData(TableEntry *table_entry) : new_table_ref_(MakeShared<BaseTableRef>(table_entry, MakeShared<BlockIndex>())){};
+    CompactStateData(TableEntry *table_entry) : new_table_ref_(MakeShared<BaseTableRef>(table_entry, MakeShared<BlockIndex>())){
+        // src/executor/operator/physical_create_index_prepare.cpp: Note1
+        new_table_ref_->index_index_ = MakeShared<IndexIndex>();
+    };
 
     void AddToDelete(TxnTimeStamp commit_ts, SegmentID segment_id, Vector<SegmentOffset> delete_offsets);
 

@@ -26,7 +26,7 @@ import physical_operator;
 import query_context;
 import operator_state;
 import load_meta;
-
+import block_index;
 import status;
 import infinity_exception;
 import index_base;
@@ -73,6 +73,11 @@ bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorSt
     if (!status.ok()) {
         operator_state->status_ = status;
     } else {
+        if (base_table_ref_->index_index_.get() == nullptr) {
+            // Note1:
+            // If same base_table_ref_ is called in multiple threads, base_table_ref_->index_index_ should be initialized in advance, not here
+            base_table_ref_->index_index_ = MakeShared<IndexIndex>();
+        }
         auto [segment_index_entries, status] = txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), prepare_);
         if (!status.ok()) {
             operator_state->status_ = status;
