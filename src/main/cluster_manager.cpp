@@ -212,14 +212,18 @@ void ClusterManager::HeartBeatToLeaderThread() {
         // Update latest update time
         auto hb_now = std::chrono::system_clock::now();
         auto hb_time_since_epoch = hb_now.time_since_epoch();
-        this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
+        SharedPtr<HeartBeatPeerTask> hb_task = nullptr;
+        {
+            std::unique_lock<std::mutex> cluster_manager_lock(mutex_);
+            this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
 
-        // Send heartbeat
-        SharedPtr<HeartBeatPeerTask> hb_task = MakeShared<HeartBeatPeerTask>(this_node_->node_name_,
-                                                                             this_node_->node_role_,
-                                                                             this_node_->ip_address_,
-                                                                             this_node_->port_,
-                                                                             storage_->txn_manager()->CurrentTS());
+            // Send heartbeat
+            hb_task = MakeShared<HeartBeatPeerTask>(this_node_->node_name_,
+                                                    this_node_->node_role_,
+                                                    this_node_->ip_address_,
+                                                    this_node_->port_,
+                                                    storage_->txn_manager()->CurrentTS());
+        }
         client_to_leader_->Send(hb_task);
         hb_task->Wait();
 
@@ -246,20 +250,22 @@ void ClusterManager::HeartBeatToLeaderThread() {
         hb_now = std::chrono::system_clock::now();
         hb_time_since_epoch = hb_now.time_since_epoch();
 
-        std::unique_lock<std::mutex> cluster_manager_lock(mutex_);
-        // Update leader info
-        leader_node_->node_status_ = NodeStatus::kAlive;
-        leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
-        leader_node_->leader_term_ = hb_task->leader_term_;
+        {
+            std::unique_lock<std::mutex> cluster_manager_lock(mutex_);
+            // Update leader info
+            leader_node_->node_status_ = NodeStatus::kAlive;
+            leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
+            leader_node_->leader_term_ = hb_task->leader_term_;
 
-        // Update heartbeat sending count
-        ++this_node_->heartbeat_count_;
+            // Update heartbeat sending count
+            ++this_node_->heartbeat_count_;
 
-        // Update the non-leader node info from leader
-        UpdateNodeInfoNoLock(hb_task->other_nodes_);
+            // Update the non-leader node info from leader
+            UpdateNodeInfoNoLock(hb_task->other_nodes_);
 
-        // Check if leader can't send message to this reader node
-        this_node_->node_status_ = hb_task->sender_status_;
+            // Check if leader can't send message to this reader node
+            this_node_->node_status_ = hb_task->sender_status_;
+        }
     }
     return;
 }
@@ -831,23 +837,23 @@ Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
     return Status::OK();
 }
 
-Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
+Vector<NodeInfo> ClusterManager::ListNodes() const {
     // ADMIN SHOW NODES;
     std::unique_lock<std::mutex> lock(mutex_);
-    Vector<SharedPtr<NodeInfo>> result;
+    Vector<NodeInfo> result;
     result.reserve(other_node_map_.size() + 2);
-    result.emplace_back(this_node_);
+    result.emplace_back(*this_node_);
     if (current_node_role_ == NodeRole::kFollower or current_node_role_ == NodeRole::kLearner) {
-        result.emplace_back(leader_node_);
+        result.emplace_back(*leader_node_);
     }
     for (const auto &node_info_pair : other_node_map_) {
-        result.emplace_back(node_info_pair.second);
+        result.emplace_back(*(node_info_pair.second));
     }
 
     return result;
 }
 
-Tuple<Status, SharedPtr<NodeInfo>> ClusterManager::GetNodeInfoPtrByName(const String &node_name) const {
+Tuple<Status, NodeInfo> ClusterManager::GetNodeInfoByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);
 
     if (current_node_role_ == NodeRole::kAdmin or current_node_role_ == NodeRole::kStandalone or current_node_role_ == NodeRole::kUnInitialized) {
@@ -858,26 +864,26 @@ Tuple<Status, SharedPtr<NodeInfo>> ClusterManager::GetNodeInfoPtrByName(const St
     if (current_node_role_ == NodeRole::kFollower or current_node_role_ == NodeRole::kLearner) {
         if (node_name == leader_node_->node_name_) {
             // Show leader
-            return {Status::OK(), leader_node_};
+            return {Status::OK(), *leader_node_};
         }
     }
 
     if (node_name == this_node_->node_name_) {
         // Show this node
-        return {Status::OK(), this_node_};
+        return {Status::OK(), *this_node_};
     }
 
     auto iter = other_node_map_.find(node_name);
     if (iter == other_node_map_.end()) {
-        return {Status::NotExistNode(node_name), nullptr};
+        return {Status::NotExistNode(node_name), NodeInfo()};
     }
-    return {Status::OK(), iter->second};
+    return {Status::OK(), *(iter->second)};
 }
 
-SharedPtr<NodeInfo> ClusterManager::ThisNode() const {
+NodeInfo ClusterManager::ThisNode() const {
     // ADMIN SHOW NODE;
     std::unique_lock<std::mutex> lock(mutex_);
-    return this->this_node_;
+    return *this_node_;
 }
 
 } // namespace infinity

@@ -96,13 +96,13 @@ public:
     Status ApplySyncedLogNolock(const Vector<String> &synced_logs);
 
     // Used by all nodes ADMIN SHOW NODES
-    Vector<SharedPtr<NodeInfo>> ListNodes() const;
+    Vector<NodeInfo> ListNodes() const;
 
     // Used by all nodes ADMIN SHOW NODE node_name;
-    Tuple<Status, SharedPtr<NodeInfo>> GetNodeInfoPtrByName(const String &node_name) const;
+    Tuple<Status, NodeInfo> GetNodeInfoByName(const String &node_name) const;
 
     // Used by all nodes / all mode ADMIN SHOW NODE;
-    SharedPtr<NodeInfo> ThisNode() const;
+    NodeInfo ThisNode() const;
 
     // Used by all nodes
     NodeRole GetNodeRole() const { return current_node_role_; }
