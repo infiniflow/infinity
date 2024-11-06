@@ -334,6 +334,11 @@ TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prep
     TxnTableStore *txn_table_store = txn_store->GetTxnTableStore(table_entry);
 
     auto &block_index = table_ref->block_index_;
+    if (table_ref->index_index_.get() == nullptr) {
+        // Note1:
+        // If same table_ref is called in multiple threads, table_ref->index_index_ should be initialized in advance
+        table_ref->index_index_ = MakeShared<IndexIndex>();
+    }
     Vector<SegmentIndexEntry *> segment_index_entries;
     SegmentID unsealed_id = table_entry->unsealed_id();
     for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
