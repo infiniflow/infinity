@@ -593,6 +593,8 @@ Status Status::NotRegistered(const String &node_info) {
     return Status(ErrorCode::kNotRegistered, MakeUnique<String>(fmt::format("Not registered node: {}", node_info)));
 }
 
+Status Status::CantSwitchRole(const String &detailed_info) { return Status(ErrorCode::kCantSwitchRole, MakeUnique<String>(detailed_info)); }
+
 // meta
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 

@@ -180,6 +180,7 @@ export enum class ErrorCode : long {
     kMinioBucketNotExists = 7023,
     kInvalidStorageType = 7024,
     kNotRegistered = 7025,
+    kCantSwitchRole = 7026,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -350,6 +351,7 @@ public:
     static Status MinioBucketNotExists(const String &bucket_name);
     static Status InvalidStorageType(const String &expected, const String &actual);
     static Status NotRegistered(const String &node_info);
+    static Status CantSwitchRole(const String &detailed_info);
 
     // meta
     static Status InvalidEntry();
