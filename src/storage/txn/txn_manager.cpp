@@ -131,7 +131,7 @@ TxnTimeStamp TxnManager::GetWriteCommitTS(Txn *txn) {
     start_ts_ += 2;
     TxnTimeStamp commit_ts = start_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
-    finishing_txns_.emplace(txn);
+    committing_txns_.emplace(txn);
     txn->SetTxnWrite();
     return commit_ts;
 }
@@ -143,11 +143,11 @@ bool TxnManager::CheckConflict(Txn *txn) {
     {
         std::lock_guard guard(locker_);
         // LOG_INFO(fmt::format("Txn {}(commit_ts:{}) check conflict", txn->TxnID(), txn->CommitTS()));
-        for (Txn *finishing_txn : finishing_txns_) {
-            TxnTimeStamp finishing_commit_ts = finishing_txn->CommitTS();
-            if (commit_ts > finishing_commit_ts) {
-                candidate_txns.push_back(finishing_txn->shared_from_this());
-                min_checking_ts = std::min(min_checking_ts, finishing_txn->BeginTS());
+        for (Txn *committing_txn : committing_txns_) {
+            TxnTimeStamp committing_ts = committing_txn->CommitTS();
+            if (commit_ts > committing_ts) {
+                candidate_txns.push_back(committing_txn->shared_from_this());
+                min_checking_ts = std::min(min_checking_ts, committing_txn->BeginTS());
             }
         }
         if (min_checking_ts != UNCOMMIT_TS) {
@@ -248,13 +248,13 @@ bool TxnManager::Stopped() { return !is_running_.load(); }
 
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
     TxnTimeStamp commit_ts = txn->Commit();
-    this->FinishTxn(txn);
+    this->CleanupTxn(txn);
     return commit_ts;
 }
 
 void TxnManager::RollBackTxn(Txn *txn) {
     txn->Rollback();
-    this->FinishTxn(txn);
+    this->CleanupTxn(txn);
 }
 
 SizeT TxnManager::ActiveTxnCount() {
@@ -311,37 +311,53 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
     return res;
 }
 
-// A Txn can be deleted when there is no uncommitted txn whose begin is less than the commit ts of the txn
-// So maintain the least uncommitted begin ts
-void TxnManager::FinishTxn(Txn *txn) {
-    std::lock_guard guard(locker_);
-
-    if (txn->GetTxnType() == TxnType::kInvalid) {
-        String error_message = "Txn type is invalid";
-        UnrecoverableError(error_message);
-    } else if (txn->GetTxnType() == TxnType::kRead) {
-        txn_map_.erase(txn->TxnID());
-        return;
-    }
-
-    auto state = txn->GetTxnState();
-    if (state == TxnState::kCommitting) {
-        txn->SetTxnCommitted();
-    } else if (state == TxnState::kRollbacking) {
-        txn->SetTxnRollbacked();
-    } else {
-        String error_message = fmt::format("Invalid transaction status: {}", ToString(state));
-        UnrecoverableError(error_message);
-    }
-    SizeT remove_n = finishing_txns_.erase(txn);
-    if (remove_n == 0) {
-        UnrecoverableError("Txn not found in finishing_txns_");
-    }
-    TransactionID txn_id = txn->TxnID();
-    remove_n = txn_map_.erase(txn_id);
-    if (remove_n == 0) {
-        String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
-        UnrecoverableError(error_message);
+void TxnManager::CleanupTxn(Txn *txn) {
+    TxnType txn_type = txn->GetTxnType();
+    switch(txn_type) {
+        case TxnType::kRead: {
+            // For read-only Txn only remove txn from txn_map
+            std::lock_guard guard(locker_);
+            txn_map_.erase(txn->TxnID());
+            break;
+        }
+        case TxnType::kWrite: {
+            // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
+            TxnState txn_state = txn->GetTxnState();
+            switch(txn_state) {
+                case TxnState::kCommitting: {
+                    txn->SetTxnCommitted();
+                    break;
+                }
+                case TxnState::kRollbacking: {
+                    txn->SetTxnRollbacked();
+                    break;
+                }
+                default: {
+                    String error_message = fmt::format("Invalid transaction status: {}", ToString(txn_state));
+                    UnrecoverableError(error_message);
+                }
+            }
+            TransactionID txn_id = txn->TxnID();
+            {
+                // cleanup the txn from committing_txn and txm_map
+                std::lock_guard guard(locker_);
+                SizeT remove_n = committing_txns_.erase(txn);
+                if (remove_n == 0) {
+                    UnrecoverableError("Txn not found in committing_txns_");
+                }
+                remove_n = txn_map_.erase(txn_id);
+                if (remove_n == 0) {
+                    String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
+                    UnrecoverableError(error_message);
+                }
+            }
+            break;
+        }
+        case TxnType::kInvalid: {
+            String error_message = "Txn type is invalid";
+            UnrecoverableError(error_message);
+            break;
+        }
     }
 }
 
