@@ -343,6 +343,10 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     break;
                 }
                 case NodeRole::kLeader: {
+                    if (current_role == NodeRole::kLearner) {
+                        Status status = Status::CantSwitchRole("Can't switch from learner to leader");
+                        return status;
+                    }
                     if (cluster_manager_ == nullptr) {
                         UnrecoverableError("cluster manager wasn't valid.");
                     }

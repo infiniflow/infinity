@@ -4036,6 +4036,11 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, false, node_name);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to LEADER role");
+                if(status.code() == ErrorCode::kCantSwitchRole) {
+                    // Just don't change the role
+                    break;
+                }
+
                 Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
                 if (!restore_status.ok()) {
                     UnrecoverableError(fmt::format("Fail to change node role to LEADER, then fail to restore to ADMIN."));
