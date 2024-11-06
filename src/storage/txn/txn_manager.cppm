@@ -95,7 +95,7 @@ public:
     WalManager *wal_manager() const { return wal_mgr_; }
 
 private:
-    void FinishTxn(Txn *txn);
+    void CleanupTxn(Txn *txn);
 
 public:
     u64 NextSequence() { return ++sequence_; }
@@ -113,7 +113,7 @@ private:
     WalManager *wal_mgr_;
 
     Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
-    HashSet<Txn *> finishing_txns_;     // the txns in committing stage, can use flat_map
+    HashSet<Txn *> committing_txns_;     // the txns in committing stage, can use flat_map
     Set<TxnTimeStamp> checking_ts_{};   // the begin ts of txn that is used to check conflict
 
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
