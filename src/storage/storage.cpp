@@ -177,7 +177,7 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
             }
 
             SizeT cache_result_num = config_ptr_->CacheResultNum();
-            if (result_cache_manager_ != nullptr) {
+            if (result_cache_manager_ == nullptr) {
                 result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
             }
 
