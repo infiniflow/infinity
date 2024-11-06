@@ -33,6 +33,7 @@ import status;
 import infinity_exception;
 import wal_manager;
 import global_resource_usage;
+import infinity_thrift_service;
 
 namespace infinity {
 
@@ -343,6 +344,10 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     break;
                 }
                 case NodeRole::kLeader: {
+                    if (current_role == NodeRole::kLearner) {
+                        Status status = Status::CantSwitchRole("Can't switch from learner to leader");
+                        return status;
+                    }
                     if (cluster_manager_ == nullptr) {
                         UnrecoverableError("cluster manager wasn't valid.");
                     }
@@ -471,6 +476,9 @@ void InfinityContext::StopThriftServers() {
         // start_servers_func_ = nullptr;
         // stop_servers_func_ = nullptr;
     }
+    // close all thrift sessions
+    const auto removed_session_count = InfinityThriftService::ClearSessionMap();
+    LOG_INFO(fmt::format("Removed {} thrift sessions", removed_session_count));
 }
 
 } // namespace infinity
