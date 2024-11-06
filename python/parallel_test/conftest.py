@@ -90,3 +90,5 @@ def pytest_configure(config):
     handler = logging.FileHandler(log_output_file)
     logger.addHandler(handler)
     logger.addHandler(logging.StreamHandler())
+    formatter = logging.Formatter('%(asctime)s - %(threadName)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
