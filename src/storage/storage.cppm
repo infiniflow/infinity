@@ -73,6 +73,8 @@ public:
 
     [[nodiscard]] ResultCacheManager *result_cache_manager() const noexcept;
 
+    [[nodiscard]] ResultCacheManager *GetResultCacheManagerPtr() const noexcept;
+
     StorageMode GetStorageMode() const;
     Status SetStorageMode(StorageMode mode);
     Status SetReaderStorageContinue(TxnTimeStamp system_start_ts);

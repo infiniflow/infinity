@@ -75,6 +75,8 @@ ResultCacheManager *Storage::result_cache_manager() const noexcept {
     return result_cache_manager_.get();
 }
 
+ResultCacheManager *Storage::GetResultCacheManagerPtr() const noexcept { return result_cache_manager_.get(); }
+
 StorageMode Storage::GetStorageMode() const {
     std::unique_lock<std::mutex> lock(mutex_);
     return current_storage_mode_;
@@ -174,12 +176,8 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                 persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
             }
 
+            SizeT cache_result_num = config_ptr_->CacheResultNum();
             if (result_cache_manager_ != nullptr) {
-                UnrecoverableError("Result cache manager was initialized before.");
-            }
-            // TODO: add result_cache_manager
-            if (config_ptr_->ResultCache() == "on") {
-                SizeT cache_result_num = config_ptr_->CacheResultNum();
                 result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
             }
 

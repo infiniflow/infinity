@@ -107,6 +107,25 @@ SizeT CacheResultMap::DropIF(std::function<bool(const CachedNodeBase &)> pred) {
     return removed;
 }
 
+void CacheResultMap::ResetCacheNumCapacity(SizeT cache_num_capacity) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    cache_num_capacity_ = cache_num_capacity;
+    while (lru_list_.size() > cache_num_capacity_) {
+        LRUEntry &envict_entry = lru_list_.back();
+        SizeT remove_n = lru_map_.erase(envict_entry.cached_node_.get());
+        if (remove_n != 1) {
+            UnrecoverableError("Failed to remove cache entry from lru_map_");
+        }
+        lru_list_.pop_back();
+    }
+}
+
+void CacheResultMap::ClearCache() {
+    std::lock_guard<std::mutex> lock(mtx_);
+    lru_list_.clear();
+    lru_map_.clear();
+}
+
 bool ResultCacheManager::AddCache(UniquePtr<CachedNodeBase> cached_node, Vector<UniquePtr<DataBlock>> data_blocks) {
     if (cached_node == nullptr) {
         return false;

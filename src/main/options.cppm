@@ -148,7 +148,7 @@ export enum class GlobalOptionIndex : i8 {
     kPersistenceObjectSizeLimit = 32,
     kMemIndexMemoryQuota = 33,
     kResultCache = 34,
-    kCacheResultNum = 35,
+    kCacheResultCapacity = 35,
     kServerMode = 36,
     kPeerServerIP = 37,
     kPeerServerPort = 38,

@@ -71,6 +71,17 @@ public:
 
     SizeT DropIF(std::function<bool(const CachedNodeBase &)> pred);
 
+    void ResetCacheNumCapacity(SizeT cache_num_capacity);
+
+    void ClearCache();
+
+    SizeT cache_num_capacity() const { return cache_num_capacity_; }
+
+    SizeT cache_num_used() { 
+        std::lock_guard<std::mutex> lock(mtx_);
+        return lru_map_.size();
+    }
+
 private:
     struct LRUEntry {
         UniquePtr<CachedNodeBase> cached_node_;
@@ -104,6 +115,14 @@ public:
     Optional<CacheOutput> GetCache(const CachedNodeBase &cached_node);
 
     SizeT DropTable(const String &schema_name, const String &table_name);
+
+    void ResetCacheNumCapacity(SizeT cache_num_capacity) { cache_map_.ResetCacheNumCapacity(cache_num_capacity); }
+
+    void ClearCache() { cache_map_.ClearCache(); }
+
+    SizeT cache_num_capacity() const { return cache_map_.cache_num_capacity(); }
+
+    SizeT cache_num_used() { return cache_map_.cache_num_used(); }
 
 private:
     CacheResultMap cache_map_;

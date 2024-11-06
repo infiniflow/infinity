@@ -446,8 +446,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
-        i64 cache_result_num = DEFAULT_CACHE_RESULT_NUM;
-        auto cache_result_num_option = MakeUnique<IntegerOption>(CACHE_RESULT_NUM_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
+        i64 cache_result_num = DEFAULT_CACHE_RESULT_CAPACITY;
+        auto cache_result_num_option = MakeUnique<IntegerOption>(CACHE_RESULT_CAPACITY_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
         status = global_options_.AddOption(std::move(cache_result_num_option));
         if (!status.ok()) {
             fmt::print("Fatal: {}", status.message());
@@ -1723,15 +1723,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             global_options_.AddOption(std::move(result_cache_option));
                             break;
                         }
-                        case GlobalOptionIndex::kCacheResultNum: {
-                            i64 cache_result_num = DEFAULT_CACHE_RESULT_NUM;
+                        case GlobalOptionIndex::kCacheResultCapacity: {
+                            i64 cache_result_num = DEFAULT_CACHE_RESULT_CAPACITY;
                             if (elem.second.is_integer()) {
                                 cache_result_num = elem.second.value_or(cache_result_num);
                             } else {
                                 return Status::InvalidConfig("'cache_result_num' field isn't integer.");
                             }
                             auto cache_result_num_option =
-                                MakeUnique<IntegerOption>(CACHE_RESULT_NUM_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
+                                MakeUnique<IntegerOption>(CACHE_RESULT_CAPACITY_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
                             global_options_.AddOption(std::move(cache_result_num_option));
                             break;
                         }
@@ -1790,10 +1790,10 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     }
                 }
 
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kCacheResultNum) == nullptr) {
-                    i64 cache_result_num = DEFAULT_CACHE_RESULT_NUM;
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kCacheResultCapacity) == nullptr) {
+                    i64 cache_result_num = DEFAULT_CACHE_RESULT_CAPACITY;
                     UniquePtr<IntegerOption> cache_result_num_option =
-                        MakeUnique<IntegerOption>(CACHE_RESULT_NUM_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
+                        MakeUnique<IntegerOption>(CACHE_RESULT_CAPACITY_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
                     Status status = global_options_.AddOption(std::move(cache_result_num_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
@@ -2388,7 +2388,7 @@ String Config::ResultCache() {
 
 i64 Config::CacheResultNum() {
     std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetIntegerValue(GlobalOptionIndex::kCacheResultNum);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kCacheResultCapacity);
 }
 
 void Config::SetCacheResult(const String &mode) {
