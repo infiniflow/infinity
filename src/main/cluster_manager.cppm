@@ -24,6 +24,7 @@ import peer_server_thrift_types;
 import peer_task;
 import storage;
 import admin_statement;
+import node_info;
 
 namespace infinity {
 
@@ -31,7 +32,7 @@ export enum class UpdateNodeOp { kRemove, kLostConnection };
 
 export class ClusterManager {
 public:
-    explicit ClusterManager(Storage *storage);
+    ClusterManager();
     ~ClusterManager();
 
 public:
@@ -96,19 +97,18 @@ public:
     Status ApplySyncedLogNolock(const Vector<String> &synced_logs);
 
     // Used by all nodes ADMIN SHOW NODES
-    Vector<NodeInfo> ListNodes() const;
+    Vector<SharedPtr<NodeInfo>> ListNodes() const;
 
     // Used by all nodes ADMIN SHOW NODE node_name;
-    Tuple<Status, NodeInfo> GetNodeInfoByName(const String &node_name) const;
+    Tuple<Status, SharedPtr<NodeInfo>> GetNodeInfoByName(const String &node_name) const;
 
     // Used by all nodes / all mode ADMIN SHOW NODE;
-    NodeInfo ThisNode() const;
+    SharedPtr<NodeInfo> ThisNode() const;
 
     // Used by all nodes
     NodeRole GetNodeRole() const { return current_node_role_; }
 
 private:
-    Storage *storage_{};
     mutable std::mutex mutex_;
 
     SharedPtr<NodeInfo> leader_node_; // Used by follower / learner

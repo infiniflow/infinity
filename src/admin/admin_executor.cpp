@@ -58,6 +58,7 @@ import cluster_manager;
 import utility;
 import peer_task;
 import infinity_exception;
+import node_info;
 
 namespace infinity {
 
@@ -3644,7 +3645,7 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    Vector<NodeInfo> server_nodes = InfinityContext::instance().cluster_manager()->ListNodes();
+    Vector<SharedPtr<NodeInfo>> server_nodes = InfinityContext::instance().cluster_manager()->ListNodes();
     for (const auto &server_node : server_nodes) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -3653,35 +3654,35 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
 
         {
             // name
-            Value value = Value::MakeVarchar(server_node.node_name_);
+            Value value = Value::MakeVarchar(server_node->node_name());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
 
         {
             // role
-            Value value = Value::MakeVarchar(ToString(server_node.node_role_));
+            Value value = Value::MakeVarchar(ToString(server_node->node_role()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
 
         {
             // status
-            Value value = Value::MakeVarchar(ToString(server_node.node_status_));
+            Value value = Value::MakeVarchar(ToString(server_node->node_status()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
 
         {
             // address
-            Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node.ip_address_, server_node.port_));
+            Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->node_ip(), server_node->node_port()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
         }
 
         {
             // last_update
-            std::chrono::system_clock::duration time_duration = std::chrono::seconds(server_node.last_update_ts_);
+            std::chrono::system_clock::duration time_duration = std::chrono::seconds(server_node->update_ts());
             std::chrono::time_point<std::chrono::system_clock> time_since_epoch = std::chrono::time_point<std::chrono::system_clock>(time_duration);
             std::time_t t_c = std::chrono::system_clock::to_time_t(time_since_epoch);
             //            std::stringstream ss;
@@ -3693,7 +3694,7 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
 
         {
             // heartbeat
-            Value value = Value::MakeBigInt(server_node.heartbeat_count_);
+            Value value = Value::MakeBigInt(server_node->heartbeat_count());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
         }
@@ -3757,7 +3758,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(server_node.node_name_);
+            Value value = Value::MakeVarchar(server_node->node_name());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -3773,7 +3774,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(ToString(server_node.node_role_));
+            Value value = Value::MakeVarchar(ToString(server_node->node_role()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -3789,7 +3790,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(ToString(server_node.node_status_));
+            Value value = Value::MakeVarchar(ToString(server_node->node_status()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -3805,7 +3806,7 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node.ip_address_, server_node.port_));
+            Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->node_ip(), server_node->node_port()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -3821,8 +3822,8 @@ QueryResult AdminExecutor::ShowNode(QueryContext *query_context, const AdminStat
 
         ++column_id;
         {
-            //            const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node.last_update_ts_);
-            const std::time_t t_c = server_node.last_update_ts_;
+            //            const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node->last_update_ts_);
+            const std::time_t t_c = server_node->update_ts();
             Value value = Value::MakeVarchar(std::ctime(&t_c));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -3877,7 +3878,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
     output_block_ptr->Init(column_types);
 
     if (InfinityContext::instance().IsClusterRole()) {
-        NodeInfo server_node = InfinityContext::instance().cluster_manager()->ThisNode();
+        SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->ThisNode();
         {
             SizeT column_id = 0;
             {
@@ -3888,7 +3889,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 
             ++column_id;
             {
-                Value value = Value::MakeVarchar(server_node.node_name_);
+                Value value = Value::MakeVarchar(server_node->node_name());
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
@@ -3904,7 +3905,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 
             ++column_id;
             {
-                Value value = Value::MakeVarchar(ToString(server_node.node_role_));
+                Value value = Value::MakeVarchar(ToString(server_node->node_role()));
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
@@ -3920,7 +3921,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 
             ++column_id;
             {
-                Value value = Value::MakeVarchar(ToString(server_node.node_status_));
+                Value value = Value::MakeVarchar(ToString(server_node->node_status()));
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
@@ -3936,7 +3937,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 
             ++column_id;
             {
-                Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node.ip_address_, server_node.port_));
+                Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->node_ip(), server_node->node_port()));
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
@@ -3952,8 +3953,8 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 
             ++column_id;
             {
-                // const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node.last_update_ts_);
-                const std::time_t t_c = server_node.last_update_ts_;
+                // const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node->last_update_ts_);
+                const std::time_t t_c = server_node->update_ts();
                 Value value = Value::MakeVarchar(std::ctime(&t_c));
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -4034,7 +4035,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
             status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, false, node_name);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to LEADER role");
-                if(status.code() == ErrorCode::kCantSwitchRole) {
+                if (status.code() == ErrorCode::kCantSwitchRole) {
                     // Just don't change the role
                     break;
                 }
@@ -4149,42 +4150,42 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     return query_result;
 }
 
-QueryResult AdminExecutor::CreateSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::CreateSnapshot(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport(fmt::format("Not support: create snapshot"));
     return query_result;
 }
 
-QueryResult AdminExecutor::ListSnapshots(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ListSnapshots(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport(fmt::format("Not support: list snapshots"));
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowSnapshot(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport(fmt::format("Not support: show snapshot"));
     return query_result;
 }
 
-QueryResult AdminExecutor::DeleteSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::DeleteSnapshot(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport(fmt::format("Not support: delete snapshot"));
     return query_result;
 }
 
-QueryResult AdminExecutor::ExportSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ExportSnapshot(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport(fmt::format("Not support: export snapshot"));
     return query_result;
 }
 
-QueryResult AdminExecutor::RecoverFromSnapshot(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::RecoverFromSnapshot(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport(fmt::format("Not support: recover from snapshot"));

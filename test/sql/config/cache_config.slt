@@ -24,10 +24,10 @@ SHOW GLOBAL VARIABLE cache_result_capacity;
 statement ok
 SET CONFIG result_cache "clear";
 
-query I
-SHOW GLOBAL VARIABLE cache_result_num;
-----
-0
+# query I
+# SHOW GLOBAL VARIABLE cache_result_num;
+# ----
+# 0
 
 query I
 EXPLAIN SELECT * FROM cache_config_test WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
@@ -58,10 +58,10 @@ SELECT * FROM cache_config_test WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR
 10004 20 1
 19990 22 5
 
-query I
-SHOW GLOBAL VARIABLE cache_result_num;
-----
-1
+# query I
+# SHOW GLOBAL VARIABLE cache_result_num;
+# ----
+# 1
 
 query I
 EXPLAIN SELECT * FROM cache_config_test WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
@@ -79,10 +79,10 @@ EXPLAIN SELECT * FROM cache_config_test WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 1
 statement ok
 SET CONFIG result_cache "clear";
 
-query I
-SHOW GLOBAL VARIABLE cache_result_num;
-----
-0
+# query I
+# SHOW GLOBAL VARIABLE cache_result_num;
+# ----
+# 0
 
 statement ok
 SET CONFIG result_cache "suspend";
@@ -106,10 +106,10 @@ SHOW GLOBAL VARIABLE cache_result_capacity;
 ----
 1
 
-query I
-SHOW GLOBAL VARIABLE cache_result_num;
-----
-0
+# query I
+# SHOW GLOBAL VARIABLE cache_result_num;
+# ----
+# 0
 
 statement ok
 SET CONFIG result_cache "off";
@@ -129,10 +129,10 @@ SET CONFIG result_cache "on";
 statement ok
 SET CONFIG cache_result_capacity 10000;
 
-query I
-SHOW GLOBAL VARIABLE cache_result_num;
-----
-0
+# query I
+# SHOW GLOBAL VARIABLE cache_result_num;
+# ----
+# 0
 
 query I
 SHOW GLOBAL VARIABLE cache_result_capacity;

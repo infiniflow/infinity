@@ -19,6 +19,7 @@ export module peer_task;
 import stl;
 import admin_statement;
 import global_resource_usage;
+import node_info;
 
 namespace infinity {
 
@@ -31,25 +32,6 @@ export enum class PeerTaskType {
     kLogSync,
     kChangeRole,
     kNewLeader,
-};
-
-export enum class NodeStatus { kAlive, kTimeout, kLostConnection, kRemoved, kInvalid };
-
-export String ToString(NodeStatus);
-
-export struct NodeInfo {
-    NodeRole node_role_{NodeRole::kUnInitialized};
-    NodeStatus node_status_{NodeStatus::kInvalid};
-    String node_name_{};
-    String ip_address_{};
-    i64 port_{};
-    i64 txn_timestamp_{};
-    u64 last_update_ts_{};
-    i64 leader_term_{};
-    i64 heartbeat_interval_{}; // provide by leader and used by follower and learner;
-    u64 heartbeat_count_{};    // given by leader to calculate how many heartbeat received on this node.
-    // u64 update_interval_{}; // seconds
-    // String from_{}; // Which node the information comes from.
 };
 
 export class PeerTask {

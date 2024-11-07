@@ -27,10 +27,12 @@ import wal_manager;
 import wal_entry;
 import admin_statement;
 import global_resource_usage;
+import node_info;
+import config;
 
 namespace infinity {
 
-ClusterManager::ClusterManager(Storage *storage) : storage_(storage) {
+ClusterManager::ClusterManager() {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("ClusterManager");
 #endif
@@ -48,60 +50,57 @@ ClusterManager::~ClusterManager() {
 #endif
 }
 
-void ClusterManager::InitAsAdmin() { current_node_role_ = NodeRole::kAdmin; }
+void ClusterManager::InitAsAdmin() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    current_node_role_ = NodeRole::kAdmin;
+}
 
-void ClusterManager::InitAsStandalone() { 
-    this_node_ = MakeShared<NodeInfo>();
-    this_node_->node_role_ = NodeRole::kStandalone;
-    this_node_->node_status_ = NodeStatus::kAlive;
+void ClusterManager::InitAsStandalone() {
+    std::unique_lock<std::mutex> lock(mutex_);
     current_node_role_ = NodeRole::kStandalone;
 }
 
 Status ClusterManager::InitAsLeader(const String &node_name) {
 
+    Config *config_ptr = InfinityContext::instance().config();
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+
     std::unique_lock<std::mutex> lock(mutex_);
     if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as leader error: already initialized.");
     }
-    this_node_ = MakeShared<NodeInfo>();
-    this_node_->node_role_ = NodeRole::kLeader;
-    this_node_->node_status_ = NodeStatus::kAlive;
-    this_node_->node_name_ = node_name;
-    this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
-    this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
 
-    auto now = std::chrono::system_clock::now();
-    auto time_since_epoch = now.time_since_epoch();
-    this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+    this_node_ = MakeShared<NodeInfo>(NodeRole::kLeader,
+                                      NodeStatus::kAlive,
+                                      node_name,
+                                      config_ptr->PeerServerIP(),
+                                      config_ptr->PeerServerPort(),
+                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
     current_node_role_ = NodeRole::kLeader;
-
     return Status::OK();
 }
 
 Status ClusterManager::InitAsFollower(const String &node_name, const String &leader_ip, i64 leader_port) {
 
+    Config *config_ptr = InfinityContext::instance().config();
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+
     std::unique_lock<std::mutex> lock(mutex_);
     if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as follower error: already initialized.");
     }
-    this_node_ = MakeShared<NodeInfo>();
-    this_node_->node_role_ = NodeRole::kFollower;
-    this_node_->node_status_ = NodeStatus::kAlive;
-    this_node_->node_name_ = node_name;
-    this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
-    this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
 
-    auto now = std::chrono::system_clock::now();
-    auto time_since_epoch = now.time_since_epoch();
-    this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+    this_node_ = MakeShared<NodeInfo>(NodeRole::kFollower,
+                                      NodeStatus::kAlive,
+                                      node_name,
+                                      config_ptr->PeerServerIP(),
+                                      config_ptr->PeerServerPort(),
+                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
-    leader_node_ = MakeShared<NodeInfo>();
-    leader_node_->node_role_ = NodeRole::kLeader;
-    leader_node_->node_status_ = NodeStatus::kInvalid;
-    leader_node_->ip_address_ = leader_ip;
-    leader_node_->port_ = leader_port;
-
+    leader_node_ = MakeShared<NodeInfo>(NodeRole::kLeader, leader_ip, leader_port);
     Status client_status = Status::OK();
     std::tie(client_to_leader_, client_status) = ClusterManager::ConnectToServerNoLock(node_name, leader_ip, leader_port);
     if (!client_status.ok()) {
@@ -115,26 +114,23 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
 
 Status ClusterManager::InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port) {
 
+    Config *config_ptr = InfinityContext::instance().config();
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+
     std::unique_lock<std::mutex> lock(mutex_);
     if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as learner error: already initialized.");
     }
-    this_node_ = MakeShared<NodeInfo>();
-    this_node_->node_role_ = NodeRole::kLearner;
-    this_node_->node_status_ = NodeStatus::kAlive;
-    this_node_->node_name_ = node_name;
-    this_node_->ip_address_ = InfinityContext::instance().config()->PeerServerIP();
-    this_node_->port_ = InfinityContext::instance().config()->PeerServerPort();
 
-    auto now = std::chrono::system_clock::now();
-    auto time_since_epoch = now.time_since_epoch();
-    this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+    this_node_ = MakeShared<NodeInfo>(NodeRole::kLearner,
+                                      NodeStatus::kAlive,
+                                      node_name,
+                                      config_ptr->PeerServerIP(),
+                                      config_ptr->PeerServerPort(),
+                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
-    leader_node_ = MakeShared<NodeInfo>();
-    leader_node_->node_role_ = NodeRole::kLeader;
-    leader_node_->node_status_ = NodeStatus::kInvalid;
-    leader_node_->ip_address_ = leader_ip;
-    leader_node_->port_ = leader_port;
+    leader_node_ = MakeShared<NodeInfo>(NodeRole::kLeader, leader_ip, leader_port);
 
     Status client_status = Status::OK();
     std::tie(client_to_leader_, client_status) = ClusterManager::ConnectToServerNoLock(node_name, leader_ip, leader_port);
@@ -194,9 +190,50 @@ Status ClusterManager::RegisterToLeader() {
     return status;
 }
 
+Status ClusterManager::RegisterToLeaderNoLock() {
+    // Register to leader, used by follower and learner
+    Storage *storage_ptr = InfinityContext::instance().storage();
+    SharedPtr<RegisterPeerTask> register_peer_task = nullptr;
+    if (storage_ptr->reader_init_phase() == ReaderInitPhase::kPhase2) {
+        register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name(),
+                                                          this_node_->node_role(),
+                                                          this_node_->node_ip(),
+                                                          this_node_->node_port(),
+                                                          storage_ptr->txn_manager()->CurrentTS());
+    } else {
+        register_peer_task =
+            MakeShared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
+    }
+
+    client_to_leader_->Send(register_peer_task);
+    register_peer_task->Wait();
+
+    Status status = Status::OK();
+    if (register_peer_task->error_code_ != 0) {
+        status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
+        status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
+        return status;
+    }
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+    leader_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+    leader_node_->set_node_name(register_peer_task->leader_name_);
+    leader_node_->set_node_status(NodeStatus::kAlive);
+    //    client_to_leader_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
+    // Start HB thread.
+    if (register_peer_task->heartbeat_interval_ == 0) {
+        leader_node_->set_heartbeat_interval(1000); // 1000 ms by default
+    } else {
+        leader_node_->set_heartbeat_interval(register_peer_task->heartbeat_interval_);
+    }
+
+    return status;
+}
+
 void ClusterManager::HeartBeatToLeaderThread() {
     // Heartbeat interval
-    auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval_);
+    auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval());
+    Storage *storage_ptr = InfinityContext::instance().storage();
     while (true) {
         std::unique_lock hb_lock(this->hb_mutex_);
         this->hb_cv_.wait_for(hb_lock, hb_interval, [&] { return !this->hb_running_; });
@@ -220,14 +257,16 @@ void ClusterManager::HeartBeatToLeaderThread() {
         SharedPtr<HeartBeatPeerTask> hb_task = nullptr;
         {
             std::unique_lock<std::mutex> cluster_manager_lock(mutex_);
-            this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
+            this_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count());
+
+            String this_node_name = this_node_->node_name();
+            NodeRole this_node_role = this_node_->node_role();
+            String this_node_ip = this_node_->node_ip();
+            i64 this_node_port = this_node_->node_port();
 
             // Send heartbeat
-            hb_task = MakeShared<HeartBeatPeerTask>(this_node_->node_name_,
-                                                    this_node_->node_role_,
-                                                    this_node_->ip_address_,
-                                                    this_node_->port_,
-                                                    storage_->txn_manager()->CurrentTS());
+            hb_task =
+                MakeShared<HeartBeatPeerTask>(this_node_name, this_node_role, this_node_ip, this_node_port, storage_ptr->txn_manager()->CurrentTS());
         }
         client_to_leader_->Send(hb_task);
         hb_task->Wait();
@@ -235,18 +274,18 @@ void ClusterManager::HeartBeatToLeaderThread() {
         if (hb_task->error_code_ != 0) {
             if (hb_task->error_code_ == (i64)(ErrorCode::kNotRegistered)) {
                 LOG_ERROR(fmt::format("Error to connect to leader: {}, {}:{}, error: {}",
-                                      leader_node_->node_name_,
-                                      leader_node_->ip_address_,
-                                      leader_node_->port_,
+                                      leader_node_->node_name(),
+                                      leader_node_->node_ip(),
+                                      leader_node_->node_port(),
                                       hb_task->error_message_));
-                leader_node_->node_status_ = hb_task->sender_status_;
+                leader_node_->set_node_status(hb_task->sender_status_);
             } else {
                 LOG_ERROR(fmt::format("Can't connect to leader: {}, {}:{}, error: {}",
-                                      leader_node_->node_name_,
-                                      leader_node_->ip_address_,
-                                      leader_node_->port_,
+                                      leader_node_->node_name(),
+                                      leader_node_->node_ip(),
+                                      leader_node_->node_port(),
                                       hb_task->error_message_));
-                leader_node_->node_status_ = NodeStatus::kTimeout;
+                leader_node_->set_node_status(NodeStatus::kTimeout);
             }
             continue;
         }
@@ -258,18 +297,18 @@ void ClusterManager::HeartBeatToLeaderThread() {
         {
             std::unique_lock<std::mutex> cluster_manager_lock(mutex_);
             // Update leader info
-            leader_node_->node_status_ = NodeStatus::kAlive;
-            leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count();
-            leader_node_->leader_term_ = hb_task->leader_term_;
+            leader_node_->set_node_status(NodeStatus::kAlive);
+            leader_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count());
+            leader_node_->set_leader_term(hb_task->leader_term_);
 
             // Update heartbeat sending count
-            ++this_node_->heartbeat_count_;
+            this_node_->heartbeat_count_increase();
 
             // Update the non-leader node info from leader
             UpdateNodeInfoNoLock(hb_task->other_nodes_);
 
             // Check if leader can't send message to this reader node
-            this_node_->node_status_ = hb_task->sender_status_;
+            this_node_->set_node_status(hb_task->sender_status_);
         }
     }
     return;
@@ -290,7 +329,7 @@ void ClusterManager::CheckHeartBeatThread() {
         UnrecoverableError(error_message);
     }
     // this_node_ is the leader;
-    auto hb_interval = std::chrono::milliseconds(this_node_->heartbeat_interval_);
+    auto hb_interval = std::chrono::milliseconds(this_node_->heartbeat_interval());
     while (true) {
         std::unique_lock hb_lock(this->hb_mutex_);
         this->hb_cv_.wait_for(hb_lock, hb_interval, [&] { return !this->hb_running_; });
@@ -301,12 +340,17 @@ void ClusterManager::CheckHeartBeatThread() {
 
         auto now = std::chrono::system_clock::now();
         auto time_since_epoch = now.time_since_epoch();
-        this_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+        this_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
-        for (auto &[node_name, node_info] : other_node_map_) {
-            if (node_info->node_status_ == NodeStatus::kAlive) {
-                if (node_info->last_update_ts_ + 2 * this_node_->heartbeat_interval_ < this_node_->last_update_ts_) {
-                    node_info->node_status_ = NodeStatus::kTimeout;
+        for (auto &[node_name, other_node] : other_node_map_) {
+            NodeStatus other_node_status = other_node->node_status();
+            if (other_node_status == NodeStatus::kAlive) {
+                u64 other_node_update_ts = other_node->update_ts();
+                u64 this_node_update_ts = this_node_->update_ts();
+                u64 this_node_hb_interval = this_node_->heartbeat_interval();
+
+                if (other_node_update_ts + 2 * this_node_hb_interval < this_node_update_ts) {
+                    other_node->set_node_status(NodeStatus::kTimeout);
                     LOG_INFO(fmt::format("Node {} is timeout", node_name));
                 }
             }
@@ -314,51 +358,12 @@ void ClusterManager::CheckHeartBeatThread() {
     }
 }
 
-Status ClusterManager::RegisterToLeaderNoLock() {
-    // Register to leader, used by follower and learner
-    SharedPtr<RegisterPeerTask> register_peer_task = nullptr;
-    if (storage_->reader_init_phase() == ReaderInitPhase::kPhase2) {
-        register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
-                                                          this_node_->node_role_,
-                                                          this_node_->ip_address_,
-                                                          this_node_->port_,
-                                                          storage_->txn_manager()->CurrentTS());
-    } else {
-        register_peer_task =
-            MakeShared<RegisterPeerTask>(this_node_->node_name_, this_node_->node_role_, this_node_->ip_address_, this_node_->port_, 0);
-    }
-
-    client_to_leader_->Send(register_peer_task);
-    register_peer_task->Wait();
-
-    Status status = Status::OK();
-    if (register_peer_task->error_code_ != 0) {
-        status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
-        status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
-        return status;
-    }
-    auto now = std::chrono::system_clock::now();
-    auto time_since_epoch = now.time_since_epoch();
-    leader_node_->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
-    leader_node_->node_name_ = register_peer_task->leader_name_;
-    leader_node_->node_status_ = NodeStatus::kAlive;
-    //    client_to_leader_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
-    // Start HB thread.
-    if (register_peer_task->heartbeat_interval_ == 0) {
-        leader_node_->heartbeat_interval_ = 1000; // 1000 ms by default
-    } else {
-        leader_node_->heartbeat_interval_ = register_peer_task->heartbeat_interval_;
-    }
-
-    return status;
-}
-
 Status ClusterManager::UnregisterToLeaderNoLock() {
     Status status = Status::OK();
     if (current_node_role_ == NodeRole::kFollower or current_node_role_ == NodeRole::kLearner) {
-        if (leader_node_->node_status_ == NodeStatus::kAlive) {
+        if (leader_node_->node_status() == NodeStatus::kAlive) {
             // Leader is alive, need to unregister
-            SharedPtr<UnregisterPeerTask> unregister_task = MakeShared<UnregisterPeerTask>(this_node_->node_name_);
+            SharedPtr<UnregisterPeerTask> unregister_task = MakeShared<UnregisterPeerTask>(this_node_->node_name());
             client_to_leader_->Send(unregister_task);
             unregister_task->Wait();
             if (unregister_task->error_code_ != 0) {
@@ -413,11 +418,13 @@ Status ClusterManager::GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
     }
 
     for (const auto &node_info_pair : other_node_map_) {
-        if (node_info_pair.second->node_role_ == NodeRole::kFollower && node_info_pair.second->node_status_ == NodeStatus::kAlive) {
+        NodeRole other_node_role = node_info_pair.second->node_role();
+        NodeStatus other_node_status = node_info_pair.second->node_status();
+        if (other_node_role == NodeRole::kFollower && other_node_status == NodeStatus::kAlive) {
             followers.emplace_back(node_info_pair.second);
             follower_clients.emplace_back(reader_client_map_[node_info_pair.first]);
         }
-        if (node_info_pair.second->node_role_ == NodeRole::kLearner && node_info_pair.second->node_status_ == NodeStatus::kAlive) {
+        if (other_node_role == NodeRole::kLearner && other_node_status == NodeStatus::kAlive) {
             learners.emplace_back(node_info_pair.second);
             learner_clients.emplace_back(reader_client_map_[node_info_pair.first]);
         }
@@ -426,8 +433,10 @@ Status ClusterManager::GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
     return Status::OK();
 }
 
-Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
+Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
     // Only used by Leader on follower/learner registration.
+
+    String other_node_name = other_node->node_name();
     {
         std::unique_lock<std::mutex> lock(mutex_);
         if (current_node_role_ != NodeRole::kLeader) {
@@ -436,22 +445,22 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
         }
 
         // Add by register
-        auto iter = other_node_map_.find(node_info->node_name_);
+        auto iter = other_node_map_.find(other_node_name);
         if (iter != other_node_map_.end()) {
             // Duplicated node
             // TODO: Update node info and not throw error.
-            return Status::DuplicateNode(node_info->node_name_);
+            return Status::DuplicateNode(other_node_name);
         }
     }
 
     // Connect to follower/learner server.
     auto [client_to_follower, client_status] =
-        ClusterManager::ConnectToServerNoLock(this_node_->node_name_, node_info->ip_address_, node_info->port_);
+        ClusterManager::ConnectToServerNoLock(this_node_->node_name(), other_node->node_ip(), other_node->node_port());
     if (!client_status.ok()) {
         return client_status;
     }
 
-    Status log_sending_status = SyncLogsOnRegistration(node_info, client_to_follower);
+    Status log_sending_status = SyncLogsOnRegistration(other_node, client_to_follower);
     if (log_sending_status.ok()) {
         std::unique_lock<std::mutex> lock(mutex_);
         if (current_node_role_ != NodeRole::kLeader) {
@@ -460,17 +469,17 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
         }
 
         // Add by register
-        auto iter = other_node_map_.find(node_info->node_name_);
+        auto iter = other_node_map_.find(other_node_name);
         if (iter == other_node_map_.end()) {
             // Not find, so add the node
-            other_node_map_.emplace(node_info->node_name_, node_info);
+            other_node_map_.emplace(other_node_name, other_node);
         } else {
             // Duplicated node
-            // TODO: If the exist node lost connection, or other malfunction, use new node_info to replace it.
-            return Status::DuplicateNode(node_info->node_name_);
+            // TODO: If the exist node lost connection, or other malfunction, use new other_node to replace it.
+            return Status::DuplicateNode(other_node_name);
         }
 
-        reader_client_map_.emplace(node_info->node_name_, client_to_follower);
+        reader_client_map_.emplace(other_node_name, client_to_follower);
     }
 
     return log_sending_status;
@@ -478,7 +487,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &node_info) {
 
 Status ClusterManager::RemoveNodeInfo(const String &node_name) {
     // Used by leader to remove node
-    if (node_name == this_node_->node_name_) {
+    if (node_name == this_node_->node_name()) {
         return Status::InvalidNodeRole(fmt::format("Can't remove current node: {}", node_name));
     }
 
@@ -492,7 +501,7 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
         std::unique_lock<std::mutex> lock(mutex_);
         auto node_iter = other_node_map_.find(node_name);
         if (node_iter != other_node_map_.end()) {
-            node_iter->second->node_status_ = NodeStatus::kRemoved;
+            node_iter->second->set_node_status(NodeStatus::kRemoved);
         } else {
             return Status::NotExistNode(node_name);
         }
@@ -540,7 +549,7 @@ Status ClusterManager::UpdateNodeByLeader(const String &node_name, UpdateNodeOp 
             }
             case UpdateNodeOp::kLostConnection: {
                 // Can't connect to the node
-                iter->second->node_status_ = NodeStatus::kLostConnection;
+                iter->second->set_node_status(NodeStatus::kLostConnection);
                 break;
             }
         }
@@ -581,29 +590,30 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
     }
 
     other_nodes.reserve(other_node_map_.size());
-    leader_term = this_node_->leader_term_;
+    leader_term = this_node_->leader_term();
     bool non_leader_node_found{false};
     for (const auto &node_info_pair : other_node_map_) {
         NodeInfo *other_node = node_info_pair.second.get();
-        if (other_node->node_name_ == non_leader_node->node_name_) {
-            if (other_node->ip_address_ != non_leader_node->ip_address_ or other_node->port_ != non_leader_node->port_) {
-                String error_message = fmt::format("Node {}, IP address: {} or port: {} is changed.",
-                                                   other_node->node_name_,
-                                                   other_node->ip_address_,
-                                                   other_node->port_);
+        String other_node_name = other_node->node_name();
+        String other_node_ip = other_node->node_ip();
+        i64 other_node_port = other_node->node_port();
+        if (other_node_name == non_leader_node->node_name()) {
+            if (other_node_ip != non_leader_node->node_ip() or other_node_port != non_leader_node->node_port()) {
+                String error_message =
+                    fmt::format("Node {}, IP address: {} or port: {} is changed.", other_node_name, other_node_ip, other_node->node_port());
                 sender_status = infinity_peer_server::NodeStatus::type::kTimeout;
-                return Status::NodeInfoUpdated(ToString(other_node->node_role_));
+                return Status::NodeInfoUpdated(ToString(other_node->node_role()));
             }
             // Found the node
-            switch (other_node->node_status_) {
+            switch (other_node->node_status()) {
                 case NodeStatus::kAlive:
                 case NodeStatus::kTimeout: {
                     // just update the timestamp
-                    other_node->txn_timestamp_ = non_leader_node->txn_timestamp_;
+                    other_node->set_txn_ts(non_leader_node->txn_ts());
                     auto now = std::chrono::system_clock::now();
                     auto time_since_epoch = now.time_since_epoch();
-                    other_node->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
-                    ++other_node->heartbeat_count_;
+                    other_node->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+                    other_node->heartbeat_count_increase();
                     sender_status = infinity_peer_server::NodeStatus::type::kAlive;
                     break;
                 }
@@ -613,9 +623,9 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
                 }
                 case NodeStatus::kLostConnection: {
                     LOG_ERROR(fmt::format("Node {} from {}:{} can't connected, but still can receive heartbeat.",
-                                          other_node->node_name_,
-                                          other_node->ip_address_,
-                                          other_node->port_));
+                                          other_node_name,
+                                          other_node_ip,
+                                          other_node_port));
                     sender_status = infinity_peer_server::NodeStatus::type::kLostConnection;
                     break;
                 }
@@ -627,12 +637,13 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
             non_leader_node_found = true;
         } else {
             infinity_peer_server::NodeInfo thrift_node_info;
-            thrift_node_info.node_name = other_node->node_name_;
-            thrift_node_info.node_ip = other_node->ip_address_;
-            thrift_node_info.node_port = other_node->port_;
-            thrift_node_info.txn_timestamp = other_node->txn_timestamp_;
-            thrift_node_info.hb_count = other_node->heartbeat_count_;
-            switch (other_node->node_role_) {
+            thrift_node_info.node_name = other_node_name;
+            thrift_node_info.node_ip = other_node_ip;
+            thrift_node_info.node_port = other_node_port;
+            thrift_node_info.txn_timestamp = other_node->txn_ts();
+            thrift_node_info.hb_count = other_node->heartbeat_count();
+            NodeRole other_node_role = other_node->node_role();
+            switch (other_node_role) {
                 case NodeRole::kLeader: {
                     thrift_node_info.node_type = infinity_peer_server::NodeType::kLeader;
                     break;
@@ -646,11 +657,12 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid node role of node: {}", other_node->node_name_);
-                    return Status::InvalidNodeRole(ToString(other_node->node_role_));
+                    String error_message = fmt::format("Invalid node role of node: {}", other_node_name);
+                    return Status::InvalidNodeRole(ToString(other_node_role));
                 }
             }
-            switch (other_node->node_status_) {
+            NodeStatus other_node_status = other_node->node_status();
+            switch (other_node_status) {
                 case NodeStatus::kAlive: {
                     thrift_node_info.node_status = infinity_peer_server::NodeStatus::kAlive;
                     break;
@@ -660,7 +672,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid node status of node: {}", other_node->node_name_);
+                    String error_message = fmt::format("Invalid node status : {} of node: {}", ToString(other_node_status), other_node_name);
                     return Status::InvalidNodeStatus(error_message);
                 }
             }
@@ -671,7 +683,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
 
     if (!non_leader_node_found) {
         sender_status = infinity_peer_server::NodeStatus::type::kLostConnection;
-        return Status::NotRegistered(non_leader_node->node_name_);
+        return Status::NotRegistered(non_leader_node->node_name());
     }
 
     return Status::OK();
@@ -682,12 +694,14 @@ Status ClusterManager::SyncLogsOnRegistration(const SharedPtr<NodeInfo> &non_lea
 
     // Check leader WAL and get the diff log
     LOG_TRACE("Leader will get the log diff");
-    WalManager *wal_manager = storage_->wal_manager();
-    Vector<SharedPtr<String>> wal_strings = wal_manager->GetDiffWalEntryString(non_leader_node->txn_timestamp_);
+    Storage *storage_ptr = InfinityContext::instance().storage();
+    WalManager *wal_manager = storage_ptr->wal_manager();
+    Vector<SharedPtr<String>> wal_strings = wal_manager->GetDiffWalEntryString(non_leader_node->txn_ts());
 
     // Leader will send the WALs
-    LOG_TRACE(fmt::format("Leader will send the diff logs count: {} to {} synchronously", wal_strings.size(), non_leader_node->node_name_));
-    return SendLogs(non_leader_node->node_name_, peer_client, wal_strings, true, true);
+    String non_leader_node_name = non_leader_node->node_name();
+    LOG_TRACE(fmt::format("Leader will send the diff logs count: {} to {} synchronously", wal_strings.size(), non_leader_node_name));
+    return SendLogs(non_leader_node_name, peer_client, wal_strings, true, true);
 }
 
 void ClusterManager::PrepareLogs(const SharedPtr<String> &log_string) { logs_to_sync_.emplace_back(log_string); }
@@ -716,7 +730,7 @@ Status ClusterManager::SyncLogs() {
 
         // Replicate logs to follower
         for (SizeT idx = 0; idx < follower_count; ++idx) {
-            const String &follower_name = followers[idx]->node_name_;
+            const String &follower_name = followers[idx]->node_name();
             if (!sent_nodes.contains(follower_name)) {
                 status = SendLogs(follower_name, follower_clients[idx], logs_to_sync_, true, false);
                 if (status.ok()) {
@@ -727,7 +741,7 @@ Status ClusterManager::SyncLogs() {
 
         // Replicate logs to learner
         for (SizeT idx = 0; idx < learner_count; ++idx) {
-            const String &learner_name = learners[idx]->node_name_;
+            const String &learner_name = learners[idx]->node_name();
             if (!sent_nodes.contains(learner_name)) {
                 status = SendLogs(learner_name, learner_clients[idx], logs_to_sync_, false, false);
                 if (status.ok()) {
@@ -768,19 +782,19 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
     auto time_since_epoch = now.time_since_epoch();
 
     for (const SharedPtr<NodeInfo> &node_info : info_of_nodes) {
-        auto iter = other_node_map_.find(node_info->node_name_);
+        auto iter = other_node_map_.find(node_info->node_name());
         if (iter == other_node_map_.end()) {
-            node_info->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
-            other_node_map_.emplace(node_info->node_name_, node_info);
+            node_info->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+            other_node_map_.emplace(node_info->node_name(), node_info);
         } else {
-            iter->second->txn_timestamp_ = node_info->txn_timestamp_;
-            iter->second->ip_address_ = node_info->ip_address_;
-            iter->second->port_ = node_info->port_;
-            iter->second->node_role_ = node_info->node_role_;
-            iter->second->node_status_ = node_info->node_status_;
-            iter->second->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+            iter->second->set_txn_ts(node_info->txn_ts());
+            iter->second->set_node_ip(node_info->node_ip());
+            iter->second->set_node_port(node_info->node_port());
+            iter->second->set_node_role(node_info->node_role());
+            iter->second->set_node_status(node_info->node_status());
+            iter->second->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
-            exist_node_name_map[node_info->node_name_] = true;
+            exist_node_name_map[node_info->node_name()] = true;
         }
     }
 
@@ -794,7 +808,8 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
 }
 
 Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
-    WalManager *wal_manager = storage_->wal_manager();
+    Storage *storage_ptr = InfinityContext::instance().storage();
+    WalManager *wal_manager = storage_ptr->wal_manager();
     TransactionID last_txn_id = 0;
     TxnTimeStamp last_commit_ts = 0;
     for (auto &log_str : synced_logs) {
@@ -808,14 +823,15 @@ Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
     }
 
     LOG_INFO(fmt::format("Replicated from leader: latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
-    storage_->catalog()->next_txn_id_ = last_txn_id;
-    storage_->wal_manager()->UpdateCommitState(last_commit_ts, 0);
-    storage_->txn_manager()->SetStartTS(last_commit_ts);
+    storage_ptr->catalog()->next_txn_id_ = last_txn_id;
+    storage_ptr->wal_manager()->UpdateCommitState(last_commit_ts, 0);
+    storage_ptr->txn_manager()->SetStartTS(last_commit_ts);
     return Status::OK();
 }
 
 Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
-    WalManager *wal_manager = storage_->wal_manager();
+    Storage *storage_ptr = InfinityContext::instance().storage();
+    WalManager *wal_manager = storage_ptr->wal_manager();
     bool is_checkpoint = true;
     TxnTimeStamp last_commit_ts;
     for (auto &log_str : synced_logs) {
@@ -838,27 +854,27 @@ Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
         last_commit_ts = entry->commit_ts_;
     }
 
-    storage_->SetReaderStorageContinue(last_commit_ts + 1);
+    storage_ptr->SetReaderStorageContinue(last_commit_ts + 1);
     return Status::OK();
 }
 
-Vector<NodeInfo> ClusterManager::ListNodes() const {
+Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
     // ADMIN SHOW NODES;
     std::unique_lock<std::mutex> lock(mutex_);
-    Vector<NodeInfo> result;
+    Vector<SharedPtr<NodeInfo>> result;
     result.reserve(other_node_map_.size() + 2);
-    result.emplace_back(*this_node_);
+    result.emplace_back(this_node_);
     if (current_node_role_ == NodeRole::kFollower or current_node_role_ == NodeRole::kLearner) {
-        result.emplace_back(*leader_node_);
+        result.emplace_back(leader_node_);
     }
     for (const auto &node_info_pair : other_node_map_) {
-        result.emplace_back(*(node_info_pair.second));
+        result.emplace_back(node_info_pair.second);
     }
 
     return result;
 }
 
-Tuple<Status, NodeInfo> ClusterManager::GetNodeInfoByName(const String &node_name) const {
+Tuple<Status, SharedPtr<NodeInfo>> ClusterManager::GetNodeInfoByName(const String &node_name) const {
     std::unique_lock<std::mutex> lock(mutex_);
 
     if (current_node_role_ == NodeRole::kAdmin or current_node_role_ == NodeRole::kStandalone or current_node_role_ == NodeRole::kUnInitialized) {
@@ -867,28 +883,28 @@ Tuple<Status, NodeInfo> ClusterManager::GetNodeInfoByName(const String &node_nam
     }
 
     if (current_node_role_ == NodeRole::kFollower or current_node_role_ == NodeRole::kLearner) {
-        if (node_name == leader_node_->node_name_) {
+        if (node_name == leader_node_->node_name()) {
             // Show leader
-            return {Status::OK(), *leader_node_};
+            return {Status::OK(), leader_node_};
         }
     }
 
-    if (node_name == this_node_->node_name_) {
+    if (node_name == this_node_->node_name()) {
         // Show this node
-        return {Status::OK(), *this_node_};
+        return {Status::OK(), this_node_};
     }
 
     auto iter = other_node_map_.find(node_name);
     if (iter == other_node_map_.end()) {
-        return {Status::NotExistNode(node_name), NodeInfo()};
+        return {Status::NotExistNode(node_name), nullptr};
     }
-    return {Status::OK(), *(iter->second)};
+    return {Status::OK(), iter->second};
 }
 
-NodeInfo ClusterManager::ThisNode() const {
+SharedPtr<NodeInfo> ClusterManager::ThisNode() const {
     // ADMIN SHOW NODE;
     std::unique_lock<std::mutex> lock(mutex_);
-    return *this_node_;
+    return this_node_;
 }
 
 } // namespace infinity
