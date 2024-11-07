@@ -117,7 +117,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
             if (cluster_manager_ != nullptr) {
                 UnrecoverableError("Cluster manager was initialized before");
             }
-            cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
+            cluster_manager_ = MakeUnique<ClusterManager>();
             cluster_manager_->InitAsAdmin();
             storage_->SetStorageMode(StorageMode::kAdmin);
             StartThriftServers();
@@ -159,7 +159,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                         storage_->SetStorageMode(StorageMode::kAdmin);
                         cluster_manager_->UnInit(from_leader);
                         cluster_manager_.reset();
-                        cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
+                        cluster_manager_ = MakeUnique<ClusterManager>();
                         cluster_manager_->InitAsAdmin();
                         return init_status;
                     }
@@ -177,7 +177,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                         storage_->SetStorageMode(StorageMode::kAdmin);
                         cluster_manager_->UnInit(from_leader);
                         cluster_manager_.reset();
-                        cluster_manager_ = MakeUnique<ClusterManager>(storage_.get());
+                        cluster_manager_ = MakeUnique<ClusterManager>();
                         cluster_manager_->InitAsAdmin();
                         return init_status;
                     }

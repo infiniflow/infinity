@@ -31,7 +31,7 @@ export enum class UpdateNodeOp { kRemove, kLostConnection };
 
 export class ClusterManager {
 public:
-    explicit ClusterManager(Storage *storage);
+    ClusterManager();
     ~ClusterManager();
 
 public:
@@ -108,7 +108,6 @@ public:
     NodeRole GetNodeRole() const { return current_node_role_; }
 
 private:
-    Storage *storage_{};
     mutable std::mutex mutex_;
 
     SharedPtr<NodeInfo> leader_node_; // Used by follower / learner

@@ -30,7 +30,7 @@ import global_resource_usage;
 
 namespace infinity {
 
-ClusterManager::ClusterManager(Storage *storage) : storage_(storage) {
+ClusterManager::ClusterManager() {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("ClusterManager");
 #endif
@@ -192,6 +192,7 @@ Status ClusterManager::RegisterToLeader() {
 void ClusterManager::HeartBeatToLeaderThread() {
     // Heartbeat interval
     auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval_);
+    Storage *storage_ptr = InfinityContext::instance().storage();
     while (true) {
         std::unique_lock hb_lock(this->hb_mutex_);
         this->hb_cv_.wait_for(hb_lock, hb_interval, [&] { return !this->hb_running_; });
@@ -222,7 +223,7 @@ void ClusterManager::HeartBeatToLeaderThread() {
                                                     this_node_->node_role_,
                                                     this_node_->ip_address_,
                                                     this_node_->port_,
-                                                    storage_->txn_manager()->CurrentTS());
+                                                    storage_ptr->txn_manager()->CurrentTS());
         }
         client_to_leader_->Send(hb_task);
         hb_task->Wait();
@@ -311,13 +312,14 @@ void ClusterManager::CheckHeartBeatThread() {
 
 Status ClusterManager::RegisterToLeaderNoLock() {
     // Register to leader, used by follower and learner
+    Storage *storage_ptr = InfinityContext::instance().storage();
     SharedPtr<RegisterPeerTask> register_peer_task = nullptr;
-    if (storage_->reader_init_phase() == ReaderInitPhase::kPhase2) {
+    if (storage_ptr->reader_init_phase() == ReaderInitPhase::kPhase2) {
         register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name_,
                                                           this_node_->node_role_,
                                                           this_node_->ip_address_,
                                                           this_node_->port_,
-                                                          storage_->txn_manager()->CurrentTS());
+                                                          storage_ptr->txn_manager()->CurrentTS());
     } else {
         register_peer_task =
             MakeShared<RegisterPeerTask>(this_node_->node_name_, this_node_->node_role_, this_node_->ip_address_, this_node_->port_, 0);
@@ -677,7 +679,8 @@ Status ClusterManager::SyncLogsOnRegistration(const SharedPtr<NodeInfo> &non_lea
 
     // Check leader WAL and get the diff log
     LOG_TRACE("Leader will get the log diff");
-    WalManager *wal_manager = storage_->wal_manager();
+    Storage *storage_ptr = InfinityContext::instance().storage();
+    WalManager *wal_manager = storage_ptr->wal_manager();
     Vector<SharedPtr<String>> wal_strings = wal_manager->GetDiffWalEntryString(non_leader_node->txn_timestamp_);
 
     // Leader will send the WALs
@@ -789,7 +792,8 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
 }
 
 Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
-    WalManager *wal_manager = storage_->wal_manager();
+    Storage *storage_ptr = InfinityContext::instance().storage();
+    WalManager *wal_manager = storage_ptr->wal_manager();
     TransactionID last_txn_id = 0;
     TxnTimeStamp last_commit_ts = 0;
     for (auto &log_str : synced_logs) {
@@ -803,14 +807,15 @@ Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
     }
 
     LOG_INFO(fmt::format("Replicated from leader: latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
-    storage_->catalog()->next_txn_id_ = last_txn_id;
-    storage_->wal_manager()->UpdateCommitState(last_commit_ts, 0);
-    storage_->txn_manager()->SetStartTS(last_commit_ts);
+    storage_ptr->catalog()->next_txn_id_ = last_txn_id;
+    storage_ptr->wal_manager()->UpdateCommitState(last_commit_ts, 0);
+    storage_ptr->txn_manager()->SetStartTS(last_commit_ts);
     return Status::OK();
 }
 
 Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
-    WalManager *wal_manager = storage_->wal_manager();
+    Storage *storage_ptr = InfinityContext::instance().storage();
+    WalManager *wal_manager = storage_ptr->wal_manager();
     bool is_checkpoint = true;
     TxnTimeStamp last_commit_ts;
     for (auto &log_str : synced_logs) {
@@ -833,7 +838,7 @@ Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
         last_commit_ts = entry->commit_ts_;
     }
 
-    storage_->SetReaderStorageContinue(last_commit_ts + 1);
+    storage_ptr->SetReaderStorageContinue(last_commit_ts + 1);
     return Status::OK();
 }
 
