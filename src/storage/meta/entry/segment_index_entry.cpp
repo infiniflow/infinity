@@ -290,9 +290,15 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
 
 void SegmentIndexEntry::MemIndexCommit() {
     const IndexBase *index_base = table_index_entry_->index_base();
-    if (index_base->index_type_ != IndexType::kFullText || memory_indexer_.get() == nullptr)
+    if (index_base->index_type_ != IndexType::kFullText)
         return;
-    memory_indexer_->Commit();
+    {
+        // memory index writer by insert / dump. 
+        std::lock_guard lck_m(mem_index_locker_);
+        if (mem_indexer != nullptr) {
+            memory_indexer_->Commit();
+        }
+    }
 }
 void SegmentIndexEntry::MemIndexWaitInflightTasks() {
     const IndexBase *index_base = table_index_entry_->index_base();
@@ -304,6 +310,8 @@ void SegmentIndexEntry::MemIndexWaitInflightTasks() {
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *dump_size) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();
+
+    // Dump prevent insert now
     std::lock_guard lck_m(mem_index_locker_);
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
